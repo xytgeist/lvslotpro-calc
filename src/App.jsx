@@ -103,7 +103,7 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // RIGOROUS CERTAINTY-EQUIVALENT MODEL
+  // Last model you said felt pretty good
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -116,11 +116,10 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const maxDrawdown = 300 * Math.max(0, (1888 - counter) / (1888 - 1300))
+    const EV_MULTIPLIER = 2.6
+    const COUNTER_BONUS = 0.18
 
-    const lambda = 0.75   // Risk-aversion coefficient based on your volatility
-
-    let walkAway = Math.round(remainingEV - lambda * maxDrawdown)
+    let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1300) * COUNTER_BONUS)
 
     return Math.max(60, Math.min(230, walkAway))
   }
@@ -319,7 +318,7 @@ function App() {
         {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Certainty-equivalent optimal stopping (rigorous model)</p>
+          <p className="text-gray-400 text-sm mb-4">Certainty-equivalent optimal stopping</p>
           
           <div className="relative h-64 bg-gray-950 rounded-2xl overflow-hidden border border-gray-700 mb-4">
             <svg 
