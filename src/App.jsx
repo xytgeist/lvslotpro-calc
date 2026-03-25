@@ -136,7 +136,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Logo + Title directly after icon, stretched to fill width */}
+        {/* Logo + Title */}
         <div className="flex items-center mb-6">
           <img 
             src="/phoenix-link-logo.png" 
@@ -293,25 +293,25 @@ function App() {
             </div>
           </div>
         </div>
-		
-		        {/* ==================== WALK-AWAY ADVISOR ==================== */}
+
+        {/* ==================== WALK-AWAY ADVISOR GRAPH ==================== */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Recommended profit (in bets) to consider locking in gains</p>
+          <p className="text-gray-400 text-sm mb-4">Recommended bets up to consider locking in gains at current counter</p>
           
           <div className="relative h-64 bg-gray-950 rounded-2xl overflow-hidden border border-gray-700 mb-4">
             <svg viewBox="0 0 400 240" className="w-full h-full">
-              {/* Grid lines */}
+              {/* Grid */}
               <line x1="40" y1="20" x2="40" y2="220" stroke="#374151" strokeWidth="1"/>
               <line x1="40" y1="220" x2="380" y2="220" stroke="#374151" strokeWidth="1"/>
               
-              {/* Y-axis labels */}
+              {/* Y labels */}
               <text x="25" y="35" fontSize="11" fill="#9CA3AF" textAnchor="end">300</text>
               <text x="25" y="95" fontSize="11" fill="#9CA3AF" textAnchor="end">200</text>
               <text x="25" y="155" fontSize="11" fill="#9CA3AF" textAnchor="end">100</text>
               <text x="25" y="215" fontSize="11" fill="#9CA3AF" textAnchor="end">0</text>
 
-              {/* X-axis labels */}
+              {/* X labels */}
               <text x="45" y="235" fontSize="11" fill="#9CA3AF">1300</text>
               <text x="150" y="235" fontSize="11" fill="#9CA3AF">1500</text>
               <text x="255" y="235" fontSize="11" fill="#9CA3AF">1700</text>
@@ -326,7 +326,7 @@ function App() {
                 strokeLinejoin="round"
               />
 
-              {/* Current counter vertical line */}
+              {/* Current counter indicator */}
               <line 
                 x1={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} 
                 y1="20" 
@@ -349,10 +349,10 @@ function App() {
             </svg>
           </div>
 
-          <div className="text-center bg-gray-800 rounded-2xl p-4">
+          <div className="text-center bg-gray-800 rounded-2xl p-4 text-sm">
             At counter <span className="text-orange-400 font-semibold">{currentX}</span>, 
             consider walking away around 
-            <span className="text-green-400 font-bold text-lg"> +{Math.round(300 * (1888 - currentX) / 588 + 65)} bets</span>
+            <span className="text-green-400 font-bold"> +{Math.round(300 * (1888 - currentX) / 588 + 65)} bets</span>
           </div>
         </div>
 
