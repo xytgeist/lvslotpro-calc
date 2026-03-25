@@ -103,7 +103,7 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Walk-Away Model - named multiplier for easy tuning
+  // Walk-Away Model - tuned for your feedback
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -116,12 +116,12 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const EV_MULTIPLIER = 4.0     // ← We increased this to push low-counter numbers higher
-    const COUNTER_BONUS = 0.20
+    const EV_MULTIPLIER = 3.5      // ← Balanced for low-counter buffer
+    const COUNTER_BONUS = 0.22     // ← Helps scaling without overshooting high end
 
     let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1300) * COUNTER_BONUS)
 
-    return Math.max(60, Math.min(230, walkAway))
+    return Math.max(65, Math.min(230, walkAway))
   }
 
   const handleGraphHover = (e) => {
@@ -179,7 +179,7 @@ function App() {
           </h1>
         </div>
 
-        {/* Inputs - unchanged */}
+        {/* Inputs */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -223,7 +223,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings - unchanged */}
+        {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
