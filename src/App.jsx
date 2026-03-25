@@ -114,7 +114,7 @@ function App() {
     calculate()
   }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Dynamic walk-away calculation based on current counter, EV, and risk
+  // Correct dynamic walk-away recommendation
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -122,16 +122,19 @@ function App() {
     const avgTrig = avgTrigger
 
     const pCounter = inc / avgTrig
-    const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)   // Bonus value
+    const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)
 
-    const spinsToBonus = Math.max(0, (avgTrig - counter) / inc)
-    const remainingEV = B - (1 - oRTP) * spinsToBonus
+    const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
+    const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    // Conservative walk-away: take profit when remaining EV is less than ~60% of max drawdown risk
-    const maxDrawdown = 300 * (1888 - counter) / (1888 - 1300)
-    const walkAwayPoint = Math.round(maxDrawdown * 0.55 + remainingEV * 0.8)
+    // Max drawdown scales linearly down as counter increases
+    const maxDrawdown = 300 * Math.max(0, (1888 - counter) / (1888 - 1300))
 
-    return Math.max(80, Math.round(walkAwayPoint))
+    // Conservative walk-away: stop when remaining EV is small relative to risk
+    // Lower counter = higher risk = lower walk-away threshold
+    const walkAway = Math.round(maxDrawdown * 0.45 + remainingEV * 1.2)
+
+    return Math.max(60, Math.min(250, walkAway))   // reasonable bounds
   }
 
   // Interactive graph hover handler
@@ -368,9 +371,9 @@ function App() {
               <text x="255" y="235" fontSize="11" fill="#9CA3AF">1700</text>
               <text x="360" y="235" fontSize="11" fill="#9CA3AF">1888</text>
 
-              {/* Walk-away curve */}
+              {/* Walk-away curve - adjusted to be lower at low counters */}
               <polyline 
-                points="45,205 80,190 120,170 160,150 200,130 240,115 280,102 320,92 360,85"
+                points="45,195 90,175 135,155 180,135 225,118 270,105 315,93 360,85"
                 fill="none" 
                 stroke="#f97316" 
                 strokeWidth="4" 
