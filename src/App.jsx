@@ -136,27 +136,25 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Logo + Title with black fill + orange outline/glow */}
-        <div className="flex flex-col items-center gap-2 mb-6">
+        {/* Logo + Title - Logo on left, thinner orange outline */}
+        <div className="flex items-center gap-4 mb-6">
           <img 
             src="/phoenix-link-logo.png" 
             alt="Phoenix Link" 
-            className="w-14 h-14 rounded-xl object-contain"
+            className="w-12 h-12 flex-shrink-0 rounded-xl object-contain"
           />
           <h1 
-            className="text-4xl font-black tracking-[-2px] text-black"
+            className="text-3xl font-black tracking-tighter text-black"
             style={{
               textShadow: `
-                -3px -3px 0 #f97316,
-                3px -3px 0 #f97316,
-                -3px 3px 0 #f97316,
-                3px 3px 0 #f97316,
-                0 0 15px #f97316,
-                0 0 25px #f97316
+                -2px -2px 0 #f97316,
+                2px -2px 0 #f97316,
+                -2px 2px 0 #f97316,
+                2px 2px 0 #f97316
               `
             }}
           >
-            PHOENIX LINK EV CALC
+            PHOENIX LINK<br />EV CALC
           </h1>
         </div>
 
