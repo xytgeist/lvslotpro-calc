@@ -114,7 +114,8 @@ function App() {
     calculate()
   }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Correct dynamic walk-away recommendation
+  // Corrected dynamic walk-away recommendation
+  // Lower at low counters (high risk), higher at high counters (low risk)
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -130,11 +131,11 @@ function App() {
     // Max drawdown scales linearly down as counter increases
     const maxDrawdown = 300 * Math.max(0, (1888 - counter) / (1888 - 1300))
 
-    // Conservative walk-away: stop when remaining EV is small relative to risk
-    // Lower counter = higher risk = lower walk-away threshold
-    const walkAway = Math.round(maxDrawdown * 0.45 + remainingEV * 1.2)
+    // Walk-away point = base + scaling with counter - risk penalty
+    // This should now be lower at low counters and higher at high counters
+    const walkAway = Math.round(75 + (counter - 1300) * 0.25 - maxDrawdown * 0.28)
 
-    return Math.max(60, Math.min(250, walkAway))   // reasonable bounds
+    return Math.max(70, Math.min(220, walkAway))
   }
 
   // Interactive graph hover handler
@@ -371,9 +372,9 @@ function App() {
               <text x="255" y="235" fontSize="11" fill="#9CA3AF">1700</text>
               <text x="360" y="235" fontSize="11" fill="#9CA3AF">1888</text>
 
-              {/* Walk-away curve - adjusted to be lower at low counters */}
+              {/* Walk-away curve */}
               <polyline 
-                points="45,195 90,175 135,155 180,135 225,118 270,105 315,93 360,85"
+                points="45,205 80,190 120,170 160,150 200,130 240,115 280,102 320,92 360,85"
                 fill="none" 
                 stroke="#f97316" 
                 strokeWidth="4" 
