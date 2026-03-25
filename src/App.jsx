@@ -151,17 +151,13 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Header with Phoenix Link Logo + Dragon-esque Title */}
+        {/* Header with Logo Only */}
         <div className="flex items-center gap-3 mb-6">
           <img 
             src="/phoenix-link-logo.png" 
             alt="Phoenix Link Logo" 
             className="w-12 h-12 rounded-xl object-contain"
           />
-          <h1 className="text-4xl font-black tracking-tighter text-orange-500 drop-shadow-[0_0_8px_#f97316] 
-                         [text-shadow:2px_2px_0_#000,-2px_-2px_0_#000,2px_-2px_0_#000,-2px_2px_0_#000]">
-            PHOENIX LINK EV CALC
-          </h1>
         </div>
 
         {/* Very Compact Top Input Frame */}
@@ -180,14 +176,15 @@ function App() {
             />
           </div>
 
-          <div>
-            <label className="block text-gray-400 mb-1 text-xs">Bet Size ($)</label>
+          <div className="relative">
+            <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
+            <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400">$</div>
             <input 
               type="number" 
               step="0.01" 
               value={betSize} 
               onChange={(e) => setBetSize(parseFloat(e.target.value) || 25)} 
-              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
             />
           </div>
 
