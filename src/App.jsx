@@ -27,9 +27,9 @@ function App() {
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
-  const [evWorst, setEvWorst] = useState(0)
+  const [evFullRun, setEvFullRun] = useState(0)
   const [beAvg, setBeAvg] = useState(0)
-  const [beWorst, setBeWorst] = useState(0)
+  const [beFullRun, setBeFullRun] = useState(0)
 
   const [evTable, setEvTable] = useState([])
 
@@ -38,22 +38,11 @@ function App() {
     let baseOverall = 91
     let baseBase = 28
 
-    if (denom <= 0.02) {
-      baseOverall = 88
-      baseBase = 25
-    } else if (denom === 0.05) {
-      baseOverall = 88.25
-      baseBase = 25
-    } else if (denom === 0.10) {
-      baseOverall = 88.4
-      baseBase = 25
-    } else if (denom === 0.25) {
-      baseOverall = 88.6
-      baseBase = 25
-    } else if (denom > 1) {
-      baseOverall = 91.5
-      baseBase = 28
-    }
+    if (denom <= 0.02) { baseOverall = 88; baseBase = 25 }
+    else if (denom === 0.05) { baseOverall = 88.25; baseBase = 25 }
+    else if (denom === 0.10) { baseOverall = 88.4; baseBase = 25 }
+    else if (denom === 0.25) { baseOverall = 88.6; baseBase = 25 }
+    else if (denom > 1) { baseOverall = 91.5; baseBase = 28 }
 
     const finalOverall = maxMajor ? baseOverall + 0.5 : baseOverall
     setOverallRTP(finalOverall)
@@ -78,42 +67,38 @@ function App() {
     const avgTrig = avgTrigger
     const must = mustHit
     const X = currentX || 0
-    const bet = betSize
+    const bet = betSize || 25
 
     const pTotal = 1 / freq
     const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / pTotal
-    const effRTP = oRTP - pCounter * B
-    const he = 1 - effRTP
+    const he = 1 - (oRTP - pCounter * B)
 
     const spinsAvg = Math.max(0, (avgTrig - X) / inc)
-    const spinsWorst = Math.max(0, (must - X) / inc)
+    const spinsFull = Math.max(0, (must - X) / inc)
 
     const avgEV = B - he * spinsAvg
-    const worstEV = B - he * spinsWorst
+    const fullEV = B - he * spinsFull
 
     const breakevenAvg = Math.round(avgTrig - (B / he) * inc)
-    const breakevenWorst = Math.round(must - (B / he) * inc)
+    const breakevenFull = Math.round(must - (B / he) * inc)
 
     setEvAvg(avgEV)
-    setEvWorst(worstEV)
+    setEvFullRun(fullEV)
     setBeAvg(breakevenAvg)
-    setBeWorst(breakevenWorst)
+    setBeFullRun(breakevenFull)
 
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
       const avgSpins = Math.max(0, (avgTrig - c) / inc)
-      const worstSpins = Math.max(0, (must - c) / inc)
-
-      const avgEV = B - he * avgSpins
-      const worstEV = B - he * worstSpins
+      const fullSpins = Math.max(0, (must - c) / inc)
 
       table.push({
         counter: c,
-        avgEV,
-        worstEV,
-        avgDollar: avgEV * bet,
-        worstDollar: worstEV * bet
+        avgEV: B - he * avgSpins,
+        fullEV: B - he * fullSpins,
+        avgDollar: (B - he * avgSpins) * bet,
+        fullDollar: (B - he * fullSpins) * bet
       })
     }
     setEvTable(table)
@@ -151,16 +136,22 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Header with Logo Only */}
-        <div className="flex items-center gap-3 mb-6">
+        {/* Logo + Title */}
+        <div className="flex flex-col items-center gap-2 mb-6">
           <img 
             src="/phoenix-link-logo.png" 
-            alt="Phoenix Link Logo" 
-            className="w-12 h-12 rounded-xl object-contain"
+            alt="Phoenix Link" 
+            className="w-14 h-14 rounded-xl object-contain"
           />
+          <h1 className="text-3xl font-black tracking-tighter text-orange-500 drop-shadow-lg"
+              style={{ 
+                textShadow: '0 0 12px rgba(249, 115, 22, 0.6), 0 0 20px rgba(249, 115, 22, 0.4)'
+              }}>
+            PHOENIX LINK EV CALC
+          </h1>
         </div>
 
-        {/* Compact Top Input Frame - Bet Size and Denom side by side */}
+        {/* Compact Top Input Frame */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -265,7 +256,6 @@ function App() {
 
         {/* Results Frame */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          {/* Current EV */}
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-2xl">
@@ -275,17 +265,15 @@ function App() {
             </div>
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
-              <div className={`text-3xl font-bold ${evWorst >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evWorst.toFixed(1)}×</div>
-              <div className="text-sm">${(evWorst * betSize).toFixed(2)}</div>
+              <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
+              <div className="text-sm">${(evFullRun * betSize).toFixed(2)}</div>
             </div>
           </div>
 
-          {/* Play / Not Play Banner */}
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
 
-          {/* Break Even Points */}
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -294,7 +282,7 @@ function App() {
             </div>
             <div>
               <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
-              <div className="text-4xl font-bold text-yellow-400">{beWorst}</div>
+              <div className="text-4xl font-bold text-yellow-400">{beFullRun}</div>
             </div>
           </div>
         </div>
@@ -318,8 +306,8 @@ function App() {
                     <td className={`py-4 px-3 font-bold ${row.avgEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {row.avgEV.toFixed(1)} | ${row.avgDollar.toFixed(0)}
                     </td>
-                    <td className={`py-4 px-5 font-bold ${row.worstEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {row.worstEV.toFixed(1)} | ${row.worstDollar.toFixed(0)}
+                    <td className={`py-4 px-5 font-bold ${row.fullEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {row.fullEV.toFixed(1)} | ${row.fullDollar.toFixed(0)}
                     </td>
                   </tr>
                 ))}
