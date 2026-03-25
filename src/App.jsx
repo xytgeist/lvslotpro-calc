@@ -114,6 +114,26 @@ function App() {
     calculate()
   }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
+  // Dynamic walk-away calculation based on current counter, EV, and risk
+  const getRecommendedWalkAway = (counter) => {
+    const oRTP = overallRTP / 100
+    const bRTP = baseRTP / 100
+    const inc = increment
+    const avgTrig = avgTrigger
+
+    const pCounter = inc / avgTrig
+    const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)   // Bonus value
+
+    const spinsToBonus = Math.max(0, (avgTrig - counter) / inc)
+    const remainingEV = B - (1 - oRTP) * spinsToBonus
+
+    // Conservative walk-away: take profit when remaining EV is less than ~60% of max drawdown risk
+    const maxDrawdown = 300 * (1888 - counter) / (1888 - 1300)
+    const walkAwayPoint = Math.round(maxDrawdown * 0.55 + remainingEV * 0.8)
+
+    return Math.max(80, Math.round(walkAwayPoint))
+  }
+
   // Interactive graph hover handler
   const handleGraphHover = (e) => {
     const svg = e.currentTarget
@@ -124,7 +144,7 @@ function App() {
     const x = clientX - rect.left
     const normalizedX = Math.max(0, Math.min(1, (x - 40) / 340))
     const counter = Math.round(1300 + normalizedX * 588)
-    const profit = Math.round(90 + (counter - 1300) * 0.18)
+    const profit = getRecommendedWalkAway(counter)
 
     setHoverCounter(counter)
     setHoverProfit(profit)
@@ -348,9 +368,9 @@ function App() {
               <text x="255" y="235" fontSize="11" fill="#9CA3AF">1700</text>
               <text x="360" y="235" fontSize="11" fill="#9CA3AF">1888</text>
 
-              {/* Correctly aligned walk-away curve */}
+              {/* Walk-away curve */}
               <polyline 
-                points="45,200 90,182 135,164 180,146 225,128 270,112 315,98 360,85"
+                points="45,205 80,190 120,170 160,150 200,130 240,115 280,102 320,92 360,85"
                 fill="none" 
                 stroke="#f97316" 
                 strokeWidth="4" 
@@ -397,7 +417,7 @@ function App() {
             {hoverCounter ? (
               <>At counter <span className="text-yellow-400 font-semibold">{hoverCounter}</span>, walk away around <span className="text-green-400 font-bold">+{hoverProfit} bets</span></>
             ) : (
-              <>At counter <span className="text-orange-400 font-semibold">{currentX}</span>, consider walking away around <span className="text-green-400 font-bold">+{Math.round(90 + (currentX - 1300) * 0.18)} bets</span></>
+              <>At counter <span className="text-orange-400 font-semibold">{currentX}</span>, consider walking away around <span className="text-green-400 font-bold">+{getRecommendedWalkAway(currentX)} bets</span></>
             )}
           </div>
         </div>
