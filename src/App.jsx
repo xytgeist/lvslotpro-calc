@@ -116,8 +116,8 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const EV_MULTIPLIER = 2.2     // Lower = less aggressive
-    const COUNTER_BONUS = 0.15
+    const EV_MULTIPLIER = 2.6     // This is the main buffer factor
+    const COUNTER_BONUS = 0.18
 
     let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1300) * COUNTER_BONUS)
 
