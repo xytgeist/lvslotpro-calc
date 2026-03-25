@@ -28,7 +28,7 @@ function App() {
 
   const [evAvg, setEvAvg] = useState(0)
   const [evFullRun, setEvFullRun] = useState(0)
-  const [currentRTP, setCurrentRTP] = useState(0)   // RTP until Counter Bonus hits
+  const [currentRTP, setCurrentRTP] = useState(0)
   const [beAvg, setBeAvg] = useState(0)
   const [beFullRun, setBeFullRun] = useState(0)
 
@@ -74,21 +74,22 @@ function App() {
     const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / pTotal   // Bonus value in bets
 
-    const spinsToAvgBonus = Math.max(0, (avgTrig - X) / inc)
-    const spinsToFullRun = Math.max(0, (must - X) / inc)
+    const spinsToAvg = Math.max(0, (avgTrig - X) / inc)
+    const spinsToFull = Math.max(0, (must - X) / inc)
 
-    const avgEV = B - (1 - oRTP) * spinsToAvgBonus
-    const fullEV = B - (1 - oRTP) * spinsToFullRun
+    const he = 1 - oRTP
 
-    // === CORRECT Current RTP until Counter Bonus hits ===
-    // This is exactly what you asked for
+    const avgEV = B - he * spinsToAvg
+    const fullEV = B - he * spinsToFull
+
+    // Correct Current RTP until the Counter Bonus is hit
     let currentRTPPercent = oRTP * 100
-    if (spinsToAvgBonus > 0) {
-      currentRTPPercent = ((bRTP * spinsToAvgBonus + B) / spinsToAvgBonus) * 100
+    if (spinsToAvg > 0) {
+      currentRTPPercent = ((bRTP * spinsToAvg + B) / spinsToAvg) * 100
     }
 
-    const breakevenAvg = Math.round(avgTrig - (B / (1 - oRTP)) * inc)
-    const breakevenFull = Math.round(must - (B / (1 - oRTP)) * inc)
+    const breakevenAvg = Math.round(avgTrig - (B / he) * inc)
+    const breakevenFull = Math.round(must - (B / he) * inc)
 
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
@@ -98,15 +99,15 @@ function App() {
 
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
-      const avgSpins = Math.max(0, (avgTrig - c) / inc)
-      const fullSpins = Math.max(0, (must - c) / inc)
+      const sAvg = Math.max(0, (avgTrig - c) / inc)
+      const sFull = Math.max(0, (must - c) / inc)
 
       table.push({
         counter: c,
-        avgEV: B - (1 - oRTP) * avgSpins,
-        fullEV: B - (1 - oRTP) * fullSpins,
-        avgDollar: (B - (1 - oRTP) * avgSpins) * bet,
-        fullDollar: (B - (1 - oRTP) * fullSpins) * bet
+        avgEV: B - he * sAvg,
+        fullEV: B - he * sFull,
+        avgDollar: (B - he * sAvg) * bet,
+        fullDollar: (B - he * sFull) * bet
       })
     }
     setEvTable(table)
@@ -183,7 +184,6 @@ function App() {
               <div className="text-sm">${(evFullRun * betSize).toFixed(2)}</div>
             </div>
 
-            {/* Corrected Current RTP until Counter Bonus hits */}
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Current RTP</div>
               <div className={`text-3xl font-bold ${currentRTP >= 100 ? 'text-green-400' : 'text-orange-400'}`}>
@@ -210,7 +210,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings Dropdown (unchanged) */}
+        {/* Advanced Settings Dropdown */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button 
             onClick={() => setShowAdvanced(!showAdvanced)}
