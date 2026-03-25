@@ -42,12 +42,10 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // New: test counter for quick walk-away checking
   const [testCounter, setTestCounter] = useState(1400)
-
-  // New: live hover state for finger/mouse drag on graph
   const [hoverCounter, setHoverCounter] = useState(null)
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
+  const [showInfoModal, setShowInfoModal] = useState(false)
 
   // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
@@ -71,7 +69,6 @@ function App() {
   }
   // =====================================================================
 
-  // Chart data
   const chartData = {
     labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
     datasets: [{
@@ -124,7 +121,7 @@ function App() {
     },
     plugins: {
       legend: { display: false },
-      tooltip: { enabled: false }, // we use custom display instead
+      tooltip: { enabled: false },
     }
   }
 
@@ -340,12 +337,19 @@ function App() {
           </div>
         </div>
 
-        {/* ==================== WALK-AWAY ADVISOR ==================== */}
+        {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Softer S-curve • finger-drag or hover for live values</p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
+            <button 
+              onClick={() => setShowInfoModal(true)}
+              className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors"
+            >
+              ℹ️
+            </button>
+          </div>
 
-          {/* Quick Test Counter Input */}
+          {/* Quick Test Counter */}
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
@@ -367,7 +371,7 @@ function App() {
             </div>
           </div>
 
-          {/* Real Chart with finger/mouse interactivity */}
+          {/* Chart */}
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
             <Line 
               data={chartData} 
@@ -375,7 +379,7 @@ function App() {
             />
           </div>
 
-          {/* Live hover / touch display */}
+          {/* Live display */}
           <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
             {hoverCounter !== null ? (
               <>
@@ -420,6 +424,38 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
+            <h3 className="text-xl font-semibold text-orange-400 mb-4">Walk-Away Advisor</h3>
+            
+            <div className="text-gray-300 text-[15px] leading-relaxed space-y-4">
+              <p>
+                This tool recommends the profit level (in bets) at which you should consider walking away from the machine, 
+                even if you're still in positive EV.
+              </p>
+              <p>
+                Because Phoenix Link is extremely volatile, big wins are rare and drawdowns of 100–300 bets are common. 
+                The advisor uses your current counter, remaining expected value, and a risk-adjusted S-curve to suggest 
+                a "lock in" point that balances greed and bankroll protection.
+              </p>
+              <p className="text-orange-300">
+                Mathematically, it combines remainingEV with a logistic curve that starts conservative at low counters 
+                (high risk) and becomes more lenient as you approach the must-hit (lower risk).
+              </p>
+            </div>
+
+            <button 
+              onClick={() => setShowInfoModal(false)}
+              className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
