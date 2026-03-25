@@ -42,7 +42,7 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // Walk-Away calculation
+  // ====================== CURVED WALK-AWAY FORMULA ======================
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -55,24 +55,31 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    return Math.round(remainingEV * 3.8 + (counter - 1400) * 0.22)
-  }
+    // Curved formula - steeper at low counters, flattens as counter rises
+    const progress = Math.max(0, (counter - 1300) / 588)   // 0 at 1300, 1 at 1888
+    const curveBonus = Math.pow(progress, 1.55) * 92       // creates the curve
 
-  // Generate chart data
+    let walkAway = Math.round(remainingEV * 3.4 + curveBonus)
+
+    return Math.max(70, Math.min(240, walkAway))
+  }
+  // =====================================================================
+
+  // Generate chart data using the curved formula
   const chartData = {
-    labels: Array.from({ length: 20 }, (_, i) => 1300 + i * 30),
+    labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
     datasets: [{
       label: 'Recommended Walk-Away',
-      data: Array.from({ length: 20 }, (_, i) => {
-        const counter = 1300 + i * 30
+      data: Array.from({ length: 21 }, (_, i) => {
+        const counter = 1300 + i * 28
         return getRecommendedWalkAway(counter)
       }),
       borderColor: '#f97316',
-      backgroundColor: 'rgba(249, 115, 22, 0.1)',
-      tension: 0.3,
-      borderWidth: 3,
+      backgroundColor: 'rgba(249, 115, 22, 0.08)',
+      tension: 0.4,
+      borderWidth: 3.5,
       pointRadius: 3,
-      pointHoverRadius: 6,
+      pointHoverRadius: 7,
     }]
   }
 
@@ -83,10 +90,10 @@ function App() {
       x: {
         title: { display: true, text: 'Counter', color: '#9CA3AF' },
         grid: { color: '#374151' },
-        ticks: { color: '#9CA3AF' }
+        ticks: { color: '#9CA3AF', maxTicksLimit: 8 }
       },
       y: {
-        title: { display: true, text: 'Walk-Away Bets', color: '#9CA3AF' },
+        title: { display: true, text: 'Walk-Away (Bets)', color: '#9CA3AF' },
         grid: { color: '#374151' },
         ticks: { color: '#9CA3AF' },
         min: 0,
@@ -97,11 +104,26 @@ function App() {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx) => `+${ctx.raw} bets`
+          label: (ctx) => `Walk-away: +${Math.round(ctx.raw)} bets`
         }
       }
     }
   }
+
+  // Auto RTP adjustment
+  useEffect(() => {
+    let baseOverall = 91
+    let baseBase = 28
+    if (denom <= 0.02) { baseOverall = 88; baseBase = 25 }
+    else if (denom === 0.05) { baseOverall = 88.25; baseBase = 25 }
+    else if (denom === 0.10) { baseOverall = 88.4; baseBase = 25 }
+    else if (denom === 0.25) { baseOverall = 88.6; baseBase = 25 }
+    else if (denom > 1) { baseOverall = 91.5; baseBase = 28 }
+
+    const finalOverall = maxMajor ? baseOverall + 0.5 : baseOverall
+    setOverallRTP(finalOverall)
+    setBaseRTP(baseBase)
+  }, [denom, maxMajor])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
@@ -300,10 +322,10 @@ function App() {
           </div>
         </div>
 
-        {/* Real Graph - Walk-Away Advisor */}
+        {/* Walk-Away Advisor with Real Curved Graph */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Plotted line: Counter vs Recommended Walk-Away</p>
+          <p className="text-gray-400 text-sm mb-4">Curved recommendation (higher buffer at low counters)</p>
           
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
             <Line 
