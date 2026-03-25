@@ -192,15 +192,26 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
+  // Updated handleSignUp with proper email redirect
+  const handleSignUp = async () => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: 'https://lvslotpro.com'   // Change this if your domain is different
+      }
+    })
+
+    if (error) {
+      alert(error.message)
+    } else {
+      alert('Account created successfully! Please check your email and click the confirmation link to activate your account.')
+    }
+  }
+
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) alert(error.message)
-  }
-
-  const handleSignUp = async () => {
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) alert(error.message)
-    else alert('Check your email to confirm your account!')
   }
 
   if (!user) {
@@ -230,7 +241,7 @@ function App() {
           </h1>
         </div>
 
-        {/* Main Counter Input - fixed deletion behavior */}
+        {/* Inputs */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -276,7 +287,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings - unchanged */}
+        {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -312,7 +323,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Break Even - unchanged */}
+        {/* Current EV + Break Even */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -351,7 +362,7 @@ function App() {
             </button>
           </div>
 
-          {/* Fixed Test Counter Input */}
+          {/* Test Counter */}
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
@@ -429,7 +440,7 @@ function App() {
         </div>
       </div>
 
-      {/* Info Modal - unchanged from last version */}
+      {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
