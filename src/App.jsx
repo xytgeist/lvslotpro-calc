@@ -348,9 +348,9 @@ function App() {
               <text x="255" y="235" fontSize="11" fill="#9CA3AF">1700</text>
               <text x="360" y="235" fontSize="11" fill="#9CA3AF">1888</text>
 
-              {/* Walk-away curve */}
+              {/* Correctly aligned walk-away curve */}
               <polyline 
-                points="45,195 90,175 135,155 180,135 225,118 270,105 315,93 360,85"
+                points="45,200 90,182 135,164 180,146 225,128 270,112 315,98 360,85"
                 fill="none" 
                 stroke="#f97316" 
                 strokeWidth="4" 
