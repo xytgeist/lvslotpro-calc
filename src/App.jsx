@@ -103,7 +103,7 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Clean walk-away model with named multiplier
+  // Walk-Away Model with named multiplier (easy to tweak)
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -116,8 +116,8 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const EV_MULTIPLIER = 2.8   // This is the buffer factor we discussed
-    const COUNTER_BONUS = 0.25
+    const EV_MULTIPLIER = 3.2     // Higher = more conservative (bigger buffer)
+    const COUNTER_BONUS = 0.20
 
     let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1300) * COUNTER_BONUS)
 
