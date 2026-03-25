@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Line } from 'react-chartjs-2'
 import {
@@ -42,22 +42,66 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  const chartRef = useRef(null)
+  // Walk-Away calculation
+  const getRecommendedWalkAway = (counter) => {
+    const oRTP = overallRTP / 100
+    const bRTP = baseRTP / 100
+    const inc = increment
+    const avgTrig = avgTrigger
 
-  // Auto-adjust RTPs
-  useEffect(() => {
-    let baseOverall = 91
-    let baseBase = 28
-    if (denom <= 0.02) { baseOverall = 88; baseBase = 25 }
-    else if (denom === 0.05) { baseOverall = 88.25; baseBase = 25 }
-    else if (denom === 0.10) { baseOverall = 88.4; baseBase = 25 }
-    else if (denom === 0.25) { baseOverall = 88.6; baseBase = 25 }
-    else if (denom > 1) { baseOverall = 91.5; baseBase = 28 }
+    const pCounter = inc / avgTrig
+    const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)
 
-    const finalOverall = maxMajor ? baseOverall + 0.5 : baseOverall
-    setOverallRTP(finalOverall)
-    setBaseRTP(baseBase)
-  }, [denom, maxMajor])
+    const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
+    const remainingEV = B - (1 - oRTP) * spinsRemaining
+
+    return Math.round(remainingEV * 3.8 + (counter - 1400) * 0.22)
+  }
+
+  // Generate chart data
+  const chartData = {
+    labels: Array.from({ length: 20 }, (_, i) => 1300 + i * 30),
+    datasets: [{
+      label: 'Recommended Walk-Away',
+      data: Array.from({ length: 20 }, (_, i) => {
+        const counter = 1300 + i * 30
+        return getRecommendedWalkAway(counter)
+      }),
+      borderColor: '#f97316',
+      backgroundColor: 'rgba(249, 115, 22, 0.1)',
+      tension: 0.3,
+      borderWidth: 3,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+    }]
+  }
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        title: { display: true, text: 'Counter', color: '#9CA3AF' },
+        grid: { color: '#374151' },
+        ticks: { color: '#9CA3AF' }
+      },
+      y: {
+        title: { display: true, text: 'Walk-Away Bets', color: '#9CA3AF' },
+        grid: { color: '#374151' },
+        ticks: { color: '#9CA3AF' },
+        min: 0,
+        max: 250
+      }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `+${ctx.raw} bets`
+        }
+      }
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
@@ -111,70 +155,6 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Walk-Away calculation (simple and stable)
-  const getRecommendedWalkAway = (counter) => {
-    const oRTP = overallRTP / 100
-    const bRTP = baseRTP / 100
-    const inc = increment
-    const avgTrig = avgTrigger
-
-    const pCounter = inc / avgTrig
-    const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)
-
-    const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
-    const remainingEV = B - (1 - oRTP) * spinsRemaining
-
-    const walkAway = Math.round(remainingEV * 3.8 + (counter - 1400) * 0.22)
-    return Math.max(70, Math.min(230, walkAway))
-  }
-
-  // Generate data for the real graph
-  const chartData = {
-    labels: Array.from({ length: 20 }, (_, i) => 1300 + i * 30), // 1300 to 1870
-    datasets: [
-      {
-        label: 'Recommended Walk-Away',
-        data: Array.from({ length: 20 }, (_, i) => {
-          const counter = 1300 + i * 30
-          return getRecommendedWalkAway(counter)
-        }),
-        borderColor: '#f97316',
-        backgroundColor: 'rgba(249, 115, 22, 0.1)',
-        tension: 0.3,
-        borderWidth: 3,
-        pointRadius: 4,
-        pointHoverRadius: 7,
-      },
-    ],
-  }
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        title: { display: true, text: 'Counter', color: '#9CA3AF' },
-        grid: { color: '#374151' },
-        ticks: { color: '#9CA3AF' },
-      },
-      y: {
-        title: { display: true, text: 'Walk-Away (Bets)', color: '#9CA3AF' },
-        grid: { color: '#374151' },
-        ticks: { color: '#9CA3AF' },
-        min: 0,
-        max: 250,
-      },
-    },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (context) => `Walk-away: +${context.raw} bets`,
-        },
-      },
-    },
-  }
-
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) alert(error.message)
@@ -213,25 +193,132 @@ function App() {
           </h1>
         </div>
 
-        {/* Your existing inputs, advanced, current EV, break even, and table sections go here */}
-        {/* (I'm keeping them exactly as they were in your last working version) */}
-
-        {/* Walk-Away Advisor with REAL GRAPH */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Real plotted line — counter vs recommended walk-away</p>
-          
-          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4">
-            <Line data={chartData} options={chartOptions} ref={chartRef} />
+        {/* Inputs */}
+        <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
+          <div>
+            <label className="block text-gray-400 mb-1 text-xs">Counter</label>
+            <input 
+              type="text" inputMode="numeric" value={currentX} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setCurrentX(val === '' ? '' : parseInt(val, 10));
+              }} 
+              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
+            />
           </div>
 
-          <div className="text-center bg-gray-800 rounded-2xl p-4 text-sm">
-            Current counter <span className="text-orange-400 font-semibold">{currentX}</span> — 
-            Recommended walk-away <span className="text-green-400 font-bold">+{getRecommendedWalkAway(currentX)} bets</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="relative">
+              <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
+              <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
+              <input type="number" step="0.01" value={betSize} 
+                onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
+              />
+            </div>
+            <div>
+              <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
+              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} 
+                className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
+                <option value={0.01}>$0.01</option>
+                <option value={0.02}>$0.02</option>
+                <option value={0.05}>$0.05</option>
+                <option value={0.10}>$0.10</option>
+                <option value={0.25}>$0.25</option>
+                <option value={1}>$1</option>
+                <option value={2}>$2</option>
+                <option value={5}>$5</option>
+                <option value={10}>$10</option>
+                <option value={25}>$25</option>
+                <option value={50}>$50</option>
+                <option value={100}>$100</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* EV Table (unchanged) */}
+        {/* Advanced Settings */}
+        <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
+            <span className="text-base font-semibold">Advanced Settings</span>
+            <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
+          </button>
+          {showAdvanced && (
+            <div className="p-4 pt-0 space-y-4 border-t border-gray-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Max Major</span>
+                <button onClick={() => setMaxMajor(!maxMajor)} className={`px-6 py-2 rounded-xl font-semibold text-sm ${maxMajor ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
+                  {maxMajor ? 'YES' : 'NO'}
+                </button>
+              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
+                <input type="number" step="0.01" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Base RTP (%)</label>
+                <input type="number" step="0.01" value={baseRTP} onChange={(e) => setBaseRTP(parseFloat(e.target.value) || 28)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
+                <input type="number" step="0.01" value={increment} onChange={(e) => setIncrement(parseFloat(e.target.value) || 1.1)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Avg Spins to Bonus</label>
+                <input type="number" value={allBonusFreq} onChange={(e) => setAllBonusFreq(parseFloat(e.target.value) || 80)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
+                <input type="number" value={avgTrigger} onChange={(e) => setAvgTrigger(parseFloat(e.target.value) || 1800)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
+                <input type="number" value={mustHit} onChange={(e) => setMustHit(parseFloat(e.target.value) || 1888)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Current EV + Break Even */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-gray-800 p-4 rounded-2xl">
+              <div className="text-gray-400 text-sm">Average Case</div>
+              <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
+              <div className="text-sm">${(evAvg * betSize).toFixed(2)}</div>
+            </div>
+            <div className="bg-gray-800 p-4 rounded-2xl">
+              <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
+              <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
+              <div className="text-sm">${(evFullRun * betSize).toFixed(2)}</div>
+            </div>
+          </div>
+
+          <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
+          </div>
+
+          <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
+            <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
+          </div>
+        </div>
+
+        {/* Real Graph - Walk-Away Advisor */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
+          <p className="text-gray-400 text-sm mb-4">Plotted line: Counter vs Recommended Walk-Away</p>
+          
+          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
+            <Line 
+              data={chartData} 
+              options={chartOptions} 
+            />
+          </div>
+
+          <div className="text-center bg-gray-800 rounded-2xl p-4 text-sm">
+            At counter <span className="text-orange-400 font-semibold">{currentX}</span>, 
+            consider walking away around <span className="text-green-400 font-bold">+{getRecommendedWalkAway(currentX)} bets</span>
+          </div>
+        </div>
+
+        {/* EV Table */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
           <div className="overflow-x-auto">
