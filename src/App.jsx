@@ -103,7 +103,7 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // FIXED & RESPONSIVE WALK-AWAY MODEL
+  // Clean walk-away model with named multiplier
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -116,16 +116,10 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const remainingVol = 170 * Math.sqrt(Math.max(1, spinsRemaining) / 80)
-    const maxDrawdown = 300 * Math.max(0, (1888 - counter) / (1888 - 1300))
+    const EV_MULTIPLIER = 2.8   // This is the buffer factor we discussed
+    const COUNTER_BONUS = 0.25
 
-    const effectiveRisk = 0.55 * remainingVol + 0.45 * maxDrawdown
-    const riskAversion = 0.58
-
-    // Strong EV weight + clear counter scaling so it rises properly
-    let walkAway = Math.round(
-      remainingEV * 2.1 - riskAversion * effectiveRisk + (counter - 1300) * 0.18
-    )
+    let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1300) * COUNTER_BONUS)
 
     return Math.max(60, Math.min(230, walkAway))
   }
@@ -314,7 +308,15 @@ function App() {
 
               <polyline points="45,205 80,190 120,170 160,150 200,130 240,115 280,102 320,92 360,85" fill="none" stroke="#f97316" strokeWidth="4" strokeLinejoin="round" />
 
-              <line x1={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} y1="20" x2={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} y2="220" stroke="#22c55e" strokeWidth="2" strokeDasharray="5 3" />
+              <line 
+                x1={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} 
+                y1="20" 
+                x2={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} 
+                y2="220" 
+                stroke="#22c55e" 
+                strokeWidth="2" 
+                strokeDasharray="5 3"
+              />
 
               {hoverCounter && (
                 <>
