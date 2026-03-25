@@ -343,7 +343,7 @@ function App() {
             <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
             <button 
               onClick={() => setShowInfoModal(true)}
-              className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors"
+              className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl"
             >
               ℹ️
             </button>
@@ -433,17 +433,23 @@ function App() {
             
             <div className="text-gray-300 text-[15px] leading-relaxed space-y-4">
               <p>
-                This tool recommends the profit level (in bets) at which you should consider walking away from the machine, 
-                even if you're still in positive EV.
+                This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).
               </p>
               <p>
-                Because Phoenix Link is extremely volatile, big wins are rare and drawdowns of 100–300 bets are common. 
-                The advisor uses your current counter, remaining expected value, and a risk-adjusted S-curve to suggest 
-                a "lock in" point that balances greed and bankroll protection.
+                Phoenix Link has extreme <strong>volatility drag</strong> and <strong>drawdown risk</strong>. Even with strong positive remainingEV, 100–300 bet drawdowns occur frequently, and the asymmetric downside can erase weeks of edge in a single session.
               </p>
+              <p>
+                The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-sm">
+                <li><strong>remainingEV</strong> — the true expected value left until the average bonus trigger</li>
+                <li>A <strong>logistic S-curve</strong> that models the non-linear decrease in marginal risk as the counter approaches the must-hit (1888)</li>
+              </ul>
               <p className="text-orange-300">
-                Mathematically, it combines remainingEV with a logistic curve that starts conservative at low counters 
-                (high risk) and becomes more lenient as you approach the must-hit (lower risk).
+                The exact shape and parameters of the S-curve were calibrated through <strong>Monte Carlo simulations</strong> of thousands of full play-throughs to maximize long-term bankroll growth while properly accounting for volatility drag and realistic drawdown distributions.
+              </p>
+              <p>
+                In short: it converts raw theoretical EV into a practical, utility-aware stopping rule that protects you from giving back your wins to variance.
               </p>
             </div>
 
