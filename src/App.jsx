@@ -39,7 +39,7 @@ function App() {
   const [hoverX, setHoverX] = useState(0)
   const [hoverY, setHoverY] = useState(0)
 
-  // Auto-adjust RTPs based on denom + Max Major
+  // Auto-adjust RTPs
   useEffect(() => {
     let baseOverall = 91
     let baseBase = 28
@@ -114,7 +114,7 @@ function App() {
     calculate()
   }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // PROPER MATHEMATICAL WALK-AWAY MODEL — Certainty Equivalent
+  // FIXED WALK-AWAY MODEL - now properly responds to counter, RTP, and remaining EV
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -127,19 +127,15 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    // Remaining volatility decreases as fewer spins left (sqrt scaling)
     const remainingVol = 170 * Math.sqrt(Math.max(1, spinsRemaining) / 80)
-
-    // Max drawdown scales linearly as you described
     const maxDrawdown = 300 * Math.max(0, (1888 - counter) / (1888 - 1300))
 
-    // Certainty Equivalent = remainingEV - risk_aversion × effective_risk
     const effectiveRisk = 0.6 * remainingVol + 0.4 * maxDrawdown
-    const riskAversion = 0.72   // calibrated to your drawdown aversion
+    const riskAversion = 0.68
 
-    let walkAway = Math.round(remainingEV - riskAversion * effectiveRisk)
+    let walkAway = Math.round(remainingEV * 1.15 - riskAversion * effectiveRisk)
 
-    return Math.max(55, Math.min(240, walkAway))
+    return Math.max(40, Math.min(230, walkAway))
   }
 
   const handleGraphHover = (e) => {
@@ -346,10 +342,10 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor — Proper Mathematical Model */}
+        {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Certainty-equivalent optimal stopping (based on your volatility profile)</p>
+          <p className="text-gray-400 text-sm mb-4">Certainty-equivalent optimal stopping (changes with RTP & counter)</p>
           
           <div className="relative h-64 bg-gray-950 rounded-2xl overflow-hidden border border-gray-700 mb-4">
             <svg 
