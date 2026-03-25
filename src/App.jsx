@@ -116,10 +116,10 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const EV_MULTIPLIER = 3.85   // Tuned for good low-counter buffer
-    const COUNTER_BONUS = 0.19
+    const EV_MULTIPLIER = 4.2
+    const COUNTER_BONUS = 0.18   // gentler ramp
 
-    let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1300) * COUNTER_BONUS)
+    let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1400) * COUNTER_BONUS)
 
     return Math.max(65, Math.min(230, walkAway))
   }
