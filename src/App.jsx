@@ -136,21 +136,21 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Logo + Stretched Title - 25% bigger font */}
-        <div className="flex items-center gap-4 mb-6">
+        {/* Logo + Title directly after icon, stretched to fill width */}
+        <div className="flex items-center mb-6">
           <img 
             src="/phoenix-link-logo.png" 
             alt="Phoenix Link" 
-            className="w-12 h-12 flex-shrink-0 rounded-xl object-contain"
+            className="w-12 h-12 flex-shrink-0 rounded-xl object-contain mr-3"
           />
           <h1 
-            className="flex-1 text-[34px] font-black tracking-[-1.8px] text-black text-center"
+            className="flex-1 text-[29px] font-black tracking-[-1.6px] text-black"
             style={{
               textShadow: `
-                -1.8px -1.8px 0 #f97316,
-                 1.8px -1.8px 0 #f97316,
-                -1.8px  1.8px 0 #f97316,
-                 1.8px  1.8px 0 #f97316
+                -1.6px -1.6px 0 #f97316,
+                 1.6px -1.6px 0 #f97316,
+                -1.6px  1.6px 0 #f97316,
+                 1.6px  1.6px 0 #f97316
               `
             }}
           >
