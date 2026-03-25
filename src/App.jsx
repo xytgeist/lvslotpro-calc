@@ -11,12 +11,10 @@ function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
-  // Main inputs
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
 
-  // Advanced settings
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
   const [baseRTP, setBaseRTP] = useState(28)
@@ -33,7 +31,6 @@ function App() {
 
   const [evTable, setEvTable] = useState([])
 
-  // Walk-Away Advisor hover states
   const [hoverCounter, setHoverCounter] = useState(null)
   const [hoverProfit, setHoverProfit] = useState(0)
   const [hoverX, setHoverX] = useState(0)
@@ -43,7 +40,6 @@ function App() {
   useEffect(() => {
     let baseOverall = 91
     let baseBase = 28
-
     if (denom <= 0.02) { baseOverall = 88; baseBase = 25 }
     else if (denom === 0.05) { baseOverall = 88.25; baseBase = 25 }
     else if (denom === 0.10) { baseOverall = 88.4; baseBase = 25 }
@@ -57,11 +53,7 @@ function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null)
-    })
-
+    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => setUser(session?.user ?? null))
     return () => listener.subscription.unsubscribe()
   }, [])
 
@@ -114,7 +106,7 @@ function App() {
     calculate()
   }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // FIXED WALK-AWAY MODEL - now properly responds to counter, RTP, and remaining EV
+  // FIXED WALK-AWAY MODEL - now clearly changes with counter and RTP
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -131,11 +123,12 @@ function App() {
     const maxDrawdown = 300 * Math.max(0, (1888 - counter) / (1888 - 1300))
 
     const effectiveRisk = 0.6 * remainingVol + 0.4 * maxDrawdown
-    const riskAversion = 0.68
+    const riskAversion = 0.65
 
-    let walkAway = Math.round(remainingEV * 1.15 - riskAversion * effectiveRisk)
+    // Stronger positive weight on remainingEV + small counter bonus
+    let walkAway = Math.round(remainingEV * 1.4 - riskAversion * effectiveRisk + (counter - 1300) * 0.08)
 
-    return Math.max(40, Math.min(230, walkAway))
+    return Math.max(50, Math.min(230, walkAway))
   }
 
   const handleGraphHover = (e) => {
@@ -309,7 +302,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV Results */}
+        {/* Current EV */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -345,7 +338,7 @@ function App() {
         {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Certainty-equivalent optimal stopping (changes with RTP & counter)</p>
+          <p className="text-gray-400 text-sm mb-4">Certainty-equivalent optimal stopping</p>
           
           <div className="relative h-64 bg-gray-950 rounded-2xl overflow-hidden border border-gray-700 mb-4">
             <svg 
