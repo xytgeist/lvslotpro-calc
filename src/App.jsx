@@ -151,12 +151,12 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Header with Logo */}
+        {/* Header with Phoenix Link Logo */}
         <div className="flex items-center gap-3 mb-6">
           <img 
-            src="https://via.placeholder.com/48x48/FF6600/FFFFFF?text=PL" 
+            src="/phoenix-link-logo.png" 
             alt="Phoenix Link Logo" 
-            className="w-12 h-12 rounded-xl"
+            className="w-12 h-12 rounded-xl object-contain"
           />
           <h1 className="text-3xl font-bold text-orange-500">Phoenix Link EV</h1>
         </div>
