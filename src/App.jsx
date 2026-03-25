@@ -42,7 +42,7 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // ====================== CURVED WALK-AWAY FORMULA ======================
+  // ====================== S-CURVE WALK-AWAY FORMULA ======================
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -55,17 +55,18 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    // Curved formula - steeper at low counters, flattens as counter rises
-    const progress = Math.max(0, (counter - 1300) / 588)   // 0 at 1300, 1 at 1888
-    const curveBonus = Math.pow(progress, 1.55) * 92       // creates the curve
+    // S-curve (logistic) - slow start, steep middle, flattens near must-hit
+    const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588)) // 0 → 1
+    const sCurve = 1 / (1 + Math.exp(-8 * (normalized - 0.52)))   // center around 1550-1600
+    const curveBonus = sCurve * 105
 
-    let walkAway = Math.round(remainingEV * 3.4 + curveBonus)
+    let walkAway = Math.round(remainingEV * 3.6 + curveBonus)
 
-    return Math.max(70, Math.min(240, walkAway))
+    return Math.max(75, Math.min(245, walkAway))
   }
   // =====================================================================
 
-  // Generate chart data using the curved formula
+  // Generate chart data with S-curve
   const chartData = {
     labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
     datasets: [{
@@ -75,8 +76,8 @@ function App() {
         return getRecommendedWalkAway(counter)
       }),
       borderColor: '#f97316',
-      backgroundColor: 'rgba(249, 115, 22, 0.08)',
-      tension: 0.4,
+      backgroundColor: 'rgba(249, 115, 22, 0.1)',
+      tension: 0.45,
       borderWidth: 3.5,
       pointRadius: 3,
       pointHoverRadius: 7,
@@ -97,14 +98,14 @@ function App() {
         grid: { color: '#374151' },
         ticks: { color: '#9CA3AF' },
         min: 0,
-        max: 250
+        max: 260
       }
     },
     plugins: {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx) => `Walk-away: +${Math.round(ctx.raw)} bets`
+          label: (ctx) => `+${Math.round(ctx.raw)} bets`
         }
       }
     }
@@ -322,10 +323,10 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor with Real Curved Graph */}
+        {/* Walk-Away Advisor with S-Curve Graph */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Curved recommendation (higher buffer at low counters)</p>
+          <p className="text-gray-400 text-sm mb-4">S-curve recommendation (slow rise at low risk, steeper in middle)</p>
           
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
             <Line 
