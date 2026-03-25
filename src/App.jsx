@@ -160,7 +160,7 @@ function App() {
           />
         </div>
 
-        {/* Compact Top Input Frame */}
+        {/* Compact Top Input Frame - Bet Size and Denom side by side */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -170,44 +170,46 @@ function App() {
               value={currentX} 
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9]/g, '');
-                setCurrentX(val === '' ? '' : Number(val));
+                setCurrentX(val === '' ? '' : parseInt(val, 10));
               }} 
               className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500"
             />
           </div>
 
-          <div className="relative">
-            <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
-            <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-            <input 
-              type="number" 
-              step="0.01" 
-              value={betSize} 
-              onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-              className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
-            />
-          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="relative">
+              <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
+              <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
+              <input 
+                type="number" 
+                step="0.01" 
+                value={betSize} 
+                onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              />
+            </div>
 
-          <div>
-            <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
-            <select 
-              value={denom} 
-              onChange={(e) => setDenom(parseFloat(e.target.value))}
-              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
-            >
-              <option value={0.01}>$0.01</option>
-              <option value={0.02}>$0.02</option>
-              <option value={0.05}>$0.05</option>
-              <option value={0.10}>$0.10</option>
-              <option value={0.25}>$0.25</option>
-              <option value={1}>$1</option>
-              <option value={2}>$2</option>
-              <option value={5}>$5</option>
-              <option value={10}>$10</option>
-              <option value={25}>$25</option>
-              <option value={50}>$50</option>
-              <option value={100}>$100</option>
-            </select>
+            <div>
+              <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
+              <select 
+                value={denom} 
+                onChange={(e) => setDenom(parseFloat(e.target.value))}
+                className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              >
+                <option value={0.01}>$0.01</option>
+                <option value={0.02}>$0.02</option>
+                <option value={0.05}>$0.05</option>
+                <option value={0.10}>$0.10</option>
+                <option value={0.25}>$0.25</option>
+                <option value={1}>$1</option>
+                <option value={2}>$2</option>
+                <option value={5}>$5</option>
+                <option value={10}>$10</option>
+                <option value={25}>$25</option>
+                <option value={50}>$50</option>
+                <option value={100}>$100</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -263,6 +265,7 @@ function App() {
 
         {/* Results Frame */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          {/* Current EV */}
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-2xl">
@@ -271,16 +274,18 @@ function App() {
               <div className="text-sm">${(evAvg * betSize).toFixed(2)}</div>
             </div>
             <div className="bg-gray-800 p-4 rounded-2xl">
-              <div className="text-gray-400 text-sm">Worst Case</div>
+              <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
               <div className={`text-3xl font-bold ${evWorst >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evWorst.toFixed(1)}×</div>
               <div className="text-sm">${(evWorst * betSize).toFixed(2)}</div>
             </div>
           </div>
 
+          {/* Play / Not Play Banner */}
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
 
+          {/* Break Even Points */}
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -288,7 +293,7 @@ function App() {
               <div className="text-4xl font-bold text-green-400">{beAvg}</div>
             </div>
             <div>
-              <div className="text-gray-400 text-sm">Worst Case</div>
+              <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
               <div className="text-4xl font-bold text-yellow-400">{beWorst}</div>
             </div>
           </div>
@@ -303,7 +308,7 @@ function App() {
                 <tr className="border-b border-gray-700">
                   <th className="py-4 px-4 text-gray-400 font-medium w-[92px]">Counter</th>
                   <th className="py-4 px-3 text-gray-400 font-medium w-[155px]">EV Avg (Bets | $)</th>
-                  <th className="py-4 px-5 text-gray-400 font-medium">EV Worst (Bets | $)</th>
+                  <th className="py-4 px-5 text-gray-400 font-medium">Full Run (to 1888) (Bets | $)</th>
                 </tr>
               </thead>
               <tbody>
