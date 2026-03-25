@@ -28,6 +28,7 @@ function App() {
 
   const [evAvg, setEvAvg] = useState(0)
   const [evFullRun, setEvFullRun] = useState(0)
+  const [currentRTP, setCurrentRTP] = useState(0)   // ← New
   const [beAvg, setBeAvg] = useState(0)
   const [beFullRun, setBeFullRun] = useState(0)
 
@@ -80,11 +81,15 @@ function App() {
     const avgEV = B - he * spinsAvg
     const fullEV = B - he * spinsFull
 
+    // New: Current effective RTP based on current counter
+    const currentEffectiveRTP = (oRTP - pCounter * B) * 100
+
     const breakevenAvg = Math.round(avgTrig - (B / he) * inc)
     const breakevenFull = Math.round(must - (B / he) * inc)
 
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
+    setCurrentRTP(currentEffectiveRTP)   // ← New
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
@@ -136,7 +141,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Logo + Title directly after icon, stretched to fill width */}
+        {/* Logo + Title */}
         <div className="flex items-center mb-6">
           <img 
             src="/phoenix-link-logo.png" 
@@ -261,19 +266,30 @@ function App() {
           )}
         </div>
 
-        {/* Results Frame */}
+        {/* Results Frame - Now includes Current RTP */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {/* Average Case */}
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Average Case</div>
               <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
               <div className="text-sm">${(evAvg * betSize).toFixed(2)}</div>
             </div>
+
+            {/* Full Run */}
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
               <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
               <div className="text-sm">${(evFullRun * betSize).toFixed(2)}</div>
+            </div>
+
+            {/* Current RTP - New */}
+            <div className="bg-gray-800 p-4 rounded-2xl">
+              <div className="text-gray-400 text-sm">Current RTP</div>
+              <div className="text-3xl font-bold text-orange-400">{currentRTP.toFixed(1)}%</div>
+              <div className="text-xs text-gray-500">at current counter</div>
             </div>
           </div>
 
