@@ -103,7 +103,7 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Final tuned walk-away model
+  // Tuned walk-away model with debug
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -116,10 +116,13 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const EV_MULTIPLIER = 4.5      // Stronger lift for low counters
-    const COUNTER_BONUS = 0.12     // Gentler ramp on high end
+    const EV_MULTIPLIER = 5.8   // Strong buffer for high risk at low counters
+    const COUNTER_BONUS = 0.12
 
     let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1400) * COUNTER_BONUS)
+
+    // DEBUG: show raw remainingEV so you can see the math
+    console.log(`Counter ${counter} / Denom ${denom} → remainingEV = ${remainingEV.toFixed(1)}`)
 
     return Math.max(70, Math.min(230, walkAway))
   }
@@ -179,33 +182,25 @@ function App() {
           </h1>
         </div>
 
-        {/* Inputs */}
+        {/* Inputs (unchanged) */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
-            <input 
-              type="text" inputMode="numeric" value={currentX} 
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setCurrentX(val === '' ? '' : parseInt(val, 10));
-              }} 
-              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
-            />
+            <input type="text" inputMode="numeric" value={currentX} onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9]/g, '');
+              setCurrentX(val === '' ? '' : parseInt(val, 10));
+            }} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input type="number" step="0.01" value={betSize} 
-                onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
-              />
+              <input type="number" step="0.01" value={betSize} onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
-              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} 
-                className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
+              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
                 <option value={0.01}>$0.01</option>
                 <option value={0.02}>$0.02</option>
                 <option value={0.05}>$0.05</option>
@@ -223,7 +218,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings */}
+        {/* Advanced Settings (unchanged) */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -237,29 +232,17 @@ function App() {
                   {maxMajor ? 'YES' : 'NO'}
                 </button>
               </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
-                <input type="number" step="0.01" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Base RTP (%)</label>
-                <input type="number" step="0.01" value={baseRTP} onChange={(e) => setBaseRTP(parseFloat(e.target.value) || 28)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
-                <input type="number" step="0.01" value={increment} onChange={(e) => setIncrement(parseFloat(e.target.value) || 1.1)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Avg Spins to Bonus</label>
-                <input type="number" value={allBonusFreq} onChange={(e) => setAllBonusFreq(parseFloat(e.target.value) || 80)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
-                <input type="number" value={avgTrigger} onChange={(e) => setAvgTrigger(parseFloat(e.target.value) || 1800)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
-                <input type="number" value={mustHit} onChange={(e) => setMustHit(parseFloat(e.target.value) || 1888)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label><input type="number" step="0.01" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} className="w-full p-3 bg-gray-800 rounded-xl" /></div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Base RTP (%)</label><input type="number" step="0.01" value={baseRTP} onChange={(e) => setBaseRTP(parseFloat(e.target.value) || 28)} className="w-full p-3 bg-gray-800 rounded-xl" /></div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label><input type="number" step="0.01" value={increment} onChange={(e) => setIncrement(parseFloat(e.target.value) || 1.1)} className="w-full p-3 bg-gray-800 rounded-xl" /></div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Avg Spins to Bonus</label><input type="number" value={allBonusFreq} onChange={(e) => setAllBonusFreq(parseFloat(e.target.value) || 80)} className="w-full p-3 bg-gray-800 rounded-xl" /></div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label><input type="number" value={avgTrigger} onChange={(e) => setAvgTrigger(parseFloat(e.target.value) || 1800)} className="w-full p-3 bg-gray-800 rounded-xl" /></div>
+              <div><label className="block text-gray-400 mb-1 text-xs">Must Hit By</label><input type="number" value={mustHit} onChange={(e) => setMustHit(parseFloat(e.target.value) || 1888)} className="w-full p-3 bg-gray-800 rounded-xl" /></div>
             </div>
           )}
         </div>
 
-        {/* Current EV + Break Even */}
+        {/* Current EV + Break Even (unchanged) */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -286,7 +269,7 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
+        {/* Walk-Away Advisor with debug */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
           <p className="text-gray-400 text-sm mb-4">Certainty-equivalent optimal stopping</p>
@@ -308,15 +291,7 @@ function App() {
 
               <polyline points="45,205 80,190 120,170 160,150 200,130 240,115 280,102 320,92 360,85" fill="none" stroke="#f97316" strokeWidth="4" strokeLinejoin="round" />
 
-              <line 
-                x1={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} 
-                y1="20" 
-                x2={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} 
-                y2="220" 
-                stroke="#22c55e" 
-                strokeWidth="2" 
-                strokeDasharray="5 3"
-              />
+              <line x1={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} y1="20" x2={40 + Math.min(340, Math.max(0, ((currentX - 1300) / 588) * 340))} y2="220" stroke="#22c55e" strokeWidth="2" strokeDasharray="5 3" />
 
               {hoverCounter && (
                 <>
@@ -333,6 +308,18 @@ function App() {
             ) : (
               <>At counter <span className="text-orange-400 font-semibold">{currentX}</span>, consider walking away around <span className="text-green-400 font-bold">+{getRecommendedWalkAway(currentX)} bets</span></>
             )}
+          </div>
+
+          {/* DEBUG LINE - shows raw remainingEV */}
+          <div className="text-center text-xs text-gray-500 mt-3">
+            Raw remainingEV = {(() => {
+              const oRTP = overallRTP / 100;
+              const bRTP = baseRTP / 100;
+              const pTotal = 1 / allBonusFreq;
+              const B = bRTP + (oRTP - bRTP) / pTotal;
+              const spinsRemaining = Math.max(0, (avgTrigger - currentX) / increment);
+              return (B - (1 - oRTP) * spinsRemaining).toFixed(1);
+            })()} bets
           </div>
         </div>
 
