@@ -55,13 +55,18 @@ function App() {
       baseBase = 28
     }
 
-    setOverallRTP(maxMajor ? baseOverall + 0.5 : baseOverall)
+    const finalOverall = maxMajor ? baseOverall + 0.5 : baseOverall
+    setOverallRTP(finalOverall)
     setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
-    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => setUser(session?.user ?? null))
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null)
+    })
+
     return () => listener.subscription.unsubscribe()
   }, [])
 
@@ -72,7 +77,7 @@ function App() {
     const freq = allBonusFreq
     const avgTrig = avgTrigger
     const must = mustHit
-    const X = currentX
+    const X = currentX || 0
     const bet = betSize
 
     const pTotal = 1 / freq
@@ -100,18 +105,23 @@ function App() {
       const avgSpins = Math.max(0, (avgTrig - c) / inc)
       const worstSpins = Math.max(0, (must - c) / inc)
 
+      const avgEV = B - he * avgSpins
+      const worstEV = B - he * worstSpins
+
       table.push({
         counter: c,
-        avgEV: B - he * avgSpins,
-        worstEV: B - he * worstSpins,
-        avgDollar: (B - he * avgSpins) * bet,
-        worstDollar: (B - he * worstSpins) * bet
+        avgEV,
+        worstEV,
+        avgDollar: avgEV * bet,
+        worstDollar: worstEV * bet
       })
     }
     setEvTable(table)
   }
 
-  useEffect(() => calculate(), [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
+  useEffect(() => {
+    calculate()
+  }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -121,10 +131,12 @@ function App() {
   const handleSignUp = async () => {
     const { error } = await supabase.auth.signUp({ email, password })
     if (error) alert(error.message)
-    else alert('Check your email to confirm!')
+    else alert('Check your email to confirm your account!')
   }
 
-  const handleLogout = async () => await supabase.auth.signOut()
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+  }
 
   if (!user) {
     return (
@@ -148,19 +160,40 @@ function App() {
           <button onClick={handleLogout} className="bg-red-600 px-5 py-2 rounded-xl text-sm font-semibold">Logout</button>
         </div>
 
-        {/* Main Inputs */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6 space-y-6">
+        {/* Compact Top Input Frame */}
+        <div className="bg-gray-900 p-4 rounded-3xl mb-6 space-y-4">
           <div>
-            <label className="block text-gray-400 mb-1.5 text-base">Counter</label>
-            <input type="number" value={currentX} onChange={(e) => setCurrentX(parseFloat(e.target.value) || 0)} className="w-full p-6 bg-gray-800 rounded-2xl text-4xl font-bold text-center border-2 border-orange-500" />
+            <label className="block text-gray-400 mb-1 text-base">Counter</label>
+            <input 
+              type="text"
+              inputMode="numeric"
+              value={currentX} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setCurrentX(val === '' ? '' : parseInt(val, 10));
+              }} 
+              className="w-full p-5 bg-gray-800 rounded-2xl text-4xl font-bold text-center border-2 border-orange-500"
+            />
           </div>
+
           <div>
-            <label className="block text-gray-400 mb-1.5 text-base">Bet Size ($)</label>
-            <input type="number" step="0.01" value={betSize} onChange={(e) => setBetSize(parseFloat(e.target.value) || 25)} className="w-full p-6 bg-gray-800 rounded-2xl text-4xl font-bold text-center" />
+            <label className="block text-gray-400 mb-1 text-base">Bet Size ($)</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              value={betSize} 
+              onChange={(e) => setBetSize(parseFloat(e.target.value) || 25)} 
+              className="w-full p-5 bg-gray-800 rounded-2xl text-4xl font-bold text-center"
+            />
           </div>
+
           <div>
-            <label className="block text-gray-400 mb-1.5 text-base">Denomination</label>
-            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-6 bg-gray-800 rounded-2xl text-4xl font-bold text-center">
+            <label className="block text-gray-400 mb-1 text-base">Denomination</label>
+            <select 
+              value={denom} 
+              onChange={(e) => setDenom(parseFloat(e.target.value))}
+              className="w-full p-5 bg-gray-800 rounded-2xl text-4xl font-bold text-center"
+            >
               <option value={0.01}>$0.01</option>
               <option value={0.02}>$0.02</option>
               <option value={0.05}>$0.05</option>
@@ -177,63 +210,12 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings */}
-        <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
-          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-800 transition-colors">
-            <span className="text-lg font-semibold">Advanced Settings</span>
-            <span className={`text-2xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
-          </button>
-
-          {showAdvanced && (
-            <div className="p-6 pt-0 space-y-6 border-t border-gray-800">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-base font-medium">Max Major</span>
-                <button onClick={() => setMaxMajor(!maxMajor)} className={`px-8 py-3 rounded-2xl font-semibold text-lg ${maxMajor ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-                  {maxMajor ? 'YES' : 'NO'}
-                </button>
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Overall RTP (%)</label>
-                <input type="number" step="0.01" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Base RTP (%)</label>
-                <input type="number" step="0.01" value={baseRTP} onChange={(e) => setBaseRTP(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Balls per Spin</label>
-                <input type="number" step="0.01" value={increment} onChange={(e) => setIncrement(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Avg Spins to Bonus</label>
-                <input type="number" value={allBonusFreq} onChange={(e) => setAllBonusFreq(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Avg Counter Trigger</label>
-                <input type="number" value={avgTrigger} onChange={(e) => setAvgTrigger(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Must Hit By</label>
-                <input type="number" value={mustHit} onChange={(e) => setMustHit(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl" />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* EV Results */}
+        {/* Results Frame - Current EV first, then banner, then Break Even */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
+          
+          {/* Current EV - Top */}
+          <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
-            <div><div className="text-gray-400 text-sm">Worst Case</div><div className="text-4xl font-bold text-yellow-400">{beWorst}</div></div>
-          </div>
-
-          <div className={`p-5 rounded-2xl text-center text-lg font-bold ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
-          </div>
-
-          <h2 className="text-xl font-semibold mt-8 mb-4">Current EV</h2>
-          <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Average Case</div>
               <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
@@ -245,13 +227,31 @@ function App() {
               <div className="text-sm">${(evWorst * betSize).toFixed(2)}</div>
             </div>
           </div>
+
+          {/* Play / Not Play Banner - Directly below Current EV */}
+          <div className={`p-5 rounded-2xl text-center text-lg font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
+          </div>
+
+          {/* Break Even Points - Below the banner */}
+          <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-gray-400 text-sm">Average</div>
+              <div className="text-4xl font-bold text-green-400">{beAvg}</div>
+            </div>
+            <div>
+              <div className="text-gray-400 text-sm">Worst Case</div>
+              <div className="text-4xl font-bold text-yellow-400">{beWorst}</div>
+            </div>
+          </div>
         </div>
 
-        {/* FINAL WORKING TABLE */}
+        {/* EV Table */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[520px]">
+            <table className="w-full text-left border-collapse min-w-[540px]">
               <thead>
                 <tr className="border-b border-gray-700">
                   <th className="py-4 px-4 text-gray-400 font-medium w-[92px]">Counter</th>
