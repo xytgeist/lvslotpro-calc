@@ -136,7 +136,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Logo + Title on same row - smaller font with thin orange outline */}
+        {/* Logo + Title - Cleaner font, single line, thin orange outline */}
         <div className="flex items-center gap-4 mb-6">
           <img 
             src="/phoenix-link-logo.png" 
@@ -144,7 +144,7 @@ function App() {
             className="w-12 h-12 flex-shrink-0 rounded-xl object-contain"
           />
           <h1 
-            className="text-2xl font-black tracking-tighter text-black whitespace-nowrap"
+            className="text-[26px] font-black tracking-[-1px] text-black"
             style={{
               textShadow: `
                 -1.5px -1.5px 0 #f97316,
