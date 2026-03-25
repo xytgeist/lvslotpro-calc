@@ -103,7 +103,7 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Walk-Away Model - tuned for your feedback
+  // Final tuned walk-away model
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -116,8 +116,8 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const EV_MULTIPLIER = 3.5      // ← Balanced for low-counter buffer
-    const COUNTER_BONUS = 0.22     // ← Helps scaling without overshooting high end
+    const EV_MULTIPLIER = 3.85   // Tuned for good low-counter buffer
+    const COUNTER_BONUS = 0.19
 
     let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1300) * COUNTER_BONUS)
 
