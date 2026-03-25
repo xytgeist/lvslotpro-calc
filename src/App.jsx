@@ -115,7 +115,7 @@ function App() {
   }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
   // Corrected dynamic walk-away recommendation
-  // Lower at low counters (high risk), higher at high counters (low risk)
+  // Now strongly depends on current RTP (denom) and remaining EV
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -128,12 +128,10 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    // Max drawdown scales linearly down as counter increases
     const maxDrawdown = 300 * Math.max(0, (1888 - counter) / (1888 - 1300))
 
-    // Walk-away point = base + scaling with counter - risk penalty
-    // This should now be lower at low counters and higher at high counters
-    const walkAway = Math.round(75 + (counter - 1300) * 0.25 - maxDrawdown * 0.28)
+    // Strong dependence on remainingEV (higher RTP/denom = higher walk-away)
+    const walkAway = Math.round(75 + remainingEV * 2.8 - maxDrawdown * 0.32)
 
     return Math.max(70, Math.min(220, walkAway))
   }
