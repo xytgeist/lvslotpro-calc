@@ -42,7 +42,7 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // ====================== S-CURVE WALK-AWAY FORMULA ======================
+  // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -55,18 +55,18 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    // S-curve (logistic) - slow start, steep middle, flattens near must-hit
-    const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588)) // 0 → 1
-    const sCurve = 1 / (1 + Math.exp(-8 * (normalized - 0.52)))   // center around 1550-1600
-    const curveBonus = sCurve * 105
+    // Softer S-curve: less steep transitions
+    const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588))
+    const sCurve = 1 / (1 + Math.exp(-5.5 * (normalized - 0.48)))   // softer slope, centered ~1520
+    const curveBonus = sCurve * 98
 
-    let walkAway = Math.round(remainingEV * 3.6 + curveBonus)
+    let walkAway = Math.round(remainingEV * 3.5 + curveBonus)
 
     return Math.max(75, Math.min(245, walkAway))
   }
   // =====================================================================
 
-  // Generate chart data with S-curve
+  // Chart data
   const chartData = {
     labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
     datasets: [{
@@ -216,7 +216,7 @@ function App() {
           </h1>
         </div>
 
-        {/* Inputs */}
+        {/* Inputs - unchanged */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -260,7 +260,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings */}
+        {/* Advanced Settings - unchanged */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -296,7 +296,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Break Even */}
+        {/* Current EV + Break Even - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -323,10 +323,10 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor with S-Curve Graph */}
+        {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">S-curve recommendation (slow rise at low risk, steeper in middle)</p>
+          <p className="text-gray-400 text-sm mb-4">Softer S-curve — smoother transitions</p>
           
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
             <Line 
@@ -341,7 +341,7 @@ function App() {
           </div>
         </div>
 
-        {/* EV Table */}
+        {/* EV Table - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
           <div className="overflow-x-auto">
