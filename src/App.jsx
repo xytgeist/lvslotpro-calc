@@ -230,16 +230,18 @@ function App() {
           </h1>
         </div>
 
-        {/* Inputs */}
+        {/* Main Counter Input - fixed deletion behavior */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
             <input 
-              type="text" inputMode="numeric" value={currentX} 
+              type="text" 
+              inputMode="numeric"
+              value={currentX}
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9]/g, '');
                 setCurrentX(val === '' ? '' : parseInt(val, 10));
-              }} 
+              }}
               className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
             />
           </div>
@@ -274,7 +276,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings */}
+        {/* Advanced Settings - unchanged */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -310,7 +312,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Break Even */}
+        {/* Current EV + Break Even - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -349,7 +351,7 @@ function App() {
             </button>
           </div>
 
-          {/* Quick Test Counter */}
+          {/* Fixed Test Counter Input */}
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
@@ -359,14 +361,16 @@ function App() {
                 value={testCounter}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
-                  setTestCounter(val === '' ? 1300 : parseInt(val, 10));
+                  setTestCounter(val === '' ? '' : parseInt(val, 10));
                 }}
                 className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400"
               />
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
-              <div className="text-4xl font-bold text-green-400">+{getRecommendedWalkAway(testCounter)}</div>
+              <div className="text-4xl font-bold text-green-400">
+                +{testCounter ? getRecommendedWalkAway(testCounter) : 0}
+              </div>
               <div className="text-xs text-gray-400">bets</div>
             </div>
           </div>
@@ -425,7 +429,7 @@ function App() {
         </div>
       </div>
 
-      {/* Info Modal */}
+      {/* Info Modal - unchanged from last version */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
