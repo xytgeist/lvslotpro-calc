@@ -192,20 +192,24 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Updated handleSignUp with proper email redirect
+  // Improved handleSignUp with better rate limit message
   const handleSignUp = async () => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: 'https://lvslotpro.com'   // Change this if your domain is different
+        emailRedirectTo: 'https://lvslotpro.com'
       }
     })
 
     if (error) {
-      alert(error.message)
+      if (error.message.toLowerCase().includes('rate limit') || error.message.includes('429')) {
+        alert('Email rate limit exceeded.\n\nSupabase only allows a few sign-up emails per hour on the free plan.\nPlease wait about 60 minutes and try again.');
+      } else {
+        alert(error.message);
+      }
     } else {
-      alert('Account created successfully! Please check your email and click the confirmation link to activate your account.')
+      alert('Account created successfully!\n\nPlease check your email (including spam/junk folder) and click the confirmation link to activate your account.');
     }
   }
 
@@ -219,8 +223,20 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Phoenix Link EV Calc</h1>
-          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
-          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
+          <input 
+            type="email" 
+            placeholder="Email" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" 
+          />
+          <input 
+            type="password" 
+            placeholder="Password" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" 
+          />
           <button onClick={handleLogin} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Login</button>
           <button onClick={handleSignUp} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Sign Up</button>
         </div>
