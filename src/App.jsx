@@ -116,12 +116,12 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    const EV_MULTIPLIER = 4.2
-    const COUNTER_BONUS = 0.18   // gentler ramp
+    const EV_MULTIPLIER = 4.5      // Stronger lift for low counters
+    const COUNTER_BONUS = 0.12     // Gentler ramp on high end
 
     let walkAway = Math.round(remainingEV * EV_MULTIPLIER + (counter - 1400) * COUNTER_BONUS)
 
-    return Math.max(65, Math.min(230, walkAway))
+    return Math.max(70, Math.min(230, walkAway))
   }
 
   const handleGraphHover = (e) => {
