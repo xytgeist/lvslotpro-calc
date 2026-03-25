@@ -134,10 +134,6 @@ function App() {
     else alert('Check your email to confirm your account!')
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-  }
-
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -155,9 +151,14 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
-        <div className="flex justify-between items-center mb-6">
+        {/* Header with Logo */}
+        <div className="flex items-center gap-3 mb-6">
+          <img 
+            src="https://via.placeholder.com/48x48/FF6600/FFFFFF?text=PL" 
+            alt="Phoenix Link Logo" 
+            className="w-12 h-12 rounded-xl"
+          />
           <h1 className="text-3xl font-bold text-orange-500">Phoenix Link EV</h1>
-          <button onClick={handleLogout} className="bg-red-600 px-4 py-1.5 rounded-xl text-sm font-semibold">Logout</button>
         </div>
 
         {/* Very Compact Top Input Frame */}
@@ -210,7 +211,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings Dropdown - Restored */}
+        {/* Advanced Settings Dropdown */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button 
             onClick={() => setShowAdvanced(!showAdvanced)}
