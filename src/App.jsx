@@ -42,6 +42,13 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
+  // New: test counter for quick walk-away checking
+  const [testCounter, setTestCounter] = useState(1400)
+
+  // New: live hover state for finger/mouse drag on graph
+  const [hoverCounter, setHoverCounter] = useState(null)
+  const [hoverWalkAway, setHoverWalkAway] = useState(null)
+
   // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
@@ -55,13 +62,11 @@ function App() {
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
 
-    // Softer S-curve: less steep transitions
     const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588))
-    const sCurve = 1 / (1 + Math.exp(-5.5 * (normalized - 0.48)))   // softer slope, centered ~1520
+    const sCurve = 1 / (1 + Math.exp(-5.5 * (normalized - 0.48)))
     const curveBonus = sCurve * 98
 
     let walkAway = Math.round(remainingEV * 3.5 + curveBonus)
-
     return Math.max(75, Math.min(245, walkAway))
   }
   // =====================================================================
@@ -87,6 +92,22 @@ function App() {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      intersect: false,
+      mode: 'index',
+    },
+    onHover: (event, elements) => {
+      if (elements.length > 0) {
+        const index = elements[0].index
+        const counter = chartData.labels[index]
+        const walkAway = chartData.datasets[0].data[index]
+        setHoverCounter(counter)
+        setHoverWalkAway(walkAway)
+      } else {
+        setHoverCounter(null)
+        setHoverWalkAway(null)
+      }
+    },
     scales: {
       x: {
         title: { display: true, text: 'Counter', color: '#9CA3AF' },
@@ -103,11 +124,7 @@ function App() {
     },
     plugins: {
       legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (ctx) => `+${Math.round(ctx.raw)} bets`
-        }
-      }
+      tooltip: { enabled: false }, // we use custom display instead
     }
   }
 
@@ -216,7 +233,7 @@ function App() {
           </h1>
         </div>
 
-        {/* Inputs - unchanged */}
+        {/* Inputs */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -260,7 +277,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings - unchanged */}
+        {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -296,7 +313,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Break Even - unchanged */}
+        {/* Current EV + Break Even */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -323,25 +340,58 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
+        {/* ==================== WALK-AWAY ADVISOR ==================== */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Walk-Away Advisor</h2>
-          <p className="text-gray-400 text-sm mb-4">Softer S-curve — smoother transitions</p>
-          
-          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
+          <p className="text-gray-400 text-sm mb-4">Softer S-curve • finger-drag or hover for live values</p>
+
+          {/* Quick Test Counter Input */}
+          <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
+              <input 
+                type="text" 
+                inputMode="numeric"
+                value={testCounter}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setTestCounter(val === '' ? 1300 : parseInt(val, 10));
+                }}
+                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400"
+              />
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-400 mb-1">Walk-away</div>
+              <div className="text-4xl font-bold text-green-400">+{getRecommendedWalkAway(testCounter)}</div>
+              <div className="text-xs text-gray-400">bets</div>
+            </div>
+          </div>
+
+          {/* Real Chart with finger/mouse interactivity */}
+          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
             <Line 
               data={chartData} 
               options={chartOptions} 
             />
           </div>
 
-          <div className="text-center bg-gray-800 rounded-2xl p-4 text-sm">
-            At counter <span className="text-orange-400 font-semibold">{currentX}</span>, 
-            consider walking away around <span className="text-green-400 font-bold">+{getRecommendedWalkAway(currentX)} bets</span>
+          {/* Live hover / touch display */}
+          <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
+            {hoverCounter !== null ? (
+              <>
+                At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> 
+                consider walking away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span>
+              </>
+            ) : (
+              <>
+                At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> 
+                consider walking away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* EV Table - unchanged */}
+        {/* EV Table */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
           <div className="overflow-x-auto">
