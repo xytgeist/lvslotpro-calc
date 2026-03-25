@@ -160,10 +160,10 @@ function App() {
           <button onClick={handleLogout} className="bg-red-600 px-5 py-2 rounded-xl text-sm font-semibold">Logout</button>
         </div>
 
-        {/* Compact Top Input Frame */}
-        <div className="bg-gray-900 p-4 rounded-3xl mb-6 space-y-4">
+        {/* Much Smaller Top Input Frame */}
+        <div className="bg-gray-900 p-4 rounded-3xl mb-6 space-y-3">
           <div>
-            <label className="block text-gray-400 mb-1 text-base">Counter</label>
+            <label className="block text-gray-400 mb-1 text-sm">Counter</label>
             <input 
               type="text"
               inputMode="numeric"
@@ -172,27 +172,27 @@ function App() {
                 const val = e.target.value.replace(/[^0-9]/g, '');
                 setCurrentX(val === '' ? '' : parseInt(val, 10));
               }} 
-              className="w-full p-5 bg-gray-800 rounded-2xl text-4xl font-bold text-center border-2 border-orange-500"
+              className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center border-2 border-orange-500"
             />
           </div>
 
           <div>
-            <label className="block text-gray-400 mb-1 text-base">Bet Size ($)</label>
+            <label className="block text-gray-400 mb-1 text-sm">Bet Size ($)</label>
             <input 
               type="number" 
               step="0.01" 
               value={betSize} 
               onChange={(e) => setBetSize(parseFloat(e.target.value) || 25)} 
-              className="w-full p-5 bg-gray-800 rounded-2xl text-4xl font-bold text-center"
+              className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center"
             />
           </div>
 
           <div>
-            <label className="block text-gray-400 mb-1 text-base">Denomination</label>
+            <label className="block text-gray-400 mb-1 text-sm">Denomination</label>
             <select 
               value={denom} 
               onChange={(e) => setDenom(parseFloat(e.target.value))}
-              className="w-full p-5 bg-gray-800 rounded-2xl text-4xl font-bold text-center"
+              className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center"
             >
               <option value={0.01}>$0.01</option>
               <option value={0.02}>$0.02</option>
@@ -210,10 +210,9 @@ function App() {
           </div>
         </div>
 
-        {/* Results Frame - Current EV first, then banner, then Break Even */}
+        {/* Results Frame */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          
-          {/* Current EV - Top */}
+          {/* Current EV */}
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-2xl">
@@ -228,12 +227,12 @@ function App() {
             </div>
           </div>
 
-          {/* Play / Not Play Banner - Directly below Current EV */}
+          {/* Play / Not Play Banner */}
           <div className={`p-5 rounded-2xl text-center text-lg font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
 
-          {/* Break Even Points - Below the banner */}
+          {/* Break Even Points */}
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
