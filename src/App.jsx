@@ -20,14 +20,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 function App() {
   const [user, setUser] = useState(null);
-  const [isAllowed, setIsAllowed] = useState(false);
-  const [debugMsg, setDebugMsg] = useState('');
-
-  // Login form
   const [emailInput, setEmailInput] = useState('');
   const [password, setPassword] = useState('');
 
-  // Calculator inputs
   const [currentX, setCurrentX] = useState(1400);
   const [betSize, setBetSize] = useState(25);
   const [denom, setDenom] = useState(1.00);
@@ -48,11 +43,8 @@ function App() {
   const [evTable, setEvTable] = useState([]);
 
   const [testCounter, setTestCounter] = useState(1400);
-  const [hoverCounter, setHoverCounter] = useState(null);
-  const [hoverWalkAway, setHoverWalkAway] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
-  // Acquisition Fee
   const [useFullRunForFee, setUseFullRunForFee] = useState(false);
   const [scoutPercentage, setScoutPercentage] = useState(10);
 
@@ -62,9 +54,7 @@ function App() {
     const inc = increment;
     const avgTrig = avgTrigger;
 
-    const pCounter = inc / avgTrig;
     const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq);
-
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc);
     const remainingEV = B - (1 - oRTP) * spinsRemaining;
 
@@ -99,7 +89,7 @@ function App() {
     },
   };
 
-  // Auto RTP by Denom
+  // Auto RTP based on Denom
   useEffect(() => {
     let oRTP = 91;
     let bRTP = 28;
@@ -108,8 +98,8 @@ function App() {
     else if (denom === 0.1) { oRTP = 88.4; bRTP = 25; }
     else if (denom === 0.25) { oRTP = 88.6; bRTP = 25; }
     else if (denom > 1) { oRTP = 91.5; bRTP = 28; }
-
     if (maxMajor) oRTP = Math.min(100, oRTP + 0.5);
+
     setOverallRTP(oRTP);
     setBaseRTP(bRTP);
   }, [denom, maxMajor]);
@@ -156,44 +146,16 @@ function App() {
 
   useEffect(() => { calculate(); }, [currentX, betSize, overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, denom, maxMajor]);
 
-  // Auth + Whitelist
+  // Simple auth (no whitelist)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user?.email) checkEmailAllowed(session.user.email);
-    });
+    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
 
     const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null);
-      if (session?.user?.email) checkEmailAllowed(session.user.email);
     });
 
     return () => listener.subscription.unsubscribe();
   }, []);
-
-  const checkEmailAllowed = async (userEmail) => {
-    const cleanEmail = userEmail.toLowerCase().trim();
-    setDebugMsg(`Checking: ${cleanEmail}`);
-
-    const { data, error } = await supabase
-      .from('allowed_emails')
-      .select('email')
-      .eq('email', cleanEmail)
-      .single();
-
-    if (error) {
-      setDebugMsg(prev => prev + `\nError: ${error.message} (Code: ${error.code})`);
-      if (error.code === '406') {
-        setDebugMsg(prev => prev + `\n→ Make sure RLS is disabled on allowed_emails table`);
-      }
-    } else if (data) {
-      setDebugMsg(prev => prev + `\n✅ Access granted`);
-    } else {
-      setDebugMsg(prev => prev + `\nNo match found`);
-    }
-
-    setIsAllowed(!!data && !error);
-  };
 
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email: emailInput, password });
@@ -207,7 +169,7 @@ function App() {
       options: { emailRedirectTo: window.location.origin }
     });
     if (error) alert(error.message);
-    else alert('Check your email for confirmation link.');
+    else alert('Check your email for confirmation.');
   };
 
   const handleSignOut = () => supabase.auth.signOut();
@@ -226,22 +188,6 @@ function App() {
     );
   }
 
-  if (!isAllowed) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm text-center">
-          <h1 className="text-3xl font-bold text-red-500 mb-4">Access Denied</h1>
-          <p className="text-gray-300 mb-6">Your email is not on the approved list.<br />Please contact the owner for access.</p>
-          <div className="text-left text-xs bg-gray-800 p-4 rounded-2xl mb-6 whitespace-pre-wrap text-gray-400">
-            {debugMsg}
-          </div>
-          <button onClick={handleSignOut} className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-2xl font-bold">Sign Out</button>
-        </div>
-      </div>
-    );
-  }
-
-  // Main Calculator UI (clean original style)
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
@@ -254,49 +200,53 @@ function App() {
           </h1>
         </div>
 
-        {/* Counter + Bet Size + Denom - Compact */}
+        {/* Inputs */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-6">
           <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-1">
+            <div>
               <label className="block text-xs text-gray-400 mb-1">Counter</label>
               <input
                 type="text"
                 value={currentX}
-                onChange={(e) => setCurrentX(e.target.value.replace(/[^0-9]/g, '') || 0)}
+                onChange={(e) => setCurrentX(e.target.value.replace(/[^0-9]/g, '') || 1400)}
                 className="w-full bg-gray-800 text-3xl font-bold text-center rounded-2xl p-4"
               />
             </div>
-            <div className="col-span-1">
+            <div>
               <label className="block text-xs text-gray-400 mb-1">Bet Size</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400">$</span>
                 <input
                   type="text"
                   value={betSize}
-                  onChange={(e) => setBetSize(e.target.value.replace(/[^0-9.]/g, '') || 0)}
+                  onChange={(e) => setBetSize(e.target.value.replace(/[^0-9.]/g, '') || 25)}
                   className="w-full bg-gray-800 text-3xl font-bold text-center rounded-2xl p-4 pl-8"
                 />
               </div>
             </div>
-            <div className="col-span-1">
+            <div>
               <label className="block text-xs text-gray-400 mb-1">Denom</label>
               <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full bg-gray-800 text-xl font-bold rounded-2xl p-4">
-                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                  <option key={d} value={d}>${d}</option>
+                ))}
               </select>
             </div>
           </div>
         </div>
 
-        {/* Advanced Toggle */}
-        <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full bg-gray-800 py-3 rounded-2xl mb-6 font-bold flex justify-between px-6">
+        {/* Advanced */}
+        <button 
+          onClick={() => setShowAdvanced(!showAdvanced)} 
+          className="w-full bg-gray-800 py-3 rounded-2xl mb-6 font-bold flex justify-between px-6"
+        >
           Advanced Settings <span>{showAdvanced ? '▲' : '▼'}</span>
         </button>
 
         {showAdvanced && (
-          <div className="bg-gray-900 rounded-3xl p-6 mb-6 space-y-4 text-sm">
-            {/* All advanced inputs here - same as before */}
-            <div><label>Overall RTP (%)</label><input type="number" step="0.01" value={overallRTP} onChange={e => setOverallRTP(parseFloat(e.target.value))} className="w-full bg-gray-800 p-3 rounded-2xl" /></div>
-            <div><label>Base RTP (%)</label><input type="number" step="0.01" value={baseRTP} onChange={e => setBaseRTP(parseFloat(e.target.value))} className="w-full bg-gray-800 p-3 rounded-2xl" /></div>
+          <div className="bg-gray-900 rounded-3xl p-6 mb-6 space-y-4">
+            <div><label>Overall RTP (%)</label><input type="number" step="0.1" value={overallRTP} onChange={e => setOverallRTP(parseFloat(e.target.value))} className="w-full bg-gray-800 p-3 rounded-2xl" /></div>
+            <div><label>Base RTP (%)</label><input type="number" step="0.1" value={baseRTP} onChange={e => setBaseRTP(parseFloat(e.target.value))} className="w-full bg-gray-800 p-3 rounded-2xl" /></div>
             <div><label>Avg Spins to Bonus</label><input type="number" value={allBonusFreq} onChange={e => setAllBonusFreq(parseFloat(e.target.value))} className="w-full bg-gray-800 p-3 rounded-2xl" /></div>
             <div><label>Avg Counter Trigger</label><input type="number" value={avgTrigger} onChange={e => setAvgTrigger(parseFloat(e.target.value))} className="w-full bg-gray-800 p-3 rounded-2xl" /></div>
             <div><label>Must Hit By</label><input type="number" value={mustHit} onChange={e => setMustHit(parseFloat(e.target.value))} className="w-full bg-gray-800 p-3 rounded-2xl" /></div>
@@ -310,7 +260,7 @@ function App() {
           <div className="grid grid-cols-2 gap-4">
             <div className={`p-5 rounded-2xl text-center ${evAvg >= 0 ? 'bg-green-900/50' : 'bg-red-900/50'}`}>
               <div className="text-4xl font-black">{evAvg >= 0 ? '+' : ''}{evAvg}x</div>
-              <div className="text-xs text-gray-400">Avg</div>
+              <div className="text-xs text-gray-400">Average</div>
             </div>
             <div className={`p-5 rounded-2xl text-center ${evFullRun >= 0 ? 'bg-green-900/50' : 'bg-red-900/50'}`}>
               <div className="text-4xl font-black">{evFullRun >= 0 ? '+' : ''}{evFullRun}x</div>
@@ -319,15 +269,15 @@ function App() {
           </div>
         </div>
 
-        {/* Acquisition Fee Calculator - moved above walk-away as requested */}
+        {/* Acquisition Fee Calculator */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-6">
           <h2 className="text-lg font-bold mb-4">Acquisition Fee Calculator</h2>
           <div className="space-y-5">
             <div>
               <label className="text-xs text-gray-400 block mb-1">EV Basis</label>
               <div className="flex bg-gray-800 rounded-2xl p-1">
-                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 rounded-xl font-medium ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Average</button>
-                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 rounded-xl font-medium ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Full Run</button>
+                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 rounded-xl font-medium ${!useFullRunForFee ? 'bg-orange-600 text-white' : ''}`}>Average</button>
+                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 rounded-xl font-medium ${useFullRunForFee ? 'bg-orange-600 text-white' : ''}`}>Full Run</button>
               </div>
             </div>
 
@@ -397,6 +347,10 @@ function App() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="text-center mt-8">
+          <button onClick={handleSignOut} className="text-gray-500 text-sm">Sign Out</button>
         </div>
       </div>
     </div>
