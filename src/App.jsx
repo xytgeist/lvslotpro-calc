@@ -48,8 +48,8 @@ function App() {
   const [showInfoModal, setShowInfoModal] = useState(false)
 
   // Acquisition Fee Calculator
-  const [useFullRunForFee, setUseFullRunForFee] = useState(false)
-  const [scoutPercentage, setScoutPercentage] = useState(10)
+  const [useFullRunForFee, setUseFullRunForFee] = useState(false)   // Average is default
+  const [scoutPercentage, setScoutPercentage] = useState(10)        // 10% default
 
   // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
@@ -331,7 +331,7 @@ function App() {
           </div>
         </div>
 
-        {/* Acquisition Fee Calculator */}
+        {/* ==================== ACQUISITION FEE CALCULATOR (Average default, 10-15% slider) ==================== */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -356,8 +356,11 @@ function App() {
             </div>
 
             <div>
-              <label className="block text-gray-400 mb-1 text-xs">Scout Share %</label>
-              <div className="flex items-center gap-3 bg-gray-800 rounded-2xl px-4 py-3">
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-gray-400 text-xs">Scout Share</label>
+                <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
+              </div>
+              <div className="bg-gray-800 rounded-2xl px-4 py-3">
                 <input 
                   type="range" 
                   min="10" 
@@ -365,9 +368,8 @@ function App() {
                   step="1"
                   value={scoutPercentage}
                   onChange={(e) => setScoutPercentage(Number(e.target.value))}
-                  className="flex-1 accent-orange-500"
+                  className="w-full accent-orange-500"
                 />
-                <span className="font-bold text-orange-400 w-12 text-right">{scoutPercentage}%</span>
               </div>
             </div>
           </div>
@@ -391,7 +393,7 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor - Now with Dollar Amount */}
+        {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
@@ -419,9 +421,7 @@ function App() {
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
-              <div className="text-4xl font-bold text-green-400">
-                +{testCounter ? getRecommendedWalkAway(testCounter) : 0} bets
-              </div>
+              <div className="text-4xl font-bold text-green-400">+{testCounter ? getRecommendedWalkAway(testCounter) : 0} bets</div>
               <div className="text-sm text-green-400">
                 ${((testCounter ? getRecommendedWalkAway(testCounter) : 0) * betSize).toFixed(0)}
               </div>
