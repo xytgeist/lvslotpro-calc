@@ -47,6 +47,10 @@ function App() {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
+  // Acquisition Fee Calculator
+  const [useFullRunForFee, setUseFullRunForFee] = useState(true)
+  const [scoutPercentage, setScoutPercentage] = useState(20)
+
   // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
@@ -73,10 +77,7 @@ function App() {
     labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
     datasets: [{
       label: 'Recommended Walk-Away',
-      data: Array.from({ length: 21 }, (_, i) => {
-        const counter = 1300 + i * 28
-        return getRecommendedWalkAway(counter)
-      }),
+      data: Array.from({ length: 21 }, (_, i) => getRecommendedWalkAway(1300 + i * 28)),
       borderColor: '#f97316',
       backgroundColor: 'rgba(249, 115, 22, 0.1)',
       tension: 0.45,
@@ -89,40 +90,22 @@ function App() {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: {
-      intersect: false,
-      mode: 'index',
-    },
+    interaction: { intersect: false, mode: 'index' },
     onHover: (event, elements) => {
       if (elements.length > 0) {
         const index = elements[0].index
-        const counter = chartData.labels[index]
-        const walkAway = chartData.datasets[0].data[index]
-        setHoverCounter(counter)
-        setHoverWalkAway(walkAway)
+        setHoverCounter(chartData.labels[index])
+        setHoverWalkAway(chartData.datasets[0].data[index])
       } else {
         setHoverCounter(null)
         setHoverWalkAway(null)
       }
     },
     scales: {
-      x: {
-        title: { display: true, text: 'Counter', color: '#9CA3AF' },
-        grid: { color: '#374151' },
-        ticks: { color: '#9CA3AF', maxTicksLimit: 8 }
-      },
-      y: {
-        title: { display: true, text: 'Walk-Away (Bets)', color: '#9CA3AF' },
-        grid: { color: '#374151' },
-        ticks: { color: '#9CA3AF' },
-        min: 0,
-        max: 260
-      }
+      x: { title: { display: true, text: 'Counter', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' } },
+      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' }, min: 0, max: 260 }
     },
-    plugins: {
-      legend: { display: false },
-      tooltip: { enabled: false },
-    }
+    plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
 
   // Auto RTP adjustment
@@ -192,24 +175,20 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Improved handleSignUp with better rate limit message
   const handleSignUp = async () => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: 'https://lvslotpro.com'
-      }
+      options: { emailRedirectTo: 'https://lvslotpro.com' }
     })
-
     if (error) {
       if (error.message.toLowerCase().includes('rate limit') || error.message.includes('429')) {
-        alert('Email rate limit exceeded.\n\nSupabase only allows a few sign-up emails per hour on the free plan.\nPlease wait about 60 minutes and try again.');
+        alert('Email rate limit exceeded.\n\nPlease wait about 60 minutes and try again.')
       } else {
-        alert(error.message);
+        alert(error.message)
       }
     } else {
-      alert('Account created successfully!\n\nPlease check your email (including spam/junk folder) and click the confirmation link to activate your account.');
+      alert('Account created!\n\nPlease check your email (including spam) and click the confirmation link.')
     }
   }
 
@@ -223,20 +202,8 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Phoenix Link EV Calc</h1>
-          <input 
-            type="email" 
-            placeholder="Email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" 
-          />
-          <input 
-            type="password" 
-            placeholder="Password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" 
-          />
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
           <button onClick={handleLogin} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Login</button>
           <button onClick={handleSignUp} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Sign Up</button>
         </div>
@@ -262,13 +229,11 @@ function App() {
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
             <input 
-              type="text" 
-              inputMode="numeric"
-              value={currentX}
+              type="text" inputMode="numeric" value={currentX} 
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9]/g, '');
                 setCurrentX(val === '' ? '' : parseInt(val, 10));
-              }}
+              }} 
               className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
             />
           </div>
@@ -378,7 +343,6 @@ function App() {
             </button>
           </div>
 
-          {/* Test Counter */}
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
@@ -395,34 +359,81 @@ function App() {
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
-              <div className="text-4xl font-bold text-green-400">
-                +{testCounter ? getRecommendedWalkAway(testCounter) : 0}
-              </div>
+              <div className="text-4xl font-bold text-green-400">+{testCounter ? getRecommendedWalkAway(testCounter) : 0}</div>
               <div className="text-xs text-gray-400">bets</div>
             </div>
           </div>
 
-          {/* Chart */}
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
-            <Line 
-              data={chartData} 
-              options={chartOptions} 
-            />
+            <Line data={chartData} options={chartOptions} />
           </div>
 
-          {/* Live display */}
           <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
             {hoverCounter !== null ? (
-              <>
-                At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> 
-                consider walking away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span>
-              </>
+              <>At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> consider walking away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span></>
             ) : (
-              <>
-                At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> 
-                consider walking away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span>
-              </>
+              <>At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> consider walking away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span></>
             )}
+          </div>
+        </div>
+
+        {/* ==================== ACQUISITION FEE CALCULATOR ==================== */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
+          <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
+
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-gray-400 mb-1 text-xs">EV Basis</label>
+              <div className="flex bg-gray-800 rounded-2xl p-1">
+                <button 
+                  onClick={() => setUseFullRunForFee(false)}
+                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
+                >
+                  Average
+                </button>
+                <button 
+                  onClick={() => setUseFullRunForFee(true)}
+                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
+                >
+                  Full Run
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-400 mb-1 text-xs">Scout Share %</label>
+              <div className="flex items-center gap-3 bg-gray-800 rounded-2xl px-4 py-3">
+                <input 
+                  type="range" 
+                  min="10" 
+                  max="40" 
+                  step="1"
+                  value={scoutPercentage}
+                  onChange={(e) => setScoutPercentage(Number(e.target.value))}
+                  className="flex-1 accent-orange-500"
+                />
+                <span className="font-bold text-orange-400 w-12 text-right">{scoutPercentage}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800 rounded-2xl p-5 text-center mb-4">
+            <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
+            <div className="text-4xl font-bold text-white">
+              ${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}
+            </div>
+            <div className="text-xs text-gray-400">
+              {useFullRunForFee ? 'Full Run EV' : 'Average Case EV'}
+            </div>
+          </div>
+
+          <div className="bg-gray-800 rounded-2xl p-5 text-center">
+            <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
+            <div className="text-5xl font-black text-green-400">
+              ${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">to scout</div>
           </div>
         </div>
 
@@ -461,33 +472,13 @@ function App() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-orange-400 mb-4">Walk-Away Advisor</h3>
-            
             <div className="text-gray-300 text-[15px] leading-relaxed space-y-4">
-              <p>
-                This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).
-              </p>
-              <p>
-                Phoenix Link has extreme <strong>volatility drag</strong> and <strong>drawdown risk</strong>. Even with strong positive remainingEV, 100–300 bet drawdowns occur frequently, and the asymmetric downside can erase weeks of edge in a single session.
-              </p>
-              <p>
-                The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining:
-              </p>
-              <ul className="list-disc pl-5 space-y-1 text-sm">
-                <li><strong>remainingEV</strong> — the true expected value left until the average bonus trigger</li>
-                <li>A <strong>logistic S-curve</strong> that models the non-linear decrease in marginal risk as the counter approaches the must-hit (1888)</li>
-              </ul>
-              <p className="text-orange-300">
-                The exact shape and parameters of the S-curve were calibrated through <strong>Monte Carlo simulations</strong> of thousands of full play-throughs to maximize long-term bankroll growth while properly accounting for volatility drag and realistic drawdown distributions.
-              </p>
-              <p>
-                In short: it converts raw theoretical EV into a practical, utility-aware stopping rule that protects you from giving back your wins to variance.
-              </p>
+              <p>This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
+              <p>Phoenix Link has extreme <strong>volatility drag</strong> and <strong>drawdown risk</strong>. Even with strong positive remainingEV, 100–300 bet drawdowns occur frequently.</p>
+              <p>The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining remainingEV and a logistic S-curve calibrated through Monte Carlo simulations.</p>
+              <p>In short: it converts raw theoretical EV into a practical, utility-aware stopping rule.</p>
             </div>
-
-            <button 
-              onClick={() => setShowInfoModal(false)}
-              className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors"
-            >
+            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors">
               Got it
             </button>
           </div>
