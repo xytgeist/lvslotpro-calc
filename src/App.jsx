@@ -22,6 +22,8 @@ function App() {
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isAllowed, setIsAllowed] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
@@ -48,8 +50,8 @@ function App() {
   const [showInfoModal, setShowInfoModal] = useState(false)
 
   // Acquisition Fee Calculator
-  const [useFullRunForFee, setUseFullRunForFee] = useState(false)   // Average is default
-  const [scoutPercentage, setScoutPercentage] = useState(10)        // 10% default
+  const [useFullRunForFee, setUseFullRunForFee] = useState(false)
+  const [scoutPercentage, setScoutPercentage] = useState(10)
 
   // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
@@ -123,11 +125,30 @@ function App() {
     setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
+  // Auth + Whitelist check
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
-    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => setUser(session?.user ?? null))
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      if (session?.user?.email) checkEmailAllowed(session.user.email)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user?.email) checkEmailAllowed(session.user.email)
+    })
+
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  const checkEmailAllowed = async (userEmail) => {
+    const { data, error } = await supabase
+      .from('allowed_emails')
+      .select('email')
+      .eq('email', userEmail.toLowerCase())
+      .single()
+
+    setIsAllowed(!!data && !error)
+  }
 
   const calculate = () => {
     const oRTP = overallRTP / 100
@@ -193,10 +214,13 @@ function App() {
   }
 
   const handleLogin = async () => {
+    setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) alert(error.message)
+    setLoading(false)
   }
 
+  // Login Screen
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -211,6 +235,28 @@ function App() {
     )
   }
 
+  // Access Denied Screen
+  if (!isAllowed) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm text-center">
+          <h1 className="text-3xl font-bold text-red-500 mb-4">Access Denied</h1>
+          <p className="text-gray-300 mb-6">
+            Your email is not on the approved list.<br />
+            Please contact the owner for access.
+          </p>
+          <button 
+            onClick={() => supabase.auth.signOut()}
+            className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-2xl font-bold"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Main Calculator (only shown to allowed users)
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
@@ -331,7 +377,7 @@ function App() {
           </div>
         </div>
 
-        {/* ==================== ACQUISITION FEE CALCULATOR (Average default, 10-15% slider) ==================== */}
+        {/* Acquisition Fee Calculator */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
