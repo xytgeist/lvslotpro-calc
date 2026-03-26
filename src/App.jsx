@@ -47,9 +47,9 @@ function App() {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Acquisition Fee Calculator - Average is now default
-  const [useFullRunForFee, setUseFullRunForFee] = useState(false)   // Changed to false (Average)
-  const [scoutPercentage, setScoutPercentage] = useState(20)
+  // Acquisition Fee Calculator - Updated defaults
+  const [useFullRunForFee, setUseFullRunForFee] = useState(false)   // Average is default
+  const [scoutPercentage, setScoutPercentage] = useState(10)        // 10% default
 
   // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
@@ -331,7 +331,7 @@ function App() {
           </div>
         </div>
 
-        {/* ==================== ACQUISITION FEE CALCULATOR (Average is now default) ==================== */}
+        {/* ==================== ACQUISITION FEE CALCULATOR ==================== */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -361,7 +361,7 @@ function App() {
                 <input 
                   type="range" 
                   min="10" 
-                  max="40" 
+                  max="15" 
                   step="1"
                   value={scoutPercentage}
                   onChange={(e) => setScoutPercentage(Number(e.target.value))}
