@@ -47,8 +47,8 @@ function App() {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Acquisition Fee Calculator
-  const [useFullRunForFee, setUseFullRunForFee] = useState(true)
+  // Acquisition Fee Calculator - Average is now default
+  const [useFullRunForFee, setUseFullRunForFee] = useState(false)   // Changed to false (Average)
   const [scoutPercentage, setScoutPercentage] = useState(20)
 
   // ====================== SOFTER S-CURVE WALK-AWAY ======================
@@ -331,7 +331,7 @@ function App() {
           </div>
         </div>
 
-        {/* ==================== ACQUISITION FEE CALCULATOR (now above Walk-Away) ==================== */}
+        {/* ==================== ACQUISITION FEE CALCULATOR (Average is now default) ==================== */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
