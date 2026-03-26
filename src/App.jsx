@@ -331,53 +331,7 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
-            <button 
-              onClick={() => setShowInfoModal(true)}
-              className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl"
-            >
-              ℹ️
-            </button>
-          </div>
-
-          <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
-            <div className="flex-1">
-              <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
-              <input 
-                type="text" 
-                inputMode="numeric"
-                value={testCounter}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  setTestCounter(val === '' ? '' : parseInt(val, 10));
-                }}
-                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400"
-              />
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-400 mb-1">Walk-away</div>
-              <div className="text-4xl font-bold text-green-400">+{testCounter ? getRecommendedWalkAway(testCounter) : 0}</div>
-              <div className="text-xs text-gray-400">bets</div>
-            </div>
-          </div>
-
-          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
-            <Line data={chartData} options={chartOptions} />
-          </div>
-
-          <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
-            {hoverCounter !== null ? (
-              <>At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> consider walking away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span></>
-            ) : (
-              <>At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> consider walking away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span></>
-            )}
-          </div>
-        </div>
-
-        {/* ==================== ACQUISITION FEE CALCULATOR ==================== */}
+        {/* ==================== ACQUISITION FEE CALCULATOR (now above Walk-Away) ==================== */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -434,6 +388,52 @@ function App() {
               ${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}
             </div>
             <div className="text-xs text-gray-400 mt-1">to scout</div>
+          </div>
+        </div>
+
+        {/* Walk-Away Advisor */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
+            <button 
+              onClick={() => setShowInfoModal(true)}
+              className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl"
+            >
+              ℹ️
+            </button>
+          </div>
+
+          <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
+              <input 
+                type="text" 
+                inputMode="numeric"
+                value={testCounter}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setTestCounter(val === '' ? '' : parseInt(val, 10));
+                }}
+                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400"
+              />
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-400 mb-1">Walk-away</div>
+              <div className="text-4xl font-bold text-green-400">+{testCounter ? getRecommendedWalkAway(testCounter) : 0}</div>
+              <div className="text-xs text-gray-400">bets</div>
+            </div>
+          </div>
+
+          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+
+          <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
+            {hoverCounter !== null ? (
+              <>At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> consider walking away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span></>
+            ) : (
+              <>At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> consider walking away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span></>
+            )}
           </div>
         </div>
 
