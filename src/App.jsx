@@ -23,6 +23,7 @@ function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isAllowed, setIsAllowed] = useState(false)
+  const [isChecking, setIsChecking] = useState(true)   // ← New: prevents flash
 
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
@@ -47,17 +48,15 @@ function App() {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Acquisition Fee Calculator
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // ====================== SOFTER S-CURVE WALK-AWAY ======================
+  // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
     const inc = increment
     const avgTrig = avgTrigger
-    const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
@@ -67,7 +66,6 @@ function App() {
     let walkAway = Math.round(remainingEV * 3.5 + curveBonus)
     return Math.max(75, Math.min(245, walkAway))
   }
-  // =====================================================================
 
   const chartData = {
     labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
@@ -118,16 +116,26 @@ function App() {
     setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
-  // Auth + Whitelist check
+  // Auth + Whitelist with loading state
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user?.email) checkEmailAllowed(session.user.email)
+      if (session?.user?.email) {
+        checkEmailAllowed(session.user.email)
+      } else {
+        setIsChecking(false)
+      }
     })
+
     const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
       setUser(session?.user ?? null)
-      if (session?.user?.email) checkEmailAllowed(session.user.email)
+      if (session?.user?.email) {
+        checkEmailAllowed(session.user.email)
+      } else {
+        setIsChecking(false)
+      }
     })
+
     return () => listener.subscription.unsubscribe()
   }, [])
 
@@ -142,11 +150,12 @@ function App() {
     if (error) {
       console.error('Whitelist query error:', error)
       if (error.code === '406') {
-        console.error('→ RLS is still enabled on allowed_emails table. Disable it in Supabase!')
+        console.error('→ RLS is still enabled on allowed_emails table. Disable it!')
       }
     }
 
     setIsAllowed(!!data && !error)
+    setIsChecking(false)   // ← Important: stop loading
   }
 
   const calculate = () => {
@@ -211,6 +220,15 @@ function App() {
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) alert(error.message)
+  }
+
+  // Show loading while checking whitelist
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-orange-500 text-xl">Loading...</div>
+      </div>
+    )
   }
 
   // Login Screen
@@ -305,7 +323,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings */}
+        {/* Advanced Settings - unchanged */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
