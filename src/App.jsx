@@ -57,13 +57,12 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // ====================== SOFTER S-CURVE WALK-AWAY ======================
+  // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
     const inc = increment
     const avgTrig = avgTrigger
-    const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
@@ -73,7 +72,6 @@ function App() {
     let walkAway = Math.round(remainingEV * 3.5 + curveBonus)
     return Math.max(75, Math.min(245, walkAway))
   }
-  // =====================================================================
 
   const chartData = {
     labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
@@ -110,7 +108,7 @@ function App() {
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
 
-  // Auto RTP adjustment
+  // Auto RTP
   useEffect(() => {
     let baseOverall = 91
     let baseBase = 28
@@ -124,17 +122,22 @@ function App() {
     setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
-  // Auth + Whitelist + Reset Link Detection
+  // Enhanced Auth + Reset Detection
   useEffect(() => {
-    const checkSession = async () => {
+    const handleAuthChange = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      
-      // Detect if user arrived via password reset link
-      if (session?.user && session.user.user_metadata?.is_recovery) {
-        setIsResetMode(true)
-        setUser(session.user)
-        setIsChecking(false)
-        return
+
+      // Check for password recovery mode (from reset link)
+      if (session?.user) {
+        const isRecovery = session.user.user_metadata?.is_recovery || 
+                          window.location.hash.includes('type=recovery')
+        
+        if (isRecovery) {
+          setIsResetMode(true)
+          setUser(session.user)
+          setIsChecking(false)
+          return
+        }
       }
 
       setUser(session?.user ?? null)
@@ -145,22 +148,10 @@ function App() {
       }
     }
 
-    checkSession()
+    handleAuthChange()
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
-      if (session?.user && session.user.user_metadata?.is_recovery) {
-        setIsResetMode(true)
-        setUser(session.user)
-        setIsChecking(false)
-        return
-      }
-
-      setUser(session?.user ?? null)
-      if (session?.user?.email) {
-        checkEmailAllowed(session.user.email)
-      } else {
-        setIsChecking(false)
-      }
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      handleAuthChange()
     })
 
     return () => listener.subscription.unsubscribe()
@@ -234,7 +225,7 @@ function App() {
       alert(error.message)
     } else {
       setResetEmailSent(true)
-      alert('Password reset link sent! Check your email (including spam).')
+      alert('Password reset link sent! Check your email (including spam folder).')
     }
   }
 
@@ -247,10 +238,11 @@ function App() {
     if (error) {
       alert(error.message)
     } else {
-      alert("Password updated successfully! Please log in with your new password.")
+      alert("Password updated successfully!")
       setIsResetMode(false)
       setNewPassword('')
-      window.location.reload() // Refresh to clear recovery mode
+      // Refresh to clear recovery state
+      window.location.reload()
     }
   }
 
@@ -260,15 +252,8 @@ function App() {
       password,
       options: { emailRedirectTo: 'https://lvslotpro.com' }
     })
-    if (error) {
-      if (error.message.toLowerCase().includes('rate limit') || error.message.includes('429')) {
-        alert('Email rate limit exceeded.\n\nCustom SMTP should fix this.')
-      } else {
-        alert(error.message)
-      }
-    } else {
-      alert('Account created!\n\nPlease check your email (including spam) and click the confirmation link.')
-    }
+    if (error) alert(error.message)
+    else alert('Account created! Check your email.')
   }
 
   const handleLogin = async () => {
@@ -282,7 +267,7 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
   }
 
-  // Reset Password Screen
+  // Reset Password Screen (triggered by reset link)
   if (isResetMode) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -297,6 +282,9 @@ function App() {
           />
           <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">
             Update Password
+          </button>
+          <button onClick={() => setIsResetMode(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">
+            Cancel
           </button>
         </div>
       </div>
@@ -316,7 +304,7 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
               <button onClick={handleForgotPassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Send Reset Link</button>
               <button onClick={() => setShowForgotPassword(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Back to Login</button>
-              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent! Check your email.</p>}
+              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent! Check your email (including spam).</p>}
             </>
           ) : (
             <>
@@ -332,7 +320,7 @@ function App() {
     )
   }
 
-  // Access Denied Screen
+  // Access Denied
   if (!isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -607,7 +595,7 @@ function App() {
           </div>
         </div>
 
-        {/* Logout Button at the bottom */}
+        {/* Logout Button at bottom */}
         <div className="text-center mt-12 mb-8">
           <button 
             onClick={handleSignOut}
