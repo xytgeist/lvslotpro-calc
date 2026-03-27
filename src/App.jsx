@@ -142,7 +142,7 @@ function App() {
     if (error) {
       console.error('Whitelist query error:', error)
       if (error.code === '406') {
-        console.error('→ Row Level Security (RLS) is still enabled on allowed_emails table!')
+        console.error('→ RLS is still enabled on allowed_emails table. Disable it in Supabase!')
       }
     }
 
@@ -199,7 +199,7 @@ function App() {
     })
     if (error) {
       if (error.message.toLowerCase().includes('rate limit') || error.message.includes('429')) {
-        alert('Email rate limit exceeded.\n\nPlease wait about 60 minutes and try again.')
+        alert('Email rate limit exceeded.\n\nCustom SMTP should fix this.')
       } else {
         alert(error.message)
       }
@@ -249,7 +249,7 @@ function App() {
     )
   }
 
-  // Main Calculator (only shown to allowed users)
+  // Main Calculator
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
