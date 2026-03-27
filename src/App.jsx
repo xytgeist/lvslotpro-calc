@@ -25,7 +25,7 @@ function App() {
   const [isAllowed, setIsAllowed] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
 
-  // Password Reset States
+  // Password Reset
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [resetEmailSent, setResetEmailSent] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -57,7 +57,6 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -122,36 +121,42 @@ function App() {
     setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
-  // Enhanced Auth + Reset Detection
+  // Stronger Reset Link Detection
   useEffect(() => {
-    const handleAuthChange = async () => {
+    const checkForReset = async () => {
       const { data: { session } } = await supabase.auth.getSession()
 
-      // Check for password recovery mode (from reset link)
-      if (session?.user) {
-        const isRecovery = session.user.user_metadata?.is_recovery || 
-                          window.location.hash.includes('type=recovery')
-        
-        if (isRecovery) {
-          setIsResetMode(true)
-          setUser(session.user)
-          setIsChecking(false)
-          return
-        }
+      // Check for recovery mode from Supabase reset link
+      const isRecovery = 
+        session?.user?.user_metadata?.is_recovery === true ||
+        window.location.hash.includes('type=recovery') ||
+        window.location.hash.includes('access_token')
+
+      if (isRecovery && session?.user) {
+        setIsResetMode(true)
+        setUser(session.user)
+        setIsChecking(false)
+        return
       }
 
       setUser(session?.user ?? null)
-      if (session?.user?.email) {
+      if (session?.user?.email && !isRecovery) {
         checkEmailAllowed(session.user.email)
       } else {
         setIsChecking(false)
       }
     }
 
-    handleAuthChange()
+    checkForReset()
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      handleAuthChange()
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResetMode(true)
+        setUser(session?.user)
+        setIsChecking(false)
+      } else {
+        checkForReset()
+      }
     })
 
     return () => listener.subscription.unsubscribe()
@@ -215,17 +220,16 @@ function App() {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      alert("Please enter your email address")
+      alert("Please enter your email")
       return
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: 'https://lvslotpro.com'
     })
-    if (error) {
-      alert(error.message)
-    } else {
+    if (error) alert(error.message)
+    else {
       setResetEmailSent(true)
-      alert('Password reset link sent! Check your email (including spam folder).')
+      alert('Password reset link sent! Check your email (including spam).')
     }
   }
 
@@ -235,13 +239,11 @@ function App() {
       return
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) {
-      alert(error.message)
-    } else {
+    if (error) alert(error.message)
+    else {
       alert("Password updated successfully!")
       setIsResetMode(false)
       setNewPassword('')
-      // Refresh to clear recovery state
       window.location.reload()
     }
   }
@@ -267,7 +269,7 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
   }
 
-  // Reset Password Screen (triggered by reset link)
+  // Reset Password Screen
   if (isResetMode) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -282,9 +284,6 @@ function App() {
           />
           <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">
             Update Password
-          </button>
-          <button onClick={() => setIsResetMode(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">
-            Cancel
           </button>
         </div>
       </div>
@@ -304,7 +303,7 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
               <button onClick={handleForgotPassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Send Reset Link</button>
               <button onClick={() => setShowForgotPassword(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Back to Login</button>
-              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent! Check your email (including spam).</p>}
+              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent! Check your email.</p>}
             </>
           ) : (
             <>
@@ -338,7 +337,7 @@ function App() {
     )
   }
 
-  // Main Calculator
+  // Main Calculator (your original UI)
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
@@ -394,7 +393,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings */}
+        {/* Advanced Settings - unchanged */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -463,18 +462,8 @@ function App() {
             <div>
               <label className="block text-gray-400 mb-1 text-xs">EV Basis</label>
               <div className="flex bg-gray-800 rounded-2xl p-1">
-                <button
-                  onClick={() => setUseFullRunForFee(false)}
-                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
-                >
-                  Average
-                </button>
-                <button
-                  onClick={() => setUseFullRunForFee(true)}
-                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
-                >
-                  Full Run
-                </button>
+                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Average</button>
+                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Full Run</button>
               </div>
             </div>
             <div>
@@ -483,15 +472,7 @@ function App() {
                 <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
               </div>
               <div className="bg-gray-800 rounded-2xl px-4 py-3">
-                <input
-                  type="range"
-                  min="10"
-                  max="15"
-                  step="1"
-                  value={scoutPercentage}
-                  onChange={(e) => setScoutPercentage(Number(e.target.value))}
-                  className="w-full accent-orange-500"
-                />
+                <input type="range" min="10" max="15" step="1" value={scoutPercentage} onChange={(e) => setScoutPercentage(Number(e.target.value))} className="w-full accent-orange-500" />
               </div>
             </div>
           </div>
@@ -517,26 +498,15 @@ function App() {
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
-            <button
-              onClick={() => setShowInfoModal(true)}
-              className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl"
-            >
-              ℹ️
-            </button>
+            <button onClick={() => setShowInfoModal(true)} className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl">ℹ️</button>
           </div>
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={testCounter}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  setTestCounter(val === '' ? '' : parseInt(val, 10));
-                }}
-                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400"
-              />
+              <input type="text" inputMode="numeric" value={testCounter} onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setTestCounter(val === '' ? '' : parseInt(val, 10));
+              }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
@@ -551,17 +521,9 @@ function App() {
           </div>
           <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
             {hoverCounter !== null ? (
-              <>
-                At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span>
-                walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span>
-                <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span>
-              </>
+              <>At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
             ) : (
-              <>
-                At <span className="text-orange-400 font-semibold mx-1">{currentX}</span>
-                walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span>
-                <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span>
-              </>
+              <>At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span></>
             )}
           </div>
         </div>
@@ -595,12 +557,9 @@ function App() {
           </div>
         </div>
 
-        {/* Logout Button at bottom */}
+        {/* Logout at bottom */}
         <div className="text-center mt-12 mb-8">
-          <button 
-            onClick={handleSignOut}
-            className="text-gray-500 hover:text-red-400 text-sm underline"
-          >
+          <button onClick={handleSignOut} className="text-gray-500 hover:text-red-400 text-sm underline">
             Log Out
           </button>
         </div>
