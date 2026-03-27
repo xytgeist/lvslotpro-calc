@@ -57,12 +57,13 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // Walk-Away S-Curve
+  // ====================== SOFTER S-CURVE WALK-AWAY ======================
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
     const inc = increment
     const avgTrig = avgTrigger
+    const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
@@ -72,6 +73,7 @@ function App() {
     let walkAway = Math.round(remainingEV * 3.5 + curveBonus)
     return Math.max(75, Math.min(245, walkAway))
   }
+  // =====================================================================
 
   const chartData = {
     labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
@@ -122,18 +124,43 @@ function App() {
     setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
-  // Auth + Whitelist
+  // Auth + Whitelist + Reset Link Detection
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      // Detect if user arrived via password reset link
+      if (session?.user && session.user.user_metadata?.is_recovery) {
+        setIsResetMode(true)
+        setUser(session.user)
+        setIsChecking(false)
+        return
+      }
+
       setUser(session?.user ?? null)
-      if (session?.user?.email) checkEmailAllowed(session.user.email)
-      else setIsChecking(false)
-    })
+      if (session?.user?.email) {
+        checkEmailAllowed(session.user.email)
+      } else {
+        setIsChecking(false)
+      }
+    }
+
+    checkSession()
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
+      if (session?.user && session.user.user_metadata?.is_recovery) {
+        setIsResetMode(true)
+        setUser(session.user)
+        setIsChecking(false)
+        return
+      }
+
       setUser(session?.user ?? null)
-      if (session?.user?.email) checkEmailAllowed(session.user.email)
-      else setIsChecking(false)
+      if (session?.user?.email) {
+        checkEmailAllowed(session.user.email)
+      } else {
+        setIsChecking(false)
+      }
     })
 
     return () => listener.subscription.unsubscribe()
@@ -223,6 +250,7 @@ function App() {
       alert("Password updated successfully! Please log in with your new password.")
       setIsResetMode(false)
       setNewPassword('')
+      window.location.reload() // Refresh to clear recovery mode
     }
   }
 
@@ -248,19 +276,18 @@ function App() {
     if (error) alert(error.message)
   }
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-  }
+  const handleSignOut = () => supabase.auth.signOut()
 
   if (isChecking) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
   }
 
+  // Reset Password Screen
   if (isResetMode) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Reset Password</h1>
+          <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
           <input 
             type="password" 
             placeholder="New Password (min 6 characters)" 
@@ -271,14 +298,12 @@ function App() {
           <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">
             Update Password
           </button>
-          <button onClick={() => setIsResetMode(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">
-            Cancel
-          </button>
         </div>
       </div>
     )
   }
 
+  // Login Screen
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -307,6 +332,7 @@ function App() {
     )
   }
 
+  // Access Denied Screen
   if (!isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -581,7 +607,7 @@ function App() {
           </div>
         </div>
 
-        {/* Logout Button - Added at the very bottom as requested */}
+        {/* Logout Button at the bottom */}
         <div className="text-center mt-12 mb-8">
           <button 
             onClick={handleSignOut}
