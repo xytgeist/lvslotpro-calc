@@ -400,7 +400,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings - FIXED with robust text inputs */}
+        {/* Advanced Settings - FIXED with safe text inputs */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
