@@ -400,7 +400,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings - FIXED with proper text inputs */}
+        {/* Advanced Settings - FIXED with robust text inputs */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -414,76 +414,82 @@ function App() {
                   {maxMajor ? 'YES' : 'NO'}
                 </button>
               </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
                 <input 
-                  type="text" 
-                  value={overallRTP} 
+                  type="text"
+                  value={overallRTP}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, '');
                     setOverallRTP(val === '' ? 91 : parseFloat(val));
-                  }} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                  }}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
                 />
               </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Base RTP (%)</label>
                 <input 
-                  type="text" 
-                  value={baseRTP} 
+                  type="text"
+                  value={baseRTP}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, '');
                     setBaseRTP(val === '' ? 28 : parseFloat(val));
-                  }} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                  }}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
                 />
               </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
                 <input 
-                  type="text" 
-                  value={increment} 
+                  type="text"
+                  value={increment}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, '');
                     setIncrement(val === '' ? 1.1 : parseFloat(val));
-                  }} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                  }}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
                 />
               </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Spins to Bonus</label>
                 <input 
-                  type="text" 
-                  value={allBonusFreq} 
+                  type="text"
+                  value={allBonusFreq}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, '');
                     setAllBonusFreq(val === '' ? 80 : parseFloat(val));
-                  }} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                  }}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
                 />
               </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
                 <input 
-                  type="text" 
-                  value={avgTrigger} 
+                  type="text"
+                  value={avgTrigger}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, '');
                     setAvgTrigger(val === '' ? 1800 : parseFloat(val));
-                  }} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                  }}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
                 />
               </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
                 <input 
-                  type="text" 
-                  value={mustHit} 
+                  type="text"
+                  value={mustHit}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, '');
                     setMustHit(val === '' ? 1888 : parseFloat(val));
-                  }} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                  }}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
                 />
               </div>
             </div>
@@ -574,10 +580,16 @@ function App() {
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
-              <input type="text" inputMode="numeric" value={testCounter} onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setTestCounter(val === '' ? '' : parseInt(val, 10));
-              }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={testCounter}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setTestCounter(val === '' ? '' : parseInt(val, 10));
+                }}
+                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400"
+              />
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
