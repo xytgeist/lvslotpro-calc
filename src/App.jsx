@@ -45,6 +45,8 @@ function App() {
 
   const [evAvg, setEvAvg] = useState(0)
   const [evFullRun, setEvFullRun] = useState(0)
+  const [maxExposureAvg, setMaxExposureAvg] = useState(0)      // New
+  const [maxExposureFull, setMaxExposureFull] = useState(0)    // New
   const [beAvg, setBeAvg] = useState(0)
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
@@ -57,6 +59,7 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
+  // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -121,12 +124,11 @@ function App() {
     setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
-  // Stronger Reset Link Detection
+  // Auth + Whitelist + Reset Detection
   useEffect(() => {
-    const checkForReset = async () => {
+    const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-
-      // Check for recovery mode from Supabase reset link
+      
       const isRecovery = 
         session?.user?.user_metadata?.is_recovery === true ||
         window.location.hash.includes('type=recovery') ||
@@ -147,7 +149,7 @@ function App() {
       }
     }
 
-    checkForReset()
+    checkSession()
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -155,7 +157,7 @@ function App() {
         setUser(session?.user)
         setIsChecking(false)
       } else {
-        checkForReset()
+        checkSession()
       }
     })
 
@@ -189,15 +191,25 @@ function App() {
     const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / pTotal
     const he = 1 - (oRTP - pCounter * B)
+
     const spinsAvg = Math.max(0, (avgTrig - X) / inc)
     const spinsFull = Math.max(0, (must - X) / inc)
+
     const avgEV = B - he * spinsAvg
     const fullEV = B - he * spinsFull
+
+    // New: Max Exposure = spins * (1 - baseRTP)   [worst case = no bonuses]
+    const baseHouseEdge = 1 - (baseRTP / 100)
+    const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
+    const maxExpFull = Math.round(spinsFull * baseHouseEdge)
+
     const breakevenAvg = Math.round(avgTrig - (B / he) * inc)
     const breakevenFull = Math.round(must - (B / he) * inc)
 
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
+    setMaxExposureAvg(maxExpAvg)      // New
+    setMaxExposureFull(maxExpFull)    // New
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
@@ -218,9 +230,10 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
+  // Forgot Password handlers (unchanged)
   const handleForgotPassword = async () => {
     if (!email) {
-      alert("Please enter your email")
+      alert("Please enter your email address")
       return
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -269,7 +282,6 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
   }
 
-  // Reset Password Screen
   if (isResetMode) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -290,7 +302,6 @@ function App() {
     )
   }
 
-  // Login Screen
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -319,25 +330,19 @@ function App() {
     )
   }
 
-  // Access Denied
   if (!isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm text-center">
           <h1 className="text-3xl font-bold text-red-500 mb-4">Access Denied</h1>
-          <p className="text-gray-300 mb-6">
-            Your email is not on the approved list.<br />
-            Please contact the owner for access.
-          </p>
-          <button onClick={handleSignOut} className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-2xl font-bold">
-            Sign Out
-          </button>
+          <p className="text-gray-300 mb-6">Your email is not on the approved list.<br />Please contact the owner for access.</p>
+          <button onClick={handleSignOut} className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-2xl font-bold">Sign Out</button>
         </div>
       </div>
     )
   }
 
-  // Main Calculator (your original UI)
+  // Main Calculator
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
@@ -350,44 +355,25 @@ function App() {
           </h1>
         </div>
 
-        {/* Inputs */}
+        {/* Inputs - unchanged */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
-            <input
-              type="text" inputMode="numeric" value={currentX}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setCurrentX(val === '' ? '' : parseInt(val, 10));
-              }}
-              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500"
-            />
+            <input type="text" inputMode="numeric" value={currentX} onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9]/g, '');
+              setCurrentX(val === '' ? '' : parseInt(val, 10));
+            }} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input type="number" step="0.01" value={betSize}
-                onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
-              />
+              <input type="number" step="0.01" value={betSize} onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
-              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))}
-                className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
-                <option value={0.01}>$0.01</option>
-                <option value={0.02}>$0.02</option>
-                <option value={0.05}>$0.05</option>
-                <option value={0.10}>$0.10</option>
-                <option value={0.25}>$0.25</option>
-                <option value={1}>$1</option>
-                <option value={2}>$2</option>
-                <option value={5}>$5</option>
-                <option value={10}>$10</option>
-                <option value={25}>$25</option>
-                <option value={50}>$50</option>
-                <option value={100}>$100</option>
+              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
               </select>
             </div>
           </div>
@@ -429,24 +415,37 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Break Even */}
+        {/* Current EV + Break Even + NEW Max Exposure */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Average Case */}
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Average Case</div>
               <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
               <div className="text-sm">${(evAvg * betSize).toFixed(2)}</div>
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <div className="text-xs text-gray-400">Max Exposure</div>
+                <div className="text-red-400 font-bold">{maxExposureAvg} bets (${(maxExposureAvg * betSize).toFixed(0)})</div>
+              </div>
             </div>
+
+            {/* Full Run */}
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
               <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
               <div className="text-sm">${(evFullRun * betSize).toFixed(2)}</div>
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <div className="text-xs text-gray-400">Max Exposure</div>
+                <div className="text-red-400 font-bold">{maxExposureFull} bets (${(maxExposureFull * betSize).toFixed(0)})</div>
+              </div>
             </div>
           </div>
+
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
+
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
@@ -454,7 +453,7 @@ function App() {
           </div>
         </div>
 
-        {/* Acquisition Fee Calculator */}
+        {/* Acquisition Fee Calculator - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -494,7 +493,7 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
+        {/* Walk-Away Advisor - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
@@ -528,7 +527,7 @@ function App() {
           </div>
         </div>
 
-        {/* EV Table */}
+        {/* EV Table - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
           <div className="overflow-x-auto">
@@ -557,7 +556,7 @@ function App() {
           </div>
         </div>
 
-        {/* Logout at bottom */}
+        {/* Logout */}
         <div className="text-center mt-12 mb-8">
           <button onClick={handleSignOut} className="text-gray-500 hover:text-red-400 text-sm underline">
             Log Out
