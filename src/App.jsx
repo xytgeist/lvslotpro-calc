@@ -45,8 +45,8 @@ function App() {
 
   const [evAvg, setEvAvg] = useState(0)
   const [evFullRun, setEvFullRun] = useState(0)
-  const [maxExposureAvg, setMaxExposureAvg] = useState(0)      // New
-  const [maxExposureFull, setMaxExposureFull] = useState(0)    // New
+  const [maxExposureAvg, setMaxExposureAvg] = useState(0)
+  const [maxExposureFull, setMaxExposureFull] = useState(0)
   const [beAvg, setBeAvg] = useState(0)
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
@@ -128,19 +128,17 @@ function App() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      
-      const isRecovery = 
+     
+      const isRecovery =
         session?.user?.user_metadata?.is_recovery === true ||
         window.location.hash.includes('type=recovery') ||
         window.location.hash.includes('access_token')
-
       if (isRecovery && session?.user) {
         setIsResetMode(true)
         setUser(session.user)
         setIsChecking(false)
         return
       }
-
       setUser(session?.user ?? null)
       if (session?.user?.email && !isRecovery) {
         checkEmailAllowed(session.user.email)
@@ -148,9 +146,7 @@ function App() {
         setIsChecking(false)
       }
     }
-
     checkSession()
-
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsResetMode(true)
@@ -160,7 +156,6 @@ function App() {
         checkSession()
       }
     })
-
     return () => listener.subscription.unsubscribe()
   }, [])
 
@@ -171,9 +166,7 @@ function App() {
       .select('email')
       .eq('email', cleanEmail)
       .single()
-
     if (error) console.error('Whitelist error:', error)
-
     setIsAllowed(!!data && !error)
     setIsChecking(false)
   }
@@ -191,25 +184,21 @@ function App() {
     const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / pTotal
     const he = 1 - (oRTP - pCounter * B)
-
     const spinsAvg = Math.max(0, (avgTrig - X) / inc)
     const spinsFull = Math.max(0, (must - X) / inc)
-
     const avgEV = B - he * spinsAvg
     const fullEV = B - he * spinsFull
 
-    // New: Max Exposure = spins * (1 - baseRTP)   [worst case = no bonuses]
     const baseHouseEdge = 1 - (baseRTP / 100)
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
-
     const breakevenAvg = Math.round(avgTrig - (B / he) * inc)
     const breakevenFull = Math.round(must - (B / he) * inc)
 
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
-    setMaxExposureAvg(maxExpAvg)      // New
-    setMaxExposureFull(maxExpFull)    // New
+    setMaxExposureAvg(maxExpAvg)
+    setMaxExposureFull(maxExpFull)
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
@@ -230,7 +219,35 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Forgot Password handlers (unchanged)
+  // Safe handlers for Advanced Settings (this fixes the delete issue)
+  const handleFloatChange = (setter, defaultVal) => (e) => {
+    const val = e.target.value.replace(/[^0-9.]/g, '');
+    setter(val);                    // Allow empty while typing
+  };
+
+  const handleFloatBlur = (setter, defaultVal) => (e) => {
+    let val = e.target.value.trim();
+    if (val === '' || isNaN(parseFloat(val))) {
+      setter(defaultVal);
+    } else {
+      setter(parseFloat(val));
+    }
+  };
+
+  const handleIntegerChange = (setter, defaultVal) => (e) => {
+    const val = e.target.value.replace(/[^0-9]/g, '');
+    setter(val);
+  };
+
+  const handleIntegerBlur = (setter, defaultVal) => (e) => {
+    let val = e.target.value.trim();
+    if (val === '' || isNaN(parseInt(val, 10))) {
+      setter(defaultVal);
+    } else {
+      setter(parseInt(val, 10));
+    }
+  };
+
   const handleForgotPassword = async () => {
     if (!email) {
       alert("Please enter your email address")
@@ -287,12 +304,12 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
-          <input 
-            type="password" 
-            placeholder="New Password (min 6 characters)" 
-            value={newPassword} 
-            onChange={(e) => setNewPassword(e.target.value)} 
-            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" 
+          <input
+            type="password"
+            placeholder="New Password (min 6 characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg"
           />
           <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">
             Update Password
@@ -307,7 +324,6 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Phoenix Link EV Calc</h1>
-
           {showForgotPassword ? (
             <>
               <h2 className="text-xl text-center mb-6">Reset Password</h2>
@@ -342,7 +358,6 @@ function App() {
     )
   }
 
-  // Main Calculator
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
@@ -355,7 +370,7 @@ function App() {
           </h1>
         </div>
 
-        {/* Inputs - unchanged */}
+        {/* Inputs */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -368,7 +383,13 @@ function App() {
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input type="number" step="0.01" value={betSize} onChange={(e) => setBetSize(e.target.value === '' ? '' : parseFloat(e.target.value))} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
+              <input 
+                type="text" 
+                value={betSize} 
+                onChange={handleFloatChange(setBetSize, 25)}
+                onBlur={handleFloatBlur(setBetSize, 25)}
+                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
+              />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
@@ -379,7 +400,7 @@ function App() {
           </div>
         </div>
 
-        {/* Advanced Settings - unchanged */}
+        {/* Advanced Settings - FIXED */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -393,33 +414,80 @@ function App() {
                   {maxMajor ? 'YES' : 'NO'}
                 </button>
               </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
-                <input type="number" step="0.01" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
+                <input 
+                  type="text"
+                  value={overallRTP}
+                  onChange={handleFloatChange(setOverallRTP, 91)}
+                  onBlur={handleFloatBlur(setOverallRTP, 91)}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
+                />
               </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Base RTP (%)</label>
-                <input type="number" step="0.01" value={baseRTP} onChange={(e) => setBaseRTP(parseFloat(e.target.value) || 28)} className="w-full p-3 bg-gray-800 rounded-xl" />
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">Base RTP (%)</label>
+                <input 
+                  type="text"
+                  value={baseRTP}
+                  onChange={handleFloatChange(setBaseRTP, 28)}
+                  onBlur={handleFloatBlur(setBaseRTP, 28)}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
+                />
               </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
-                <input type="number" step="0.01" value={increment} onChange={(e) => setIncrement(parseFloat(e.target.value) || 1.1)} className="w-full p-3 bg-gray-800 rounded-xl" />
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
+                <input 
+                  type="text"
+                  value={increment}
+                  onChange={handleFloatChange(setIncrement, 1.1)}
+                  onBlur={handleFloatBlur(setIncrement, 1.1)}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
+                />
               </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Avg Spins to Bonus</label>
-                <input type="number" value={allBonusFreq} onChange={(e) => setAllBonusFreq(parseFloat(e.target.value) || 80)} className="w-full p-3 bg-gray-800 rounded-xl" />
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">Avg Spins to Bonus</label>
+                <input 
+                  type="text"
+                  value={allBonusFreq}
+                  onChange={handleFloatChange(setAllBonusFreq, 80)}
+                  onBlur={handleFloatBlur(setAllBonusFreq, 80)}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
+                />
               </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
-                <input type="number" value={avgTrigger} onChange={(e) => setAvgTrigger(parseFloat(e.target.value) || 1800)} className="w-full p-3 bg-gray-800 rounded-xl" />
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
+                <input 
+                  type="text"
+                  value={avgTrigger}
+                  onChange={handleFloatChange(setAvgTrigger, 1800)}
+                  onBlur={handleFloatBlur(setAvgTrigger, 1800)}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
+                />
               </div>
-              <div><label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
-                <input type="number" value={mustHit} onChange={(e) => setMustHit(parseFloat(e.target.value) || 1888)} className="w-full p-3 bg-gray-800 rounded-xl" />
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
+                <input 
+                  type="text"
+                  value={mustHit}
+                  onChange={handleIntegerChange(setMustHit, 1888)}
+                  onBlur={handleIntegerBlur(setMustHit, 1888)}
+                  className="w-full p-3 bg-gray-800 rounded-xl"
+                />
               </div>
             </div>
           )}
         </div>
 
-        {/* Current EV + Break Even + NEW Max Exposure */}
+        {/* Current EV + Max Exposure (unchanged) */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
-            {/* Average Case */}
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Average Case</div>
               <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
@@ -429,8 +497,6 @@ function App() {
                 <div className="text-red-400 font-bold">{maxExposureAvg} bets (${(maxExposureAvg * betSize).toFixed(0)})</div>
               </div>
             </div>
-
-            {/* Full Run */}
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
               <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
@@ -453,7 +519,7 @@ function App() {
           </div>
         </div>
 
-        {/* Acquisition Fee Calculator - unchanged */}
+        {/* Acquisition Fee Calculator */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -493,7 +559,7 @@ function App() {
           </div>
         </div>
 
-        {/* Walk-Away Advisor - unchanged */}
+        {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
@@ -527,7 +593,7 @@ function App() {
           </div>
         </div>
 
-        {/* EV Table - unchanged */}
+        {/* EV Table */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
           <div className="overflow-x-auto">
