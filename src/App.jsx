@@ -51,7 +51,7 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // New: FP to +EV (dollar amount)
+  // NEW: FP to +EV (dollar amount of Free Play needed)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
@@ -132,11 +132,11 @@ function App() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      const isRecovery = 
+    
+      const isRecovery =
         session?.user?.user_metadata?.is_recovery === true ||
         window.location.hash.includes('type=recovery') ||
         window.location.hash.includes('access_token')
-
       if (isRecovery && session?.user) {
         setIsResetMode(true)
         setUser(session.user)
@@ -151,7 +151,6 @@ function App() {
       }
     }
     checkSession()
-
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsResetMode(true)
@@ -210,7 +209,7 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // ==================== FP to +EV (Dollar Amount) ====================
+    // NEW: FP to +EV (dollar amount using Free Play)
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -221,7 +220,6 @@ function App() {
       const dollarsNeeded = Math.round(spinsNeeded * bet)
       setFpDollarsNeeded(dollarsNeeded)
     }
-    // =================================================================
 
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
@@ -240,7 +238,7 @@ function App() {
 
   useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Safe input handlers
+  // Safe handlers for Advanced Settings
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '');
     setter(val);
@@ -325,8 +323,16 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
-          <input type="password" placeholder="New Password (min 6 characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
-          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Update Password</button>
+          <input
+            type="password"
+            placeholder="New Password (min 6 characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg"
+          />
+          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">
+            Update Password
+          </button>
         </div>
       </div>
     )
@@ -387,27 +393,21 @@ function App() {
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
-            <input 
-              type="text" 
-              inputMode="numeric" 
-              value={currentX} 
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setCurrentX(val === '' ? '' : parseInt(val, 10));
-              }} 
-              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
-            />
+            <input type="text" inputMode="numeric" value={currentX} onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9]/g, '');
+              setCurrentX(val === '' ? '' : parseInt(val, 10));
+            }} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input 
-                type="text" 
-                value={betSize} 
+              <input
+                type="text"
+                value={betSize}
                 onChange={handleFloatChange(setBetSize, 25)}
                 onBlur={handleFloatBlur(setBetSize, 25)}
-                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
+                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
               />
             </div>
             <div>
@@ -433,7 +433,6 @@ function App() {
                   {maxMajor ? 'YES' : 'NO'}
                 </button>
               </div>
-
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
                 <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
@@ -485,11 +484,9 @@ function App() {
               </div>
             </div>
           </div>
-
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
-
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
@@ -512,18 +509,140 @@ function App() {
                 ${fpDollarsNeeded}
               </div>
               <div className="text-xs text-gray-400 mt-4">
-                Use this amount of casino Free Play to push the counter to breakeven
+                Use this amount of casino Free Play to push the counter to breakeven (Average Case)
               </div>
             </div>
           )}
         </div>
 
-        {/* Acquisition Fee Calculator, Walk-Away Advisor, EV Table, Logout, Info Modal remain unchanged */}
-        {/* ... (keep the rest of your file exactly as it was) ... */}
+        {/* Acquisition Fee Calculator */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
+          <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-gray-400 mb-1 text-xs">EV Basis</label>
+              <div className="flex bg-gray-800 rounded-2xl p-1">
+                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Average</button>
+                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Full Run</button>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-gray-400 text-xs">Scout Share</label>
+                <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
+              </div>
+              <div className="bg-gray-800 rounded-2xl px-4 py-3">
+                <input type="range" min="10" max="15" step="1" value={scoutPercentage} onChange={(e) => setScoutPercentage(Number(e.target.value))} className="w-full accent-orange-500" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-5 text-center mb-4">
+            <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
+            <div className="text-4xl font-bold text-white">
+              ${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}
+            </div>
+            <div className="text-xs text-gray-400">
+              {useFullRunForFee ? 'Full Run EV' : 'Average Case EV'}
+            </div>
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-5 text-center">
+            <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
+            <div className="text-5xl font-black text-green-400">
+              ${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">to scout</div>
+          </div>
+        </div>
 
-        {/* For space, the rest is omitted here but should stay the same as your previous working version */}
+        {/* Walk-Away Advisor */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
+            <button onClick={() => setShowInfoModal(true)} className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl">ℹ️</button>
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
+              <input type="text" inputMode="numeric" value={testCounter} onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setTestCounter(val === '' ? '' : parseInt(val, 10));
+              }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-400 mb-1">Walk-away</div>
+              <div className="text-4xl font-bold text-green-400">+{testCounter ? getRecommendedWalkAway(testCounter) : 0} bets</div>
+              <div className="text-sm text-green-400">
+                ${((testCounter ? getRecommendedWalkAway(testCounter) : 0) * betSize).toFixed(0)}
+              </div>
+            </div>
+          </div>
+          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
+            {hoverCounter !== null ? (
+              <>At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
+            ) : (
+              <>At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span></>
+            )}
+          </div>
+        </div>
 
+        {/* EV Table */}
+        <div className="bg-gray-900 p-6 rounded-3xl">
+          <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[540px]">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="py-4 px-4 text-gray-400 font-medium w-[92px]">Counter</th>
+                  <th className="py-4 px-3 text-gray-400 font-medium w-[155px]">EV Avg (Bets | $)</th>
+                  <th className="py-4 px-5 text-gray-400 font-medium">Full Run (to 1888) (Bets | $)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {evTable.map((row, index) => (
+                  <tr key={index} className="border-b border-gray-800">
+                    <td className="py-4 px-4 font-semibold">{row.counter}</td>
+                    <td className={`py-4 px-3 font-bold ${row.avgEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {row.avgEV.toFixed(1)} | ${row.avgDollar.toFixed(0)}
+                    </td>
+                    <td className={`py-4 px-5 font-bold ${row.fullEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {row.fullEV.toFixed(1)} | ${row.fullDollar.toFixed(0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Logout */}
+        <div className="text-center mt-12 mb-8">
+          <button onClick={handleSignOut} className="text-gray-500 hover:text-red-400 text-sm underline">
+            Log Out
+          </button>
+        </div>
       </div>
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
+            <h3 className="text-xl font-semibold text-orange-400 mb-4">Walk-Away Advisor</h3>
+            <div className="text-gray-300 text-[15px] leading-relaxed space-y-4">
+              <p>This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
+              <p>Phoenix Link has extreme <strong>volatility drag</strong> and <strong>drawdown risk</strong>. Even with strong positive remainingEV, 100–300 bet drawdowns occur frequently.</p>
+              <p>The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining remainingEV and a logistic S-curve calibrated through Monte Carlo simulations.</p>
+              <p>In short: it converts raw theoretical EV into a practical, utility-aware stopping rule.</p>
+            </div>
+            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors">
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
