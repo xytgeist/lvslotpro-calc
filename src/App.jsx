@@ -209,7 +209,7 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // FP to +EV - only calculate when needed
+    // FP to +EV
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -498,7 +498,7 @@ function App() {
           {/* FP line - only shown when -EV, simple text at the very bottom */}
           {!isAlreadyPositive && (
             <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm text-amber-400">
-              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (at counter {beAvg})
+              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
             </div>
           )}
         </div>
