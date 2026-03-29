@@ -495,9 +495,9 @@ function App() {
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
 
-          {/* FP line - simple text at the very bottom, only when -EV */}
+          {/* FP line - simple text at the very bottom, only when -EV, orange and italic */}
           {!isAlreadyPositive && (
-            <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic" style={{ color: '#00f0ff' }}>
+            <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic text-orange-400">
               FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
             </div>
           )}
