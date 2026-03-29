@@ -51,7 +51,7 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // NEW: FP to +EV (dollar amount of Free Play needed)
+  // FP to +EV
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
@@ -209,7 +209,7 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // NEW: FP to +EV (dollar amount using Free Play)
+    // FP to +EV (dollar amount)
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -461,7 +461,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Max Exposure */}
+        {/* Current EV + Max Exposure + FP to +EV (integrated) */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -484,35 +484,30 @@ function App() {
               </div>
             </div>
           </div>
+
+          {/* FP to +EV integrated here */}
+          <div className="mb-6 p-4 rounded-2xl border border-amber-500 bg-amber-900/30">
+            {isAlreadyPositive ? (
+              <div className="text-green-400 text-center">
+                ✅ <span className="font-bold">Already +EV</span> — No FP needed
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="text-amber-400 text-sm">FP needed to reach +EV</div>
+                <div className="text-3xl font-bold text-white">${fpDollarsNeeded}</div>
+              </div>
+            )}
+          </div>
+
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
+
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
-        </div>
-
-        {/* NEW: FP to +EV */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-400">FP to +EV</h2>
-          {isAlreadyPositive ? (
-            <div className="bg-green-900/50 border border-green-500 p-6 rounded-2xl text-center">
-              <div className="text-green-400 text-2xl font-bold mb-2">✅ Already +EV</div>
-              <p className="text-green-300">No Free Play needed. The machine is currently in positive expected value.</p>
-            </div>
-          ) : (
-            <div className="bg-amber-900/50 border border-amber-500 p-6 rounded-2xl text-center">
-              <div className="text-amber-400 text-sm mb-3">Free Play needed to reach +EV</div>
-              <div className="text-5xl font-black text-white mb-1">
-                ${fpDollarsNeeded}
-              </div>
-              <div className="text-xs text-gray-400 mt-4">
-                Use this amount of casino Free Play to push the counter to breakeven (Average Case)
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Acquisition Fee Calculator */}
