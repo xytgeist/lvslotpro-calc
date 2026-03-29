@@ -209,7 +209,7 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // FP to +EV
+    // FP to +EV - only calculate when needed
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -461,7 +461,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Max Exposure + FP line at the very bottom */}
+        {/* Current EV + Max Exposure */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -495,16 +495,12 @@ function App() {
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
 
-          {/* FP line at the very bottom of Current EV section */}
-          <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm">
-            {isAlreadyPositive ? (
-              <span className="text-green-400">✅ Already +EV — No FP needed</span>
-            ) : (
-              <span className="text-amber-400">
-                FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (at counter {beAvg})
-              </span>
-            )}
-          </div>
+          {/* FP line - only shown when -EV, simple text at the very bottom */}
+          {!isAlreadyPositive && (
+            <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm text-amber-400">
+              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (at counter {beAvg})
+            </div>
+          )}
         </div>
 
         {/* Acquisition Fee Calculator */}
