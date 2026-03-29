@@ -209,7 +209,7 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // FP to +EV (dollar amount)
+    // FP to +EV
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -461,7 +461,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Max Exposure + FP to +EV (integrated) */}
+        {/* Current EV + Max Exposure */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -485,20 +485,6 @@ function App() {
             </div>
           </div>
 
-          {/* FP to +EV integrated here */}
-          <div className="mb-6 p-4 rounded-2xl border border-amber-500 bg-amber-900/30">
-            {isAlreadyPositive ? (
-              <div className="text-green-400 text-center">
-                ✅ <span className="font-bold">Already +EV</span> — No FP needed
-              </div>
-            ) : (
-              <div className="text-center">
-                <div className="text-amber-400 text-sm">FP needed to reach +EV</div>
-                <div className="text-3xl font-bold text-white">${fpDollarsNeeded}</div>
-              </div>
-            )}
-          </div>
-
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
@@ -507,6 +493,20 @@ function App() {
           <div className="grid grid-cols-2 gap-4">
             <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
+          </div>
+
+          {/* FP to +EV - moved here as requested */}
+          <div className="mt-6 p-4 rounded-2xl border border-amber-500 bg-amber-900/30">
+            {isAlreadyPositive ? (
+              <div className="text-green-400 text-center font-medium">
+                ✅ Already +EV — No FP needed
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="text-amber-400 text-sm">FP needed to reach +EV (at counter {beAvg})</div>
+                <div className="text-4xl font-bold text-white mt-1">${fpDollarsNeeded}</div>
+              </div>
+            )}
           </div>
         </div>
 
