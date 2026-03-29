@@ -461,7 +461,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV + Max Exposure */}
+        {/* Current EV + Max Exposure + FP line at the very bottom */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -494,22 +494,17 @@ function App() {
             <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
-        </div>
 
-        {/* FP to +EV - own section directly below Current EV */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-400">FP to +EV</h2>
-          {isAlreadyPositive ? (
-            <div className="bg-green-900/50 border border-green-500 p-6 rounded-2xl text-center">
-              <div className="text-green-400 text-2xl font-bold mb-2">✅ Already +EV</div>
-              <p className="text-green-300">No FP needed.</p>
-            </div>
-          ) : (
-            <div className="bg-amber-900/50 border border-amber-500 p-6 rounded-2xl text-center">
-              <div className="text-amber-400 text-sm mb-2">FP needed to reach +EV (at counter {beAvg})</div>
-              <div className="text-5xl font-black text-white">${fpDollarsNeeded}</div>
-            </div>
-          )}
+          {/* FP line at the very bottom of Current EV section */}
+          <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm">
+            {isAlreadyPositive ? (
+              <span className="text-green-400">✅ Already +EV — No FP needed</span>
+            ) : (
+              <span className="text-amber-400">
+                FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (at counter {beAvg})
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Acquisition Fee Calculator */}
