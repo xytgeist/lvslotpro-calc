@@ -42,11 +42,10 @@ function BuffaloLink({ onBack }) {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Acquisition Fee states - matching Phoenix (10-15%, default 10%)
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
-  // Walk-Away S-Curve
+  // Walk-Away S-Curve (matching Phoenix logic, using Buffalo math)
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -89,10 +88,23 @@ function BuffaloLink({ onBack }) {
       }
     },
     scales: {
-      x: { title: { display: true, text: 'Counter', color: '#d1d5db' }, grid: { color: '#374151' }, ticks: { color: '#d1d5db' } },
-      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, grid: { color: '#374151' }, ticks: { color: '#d1d5db' }, min: 0, max: 260 }
+      x: { 
+        title: { display: true, text: 'Counter', color: '#d1d5db' }, 
+        grid: { color: '#374151' }, 
+        ticks: { color: '#d1d5db' } 
+      },
+      y: { 
+        title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, 
+        grid: { color: '#374151' }, 
+        ticks: { color: '#d1d5db' }, 
+        min: 0, 
+        max: 260 
+      }
     },
-    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    plugins: { 
+      legend: { display: false }, 
+      tooltip: { enabled: false } 
+    }
   }
 
   // Auto RTP adjustment
@@ -108,7 +120,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation
+  // Main calculation (Buffalo math)
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -356,7 +368,7 @@ function BuffaloLink({ onBack }) {
           )}
         </div>
 
-        {/* Acquisition Fee - Updated to match Phoenix layout */}
+        {/* Acquisition Fee */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -396,7 +408,6 @@ function BuffaloLink({ onBack }) {
             </div>
           </div>
 
-          {/* Expected Profit - Centered */}
           <div className="bg-gray-800 rounded-2xl p-5 mb-4 text-center">
             <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
             <div className="text-4xl font-bold text-white">
@@ -407,7 +418,6 @@ function BuffaloLink({ onBack }) {
             </div>
           </div>
 
-          {/* Recommended Finder's Fee */}
           <div className="bg-gray-800 rounded-2xl p-5 text-center">
             <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
             <div className="text-5xl font-black text-green-400">
@@ -417,7 +427,7 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
+        {/* Walk-Away Advisor - Now matches Phoenix exactly (with Buffalo math) */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-amber-400">Walk-Away Advisor</h2>
@@ -428,8 +438,12 @@ function BuffaloLink({ onBack }) {
             <Line data={chartData} options={chartOptions} />
           </div>
 
-          <div className="bg-gray-800 rounded-2xl p-5 text-center">
-            Walk away at <span className="text-amber-400 font-bold">{currentX}</span> around <span className="text-green-400 font-bold">+{getRecommendedWalkAway(currentX)} bets</span> (${(getRecommendedWalkAway(currentX) * betSize).toFixed(0)})
+          <div className="bg-gray-800 rounded-2xl p-5 text-center min-h-[52px] flex items-center justify-center">
+            {hoverCounter !== null ? (
+              <>At <span className="text-amber-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
+            ) : (
+              <>At <span className="text-amber-400 font-semibold mx-1">{currentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span></>
+            )}
           </div>
         </div>
 
@@ -463,12 +477,15 @@ function BuffaloLink({ onBack }) {
         </div>
       </div>
 
-      {/* Info Modal */}
+      {/* Info Modal - matching Phoenix */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-amber-400 mb-4">Walk-Away Advisor</h3>
-            <p className="text-gray-300">Recommends optimal stopping point accounting for volatility and remaining EV.</p>
+            <div className="text-gray-300 text-[15px] leading-relaxed space-y-4">
+              <p>This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
+              <p>Buffalo Link has high volatility. The advisor uses a logistic S-curve to balance remaining EV and drawdown risk.</p>
+            </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-amber-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
         </div>
