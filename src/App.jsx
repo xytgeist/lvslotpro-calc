@@ -161,39 +161,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Top Bar - Only shown inside calculators */}
-      {currentView !== 'dashboard' && (
-        <div className="fixed top-0 left-0 right-0 bg-gray-950 border-b border-gray-800 z-50">
-          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-            <button 
-              onClick={() => setShowMenu(!showMenu)} 
-              className="text-4xl text-orange-400 hover:text-orange-300 p-1 -ml-1"
-            >
-              ☰
-            </button>
-
-            <div className="flex items-center gap-3">
-              <img 
-                src="/phoenix-link-logo.png" 
-                alt="Phoenix Link" 
-                className="w-9 h-9 flex-shrink-0 rounded-xl object-contain" 
-              />
-              <h1 
-                className="text-[22px] font-black tracking-[-1px] text-black leading-none"
-                style={{
-                  textShadow: `-1.5px -1.5px 0 #f97316, 1.5px -1.5px 0 #f97316, -1.5px 1.5px 0 #f97316, 1.5px 1.5px 0 #f97316`
-                }}
-              >
-                PHOENIX LINK<br />EV CALC
-              </h1>
-            </div>
-
-            <button onClick={handleSignOut} className="text-gray-400 hover:text-red-400 text-sm">Log Out</button>
-          </div>
-        </div>
-      )}
-
-      {/* Dashboard - Clean buttons only */}
+      {/* Dashboard */}
       {currentView === 'dashboard' ? (
         <div className="max-w-lg mx-auto px-4 pt-8">
           <div className="flex justify-end mb-8">
@@ -214,35 +182,9 @@ function App() {
           </button>
         </div>
       ) : (
-        /* Calculator - no duplicate title or back button */
+        /* Calculator view */
         <div className="pt-20">
           <PhoenixLink onBack={() => setCurrentView('dashboard')} />
-        </div>
-      )}
-
-      {/* Hamburger Dropdown */}
-      {showMenu && (
-        <div 
-          className="fixed inset-0 bg-black/70 z-[60] flex items-start justify-center pt-24" 
-          onClick={() => setShowMenu(false)}
-        >
-          <div 
-            className="bg-gray-900 rounded-3xl w-full max-w-xs mx-4 overflow-hidden" 
-            onClick={e => e.stopPropagation()}
-          >
-            <button 
-              onClick={() => { setCurrentView('phoenix'); setShowMenu(false); }}
-              className="w-full text-left px-6 py-5 hover:bg-gray-800 border-b border-gray-700 flex items-center gap-3 text-white"
-            >
-              🔥 Phoenix Link EV Calc
-            </button>
-            <button 
-              onClick={() => { setCurrentView('buffalo'); setShowMenu(false); }}
-              className="w-full text-left px-6 py-5 hover:bg-gray-800 flex items-center gap-3 text-white"
-            >
-              🦬 Buffalo Link Calculator
-            </button>
-          </div>
         </div>
       )}
     </div>
