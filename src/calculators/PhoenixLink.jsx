@@ -165,17 +165,38 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Back to Dashboard */}
-      <div className="px-4 pt-4">
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 text-orange-400 hover:text-orange-300 text-lg font-medium"
-        >
-          ← Back to Dashboard
-        </button>
+      {/* Clean Top Bar - Hamburger + Logo + Title */}
+      <div className="fixed top-0 left-0 right-0 bg-gray-950 border-b border-gray-800 z-50">
+        <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
+          <button 
+            onClick={() => {}} 
+            className="text-4xl text-orange-400 hover:text-orange-300 p-1 -ml-1"
+          >
+            ☰
+          </button>
+
+          <div className="flex items-center gap-3">
+            <img 
+              src="/phoenix-link-logo.png" 
+              alt="Phoenix Link" 
+              className="w-9 h-9 flex-shrink-0 rounded-xl object-contain" 
+            />
+            <h1 
+              className="text-[22px] font-black tracking-[-1px] text-black leading-none"
+              style={{
+                textShadow: `-1.5px -1.5px 0 #f97316, 1.5px -1.5px 0 #f97316, -1.5px 1.5px 0 #f97316, 1.5px 1.5px 0 #f97316`
+              }}
+            >
+              PHOENIX LINK<br />EV CALC
+            </h1>
+          </div>
+
+          <div className="w-10" />
+        </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 pt-4">
+      {/* Main Calculator Content */}
+      <div className="pt-20 max-w-lg mx-auto px-4">
         {/* Counter */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-4">
           <label className="text-gray-400 text-sm block mb-2">Counter</label>
@@ -229,7 +250,7 @@ function PhoenixLink({ onBack }) {
 
         {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-6">
-          <button 
+          <button
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="w-full flex justify-between items-center text-left"
           >
@@ -276,12 +297,10 @@ function PhoenixLink({ onBack }) {
               <div className="text-sm text-gray-400">bets</div>
             </div>
           </div>
-
           <div className="text-sm text-gray-400 mb-1">Full Run (to {MUST_HIT})</div>
           <div className={`text-2xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {evFullRun.toFixed(1)}x bets
           </div>
-
           {fpDollarsNeeded > 0 && (
             <div className="mt-4 text-orange-400 italic text-sm">
               FP needed to reach +EV: ${fpDollarsNeeded} (play to {beAvg})
