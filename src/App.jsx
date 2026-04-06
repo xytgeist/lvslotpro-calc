@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -14,25 +13,9 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
 const MUST_HIT = 1888
 
-function App() {
-  const [user, setUser] = useState(null)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isAllowed, setIsAllowed] = useState(false)
-  const [isChecking, setIsChecking] = useState(true)
-
-  // Password Reset
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [resetEmailSent, setResetEmailSent] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [isResetMode, setIsResetMode] = useState(false)
-
+function PhoenixLink({ onBack }) {
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -51,10 +34,7 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // Current RTP
   const [currentRTP, setCurrentRTP] = useState(0)
-
-  // FP to +EV
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
@@ -128,52 +108,6 @@ function App() {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Auth + Whitelist + Reset Detection
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      const isRecovery =
-        session?.user?.user_metadata?.is_recovery === true ||
-        window.location.hash.includes('type=recovery') ||
-        window.location.hash.includes('access_token')
-      if (isRecovery && session?.user) {
-        setIsResetMode(true)
-        setUser(session.user)
-        setIsChecking(false)
-        return
-      }
-      setUser(session?.user ?? null)
-      if (session?.user?.email && !isRecovery) {
-        checkEmailAllowed(session.user.email)
-      } else {
-        setIsChecking(false)
-      }
-    }
-    checkSession()
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsResetMode(true)
-        setUser(session?.user)
-        setIsChecking(false)
-      } else {
-        checkSession()
-      }
-    })
-    return () => listener.subscription.unsubscribe()
-  }, [])
-
-  const checkEmailAllowed = async (userEmail) => {
-    const cleanEmail = userEmail.toLowerCase().trim()
-    const { data, error } = await supabase
-      .from('allowed_emails')
-      .select('email')
-      .eq('email', cleanEmail)
-      .single()
-    if (error) console.error('Whitelist error:', error)
-    setIsAllowed(!!data && !error)
-    setIsChecking(false)
-  }
-
   // Calculation
   const calculate = () => {
     const oRTP = overallRTP / 100
@@ -181,20 +115,15 @@ function App() {
     const avgTrig = avgTrigger
     const X = currentX || 0
     const bet = betSize || 25
-
     const B = avgBonusPay
     const houseEdge = 1 - oRTP
-
     const spinsAvg = Math.max(0, (avgTrig - X) / inc)
     const spinsFull = Math.max(0, (MUST_HIT - X) / inc)
-
     const avgEV = B - houseEdge * spinsAvg
     const fullEV = B - houseEdge * spinsFull
-
     const baseHouseEdge = 1 - (28 / 100)
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
-
     const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc)
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
@@ -205,13 +134,12 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // Current RTP % calculation
     let rtp = oRTP * 100
     if (spinsAvg > 0) {
       const evPerSpin = avgEV / spinsAvg
       rtp = 100 + (evPerSpin * 100)
     }
-    setCurrentRTP(Math.round(rtp * 10) / 10)   // one decimal place
+    setCurrentRTP(Math.round(rtp * 10) / 10)
 
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
@@ -239,9 +167,11 @@ function App() {
     setEvTable(table)
   }
 
-  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
+  useEffect(() => {
+    calculate()
+  }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
 
-  // Safe handlers (unchanged)
+  // Safe handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '');
     setter(val);
@@ -270,106 +200,31 @@ function App() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) return alert("Please enter your email address")
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'https://lvslotpro.com' })
-    if (error) alert(error.message)
-    else {
-      setResetEmailSent(true)
-      alert('Password reset link sent!')
-    }
-  }
-
-  const handleUpdatePassword = async () => {
-    if (!newPassword || newPassword.length < 6) return alert("Password must be at least 6 characters")
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) alert(error.message)
-    else {
-      alert("Password updated successfully!")
-      setIsResetMode(false)
-      setNewPassword('')
-      window.location.reload()
-    }
-  }
-
-  const handleSignUp = async () => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: 'https://lvslotpro.com' } })
-    if (error) alert(error.message)
-    else alert('Account created! Check your email.')
-  }
-
-  const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) alert(error.message)
-  }
-
-  const handleSignOut = () => supabase.auth.signOut()
-
-  if (isChecking) return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
-
-  if (isResetMode) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
-          <input type="password" placeholder="New Password (min 6 characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
-          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Update Password</button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Phoenix Link EV Calc</h1>
-          {showForgotPassword ? (
-            <>
-              <h2 className="text-xl text-center mb-6">Reset Password</h2>
-              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
-              <button onClick={handleForgotPassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Send Reset Link</button>
-              <button onClick={() => setShowForgotPassword(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Back to Login</button>
-              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent!</p>}
-            </>
-          ) : (
-            <>
-              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
-              <button onClick={handleLogin} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Login</button>
-              <button onClick={handleSignUp} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg mb-4">Sign Up</button>
-              <button onClick={() => setShowForgotPassword(true)} className="text-orange-400 text-sm underline block text-center">Forgot Password?</button>
-            </>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAllowed) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm text-center">
-          <h1 className="text-3xl font-bold text-red-500 mb-4">Access Denied</h1>
-          <p className="text-gray-300 mb-6">Your email is not on the approved list.<br />Please contact the owner for access.</p>
-          <button onClick={handleSignOut} className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-2xl font-bold">Sign Out</button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Logo + Title */}
-        <div className="flex items-center mb-6">
+      {/* Back button to dashboard */}
+      <div className="max-w-lg mx-auto px-4 pt-4">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 text-orange-400 hover:text-orange-300 text-lg font-medium"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+
+      {/* Logo + Title */}
+      <div className="max-w-lg mx-auto px-4 pt-2 pb-6">
+        <div className="flex items-center">
           <img src="/phoenix-link-logo.png" alt="Phoenix Link" className="w-12 h-12 flex-shrink-0 rounded-xl object-contain mr-3" />
           <h1 className="flex-1 text-[29px] font-black tracking-[-1.6px] text-black"
               style={{ textShadow: `-1.6px -1.6px 0 #f97316, 1.6px -1.6px 0 #f97316, -1.6px 1.6px 0 #f97316, 1.6px 1.6px 0 #f97316` }}>
             PHOENIX LINK EV CALC
           </h1>
         </div>
+      </div>
 
+      {/* All your original content below - completely unchanged */}
+      <div className="max-w-lg mx-auto px-4">
         {/* Inputs */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
@@ -436,7 +291,6 @@ function App() {
               {currentRTP.toFixed(1)}% RTP
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Average Case</div>
@@ -457,17 +311,14 @@ function App() {
               </div>
             </div>
           </div>
-
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
-
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
-
           {!isAlreadyPositive && (
             <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic text-orange-400">
               FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
@@ -580,7 +431,7 @@ function App() {
 
         {/* Logout */}
         <div className="text-center mt-12 mb-8">
-          <button onClick={handleSignOut} className="text-gray-500 hover:text-red-400 text-sm underline">
+          <button onClick={() => window.location.reload()} className="text-gray-500 hover:text-red-400 text-sm underline">
             Log Out
           </button>
         </div>
@@ -607,4 +458,4 @@ function App() {
   )
 }
 
-export default App
+export default PhoenixLink
