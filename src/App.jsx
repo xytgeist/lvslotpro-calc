@@ -38,7 +38,6 @@ function App() {
   const [overallRTP, setOverallRTP] = useState(91)
   const [avgBonusPay, setAvgBonusPay] = useState(31)
   const [increment, setIncrement] = useState(1.2)
-  const [avgTrigger, setAvgTrigger] = useState(1795)   // ← Changed to 1795
   const [mustHit, setMustHit] = useState(1888)
   const [maxMajor, setMaxMajor] = useState(false)
 
@@ -62,13 +61,13 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // Walk-Away S-Curve
+  // Walk-Away S-Curve (uses mid-point logic)
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const inc = increment
-    const avgTrig = avgTrigger
     const B = avgBonusPay
-    const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
+    const midPoint = (counter + 1888) / 2
+    const spinsRemaining = Math.max(0, (midPoint - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
     const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588))
     const sCurve = 1 / (1 + Math.exp(-5.5 * (normalized - 0.48)))
@@ -170,11 +169,10 @@ function App() {
     setIsChecking(false)
   }
 
-  // Calculation
+  // ==================== UPDATED CALCULATION (Mid-Point Logic) ====================
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = increment
-    const avgTrig = avgTrigger
     const must = mustHit
     const X = currentX || 0
     const bet = betSize || 25
@@ -182,18 +180,21 @@ function App() {
     const B = avgBonusPay
     const houseEdge = 1 - oRTP
 
-    const spinsAvg = Math.max(0, (avgTrig - X) / inc)
-    const spinsFull = Math.max(0, (must - X) / inc)
+    // Mid-point between current counter and 1888
+    const midPoint = (X + must) / 2
+    const spinsToMid = Math.max(0, (midPoint - X) / inc)
 
-    const avgEV = B - houseEdge * spinsAvg
-    const fullEV = B - houseEdge * spinsFull
+    // EV uses spins to mid-point
+    const avgEV = B - houseEdge * spinsToMid
+    const fullEV = B - houseEdge * Math.max(0, (must - X) / inc)   // Full run still to 1888
 
     const baseHouseEdge = 1 - (28 / 100)
-    const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
-    const maxExpFull = Math.round(spinsFull * baseHouseEdge)
+    const maxExpAvg = Math.round(spinsToMid * baseHouseEdge)
+    const maxExpFull = Math.round(Math.max(0, (must - X) / inc) * baseHouseEdge)
 
-    const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc)
-    const breakevenFull = Math.round(must - (B / houseEdge) * inc)
+    // Breakeven points (still calculated to reach zero EV)
+    const breakevenAvg = Math.round(X + (B / houseEdge) * inc)
+    const breakevenFull = Math.round(must - (B / houseEdge) * inc)   // Full run breakeven remains to 1888
 
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
@@ -213,22 +214,24 @@ function App() {
       setFpDollarsNeeded(dollarsNeeded)
     }
 
+    // EV Table
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
-      const avgSpins = Math.max(0, (avgTrig - c) / inc)
-      const fullSpins = Math.max(0, (must - c) / inc)
+      const mid = (c + must) / 2
+      const spinsMid = Math.max(0, (mid - c) / inc)
+      const spinsFull = Math.max(0, (must - c) / inc)
       table.push({
         counter: c,
-        avgEV: B - houseEdge * avgSpins,
-        fullEV: B - houseEdge * fullSpins,
-        avgDollar: (B - houseEdge * avgSpins) * bet,
-        fullDollar: (B - houseEdge * fullSpins) * bet
+        avgEV: B - houseEdge * spinsMid,
+        fullEV: B - houseEdge * spinsFull,
+        avgDollar: (B - houseEdge * spinsMid) * bet,
+        fullDollar: (B - houseEdge * spinsFull) * bet
       })
     }
     setEvTable(table)
   }
 
-  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
+  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, mustHit, currentX, betSize, denom, maxMajor])
 
   // Safe handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
@@ -410,10 +413,6 @@ function App() {
                 <input type="text" value={increment} onChange={handleFloatChange(setIncrement, 1.2)} onBlur={handleFloatBlur(setIncrement, 1.2)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
-                <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1795)} onBlur={handleFloatBlur(setAvgTrigger, 1795)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div>
                 <label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
                 <input type="text" value={mustHit} onChange={handleIntegerChange(setMustHit, 1888)} onBlur={handleIntegerBlur(setMustHit, 1888)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
@@ -426,7 +425,7 @@ function App() {
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-2xl">
-              <div className="text-gray-400 text-sm">Average Case</div>
+              <div className="text-gray-400 text-sm">Average Case (Mid-Point)</div>
               <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
               <div className="text-sm">${(evAvg * betSize).toFixed(2)}</div>
               <div className="mt-3 pt-3 border-t border-gray-700">
@@ -451,7 +450,7 @@ function App() {
 
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
+            <div><div className="text-gray-400 text-sm">Mid-Point Method</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
 
