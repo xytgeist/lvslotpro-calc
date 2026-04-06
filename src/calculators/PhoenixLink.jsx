@@ -46,7 +46,6 @@ function PhoenixLink({ onBack }) {
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
-  const [showMenu, setShowMenu] = useState(false)
 
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
@@ -195,19 +194,11 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* pt-8 as you requested */}
+      {/* pt-8 as you liked it */}
       <div className="pt-8 max-w-lg mx-auto px-4">
 
-        {/* Back Button */}
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 text-orange-400 hover:text-orange-300 text-lg font-medium mb-6"
-        >
-          ← Back to Dashboard
-        </button>
-
-        {/* Phoenix Link Title + Logo */}
-        <div className="flex items-center justify-center mb-4">
+        {/* Phoenix Link Title + Logo - no back button */}
+        <div className="flex items-center justify-center mb-6">
           <img 
             src="/phoenix-link-logo.png" 
             alt="Phoenix Link" 
