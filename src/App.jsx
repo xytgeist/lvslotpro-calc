@@ -117,6 +117,7 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Phoenix Link EV Calc</h1>
+          
           {showForgotPassword ? (
             <>
               <h2 className="text-xl text-center mb-6">Reset Password</h2>
@@ -186,6 +187,7 @@ function App() {
     )
   }
 
+  // Only show Access Denied if we have a user but they are not allowed
   if (!isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
