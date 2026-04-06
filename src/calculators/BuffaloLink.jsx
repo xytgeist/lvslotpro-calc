@@ -21,7 +21,7 @@ function BuffaloLink({ onBack }) {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(31)
+  const [avgBonusPay, setAvgBonusPay] = useState(20)
   const [buffalosPerSpin, setBuffalosPerSpin] = useState(1.7)
   const [midpointFactor, setMidpointFactor] = useState(0.5)
   const [maxMajor, setMaxMajor] = useState(false)
@@ -42,7 +42,6 @@ function BuffaloLink({ onBack }) {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Fixed: Missing states for Acquisition Fee
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
@@ -114,7 +113,7 @@ function BuffaloLink({ onBack }) {
     const inc = buffalosPerSpin
     const X = Number(currentX) || 0
     const bet = Number(betSize) || 25
-    const B = Number(avgBonusPay) || 31
+    const B = Number(avgBonusPay) || 20
     const houseEdge = 1 - oRTP
 
     const midpointTrigger = X + (MUST_HIT - X) * midpointFactor
@@ -247,35 +246,63 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Advanced Settings */}
+        {/* Advanced Settings - with sliders for Buffalos per Spin and Midpoint Factor */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800">
             <span className="text-base font-semibold">Advanced Settings</span>
             <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="p-4 pt-0 space-y-4 border-t border-gray-800">
+            <div className="p-4 pt-0 space-y-5 border-t border-gray-800">
               <div className="flex justify-between items-center">
                 <span>Max Major</span>
                 <button onClick={() => setMaxMajor(!maxMajor)} className={`px-6 py-2 rounded-xl text-sm font-semibold ${maxMajor ? 'bg-green-600' : 'bg-gray-700'}`}>
                   {maxMajor ? 'YES' : 'NO'}
                 </button>
               </div>
+
               <div>
                 <label className="block text-gray-400 text-xs mb-1">Overall RTP (%)</label>
                 <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
+
               <div>
                 <label className="block text-gray-400 text-xs mb-1">Avg Bonus Pay (bets)</label>
-                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 31)} onBlur={handleFloatBlur(setAvgBonusPay, 31)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 20)} onBlur={handleFloatBlur(setAvgBonusPay, 20)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
+
+              {/* Buffalos per Spin - Slider */}
               <div>
-                <label className="block text-gray-400 text-xs mb-1">Buffalos per Spin</label>
-                <input type="text" value={buffalosPerSpin} onChange={handleFloatChange(setBuffalosPerSpin, 1.7)} onBlur={handleFloatBlur(setBuffalosPerSpin, 1.7)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <div className="flex justify-between mb-1">
+                  <label className="text-gray-400 text-xs">Buffalos per Spin</label>
+                  <span className="text-amber-400 font-bold">{buffalosPerSpin.toFixed(1)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="1.5" 
+                  max="1.9" 
+                  step="0.1" 
+                  value={buffalosPerSpin} 
+                  onChange={(e) => setBuffalosPerSpin(parseFloat(e.target.value))} 
+                  className="w-full accent-amber-500" 
+                />
               </div>
+
+              {/* Midpoint Factor - Slider */}
               <div>
-                <label className="block text-gray-400 text-xs mb-1">Midpoint Factor (0.0–1.0)</label>
-                <input type="text" value={midpointFactor} onChange={handleFloatChange(setMidpointFactor, 0.5)} onBlur={handleFloatBlur(setMidpointFactor, 0.5)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <div className="flex justify-between mb-1">
+                  <label className="text-gray-400 text-xs">Midpoint Factor</label>
+                  <span className="text-amber-400 font-bold">{midpointFactor.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.05" 
+                  value={midpointFactor} 
+                  onChange={(e) => setMidpointFactor(parseFloat(e.target.value))} 
+                  className="w-full accent-amber-500" 
+                />
               </div>
             </div>
           )}
