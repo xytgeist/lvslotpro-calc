@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import PhoenixLink from './calculators/PhoenixLink'
+import BuffaloLink from './calculators/BuffaloLink'   // ← Added import
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -60,8 +61,22 @@ function App() {
         <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Las Vegas Slot Pro</h2>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+            <input 
+              type="email" 
+              placeholder="Email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              className="w-full p-4 bg-gray-800 rounded-2xl text-white" 
+              required 
+            />
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              className="w-full p-4 bg-gray-800 rounded-2xl text-white" 
+              required 
+            />
             <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
           </form>
         </div>
@@ -71,7 +86,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Title Bar - LAS VEGAS SLOT PRO + Back button */}
+      {/* Title Bar - clean, with back button when in calculator */}
       {currentView !== 'dashboard' && (
         <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
           <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
@@ -82,7 +97,7 @@ function App() {
               ←
             </button>
             <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
-            <div className="w-8" /> {/* spacer to balance */}
+            <div className="w-8" />
           </div>
         </div>
       )}
@@ -95,9 +110,11 @@ function App() {
               <h1 className="text-4xl font-black text-white tracking-tight">Las Vegas Slot Pro</h1>
               <p className="text-zinc-400 mt-3">Select a calculator</p>
             </div>
+
+            {/* Phoenix Link Button */}
             <button
               onClick={() => setCurrentView('phoenix')}
-              className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-4"
+              className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-4 mb-4"
             >
               <img src="/phoenix-link-logo.png" alt="Phoenix" className="w-12 h-12 rounded-xl" />
               <div>
@@ -105,9 +122,23 @@ function App() {
                 <div className="text-sm text-gray-400">Must-hit counter bonus analyzer</div>
               </div>
             </button>
+
+            {/* Buffalo Link Button */}
+            <button
+              onClick={() => setCurrentView('buffalo')}
+              className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-4"
+            >
+              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-3xl">🦬</div>
+              <div>
+                <div className="font-semibold text-xl text-blue-400">Buffalo Link EV Calc</div>
+                <div className="text-sm text-gray-400">Midpoint-based counter analyzer</div>
+              </div>
+            </button>
           </div>
-        ) : (
+        ) : currentView === 'phoenix' ? (
           <PhoenixLink onBack={() => setCurrentView('dashboard')} />
+        ) : (
+          <BuffaloLink onBack={() => setCurrentView('dashboard')} />
         )}
       </div>
     </div>
