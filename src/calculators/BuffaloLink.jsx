@@ -45,7 +45,7 @@ function BuffaloLink({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
-  // Walk-Away S-Curve (matching Phoenix logic, using Buffalo math)
+  // Walk-Away S-Curve (matching Phoenix)
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -120,7 +120,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation (Buffalo math)
+  // Main calculation
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -427,17 +427,43 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Walk-Away Advisor - Now matches Phoenix exactly (with Buffalo math) */}
+        {/* Walk-Away Advisor - Now includes Test Counter input (matching Phoenix) */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-amber-400">Walk-Away Advisor</h2>
             <button onClick={() => setShowInfoModal(true)} className="text-2xl text-amber-400">ℹ️</button>
           </div>
 
+          {/* Test Counter Input */}
+          <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
+              <input 
+                type="text" 
+                inputMode="numeric" 
+                value={testCounter} 
+                onChange={handleIntegerChange(setTestCounter, 1400)} 
+                onBlur={handleIntegerBlur(setTestCounter, 1400)} 
+                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-amber-400" 
+              />
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-400 mb-1">Recommended Walk-Away</div>
+              <div className="text-4xl font-bold text-green-400">
+                +{getRecommendedWalkAway(testCounter)} bets
+              </div>
+              <div className="text-sm text-green-400">
+                ${ (getRecommendedWalkAway(testCounter) * betSize).toFixed(0) }
+              </div>
+            </div>
+          </div>
+
+          {/* Chart */}
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
             <Line data={chartData} options={chartOptions} />
           </div>
 
+          {/* Live Hover Info */}
           <div className="bg-gray-800 rounded-2xl p-5 text-center min-h-[52px] flex items-center justify-center">
             {hoverCounter !== null ? (
               <>At <span className="text-amber-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
@@ -477,7 +503,7 @@ function BuffaloLink({ onBack }) {
         </div>
       </div>
 
-      {/* Info Modal - matching Phoenix */}
+      {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
