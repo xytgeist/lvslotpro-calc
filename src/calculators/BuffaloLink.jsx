@@ -42,7 +42,7 @@ function BuffaloLink({ onBack }) {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Acquisition Fee states
+  // Acquisition Fee states - matching Phoenix (10-15%, default 10%)
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
@@ -272,7 +272,6 @@ function BuffaloLink({ onBack }) {
                 <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 20)} onBlur={handleFloatBlur(setAvgBonusPay, 20)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
 
-              {/* Buffalos per Spin Slider */}
               <div>
                 <div className="flex justify-between mb-1">
                   <label className="text-gray-400 text-xs">Buffalos per Spin</label>
@@ -289,7 +288,6 @@ function BuffaloLink({ onBack }) {
                 />
               </div>
 
-              {/* Midpoint Factor Slider */}
               <div>
                 <div className="flex justify-between mb-1">
                   <label className="text-gray-400 text-xs">Midpoint Factor</label>
@@ -358,7 +356,7 @@ function BuffaloLink({ onBack }) {
           )}
         </div>
 
-        {/* Acquisition Fee - Now matches Phoenix style with full data points */}
+        {/* Acquisition Fee - Updated to match Phoenix layout */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -388,7 +386,7 @@ function BuffaloLink({ onBack }) {
               </div>
               <input 
                 type="range" 
-                min="5" 
+                min="10" 
                 max="15" 
                 step="1" 
                 value={scoutPercentage} 
@@ -398,8 +396,8 @@ function BuffaloLink({ onBack }) {
             </div>
           </div>
 
-          {/* Expected Profit */}
-          <div className="bg-gray-800 rounded-2xl p-5 mb-4">
+          {/* Expected Profit - Centered */}
+          <div className="bg-gray-800 rounded-2xl p-5 mb-4 text-center">
             <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
             <div className="text-4xl font-bold text-white">
               ${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}
