@@ -63,7 +63,7 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // Walk-Away S-Curve
+  // Walk-Away S-Curve (unchanged)
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -132,7 +132,6 @@ function App() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-    
       const isRecovery =
         session?.user?.user_metadata?.is_recovery === true ||
         window.location.hash.includes('type=recovery') ||
@@ -175,6 +174,7 @@ function App() {
     setIsChecking(false)
   }
 
+  // ==================== UPDATED CURRENT EV CALCULATION ====================
   const calculate = () => {
     const oRTP = overallRTP / 100
     const bRTP = baseRTP / 100
@@ -184,23 +184,29 @@ function App() {
     const must = mustHit
     const X = currentX || 0
     const bet = betSize || 25
+
+    // Average value of one counter bonus hit
     const pTotal = 1 / freq
-    const pCounter = inc / avgTrig
     const B = bRTP + (oRTP - bRTP) / pTotal
-    const he = 1 - (oRTP - pCounter * B)
+
+    // Pure house edge using overall RTP only
+    const houseEdge = 1 - oRTP
 
     const spinsAvg = Math.max(0, (avgTrig - X) / inc)
     const spinsFull = Math.max(0, (must - X) / inc)
 
-    const avgEV = B - he * spinsAvg
-    const fullEV = B - he * spinsFull
+    // New EV formulas
+    const avgEV = B - houseEdge * spinsAvg
+    const fullEV = B - houseEdge * spinsFull
 
+    // Max Exposure still uses base RTP (worst-case no-bonus loss)
     const baseHouseEdge = 1 - (baseRTP / 100)
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    const breakevenAvg = Math.round(avgTrig - (B / he) * inc)
-    const breakevenFull = Math.round(must - (B / he) * inc)
+    // New breakeven points
+    const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc)
+    const breakevenFull = Math.round(must - (B / houseEdge) * inc)
 
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
@@ -209,7 +215,7 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // FP to +EV
+    // FP to +EV - only shows when still -EV
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -221,16 +227,17 @@ function App() {
       setFpDollarsNeeded(dollarsNeeded)
     }
 
+    // EV Table with new math
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
       const avgSpins = Math.max(0, (avgTrig - c) / inc)
       const fullSpins = Math.max(0, (must - c) / inc)
       table.push({
         counter: c,
-        avgEV: B - he * avgSpins,
-        fullEV: B - he * fullSpins,
-        avgDollar: (B - he * avgSpins) * bet,
-        fullDollar: (B - he * fullSpins) * bet
+        avgEV: B - houseEdge * avgSpins,
+        fullEV: B - houseEdge * fullSpins,
+        avgDollar: (B - houseEdge * avgSpins) * bet,
+        fullDollar: (B - houseEdge * fullSpins) * bet
       })
     }
     setEvTable(table)
@@ -495,7 +502,7 @@ function App() {
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
 
-          {/* FP line - simple text at the very bottom, only when -EV, orange and italic */}
+          {/* FP line - orange and italic */}
           {!isAlreadyPositive && (
             <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic text-orange-400">
               FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
