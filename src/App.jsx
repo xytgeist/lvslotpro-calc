@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import PhoenixLink from './calculators/PhoenixLink'
-import BuffaloLink from './calculators/BuffaloLink' // ← Added import
+import BuffaloLink from './calculators/BuffaloLink'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -121,12 +121,18 @@ function App() {
               </div>
             </button>
 
-            {/* Buffalo Link Button - updated with sunset/amber colors only */}
+            {/* Buffalo Link Button - now using your real buffalo icon */}
             <button
               onClick={() => setCurrentView('buffalo')}
               className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-4 transition-all active:scale-[0.985]"
             >
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-600 rounded-xl flex items-center justify-center text-4xl shadow-inner">🦬</div>
+              <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner">
+                <img 
+                  src="/buffalo-icon.png" 
+                  alt="Buffalo" 
+                  className="w-11 h-11 object-contain" 
+                />
+              </div>
               <div>
                 <div className="font-semibold text-xl text-amber-100">Buffalo Link EV Calc</div>
                 <div className="text-sm text-amber-200">Midpoint-based counter analyzer</div>
