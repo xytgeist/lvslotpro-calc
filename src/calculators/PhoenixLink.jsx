@@ -200,11 +200,11 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Clean Fixed Top Bar - Hamburger + Logo + Title */}
+      {/* Clean Fixed Top Bar */}
       <div className="fixed top-0 left-0 right-0 bg-gray-950 border-b border-gray-800 z-50">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
           <button 
-            onClick={() => {}} 
+            onClick={() => setShowMenu(!showMenu)} 
             className="text-4xl text-orange-400 hover:text-orange-300 p-1 -ml-1"
           >
             ☰
@@ -217,12 +217,12 @@ function PhoenixLink({ onBack }) {
               className="w-9 h-9 flex-shrink-0 rounded-xl object-contain" 
             />
             <h1 
-              className="text-[22px] font-black tracking-[-1px] text-black leading-none"
+              className="text-[19px] font-black tracking-[-0.8px] text-black leading-none whitespace-nowrap"
               style={{
-                textShadow: `-1.5px -1.5px 0 #f97316, 1.5px -1.5px 0 #f97316, -1.5px 1.5px 0 #f97316, 1.5px 1.5px 0 #f97316`
+                textShadow: `-1.2px -1.2px 0 #f97316, 1.2px -1.2px 0 #f97316, -1.2px 1.2px 0 #f97316, 1.2px 1.2px 0 #f97316`
               }}
             >
-              PHOENIX LINK<br />EV CALC
+              PHOENIX LINK EV CALC
             </h1>
           </div>
 
@@ -230,9 +230,9 @@ function PhoenixLink({ onBack }) {
         </div>
       </div>
 
-      {/* Main Content - padded for fixed top bar */}
+      {/* Main Content */}
       <div className="pt-20 max-w-lg mx-auto px-4">
-        {/* Inputs */}
+        {/* Counter */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -436,6 +436,32 @@ function PhoenixLink({ onBack }) {
           </div>
         </div>
       </div>
+
+      {/* Hamburger Menu Dropdown */}
+      {showMenu && (
+        <div 
+          className="fixed inset-0 bg-black/70 z-[60] flex items-start justify-center pt-24" 
+          onClick={() => setShowMenu(false)}
+        >
+          <div 
+            className="bg-gray-900 rounded-3xl w-full max-w-xs mx-4 overflow-hidden" 
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setShowMenu(false)} 
+              className="w-full text-left px-6 py-5 hover:bg-gray-800 border-b border-gray-700 flex items-center gap-3 text-white"
+            >
+              🔥 Phoenix Link EV Calc
+            </button>
+            <button 
+              onClick={() => setShowMenu(false)} 
+              className="w-full text-left px-6 py-5 hover:bg-gray-800 flex items-center gap-3 text-white"
+            >
+              🦬 Buffalo Link Calculator
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Info Modal */}
       {showInfoModal && (
