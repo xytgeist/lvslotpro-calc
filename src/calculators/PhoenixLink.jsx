@@ -15,7 +15,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 const MUST_HIT = 1888
 
-function PhoenixLink({ onBack }) {
+function PhoenixLink() {
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -60,33 +60,17 @@ function PhoenixLink({ onBack }) {
     setter((prev) => (isNaN(prev) || prev === 0 ? defaultVal : prev))
   }
 
-  // Auto-adjust RTP based on denom and maxMajor
+  // Auto RTP adjustment
   useEffect(() => {
     let newOverall = 91
-    let newBase = 28
-
-    if (denom <= 0.02) {
-      newOverall = 88
-      newBase = 25
-    } else if (denom === 0.05) {
-      newOverall = 88.25
-      newBase = 25
-    } else if (denom === 0.1) {
-      newOverall = 88.4
-      newBase = 25
-    } else if (denom === 0.25) {
-      newOverall = 88.6
-      newBase = 25
-    } else if (denom === 1) {
-      newOverall = 91
-      newBase = 28
-    } else if (denom > 1) {
-      newOverall = 91.5
-      newBase = 28
-    }
+    if (denom <= 0.02) newOverall = 88
+    else if (denom === 0.05) newOverall = 88.25
+    else if (denom === 0.1) newOverall = 88.4
+    else if (denom === 0.25) newOverall = 88.6
+    else if (denom === 1) newOverall = 91
+    else if (denom > 1) newOverall = 91.5
 
     if (maxMajor) newOverall += 0.5
-
     setOverallRTP(newOverall)
   }, [denom, maxMajor])
 
@@ -181,11 +165,11 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Clean Top Bar - Hamburger + Logo + Title */}
+      {/* Clean Top Bar */}
       <div className="fixed top-0 left-0 right-0 bg-gray-950 border-b border-gray-800 z-50">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
           <button 
-            onClick={() => {}} // Hamburger is handled in App.jsx for now
+            onClick={() => {}} // Hamburger handled in App.jsx
             className="text-4xl text-orange-400 hover:text-orange-300 p-1 -ml-1"
           >
             ☰
@@ -207,11 +191,10 @@ function PhoenixLink({ onBack }) {
             </h1>
           </div>
 
-          <div className="w-10" /> {/* spacer */}
+          <div className="w-10" />
         </div>
       </div>
 
-      {/* Main Calculator Content - pt-20 to make room for fixed top bar */}
       <div className="pt-20 max-w-lg mx-auto px-4">
         {/* Counter */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-4">
@@ -264,7 +247,7 @@ function PhoenixLink({ onBack }) {
           </div>
         </div>
 
-        {/* Advanced Settings (your existing dropdown) */}
+        {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-6">
           <button 
             onClick={() => setShowAdvanced(!showAdvanced)}
@@ -274,40 +257,108 @@ function PhoenixLink({ onBack }) {
             <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="mt-6 space-y-6">
-              {/* Add your other advanced fields here (overallRTP, avgBonusPay, increment, avgTrigger, maxMajor, etc.) */}
+            <div className="mt-6 space-y-6 text-sm">
               <div>
-                <label className="text-gray-400 text-sm block mb-1">Overall RTP (%)</label>
+                <label className="text-gray-400 block mb-1">Overall RTP (%)</label>
                 <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div>
-                <label className="text-gray-400 text-sm block mb-1">Avg Counter Bonus Pay (bets)</label>
+                <label className="text-gray-400 block mb-1">Avg Counter Bonus Pay (bets)</label>
                 <input type="text" value={avgBonusPay} onChange={handleIntegerChange(setAvgBonusPay)} onBlur={handleIntegerBlur(setAvgBonusPay, 31)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div>
-                <label className="text-gray-400 text-sm block mb-1">Balls per Spin</label>
+                <label className="text-gray-400 block mb-1">Balls per Spin</label>
                 <input type="text" value={increment} onChange={handleFloatChange(setIncrement)} onBlur={handleFloatBlur(setIncrement, 1.2)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div>
-                <label className="text-gray-400 text-sm block mb-1">Avg Counter Trigger</label>
+                <label className="text-gray-400 block mb-1">Avg Counter Trigger</label>
                 <input type="text" value={avgTrigger} onChange={handleIntegerChange(setAvgTrigger)} onBlur={handleIntegerBlur(setAvgTrigger, 1795)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div className="flex items-center gap-3">
-                <input type="checkbox" checked={maxMajor} onChange={(e) => setMaxMajor(e.target.checked)} className="w-5 h-5" />
-                <span>Max Major (+0.5% RTP)</span>
+                <input type="checkbox" checked={maxMajor} onChange={(e) => setMaxMajor(e.target.checked)} className="w-5 h-5 accent-orange-500" />
+                <span className="text-white">Max Major (+0.5% RTP)</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Current EV, Acquisition Fee, Walk-Away Advisor, EV Table, Info Modal */}
-        {/* Paste the rest of your existing calculator sections here (Current EV box, FP line, Walk-Away chart, EV Table, Info Modal, etc.) */}
+        {/* Current EV */}
+        <div className="bg-gray-900 rounded-3xl p-6 mb-6">
+          <div className="flex justify-between items-baseline mb-4">
+            <div>
+              <div className="text-orange-400 text-xl font-bold">Current EV</div>
+              <div className="text-sm text-gray-400">Average Case</div>
+            </div>
+            <div className="text-right">
+              <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {evAvg.toFixed(1)}x
+              </div>
+              <div className="text-sm text-gray-400">bets</div>
+            </div>
+          </div>
 
-        {/* For brevity in this message, I'm showing the structure. Replace this comment with all your remaining JSX from the old file (Current EV, Walk-Away, Table, Modal). */}
+          <div className="text-sm text-gray-400 mb-1">Full Run (to {MUST_HIT})</div>
+          <div className={`text-2xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {evFullRun.toFixed(1)}x bets
+          </div>
 
+          {fpDollarsNeeded > 0 && (
+            <div className="mt-4 text-orange-400 italic text-sm">
+              FP needed to reach +EV: ${fpDollarsNeeded} (play to {beAvg})
+            </div>
+          )}
+        </div>
+
+        {/* Walk-Away Advisor */}
+        <div className="bg-gray-900 rounded-3xl p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-lg font-medium">Walk-Away Advisor</div>
+            <button onClick={() => setShowInfoModal(true)} className="text-orange-400 text-sm underline">i</button>
+          </div>
+          <div className="h-64">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+          {hoverInfo && (
+            <div className="text-center text-orange-400 mt-2">
+              At counter {hoverInfo.counter}: Walk away at +{hoverInfo.bets} bets
+            </div>
+          )}
+          <div className="mt-4 text-center text-sm text-gray-400">
+            Recommended walk-away point (in bets)
+          </div>
+        </div>
+
+        {/* EV Table */}
+        <div className="bg-gray-900 rounded-3xl p-6">
+          <div className="text-lg font-medium mb-4">EV Table (Average Case)</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-3 pr-4">Counter</th>
+                  <th className="text-right py-3">EV Avg (bets)</th>
+                  <th className="text-right py-3">EV Full (bets)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {evTable.map((row) => (
+                  <tr key={row.counter} className="border-b border-gray-800 last:border-none">
+                    <td className="py-3 pr-4 font-medium">{row.counter}</td>
+                    <td className={`text-right py-3 ${row.evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {row.evAvg.toFixed(1)}
+                    </td>
+                    <td className={`text-right py-3 ${row.evFull >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {row.evFull.toFixed(1)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      {/* Info Modal - keep your existing modal */}
+      {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
