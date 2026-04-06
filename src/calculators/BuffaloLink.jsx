@@ -42,6 +42,7 @@ function BuffaloLink({ onBack }) {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
+  // Acquisition Fee states
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
@@ -246,7 +247,7 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Advanced Settings - with sliders for Buffalos per Spin and Midpoint Factor */}
+        {/* Advanced Settings with Sliders */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -271,7 +272,7 @@ function BuffaloLink({ onBack }) {
                 <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 20)} onBlur={handleFloatBlur(setAvgBonusPay, 20)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
 
-              {/* Buffalos per Spin - Slider */}
+              {/* Buffalos per Spin Slider */}
               <div>
                 <div className="flex justify-between mb-1">
                   <label className="text-gray-400 text-xs">Buffalos per Spin</label>
@@ -288,7 +289,7 @@ function BuffaloLink({ onBack }) {
                 />
               </div>
 
-              {/* Midpoint Factor - Slider */}
+              {/* Midpoint Factor Slider */}
               <div>
                 <div className="flex justify-between mb-1">
                   <label className="text-gray-400 text-xs">Midpoint Factor</label>
@@ -357,9 +358,11 @@ function BuffaloLink({ onBack }) {
           )}
         </div>
 
-        {/* Acquisition Fee */}
+        {/* Acquisition Fee - Now matches Phoenix style with full data points */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
+          <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
+
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-gray-400 text-xs mb-2">EV Basis</label>
@@ -394,11 +397,25 @@ function BuffaloLink({ onBack }) {
               />
             </div>
           </div>
+
+          {/* Expected Profit */}
+          <div className="bg-gray-800 rounded-2xl p-5 mb-4">
+            <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
+            <div className="text-4xl font-bold text-white">
+              ${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {useFullRunForFee ? 'Full Run EV' : 'Average Case EV'}
+            </div>
+          </div>
+
+          {/* Recommended Finder's Fee */}
           <div className="bg-gray-800 rounded-2xl p-5 text-center">
+            <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
             <div className="text-5xl font-black text-green-400">
               ${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}
             </div>
-            <div className="text-xs text-gray-400 mt-1">Recommended Finder's Fee</div>
+            <div className="text-xs text-gray-400 mt-1">to scout ({scoutPercentage}% of expected profit)</div>
           </div>
         </div>
 
