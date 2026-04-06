@@ -9,9 +9,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 function App() {
   const [user, setUser] = useState(null)
   const [isAllowed, setIsAllowed] = useState(false)
+  const [hasCheckedWhitelist, setHasCheckedWhitelist] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [currentView, setCurrentView] = useState('dashboard')
-  const [showMenu, setShowMenu] = useState(false)
 
   // Login form states
   const [email, setEmail] = useState('')
@@ -36,17 +36,6 @@ function App() {
       }
 
       setUser(session?.user ?? null)
-
-      if (session?.user?.email && !isRecovery) {
-        const cleanEmail = session.user.email.toLowerCase().trim()
-        const { data, error } = await supabase
-          .from('allowed_emails')
-          .select('email')
-          .eq('email', cleanEmail)
-          .single()
-
-        setIsAllowed(!!data && !error)
-      }
       setIsChecking(false)
     }
 
@@ -56,6 +45,7 @@ function App() {
       if (event === 'SIGNED_OUT') {
         setUser(null)
         setIsAllowed(false)
+        setHasCheckedWhitelist(false)
         setCurrentView('dashboard')
         setIsChecking(false)
       } else if (event === 'PASSWORD_RECOVERY') {
@@ -69,6 +59,25 @@ function App() {
 
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  // Whitelist check - only after we have a user
+  useEffect(() => {
+    if (!user) return
+
+    const checkWhitelist = async () => {
+      const cleanEmail = user.email.toLowerCase().trim()
+      const { data, error } = await supabase
+        .from('allowed_emails')
+        .select('email')
+        .eq('email', cleanEmail)
+        .single()
+
+      setIsAllowed(!!data && !error)
+      setHasCheckedWhitelist(true)
+    }
+
+    checkWhitelist()
+  }, [user])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -138,7 +147,8 @@ function App() {
     )
   }
 
-  if (user && !isAllowed) {
+  // Only show Access Denied AFTER whitelist check is done
+  if (user && hasCheckedWhitelist && !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm text-center">
@@ -150,7 +160,7 @@ function App() {
     )
   }
 
-  // Main logged-in view
+  // Main view
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
@@ -175,26 +185,6 @@ function App() {
         </div>
       ) : (
         <PhoenixLink onBack={() => setCurrentView('dashboard')} />
-      )}
-
-      {/* Hamburger Menu Dropdown */}
-      {showMenu && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center pt-20">
-          <div className="bg-gray-900 rounded-3xl w-full max-w-xs mx-4 overflow-hidden">
-            <button 
-              onClick={() => { setCurrentView('phoenix'); setShowMenu(false); }}
-              className="w-full text-left px-6 py-5 hover:bg-gray-800 border-b border-gray-700 flex items-center gap-3 text-white"
-            >
-              🔥 Phoenix Link EV Calc
-            </button>
-            <button 
-              onClick={() => { setCurrentView('buffalo'); setShowMenu(false); }}
-              className="w-full text-left px-6 py-5 hover:bg-gray-800 flex items-center gap-3 text-white"
-            >
-              🦬 Buffalo Link Calculator
-            </button>
-          </div>
-        </div>
       )}
     </div>
   )
