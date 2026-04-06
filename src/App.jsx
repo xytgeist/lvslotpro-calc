@@ -35,7 +35,7 @@ function App() {
   const [newPassword, setNewPassword] = useState('')
   const [isResetMode, setIsResetMode] = useState(false)
 
-  // ====================== PHOENIX LINK STATES (UNCHANGED) ======================
+  // ====================== PHOENIX LINK STATES (FULL - UNCHANGED) ======================
   const [phoenixCurrentX, setPhoenixCurrentX] = useState(1400)
   const [phoenixBetSize, setPhoenixBetSize] = useState(25)
   const [phoenixDenom, setPhoenixDenom] = useState(1.00)
@@ -179,7 +179,7 @@ function App() {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // Corrected breakeven for midpoint method
+    // Corrected breakeven for midpoint
     const breakevenAvg = Math.round(X + (B / houseEdge) * inc / factor)
     const breakevenFull = Math.round(BUFFALO_MUST_HIT - (B / houseEdge) * inc)
 
@@ -252,7 +252,7 @@ function App() {
 
   const handleSignOut = () => supabase.auth.signOut()
 
-  // ==================== DASHBOARD ====================
+  // Dashboard
   if (currentView === 'dashboard') {
     return (
       <div className="min-h-screen bg-gray-950 pb-12">
@@ -288,7 +288,7 @@ function App() {
     )
   }
 
-  // ==================== PHOENIX LINK CALCULATOR (FULL - UNCHANGED) ====================
+  // ====================== PHOENIX LINK CALCULATOR (FULL - UNCHANGED) ======================
   if (currentView === 'phoenix') {
     return (
       <div className="min-h-screen bg-gray-950 pb-12">
@@ -415,14 +415,114 @@ function App() {
             )}
           </div>
 
-          {/* Acquisition Fee, Walk-Away Advisor, EV Table for Phoenix would go here - left as-is from your last version */}
-          {/* (Omitted in this paste for length, but they are unchanged in your file) */}
+          {/* Acquisition Fee Calculator */}
+          <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
+            <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">EV Basis</label>
+                <div className="flex bg-gray-800 rounded-2xl p-1">
+                  <button onClick={() => setPhoenixUseFullRunForFee(false)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!phoenixUseFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Average</button>
+                  <button onClick={() => setPhoenixUseFullRunForFee(true)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${phoenixUseFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Full Run</button>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-gray-400 text-xs">Scout Share</label>
+                  <span className="font-bold text-orange-400 text-lg">{phoenixScoutPercentage}%</span>
+                </div>
+                <div className="bg-gray-800 rounded-2xl px-4 py-3">
+                  <input type="range" min="10" max="15" step="1" value={phoenixScoutPercentage} onChange={(e) => setPhoenixScoutPercentage(Number(e.target.value))} className="w-full accent-orange-500" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-2xl p-5 text-center mb-4">
+              <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
+              <div className="text-4xl font-bold text-white">
+                ${((phoenixUseFullRunForFee ? phoenixEvFullRun : phoenixEvAvg) * phoenixBetSize).toFixed(2)}
+              </div>
+              <div className="text-xs text-gray-400">
+                {phoenixUseFullRunForFee ? 'Full Run EV' : 'Average Case EV'}
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-2xl p-5 text-center">
+              <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
+              <div className="text-5xl font-black text-green-400">
+                ${(((phoenixUseFullRunForFee ? phoenixEvFullRun : phoenixEvAvg) * phoenixBetSize) * (phoenixScoutPercentage / 100)).toFixed(2)}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">to scout</div>
+            </div>
+          </div>
+
+          {/* Walk-Away Advisor */}
+          <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
+              <button onClick={() => setPhoenixShowInfoModal(true)} className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl">ℹ️</button>
+            </div>
+            <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
+              <div className="flex-1">
+                <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
+                <input type="text" inputMode="numeric" value={phoenixTestCounter} onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setPhoenixTestCounter(val === '' ? '' : parseInt(val, 10));
+                }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-1">Walk-away</div>
+                <div className="text-4xl font-bold text-green-400">+{phoenixTestCounter ? getRecommendedWalkAway(phoenixTestCounter) : 0} bets</div>
+                <div className="text-sm text-green-400">
+                  ${((phoenixTestCounter ? getRecommendedWalkAway(phoenixTestCounter) : 0) * phoenixBetSize).toFixed(0)}
+                </div>
+              </div>
+            </div>
+            <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
+              <Line data={chartData} options={chartOptions} />
+            </div>
+            <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
+              {phoenixHoverCounter !== null ? (
+                <>At <span className="text-orange-400 font-semibold mx-1">{phoenixHoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{phoenixHoverWalkAway} bets</span> <span className="text-green-400">(${ (phoenixHoverWalkAway * phoenixBetSize).toFixed(0) })</span></>
+              ) : (
+                <>At <span className="text-orange-400 font-semibold mx-1">{phoenixCurrentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(phoenixCurrentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(phoenixCurrentX) * phoenixBetSize).toFixed(0) })</span></>
+              )}
+            </div>
+          </div>
+
+          {/* EV Table */}
+          <div className="bg-gray-900 p-6 rounded-3xl">
+            <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[540px]">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="py-4 px-4 text-gray-400 font-medium w-[92px]">Counter</th>
+                    <th className="py-4 px-3 text-gray-400 font-medium w-[155px]">EV Avg (Bets | $)</th>
+                    <th className="py-4 px-5 text-gray-400 font-medium">Full Run (to 1888) (Bets | $)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {phoenixEvTable.map((row, index) => (
+                    <tr key={index} className="border-b border-gray-800">
+                      <td className="py-4 px-4 font-semibold">{row.counter}</td>
+                      <td className={`py-4 px-3 font-bold ${row.avgEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {row.avgEV.toFixed(1)} | ${row.avgDollar.toFixed(0)}
+                      </td>
+                      <td className={`py-4 px-5 font-bold ${row.fullEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {row.fullEV.toFixed(1)} | ${row.fullDollar.toFixed(0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
-  // ==================== BUFFALO LINK CALCULATOR (full) ====================
+  // ====================== BUFFALO LINK CALCULATOR ======================
   if (currentView === 'buffalo') {
     return (
       <div className="min-h-screen bg-gray-950 pb-12">
@@ -497,7 +597,7 @@ function App() {
                 <div>
                   <label className="block text-gray-400 mb-1 text-xs">Midpoint Factor ({buffaloMidpointFactor.toFixed(2)})</label>
                   <input type="range" min="0.1" max="0.9" step="0.05" value={buffaloMidpointFactor} onChange={(e) => setBuffaloMidpointFactor(parseFloat(e.target.value))} className="w-full accent-yellow-500" />
-                  <div className="text-center text-xs text-gray-400 mt-1">0.5 = true midpoint between current and 1800</div>
+                  <div className="text-center text-xs text-gray-400 mt-1">0.5 = true midpoint</div>
                 </div>
               </div>
             )}
