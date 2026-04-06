@@ -36,9 +36,9 @@ function App() {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(40)
-  const [increment, setIncrement] = useState(1.1)
-  const [avgTrigger, setAvgTrigger] = useState(1800)
+  const [avgBonusPay, setAvgBonusPay] = useState(31)
+  const [increment, setIncrement] = useState(1.2)
+  const [avgTrigger, setAvgTrigger] = useState(1795)   // ← Changed to 1795
   const [mustHit, setMustHit] = useState(1888)
   const [maxMajor, setMaxMajor] = useState(false)
 
@@ -170,7 +170,7 @@ function App() {
     setIsChecking(false)
   }
 
-  // ==================== CALCULATION ====================
+  // Calculation
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = increment
@@ -403,15 +403,15 @@ function App() {
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Bonus Pay (bets)</label>
-                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 40)} onBlur={handleFloatBlur(setAvgBonusPay, 40)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 31)} onBlur={handleFloatBlur(setAvgBonusPay, 31)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
-                <input type="text" value={increment} onChange={handleFloatChange(setIncrement, 1.1)} onBlur={handleFloatBlur(setIncrement, 1.1)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input type="text" value={increment} onChange={handleFloatChange(setIncrement, 1.2)} onBlur={handleFloatBlur(setIncrement, 1.2)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
-                <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1800)} onBlur={handleFloatBlur(setAvgTrigger, 1800)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1795)} onBlur={handleFloatBlur(setAvgTrigger, 1795)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
