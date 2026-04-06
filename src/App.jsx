@@ -60,22 +60,8 @@ function App() {
         <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Las Vegas Slot Pro</h2>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-              required
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-              required
-            />
+            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
             <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
           </form>
         </div>
@@ -85,19 +71,11 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Shared Title Bar - ONLY on calculator pages, with hamburger, no Log Out */}
+      {/* Title Bar - clean, no hamburger, no logout */}
       {currentView !== 'dashboard' && (
         <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
-          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
-            
-            {/* Hamburger Menu in title bar */}
-            <button
-              onClick={() => {/* We'll handle this in PhoenixLink for now */}}
-              className="text-3xl text-orange-400 hover:text-orange-300"
-            >
-              ☰
-            </button>
+          <div className="max-w-lg mx-auto px-4 py-4">
+            <div className="text-white text-xl font-semibold tracking-wide text-center">LAS VEGAS SLOT PRO</div>
           </div>
         </div>
       )}
