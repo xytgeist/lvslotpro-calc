@@ -432,20 +432,6 @@ function PhoenixLink({ onBack }) {
           </div>
         </div>
 
-        {/* Fixed Logout */}
-        <div className="text-center mt-12 mb-8">
-          <button 
-            onClick={async () => {
-              await supabase.auth.signOut()
-              window.location.reload()
-            }} 
-            className="text-gray-500 hover:text-red-400 text-sm underline"
-          >
-            Log Out
-          </button>
-        </div>
-      </div>
-
       {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
