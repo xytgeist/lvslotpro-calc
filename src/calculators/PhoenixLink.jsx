@@ -15,7 +15,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 const MUST_HIT = 1888
 
-function PhoenixLink() {
+function PhoenixLink({ onBack }) {
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -60,7 +60,7 @@ function PhoenixLink() {
     setter((prev) => (isNaN(prev) || prev === 0 ? defaultVal : prev))
   }
 
-  // Auto RTP adjustment
+  // Auto-adjust RTP
   useEffect(() => {
     let newOverall = 91
     if (denom <= 0.02) newOverall = 88
@@ -165,37 +165,18 @@ function PhoenixLink() {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Clean Top Bar */}
-      <div className="fixed top-0 left-0 right-0 bg-gray-950 border-b border-gray-800 z-50">
-        <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <button 
-            onClick={() => {}} // Hamburger handled in App.jsx
-            className="text-4xl text-orange-400 hover:text-orange-300 p-1 -ml-1"
-          >
-            ☰
-          </button>
-
-          <div className="flex items-center gap-3">
-            <img 
-              src="/phoenix-link-logo.png" 
-              alt="Phoenix Link" 
-              className="w-9 h-9 flex-shrink-0 rounded-xl object-contain" 
-            />
-            <h1 
-              className="text-[22px] font-black tracking-[-1px] text-black leading-none"
-              style={{
-                textShadow: `-1.5px -1.5px 0 #f97316, 1.5px -1.5px 0 #f97316, -1.5px 1.5px 0 #f97316, 1.5px 1.5px 0 #f97316`
-              }}
-            >
-              PHOENIX LINK<br />EV CALC
-            </h1>
-          </div>
-
-          <div className="w-10" />
-        </div>
+      {/* Back to Dashboard - kept for now */}
+      <div className="px-4 pt-4">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 text-orange-400 hover:text-orange-300 text-lg font-medium"
+        >
+          ← Back to Dashboard
+        </button>
       </div>
 
-      <div className="pt-20 max-w-lg mx-auto px-4">
+      {/* Your full original calculator content starts here */}
+      <div className="max-w-lg mx-auto px-4">
         {/* Counter */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-4">
           <label className="text-gray-400 text-sm block mb-2">Counter</label>
@@ -257,26 +238,26 @@ function PhoenixLink() {
             <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="mt-6 space-y-6 text-sm">
+            <div className="mt-6 space-y-6">
               <div>
-                <label className="text-gray-400 block mb-1">Overall RTP (%)</label>
+                <label className="text-gray-400 text-sm block mb-1">Overall RTP (%)</label>
                 <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div>
-                <label className="text-gray-400 block mb-1">Avg Counter Bonus Pay (bets)</label>
+                <label className="text-gray-400 text-sm block mb-1">Avg Counter Bonus Pay (bets)</label>
                 <input type="text" value={avgBonusPay} onChange={handleIntegerChange(setAvgBonusPay)} onBlur={handleIntegerBlur(setAvgBonusPay, 31)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div>
-                <label className="text-gray-400 block mb-1">Balls per Spin</label>
+                <label className="text-gray-400 text-sm block mb-1">Balls per Spin</label>
                 <input type="text" value={increment} onChange={handleFloatChange(setIncrement)} onBlur={handleFloatBlur(setIncrement, 1.2)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div>
-                <label className="text-gray-400 block mb-1">Avg Counter Trigger</label>
+                <label className="text-gray-400 text-sm block mb-1">Avg Counter Trigger</label>
                 <input type="text" value={avgTrigger} onChange={handleIntegerChange(setAvgTrigger)} onBlur={handleIntegerBlur(setAvgTrigger, 1795)} className="w-full bg-gray-800 rounded-2xl p-4 text-white" />
               </div>
               <div className="flex items-center gap-3">
                 <input type="checkbox" checked={maxMajor} onChange={(e) => setMaxMajor(e.target.checked)} className="w-5 h-5 accent-orange-500" />
-                <span className="text-white">Max Major (+0.5% RTP)</span>
+                <span>Max Major (+0.5% RTP)</span>
               </div>
             </div>
           )}
@@ -323,9 +304,6 @@ function PhoenixLink() {
               At counter {hoverInfo.counter}: Walk away at +{hoverInfo.bets} bets
             </div>
           )}
-          <div className="mt-4 text-center text-sm text-gray-400">
-            Recommended walk-away point (in bets)
-          </div>
         </div>
 
         {/* EV Table */}
