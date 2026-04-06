@@ -10,8 +10,13 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
+import { createClient } from '@supabase/supabase-js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 const MUST_HIT = 1888
 
@@ -204,7 +209,7 @@ function PhoenixLink({ onBack }) {
     <div className="min-h-screen bg-gray-950 pb-12">
       {/* Back to Dashboard */}
       <div className="max-w-lg mx-auto px-4 pt-4">
-        <button 
+        <button
           onClick={onBack}
           className="flex items-center gap-2 text-orange-400 hover:text-orange-300 text-lg font-medium"
         >
@@ -290,7 +295,6 @@ function PhoenixLink({ onBack }) {
               {currentRTP.toFixed(1)}% RTP
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Average Case</div>
@@ -311,17 +315,14 @@ function PhoenixLink({ onBack }) {
               </div>
             </div>
           </div>
-
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
-
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
             <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
-
           {!isAlreadyPositive && (
             <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic text-orange-400">
               FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
@@ -431,6 +432,7 @@ function PhoenixLink({ onBack }) {
             </table>
           </div>
         </div>
+      </div>
 
       {/* Info Modal */}
       {showInfoModal && (
