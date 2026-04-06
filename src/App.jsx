@@ -22,7 +22,6 @@ function App() {
   const [newPassword, setNewPassword] = useState('')
   const [isResetMode, setIsResetMode] = useState(false)
 
-  // Auth + Whitelist
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -36,11 +35,18 @@ function App() {
       }
 
       setUser(session?.user ?? null)
+
       if (session?.user?.email && !isRecovery) {
-        checkEmailAllowed(session.user.email)
-      } else {
-        setIsChecking(false)
+        const cleanEmail = session.user.email.toLowerCase().trim()
+        const { data, error } = await supabase
+          .from('allowed_emails')
+          .select('email')
+          .eq('email', cleanEmail)
+          .single()
+
+        setIsAllowed(!!data && !error)
       }
+      setIsChecking(false)
     }
 
     checkSession()
@@ -63,23 +69,16 @@ function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  const checkEmailAllowed = async (userEmail) => {
-    const cleanEmail = userEmail.toLowerCase().trim()
-    const { data, error } = await supabase
-      .from('allowed_emails')
-      .select('email')
-      .eq('email', cleanEmail)
-      .single()
-    setIsAllowed(!!data && !error)
-    setIsChecking(false)
-  }
-
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
 
   if (isChecking) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-orange-500 text-xl">Loading...</div>
+      </div>
+    )
   }
 
   if (isResetMode) {
@@ -118,7 +117,6 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Phoenix Link EV Calc</h1>
-          
           {showForgotPassword ? (
             <>
               <h2 className="text-xl text-center mb-6">Reset Password</h2>
@@ -200,7 +198,7 @@ function App() {
     )
   }
 
-  // Main view after successful login
+  // Main logged-in view
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
