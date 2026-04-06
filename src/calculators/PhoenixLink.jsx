@@ -233,7 +233,7 @@ function PhoenixLink({ onBack }) {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - no extra padding */}
       <div className="pt-20 max-w-lg mx-auto px-4">
         {/* Counter */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
