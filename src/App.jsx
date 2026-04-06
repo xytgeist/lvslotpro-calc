@@ -36,7 +36,7 @@ function App() {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [baseRTP, setBaseRTP] = useState(28)
+  const [avgBonusPay, setAvgBonusPay] = useState(40)   // ← New field
   const [increment, setIncrement] = useState(1.1)
   const [allBonusFreq, setAllBonusFreq] = useState(80)
   const [avgTrigger, setAvgTrigger] = useState(1800)
@@ -66,10 +66,9 @@ function App() {
   // Walk-Away S-Curve (unchanged)
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
-    const bRTP = baseRTP / 100
     const inc = increment
     const avgTrig = avgTrigger
-    const B = bRTP + (oRTP - bRTP) / (1 / allBonusFreq)
+    const B = avgBonusPay                     // ← Now directly uses Avg Bonus Pay
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
     const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588))
@@ -114,21 +113,19 @@ function App() {
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
 
-  // Auto RTP
+  // Auto RTP (no longer affects Avg Bonus Pay)
   useEffect(() => {
     let baseOverall = 91
-    let baseBase = 28
-    if (denom <= 0.02) { baseOverall = 88; baseBase = 25 }
-    else if (denom === 0.05) { baseOverall = 88.25; baseBase = 25 }
-    else if (denom === 0.10) { baseOverall = 88.4; baseBase = 25 }
-    else if (denom === 0.25) { baseOverall = 88.6; baseBase = 25 }
-    else if (denom > 1) { baseOverall = 91.5; baseBase = 28 }
+    if (denom <= 0.02) baseOverall = 88
+    else if (denom === 0.05) baseOverall = 88.25
+    else if (denom === 0.10) baseOverall = 88.4
+    else if (denom === 0.25) baseOverall = 88.6
+    else if (denom > 1) baseOverall = 91.5
     const finalOverall = maxMajor ? baseOverall + 0.5 : baseOverall
     setOverallRTP(finalOverall)
-    setBaseRTP(baseBase)
   }, [denom, maxMajor])
 
-  // Auth + Whitelist + Reset Detection
+  // Auth + Whitelist + Reset Detection (unchanged)
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -174,10 +171,9 @@ function App() {
     setIsChecking(false)
   }
 
-  // ==================== UPDATED CURRENT EV CALCULATION ====================
+  // ==================== UPDATED CALCULATION ====================
   const calculate = () => {
     const oRTP = overallRTP / 100
-    const bRTP = baseRTP / 100
     const inc = increment
     const freq = allBonusFreq
     const avgTrig = avgTrigger
@@ -185,9 +181,8 @@ function App() {
     const X = currentX || 0
     const bet = betSize || 25
 
-    // Average value of one counter bonus hit
-    const pTotal = 1 / freq
-    const B = bRTP + (oRTP - bRTP) / pTotal
+    // B is now directly the user-entered Avg Bonus Pay (bets)
+    const B = avgBonusPay
 
     // Pure house edge using overall RTP only
     const houseEdge = 1 - oRTP
@@ -200,7 +195,7 @@ function App() {
     const fullEV = B - houseEdge * spinsFull
 
     // Max Exposure still uses base RTP (worst-case no-bonus loss)
-    const baseHouseEdge = 1 - (baseRTP / 100)
+    const baseHouseEdge = 1 - (28 / 100)   // kept at 28% as fallback since we removed the field
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
@@ -215,7 +210,7 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // FP to +EV - only shows when still -EV
+    // FP to +EV
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -227,7 +222,7 @@ function App() {
       setFpDollarsNeeded(dollarsNeeded)
     }
 
-    // EV Table with new math
+    // EV Table
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
       const avgSpins = Math.max(0, (avgTrig - c) / inc)
@@ -243,9 +238,9 @@ function App() {
     setEvTable(table)
   }
 
-  useEffect(() => { calculate() }, [overallRTP, baseRTP, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
+  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
-  // Safe handlers for Advanced Settings
+  // Safe handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '');
     setter(val);
@@ -275,25 +270,17 @@ function App() {
   };
 
   const handleForgotPassword = async () => {
-    if (!email) {
-      alert("Please enter your email address")
-      return
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://lvslotpro.com'
-    })
+    if (!email) return alert("Please enter your email address")
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'https://lvslotpro.com' })
     if (error) alert(error.message)
     else {
       setResetEmailSent(true)
-      alert('Password reset link sent! Check your email (including spam).')
+      alert('Password reset link sent! Check your email.')
     }
   }
 
   const handleUpdatePassword = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      alert("Password must be at least 6 characters")
-      return
-    }
+    if (!newPassword || newPassword.length < 6) return alert("Password must be at least 6 characters")
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) alert(error.message)
     else {
@@ -305,11 +292,7 @@ function App() {
   }
 
   const handleSignUp = async () => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: 'https://lvslotpro.com' }
-    })
+    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: 'https://lvslotpro.com' } })
     if (error) alert(error.message)
     else alert('Account created! Check your email.')
   }
@@ -321,25 +304,15 @@ function App() {
 
   const handleSignOut = () => supabase.auth.signOut()
 
-  if (isChecking) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
-  }
+  if (isChecking) return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
 
   if (isResetMode) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
-          <input
-            type="password"
-            placeholder="New Password (min 6 characters)"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg"
-          />
-          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">
-            Update Password
-          </button>
+          <input type="password" placeholder="New Password (min 6 characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
+          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Update Password</button>
         </div>
       </div>
     )
@@ -356,7 +329,7 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
               <button onClick={handleForgotPassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Send Reset Link</button>
               <button onClick={() => setShowForgotPassword(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Back to Login</button>
-              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent! Check your email.</p>}
+              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent!</p>}
             </>
           ) : (
             <>
@@ -409,13 +382,7 @@ function App() {
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input
-                type="text"
-                value={betSize}
-                onChange={handleFloatChange(setBetSize, 25)}
-                onBlur={handleFloatBlur(setBetSize, 25)}
-                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
-              />
+              <input type="text" value={betSize} onChange={handleFloatChange(setBetSize, 25)} onBlur={handleFloatBlur(setBetSize, 25)} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
@@ -445,8 +412,8 @@ function App() {
                 <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1 text-xs">Base RTP (%)</label>
-                <input type="text" value={baseRTP} onChange={handleFloatChange(setBaseRTP, 28)} onBlur={handleFloatBlur(setBaseRTP, 28)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <label className="block text-gray-400 mb-1 text-xs">Avg Bonus Pay (bets)</label>
+                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 40)} onBlur={handleFloatBlur(setAvgBonusPay, 40)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
@@ -502,7 +469,7 @@ function App() {
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
 
-          {/* FP line - orange and italic */}
+          {/* FP line */}
           {!isAlreadyPositive && (
             <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic text-orange-400">
               FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
