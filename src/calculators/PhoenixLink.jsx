@@ -202,7 +202,7 @@ function PhoenixLink({ onBack }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 pb-12">
+    <div className="min-h-screen bg-gray-950">
       {/* Clean Fixed Top Bar */}
       <div className="fixed top-0 left-0 right-0 bg-gray-950 border-b border-gray-800 z-50">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
@@ -233,7 +233,7 @@ function PhoenixLink({ onBack }) {
         </div>
       </div>
 
-      {/* Main Content - tight padding, no extra space */}
+      {/* Main Content - tight, no extra space */}
       <div className="pt-20 max-w-lg mx-auto px-4">
         {/* Counter */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
