@@ -12,6 +12,7 @@ function App() {
   const [hasCheckedWhitelist, setHasCheckedWhitelist] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [currentView, setCurrentView] = useState('dashboard')
+  const [showMenu, setShowMenu] = useState(false)
 
   // Login form states
   const [email, setEmail] = useState('')
@@ -60,7 +61,7 @@ function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  // Whitelist check - only after we have a user
+  // Whitelist check
   useEffect(() => {
     if (!user) return
 
@@ -147,7 +148,6 @@ function App() {
     )
   }
 
-  // Only show Access Denied AFTER whitelist check is done
   if (user && hasCheckedWhitelist && !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -160,7 +160,7 @@ function App() {
     )
   }
 
-  // Main view
+  // Main logged-in view
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
@@ -185,6 +185,38 @@ function App() {
         </div>
       ) : (
         <PhoenixLink onBack={() => setCurrentView('dashboard')} />
+      )}
+
+      {/* Hamburger Menu */}
+      {showMenu && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center pt-20" onClick={() => setShowMenu(false)}>
+          <div className="bg-gray-900 rounded-3xl w-full max-w-xs mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => { setCurrentView('phoenix'); setShowMenu(false); }}
+              className="w-full text-left px-6 py-5 hover:bg-gray-800 border-b border-gray-700 flex items-center gap-3 text-white"
+            >
+              🔥 Phoenix Link EV Calc
+            </button>
+            <button 
+              onClick={() => { setCurrentView('buffalo'); setShowMenu(false); }}
+              className="w-full text-left px-6 py-5 hover:bg-gray-800 flex items-center gap-3 text-white"
+            >
+              🦬 Buffalo Link Calculator
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hamburger Button - only show when logged in and not on dashboard */}
+      {user && currentView !== 'dashboard' && (
+        <div className="fixed top-4 left-4 z-40">
+          <button 
+            onClick={() => setShowMenu(!showMenu)} 
+            className="text-4xl text-orange-400 hover:text-orange-300 p-2"
+          >
+            ☰
+          </button>
+        </div>
       )}
     </div>
   )
