@@ -18,6 +18,8 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+const MUST_HIT = 1888
+
 function App() {
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
@@ -38,8 +40,7 @@ function App() {
   const [overallRTP, setOverallRTP] = useState(91)
   const [avgBonusPay, setAvgBonusPay] = useState(31)
   const [increment, setIncrement] = useState(1.2)
-  const [avgTrigger, setAvgTrigger] = useState(1795)   // ← Back to using Avg Counter Trigger
-  const [mustHit, setMustHit] = useState(1888)
+  const [avgTrigger, setAvgTrigger] = useState(1795)
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
@@ -49,6 +50,9 @@ function App() {
   const [beAvg, setBeAvg] = useState(0)
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
+
+  // Current RTP
+  const [currentRTP, setCurrentRTP] = useState(0)
 
   // FP to +EV
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
@@ -170,12 +174,11 @@ function App() {
     setIsChecking(false)
   }
 
-  // Calculation - using Avg Counter Trigger
+  // Calculation
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = increment
     const avgTrig = avgTrigger
-    const must = mustHit
     const X = currentX || 0
     const bet = betSize || 25
 
@@ -183,7 +186,7 @@ function App() {
     const houseEdge = 1 - oRTP
 
     const spinsAvg = Math.max(0, (avgTrig - X) / inc)
-    const spinsFull = Math.max(0, (must - X) / inc)
+    const spinsFull = Math.max(0, (MUST_HIT - X) / inc)
 
     const avgEV = B - houseEdge * spinsAvg
     const fullEV = B - houseEdge * spinsFull
@@ -193,7 +196,7 @@ function App() {
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
     const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc)
-    const breakevenFull = Math.round(must - (B / houseEdge) * inc)
+    const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
@@ -201,6 +204,14 @@ function App() {
     setMaxExposureFull(maxExpFull)
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
+
+    // Current RTP % calculation
+    let rtp = oRTP * 100
+    if (spinsAvg > 0) {
+      const evPerSpin = avgEV / spinsAvg
+      rtp = 100 + (evPerSpin * 100)
+    }
+    setCurrentRTP(Math.round(rtp * 10) / 10)   // one decimal place
 
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
@@ -216,7 +227,7 @@ function App() {
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
       const avgSpins = Math.max(0, (avgTrig - c) / inc)
-      const fullSpins = Math.max(0, (must - c) / inc)
+      const fullSpins = Math.max(0, (MUST_HIT - c) / inc)
       table.push({
         counter: c,
         avgEV: B - houseEdge * avgSpins,
@@ -228,9 +239,9 @@ function App() {
     setEvTable(table)
   }
 
-  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
+  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
 
-  // Safe handlers
+  // Safe handlers (unchanged)
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '');
     setter(val);
@@ -413,17 +424,19 @@ function App() {
                 <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
                 <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1795)} onBlur={handleFloatBlur(setAvgTrigger, 1795)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">Must Hit By</label>
-                <input type="text" value={mustHit} onChange={handleIntegerChange(setMustHit, 1888)} onBlur={handleIntegerBlur(setMustHit, 1888)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
             </div>
           )}
         </div>
 
         {/* Current EV + Max Exposure */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-400">Current EV</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-orange-400">Current EV</h2>
+            <div className={`text-lg font-bold ${currentRTP >= 100 ? 'text-green-400' : 'text-red-400'}`}>
+              {currentRTP.toFixed(1)}% RTP
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Average Case</div>
