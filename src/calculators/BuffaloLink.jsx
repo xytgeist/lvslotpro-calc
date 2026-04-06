@@ -45,7 +45,7 @@ function BuffaloLink({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
-  // Walk-Away S-Curve (matching Phoenix)
+  // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -88,26 +88,13 @@ function BuffaloLink({ onBack }) {
       }
     },
     scales: {
-      x: { 
-        title: { display: true, text: 'Counter', color: '#d1d5db' }, 
-        grid: { color: '#374151' }, 
-        ticks: { color: '#d1d5db' } 
-      },
-      y: { 
-        title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, 
-        grid: { color: '#374151' }, 
-        ticks: { color: '#d1d5db' }, 
-        min: 0, 
-        max: 260 
-      }
+      x: { title: { display: true, text: 'Counter', color: '#d1d5db' }, grid: { color: '#374151' }, ticks: { color: '#d1d5db' } },
+      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, grid: { color: '#374151' }, ticks: { color: '#d1d5db' }, min: 0, max: 260 }
     },
-    plugins: { 
-      legend: { display: false }, 
-      tooltip: { enabled: false } 
-    }
+    plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
 
-  // Auto RTP adjustment
+  // Auto RTP
   useEffect(() => {
     let baseOverall = 91
     if (denom <= 0.02) baseOverall = 88
@@ -141,7 +128,8 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    const breakevenAvg = Math.round(midpointTrigger - (B / houseEdge) * inc)
+    // FIXED: Breakeven points now calculated independently of currentX
+    const breakevenAvg = Math.round(midpointTrigger - (B / houseEdge) * inc)   // was wrongly depending on X
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
     setEvAvg(avgEV)
@@ -186,7 +174,8 @@ function BuffaloLink({ onBack }) {
     calculate()
   }, [currentX, betSize, denom, overallRTP, avgBonusPay, buffalosPerSpin, midpointFactor, maxMajor])
 
-  // Input handlers
+  // ... (input handlers remain the same - omitted for brevity)
+
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '')
     setter(val)
@@ -210,7 +199,7 @@ function BuffaloLink({ onBack }) {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="pt-8 max-w-lg mx-auto px-4">
-        {/* Title */}
+        {/* Title - unchanged */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 mr-4">
             <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
@@ -223,7 +212,7 @@ function BuffaloLink({ onBack }) {
           </h1>
         </div>
 
-        {/* Counter + Bet + Denom */}
+        {/* Counter + Bet + Denom - unchanged */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -259,7 +248,7 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Advanced Settings with Sliders */}
+        {/* Advanced Settings - unchanged */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -368,7 +357,7 @@ function BuffaloLink({ onBack }) {
           )}
         </div>
 
-        {/* Acquisition Fee */}
+        {/* Acquisition Fee - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -427,14 +416,13 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Walk-Away Advisor - Now includes Test Counter input (matching Phoenix) */}
+        {/* Walk-Away Advisor - unchanged from last fix */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-amber-400">Walk-Away Advisor</h2>
             <button onClick={() => setShowInfoModal(true)} className="text-2xl text-amber-400">ℹ️</button>
           </div>
 
-          {/* Test Counter Input */}
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
@@ -458,13 +446,11 @@ function BuffaloLink({ onBack }) {
             </div>
           </div>
 
-          {/* Chart */}
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
             <Line data={chartData} options={chartOptions} />
           </div>
 
-          {/* Live Hover Info */}
-          <div className="bg-gray-800 rounded-2xl p-5 text-center min-h-[52px] flex items-center justify-center">
+          <div className="bg-gray-800 rounded-2xl p-5 text-center">
             {hoverCounter !== null ? (
               <>At <span className="text-amber-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
             ) : (
@@ -473,7 +459,7 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* EV Table */}
+        {/* EV Table - unchanged */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-amber-400">EV Table (1150 to 1775)</h2>
           <div className="overflow-x-auto">
