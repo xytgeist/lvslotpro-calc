@@ -107,7 +107,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation - FIXED Breakeven
+  // Main calculation with FIXED breakeven logic
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -116,10 +116,10 @@ function BuffaloLink({ onBack }) {
     const B = Number(avgBonusPay) || 20
     const houseEdge = 1 - oRTP
 
-    // Midpoint trigger for average case (independent of current X for breakeven)
-    const midpointTriggerForBE = (MUST_HIT + 0) * midpointFactor   // This is the key fix
+    // Average case uses midpoint
+    const midpointTrigger = X + (MUST_HIT - X) * midpointFactor
 
-    const spinsAvg = Math.max(0, (midpointTriggerForBE - X) / inc)   // for EV only
+    const spinsAvg = Math.max(0, (midpointTrigger - X) / inc)
     const spinsFull = Math.max(0, (MUST_HIT - X) / inc)
 
     const avgEV = B - houseEdge * spinsAvg
@@ -129,8 +129,11 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // FIXED: Breakeven points no longer depend on current counter
-    const breakevenAvg = Math.round(midpointTriggerForBE - (B / houseEdge) * inc)
+    // FIXED Breakeven Calculation (independent of current X)
+    // Average breakeven = point where average-case EV = 0
+    const breakevenAvg = Math.round(MUST_HIT * midpointFactor - (B / houseEdge) * inc)
+
+    // Full Run breakeven = point where full-run EV = 0
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
     setEvAvg(avgEV)
@@ -175,7 +178,7 @@ function BuffaloLink({ onBack }) {
     calculate()
   }, [currentX, betSize, denom, overallRTP, avgBonusPay, buffalosPerSpin, midpointFactor, maxMajor])
 
-  // Input handlers (unchanged)
+  // Input handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '')
     setter(val)
@@ -357,7 +360,7 @@ function BuffaloLink({ onBack }) {
           )}
         </div>
 
-        {/* Acquisition Fee - unchanged */}
+        {/* Acquisition Fee */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
