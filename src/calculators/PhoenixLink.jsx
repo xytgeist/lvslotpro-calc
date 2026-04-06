@@ -48,7 +48,6 @@ function PhoenixLink({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showMenu, setShowMenu] = useState(false)
 
-  // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const inc = increment
@@ -98,7 +97,6 @@ function PhoenixLink({ onBack }) {
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
 
-  // Auto RTP
   useEffect(() => {
     let baseOverall = 91
     if (denom <= 0.02) baseOverall = 88
@@ -110,7 +108,6 @@ function PhoenixLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Calculation
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = increment
@@ -168,7 +165,6 @@ function PhoenixLink({ onBack }) {
     calculate()
   }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
 
-  // Safe handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '');
     setter(val);
@@ -199,11 +195,11 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Main Content - tight spacing under the LAS VEGAS SLOT PRO bar */}
-      <div className="pt-16 max-w-lg mx-auto px-4">
+      {/* Main Content - pt-2 as requested (almost touching the bar) */}
+      <div className="pt-2 max-w-lg mx-auto px-4">
 
         {/* Phoenix Link Title + Logo */}
-        <div className="flex items-center justify-center mb-6">
+        <div className="flex items-center justify-center mb-4 pt-1">
           <img 
             src="/phoenix-link-logo.png" 
             alt="Phoenix Link" 
@@ -223,39 +219,21 @@ function PhoenixLink({ onBack }) {
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
-            <input 
-              type="text" 
-              inputMode="numeric" 
-              value={currentX} 
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setCurrentX(val === '' ? '' : parseInt(val, 10));
-              }} 
-              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
-            />
+            <input type="text" inputMode="numeric" value={currentX} onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9]/g, '');
+              setCurrentX(val === '' ? '' : parseInt(val, 10));
+            }} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input 
-                type="text" 
-                value={betSize} 
-                onChange={handleFloatChange(setBetSize, 25)} 
-                onBlur={handleFloatBlur(setBetSize, 25)} 
-                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
-              />
+              <input type="text" value={betSize} onChange={handleFloatChange(setBetSize, 25)} onBlur={handleFloatBlur(setBetSize, 25)} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
-              <select 
-                value={denom} 
-                onChange={(e) => setDenom(parseFloat(e.target.value))} 
-                className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
-              >
-                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
-                  <option key={d} value={d}>${d}</option>
-                ))}
+              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
               </select>
             </div>
           </div>
@@ -263,10 +241,7 @@ function PhoenixLink({ onBack }) {
 
         {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
-          <button 
-            onClick={() => setShowAdvanced(!showAdvanced)} 
-            className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors"
-          >
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
             <span className="text-base font-semibold">Advanced Settings</span>
             <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
@@ -274,52 +249,25 @@ function PhoenixLink({ onBack }) {
             <div className="p-4 pt-0 space-y-4 border-t border-gray-800">
               <div className="flex items-center justify-between">
                 <span className="text-sm">Max Major</span>
-                <button 
-                  onClick={() => setMaxMajor(!maxMajor)} 
-                  className={`px-6 py-2 rounded-xl font-semibold text-sm ${maxMajor ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-                >
+                <button onClick={() => setMaxMajor(!maxMajor)} className={`px-6 py-2 rounded-xl font-semibold text-sm ${maxMajor ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
                   {maxMajor ? 'YES' : 'NO'}
                 </button>
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
-                <input 
-                  type="text" 
-                  value={overallRTP} 
-                  onChange={handleFloatChange(setOverallRTP, 91)} 
-                  onBlur={handleFloatBlur(setOverallRTP, 91)} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
-                />
+                <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Bonus Pay (bets)</label>
-                <input 
-                  type="text" 
-                  value={avgBonusPay} 
-                  onChange={handleFloatChange(setAvgBonusPay, 31)} 
-                  onBlur={handleFloatBlur(setAvgBonusPay, 31)} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
-                />
+                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 31)} onBlur={handleFloatBlur(setAvgBonusPay, 31)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
-                <input 
-                  type="text" 
-                  value={increment} 
-                  onChange={handleFloatChange(setIncrement, 1.2)} 
-                  onBlur={handleFloatBlur(setIncrement, 1.2)} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
-                />
+                <input type="text" value={increment} onChange={handleFloatChange(setIncrement, 1.2)} onBlur={handleFloatBlur(setIncrement, 1.2)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
-                <input 
-                  type="text" 
-                  value={avgTrigger} 
-                  onChange={handleFloatChange(setAvgTrigger, 1795)} 
-                  onBlur={handleFloatBlur(setAvgTrigger, 1795)} 
-                  className="w-full p-3 bg-gray-800 rounded-xl" 
-                />
+                <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1795)} onBlur={handleFloatBlur(setAvgTrigger, 1795)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
             </div>
           )}
@@ -376,18 +324,8 @@ function PhoenixLink({ onBack }) {
             <div>
               <label className="block text-gray-400 mb-1 text-xs">EV Basis</label>
               <div className="flex bg-gray-800 rounded-2xl p-1">
-                <button 
-                  onClick={() => setUseFullRunForFee(false)} 
-                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
-                >
-                  Average
-                </button>
-                <button 
-                  onClick={() => setUseFullRunForFee(true)} 
-                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
-                >
-                  Full Run
-                </button>
+                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Average</button>
+                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Full Run</button>
               </div>
             </div>
             <div>
@@ -396,15 +334,7 @@ function PhoenixLink({ onBack }) {
                 <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
               </div>
               <div className="bg-gray-800 rounded-2xl px-4 py-3">
-                <input 
-                  type="range" 
-                  min="10" 
-                  max="15" 
-                  step="1" 
-                  value={scoutPercentage} 
-                  onChange={(e) => setScoutPercentage(Number(e.target.value))} 
-                  className="w-full accent-orange-500" 
-                />
+                <input type="range" min="10" max="15" step="1" value={scoutPercentage} onChange={(e) => setScoutPercentage(Number(e.target.value))} className="w-full accent-orange-500" />
               </div>
             </div>
           </div>
@@ -430,32 +360,19 @@ function PhoenixLink({ onBack }) {
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
-            <button 
-              onClick={() => setShowInfoModal(true)} 
-              className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl"
-            >
-              ℹ️
-            </button>
+            <button onClick={() => setShowInfoModal(true)} className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl">ℹ️</button>
           </div>
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
-              <input 
-                type="text" 
-                inputMode="numeric" 
-                value={testCounter} 
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  setTestCounter(val === '' ? '' : parseInt(val, 10));
-                }} 
-                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" 
-              />
+              <input type="text" inputMode="numeric" value={testCounter} onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setTestCounter(val === '' ? '' : parseInt(val, 10));
+              }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
-              <div className="text-4xl font-bold text-green-400">
-                +{testCounter ? getRecommendedWalkAway(testCounter) : 0} bets
-              </div>
+              <div className="text-4xl font-bold text-green-400">+{testCounter ? getRecommendedWalkAway(testCounter) : 0} bets</div>
               <div className="text-sm text-green-400">
                 ${((testCounter ? getRecommendedWalkAway(testCounter) : 0) * betSize).toFixed(0)}
               </div>
@@ -540,10 +457,7 @@ function PhoenixLink({ onBack }) {
               <p>The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining remainingEV and a logistic S-curve calibrated through Monte Carlo simulations.</p>
               <p>In short: it converts raw theoretical EV into a practical, utility-aware stopping rule.</p>
             </div>
-            <button 
-              onClick={() => setShowInfoModal(false)} 
-              className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors"
-            >
+            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors">
               Got it
             </button>
           </div>
