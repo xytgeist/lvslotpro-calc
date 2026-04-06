@@ -1,6 +1,6 @@
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Clean Fixed Top Bar - Hamburger + Logo + Title */}
+      {/* Clean Fixed Top Bar */}
       <div className="fixed top-0 left-0 right-0 bg-gray-950 border-b border-gray-800 z-50">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
           <button 
@@ -30,7 +30,7 @@
         </div>
       </div>
 
-      {/* Main Content with padding for the fixed top bar */}
+      {/* Main Content with padding for fixed bar */}
       <div className="pt-20 max-w-lg mx-auto px-4">
         {/* Counter */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
@@ -90,7 +90,7 @@
           )}
         </div>
 
-        {/* Current EV - kept exactly as you had it */}
+        {/* Current EV */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Current EV</h2>
@@ -133,7 +133,7 @@
           )}
         </div>
 
-        {/* Acquisition Fee Calculator - kept exactly as you had */}
+        {/* Acquisition Fee Calculator */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -173,7 +173,7 @@
           </div>
         </div>
 
-        {/* Walk-Away Advisor - kept exactly as you had */}
+        {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
@@ -207,7 +207,7 @@
           </div>
         </div>
 
-        {/* EV Table - kept exactly as you had */}
+        {/* EV Table */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
           <div className="overflow-x-auto">
@@ -237,7 +237,7 @@
         </div>
       </div>
 
-      {/* Info Modal - kept exactly as you had */}
+      {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
