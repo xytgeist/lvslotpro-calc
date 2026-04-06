@@ -60,7 +60,7 @@ function PhoenixLink({ onBack }) {
     setter((prev) => (isNaN(prev) || prev === 0 ? defaultVal : prev))
   }
 
-  // Auto-adjust RTP
+  // Auto-adjust RTP based on denom and maxMajor
   useEffect(() => {
     let newOverall = 91
     if (denom <= 0.02) newOverall = 88
@@ -165,7 +165,7 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Back to Dashboard - kept for now */}
+      {/* Back to Dashboard */}
       <div className="px-4 pt-4">
         <button 
           onClick={onBack}
@@ -175,8 +175,7 @@ function PhoenixLink({ onBack }) {
         </button>
       </div>
 
-      {/* Your full original calculator content starts here */}
-      <div className="max-w-lg mx-auto px-4">
+      <div className="max-w-lg mx-auto px-4 pt-4">
         {/* Counter */}
         <div className="bg-gray-900 rounded-3xl p-6 mb-4">
           <label className="text-gray-400 text-sm block mb-2">Counter</label>
