@@ -22,6 +22,7 @@ function App() {
   const [newPassword, setNewPassword] = useState('')
   const [isResetMode, setIsResetMode] = useState(false)
 
+  // 1. Auth session check
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -35,17 +36,6 @@ function App() {
       }
 
       setUser(session?.user ?? null)
-
-      if (session?.user?.email && !isRecovery) {
-        const cleanEmail = session.user.email.toLowerCase().trim()
-        const { data, error } = await supabase
-          .from('allowed_emails')
-          .select('email')
-          .eq('email', cleanEmail)
-          .single()
-
-        setIsAllowed(!!data && !error)
-      }
       setIsChecking(false)
     }
 
@@ -68,6 +58,24 @@ function App() {
 
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  // 2. Whitelist check - ONLY runs AFTER we have a user
+  useEffect(() => {
+    if (!user) return
+
+    const checkWhitelist = async () => {
+      const cleanEmail = user.email.toLowerCase().trim()
+      const { data, error } = await supabase
+        .from('allowed_emails')
+        .select('email')
+        .eq('email', cleanEmail)
+        .single()
+
+      setIsAllowed(!!data && !error)
+    }
+
+    checkWhitelist()
+  }, [user])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -153,7 +161,7 @@ function App() {
     )
   }
 
-  // Only show Access Denied if we have a confirmed user AND they are NOT allowed
+  // Only show Access Denied if we have a user AND they are NOT allowed
   if (user && !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
