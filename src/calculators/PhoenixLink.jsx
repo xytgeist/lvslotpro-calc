@@ -195,7 +195,7 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Main Content - pt-2 as requested (almost touching the bar) */}
+      {/* Very tight spacing under title bar */}
       <div className="pt-2 max-w-lg mx-auto px-4">
 
         {/* Phoenix Link Title + Logo */}

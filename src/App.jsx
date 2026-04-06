@@ -60,21 +60,21 @@ function App() {
         <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Las Vegas Slot Pro</h2>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              className="w-full p-4 bg-gray-800 rounded-2xl text-white" 
-              required 
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+              required
             />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              className="w-full p-4 bg-gray-800 rounded-2xl text-white" 
-              required 
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+              required
             />
             <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
           </form>
@@ -85,25 +85,31 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Shared Title Bar - ONLY shown on calculator pages */}
+      {/* Shared Title Bar - ONLY on calculator pages, with hamburger, no Log Out */}
       {currentView !== 'dashboard' && (
         <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
           <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
             <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
-            <button onClick={handleLogout} className="text-zinc-400 hover:text-red-400 text-sm">Log Out</button>
+            
+            {/* Hamburger Menu in title bar */}
+            <button
+              onClick={() => {/* We'll handle this in PhoenixLink for now */}}
+              className="text-3xl text-orange-400 hover:text-orange-300"
+            >
+              ☰
+            </button>
           </div>
         </div>
       )}
 
       {/* Main Content */}
-      <div className={currentView !== 'dashboard' ? 'pt-20' : ''}>
+      <div className={currentView !== 'dashboard' ? 'pt-12' : ''}>
         {currentView === 'dashboard' ? (
           <div className="max-w-lg mx-auto px-4 py-8">
             <div className="text-center mb-12">
               <h1 className="text-4xl font-black text-white tracking-tight">Las Vegas Slot Pro</h1>
               <p className="text-zinc-400 mt-3">Select a calculator</p>
             </div>
-
             <button
               onClick={() => setCurrentView('phoenix')}
               className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-4"
