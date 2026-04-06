@@ -33,7 +33,6 @@ function App() {
   const [newPassword, setNewPassword] = useState('')
   const [isResetMode, setIsResetMode] = useState(false)
 
-  // Phoenix Link States
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -52,9 +51,12 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
+  // Current RTP
+  const [currentRTP, setCurrentRTP] = useState(0)
+
+  // FP to +EV
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
-  const [currentRTP, setCurrentRTP] = useState(0)
 
   const [testCounter, setTestCounter] = useState(1400)
   const [hoverCounter, setHoverCounter] = useState(null)
@@ -64,7 +66,182 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // Safe handlers
+  // Walk-Away S-Curve
+  const getRecommendedWalkAway = (counter) => {
+    const oRTP = overallRTP / 100
+    const inc = increment
+    const avgTrig = avgTrigger
+    const B = avgBonusPay
+    const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
+    const remainingEV = B - (1 - oRTP) * spinsRemaining
+    const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588))
+    const sCurve = 1 / (1 + Math.exp(-5.5 * (normalized - 0.48)))
+    const curveBonus = sCurve * 98
+    let walkAway = Math.round(remainingEV * 3.5 + curveBonus)
+    return Math.max(75, Math.min(245, walkAway))
+  }
+
+  const chartData = {
+    labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
+    datasets: [{
+      label: 'Recommended Walk-Away',
+      data: Array.from({ length: 21 }, (_, i) => getRecommendedWalkAway(1300 + i * 28)),
+      borderColor: '#f97316',
+      backgroundColor: 'rgba(249, 115, 22, 0.1)',
+      tension: 0.45,
+      borderWidth: 3.5,
+      pointRadius: 3,
+      pointHoverRadius: 7,
+    }]
+  }
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { intersect: false, mode: 'index' },
+    onHover: (event, elements) => {
+      if (elements.length > 0) {
+        const index = elements[0].index
+        setHoverCounter(chartData.labels[index])
+        setHoverWalkAway(chartData.datasets[0].data[index])
+      } else {
+        setHoverCounter(null)
+        setHoverWalkAway(null)
+      }
+    },
+    scales: {
+      x: { title: { display: true, text: 'Counter', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' } },
+      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' }, min: 0, max: 260 }
+    },
+    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+  }
+
+  // Auto RTP
+  useEffect(() => {
+    let baseOverall = 91
+    if (denom <= 0.02) baseOverall = 88
+    else if (denom === 0.05) baseOverall = 88.25
+    else if (denom === 0.10) baseOverall = 88.4
+    else if (denom === 0.25) baseOverall = 88.6
+    else if (denom > 1) baseOverall = 91.5
+    const finalOverall = maxMajor ? baseOverall + 0.5 : baseOverall
+    setOverallRTP(finalOverall)
+  }, [denom, maxMajor])
+
+  // Auth + Whitelist + Reset Detection
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const isRecovery =
+        session?.user?.user_metadata?.is_recovery === true ||
+        window.location.hash.includes('type=recovery') ||
+        window.location.hash.includes('access_token')
+      if (isRecovery && session?.user) {
+        setIsResetMode(true)
+        setUser(session.user)
+        setIsChecking(false)
+        return
+      }
+      setUser(session?.user ?? null)
+      if (session?.user?.email && !isRecovery) {
+        checkEmailAllowed(session.user.email)
+      } else {
+        setIsChecking(false)
+      }
+    }
+    checkSession()
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResetMode(true)
+        setUser(session?.user)
+        setIsChecking(false)
+      } else {
+        checkSession()
+      }
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  const checkEmailAllowed = async (userEmail) => {
+    const cleanEmail = userEmail.toLowerCase().trim()
+    const { data, error } = await supabase
+      .from('allowed_emails')
+      .select('email')
+      .eq('email', cleanEmail)
+      .single()
+    if (error) console.error('Whitelist error:', error)
+    setIsAllowed(!!data && !error)
+    setIsChecking(false)
+  }
+
+  // Calculation
+  const calculate = () => {
+    const oRTP = overallRTP / 100
+    const inc = increment
+    const avgTrig = avgTrigger
+    const X = currentX || 0
+    const bet = betSize || 25
+
+    const B = avgBonusPay
+    const houseEdge = 1 - oRTP
+
+    const spinsAvg = Math.max(0, (avgTrig - X) / inc)
+    const spinsFull = Math.max(0, (MUST_HIT - X) / inc)
+
+    const avgEV = B - houseEdge * spinsAvg
+    const fullEV = B - houseEdge * spinsFull
+
+    const baseHouseEdge = 1 - (28 / 100)
+    const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
+    const maxExpFull = Math.round(spinsFull * baseHouseEdge)
+
+    const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc)
+    const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
+
+    setEvAvg(avgEV)
+    setEvFullRun(fullEV)
+    setMaxExposureAvg(maxExpAvg)
+    setMaxExposureFull(maxExpFull)
+    setBeAvg(breakevenAvg)
+    setBeFullRun(breakevenFull)
+
+    // Current RTP % calculation
+    let rtp = oRTP * 100
+    if (spinsAvg > 0) {
+      const evPerSpin = avgEV / spinsAvg
+      rtp = 100 + (evPerSpin * 100)
+    }
+    setCurrentRTP(Math.round(rtp * 10) / 10)   // one decimal place
+
+    const alreadyPositive = avgEV >= 0
+    setIsAlreadyPositive(alreadyPositive)
+
+    if (alreadyPositive) {
+      setFpDollarsNeeded(0)
+    } else {
+      const spinsNeeded = Math.max(0, breakevenAvg - X)
+      const dollarsNeeded = Math.round(spinsNeeded * bet)
+      setFpDollarsNeeded(dollarsNeeded)
+    }
+
+    const table = []
+    for (let c = 1150; c <= 1875; c += 25) {
+      const avgSpins = Math.max(0, (avgTrig - c) / inc)
+      const fullSpins = Math.max(0, (MUST_HIT - c) / inc)
+      table.push({
+        counter: c,
+        avgEV: B - houseEdge * avgSpins,
+        fullEV: B - houseEdge * fullSpins,
+        avgDollar: (B - houseEdge * avgSpins) * bet,
+        fullDollar: (B - houseEdge * fullSpins) * bet
+      })
+    }
+    setEvTable(table)
+  }
+
+  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
+
+  // Safe handlers (unchanged)
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '');
     setter(val);
@@ -72,8 +249,11 @@ function App() {
 
   const handleFloatBlur = (setter, defaultVal) => (e) => {
     let val = e.target.value.trim();
-    if (val === '' || isNaN(parseFloat(val))) setter(defaultVal);
-    else setter(parseFloat(val));
+    if (val === '' || isNaN(parseFloat(val))) {
+      setter(defaultVal);
+    } else {
+      setter(parseFloat(val));
+    }
   };
 
   const handleIntegerChange = (setter, defaultVal) => (e) => {
@@ -83,145 +263,127 @@ function App() {
 
   const handleIntegerBlur = (setter, defaultVal) => (e) => {
     let val = e.target.value.trim();
-    if (val === '' || isNaN(parseInt(val, 10))) setter(defaultVal);
-    else setter(parseInt(val, 10));
-  };
-
-  const calculate = () => {
-    const oRTP = overallRTP / 100;
-    const inc = increment;
-    const avgTrig = avgTrigger;
-    const X = currentX || 0;
-    const bet = betSize || 25;
-
-    const B = avgBonusPay;
-    const houseEdge = 1 - oRTP;
-
-    const spinsAvg = Math.max(0, (avgTrig - X) / inc);
-    const spinsFull = Math.max(0, (MUST_HIT - X) / inc);
-
-    const avgEV = B - houseEdge * spinsAvg;
-    const fullEV = B - houseEdge * spinsFull;
-
-    const baseHouseEdge = 1 - (28 / 100);
-    const maxExpAvg = Math.round(spinsAvg * baseHouseEdge);
-    const maxExpFull = Math.round(spinsFull * baseHouseEdge);
-
-    const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc);
-    const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc);
-
-    setEvAvg(avgEV);
-    setEvFullRun(fullEV);
-    setMaxExposureAvg(maxExpAvg);
-    setMaxExposureFull(maxExpFull);
-    setBeAvg(breakevenAvg);
-    setBeFullRun(breakevenFull);
-
-    let rtp = oRTP * 100;
-    if (spinsAvg > 0) rtp = 100 + (avgEV / spinsAvg) * 100;
-    setCurrentRTP(Math.round(rtp * 10) / 10);
-
-    const alreadyPositive = avgEV >= 0;
-    setIsAlreadyPositive(alreadyPositive);
-
-    if (alreadyPositive) {
-      setFpDollarsNeeded(0);
+    if (val === '' || isNaN(parseInt(val, 10))) {
+      setter(defaultVal);
     } else {
-      const spinsNeeded = Math.max(0, breakevenAvg - X);
-      setFpDollarsNeeded(Math.round(spinsNeeded * bet));
-    }
-
-    const table = [];
-    for (let c = 1150; c <= 1875; c += 25) {
-      const avgSpins = Math.max(0, (avgTrig - c) / inc);
-      const fullSpins = Math.max(0, (MUST_HIT - c) / inc);
-      table.push({
-        counter: c,
-        avgEV: B - houseEdge * avgSpins,
-        fullEV: B - houseEdge * fullSpins,
-        avgDollar: (B - houseEdge * avgSpins) * bet,
-        fullDollar: (B - houseEdge * fullSpins) * bet
-      });
-    }
-    setEvTable(table);
-  };
-
-  const getRecommendedWalkAway = (counter) => {
-    const normalized = (counter - 1300) / 588;
-    const s = 1 / (1 + Math.exp(-5.5 * (normalized - 0.48)));
-    const remainingEV = Math.max(0, evAvg);
-    return Math.round(remainingEV * 3.2 * s);
-  };
-
-  const chartData = {
-    labels: Array.from({ length: 23 }, (_, i) => 1300 + i * 25),
-    datasets: [{
-      label: 'Recommended Walk-Away (bets)',
-      data: Array.from({ length: 23 }, (_, i) => getRecommendedWalkAway(1300 + i * 25)),
-      borderColor: '#f97316',
-      backgroundColor: 'rgba(249, 115, 22, 0.1)',
-      tension: 0.45,
-      borderWidth: 3,
-      pointRadius: 2,
-      pointHoverRadius: 6,
-    }]
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: { ticks: { color: '#9ca3af', stepSize: 50 }, grid: { color: '#374151' } },
-      y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' }, min: 0 }
-    },
-    plugins: { legend: { display: false } },
-    onHover: (event, elements) => {
-      if (elements.length > 0) {
-        const index = elements[0].index;
-        setHoverCounter(1300 + index * 25);
-        setHoverWalkAway(getRecommendedWalkAway(1300 + index * 25));
-      } else {
-        setHoverCounter(null);
-        setHoverWalkAway(null);
-      }
+      setter(parseInt(val, 10));
     }
   };
 
-  useEffect(() => {
-    calculate();
-  }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, maxMajor]);
+  const handleForgotPassword = async () => {
+    if (!email) return alert("Please enter your email address")
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'https://lvslotpro.com' })
+    if (error) alert(error.message)
+    else {
+      setResetEmailSent(true)
+      alert('Password reset link sent!')
+    }
+  }
 
-  const handleSignOut = () => supabase.auth.signOut();
+  const handleUpdatePassword = async () => {
+    if (!newPassword || newPassword.length < 6) return alert("Password must be at least 6 characters")
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) alert(error.message)
+    else {
+      alert("Password updated successfully!")
+      setIsResetMode(false)
+      setNewPassword('')
+      window.location.reload()
+    }
+  }
+
+  const handleSignUp = async () => {
+    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: 'https://lvslotpro.com' } })
+    if (error) alert(error.message)
+    else alert('Account created! Check your email.')
+  }
+
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) alert(error.message)
+  }
+
+  const handleSignOut = () => supabase.auth.signOut()
+
+  if (isChecking) return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
+
+  if (isResetMode) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
+          <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
+          <input type="password" placeholder="New Password (min 6 characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
+          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Update Password</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
+          <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Phoenix Link EV Calc</h1>
+          {showForgotPassword ? (
+            <>
+              <h2 className="text-xl text-center mb-6">Reset Password</h2>
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
+              <button onClick={handleForgotPassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Send Reset Link</button>
+              <button onClick={() => setShowForgotPassword(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Back to Login</button>
+              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent!</p>}
+            </>
+          ) : (
+            <>
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
+              <button onClick={handleLogin} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Login</button>
+              <button onClick={handleSignUp} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg mb-4">Sign Up</button>
+              <button onClick={() => setShowForgotPassword(true)} className="text-orange-400 text-sm underline block text-center">Forgot Password?</button>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAllowed) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm text-center">
+          <h1 className="text-3xl font-bold text-red-500 mb-4">Access Denied</h1>
+          <p className="text-gray-300 mb-6">Your email is not on the approved list.<br />Please contact the owner for access.</p>
+          <button onClick={handleSignOut} className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-2xl font-bold">Sign Out</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
+        {/* Logo + Title */}
+        <div className="flex items-center mb-6">
+          <img src="/phoenix-link-logo.png" alt="Phoenix Link" className="w-12 h-12 flex-shrink-0 rounded-xl object-contain mr-3" />
+          <h1 className="flex-1 text-[29px] font-black tracking-[-1.6px] text-black"
+              style={{ textShadow: `-1.6px -1.6px 0 #f97316, 1.6px -1.6px 0 #f97316, -1.6px 1.6px 0 #f97316, 1.6px 1.6px 0 #f97316` }}>
+            PHOENIX LINK EV CALC
+          </h1>
+        </div>
+
         {/* Inputs */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
-            <input 
-              type="text" 
-              inputMode="numeric" 
-              value={currentX} 
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setCurrentX(val === '' ? '' : parseInt(val, 10));
-              }} 
-              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
-            />
+            <input type="text" inputMode="numeric" value={currentX} onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9]/g, '');
+              setCurrentX(val === '' ? '' : parseInt(val, 10));
+            }} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input 
-                type="text" 
-                value={betSize} 
-                onChange={handleFloatChange(setBetSize, 25)} 
-                onBlur={handleFloatBlur(setBetSize, 25)} 
-                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
-              />
+              <input type="text" value={betSize} onChange={handleFloatChange(setBetSize, 25)} onBlur={handleFloatBlur(setBetSize, 25)} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
@@ -266,7 +428,7 @@ function App() {
           )}
         </div>
 
-        {/* Current EV */}
+        {/* Current EV + Max Exposure */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-orange-400">Current EV</h2>
@@ -313,7 +475,7 @@ function App() {
           )}
         </div>
 
-        {/* Acquisition Fee */}
+        {/* Acquisition Fee Calculator */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
@@ -340,12 +502,16 @@ function App() {
             <div className="text-4xl font-bold text-white">
               ${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}
             </div>
+            <div className="text-xs text-gray-400">
+              {useFullRunForFee ? 'Full Run EV' : 'Average Case EV'}
+            </div>
           </div>
           <div className="bg-gray-800 rounded-2xl p-5 text-center">
             <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
             <div className="text-5xl font-black text-green-400">
               ${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}
             </div>
+            <div className="text-xs text-gray-400 mt-1">to scout</div>
           </div>
         </div>
 
@@ -358,16 +524,10 @@ function App() {
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
-              <input 
-                type="text" 
-                inputMode="numeric" 
-                value={testCounter} 
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  setTestCounter(val === '' ? '' : parseInt(val, 10));
-                }} 
-                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" 
-              />
+              <input type="text" inputMode="numeric" value={testCounter} onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setTestCounter(val === '' ? '' : parseInt(val, 10));
+              }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
@@ -417,6 +577,13 @@ function App() {
             </table>
           </div>
         </div>
+
+        {/* Logout */}
+        <div className="text-center mt-12 mb-8">
+          <button onClick={handleSignOut} className="text-gray-500 hover:text-red-400 text-sm underline">
+            Log Out
+          </button>
+        </div>
       </div>
 
       {/* Info Modal */}
@@ -437,7 +604,7 @@ function App() {
         </div>
       )}
     </div>
-  );
+  )
 }
 
 export default App
