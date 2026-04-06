@@ -42,7 +42,7 @@ function BuffaloLink({ onBack }) {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Scout fee states
+  // Fixed: Missing states for Acquisition Fee
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
@@ -95,7 +95,7 @@ function BuffaloLink({ onBack }) {
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
 
-  // Auto-adjust RTP based on denom + Max Major
+  // Auto RTP adjustment
   useEffect(() => {
     let baseOverall = 91
     if (denom <= 0.02) baseOverall = 88
@@ -174,7 +174,7 @@ function BuffaloLink({ onBack }) {
     calculate()
   }, [currentX, betSize, denom, overallRTP, avgBonusPay, buffalosPerSpin, midpointFactor, maxMajor])
 
-  // Safe input handlers
+  // Input handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '')
     setter(val)
@@ -198,12 +198,15 @@ function BuffaloLink({ onBack }) {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="pt-8 max-w-lg mx-auto px-4">
-        {/* Title with real icon */}
+        {/* Title */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 mr-4">
             <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
           </div>
-          <h1 className="text-[29px] font-black tracking-[-1.6px] text-amber-100" style={{ textShadow: `-2px -2px 0 #b45309, 2px -2px 0 #b45309, -2px 2px 0 #b45309, 2px 2px 0 #b45309` }}>
+          <h1 
+            className="text-[29px] font-black tracking-[-1.6px] text-amber-100"
+            style={{ textShadow: `-2px -2px 0 #b45309, 2px -2px 0 #b45309, -2px 2px 0 #b45309, 2px 2px 0 #b45309` }}
+          >
             BUFFALO LINK EV CALC
           </h1>
         </div>
@@ -278,7 +281,7 @@ function BuffaloLink({ onBack }) {
           )}
         </div>
 
-        {/* Current EV Section */}
+        {/* Current EV */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold text-amber-400">Current EV</h2>
@@ -290,13 +293,17 @@ function BuffaloLink({ onBack }) {
               <div className="text-gray-400 text-sm">Average Case</div>
               <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
               <div className="text-sm text-gray-300">${(evAvg * betSize).toFixed(2)}</div>
-              <div className="mt-4 pt-3 border-t border-gray-700 text-xs text-gray-400">Max Exposure: <span className="text-red-400 font-bold">{maxExposureAvg} bets</span></div>
+              <div className="mt-4 pt-3 border-t border-gray-700 text-xs text-gray-400">
+                Max Exposure: <span className="text-red-400 font-bold">{maxExposureAvg} bets</span>
+              </div>
             </div>
             <div className="bg-gray-800 p-4 rounded-2xl">
               <div className="text-gray-400 text-sm">Full Run (to 1800)</div>
               <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
               <div className="text-sm text-gray-300">${(evFullRun * betSize).toFixed(2)}</div>
-              <div className="mt-4 pt-3 border-t border-gray-700 text-xs text-gray-400">Max Exposure: <span className="text-red-400 font-bold">{maxExposureFull} bets</span></div>
+              <div className="mt-4 pt-3 border-t border-gray-700 text-xs text-gray-400">
+                Max Exposure: <span className="text-red-400 font-bold">{maxExposureFull} bets</span>
+              </div>
             </div>
           </div>
 
@@ -330,8 +337,18 @@ function BuffaloLink({ onBack }) {
             <div>
               <label className="block text-gray-400 text-xs mb-2">EV Basis</label>
               <div className="flex bg-gray-800 rounded-2xl p-1">
-                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${!useFullRunForFee ? 'bg-amber-600 text-white' : 'text-gray-400'}`}>Average</button>
-                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${useFullRunForFee ? 'bg-amber-600 text-white' : 'text-gray-400'}`}>Full Run</button>
+                <button 
+                  onClick={() => setUseFullRunForFee(false)} 
+                  className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${!useFullRunForFee ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                >
+                  Average
+                </button>
+                <button 
+                  onClick={() => setUseFullRunForFee(true)} 
+                  className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${useFullRunForFee ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                >
+                  Full Run
+                </button>
               </div>
             </div>
             <div>
@@ -339,7 +356,15 @@ function BuffaloLink({ onBack }) {
                 <span className="text-gray-400 text-xs">Scout Share</span>
                 <span className="text-amber-400 font-bold">{scoutPercentage}%</span>
               </div>
-              <input type="range" min="5" max="15" step="1" value={scoutPercentage} onChange={(e) => setScoutPercentage(Number(e.target.value))} className="w-full accent-amber-500" />
+              <input 
+                type="range" 
+                min="5" 
+                max="15" 
+                step="1" 
+                value={scoutPercentage} 
+                onChange={(e) => setScoutPercentage(Number(e.target.value))} 
+                className="w-full accent-amber-500" 
+              />
             </div>
           </div>
           <div className="bg-gray-800 rounded-2xl p-5 text-center">
