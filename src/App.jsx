@@ -18,45 +18,49 @@ function App() {
   const [newPassword, setNewPassword] = useState('')
   const [isResetMode, setIsResetMode] = useState(false)
 
-  // Auth + Whitelist
   useEffect(() => {
+    let mounted = true
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       const isRecovery = window.location.hash.includes('type=recovery') || window.location.hash.includes('access_token')
-      
-      if (isRecovery && session?.user) {
-        setIsResetMode(true)
-        setUser(session.user)
-        setIsChecking(false)
-        return
-      }
 
-      setUser(session?.user ?? null)
-      if (session?.user?.email && !isRecovery) {
-        checkEmailAllowed(session.user.email)
-      } else {
-        setIsChecking(false)
+      if (mounted) {
+        if (isRecovery && session?.user) {
+          setIsResetMode(true)
+          setUser(session.user)
+        } else {
+          setUser(session?.user ?? null)
+          if (session?.user?.email && !isRecovery) {
+            checkEmailAllowed(session.user.email)
+          } else {
+            setIsChecking(false)
+          }
+        }
       }
     }
 
     checkSession()
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsResetMode(true)
-        setUser(session?.user)
-        setIsChecking(false)
-      } else if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT') {
         setUser(null)
         setIsAllowed(false)
         setCurrentView('dashboard')
+        setIsChecking(false)
+      } else if (event === 'PASSWORD_RECOVERY') {
+        setIsResetMode(true)
+        setUser(session?.user)
         setIsChecking(false)
       } else {
         checkSession()
       }
     })
 
-    return () => listener.subscription.unsubscribe()
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   const checkEmailAllowed = async (userEmail) => {
@@ -66,6 +70,7 @@ function App() {
       .select('email')
       .eq('email', cleanEmail)
       .single()
+    
     setIsAllowed(!!data && !error)
     setIsChecking(false)
   }
@@ -121,64 +126,31 @@ function App() {
           {showForgotPassword ? (
             <>
               <h2 className="text-xl text-center mb-6">Reset Password</h2>
-              <input 
-                type="email" 
-                placeholder="Email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" 
-              />
-              <button 
-                onClick={async () => {
-                  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'https://lvslotpro.com' })
-                  if (error) alert(error.message)
-                  else {
-                    setResetEmailSent(true)
-                    alert('Password reset link sent!')
-                  }
-                }} 
-                className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3"
-              >
-                Send Reset Link
-              </button>
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
+              <button onClick={async () => {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'https://lvslotpro.com' })
+                if (error) alert(error.message)
+                else {
+                  setResetEmailSent(true)
+                  alert('Password reset link sent!')
+                }
+              }} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Send Reset Link</button>
               <button onClick={() => setShowForgotPassword(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Back to Login</button>
               {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent!</p>}
             </>
           ) : (
             <>
-              <input 
-                type="email" 
-                placeholder="Email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" 
-              />
-              <input 
-                type="password" 
-                placeholder="Password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" 
-              />
-              <button 
-                onClick={async () => {
-                  const { error } = await supabase.auth.signInWithPassword({ email, password })
-                  if (error) alert(error.message)
-                }} 
-                className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3"
-              >
-                Login
-              </button>
-              <button 
-                onClick={async () => {
-                  const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: 'https://lvslotpro.com' } })
-                  if (error) alert(error.message)
-                  else alert('Check your email')
-                }} 
-                className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg mb-4"
-              >
-                Sign Up
-              </button>
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-4 text-white text-lg" />
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
+              <button onClick={async () => {
+                const { error } = await supabase.auth.signInWithPassword({ email, password })
+                if (error) alert(error.message)
+              }} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Login</button>
+              <button onClick={async () => {
+                const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: 'https://lvslotpro.com' } })
+                if (error) alert(error.message)
+                else alert('Check your email')
+              }} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg mb-4">Sign Up</button>
               <button onClick={() => setShowForgotPassword(true)} className="text-orange-400 text-sm underline block text-center">Forgot Password?</button>
             </>
           )}
@@ -199,7 +171,7 @@ function App() {
     )
   }
 
-  // Main logged-in view
+  // Main view
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
@@ -209,20 +181,18 @@ function App() {
             <button onClick={handleSignOut} className="text-gray-400 hover:text-red-400">Log Out</button>
           </div>
 
-          <div className="space-y-4">
-            <button 
-              onClick={() => setCurrentView('phoenix')} 
-              className="w-full bg-gray-900 hover:bg-gray-800 border border-orange-500/30 rounded-3xl p-6 text-left transition-all active:scale-[0.985]"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center text-4xl">🔥</div>
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-white">Phoenix Link EV Calc</h2>
-                  <p className="text-gray-400 mt-1">Must-hit counter bonus • Real-time EV</p>
-                </div>
+          <button 
+            onClick={() => setCurrentView('phoenix')} 
+            className="w-full bg-gray-900 hover:bg-gray-800 border border-orange-500/30 rounded-3xl p-6 text-left transition-all active:scale-[0.985]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center text-4xl">🔥</div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-white">Phoenix Link EV Calc</h2>
+                <p className="text-gray-400 mt-1">Must-hit counter bonus • Real-time EV</p>
               </div>
-            </button>
-          </div>
+            </div>
+          </button>
         </div>
       ) : (
         <PhoenixLink onBack={() => setCurrentView('dashboard')} />
