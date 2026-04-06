@@ -71,11 +71,18 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Title Bar - clean, no hamburger, no logout */}
+      {/* Title Bar - LAS VEGAS SLOT PRO + Back button */}
       {currentView !== 'dashboard' && (
         <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
-          <div className="max-w-lg mx-auto px-4 py-4">
-            <div className="text-white text-xl font-semibold tracking-wide text-center">LAS VEGAS SLOT PRO</div>
+          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
+            <button 
+              onClick={() => setCurrentView('dashboard')}
+              className="text-3xl text-orange-400 hover:text-orange-300 font-light"
+            >
+              ←
+            </button>
+            <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
+            <div className="w-8" /> {/* spacer to balance */}
           </div>
         </div>
       )}
