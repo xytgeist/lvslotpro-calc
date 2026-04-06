@@ -30,8 +30,6 @@ function BuffaloLink({ onBack }) {
   const [evFullRun, setEvFullRun] = useState(0)
   const [maxExposureAvg, setMaxExposureAvg] = useState(0)
   const [maxExposureFull, setMaxExposureFull] = useState(0)
-  const [beAvg, setBeAvg] = useState(0)
-  const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
   const [currentRTP, setCurrentRTP] = useState(0)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
@@ -107,7 +105,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation with FIXED breakeven logic
+  // Main calculation
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -116,7 +114,6 @@ function BuffaloLink({ onBack }) {
     const B = Number(avgBonusPay) || 20
     const houseEdge = 1 - oRTP
 
-    // Average case uses midpoint
     const midpointTrigger = X + (MUST_HIT - X) * midpointFactor
 
     const spinsAvg = Math.max(0, (midpointTrigger - X) / inc)
@@ -129,19 +126,10 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // FIXED Breakeven Calculation (independent of current X)
-    // Average breakeven = point where average-case EV = 0
-    const breakevenAvg = Math.round(MUST_HIT * midpointFactor - (B / houseEdge) * inc)
-
-    // Full Run breakeven = point where full-run EV = 0
-    const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
-
     setEvAvg(avgEV)
     setEvFullRun(fullEV)
     setMaxExposureAvg(maxExpAvg)
     setMaxExposureFull(maxExpFull)
-    setBeAvg(breakevenAvg)
-    setBeFullRun(breakevenFull)
 
     let rtp = oRTP * 100
     if (spinsAvg > 0) rtp = 100 + ((avgEV / spinsAvg) * 100)
@@ -151,7 +139,8 @@ function BuffaloLink({ onBack }) {
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
-      const spinsNeeded = Math.max(0, breakevenAvg - X)
+      // Simple fallback for FP needed when we removed breakeven
+      const spinsNeeded = Math.max(0, Math.round((MUST_HIT - X) * 0.6))
       setFpDollarsNeeded(Math.round(spinsNeeded * bet))
     } else {
       setFpDollarsNeeded(0)
@@ -337,25 +326,13 @@ function BuffaloLink({ onBack }) {
             </div>
           </div>
 
-          <div className={`p-4 rounded-2xl text-center font-bold ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
-          </div>
-
-          <h2 className="text-xl font-semibold mt-8 mb-4 text-amber-400">Break Even Points</h2>
-          <div className="grid grid-cols-2 gap-6 text-center">
-            <div>
-              <div className="text-gray-400 text-sm">Average Case</div>
-              <div className="text-4xl font-bold text-green-400">{beAvg}</div>
-            </div>
-            <div>
-              <div className="text-gray-400 text-sm">Full Run (to 1800)</div>
-              <div className="text-4xl font-bold text-amber-400">{beFullRun}</div>
-            </div>
+          <div className={`p-4 rounded-2xl text-center font-bold ${isAlreadyPositive ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+            {isAlreadyPositive ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
 
           {!isAlreadyPositive && fpDollarsNeeded > 0 && (
             <div className="mt-6 text-center text-amber-400 italic text-sm">
-              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
+              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span>
             </div>
           )}
         </div>
