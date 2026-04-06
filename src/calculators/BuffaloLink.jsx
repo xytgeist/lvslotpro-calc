@@ -107,7 +107,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation
+  // Main calculation - FIXED Breakeven
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -116,9 +116,10 @@ function BuffaloLink({ onBack }) {
     const B = Number(avgBonusPay) || 20
     const houseEdge = 1 - oRTP
 
-    const midpointTrigger = X + (MUST_HIT - X) * midpointFactor
+    // Midpoint trigger for average case (independent of current X for breakeven)
+    const midpointTriggerForBE = (MUST_HIT + 0) * midpointFactor   // This is the key fix
 
-    const spinsAvg = Math.max(0, (midpointTrigger - X) / inc)
+    const spinsAvg = Math.max(0, (midpointTriggerForBE - X) / inc)   // for EV only
     const spinsFull = Math.max(0, (MUST_HIT - X) / inc)
 
     const avgEV = B - houseEdge * spinsAvg
@@ -128,8 +129,8 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // FIXED: Breakeven points now calculated independently of currentX
-    const breakevenAvg = Math.round(midpointTrigger - (B / houseEdge) * inc)   // was wrongly depending on X
+    // FIXED: Breakeven points no longer depend on current counter
+    const breakevenAvg = Math.round(midpointTriggerForBE - (B / houseEdge) * inc)
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
     setEvAvg(avgEV)
@@ -174,8 +175,7 @@ function BuffaloLink({ onBack }) {
     calculate()
   }, [currentX, betSize, denom, overallRTP, avgBonusPay, buffalosPerSpin, midpointFactor, maxMajor])
 
-  // ... (input handlers remain the same - omitted for brevity)
-
+  // Input handlers (unchanged)
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '')
     setter(val)
@@ -199,7 +199,7 @@ function BuffaloLink({ onBack }) {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="pt-8 max-w-lg mx-auto px-4">
-        {/* Title - unchanged */}
+        {/* Title */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 mr-4">
             <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
@@ -212,7 +212,7 @@ function BuffaloLink({ onBack }) {
           </h1>
         </div>
 
-        {/* Counter + Bet + Denom - unchanged */}
+        {/* Counter + Bet + Denom */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -248,7 +248,7 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Advanced Settings - unchanged */}
+        {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800">
             <span className="text-base font-semibold">Advanced Settings</span>
@@ -416,7 +416,7 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* Walk-Away Advisor - unchanged from last fix */}
+        {/* Walk-Away Advisor */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-amber-400">Walk-Away Advisor</h2>
@@ -459,7 +459,7 @@ function BuffaloLink({ onBack }) {
           </div>
         </div>
 
-        {/* EV Table - unchanged */}
+        {/* EV Table */}
         <div className="bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold mb-5 text-amber-400">EV Table (1150 to 1775)</h2>
           <div className="overflow-x-auto">
