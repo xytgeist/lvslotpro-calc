@@ -26,6 +26,7 @@ function App() {
   const [password, setPassword] = useState('')
   const [isAllowed, setIsAllowed] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
+  const [currentView, setCurrentView] = useState('dashboard') // 'dashboard' or 'phoenix'
 
   // Password Reset
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -33,6 +34,7 @@ function App() {
   const [newPassword, setNewPassword] = useState('')
   const [isResetMode, setIsResetMode] = useState(false)
 
+  // Phoenix Link States
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -51,12 +53,9 @@ function App() {
   const [beFullRun, setBeFullRun] = useState(0)
   const [evTable, setEvTable] = useState([])
 
-  // Current RTP
-  const [currentRTP, setCurrentRTP] = useState(0)
-
-  // FP to +EV
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
+  const [currentRTP, setCurrentRTP] = useState(0)
 
   const [testCounter, setTestCounter] = useState(1400)
   const [hoverCounter, setHoverCounter] = useState(null)
@@ -174,8 +173,8 @@ function App() {
     setIsChecking(false)
   }
 
-  // Calculation
-  const calculate = () => {
+  // Phoenix Link Calculation
+  const calculatePhoenix = () => {
     const oRTP = overallRTP / 100
     const inc = increment
     const avgTrig = avgTrigger
@@ -205,13 +204,12 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // Current RTP % calculation
+    // Current RTP %
     let rtp = oRTP * 100
     if (spinsAvg > 0) {
-      const evPerSpin = avgEV / spinsAvg
-      rtp = 100 + (evPerSpin * 100)
+      rtp = 100 + (avgEV / spinsAvg) * 100
     }
-    setCurrentRTP(Math.round(rtp * 10) / 10)   // one decimal place
+    setCurrentRTP(Math.round(rtp * 10) / 10)
 
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
@@ -239,9 +237,11 @@ function App() {
     setEvTable(table)
   }
 
-  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
+  useEffect(() => {
+    if (currentView === 'phoenix') calculatePhoenix()
+  }, [currentView, overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
 
-  // Safe handlers (unchanged)
+  // Safe handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '');
     setter(val);
@@ -305,15 +305,25 @@ function App() {
 
   const handleSignOut = () => supabase.auth.signOut()
 
-  if (isChecking) return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
+  if (isChecking) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
+  }
 
   if (isResetMode) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
-          <input type="password" placeholder="New Password (min 6 characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
-          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Update Password</button>
+          <input
+            type="password"
+            placeholder="New Password (min 6 characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg"
+          />
+          <button onClick={handleUpdatePassword} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">
+            Update Password
+          </button>
         </div>
       </div>
     )
@@ -358,19 +368,75 @@ function App() {
     )
   }
 
+  // ==================== DASHBOARD ====================
+  if (currentView === 'dashboard') {
+    return (
+      <div className="min-h-screen bg-gray-950 pb-12">
+        <div className="max-w-lg mx-auto px-4 pt-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-black text-orange-400 tracking-tight">Slot Pro Tools</h1>
+            <button onClick={handleSignOut} className="text-gray-400 hover:text-red-400 text-sm">Log Out</button>
+          </div>
+
+          <div className="space-y-4">
+            <button
+              onClick={() => setCurrentView('phoenix')}
+              className="w-full bg-gray-900 hover:bg-gray-800 border border-orange-500/30 rounded-3xl p-6 text-left transition-all active:scale-[0.985]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center text-4xl">🔥</div>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-white">Phoenix Link EV Calc</h2>
+                  <p className="text-gray-400 mt-1">Must-hit counter bonus • Real-time EV • Walk-away advisor</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => alert('Buffalo Link calculator coming soon!')}
+              className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-700 rounded-3xl p-6 text-left transition-all active:scale-[0.985]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-yellow-600 rounded-2xl flex items-center justify-center text-4xl">🦬</div>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-white">Buffalo Link Calculator</h2>
+                  <p className="text-gray-400 mt-1">Coming soon</p>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ==================== PHOENIX LINK CALCULATOR ====================
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Logo + Title */}
-        <div className="flex items-center mb-6">
+      {/* Hamburger Menu */}
+      <div className="max-w-lg mx-auto px-4 pt-4 flex justify-between items-center">
+        <button
+          onClick={() => setCurrentView('dashboard')}
+          className="text-3xl text-orange-400 hover:text-orange-300 p-2"
+        >
+          ☰
+        </button>
+        <div className="text-sm text-gray-400">Phoenix Link EV Calc</div>
+      </div>
+
+      {/* Logo + Title */}
+      <div className="max-w-lg mx-auto px-4 pt-2 pb-6">
+        <div className="flex items-center">
           <img src="/phoenix-link-logo.png" alt="Phoenix Link" className="w-12 h-12 flex-shrink-0 rounded-xl object-contain mr-3" />
           <h1 className="flex-1 text-[29px] font-black tracking-[-1.6px] text-black"
               style={{ textShadow: `-1.6px -1.6px 0 #f97316, 1.6px -1.6px 0 #f97316, -1.6px 1.6px 0 #f97316, 1.6px 1.6px 0 #f97316` }}>
             PHOENIX LINK EV CALC
           </h1>
         </div>
+      </div>
 
-        {/* Inputs */}
+      {/* Inputs */}
+      <div className="max-w-lg mx-auto px-4">
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
@@ -383,7 +449,13 @@ function App() {
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input type="text" value={betSize} onChange={handleFloatChange(setBetSize, 25)} onBlur={handleFloatBlur(setBetSize, 25)} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
+              <input
+                type="text"
+                value={betSize}
+                onChange={handleFloatChange(setBetSize, 25)}
+                onBlur={handleFloatBlur(setBetSize, 25)}
+                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
@@ -578,7 +650,7 @@ function App() {
           </div>
         </div>
 
-        {/* Logout */}
+        {/* Logout in calculator view */}
         <div className="text-center mt-12 mb-8">
           <button onClick={handleSignOut} className="text-gray-500 hover:text-red-400 text-sm underline">
             Log Out
