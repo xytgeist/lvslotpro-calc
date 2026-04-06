@@ -195,7 +195,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Phoenix Link Calculator - Full working version */}
       <div className="max-w-lg mx-auto px-4 pt-6">
         {/* Inputs */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
