@@ -36,9 +36,8 @@ function App() {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(40)   // ← New field
+  const [avgBonusPay, setAvgBonusPay] = useState(40)
   const [increment, setIncrement] = useState(1.1)
-  const [allBonusFreq, setAllBonusFreq] = useState(80)
   const [avgTrigger, setAvgTrigger] = useState(1800)
   const [mustHit, setMustHit] = useState(1888)
   const [maxMajor, setMaxMajor] = useState(false)
@@ -63,12 +62,12 @@ function App() {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  // Walk-Away S-Curve (unchanged)
+  // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const inc = increment
     const avgTrig = avgTrigger
-    const B = avgBonusPay                     // ← Now directly uses Avg Bonus Pay
+    const B = avgBonusPay
     const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
     const remainingEV = B - (1 - oRTP) * spinsRemaining
     const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588))
@@ -113,7 +112,7 @@ function App() {
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
 
-  // Auto RTP (no longer affects Avg Bonus Pay)
+  // Auto RTP
   useEffect(() => {
     let baseOverall = 91
     if (denom <= 0.02) baseOverall = 88
@@ -125,7 +124,7 @@ function App() {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Auth + Whitelist + Reset Detection (unchanged)
+  // Auth + Whitelist + Reset Detection
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -171,35 +170,28 @@ function App() {
     setIsChecking(false)
   }
 
-  // ==================== UPDATED CALCULATION ====================
+  // ==================== CALCULATION ====================
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = increment
-    const freq = allBonusFreq
     const avgTrig = avgTrigger
     const must = mustHit
     const X = currentX || 0
     const bet = betSize || 25
 
-    // B is now directly the user-entered Avg Bonus Pay (bets)
     const B = avgBonusPay
-
-    // Pure house edge using overall RTP only
     const houseEdge = 1 - oRTP
 
     const spinsAvg = Math.max(0, (avgTrig - X) / inc)
     const spinsFull = Math.max(0, (must - X) / inc)
 
-    // New EV formulas
     const avgEV = B - houseEdge * spinsAvg
     const fullEV = B - houseEdge * spinsFull
 
-    // Max Exposure still uses base RTP (worst-case no-bonus loss)
-    const baseHouseEdge = 1 - (28 / 100)   // kept at 28% as fallback since we removed the field
+    const baseHouseEdge = 1 - (28 / 100)
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // New breakeven points
     const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc)
     const breakevenFull = Math.round(must - (B / houseEdge) * inc)
 
@@ -210,7 +202,6 @@ function App() {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // FP to +EV
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
@@ -222,7 +213,6 @@ function App() {
       setFpDollarsNeeded(dollarsNeeded)
     }
 
-    // EV Table
     const table = []
     for (let c = 1150; c <= 1875; c += 25) {
       const avgSpins = Math.max(0, (avgTrig - c) / inc)
@@ -238,7 +228,7 @@ function App() {
     setEvTable(table)
   }
 
-  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, allBonusFreq, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
+  useEffect(() => { calculate() }, [overallRTP, avgBonusPay, increment, avgTrigger, mustHit, currentX, betSize, denom, maxMajor])
 
   // Safe handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
@@ -275,7 +265,7 @@ function App() {
     if (error) alert(error.message)
     else {
       setResetEmailSent(true)
-      alert('Password reset link sent! Check your email.')
+      alert('Password reset link sent!')
     }
   }
 
@@ -420,10 +410,6 @@ function App() {
                 <input type="text" value={increment} onChange={handleFloatChange(setIncrement, 1.1)} onBlur={handleFloatBlur(setIncrement, 1.1)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1 text-xs">Avg Spins to Bonus</label>
-                <input type="text" value={allBonusFreq} onChange={handleFloatChange(setAllBonusFreq, 80)} onBlur={handleFloatBlur(setAllBonusFreq, 80)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
                 <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1800)} onBlur={handleFloatBlur(setAvgTrigger, 1800)} className="w-full p-3 bg-gray-800 rounded-xl" />
               </div>
@@ -469,7 +455,6 @@ function App() {
             <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
           </div>
 
-          {/* FP line */}
           {!isAlreadyPositive && (
             <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic text-orange-400">
               FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
