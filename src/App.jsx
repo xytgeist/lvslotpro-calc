@@ -37,7 +37,6 @@ function App() {
       setUser(session?.user ?? null)
 
       if (session?.user?.email && !isRecovery) {
-        // Only check whitelist after we have a user
         const cleanEmail = session.user.email.toLowerCase().trim()
         const { data, error } = await supabase
           .from('allowed_emails')
@@ -75,7 +74,11 @@ function App() {
   }
 
   if (isChecking) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="text-orange-500 text-xl">Loading...</div></div>
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-orange-500 text-xl">Loading...</div>
+      </div>
+    )
   }
 
   if (isResetMode) {
@@ -83,16 +86,27 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
           <h1 className="text-3xl font-bold text-orange-500 text-center mb-8">Set New Password</h1>
-          <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" />
-          <button onClick={async () => {
-            const { error } = await supabase.auth.updateUser({ password: newPassword })
-            if (error) alert(error.message)
-            else {
-              alert("Password updated!")
-              setIsResetMode(false)
-              window.location.reload()
-            }
-          }} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg">Update Password</button>
+          <input 
+            type="password" 
+            placeholder="New Password (min 6 characters)" 
+            value={newPassword} 
+            onChange={(e) => setNewPassword(e.target.value)} 
+            className="w-full p-4 bg-gray-800 rounded-2xl mb-6 text-white text-lg" 
+          />
+          <button 
+            onClick={async () => {
+              const { error } = await supabase.auth.updateUser({ password: newPassword })
+              if (error) alert(error.message)
+              else {
+                alert("Password updated successfully!")
+                setIsResetMode(false)
+                window.location.reload()
+              }
+            }} 
+            className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg"
+          >
+            Update Password
+          </button>
         </div>
       </div>
     )
@@ -116,6 +130,7 @@ function App() {
                 }
               }} className="w-full bg-orange-600 py-4 rounded-2xl font-bold text-lg mb-3">Send Reset Link</button>
               <button onClick={() => setShowForgotPassword(false)} className="w-full bg-gray-700 py-4 rounded-2xl font-bold text-lg">Back to Login</button>
+              {resetEmailSent && <p className="text-green-400 text-center mt-4">Reset link sent!</p>}
             </>
           ) : (
             <>
@@ -138,7 +153,7 @@ function App() {
     )
   }
 
-  // Only show Access Denied AFTER we have confirmed the user is NOT allowed
+  // Only show Access Denied if we have a confirmed user AND they are NOT allowed
   if (user && !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
