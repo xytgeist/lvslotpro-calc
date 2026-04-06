@@ -49,6 +49,9 @@ function PhoenixLink({ onBack }) {
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
 
+  // Hamburger menu state
+  const [showMenu, setShowMenu] = useState(false)
+
   // Walk-Away S-Curve
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
