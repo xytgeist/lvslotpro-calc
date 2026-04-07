@@ -107,7 +107,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation with correct Current RTP
+  // Main calculation
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -128,7 +128,7 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // Correct Average Break Even (stable)
+    // Stable Average Break Even
     const breakevenAvg = Math.round(MUST_HIT - (B / houseEdge) * (inc / midpointFactor))
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
@@ -139,14 +139,18 @@ function BuffaloLink({ onBack }) {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // FIXED: Current RTP from now until bonus hits (using midpoint)
+    // FIXED Current RTP: Effective RTP from now until expected hit
     let effectiveRTP = oRTP * 100
-    if (spinsAvg > 0) {
+    if (spinsAvg > 5) {   // avoid division by tiny numbers at very low counters
       const evPerSpin = avgEV / spinsAvg
       effectiveRTP = 100 + (evPerSpin * 100)
+    } else {
+      effectiveRTP = overallRTP   // when very far away, RTP is basically the machine's base RTP
     }
-    // Clamp to reasonable range to avoid crazy numbers at very low counters
-    effectiveRTP = Math.max(overallRTP - 5, Math.min(overallRTP + 15, effectiveRTP))
+
+    // Reasonable clamp
+    effectiveRTP = Math.max(overallRTP - 8, Math.min(overallRTP + 20, effectiveRTP))
+
     setCurrentRTP(Math.round(effectiveRTP * 10) / 10)
 
     const alreadyPositive = avgEV >= 0
