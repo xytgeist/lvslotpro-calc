@@ -16,7 +16,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const MUST_HIT = {
   mega: 350,
   grand: 250,
-  major: 200,     // Corrected
+  major: 200,
   minor: 150,
   mini: 125,
 }
@@ -162,15 +162,15 @@ function StackUpPays({ onBack }) {
         {/* Meter Sliders with matching colors */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  color: 'red',    accent: 'accent-red-500' },
-            { label: 'Grand', value: grand, setter: setGrand, color: 'orange', accent: 'accent-orange-500' },
-            { label: 'Major', value: major, setter: setMajor, color: 'purple', accent: 'accent-purple-500' },
-            { label: 'Minor', value: minor, setter: setMinor, color: 'green',  accent: 'accent-green-500' },
-            { label: 'Mini',  value: mini,  setter: setMini,  color: 'blue',   accent: 'accent-blue-500' },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400' },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400' },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400' },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400' },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400' },
           ].map((m, i) => (
             <div key={i}>
               <div className="flex justify-between mb-1.5">
-                <div className={`font-semibold text-${m.color}-400`}>{m.label}</div>
+                <div className={`font-semibold ${m.text}`}>{m.label}</div>
                 <div className="text-slate-300 font-mono text-lg font-bold">{m.value}</div>
               </div>
               <input
