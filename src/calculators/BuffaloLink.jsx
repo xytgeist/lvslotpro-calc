@@ -107,7 +107,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation with correct FP needed
+  // Main calculation with correct stable breakeven
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -128,8 +128,10 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // Correct Average Break Even (stable)
+    // Correct Average Break Even (stable, independent of current counter)
     const breakevenAvg = Math.round(MUST_HIT - (B / houseEdge) * (inc / midpointFactor))
+
+    // Full Run Break Even
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
     setEvAvg(avgEV)
@@ -146,7 +148,6 @@ function BuffaloLink({ onBack }) {
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
-    // FIXED FP Needed - exactly as you described
     if (!alreadyPositive && breakevenAvg > X) {
       const spinsNeeded = (breakevenAvg - X) / inc
       setFpDollarsNeeded(Math.round(spinsNeeded * bet))
@@ -334,8 +335,21 @@ function BuffaloLink({ onBack }) {
             </div>
           </div>
 
-          <div className={`p-4 rounded-2xl text-center font-bold ${isAlreadyPositive ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-            {isAlreadyPositive ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
+          <div className={`p-4 rounded-2xl text-center font-bold ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
+          </div>
+
+          {/* Restored Break Even Points Section */}
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-amber-400">Break Even Points</h2>
+          <div className="grid grid-cols-2 gap-6 text-center">
+            <div>
+              <div className="text-gray-400 text-sm">Average Case</div>
+              <div className="text-4xl font-bold text-green-400">{beAvg}</div>
+            </div>
+            <div>
+              <div className="text-gray-400 text-sm">Full Run (to 1800)</div>
+              <div className="text-4xl font-bold text-amber-400">{beFullRun}</div>
+            </div>
           </div>
 
           {!isAlreadyPositive && fpDollarsNeeded > 0 && (
