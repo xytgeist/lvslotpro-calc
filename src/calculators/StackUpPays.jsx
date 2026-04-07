@@ -33,7 +33,7 @@ function StackUpPays({ onBack }) {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(48)        // Average value per full stack-up in bets
+  const [avgBonusPay, setAvgBonusPay] = useState(48)
   const [incrementPerSpin, setIncrementPerSpin] = useState(1.35)
   const [maxMajor, setMaxMajor] = useState(false)
 
@@ -51,13 +51,13 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Combined meter progress for walk-away advisor
+  // Combined meter progress for walk-away
   const getCombinedProgress = () => {
     const values = [mini, minor, major, grand, mega]
     const hits = Object.values(MUST_HIT)
     let total = 0
     values.forEach((val, i) => {
-      total += Math.max(0, (val / hits[i]))
+      total += Math.max(0, val / hits[i])
     })
     return Math.min(1, total / 5)
   }
@@ -116,13 +116,13 @@ function StackUpPays({ onBack }) {
     const avgProgress = totalProgress / 5
 
     const avgEV = B * avgProgress * 1.2 - houseEdge * 65
-    const bestEV = B * 2.8 - houseEdge * 35   // Best case when high meters are close
+    const bestEV = B * 2.8 - houseEdge * 35
 
     setEvAvg(avgEV)
     setEvBest(bestEV)
 
-    // Smooth Current RTP (your preferred logic)
-    const breakevenPoint = 1650 // approximate combined break-even
+    // Smooth Current RTP
+    const breakevenPoint = 1650
     let finalRTP
     if (avgEV >= 0) {
       finalRTP = 100 + (avgEV / 55) * 100
@@ -138,7 +138,6 @@ function StackUpPays({ onBack }) {
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
-    // FP needed (simplified)
     if (!alreadyPositive) {
       setFpDollarsNeeded(Math.round(45 * bet))
     } else {
@@ -177,24 +176,24 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* 5 Meter Inputs */}
+        {/* 5 Meter Inputs with requested outline colors */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-6 space-y-5">
           {[
-            { label: 'Mini', value: mini, setter: setMini, color: 'cyan' },
-            { label: 'Minor', value: minor, setter: setMinor, color: 'teal' },
-            { label: 'Major', value: major, setter: setMajor, color: 'sky' },
-            { label: 'Grand', value: grand, setter: setGrand, color: 'blue' },
-            { label: 'Mega', value: mega, setter: setMega, color: 'indigo' },
+            { label: 'Mini',   value: mini,   setter: setMini,   color: 'border-blue-500' },
+            { label: 'Minor',  value: minor,  setter: setMinor,  color: 'border-green-500' },
+            { label: 'Major',  value: major,  setter: setMajor,  color: 'border-purple-500' },
+            { label: 'Grand',  value: grand,  setter: setGrand,  color: 'border-orange-500' },
+            { label: 'Mega',   value: mega,   setter: setMega,   color: 'border-red-500' },
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-4">
-              <div className={`w-16 font-semibold text-${m.color}-400`}>{m.label}</div>
+              <div className="w-20 font-semibold text-white">{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className="flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border border-cyan-500 focus:border-cyan-400"
+                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.color} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900`}
               />
               <div className="text-xs text-slate-400 w-12 text-right">/ {MUST_HIT[m.label.toLowerCase()]}</div>
             </div>
@@ -327,7 +326,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              This tool helps you evaluate when multiple Stack Up meters are close to hitting. The walk-away advisor uses combined meter progress to recommend a safe profit target.
+              This tool evaluates when multiple Stack Up meters are close to hitting. The walk-away advisor uses combined meter progress to recommend a safe profit target.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
