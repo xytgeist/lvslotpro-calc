@@ -86,14 +86,14 @@ function StackUpPays({ onBack }) {
     plugins: { legend: { display: false } }
   }
 
-  // Auto RTP
+  // Auto RTP based on denomination (using your provided paytable range)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
-    else if (denom === 0.05) base = 88.25
-    else if (denom === 0.10) base = 88.4
-    else if (denom === 0.25) base = 88.6
-    else if (denom > 1) base = 91.5
+    else if (denom === 0.05) base = 88.5
+    else if (denom === 0.10) base = 89
+    else if (denom === 0.25) base = 90
+    else if (denom >= 0.50) base = 92   // higher denoms tend to have better RTP
     setOverallRTP(maxMajor ? base + 0.5 : base)
   }, [denom, maxMajor])
 
@@ -169,7 +169,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Inputs - Mega at top, compact sizing */}
+        {/* Meter Inputs - Compact & Mobile Friendly */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
@@ -186,13 +186,13 @@ function StackUpPays({ onBack }) {
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow} max-w-[180px]`}
+                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow}`}
               />
             </div>
           ))}
         </div>
 
-        {/* Bet Size + Denom */}
+        {/* Bet Size + Denom - Compact */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
