@@ -22,12 +22,12 @@ const MUST_HIT = {
 }
 
 function StackUpPays({ onBack }) {
-  // Meter states
-  const [mini, setMini] = useState(75)
-  const [minor, setMinor] = useState(125)
-  const [major, setMajor] = useState(155)
-  const [grand, setGrand] = useState(195)
+  // Meter states - Mega at top
   const [mega, setMega] = useState(265)
+  const [grand, setGrand] = useState(195)
+  const [major, setMajor] = useState(155)
+  const [minor, setMinor] = useState(125)
+  const [mini, setMini] = useState(75)
 
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -176,14 +176,14 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* 5 Meter Inputs with colored outlines + glow + matching text */}
+        {/* 5 Meter Inputs - Mega at top, with colored borders + glow + matching text */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-6 space-y-5">
           {[
-            { label: 'Mini',   value: mini,   setter: setMini,   color: 'blue',   glow: 'shadow-blue-500/50' },
-            { label: 'Minor',  value: minor,  setter: setMinor,  color: 'green',  glow: 'shadow-green-500/50' },
-            { label: 'Major',  value: major,  setter: setMajor,  color: 'purple', glow: 'shadow-purple-500/50' },
-            { label: 'Grand',  value: grand,  setter: setGrand,  color: 'orange', glow: 'shadow-orange-500/50' },
-            { label: 'Mega',   value: mega,   setter: setMega,   color: 'red',    glow: 'shadow-red-500/50' },
+            { label: 'Mega',  value: mega,  setter: setMega,  color: 'red',    glow: 'shadow-red-500/60' },
+            { label: 'Grand', value: grand, setter: setGrand, color: 'orange', glow: 'shadow-orange-500/60' },
+            { label: 'Major', value: major, setter: setMajor, color: 'purple', glow: 'shadow-purple-500/60' },
+            { label: 'Minor', value: minor, setter: setMinor, color: 'green',  glow: 'shadow-green-500/60' },
+            { label: 'Mini',  value: mini,  setter: setMini,  color: 'blue',   glow: 'shadow-blue-500/60' },
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-4">
               <div className={`w-20 font-semibold text-${m.color}-400`}>{m.label}</div>
@@ -193,7 +193,7 @@ function StackUpPays({ onBack }) {
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 border-${m.color}-500 focus:outline-none focus:ring-2 focus:ring-${m.color}-500/70 ${m.glow}`}
+                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 border-${m.color}-500 focus:outline-none focus:ring-2 focus:ring-${m.color}-500 ${m.glow}`}
               />
               <div className="text-xs text-slate-400 w-12 text-right">/ {MUST_HIT[m.label.toLowerCase()]}</div>
             </div>
