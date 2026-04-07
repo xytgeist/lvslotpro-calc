@@ -14,11 +14,19 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 const MUST_HIT = {
-  mini: 120,
-  minor: 180,
-  major: 220,
-  grand: 260,
   mega: 350,
+  grand: 250,
+  major: 200,
+  minor: 150,
+  mini: 125,
+}
+
+const AVG_PAYOUT = {
+  mega: 210,
+  grand: 100,
+  major: 60,
+  minor: 30,
+  mini: 20,
 }
 
 function StackUpPays({ onBack }) {
@@ -51,11 +59,14 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
+  // Combined progress for walk-away advisor
   const getCombinedProgress = () => {
     const values = [mini, minor, major, grand, mega]
     const hits = Object.values(MUST_HIT)
     let total = 0
-    values.forEach((val, i) => total += Math.max(0, val / hits[i]))
+    values.forEach((val, i) => {
+      total += Math.max(0, val / hits[i])
+    })
     return Math.min(1, total / 5)
   }
 
@@ -99,31 +110,34 @@ function StackUpPays({ onBack }) {
 
   const calculate = () => {
     const bet = Number(betSize) || 25
-    const B = Number(avgBonusPay) || 48
     const oRTP = overallRTP / 100
     const houseEdge = 1 - oRTP
 
     const meters = [mini, minor, major, grand, mega]
     const hits = Object.values(MUST_HIT)
+    const payouts = Object.values(AVG_PAYOUT)
 
-    let totalProgress = 0
-    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]))
-    const avgProgress = totalProgress / 5
+    let totalEV = 0
+    meters.forEach((val, i) => {
+      const progress = Math.max(0, val / hits[i])
+      totalEV += payouts[i] * progress
+    })
 
-    const avgEV = B * avgProgress * 1.2 - houseEdge * 65
-    const bestEV = B * 2.8 - houseEdge * 35
+    const avgEV = totalEV * 0.85 - houseEdge * 70   // rough average spins
+    const bestEV = totalEV * 1.75 - houseEdge * 35
 
     setEvAvg(avgEV)
     setEvBest(bestEV)
 
+    // Smooth Current RTP
     const breakevenPoint = 1650
     let finalRTP
     if (avgEV >= 0) {
       finalRTP = 100 + (avgEV / 55) * 100
-    } else if (avgProgress < 0.4) {
+    } else if (totalEV < 40) {
       finalRTP = overallRTP
     } else {
-      const progress = (breakevenPoint - avgProgress * 1000) / (breakevenPoint - 850)
+      const progress = (breakevenPoint - totalEV * 10) / (breakevenPoint - 850)
       finalRTP = 100 - (100 - overallRTP) * Math.max(0, progress)
     }
 
@@ -133,7 +147,7 @@ function StackUpPays({ onBack }) {
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
-      setFpDollarsNeeded(Math.round(45 * bet))
+      setFpDollarsNeeded(Math.round(60 * bet))
     } else {
       setFpDollarsNeeded(0)
     }
@@ -169,14 +183,14 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* 5 Meter Inputs - Mega at top with individual colors */}
+        {/* 5 Meter Inputs - Mega at top with correct colors */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-6 space-y-5">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
-            { label: 'Grand', value: grand, setter: setGrand, border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-orange-500/60' },
-            { label: 'Major', value: major, setter: setMajor, border: 'border-purple-500', text: 'text-purple-400', glow: 'shadow-purple-500/60' },
-            { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60' },
-            { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
+            { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/70' },
+            { label: 'Grand', value: grand, setter: setGrand, border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-orange-500/70' },
+            { label: 'Major', value: major, setter: setMajor, border: 'border-purple-500', text: 'text-purple-400', glow: 'shadow-purple-500/70' },
+            { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/70' },
+            { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/70' },
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-4">
               <div className={`w-20 font-semibold ${m.text}`}>{m.label}</div>
@@ -186,9 +200,9 @@ function StackUpPays({ onBack }) {
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow}`}
+                className={`flex-1 p-4 bg-slate-800 rounded-2xl text-2xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow}`}
               />
-              <div className="text-xs text-slate-400 w-12 text-right">/ {MUST_HIT[m.label.toLowerCase()]}</div>
+              <div className="text-xs text-slate-400 w-14 text-right">/ {MUST_HIT[m.label.toLowerCase()]}</div>
             </div>
           ))}
         </div>
@@ -209,7 +223,7 @@ function StackUpPays({ onBack }) {
           <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
             <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
-              {[0.01, 0.02, 0.05, 0.10, 0.25, 1, 2, 5, 10, 25, 50, 100].map(d => (
+              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
                 <option key={d} value={d}>${d}</option>
               ))}
             </select>
