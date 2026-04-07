@@ -107,7 +107,7 @@ function BuffaloLink({ onBack }) {
     setOverallRTP(finalOverall)
   }, [denom, maxMajor])
 
-  // Main calculation with correct stable breakeven
+  // Main calculation with correct Current RTP
   const calculate = () => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -128,10 +128,8 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // Correct Average Break Even (stable, independent of current counter)
+    // Correct Average Break Even (stable)
     const breakevenAvg = Math.round(MUST_HIT - (B / houseEdge) * (inc / midpointFactor))
-
-    // Full Run Break Even
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
     setEvAvg(avgEV)
@@ -141,9 +139,15 @@ function BuffaloLink({ onBack }) {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    let rtp = oRTP * 100
-    if (spinsAvg > 0) rtp = 100 + ((avgEV / spinsAvg) * 100)
-    setCurrentRTP(Math.round(rtp * 10) / 10)
+    // FIXED: Current RTP from now until bonus hits (using midpoint)
+    let effectiveRTP = oRTP * 100
+    if (spinsAvg > 0) {
+      const evPerSpin = avgEV / spinsAvg
+      effectiveRTP = 100 + (evPerSpin * 100)
+    }
+    // Clamp to reasonable range to avoid crazy numbers at very low counters
+    effectiveRTP = Math.max(overallRTP - 5, Math.min(overallRTP + 15, effectiveRTP))
+    setCurrentRTP(Math.round(effectiveRTP * 10) / 10)
 
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
@@ -339,7 +343,6 @@ function BuffaloLink({ onBack }) {
             {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
 
-          {/* Restored Break Even Points Section */}
           <h2 className="text-xl font-semibold mt-8 mb-4 text-amber-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-6 text-center">
             <div>
