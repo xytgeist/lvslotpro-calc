@@ -16,7 +16,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const MUST_HIT = {
   mega: 350,
   grand: 250,
-  major: 220,
+  major: 200,     // Corrected
   minor: 150,
   mini: 125,
 }
@@ -179,7 +179,7 @@ function StackUpPays({ onBack }) {
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent} accent-opacity-90`}
+                className={`w-full ${m.accent}`}
               />
             </div>
           ))}
