@@ -51,7 +51,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Combined meter progress for walk-away
+  // Combined meter progress
   const getCombinedProgress = () => {
     const values = [mini, minor, major, grand, mega]
     const hits = Object.values(MUST_HIT)
@@ -163,7 +163,7 @@ function StackUpPays({ onBack }) {
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="pt-8 max-w-lg mx-auto px-4">
-        {/* Title - Blue Surfer Theme */}
+        {/* Title */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
             🌊
@@ -176,24 +176,24 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* 5 Meter Inputs with requested outline colors */}
+        {/* 5 Meter Inputs with colored outlines + glow + matching text */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-6 space-y-5">
           {[
-            { label: 'Mini',   value: mini,   setter: setMini,   color: 'border-blue-500' },
-            { label: 'Minor',  value: minor,  setter: setMinor,  color: 'border-green-500' },
-            { label: 'Major',  value: major,  setter: setMajor,  color: 'border-purple-500' },
-            { label: 'Grand',  value: grand,  setter: setGrand,  color: 'border-orange-500' },
-            { label: 'Mega',   value: mega,   setter: setMega,   color: 'border-red-500' },
+            { label: 'Mini',   value: mini,   setter: setMini,   color: 'blue',   glow: 'shadow-blue-500/50' },
+            { label: 'Minor',  value: minor,  setter: setMinor,  color: 'green',  glow: 'shadow-green-500/50' },
+            { label: 'Major',  value: major,  setter: setMajor,  color: 'purple', glow: 'shadow-purple-500/50' },
+            { label: 'Grand',  value: grand,  setter: setGrand,  color: 'orange', glow: 'shadow-orange-500/50' },
+            { label: 'Mega',   value: mega,   setter: setMega,   color: 'red',    glow: 'shadow-red-500/50' },
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-4">
-              <div className="w-20 font-semibold text-white">{m.label}</div>
+              <div className={`w-20 font-semibold text-${m.color}-400`}>{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.color} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900`}
+                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 border-${m.color}-500 focus:outline-none focus:ring-2 focus:ring-${m.color}-500/70 ${m.glow}`}
               />
               <div className="text-xs text-slate-400 w-12 text-right">/ {MUST_HIT[m.label.toLowerCase()]}</div>
             </div>
