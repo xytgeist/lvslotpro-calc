@@ -44,7 +44,7 @@ function BuffaloLink({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
-  // Walk-Away S-Curve
+  // Walk-Away S-Curve - unchanged
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
     const inc = buffalosPerSpin
@@ -136,21 +136,19 @@ function BuffaloLink({ onBack }) {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // === NEW CURRENT RTP LOGIC ===
+    // ==================== CURRENT RTP ====================
     const spinsToExpectedHit = Math.max(1, spinsAvg)
+
     let rawRTP = 100 + 100 * (B / spinsToExpectedHit - houseEdge)
 
-    let finalRTP
-    if (X >= breakevenAvg) {
-      finalRTP = rawRTP                     // Real value when in +EV
-    } else {
-      finalRTP = overallRTP - 3             // Slightly below machine RTP when still -EV
-    }
+    // Simple rule you asked for:
+    let finalRTP = (X >= breakevenAvg) ? rawRTP : overallRTP
 
-    // Light clamp
-    finalRTP = Math.max(overallRTP - 12, Math.min(overallRTP + 35, finalRTP))
+    // Light clamp so it doesn't go crazy
+    finalRTP = Math.max(overallRTP - 15, Math.min(overallRTP + 40, finalRTP))
 
     setCurrentRTP(Math.round(finalRTP * 10) / 10)
+    // ====================================================
 
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
@@ -207,7 +205,7 @@ function BuffaloLink({ onBack }) {
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="pt-8 max-w-lg mx-auto px-4">
-        {/* Title - unchanged */}
+        {/* Title */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 mr-4">
             <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
@@ -220,24 +218,223 @@ function BuffaloLink({ onBack }) {
           </h1>
         </div>
 
-        {/* All other sections (Counter, Advanced, Current EV, Acquisition Fee, Walk-Away, EV Table) are 100% unchanged from your base */}
-        {/* ... (the rest of your return statement is identical) ... */}
+        {/* Counter + Bet + Denom */}
+        <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
+          <div>
+            <label className="block text-gray-400 mb-1 text-xs">Counter</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={currentX}
+              onChange={handleIntegerChange(setCurrentX, 1400)}
+              onBlur={handleIntegerBlur(setCurrentX, 1400)}
+              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-amber-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="relative">
+              <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
+              <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400">$</div>
+              <input
+                type="text"
+                value={betSize}
+                onChange={handleFloatChange(setBetSize, 25)}
+                onBlur={handleFloatBlur(setBetSize, 25)}
+                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
+              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                  <option key={d} value={d}>${d}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
 
-        {/* Current EV section with updated RTP display */}
+        {/* Advanced Settings - unchanged */}
+        <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800">
+            <span className="text-base font-semibold">Advanced Settings</span>
+            <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
+          </button>
+          {showAdvanced && (
+            <div className="p-4 pt-0 space-y-5 border-t border-gray-800">
+              <div className="flex justify-between items-center">
+                <span>Max Major</span>
+                <button onClick={() => setMaxMajor(!maxMajor)} className={`px-6 py-2 rounded-xl text-sm font-semibold ${maxMajor ? 'bg-green-600' : 'bg-gray-700'}`}>
+                  {maxMajor ? 'YES' : 'NO'}
+                </button>
+              </div>
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">Overall RTP (%)</label>
+                <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">Avg Bonus Pay (bets)</label>
+                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 20)} onBlur={handleFloatBlur(setAvgBonusPay, 20)} className="w-full p-3 bg-gray-800 rounded-xl" />
+              </div>
+              <div>
+                <div className="flex justify-between mb-1">
+                  <label className="text-gray-400 text-xs">Buffalos per Spin</label>
+                  <span className="text-amber-400 font-bold">{buffalosPerSpin.toFixed(1)}</span>
+                </div>
+                <input type="range" min="1.5" max="1.9" step="0.1" value={buffalosPerSpin} onChange={(e) => setBuffalosPerSpin(parseFloat(e.target.value))} className="w-full accent-amber-500" />
+              </div>
+              <div>
+                <div className="flex justify-between mb-1">
+                  <label className="text-gray-400 text-xs">Midpoint Factor</label>
+                  <span className="text-amber-400 font-bold">{midpointFactor.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0" max="1" step="0.05" value={midpointFactor} onChange={(e) => setMidpointFactor(parseFloat(e.target.value))} className="w-full accent-amber-500" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Current EV - only RTP logic changed */}
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold text-amber-400">Current EV</h2>
             <div className={`text-lg font-bold ${currentRTP >= 100 ? 'text-green-400' : 'text-red-400'}`}>{currentRTP.toFixed(1)}% RTP</div>
           </div>
 
-          {/* Rest of Current EV section unchanged */}
-          {/* ... */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-gray-800 p-4 rounded-2xl">
+              <div className="text-gray-400 text-sm">Average Case</div>
+              <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
+              <div className="text-sm text-gray-300">${(evAvg * betSize).toFixed(2)}</div>
+              <div className="mt-4 pt-3 border-t border-gray-700 text-xs text-gray-400">
+                Max Exposure: <span className="text-red-400 font-bold">{maxExposureAvg} bets</span>
+              </div>
+            </div>
+            <div className="bg-gray-800 p-4 rounded-2xl">
+              <div className="text-gray-400 text-sm">Full Run (to 1800)</div>
+              <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
+              <div className="text-sm text-gray-300">${(evFullRun * betSize).toFixed(2)}</div>
+              <div className="mt-4 pt-3 border-t border-gray-700 text-xs text-gray-400">
+                Max Exposure: <span className="text-red-400 font-bold">{maxExposureFull} bets</span>
+              </div>
+            </div>
+          </div>
+
+          <div className={`p-4 rounded-2xl text-center font-bold ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
+          </div>
+
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-amber-400">Break Even Points</h2>
+          <div className="grid grid-cols-2 gap-6 text-center">
+            <div>
+              <div className="text-gray-400 text-sm">Average Case</div>
+              <div className="text-4xl font-bold text-green-400">{beAvg}</div>
+            </div>
+            <div>
+              <div className="text-gray-400 text-sm">Full Run (to 1800)</div>
+              <div className="text-4xl font-bold text-amber-400">{beFullRun}</div>
+            </div>
+          </div>
+
+          {!isAlreadyPositive && fpDollarsNeeded > 0 && (
+            <div className="mt-6 text-center text-amber-400 italic text-sm">
+              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
+            </div>
+          )}
         </div>
 
-        {/* Acquisition Fee, Walk-Away Advisor, EV Table - all unchanged */}
+        {/* Acquisition Fee - unchanged */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
+          <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-gray-400 text-xs mb-2">EV Basis</label>
+              <div className="flex bg-gray-800 rounded-2xl p-1">
+                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${!useFullRunForFee ? 'bg-amber-600 text-white' : 'text-gray-400'}`}>Average</button>
+                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${useFullRunForFee ? 'bg-amber-600 text-white' : 'text-gray-400'}`}>Full Run</button>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-400 text-xs">Scout Share</span>
+                <span className="text-amber-400 font-bold">{scoutPercentage}%</span>
+              </div>
+              <input type="range" min="10" max="15" step="1" value={scoutPercentage} onChange={(e) => setScoutPercentage(Number(e.target.value))} className="w-full accent-amber-500" />
+            </div>
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-5 mb-4 text-center">
+            <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
+            <div className="text-4xl font-bold text-white">${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}</div>
+            <div className="text-xs text-gray-400 mt-1">{useFullRunForFee ? 'Full Run EV' : 'Average Case EV'}</div>
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-5 text-center">
+            <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
+            <div className="text-5xl font-black text-green-400">${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}</div>
+            <div className="text-xs text-gray-400 mt-1">to scout ({scoutPercentage}% of expected profit)</div>
+          </div>
+        </div>
+
+        {/* Walk-Away Advisor - unchanged */}
+        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-amber-400">Walk-Away Advisor</h2>
+            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-amber-400">ℹ️</button>
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
+              <input type="text" inputMode="numeric" value={testCounter} onChange={handleIntegerChange(setTestCounter, 1400)} onBlur={handleIntegerBlur(setTestCounter, 1400)} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-amber-400" />
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-400 mb-1">Recommended Walk-Away</div>
+              <div className="text-4xl font-bold text-green-400">+{getRecommendedWalkAway(testCounter)} bets</div>
+              <div className="text-sm text-green-400">${(getRecommendedWalkAway(testCounter) * betSize).toFixed(0)}</div>
+            </div>
+          </div>
+          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-6">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+          <div className="bg-gray-800 rounded-2xl p-5 text-center">
+            {hoverCounter !== null ? (
+              <>At <span className="text-amber-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
+            ) : (
+              <>At <span className="text-amber-400 font-semibold mx-1">{currentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span></>
+            )}
+          </div>
+        </div>
+
+        {/* EV Table - unchanged */}
+        <div className="bg-gray-900 p-6 rounded-3xl">
+          <h2 className="text-xl font-semibold mb-5 text-amber-400">EV Table (1150 to 1775)</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="py-3 px-4 text-left text-gray-400">Counter</th>
+                  <th className="py-3 px-4 text-left text-gray-400">Avg EV (Bets | $)</th>
+                  <th className="py-3 px-4 text-left text-gray-400">Full Run (Bets | $)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {evTable.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-800">
+                    <td className="py-3 px-4 font-semibold">{row.counter}</td>
+                    <td className={`py-3 px-4 ${row.avgEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {row.avgEV.toFixed(1)} | ${(row.avgDollar || 0).toFixed(0)}
+                    </td>
+                    <td className={`py-3 px-4 ${row.fullEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {row.fullEV.toFixed(1)} | ${(row.fullDollar || 0).toFixed(0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      {/* Info Modal unchanged */}
+      {/* Info Modal - unchanged */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
