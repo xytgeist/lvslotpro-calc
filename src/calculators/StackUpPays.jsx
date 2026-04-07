@@ -169,7 +169,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Inputs - Mega at top, properly sized */}
+        {/* Meter Inputs - Mega at top, compact sizing */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
@@ -179,14 +179,14 @@ function StackUpPays({ onBack }) {
             { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className={`w-16 font-semibold ${m.text} text-sm`}>{m.label}</div>
+              <div className={`w-16 font-semibold ${m.text} text-base`}>{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-4 bg-slate-800 rounded-2xl text-2xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow}`}
+                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow} max-w-[180px]`}
               />
             </div>
           ))}
@@ -202,12 +202,12 @@ function StackUpPays({ onBack }) {
               value={betSize}
               onChange={(e) => setBetSize(e.target.value.replace(/[^0-9.]/g, ''))}
               onBlur={(e) => setBetSize(parseFloat(e.target.value) || 25)}
-              className="w-full pl-8 p-4 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
+              className="w-full pl-8 p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
             />
           </div>
           <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
-            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-4 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
+            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
               {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
                 <option key={d} value={d}>${d}</option>
               ))}
