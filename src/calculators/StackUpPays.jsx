@@ -159,27 +159,27 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - Mega at top */}
+        {/* Meter Sliders with matching colors */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60',  max: 350 },
-            { label: 'Grand', value: grand, setter: setGrand, border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-orange-500/60', max: 250 },
-            { label: 'Major', value: major, setter: setMajor, border: 'border-purple-500', text: 'text-purple-400', glow: 'shadow-purple-500/60', max: 220 },
-            { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60',  max: 150 },
-            { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60',  max: 125 },
+            { label: 'Mega',  value: mega,  setter: setMega,  color: 'red',    accent: 'accent-red-500' },
+            { label: 'Grand', value: grand, setter: setGrand, color: 'orange', accent: 'accent-orange-500' },
+            { label: 'Major', value: major, setter: setMajor, color: 'purple', accent: 'accent-purple-500' },
+            { label: 'Minor', value: minor, setter: setMinor, color: 'green',  accent: 'accent-green-500' },
+            { label: 'Mini',  value: mini,  setter: setMini,  color: 'blue',   accent: 'accent-blue-500' },
           ].map((m, i) => (
             <div key={i}>
               <div className="flex justify-between mb-1.5">
-                <div className={`font-semibold ${m.text}`}>{m.label}</div>
-                <div className="text-slate-300 font-mono text-lg">{m.value}</div>
+                <div className={`font-semibold text-${m.color}-400`}>{m.label}</div>
+                <div className="text-slate-300 font-mono text-lg font-bold">{m.value}</div>
               </div>
               <input
                 type="range"
                 min="0"
-                max={m.max}
+                max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full accent-${m.text.split('-')[1]}-500 ${m.glow}`}
+                className={`w-full ${m.accent} accent-opacity-90`}
               />
             </div>
           ))}
