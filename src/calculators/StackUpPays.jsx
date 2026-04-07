@@ -155,22 +155,22 @@ function StackUpPays({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      <div className="pt-8 max-w-lg mx-auto px-4">
+      <div className="max-w-lg mx-auto px-4 pt-6">
         {/* Title */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
             🌊
           </div>
           <h1
-            className="text-[28px] font-black tracking-[-1.2px] text-cyan-100"
-            style={{ textShadow: `0 0 15px #67e8f9, -2px -2px 0 #0ea5e9` }}
+            className="text-[27px] font-black tracking-[-1px] text-cyan-100"
+            style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
           >
             STACK UP PAYS
           </h1>
         </div>
 
-        {/* 5 Meter Inputs - Mega at top */}
-        <div className="bg-slate-900 p-6 rounded-3xl mb-6 space-y-5">
+        {/* Meter Inputs - Mega at top */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
             { label: 'Grand', value: grand, setter: setGrand, border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-orange-500/60' },
@@ -178,8 +178,8 @@ function StackUpPays({ onBack }) {
             { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60' },
             { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
           ].map((m, i) => (
-            <div key={i} className="flex items-center gap-4">
-              <div className={`w-20 font-semibold ${m.text}`}>{m.label}</div>
+            <div key={i} className="flex items-center gap-3">
+              <div className={`w-16 font-semibold ${m.text}`}>{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
@@ -192,7 +192,7 @@ function StackUpPays({ onBack }) {
           ))}
         </div>
 
-        {/* Bet Size + Denomination */}
+        {/* Bet Size + Denom */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
@@ -284,18 +284,8 @@ function StackUpPays({ onBack }) {
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
           <div className="flex justify-between mb-4">
-            <button 
-              onClick={() => setUseBestCaseForFee(false)} 
-              className={`flex-1 py-3 rounded-l-2xl text-sm font-semibold ${!useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
-            >
-              Average
-            </button>
-            <button 
-              onClick={() => setUseBestCaseForFee(true)} 
-              className={`flex-1 py-3 rounded-r-2xl text-sm font-semibold ${useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
-            >
-              Best Case
-            </button>
+            <button onClick={() => setUseBestCaseForFee(false)} className={`flex-1 py-3 rounded-l-2xl text-sm font-semibold ${!useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Average</button>
+            <button onClick={() => setUseBestCaseForFee(true)} className={`flex-1 py-3 rounded-r-2xl text-sm font-semibold ${useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Best Case</button>
           </div>
 
           <div className="bg-slate-800 rounded-2xl p-5 text-center mb-4">
