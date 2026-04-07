@@ -22,7 +22,7 @@ const MUST_HIT = {
 }
 
 function StackUpPays({ onBack }) {
-  // Meter states - Mega at top
+  // Meters - Mega at top
   const [mega, setMega] = useState(265)
   const [grand, setGrand] = useState(195)
   const [major, setMajor] = useState(155)
@@ -51,14 +51,11 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Combined meter progress
   const getCombinedProgress = () => {
     const values = [mini, minor, major, grand, mega]
     const hits = Object.values(MUST_HIT)
     let total = 0
-    values.forEach((val, i) => {
-      total += Math.max(0, val / hits[i])
-    })
+    values.forEach((val, i) => total += Math.max(0, val / hits[i]))
     return Math.min(1, total / 5)
   }
 
@@ -110,9 +107,7 @@ function StackUpPays({ onBack }) {
     const hits = Object.values(MUST_HIT)
 
     let totalProgress = 0
-    meters.forEach((val, i) => {
-      totalProgress += Math.max(0, val / hits[i])
-    })
+    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]))
     const avgProgress = totalProgress / 5
 
     const avgEV = B * avgProgress * 1.2 - houseEdge * 65
@@ -121,7 +116,6 @@ function StackUpPays({ onBack }) {
     setEvAvg(avgEV)
     setEvBest(bestEV)
 
-    // Smooth Current RTP
     const breakevenPoint = 1650
     let finalRTP
     if (avgEV >= 0) {
@@ -149,7 +143,6 @@ function StackUpPays({ onBack }) {
     calculate()
   }, [mini, minor, major, grand, mega, betSize, denom, overallRTP, avgBonusPay, incrementPerSpin, maxMajor])
 
-  // Input handlers
   const handleMeterChange = (setter) => (e) => {
     const val = e.target.value.replace(/[^0-9]/g, '')
     setter(val)
@@ -176,24 +169,24 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* 5 Meter Inputs - Mega at top, with colored borders + glow + matching text */}
+        {/* 5 Meter Inputs - Mega at top with individual colors */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-6 space-y-5">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  color: 'red',    glow: 'shadow-red-500/60' },
-            { label: 'Grand', value: grand, setter: setGrand, color: 'orange', glow: 'shadow-orange-500/60' },
-            { label: 'Major', value: major, setter: setMajor, color: 'purple', glow: 'shadow-purple-500/60' },
-            { label: 'Minor', value: minor, setter: setMinor, color: 'green',  glow: 'shadow-green-500/60' },
-            { label: 'Mini',  value: mini,  setter: setMini,  color: 'blue',   glow: 'shadow-blue-500/60' },
+            { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
+            { label: 'Grand', value: grand, setter: setGrand, border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-orange-500/60' },
+            { label: 'Major', value: major, setter: setMajor, border: 'border-purple-500', text: 'text-purple-400', glow: 'shadow-purple-500/60' },
+            { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60' },
+            { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-4">
-              <div className={`w-20 font-semibold text-${m.color}-400`}>{m.label}</div>
+              <div className={`w-20 font-semibold ${m.text}`}>{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 border-${m.color}-500 focus:outline-none focus:ring-2 focus:ring-${m.color}-500 ${m.glow}`}
+                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow}`}
               />
               <div className="text-xs text-slate-400 w-12 text-right">/ {MUST_HIT[m.label.toLowerCase()]}</div>
             </div>
