@@ -86,7 +86,7 @@ function StackUpPays({ onBack }) {
     plugins: { legend: { display: false } }
   }
 
-  // Auto RTP based on denomination
+  // Auto RTP
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -169,7 +169,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Inputs - Fixed alignment with consistent label width */}
+        {/* Meter Inputs - Tighter and guaranteed to fit */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
@@ -178,16 +178,15 @@ function StackUpPays({ onBack }) {
             { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60' },
             { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
           ].map((m, i) => (
-            <div key={i} className="flex items-center gap-4">
-              {/* Fixed width label for perfect alignment */}
-              <div className={`w-20 font-semibold ${m.text} text-base flex-shrink-0`}>{m.label}</div>
+            <div key={i} className="flex items-center gap-3">
+              <div className={`w-16 font-semibold ${m.text} text-base flex-shrink-0`}>{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
                 value={m.value}
                 onChange={handleMeterChange(m.setter)}
                 onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-3.5 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow}`}
+                className={`flex-1 p-3 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow} max-w-[200px]`}
               />
             </div>
           ))}
