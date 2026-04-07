@@ -179,7 +179,7 @@ function StackUpPays({ onBack }) {
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent}`}
+                className={`w-full ${m.accent} accent-opacity-100`}
               />
             </div>
           ))}
