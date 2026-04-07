@@ -169,7 +169,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Inputs - Mega at top */}
+        {/* Meter Inputs - Mega at top, properly sized */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
@@ -179,7 +179,7 @@ function StackUpPays({ onBack }) {
             { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className={`w-16 font-semibold ${m.text}`}>{m.label}</div>
+              <div className={`w-16 font-semibold ${m.text} text-sm`}>{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
