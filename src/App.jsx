@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import PhoenixLink from './calculators/PhoenixLink'
 import BuffaloLink from './calculators/BuffaloLink'
+import StackUpPays from './calculators/StackUpPays'   // ← New
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -21,6 +22,7 @@ function App() {
       if (session?.user) checkWhitelist(session.user.email)
       else setIsChecking(false)
     })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) checkWhitelist(session.user.email)
@@ -29,6 +31,7 @@ function App() {
         setIsChecking(false)
       }
     })
+
     return () => subscription.unsubscribe()
   }, [])
 
@@ -84,7 +87,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Title Bar - clean, with back button when in calculator */}
+      {/* Title Bar */}
       {currentView !== 'dashboard' && (
         <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
           <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
@@ -109,7 +112,7 @@ function App() {
               <p className="text-zinc-400 mt-3">Select a calculator</p>
             </div>
 
-            {/* Phoenix Link Button - unchanged */}
+            {/* Phoenix Link */}
             <button
               onClick={() => setCurrentView('phoenix')}
               className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-4 mb-4"
@@ -121,28 +124,40 @@ function App() {
               </div>
             </button>
 
-            {/* Buffalo Link Button - now using your real buffalo icon */}
+            {/* Buffalo Link */}
             <button
               onClick={() => setCurrentView('buffalo')}
-              className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-4 transition-all active:scale-[0.985]"
+              className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-4 mb-4 transition-all active:scale-[0.985]"
             >
               <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner">
-                <img 
-                  src="/buffalo-icon.png" 
-                  alt="Buffalo" 
-                  className="w-11 h-11 object-contain" 
-                />
+                <img src="/buffalo-icon.png" alt="Buffalo" className="w-11 h-11 object-contain" />
               </div>
               <div>
                 <div className="font-semibold text-xl text-amber-100">Buffalo Link EV Calc</div>
                 <div className="text-sm text-amber-200">Midpoint-based counter analyzer</div>
               </div>
             </button>
+
+            {/* Stack Up Pays - Blue Surfer Theme */}
+            <button
+              onClick={() => setCurrentView('stackup')}
+              className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-4 transition-all active:scale-[0.985]"
+            >
+              <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-sky-400 shadow-inner text-4xl">
+                🌊
+              </div>
+              <div>
+                <div className="font-semibold text-xl text-cyan-100">Stack Up Pays</div>
+                <div className="text-sm text-cyan-200">5-meter expansion analyzer</div>
+              </div>
+            </button>
           </div>
         ) : currentView === 'phoenix' ? (
           <PhoenixLink onBack={() => setCurrentView('dashboard')} />
-        ) : (
+        ) : currentView === 'buffalo' ? (
           <BuffaloLink onBack={() => setCurrentView('dashboard')} />
+        ) : (
+          <StackUpPays onBack={() => setCurrentView('dashboard')} />
         )}
       </div>
     </div>
