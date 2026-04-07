@@ -86,14 +86,14 @@ function StackUpPays({ onBack }) {
     plugins: { legend: { display: false } }
   }
 
-  // Auto RTP based on denomination (using your provided paytable range)
+  // Auto RTP based on denomination
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
     else if (denom === 0.05) base = 88.5
     else if (denom === 0.10) base = 89
     else if (denom === 0.25) base = 90
-    else if (denom >= 0.50) base = 92   // higher denoms tend to have better RTP
+    else if (denom >= 0.50) base = 92
     setOverallRTP(maxMajor ? base + 0.5 : base)
   }, [denom, maxMajor])
 
@@ -169,7 +169,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Inputs - Compact & Mobile Friendly */}
+        {/* Meter Inputs - Fixed alignment with consistent label width */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
@@ -178,8 +178,9 @@ function StackUpPays({ onBack }) {
             { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60' },
             { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
           ].map((m, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className={`w-16 font-semibold ${m.text} text-base`}>{m.label}</div>
+            <div key={i} className="flex items-center gap-4">
+              {/* Fixed width label for perfect alignment */}
+              <div className={`w-20 font-semibold ${m.text} text-base flex-shrink-0`}>{m.label}</div>
               <input
                 type="text"
                 inputMode="numeric"
@@ -192,7 +193,7 @@ function StackUpPays({ onBack }) {
           ))}
         </div>
 
-        {/* Bet Size + Denom - Compact */}
+        {/* Bet Size + Denom */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
