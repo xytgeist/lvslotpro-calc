@@ -141,17 +141,7 @@ function StackUpPays({ onBack }) {
 
   useEffect(() => {
     calculate()
-  }, [mini, minor, major, grand, mega, betSize, denom, overallRTP, avgBonusPay, incrementPerSpin, maxMajor])
-
-  const handleMeterChange = (setter) => (e) => {
-    const val = e.target.value.replace(/[^0-9]/g, '')
-    setter(val)
-  }
-
-  const handleMeterBlur = (setter, defaultVal) => (e) => {
-    let val = parseInt(e.target.value, 10) || defaultVal
-    setter(Math.max(0, val))
-  }
+  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP, avgBonusPay, incrementPerSpin, maxMajor])
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
@@ -169,24 +159,27 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Inputs - Tighter and guaranteed to fit */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
+        {/* Meter Sliders - Mega at top */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60' },
-            { label: 'Grand', value: grand, setter: setGrand, border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-orange-500/60' },
-            { label: 'Major', value: major, setter: setMajor, border: 'border-purple-500', text: 'text-purple-400', glow: 'shadow-purple-500/60' },
-            { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60' },
-            { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60' },
+            { label: 'Mega',  value: mega,  setter: setMega,  border: 'border-red-500',    text: 'text-red-400',    glow: 'shadow-red-500/60',  max: 350 },
+            { label: 'Grand', value: grand, setter: setGrand, border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-orange-500/60', max: 250 },
+            { label: 'Major', value: major, setter: setMajor, border: 'border-purple-500', text: 'text-purple-400', glow: 'shadow-purple-500/60', max: 220 },
+            { label: 'Minor', value: minor, setter: setMinor, border: 'border-green-500',  text: 'text-green-400',  glow: 'shadow-green-500/60',  max: 150 },
+            { label: 'Mini',  value: mini,  setter: setMini,  border: 'border-blue-500',   text: 'text-blue-400',   glow: 'shadow-blue-500/60',  max: 125 },
           ].map((m, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className={`w-16 font-semibold ${m.text} text-base flex-shrink-0`}>{m.label}</div>
+            <div key={i}>
+              <div className="flex justify-between mb-1.5">
+                <div className={`font-semibold ${m.text}`}>{m.label}</div>
+                <div className="text-slate-300 font-mono text-lg">{m.value}</div>
+              </div>
               <input
-                type="text"
-                inputMode="numeric"
+                type="range"
+                min="0"
+                max={m.max}
                 value={m.value}
-                onChange={handleMeterChange(m.setter)}
-                onBlur={handleMeterBlur(m.setter, 100)}
-                className={`flex-1 p-3 bg-slate-800 rounded-2xl text-xl font-bold text-center border-2 ${m.border} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${m.glow} max-w-[200px]`}
+                onChange={(e) => m.setter(Number(e.target.value))}
+                className={`w-full accent-${m.text.split('-')[1]}-500 ${m.glow}`}
               />
             </div>
           ))}
