@@ -33,8 +33,6 @@ function StackUpPays({ onBack }) {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(48)
-  const [incrementPerSpin, setIncrementPerSpin] = useState(1.35)
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
@@ -51,17 +49,80 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  const getCombinedProgress = () => {
-    const values = [mini, minor, major, grand, mega]
-    const hits = Object.values(MUST_HIT)
-    let total = 0
-    values.forEach((val, i) => total += Math.max(0, val / hits[i]))
-    return Math.min(1, total / 5)
+  // Auto RTP based on denomination
+  useEffect(() => {
+    let base = 91
+    if (denom <= 0.02) base = 88
+    else if (denom === 0.05) base = 88.5
+    else if (denom === 0.10) base = 89
+    else if (denom === 0.25) base = 90
+    else if (denom >= 0.50) base = 92
+    setOverallRTP(maxMajor ? base + 0.5 : base)
+  }, [denom, maxMajor])
+
+  const calculate = () => {
+    const bet = Number(betSize) || 25
+    const oRTP = overallRTP / 100
+    const houseEdge = 1 - oRTP
+
+    // Meter data for weighted equity
+    const meters = [
+      { value: mega,  mhb: MUST_HIT.mega,  payout: 210 },
+      { value: grand, mhb: MUST_HIT.grand, payout: 100 },
+      { value: major, mhb: MUST_HIT.major, payout: 60 },
+      { value: minor, mhb: MUST_HIT.minor, payout: 30 },
+      { value: mini,  mhb: MUST_HIT.mini,  payout: 20 }
+    ]
+
+    let totalEquity = 0
+    meters.forEach(m => {
+      const progress = Math.max(0, m.value / m.mhb)
+      totalEquity += Math.pow(progress, 2.3) * m.payout   // 2.3 power weights high meters heavily
+    })
+
+    const avgEV = (totalEquity / 68) - houseEdge          // 68 = calibrated spins per expansion
+    const bestEV = (totalEquity * 2.1 / 68) - houseEdge   // Best-case combo multiplier
+
+    setEvAvg(avgEV)
+    setEvBest(bestEV)
+
+    // Current RTP with smooth curve
+    const breakevenProgress = 0.68
+    const combinedProgress = totalEquity / (210 + 100 + 60 + 30 + 20)
+
+    let finalRTP
+    if (combinedProgress >= breakevenProgress) {
+      finalRTP = 100 + (combinedProgress - breakevenProgress) * 280
+    } else if (combinedProgress <= 0.25) {
+      finalRTP = overallRTP
+    } else {
+      const progressToFloor = (breakevenProgress - combinedProgress) / (breakevenProgress - 0.25)
+      finalRTP = 100 - (100 - overallRTP) * progressToFloor
+    }
+
+    setCurrentRTP(Math.round(finalRTP * 10) / 10)
+
+    const alreadyPositive = avgEV >= 0
+    setIsAlreadyPositive(alreadyPositive)
+
+    if (!alreadyPositive) {
+      setFpDollarsNeeded(Math.round(68 * bet))
+    } else {
+      setFpDollarsNeeded(0)
+    }
   }
 
+  useEffect(() => {
+    calculate()
+  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP, maxMajor])
+
   const getRecommendedWalkAway = () => {
-    const progress = getCombinedProgress()
-    return Math.round(55 + progress * 165)
+    const meters = [mini, minor, major, grand, mega]
+    const hits = Object.values(MUST_HIT)
+    let totalProgress = 0
+    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]))
+    const avgProgress = totalProgress / 5
+    return Math.round(55 + avgProgress * 165)
   }
 
   const chartData = {
@@ -86,63 +147,6 @@ function StackUpPays({ onBack }) {
     plugins: { legend: { display: false } }
   }
 
-  // Auto RTP
-  useEffect(() => {
-    let base = 91
-    if (denom <= 0.02) base = 88
-    else if (denom === 0.05) base = 88.5
-    else if (denom === 0.10) base = 89
-    else if (denom === 0.25) base = 90
-    else if (denom >= 0.50) base = 92
-    setOverallRTP(maxMajor ? base + 0.5 : base)
-  }, [denom, maxMajor])
-
-  const calculate = () => {
-    const bet = Number(betSize) || 25
-    const B = Number(avgBonusPay) || 48
-    const oRTP = overallRTP / 100
-    const houseEdge = 1 - oRTP
-
-    const meters = [mini, minor, major, grand, mega]
-    const hits = Object.values(MUST_HIT)
-
-    let totalProgress = 0
-    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]))
-    const avgProgress = totalProgress / 5
-
-    const avgEV = B * avgProgress * 1.2 - houseEdge * 65
-    const bestEV = B * 2.8 - houseEdge * 35
-
-    setEvAvg(avgEV)
-    setEvBest(bestEV)
-
-    const breakevenPoint = 1650
-    let finalRTP
-    if (avgEV >= 0) {
-      finalRTP = 100 + (avgEV / 55) * 100
-    } else if (avgProgress < 0.4) {
-      finalRTP = overallRTP
-    } else {
-      const progress = (breakevenPoint - avgProgress * 1000) / (breakevenPoint - 850)
-      finalRTP = 100 - (100 - overallRTP) * Math.max(0, progress)
-    }
-
-    setCurrentRTP(Math.round(finalRTP * 10) / 10)
-
-    const alreadyPositive = avgEV >= 0
-    setIsAlreadyPositive(alreadyPositive)
-
-    if (!alreadyPositive) {
-      setFpDollarsNeeded(Math.round(60 * bet))
-    } else {
-      setFpDollarsNeeded(0)
-    }
-  }
-
-  useEffect(() => {
-    calculate()
-  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP, avgBonusPay, incrementPerSpin, maxMajor])
-
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
@@ -159,7 +163,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders with matching colors */}
+        {/* Meter Sliders */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400' },
@@ -200,7 +204,11 @@ function StackUpPays({ onBack }) {
           </div>
           <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
-            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
+            <select 
+              value={denom} 
+              onChange={(e) => setDenom(parseFloat(e.target.value))} 
+              className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
+            >
               {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
                 <option key={d} value={d}>${d}</option>
               ))}
@@ -221,26 +229,29 @@ function StackUpPays({ onBack }) {
             <div className="p-5 pt-0 space-y-6 border-t border-slate-800">
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Overall RTP (%)</label>
-                <input type="text" value={overallRTP} onChange={(e) => setOverallRTP(e.target.value)} className="w-full p-4 bg-slate-800 rounded-2xl" />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-xs mb-1">Avg Bonus Pay (bets)</label>
-                <input type="text" value={avgBonusPay} onChange={(e) => setAvgBonusPay(e.target.value)} className="w-full p-4 bg-slate-800 rounded-2xl" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-slate-400 text-xs">Increment per Spin</span>
-                  <span className="text-cyan-400 font-bold">{incrementPerSpin.toFixed(2)}</span>
-                </div>
                 <input 
-                  type="range" 
-                  min="1.0" 
-                  max="2.0" 
-                  step="0.05" 
-                  value={incrementPerSpin} 
-                  onChange={(e) => setIncrementPerSpin(parseFloat(e.target.value))} 
-                  className="w-full accent-cyan-500" 
+                  type="text" 
+                  value={overallRTP} 
+                  onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} 
+                  className="w-full p-4 bg-slate-800 rounded-2xl text-center" 
                 />
+              </div>
+              <div>
+                <label className="block text-slate-400 text-xs mb-1">Max Major Bonus</label>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setMaxMajor(false)} 
+                    className={`flex-1 py-3 rounded-2xl ${!maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    No
+                  </button>
+                  <button 
+                    onClick={() => setMaxMajor(true)} 
+                    className={`flex-1 py-3 rounded-2xl ${maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    Yes (+0.5%)
+                  </button>
+                </div>
               </div>
             </div>
           )}
