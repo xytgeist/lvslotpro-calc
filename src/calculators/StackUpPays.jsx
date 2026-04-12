@@ -46,7 +46,6 @@ const SPINS_PER_INCREMENT = {
 }
 
 function StackUpPays({ onBack }) {
-  // Defaults set to the break-even (+EV) points
   const [mega, setMega] = useState(330)
   const [grand, setGrand] = useState(238)
   const [major, setMajor] = useState(192)
@@ -73,7 +72,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Auto RTP based on denomination
+  // Auto base RTP
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -84,10 +83,9 @@ function StackUpPays({ onBack }) {
     setOverallRTP(maxMajor ? base + 0.5 : base)
   }, [denom, maxMajor])
 
-  // Calculate individual meter RTP using your exact method
+  // Exact RTP for any counter on any meter
   const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
-    const spinsRemaining = (mustHit - counter) * spi
-    if (spinsRemaining <= 0) return 1000 // safety cap
+    const spinsRemaining = Math.max(0.001, (mustHit - counter) * spi) // avoid divide by zero
     const baseReturn = spinsRemaining * baseRTP
     const totalReturn = baseReturn + payout
     return (totalReturn / spinsRemaining) * 100
@@ -97,32 +95,34 @@ function StackUpPays({ onBack }) {
     const bet = Number(betSize) || 25
     const baseRTP = overallRTP / 100
 
-    const meters = [
-      { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega },
-      { counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand },
-      { counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major },
-      { counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor },
-      { counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini },
+    const meterData = [
+      { name: 'mega', counter: mega, mustHit: MUST_HIT.mega, payout: AVG_PAYOUT.mega, spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250 },
+      { name: 'grand', counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, plusEV: PLUS_EV.grand, reset: 200 },
+      { name: 'major', counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, plusEV: PLUS_EV.major, reset: 150 },
+      { name: 'minor', counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, plusEV: PLUS_EV.minor, reset: 100 },
+      { name: 'mini', counter: mini, mustHit: MUST_HIT.mini, payout: AVG_PAYOUT.mini, spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75 },
     ]
 
     let totalRTP = 0
     let totalEV = 0
 
-    meters.forEach(m => {
+    meterData.forEach(m => {
       let meterRTP
-      if (m.counter >= PLUS_EV[m.name || Object.keys(PLUS_EV).find(k => MUST_HIT[k] === m.mustHit)]) {
+
+      if (m.counter >= m.plusEV) {
         // Exact formula above break-even
         meterRTP = getMeterRTP(m.counter, m.mustHit, m.payout, m.spi, baseRTP)
       } else {
-        // Balanced linear ramp below break-even (midpoint = baseRTP)
-        const midPoint = (m.mustHit + 0) / 2 // approximate midpoint
-        const progress = (m.counter - 0) / (PLUS_EV[m.name || Object.keys(PLUS_EV).find(k => MUST_HIT[k] === m.mustHit)] - 0)
-        meterRTP = baseRTP * 100 + (103.125 - baseRTP * 100) * progress * 0.8 // tuned ramp
+        // Balanced linear ramp below break-even
+        const plusEV_RTP = getMeterRTP(m.plusEV, m.mustHit, m.payout, m.spi, baseRTP)
+        const reset_RTP = 2 * (baseRTP * 100) - plusEV_RTP   // forces average of low end to be base
+        const progress = (m.counter - m.reset) / (m.plusEV - m.reset)
+        meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
       }
 
       totalRTP += meterRTP
 
-      // Simple EV for play / walk-away logic
+      // EV for play decision
       const spinsRem = (m.mustHit - m.counter) * m.spi
       const meterEV = m.payout - (1 - baseRTP) * spinsRem
       totalEV += meterEV
@@ -366,8 +366,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              This tool now uses exact per-meter RTP calculations based on remaining spins and bonus payouts. 
-              Overall RTP is the average of all five meters.
+              This version uses your exact RTP calculation method for every counter point.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
