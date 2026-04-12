@@ -196,7 +196,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - Chrome + Brave friendly: colored accents, no white border */}
+        {/* Meter Sliders - original colored accents + Chrome white border fix */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
@@ -216,10 +216,7 @@ function StackUpPays({ onBack }) {
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer 
-                           ${m.accent} accent-opacity-100 
-                           outline-none focus:outline-none focus:ring-0 focus:border-transparent
-                           [-webkit-appearance:none] [-moz-appearance:none]`}
+                className={`w-full ${m.accent} accent-opacity-100 outline-none focus:outline-none focus:ring-0 focus:border-transparent [-webkit-appearance:none]`}
               />
             </div>
           ))}
