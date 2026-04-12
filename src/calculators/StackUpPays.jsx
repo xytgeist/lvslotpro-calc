@@ -300,4 +300,64 @@ function StackUpPays({ onBack }) {
           <div className={`mt-6 p-4 rounded-2xl text-center font-bold ${isAlreadyPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
             {isAlreadyPositive ? '✅ PLAY — Strong +EV' : '❌ Still -EV — Keep Waiting'}
           </div>
-        </
+        </div>
+
+        {/* Acquisition Fee */}
+        <div className="bg-slate-900 p-6 rounded-3xl mb-8">
+          <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
+          <div className="flex justify-between mb-4">
+            <button onClick={() => setUseBestCaseForFee(false)} className={`flex-1 py-3 rounded-l-2xl text-sm font-semibold ${!useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Average</button>
+            <button onClick={() => setUseBestCaseForFee(true)} className={`flex-1 py-3 rounded-r-2xl text-sm font-semibold ${useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Best Case</button>
+          </div>
+
+          <div className="bg-slate-800 rounded-2xl p-5 text-center mb-4">
+            <div className="text-slate-400 text-sm">Expected Profit</div>
+            <div className="text-4xl font-bold text-white">
+              ${((useBestCaseForFee ? evBest : evAvg) * betSize).toFixed(0)}
+            </div>
+          </div>
+
+          <div className="bg-slate-800 rounded-2xl p-5 text-center">
+            <div className="text-slate-400 text-sm">Recommended Scout Fee</div>
+            <div className="text-5xl font-black text-emerald-400">
+              ${(((useBestCaseForFee ? evBest : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(0)}
+            </div>
+            <div className="text-xs text-slate-400 mt-1">{scoutPercentage}% of expected profit</div>
+          </div>
+        </div>
+
+        {/* Walk-Away Advisor */}
+        <div className="bg-slate-900 p-6 rounded-3xl mb-8">
+          <div className="flex justify-between mb-4">
+            <h2 className="text-xl font-semibold text-cyan-400">Walk-Away Advisor</h2>
+            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-cyan-400">ℹ️</button>
+          </div>
+          <div className="h-72 bg-slate-950 rounded-2xl p-4 mb-6">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+          <div className="bg-slate-800 p-5 rounded-2xl text-center text-lg">
+            Recommended Walk-Away: <span className="text-emerald-400 font-bold">+{getRecommendedWalkAway()} bets</span>
+          </div>
+        </div>
+
+        <div className="text-center text-slate-500 text-sm mt-12">
+          Stack Up Pays • Blue Surfer Edition
+        </div>
+      </div>
+
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
+            <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
+            <div className="text-slate-300 leading-relaxed">
+              This version uses the exact RTP values you approved for every counter point.
+            </div>
+            <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default StackUpPays
