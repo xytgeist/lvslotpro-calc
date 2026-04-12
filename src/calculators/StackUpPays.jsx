@@ -46,11 +46,11 @@ const SPINS_PER_INCREMENT = {
 }
 
 function StackUpPays({ onBack }) {
-  // Meters - Mega at top
-  const [mega, setMega] = useState(265)
-  const [grand, setGrand] = useState(195)
-  const [major, setMajor] = useState(155)
-  const [minor, setMinor] = useState(125)
+  // Updated starting values = reset points after bonus
+  const [mega, setMega] = useState(250)
+  const [grand, setGrand] = useState(200)
+  const [major, setMajor] = useState(150)
+  const [minor, setMinor] = useState(100)
   const [mini, setMini] = useState(75)
 
   const [betSize, setBetSize] = useState(25)
@@ -73,7 +73,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Auto RTP based on denomination (same logic as other calculators)
+  // Auto RTP based on denomination (same as other calculators)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -110,7 +110,7 @@ function StackUpPays({ onBack }) {
       } else {
         // Still building - use distance to +EV counter
         const spinsToPlusEV = (m.pev - m.value) / m.spi
-        const meterEV = -houseEdge * spinsToPlusEV   // negative until we reach +EV counter
+        const meterEV = -houseEdge * spinsToPlusEV
         totalEV += meterEV
       }
 
@@ -125,7 +125,7 @@ function StackUpPays({ onBack }) {
     setEvAvg(totalEV)
     setEvBest(bestEV)
 
-    // Current RTP with smooth curve (updated for individual meters)
+    // Current RTP with smooth curve
     const combinedProgress = totalEquity / (210 + 100 + 60 + 20 + 7.5)
     const breakevenProgress = 0.68
 
@@ -145,7 +145,6 @@ function StackUpPays({ onBack }) {
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
-      // FP needed uses average case to reach breakeven (68 spins per expansion calibrated)
       setFpDollarsNeeded(Math.round(68 * bet))
     } else {
       setFpDollarsNeeded(0)
