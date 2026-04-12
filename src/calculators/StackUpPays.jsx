@@ -196,7 +196,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - restored original colored accents, removed white borders/outlines */}
+        {/* Meter Sliders - colored accents + NO white border */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
