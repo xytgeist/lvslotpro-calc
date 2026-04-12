@@ -197,7 +197,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - Blue Surfer Theme (removed white outlines) */}
+        {/* Meter Sliders - Blue Surfer Theme (colored accents preserved, white outlines removed) */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
@@ -217,7 +217,7 @@ function StackUpPays({ onBack }) {
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent} accent-opacity-100 appearance-none bg-slate-700 h-2 rounded-full outline-none focus:outline-none`}  // Removed white outlines + clean styling
+                className={`w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer ${m.accent} accent-opacity-100 outline-none focus:outline-none`} 
               />
             </div>
           ))}
