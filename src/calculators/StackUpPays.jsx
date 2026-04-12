@@ -196,14 +196,14 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - colored accents kept, white outlines removed */}
+        {/* Meter Sliders - colored accents + matching colored border instead of white */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
-            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
-            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400', min: 100 },
-            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400', min: 75 },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', border: 'focus:border-red-500', min: 250 },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', border: 'focus:border-orange-500', min: 200 },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', border: 'focus:border-purple-500', min: 150 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400', border: 'focus:border-green-500', min: 100 },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400', border: 'focus:border-blue-500', min: 75 },
           ].map((m, i) => (
             <div key={i}>
               <div className="flex justify-between mb-1.5">
@@ -216,7 +216,7 @@ function StackUpPays({ onBack }) {
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent} accent-opacity-100 outline-none focus:outline-none`}
+                className={`w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer ${m.accent} accent-opacity-100 outline-none ${m.border}`}
               />
             </div>
           ))}
