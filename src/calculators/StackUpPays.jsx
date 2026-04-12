@@ -196,7 +196,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - original style that works in Brave */}
+        {/* Meter Sliders - colored accents (Brave version) + number text now matches each bonus color */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
@@ -208,7 +208,7 @@ function StackUpPays({ onBack }) {
             <div key={i}>
               <div className="flex justify-between mb-1.5">
                 <div className={`font-semibold ${m.text}`}>{m.label}</div>
-                <div className="text-slate-300 font-mono text-lg font-bold">{m.value}</div>
+                <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>   {/* ← Number now matches meter color */}
               </div>
               <input
                 type="range"
