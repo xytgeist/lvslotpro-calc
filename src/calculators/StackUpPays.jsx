@@ -21,7 +21,7 @@ const MUST_HIT = {
   mini: 125,
 }
 
-const PLUS_EV = {
+const PLUS_EV = {   // These are the break-even / +EV counters
   mega: 330,
   grand: 238,
   major: 192,
@@ -46,12 +46,12 @@ const SPINS_PER_INCREMENT = {
 }
 
 function StackUpPays({ onBack }) {
-  // Updated starting values = reset points after bonus
-  const [mega, setMega] = useState(250)
-  const [grand, setGrand] = useState(200)
-  const [major, setMajor] = useState(150)
-  const [minor, setMinor] = useState(100)
-  const [mini, setMini] = useState(75)
+  // Defaults changed to the break-even (+EV) points as requested
+  const [mega, setMega] = useState(330)
+  const [grand, setGrand] = useState(238)
+  const [major, setMajor] = useState(192)
+  const [minor, setMinor] = useState(146)
+  const [mini, setMini] = useState(123)
 
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -103,29 +103,24 @@ function StackUpPays({ onBack }) {
 
     meterData.forEach(m => {
       if (m.value >= m.pev) {
-        // Already in +EV zone for this meter
         const spinsToHit = Math.max(0, (m.mhb - m.value) / m.spi)
         const meterEV = m.payout - houseEdge * spinsToHit
         totalEV += meterEV
       } else {
-        // Still building - use distance to +EV counter
         const spinsToPlusEV = (m.pev - m.value) / m.spi
         const meterEV = -houseEdge * spinsToPlusEV
         totalEV += meterEV
       }
 
-      // For smooth RTP curve & equity display
       const progress = Math.max(0, Math.min(1, (m.value - 0) / m.mhb))
       totalEquity += progress * m.payout
     })
 
-    // Best case = combo play multiplier (calibrated ~2.1x on strong combos)
     const bestEV = totalEV * 2.1
 
     setEvAvg(totalEV)
     setEvBest(bestEV)
 
-    // Current RTP with smooth curve
     const combinedProgress = totalEquity / (210 + 100 + 60 + 20 + 7.5)
     const breakevenProgress = 0.68
 
@@ -205,11 +200,11 @@ function StackUpPays({ onBack }) {
         {/* Meter Sliders - Blue Surfer Theme */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400' },
-            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400' },
-            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400' },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400' },
-            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400' },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400', min: 100 },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400', min: 75 },
           ].map((m, i) => (
             <div key={i}>
               <div className="flex justify-between mb-1.5">
@@ -218,7 +213,7 @@ function StackUpPays({ onBack }) {
               </div>
               <input
                 type="range"
-                min="0"
+                min={m.min}
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
