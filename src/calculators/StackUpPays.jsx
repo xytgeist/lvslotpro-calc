@@ -21,6 +21,30 @@ const MUST_HIT = {
   mini: 125,
 }
 
+const PLUS_EV = {
+  mega: 330,
+  grand: 238,
+  major: 192,
+  minor: 146,
+  mini: 123,
+}
+
+const AVG_PAYOUT = {
+  mega: 210,
+  grand: 100,
+  major: 60,
+  minor: 20,
+  mini: 7.5,
+}
+
+const SPINS_PER_INCREMENT = {
+  mega: 80,
+  grand: 67,
+  major: 50,
+  minor: 40,
+  mini: 25,
+}
+
 function StackUpPays({ onBack }) {
   // Meters - Mega at top
   const [mega, setMega] = useState(265)
@@ -49,7 +73,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Auto RTP based on denomination
+  // Auto RTP based on denomination (same logic as other calculators)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -65,30 +89,45 @@ function StackUpPays({ onBack }) {
     const oRTP = overallRTP / 100
     const houseEdge = 1 - oRTP
 
-    // Meter data for weighted equity
-    const meters = [
-      { value: mega,  mhb: MUST_HIT.mega,  payout: 210 },
-      { value: grand, mhb: MUST_HIT.grand, payout: 100 },
-      { value: major, mhb: MUST_HIT.major, payout: 60 },
-      { value: minor, mhb: MUST_HIT.minor, payout: 30 },
-      { value: mini,  mhb: MUST_HIT.mini,  payout: 20 }
+    // Individual meter EV calculation (Option A - locked parameters)
+    const meterData = [
+      { name: 'mega',  value: mega,  mhb: MUST_HIT.mega,  pev: PLUS_EV.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega },
+      { name: 'grand', value: grand, mhb: MUST_HIT.grand, pev: PLUS_EV.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand },
+      { name: 'major', value: major, mhb: MUST_HIT.major, pev: PLUS_EV.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major },
+      { name: 'minor', value: minor, mhb: MUST_HIT.minor, pev: PLUS_EV.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor },
+      { name: 'mini',  value: mini,  mhb: MUST_HIT.mini,  pev: PLUS_EV.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini },
     ]
 
+    let totalEV = 0
     let totalEquity = 0
-    meters.forEach(m => {
-      const progress = Math.max(0, m.value / m.mhb)
-      totalEquity += Math.pow(progress, 2.3) * m.payout   // 2.3 power weights high meters heavily
+
+    meterData.forEach(m => {
+      if (m.value >= m.pev) {
+        // Already in +EV zone for this meter
+        const spinsToHit = Math.max(0, (m.mhb - m.value) / m.spi)
+        const meterEV = m.payout - houseEdge * spinsToHit
+        totalEV += meterEV
+      } else {
+        // Still building - use distance to +EV counter
+        const spinsToPlusEV = (m.pev - m.value) / m.spi
+        const meterEV = -houseEdge * spinsToPlusEV   // negative until we reach +EV counter
+        totalEV += meterEV
+      }
+
+      // For smooth RTP curve & equity display
+      const progress = Math.max(0, Math.min(1, (m.value - 0) / m.mhb))
+      totalEquity += progress * m.payout
     })
 
-    const avgEV = (totalEquity / 68) - houseEdge          // 68 = calibrated spins per expansion
-    const bestEV = (totalEquity * 2.1 / 68) - houseEdge   // Best-case combo multiplier
+    // Best case = combo play multiplier (calibrated ~2.1x on strong combos)
+    const bestEV = totalEV * 2.1
 
-    setEvAvg(avgEV)
+    setEvAvg(totalEV)
     setEvBest(bestEV)
 
-    // Current RTP with smooth curve
+    // Current RTP with smooth curve (updated for individual meters)
+    const combinedProgress = totalEquity / (210 + 100 + 60 + 20 + 7.5)
     const breakevenProgress = 0.68
-    const combinedProgress = totalEquity / (210 + 100 + 60 + 30 + 20)
 
     let finalRTP
     if (combinedProgress >= breakevenProgress) {
@@ -102,10 +141,11 @@ function StackUpPays({ onBack }) {
 
     setCurrentRTP(Math.round(finalRTP * 10) / 10)
 
-    const alreadyPositive = avgEV >= 0
+    const alreadyPositive = totalEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
+      // FP needed uses average case to reach breakeven (68 spins per expansion calibrated)
       setFpDollarsNeeded(Math.round(68 * bet))
     } else {
       setFpDollarsNeeded(0)
@@ -163,7 +203,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders */}
+        {/* Meter Sliders - Blue Surfer Theme */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400' },
@@ -273,7 +313,7 @@ function StackUpPays({ onBack }) {
               <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
             </div>
             <div className="bg-slate-800 p-5 rounded-2xl">
-              <div className="text-slate-400 text-sm">Best Case</div>
+              <div className="text-slate-400 text-sm">Best Case (Combo)</div>
               <div className={`text-4xl font-bold ${evBest >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evBest.toFixed(1)}×</div>
               <div className="text-sm text-slate-300">${(evBest * betSize).toFixed(0)}</div>
             </div>
@@ -333,7 +373,8 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              This tool evaluates when multiple Stack Up meters are close to hitting. The walk-away advisor uses combined meter progress to recommend a safe profit target.
+              This tool evaluates when multiple Stack Up meters are close to hitting using individual increment rates per meter (Option A). 
+              Total EV is the sum of the five separate meter EVs, correctly rewarding strong combo plays.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
