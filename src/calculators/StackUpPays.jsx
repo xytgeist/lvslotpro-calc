@@ -73,7 +73,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Auto RTP based on denomination (same as other calculators)
+  // Auto RTP based on denomination
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -89,7 +89,6 @@ function StackUpPays({ onBack }) {
     const oRTP = overallRTP / 100
     const houseEdge = 1 - oRTP
 
-    // Individual meter EV calculation (Option A - locked parameters)
     const meterData = [
       { name: 'mega',  value: mega,  mhb: MUST_HIT.mega,  pev: PLUS_EV.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega },
       { name: 'grand', value: grand, mhb: MUST_HIT.grand, pev: PLUS_EV.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand },
@@ -197,7 +196,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - Blue Surfer Theme (colored accents preserved, white outlines removed) */}
+        {/* Meter Sliders - colored accents kept, white outlines removed */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
@@ -217,7 +216,7 @@ function StackUpPays({ onBack }) {
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer ${m.accent} accent-opacity-100 outline-none focus:outline-none`} 
+                className={`w-full ${m.accent} accent-opacity-100 outline-none focus:outline-none`}
               />
             </div>
           ))}
