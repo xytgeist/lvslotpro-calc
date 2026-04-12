@@ -21,7 +21,7 @@ const MUST_HIT = {
   mini: 125,
 }
 
-const PLUS_EV = {   // These are the break-even / +EV counters
+const PLUS_EV = {
   mega: 330,
   grand: 238,
   major: 192,
@@ -46,7 +46,7 @@ const SPINS_PER_INCREMENT = {
 }
 
 function StackUpPays({ onBack }) {
-  // Defaults changed to the break-even (+EV) points as requested
+  // Defaults set to the break-even (+EV) points
   const [mega, setMega] = useState(330)
   const [grand, setGrand] = useState(238)
   const [major, setMajor] = useState(192)
@@ -197,7 +197,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - Blue Surfer Theme */}
+        {/* Meter Sliders - Blue Surfer Theme (removed white outlines) */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
@@ -217,7 +217,7 @@ function StackUpPays({ onBack }) {
                 max={MUST_HIT[m.label.toLowerCase()]}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent} accent-opacity-100`}
+                className={`w-full ${m.accent} accent-opacity-100 appearance-none bg-slate-700 h-2 rounded-full outline-none focus:outline-none`}  // Removed white outlines + clean styling
               />
             </div>
           ))}
