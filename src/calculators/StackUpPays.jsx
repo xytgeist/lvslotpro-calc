@@ -185,8 +185,8 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Meters - Even tighter spacing */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-3">   {/* Reduced from space-y-4 to space-y-3 */}
+        {/* Meters - Further tightened spacing */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-2.5">   {/* Tightened from space-y-3 to space-y-2.5 */}
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
             { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
@@ -195,7 +195,7 @@ function StackUpPays({ onBack }) {
             { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
           ].map((m, i) => (
             <div key={i}>
-              <div className="flex justify-between mb-0.5">   {/* Tightened even more */}
+              <div className="flex justify-between mb-0.5">   {/* Even tighter label spacing */}
                 <div className={`font-semibold ${m.text}`}>{m.label}</div>
                 <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
               </div>
