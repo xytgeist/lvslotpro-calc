@@ -76,6 +76,7 @@ function StackUpPays({ onBack }) {
 
   const [showInfoModal, setShowInfoModal] = useState(false)
 
+  // Auto RTP based on denomination
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -98,15 +99,16 @@ function StackUpPays({ onBack }) {
     const baseRTP = overallRTP / 100
 
     const meterData = [
-      { label: 'Mega', counter: mega, mustHit: MUST_HIT.mega, payout: AVG_PAYOUT.mega, spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250, mid: MIDPOINT.mega },
+      { label: 'Mega',  counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250, mid: MIDPOINT.mega },
       { label: 'Grand', counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, plusEV: PLUS_EV.grand, reset: 200, mid: MIDPOINT.grand },
       { label: 'Major', counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, plusEV: PLUS_EV.major, reset: 150, mid: MIDPOINT.major },
       { label: 'Minor', counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, plusEV: PLUS_EV.minor, reset: 100, mid: MIDPOINT.minor },
-      { label: 'Mini', counter: mini, mustHit: MUST_HIT.mini, payout: AVG_PAYOUT.mini, spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75, mid: MIDPOINT.mini },
+      { label: 'Mini',  counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75,  mid: MIDPOINT.mini },
     ]
 
     let sumExtras = 0
-    let totalEV = 0   // raw sum of individual meter EVs
+    let totalEV = 0                     // used for overall +EV check and Best Case
+    let meterEVs = []                   // individual EVs for each meter
 
     meterData.forEach(m => {
       let meterRTP
@@ -125,17 +127,21 @@ function StackUpPays({ onBack }) {
       const extra = meterRTP - (baseRTP * 100)
       sumExtras += extra
 
+      // Individual meter EV
       const spinsRem = (m.mustHit - m.counter) * m.spi
       const meterEV = m.payout - (1 - baseRTP) * spinsRem
+
       totalEV += meterEV
+      meterEVs.push(meterEV)
     })
 
     let combinedRTP = (baseRTP * 100) + sumExtras
     const displayedRTP = Math.max(78, combinedRTP)
 
-    // FIXED Average Case: apply realistic combo weighting
-    const avgComboFactor = 1.35
-    const averageEV = totalEV * avgComboFactor
+    // NEW LOGIC: Average Case = the SINGLE strongest meter (the one we actually chase)
+    const averageEV = Math.max(...meterEVs)
+
+    // Best Case remains the full-combo potential
     const bestEV = totalEV * 2.1
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
@@ -244,7 +250,7 @@ function StackUpPays({ onBack }) {
           ))}
         </div>
 
-        {/* Advanced */}
+        {/* Advanced Settings */}
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800">
             <span className="font-semibold">Advanced Settings</span>
@@ -260,7 +266,7 @@ function StackUpPays({ onBack }) {
           )}
         </div>
 
-        {/* Current EV - Updated Average Case */}
+        {/* Current EV */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-semibold text-cyan-400">Current EV</h2>
@@ -330,13 +336,14 @@ function StackUpPays({ onBack }) {
         </div>
       </div>
 
+      {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Average Case now uses a realistic 1.35× combo weighting.<br/><br/>
-              Overall RTP is floored at 78%.
+              Average Case now shows the EV of the single strongest meter (the one you will actually chase until it hits).<br/><br/>
+              You only sit when the machine is overall +EV, then you play only until that best meter pays.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
