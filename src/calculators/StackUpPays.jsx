@@ -179,10 +179,14 @@ function StackUpPays({ onBack }) {
       totalEV += meterEV
     })
 
-    const combinedRTP = (baseRTP * 100) + sumExtras
+    let combinedRTP = (baseRTP * 100) + sumExtras
+
+    // NEW: Floor the displayed RTP at 78%
+    const displayedRTP = Math.max(78, combinedRTP)
+
     const bestEV = totalEV * 2.1   // Combo multiplier for best-case
 
-    setCurrentRTP(Math.round(combinedRTP * 10) / 10)
+    setCurrentRTP(Math.round(displayedRTP * 10) / 10)
     setEvAvg(totalEV)
     setEvBest(bestEV)
 
@@ -190,7 +194,7 @@ function StackUpPays({ onBack }) {
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
-      setFpDollarsNeeded(Math.round(68 * bet))   // ~combined any-increment rate
+      setFpDollarsNeeded(Math.round(68 * bet))
     } else {
       setFpDollarsNeeded(0)
     }
@@ -435,7 +439,7 @@ function StackUpPays({ onBack }) {
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
               This tool uses individual meter EV calculations (Option A) so combo plays are properly rewarded.<br/><br/>
-              Overall RTP correctly adds each meter's extra contribution while anchoring at your tested midpoints.
+              Overall RTP is now floored at 78% (even if the raw calculation goes lower).
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
