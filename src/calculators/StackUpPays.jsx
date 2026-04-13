@@ -53,9 +53,9 @@ function StackUpPays({ onBack }) {
   const [mini, setMini] = useState(100)
 
   const [betSize, setBetSize] = useState(25)
-  const [denom, setDenom] = useState(1.00)
+  const [denom, setDenom] = useState(0.10)   // Changed default to 10¢ as requested
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [overallRTP, setOverallRTP] = useState(89)   // Default is now 89%
+  const [overallRTP, setOverallRTP] = useState(89)
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
@@ -72,7 +72,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Use the value from Advanced Settings as the base
+  // Auto base RTP from denomination + Advanced Settings
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -92,7 +92,7 @@ function StackUpPays({ onBack }) {
 
   const calculate = () => {
     const bet = Number(betSize) || 25
-    const baseRTP = overallRTP / 100   // This is now correctly used from Advanced Settings
+    const baseRTP = overallRTP / 100
 
     const meterData = [
       { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250 },
@@ -230,14 +230,23 @@ function StackUpPays({ onBack }) {
           </div>
           <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
-            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
-              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
+            <select 
+              value={denom} 
+              onChange={(e) => setDenom(parseFloat(e.target.value))} 
+              className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
+            >
+              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                <option key={d} value={d}>${d}</option>
+              ))}
             </select>
           </div>
         </div>
 
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
-          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800">
+          <button 
+            onClick={() => setShowAdvanced(!showAdvanced)} 
+            className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800"
+          >
             <span className="font-semibold">Advanced Settings</span>
             <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
@@ -255,8 +264,18 @@ function StackUpPays({ onBack }) {
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Max Major Bonus</label>
                 <div className="flex gap-3">
-                  <button onClick={() => setMaxMajor(false)} className={`flex-1 py-3 rounded-2xl ${!maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>No</button>
-                  <button onClick={() => setMaxMajor(true)} className={`flex-1 py-3 rounded-2xl ${maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Yes (+0.5%)</button>
+                  <button 
+                    onClick={() => setMaxMajor(false)} 
+                    className={`flex-1 py-3 rounded-2xl ${!maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    No
+                  </button>
+                  <button 
+                    onClick={() => setMaxMajor(true)} 
+                    className={`flex-1 py-3 rounded-2xl ${maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    Yes (+0.5%)
+                  </button>
                 </div>
               </div>
             </div>
