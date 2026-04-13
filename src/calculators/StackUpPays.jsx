@@ -45,6 +45,14 @@ const SPINS_PER_INCREMENT = {
   mini: 25,
 }
 
+const MIDPOINT = {   // exact counters you test as "midpoint"
+  mega: 300,
+  grand: 225,
+  major: 175,
+  minor: 125,
+  mini: 100,
+}
+
 function StackUpPays({ onBack }) {
   const [mega, setMega] = useState(300)
   const [grand, setGrand] = useState(225)
@@ -94,11 +102,11 @@ function StackUpPays({ onBack }) {
     const baseRTP = overallRTP / 100
 
     const meterData = [
-      { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250 },
-      { counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, plusEV: PLUS_EV.grand, reset: 200 },
-      { counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, plusEV: PLUS_EV.major, reset: 150 },
-      { counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, plusEV: PLUS_EV.minor, reset: 100 },
-      { counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75 },
+      { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250, mid: MIDPOINT.mega },
+      { counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, plusEV: PLUS_EV.grand, reset: 200, mid: MIDPOINT.grand },
+      { counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, plusEV: PLUS_EV.major, reset: 150, mid: MIDPOINT.major },
+      { counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, plusEV: PLUS_EV.minor, reset: 100, mid: MIDPOINT.minor },
+      { counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75,  mid: MIDPOINT.mini },
     ]
 
     let sumExtras = 0
@@ -111,13 +119,13 @@ function StackUpPays({ onBack }) {
         meterRTP = getMeterRTP(m.counter, m.mustHit, m.payout, m.spi, baseRTP)
       } else {
         const plusEV_RTP = getMeterRTP(m.plusEV, m.mustHit, m.payout, m.spi, baseRTP)
-        const reset_RTP = 2 * (baseRTP * 100) - plusEV_RTP
+        const p_mid = (m.mid - m.reset) / (m.plusEV - m.reset)
+        const midRTP = baseRTP * 100
+        const reset_RTP = (midRTP - p_mid * plusEV_RTP) / (1 - p_mid)
         const progress = (m.counter - m.reset) / (m.plusEV - m.reset)
         meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
       }
 
-      // Each meter RTP already contains baseRTP + its own extra
-      // So we extract the extra and add it only once
       const extra = meterRTP - (baseRTP * 100)
       sumExtras += extra
 
@@ -126,7 +134,6 @@ function StackUpPays({ onBack }) {
       totalEV += meterEV
     })
 
-    // CORRECT overall RTP = base + all extras (not averaged)
     const combinedRTP = (baseRTP * 100) + sumExtras
     const bestEV = totalEV * 2.1
 
@@ -357,7 +364,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Overall RTP now correctly adds each meter's extra contribution (base + sum of all extras).
+              Overall RTP now correctly adds each meter's extra contribution (base + sum of all extras) while forcing exact base RTP at your tested midpoints.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
