@@ -27,9 +27,9 @@ const AVG_PAYOUT = {
 const SPINS_PER_INCREMENT = {
   mega: 95,
   grand: 72,
-  major: 64,     // Updated to 64
+  major: 64,
   minor: 45,
-  mini: 35,      // Updated to 35
+  mini: 35,
 }
 
 const MIDPOINT = {
@@ -185,8 +185,8 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Meters - Tight spacing */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
+        {/* Meters - Even tighter spacing */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-3">   {/* Reduced from space-y-4 to space-y-3 */}
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
             { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
@@ -195,7 +195,7 @@ function StackUpPays({ onBack }) {
             { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
           ].map((m, i) => (
             <div key={i}>
-              <div className="flex justify-between mb-1">
+              <div className="flex justify-between mb-0.5">   {/* Tightened even more */}
                 <div className={`font-semibold ${m.text}`}>{m.label}</div>
                 <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
               </div>
@@ -286,13 +286,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Average Case shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.<br/><br/>
-              Current spins per increment:<br/>
-              • Mega: 95<br/>
-              • Grand: 72<br/>
-              • Major: 64<br/>
-              • Minor: 45<br/>
-              • Mini: 35
+              Average Case shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
