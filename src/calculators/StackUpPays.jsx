@@ -65,14 +65,13 @@ function StackUpPays({ onBack }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(89)
 
-  const [evAvg, setEvAvg] = useState(0)
-  const [evBest, setEvBest] = useState(0)
+  const [evAvg, setEvAvg] = useState(0)           // Now the ONLY EV shown (strongest meter)
   const [currentRTP, setCurrentRTP] = useState(89)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
-  const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
+  const [useBestCaseForFee, setUseBestCaseForFee] = useState(true) // still kept for now, defaults to Average
 
   const [showInfoModal, setShowInfoModal] = useState(false)
 
@@ -107,8 +106,8 @@ function StackUpPays({ onBack }) {
     ]
 
     let sumExtras = 0
-    let totalEV = 0                     // used for overall +EV check and Best Case
-    let meterEVs = []                   // individual EVs for each meter
+    let totalEV = 0                     // still used for overall +EV check
+    let meterEVs = []                   // for finding the strongest meter
 
     meterData.forEach(m => {
       let meterRTP
@@ -127,7 +126,6 @@ function StackUpPays({ onBack }) {
       const extra = meterRTP - (baseRTP * 100)
       sumExtras += extra
 
-      // Individual meter EV
       const spinsRem = (m.mustHit - m.counter) * m.spi
       const meterEV = m.payout - (1 - baseRTP) * spinsRem
 
@@ -138,15 +136,11 @@ function StackUpPays({ onBack }) {
     let combinedRTP = (baseRTP * 100) + sumExtras
     const displayedRTP = Math.max(78, combinedRTP)
 
-    // NEW LOGIC: Average Case = the SINGLE strongest meter (the one we actually chase)
+    // Average Case = EV of the SINGLE strongest meter (the one we actually chase)
     const averageEV = Math.max(...meterEVs)
-
-    // Best Case remains the full-combo potential
-    const bestEV = totalEV * 2.1
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
     setEvAvg(averageEV)
-    setEvBest(bestEV)
 
     const alreadyPositive = averageEV >= 0
     setIsAlreadyPositive(alreadyPositive)
@@ -266,7 +260,7 @@ function StackUpPays({ onBack }) {
           )}
         </div>
 
-        {/* Current EV */}
+        {/* Current EV - Best Case removed */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-semibold text-cyan-400">Current EV</h2>
@@ -275,17 +269,10 @@ function StackUpPays({ onBack }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-800 p-5 rounded-2xl">
-              <div className="text-slate-400 text-sm">Average Case</div>
-              <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
-              <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
-            </div>
-            <div className="bg-slate-800 p-5 rounded-2xl">
-              <div className="text-slate-400 text-sm">Best Case (Combo)</div>
-              <div className={`text-4xl font-bold ${evBest >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evBest.toFixed(1)}×</div>
-              <div className="text-sm text-slate-300">${(evBest * betSize).toFixed(0)}</div>
-            </div>
+          <div className="bg-slate-800 p-5 rounded-2xl">
+            <div className="text-slate-400 text-sm">Average Case (Strongest Meter)</div>
+            <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
+            <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
           </div>
 
           <div className={`mt-6 p-4 rounded-2xl text-center font-bold ${isAlreadyPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
@@ -293,25 +280,21 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Acquisition Fee */}
+        {/* Acquisition Fee - Now only uses Average Case */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
-          <div className="flex justify-between mb-4">
-            <button onClick={() => setUseBestCaseForFee(false)} className={`flex-1 py-3 rounded-l-2xl text-sm font-semibold ${!useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Average</button>
-            <button onClick={() => setUseBestCaseForFee(true)} className={`flex-1 py-3 rounded-r-2xl text-sm font-semibold ${useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Best Case</button>
-          </div>
-
+          
           <div className="bg-slate-800 rounded-2xl p-5 text-center mb-4">
-            <div className="text-slate-400 text-sm">Expected Profit</div>
+            <div className="text-slate-400 text-sm">Expected Profit (Strongest Meter)</div>
             <div className="text-4xl font-bold text-white">
-              ${((useBestCaseForFee ? evBest : evAvg) * betSize).toFixed(0)}
+              ${(evAvg * betSize).toFixed(0)}
             </div>
           </div>
 
           <div className="bg-slate-800 rounded-2xl p-5 text-center">
             <div className="text-slate-400 text-sm">Recommended Scout Fee</div>
             <div className="text-5xl font-black text-emerald-400">
-              ${(((useBestCaseForFee ? evBest : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(0)}
+              ${((evAvg * betSize) * (scoutPercentage / 100)).toFixed(0)}
             </div>
             <div className="text-xs text-slate-400 mt-1">{scoutPercentage}% of expected profit</div>
           </div>
@@ -342,8 +325,8 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Average Case now shows the EV of the single strongest meter (the one you will actually chase until it hits).<br/><br/>
-              You only sit when the machine is overall +EV, then you play only until that best meter pays.
+              Average Case now shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.<br/><br/>
+              Best Case has been removed as requested.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
