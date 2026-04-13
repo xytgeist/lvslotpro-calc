@@ -54,7 +54,6 @@ const MIDPOINT = {
 }
 
 function StackUpPays({ onBack }) {
-  // Meters - Mega at top (locked starting points = midpoints)
   const [mega, setMega] = useState(300)
   const [grand, setGrand] = useState(225)
   const [major, setMajor] = useState(175)
@@ -77,7 +76,6 @@ function StackUpPays({ onBack }) {
 
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Auto RTP based on denomination (Blue Surfer theme)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -100,60 +98,15 @@ function StackUpPays({ onBack }) {
     const baseRTP = overallRTP / 100
 
     const meterData = [
-      { 
-        label: 'Mega', 
-        counter: mega,  
-        mustHit: MUST_HIT.mega,  
-        payout: AVG_PAYOUT.mega,  
-        spi: SPINS_PER_INCREMENT.mega, 
-        plusEV: PLUS_EV.mega, 
-        reset: 250, 
-        mid: MIDPOINT.mega 
-      },
-      { 
-        label: 'Grand', 
-        counter: grand, 
-        mustHit: MUST_HIT.grand, 
-        payout: AVG_PAYOUT.grand, 
-        spi: SPINS_PER_INCREMENT.grand, 
-        plusEV: PLUS_EV.grand, 
-        reset: 200, 
-        mid: MIDPOINT.grand 
-      },
-      { 
-        label: 'Major', 
-        counter: major, 
-        mustHit: MUST_HIT.major, 
-        payout: AVG_PAYOUT.major, 
-        spi: SPINS_PER_INCREMENT.major, 
-        plusEV: PLUS_EV.major, 
-        reset: 150, 
-        mid: MIDPOINT.major 
-      },
-      { 
-        label: 'Minor', 
-        counter: minor, 
-        mustHit: MUST_HIT.minor, 
-        payout: AVG_PAYOUT.minor, 
-        spi: SPINS_PER_INCREMENT.minor, 
-        plusEV: PLUS_EV.minor, 
-        reset: 100, 
-        mid: MIDPOINT.minor 
-      },
-      { 
-        label: 'Mini',  
-        counter: mini,  
-        mustHit: MUST_HIT.mini,  
-        payout: AVG_PAYOUT.mini,  
-        spi: SPINS_PER_INCREMENT.mini, 
-        plusEV: PLUS_EV.mini, 
-        reset: 75,  
-        mid: MIDPOINT.mini 
-      },
+      { label: 'Mega', counter: mega, mustHit: MUST_HIT.mega, payout: AVG_PAYOUT.mega, spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250, mid: MIDPOINT.mega },
+      { label: 'Grand', counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, plusEV: PLUS_EV.grand, reset: 200, mid: MIDPOINT.grand },
+      { label: 'Major', counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, plusEV: PLUS_EV.major, reset: 150, mid: MIDPOINT.major },
+      { label: 'Minor', counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, plusEV: PLUS_EV.minor, reset: 100, mid: MIDPOINT.minor },
+      { label: 'Mini', counter: mini, mustHit: MUST_HIT.mini, payout: AVG_PAYOUT.mini, spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75, mid: MIDPOINT.mini },
     ]
 
     let sumExtras = 0
-    let totalEV = 0
+    let totalEV = 0   // raw sum of individual meter EVs
 
     meterData.forEach(m => {
       let meterRTP
@@ -172,24 +125,24 @@ function StackUpPays({ onBack }) {
       const extra = meterRTP - (baseRTP * 100)
       sumExtras += extra
 
-      // Individual meter EV (Option A - rewards combo plays correctly)
       const spinsRem = (m.mustHit - m.counter) * m.spi
       const meterEV = m.payout - (1 - baseRTP) * spinsRem
       totalEV += meterEV
     })
 
     let combinedRTP = (baseRTP * 100) + sumExtras
-
-    // Floor the displayed RTP at 78%
     const displayedRTP = Math.max(78, combinedRTP)
 
+    // FIXED Average Case: apply realistic combo weighting
+    const avgComboFactor = 1.35
+    const averageEV = totalEV * avgComboFactor
     const bestEV = totalEV * 2.1
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
-    setEvAvg(totalEV)
+    setEvAvg(averageEV)
     setEvBest(bestEV)
 
-    const alreadyPositive = totalEV >= 0
+    const alreadyPositive = averageEV >= 0
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
@@ -228,24 +181,17 @@ function StackUpPays({ onBack }) {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-      x: { 
-        title: { display: true, text: 'Meter Progress', color: '#d1d5db' }, 
-        ticks: { color: '#d1d5db' } 
-      },
-      y: { 
-        title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, 
-        ticks: { color: '#d1d5db' }, 
-        min: 0 
-      }
+      x: { title: { display: true, text: 'Meter Progress', color: '#d1d5db' }, ticks: { color: '#d1d5db' } },
+      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, ticks: { color: '#d1d5db' }, min: 0 }
     },
     plugins: { legend: { display: false } }
   }
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-10">   {/* Increased top padding from pt-6 to pt-10 for more breathing room */}
+      <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title - Blue Surfer Theme */}
+        {/* Title */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
             🌊
@@ -258,7 +204,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Bet Size + Denomination - At the top */}
+        {/* Bet + Denom */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
@@ -273,50 +219,34 @@ function StackUpPays({ onBack }) {
           </div>
           <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
-            <select 
-              value={denom} 
-              onChange={(e) => setDenom(parseFloat(e.target.value))} 
-              className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
-            >
-              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
-                <option key={d} value={d}>${d}</option>
-              ))}
+            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
+              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
             </select>
           </div>
         </div>
 
-        {/* Meter Sliders */}
+        {/* Meters */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
+            { label: 'Mega', value: mega, setter: setMega, accent: 'accent-red-500', text: 'text-red-400', min: 250 },
             { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
             { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: 100 },
-            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500', text: 'text-green-400', min: 100 },
+            { label: 'Mini', value: mini, setter: setMini, accent: 'accent-blue-500', text: 'text-blue-400', min: 75 },
           ].map((m, i) => (
             <div key={i}>
               <div className="flex justify-between mb-1.5">
                 <div className={`font-semibold ${m.text}`}>{m.label}</div>
                 <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
               </div>
-              <input
-                type="range"
-                min={m.min}
-                max={MUST_HIT[m.label.toLowerCase()]}
-                value={m.value}
-                onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent}`}
-              />
+              <input type="range" min={m.min} max={MUST_HIT[m.label.toLowerCase()]} value={m.value} onChange={(e) => m.setter(Number(e.target.value))} className={`w-full ${m.accent}`} />
             </div>
           ))}
         </div>
 
-        {/* Advanced Settings */}
+        {/* Advanced */}
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
-          <button 
-            onClick={() => setShowAdvanced(!showAdvanced)} 
-            className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800"
-          >
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800">
             <span className="font-semibold">Advanced Settings</span>
             <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
@@ -324,18 +254,13 @@ function StackUpPays({ onBack }) {
             <div className="p-5 pt-0 space-y-6 border-t border-slate-800">
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Overall RTP (%)</label>
-                <input 
-                  type="text" 
-                  value={overallRTP} 
-                  onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
-                  className="w-full p-4 bg-slate-800 rounded-2xl text-center" 
-                />
+                <input type="text" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} className="w-full p-4 bg-slate-800 rounded-2xl text-center" />
               </div>
             </div>
           )}
         </div>
 
-        {/* Current EV */}
+        {/* Current EV - Updated Average Case */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-semibold text-cyan-400">Current EV</h2>
@@ -362,22 +287,12 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Acquisition Fee Calculator */}
+        {/* Acquisition Fee */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
           <div className="flex justify-between mb-4">
-            <button 
-              onClick={() => setUseBestCaseForFee(false)} 
-              className={`flex-1 py-3 rounded-l-2xl text-sm font-semibold ${!useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
-            >
-              Average
-            </button>
-            <button 
-              onClick={() => setUseBestCaseForFee(true)} 
-              className={`flex-1 py-3 rounded-r-2xl text-sm font-semibold ${useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
-            >
-              Best Case
-            </button>
+            <button onClick={() => setUseBestCaseForFee(false)} className={`flex-1 py-3 rounded-l-2xl text-sm font-semibold ${!useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Average</button>
+            <button onClick={() => setUseBestCaseForFee(true)} className={`flex-1 py-3 rounded-r-2xl text-sm font-semibold ${useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Best Case</button>
           </div>
 
           <div className="bg-slate-800 rounded-2xl p-5 text-center mb-4">
@@ -415,14 +330,13 @@ function StackUpPays({ onBack }) {
         </div>
       </div>
 
-      {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              This tool uses individual meter EV calculations (Option A) so combo plays are properly rewarded.<br/><br/>
-              Overall RTP is now floored at 78% (even if the raw calculation goes lower).
+              Average Case now uses a realistic 1.35× combo weighting.<br/><br/>
+              Overall RTP is floored at 78%.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
