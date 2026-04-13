@@ -55,7 +55,7 @@ function StackUpPays({ onBack }) {
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [overallRTP, setOverallRTP] = useState(89)
+  const [overallRTP, setOverallRTP] = useState(89)   // ← Default changed to 89%
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
@@ -72,7 +72,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Use the value from Advanced Settings as base
+  // Use Advanced Settings value as base
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -92,7 +92,7 @@ function StackUpPays({ onBack }) {
 
   const calculate = () => {
     const bet = Number(betSize) || 25
-    const baseRTP = overallRTP / 100   // ← This is now correctly used
+    const baseRTP = overallRTP / 100
 
     const meterData = [
       { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250 },
@@ -335,7 +335,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              The Overall RTP now correctly uses the value you set in Advanced Settings.
+              The Overall RTP now correctly uses the value from Advanced Settings.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
