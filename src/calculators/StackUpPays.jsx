@@ -191,7 +191,7 @@ function StackUpPays({ onBack }) {
       <div className="max-w-lg mx-auto px-4 pt-6">
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
-            🌊
+            ðŸŒŠ
           </div>
           <h1
             className="text-[27px] font-black tracking-[-1px] text-cyan-100"
@@ -258,7 +258,7 @@ function StackUpPays({ onBack }) {
             className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800"
           >
             <span className="font-semibold">Advanced Settings</span>
-            <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
+            <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>â–¼</span>
           </button>
           {showAdvanced && (
             <div className="p-5 pt-0 space-y-6 border-t border-slate-800">
@@ -303,18 +303,18 @@ function StackUpPays({ onBack }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-slate-800 p-5 rounded-2xl">
               <div className="text-slate-400 text-sm">Average Case</div>
-              <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
+              <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}Ã—</div>
               <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
             </div>
             <div className="bg-slate-800 p-5 rounded-2xl">
               <div className="text-slate-400 text-sm">Best Case (Combo)</div>
-              <div className={`text-4xl font-bold ${evBest >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evBest.toFixed(1)}×</div>
+              <div className={`text-4xl font-bold ${evBest >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evBest.toFixed(1)}Ã—</div>
               <div className="text-sm text-slate-300">${(evBest * betSize).toFixed(0)}</div>
             </div>
           </div>
 
           <div className={`mt-6 p-4 rounded-2xl text-center font-bold ${isAlreadyPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
-            {isAlreadyPositive ? '✅ PLAY — Strong +EV' : '❌ Still -EV — Keep Waiting'}
+            {isAlreadyPositive ? 'âœ… PLAY â€” Strong +EV' : 'âŒ Still -EV â€” Keep Waiting'}
           </div>
         </div>
 
@@ -344,7 +344,7 @@ function StackUpPays({ onBack }) {
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold text-cyan-400">Walk-Away Advisor</h2>
-            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-cyan-400">ℹ️</button>
+            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-cyan-400">â„¹ï¸</button>
           </div>
           <div className="h-72 bg-slate-950 rounded-2xl p-4 mb-6">
             <Line data={chartData} options={chartOptions} />
@@ -355,7 +355,7 @@ function StackUpPays({ onBack }) {
         </div>
 
         <div className="text-center text-slate-500 text-sm mt-12">
-          Stack Up Pays • Blue Surfer Edition
+          Stack Up Pays â€¢ Blue Surfer Edition
         </div>
       </div>
 
