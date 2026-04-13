@@ -116,11 +116,8 @@ function StackUpPays({ onBack }) {
         const plusEV_RTP = getMeterRTP(m.plusEV, m.mustHit, m.payout, m.spi, baseRTP)
         const p_mid = (m.mid - m.reset) / (m.plusEV - m.reset)
         const midRTP = baseRTP * 100
-
-        // Fixed reset RTP calculation with realistic bounds
         let reset_RTP = (midRTP - p_mid * plusEV_RTP) / (1 - p_mid)
-        reset_RTP = Math.max(78, Math.min(88, reset_RTP))   // realistic floor/ceiling
-
+        reset_RTP = Math.max(78, reset_RTP)
         const progress = (m.counter - m.reset) / (m.plusEV - m.reset)
         meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
       }
@@ -133,7 +130,13 @@ function StackUpPays({ onBack }) {
       totalEV += meterEV
     })
 
-    const combinedRTP = (baseRTP * 100) + sumExtras
+    let combinedRTP = (baseRTP * 100) + sumExtras
+
+    // FINAL SAFETY: lock the displayed overall RTP at minimum 78%
+    if (combinedRTP < 78) {
+      combinedRTP = 78
+    }
+
     const bestEV = totalEV * 2.1
 
     setCurrentRTP(Math.round(combinedRTP * 10) / 10)
@@ -363,7 +366,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Low-end curve fixed so reset values stay realistic (~78-88%). Mega at 330 + others at reset should now give sensible overall RTP.
+              Overall RTP is now calculated exactly as before, but the displayed value is hard-locked at a minimum of 78%.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
