@@ -65,7 +65,6 @@ function StackUpPays({ onBack }) {
   const [denom, setDenom] = useState(0.10)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(89)
-  const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
   const [evBest, setEvBest] = useState(0)
@@ -86,8 +85,8 @@ function StackUpPays({ onBack }) {
     else if (denom === 0.10) base = 89
     else if (denom === 0.25) base = 90
     else if (denom >= 0.50) base = 92
-    setOverallRTP(maxMajor ? base + 0.5 : base)
-  }, [denom, maxMajor])
+    setOverallRTP(base)   // Removed Max Major logic
+  }, [denom])
 
   const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
     const spinsRemaining = Math.max(0.001, (mustHit - counter) * spi)
@@ -181,7 +180,7 @@ function StackUpPays({ onBack }) {
 
     let combinedRTP = (baseRTP * 100) + sumExtras
 
-    // NEW: Floor the displayed RTP at 78%
+    // Floor the displayed RTP at 78%
     const displayedRTP = Math.max(78, combinedRTP)
 
     const bestEV = totalEV * 2.1   // Combo multiplier for best-case
@@ -202,7 +201,7 @@ function StackUpPays({ onBack }) {
 
   useEffect(() => {
     calculate()
-  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP, maxMajor])
+  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP])
 
   const getRecommendedWalkAway = () => {
     const meters = [mini, minor, major, grand, mega]
@@ -258,33 +257,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Meter Sliders - Color matched + locked mins */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
-          {[
-            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
-            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
-            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: 100 },
-            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
-          ].map((m, i) => (
-            <div key={i}>
-              <div className="flex justify-between mb-1.5">
-                <div className={`font-semibold ${m.text}`}>{m.label}</div>
-                <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
-              </div>
-              <input
-                type="range"
-                min={m.min}
-                max={MUST_HIT[m.label.toLowerCase()]}
-                value={m.value}
-                onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent}`}
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Bet Size + Denomination */}
+        {/* Bet Size + Denomination - MOVED TO TOP */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
@@ -311,7 +284,33 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Advanced Settings */}
+        {/* Meter Sliders - Color matched + locked mins */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
+          {[
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: 100 },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
+          ].map((m, i) => (
+            <div key={i}>
+              <div className="flex justify-between mb-1.5">
+                <div className={`font-semibold ${m.text}`}>{m.label}</div>
+                <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
+              </div>
+              <input
+                type="range"
+                min={m.min}
+                max={MUST_HIT[m.label.toLowerCase()]}
+                value={m.value}
+                onChange={(e) => m.setter(Number(e.target.value))}
+                className={`w-full ${m.accent}`}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Advanced Settings - Max Major removed */}
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
           <button 
             onClick={() => setShowAdvanced(!showAdvanced)} 
@@ -330,23 +329,6 @@ function StackUpPays({ onBack }) {
                   onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
                   className="w-full p-4 bg-slate-800 rounded-2xl text-center" 
                 />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-xs mb-1">Max Major Bonus</label>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => setMaxMajor(false)} 
-                    className={`flex-1 py-3 rounded-2xl ${!maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
-                  >
-                    No
-                  </button>
-                  <button 
-                    onClick={() => setMaxMajor(true)} 
-                    className={`flex-1 py-3 rounded-2xl ${maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
-                  >
-                    Yes (+0.5%)
-                  </button>
-                </div>
               </div>
             </div>
           )}
