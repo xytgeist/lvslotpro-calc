@@ -131,11 +131,7 @@ function StackUpPays({ onBack }) {
     })
 
     let combinedRTP = (baseRTP * 100) + sumExtras
-
-    // FINAL SAFETY: lock the displayed overall RTP at minimum 78%
-    if (combinedRTP < 78) {
-      combinedRTP = 78
-    }
+    if (combinedRTP < 78) combinedRTP = 78
 
     const bestEV = totalEV * 2.1
 
@@ -203,31 +199,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
-          {[
-            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
-            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
-            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400', min: 100 },
-            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400', min: 75 },
-          ].map((m, i) => (
-            <div key={i}>
-              <div className="flex justify-between mb-1.5">
-                <div className={`font-semibold ${m.text}`}>{m.label}</div>
-                <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
-              </div>
-              <input
-                type="range"
-                min={m.min}
-                max={MUST_HIT[m.label.toLowerCase()]}
-                value={m.value}
-                onChange={(e) => m.setter(Number(e.target.value))}
-                className={`w-full ${m.accent} accent-opacity-100`}
-              />
-            </div>
-          ))}
-        </div>
-
+        {/* BET SIZE + DENOMINATION — MOVED ABOVE SLIDERS */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
@@ -252,6 +224,32 @@ function StackUpPays({ onBack }) {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* BONUS SLIDERS */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
+          {[
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400', min: 100 },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400', min: 75 },
+          ].map((m, i) => (
+            <div key={i}>
+              <div className="flex justify-between mb-1.5">
+                <div className={`font-semibold ${m.text}`}>{m.label}</div>
+                <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
+              </div>
+              <input
+                type="range"
+                min={m.min}
+                max={MUST_HIT[m.label.toLowerCase()]}
+                value={m.value}
+                onChange={(e) => m.setter(Number(e.target.value))}
+                className={`w-full ${m.accent} accent-opacity-100`}
+              />
+            </div>
+          ))}
         </div>
 
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
@@ -366,7 +364,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Overall RTP is now calculated exactly as before, but the displayed value is hard-locked at a minimum of 78%.
+              Bet Size & Denomination moved above the bonus sliders as requested.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
