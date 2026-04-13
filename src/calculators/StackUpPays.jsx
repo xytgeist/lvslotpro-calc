@@ -55,7 +55,7 @@ function StackUpPays({ onBack }) {
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [overallRTP, setOverallRTP] = useState(89)   // ← Default changed to 89%
+  const [overallRTP, setOverallRTP] = useState(89)   // Default is now 89%
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
@@ -72,7 +72,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Use Advanced Settings value as base
+  // Use the value from Advanced Settings as the base
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -92,7 +92,7 @@ function StackUpPays({ onBack }) {
 
   const calculate = () => {
     const bet = Number(betSize) || 25
-    const baseRTP = overallRTP / 100
+    const baseRTP = overallRTP / 100   // This is now correctly used from Advanced Settings
 
     const meterData = [
       { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250 },
