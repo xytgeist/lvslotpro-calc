@@ -25,11 +25,11 @@ const AVG_PAYOUT = {
 }
 
 const SPINS_PER_INCREMENT = {
-  mega: 95,      // Good as-is
-  grand: 72,     // Updated
-  major: 60,     // Updated
-  minor: 45,     // Updated
-  mini: 32,      // Updated
+  mega: 95,
+  grand: 72,
+  major: 64,     // Updated to 64
+  minor: 45,
+  mini: 35,      // Updated to 35
 }
 
 const MIDPOINT = {
@@ -287,12 +287,12 @@ function StackUpPays({ onBack }) {
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
               Average Case shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.<br/><br/>
-              Updated spins per increment:<br/>
+              Current spins per increment:<br/>
               • Mega: 95<br/>
               • Grand: 72<br/>
-              • Major: 60<br/>
+              • Major: 64<br/>
               • Minor: 45<br/>
-              • Mini: 32
+              • Mini: 35
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
