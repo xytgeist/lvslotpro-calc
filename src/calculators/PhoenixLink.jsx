@@ -26,7 +26,7 @@ function PhoenixLink({ onBack }) {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(31)
+  const [avgBonusPay, setAvgBonusPay] = useState(35)
   const [increment, setIncrement] = useState(1.2)
   const [avgTrigger, setAvgTrigger] = useState(1795)
   const [maxMajor, setMaxMajor] = useState(false)
