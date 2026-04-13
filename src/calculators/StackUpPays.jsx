@@ -53,7 +53,7 @@ function StackUpPays({ onBack }) {
   const [mini, setMini] = useState(100)
 
   const [betSize, setBetSize] = useState(25)
-  const [denom, setDenom] = useState(0.10)   // Changed default to 10¢ as requested
+  const [denom, setDenom] = useState(0.10)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(89)
   const [maxMajor, setMaxMajor] = useState(false)
@@ -72,7 +72,6 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Auto base RTP from denomination + Advanced Settings
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -102,7 +101,7 @@ function StackUpPays({ onBack }) {
       { counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75 },
     ]
 
-    let totalRTP = 0
+    let sumExtras = 0
     let totalEV = 0
 
     meterData.forEach(m => {
@@ -117,14 +116,18 @@ function StackUpPays({ onBack }) {
         meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
       }
 
-      totalRTP += meterRTP
+      // Each meter RTP already contains baseRTP + its own extra
+      // So we extract the extra and add it only once
+      const extra = meterRTP - (baseRTP * 100)
+      sumExtras += extra
 
       const spinsRem = (m.mustHit - m.counter) * m.spi
       const meterEV = m.payout - (1 - baseRTP) * spinsRem
       totalEV += meterEV
     })
 
-    const combinedRTP = totalRTP / 5
+    // CORRECT overall RTP = base + all extras (not averaged)
+    const combinedRTP = (baseRTP * 100) + sumExtras
     const bestEV = totalEV * 2.1
 
     setCurrentRTP(Math.round(combinedRTP * 10) / 10)
@@ -354,7 +357,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              The Overall RTP now correctly uses the value from Advanced Settings.
+              Overall RTP now correctly adds each meter's extra contribution (base + sum of all extras).
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
