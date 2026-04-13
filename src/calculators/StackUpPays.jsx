@@ -65,13 +65,12 @@ function StackUpPays({ onBack }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(89)
 
-  const [evAvg, setEvAvg] = useState(0)           // Now the ONLY EV shown (strongest meter)
+  const [evAvg, setEvAvg] = useState(0)
   const [currentRTP, setCurrentRTP] = useState(89)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
-  const [useBestCaseForFee, setUseBestCaseForFee] = useState(true) // still kept for now, defaults to Average
 
   const [showInfoModal, setShowInfoModal] = useState(false)
 
@@ -106,8 +105,8 @@ function StackUpPays({ onBack }) {
     ]
 
     let sumExtras = 0
-    let totalEV = 0                     // still used for overall +EV check
-    let meterEVs = []                   // for finding the strongest meter
+    let totalEV = 0
+    let meterEVs = []
 
     meterData.forEach(m => {
       let meterRTP
@@ -136,7 +135,6 @@ function StackUpPays({ onBack }) {
     let combinedRTP = (baseRTP * 100) + sumExtras
     const displayedRTP = Math.max(78, combinedRTP)
 
-    // Average Case = EV of the SINGLE strongest meter (the one we actually chase)
     const averageEV = Math.max(...meterEVs)
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
@@ -156,37 +154,6 @@ function StackUpPays({ onBack }) {
     calculate()
   }, [mega, grand, major, minor, mini, betSize, denom, overallRTP])
 
-  const getRecommendedWalkAway = () => {
-    const meters = [mini, minor, major, grand, mega]
-    const hits = Object.values(MUST_HIT)
-    let totalProgress = 0
-    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]))
-    const avgProgress = totalProgress / 5
-    return Math.round(55 + avgProgress * 165)
-  }
-
-  const chartData = {
-    labels: Array.from({ length: 16 }, (_, i) => 40 + i * 15),
-    datasets: [{
-      label: 'Recommended Walk-Away',
-      data: Array.from({ length: 16 }, (_, i) => Math.round(55 + (i * 15) * 0.85)),
-      borderColor: '#67e8f9',
-      backgroundColor: 'rgba(103, 232, 249, 0.2)',
-      tension: 0.4,
-      borderWidth: 3.5,
-    }]
-  }
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: { title: { display: true, text: 'Meter Progress', color: '#d1d5db' }, ticks: { color: '#d1d5db' } },
-      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, ticks: { color: '#d1d5db' }, min: 0 }
-    },
-    plugins: { legend: { display: false } }
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
@@ -204,7 +171,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Bet + Denom */}
+        {/* Bet Size + Denomination */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
@@ -219,34 +186,50 @@ function StackUpPays({ onBack }) {
           </div>
           <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
-            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
-              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
+            <select 
+              value={denom} 
+              onChange={(e) => setDenom(parseFloat(e.target.value))} 
+              className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
+            >
+              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                <option key={d} value={d}>${d}</option>
+              ))}
             </select>
           </div>
         </div>
 
-        {/* Meters */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
+        {/* Meters - Tighter spacing */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">   {/* Reduced from space-y-6 to space-y-4 */}
           {[
-            { label: 'Mega', value: mega, setter: setMega, accent: 'accent-red-500', text: 'text-red-400', min: 250 },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
             { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
             { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500', text: 'text-green-400', min: 100 },
-            { label: 'Mini', value: mini, setter: setMini, accent: 'accent-blue-500', text: 'text-blue-400', min: 75 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: 100 },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
           ].map((m, i) => (
             <div key={i}>
-              <div className="flex justify-between mb-1.5">
+              <div className="flex justify-between mb-1">   {/* Reduced margin */}
                 <div className={`font-semibold ${m.text}`}>{m.label}</div>
                 <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
               </div>
-              <input type="range" min={m.min} max={MUST_HIT[m.label.toLowerCase()]} value={m.value} onChange={(e) => m.setter(Number(e.target.value))} className={`w-full ${m.accent}`} />
+              <input
+                type="range"
+                min={m.min}
+                max={MUST_HIT[m.label.toLowerCase()]}
+                value={m.value}
+                onChange={(e) => m.setter(Number(e.target.value))}
+                className={`w-full ${m.accent}`}
+              />
             </div>
           ))}
         </div>
 
         {/* Advanced Settings */}
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
-          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800">
+          <button 
+            onClick={() => setShowAdvanced(!showAdvanced)} 
+            className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800"
+          >
             <span className="font-semibold">Advanced Settings</span>
             <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
@@ -254,13 +237,18 @@ function StackUpPays({ onBack }) {
             <div className="p-5 pt-0 space-y-6 border-t border-slate-800">
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Overall RTP (%)</label>
-                <input type="text" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} className="w-full p-4 bg-slate-800 rounded-2xl text-center" />
+                <input 
+                  type="text" 
+                  value={overallRTP} 
+                  onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
+                  className="w-full p-4 bg-slate-800 rounded-2xl text-center" 
+                />
               </div>
             </div>
           )}
         </div>
 
-        {/* Current EV - Best Case removed */}
+        {/* Current EV - Now visible with less scrolling */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-semibold text-cyan-400">Current EV</h2>
@@ -280,10 +268,10 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Acquisition Fee - Now only uses Average Case */}
+        {/* Acquisition Fee Calculator */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
-          
+
           <div className="bg-slate-800 rounded-2xl p-5 text-center mb-4">
             <div className="text-slate-400 text-sm">Expected Profit (Strongest Meter)</div>
             <div className="text-4xl font-bold text-white">
@@ -300,20 +288,6 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
-        <div className="bg-slate-900 p-6 rounded-3xl mb-8">
-          <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold text-cyan-400">Walk-Away Advisor</h2>
-            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-cyan-400">ℹ️</button>
-          </div>
-          <div className="h-72 bg-slate-950 rounded-2xl p-4 mb-6">
-            <Line data={chartData} options={chartOptions} />
-          </div>
-          <div className="bg-slate-800 p-5 rounded-2xl text-center text-lg">
-            Recommended Walk-Away: <span className="text-emerald-400 font-bold">+{getRecommendedWalkAway()} bets</span>
-          </div>
-        </div>
-
         <div className="text-center text-slate-500 text-sm mt-12">
           Stack Up Pays • Blue Surfer Edition
         </div>
@@ -325,8 +299,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Average Case now shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.<br/><br/>
-              Best Case has been removed as requested.
+              Average Case shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
