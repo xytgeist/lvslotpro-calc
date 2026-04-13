@@ -10,429 +10,364 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
-import { createClient } from '@supabase/supabase-js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const MUST_HIT = {
+  mega: 350,
+  grand: 250,
+  major: 200,
+  minor: 150,
+  mini: 125,
+}
 
-const MUST_HIT = 1888
+const PLUS_EV = {
+  mega: 330,
+  grand: 238,
+  major: 192,
+  minor: 146,
+  mini: 123,
+}
 
-function PhoenixLink({ onBack }) {
-  const [currentX, setCurrentX] = useState(1400)
+const AVG_PAYOUT = {
+  mega: 210,
+  grand: 100,
+  major: 60,
+  minor: 20,
+  mini: 7.5,
+}
+
+const SPINS_PER_INCREMENT = {
+  mega: 80,
+  grand: 67,
+  major: 50,
+  minor: 40,
+  mini: 25,
+}
+
+const MIDPOINT = {
+  mega: 300,
+  grand: 225,
+  major: 175,
+  minor: 125,
+  mini: 100,
+}
+
+function StackUpPays({ onBack }) {
+  const [mega, setMega] = useState(300)
+  const [grand, setGrand] = useState(225)
+  const [major, setMajor] = useState(175)
+  const [minor, setMinor] = useState(125)
+  const [mini, setMini] = useState(100)
+
   const [betSize, setBetSize] = useState(25)
-  const [denom, setDenom] = useState(1.00)
+  const [denom, setDenom] = useState(0.10)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(35)
-  const [increment, setIncrement] = useState(1.2)
-  const [avgTrigger, setAvgTrigger] = useState(1795)
+  const [overallRTP, setOverallRTP] = useState(89)
   const [maxMajor, setMaxMajor] = useState(false)
+
   const [evAvg, setEvAvg] = useState(0)
-  const [evFullRun, setEvFullRun] = useState(0)
-  const [maxExposureAvg, setMaxExposureAvg] = useState(0)
-  const [maxExposureFull, setMaxExposureFull] = useState(0)
-  const [beAvg, setBeAvg] = useState(0)
-  const [beFullRun, setBeFullRun] = useState(0)
-  const [evTable, setEvTable] = useState([])
-  const [currentRTP, setCurrentRTP] = useState(0)
+  const [evBest, setEvBest] = useState(0)
+  const [currentRTP, setCurrentRTP] = useState(89)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
+
   const [testCounter, setTestCounter] = useState(1400)
   const [hoverCounter, setHoverCounter] = useState(null)
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
-  const [useFullRunForFee, setUseFullRunForFee] = useState(false)
-  const [scoutPercentage, setScoutPercentage] = useState(10)
 
-  const getRecommendedWalkAway = (counter) => {
-    const oRTP = overallRTP / 100
-    const inc = increment
-    const avgTrig = avgTrigger
-    const B = avgBonusPay
-    const spinsRemaining = Math.max(0, (avgTrig - counter) / inc)
-    const remainingEV = B - (1 - oRTP) * spinsRemaining
-    const normalized = Math.max(0, Math.min(1, (counter - 1300) / 588))
-    const sCurve = 1 / (1 + Math.exp(-5.5 * (normalized - 0.48)))
-    const curveBonus = sCurve * 98
-    let walkAway = Math.round(remainingEV * 3.5 + curveBonus)
-    return Math.max(75, Math.min(245, walkAway))
+  const [scoutPercentage, setScoutPercentage] = useState(10)
+  const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
+
+  useEffect(() => {
+    let base = 91
+    if (denom <= 0.02) base = 88
+    else if (denom === 0.05) base = 88.5
+    else if (denom === 0.10) base = 89
+    else if (denom === 0.25) base = 90
+    else if (denom >= 0.50) base = 92
+    setOverallRTP(maxMajor ? base + 0.5 : base)
+  }, [denom, maxMajor])
+
+  const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
+    const spinsRemaining = Math.max(0.001, (mustHit - counter) * spi)
+    const baseReturn = spinsRemaining * baseRTP
+    const totalReturn = baseReturn + payout
+    return (totalReturn / spinsRemaining) * 100
+  }
+
+  const calculate = () => {
+    const bet = Number(betSize) || 25
+    const baseRTP = overallRTP / 100
+
+    const meterData = [
+      { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250, mid: MIDPOINT.mega },
+      { counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, plusEV: PLUS_EV.grand, reset: 200, mid: MIDPOINT.grand },
+      { counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, plusEV: PLUS_EV.major, reset: 150, mid: MIDPOINT.major },
+      { counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, plusEV: PLUS_EV.minor, reset: 100, mid: MIDPOINT.minor },
+      { counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75,  mid: MIDPOINT.mini },
+    ]
+
+    let sumExtras = 0
+    let totalEV = 0
+
+    meterData.forEach(m => {
+      let meterRTP
+
+      if (m.counter >= m.plusEV) {
+        meterRTP = getMeterRTP(m.counter, m.mustHit, m.payout, m.spi, baseRTP)
+      } else {
+        const plusEV_RTP = getMeterRTP(m.plusEV, m.mustHit, m.payout, m.spi, baseRTP)
+        const p_mid = (m.mid - m.reset) / (m.plusEV - m.reset)
+        const midRTP = baseRTP * 100
+        let reset_RTP = (midRTP - p_mid * plusEV_RTP) / (1 - p_mid)
+        reset_RTP = Math.max(72, reset_RTP)   // ← FLOOR to prevent unrealistic drops below reset
+        const progress = (m.counter - m.reset) / (m.plusEV - m.reset)
+        meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
+      }
+
+      const extra = meterRTP - (baseRTP * 100)
+      sumExtras += extra
+
+      const spinsRem = (m.mustHit - m.counter) * m.spi
+      const meterEV = m.payout - (1 - baseRTP) * spinsRem
+      totalEV += meterEV
+    })
+
+    const combinedRTP = (baseRTP * 100) + sumExtras
+    const bestEV = totalEV * 2.1
+
+    setCurrentRTP(Math.round(combinedRTP * 10) / 10)
+    setEvAvg(totalEV)
+    setEvBest(bestEV)
+
+    const alreadyPositive = totalEV >= 0
+    setIsAlreadyPositive(alreadyPositive)
+
+    if (!alreadyPositive) {
+      setFpDollarsNeeded(Math.round(68 * bet))
+    } else {
+      setFpDollarsNeeded(0)
+    }
+  }
+
+  useEffect(() => {
+    calculate()
+  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP, maxMajor])
+
+  const getRecommendedWalkAway = () => {
+    const meters = [mini, minor, major, grand, mega]
+    const hits = Object.values(MUST_HIT)
+    let totalProgress = 0
+    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]))
+    const avgProgress = totalProgress / 5
+    return Math.round(55 + avgProgress * 165)
   }
 
   const chartData = {
-    labels: Array.from({ length: 21 }, (_, i) => 1300 + i * 28),
+    labels: Array.from({ length: 16 }, (_, i) => 40 + i * 15),
     datasets: [{
       label: 'Recommended Walk-Away',
-      data: Array.from({ length: 21 }, (_, i) => getRecommendedWalkAway(1300 + i * 28)),
-      borderColor: '#f97316',
-      backgroundColor: 'rgba(249, 115, 22, 0.1)',
-      tension: 0.45,
+      data: Array.from({ length: 16 }, (_, i) => Math.round(55 + (i * 15) * 0.85)),
+      borderColor: '#67e8f9',
+      backgroundColor: 'rgba(103, 232, 249, 0.2)',
+      tension: 0.4,
       borderWidth: 3.5,
-      pointRadius: 3,
-      pointHoverRadius: 7,
     }]
   }
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: { intersect: false, mode: 'index' },
-    onHover: (event, elements) => {
-      if (elements.length > 0) {
-        const index = elements[0].index
-        setHoverCounter(chartData.labels[index])
-        setHoverWalkAway(chartData.datasets[0].data[index])
-      } else {
-        setHoverCounter(null)
-        setHoverWalkAway(null)
-      }
-    },
     scales: {
-      x: { title: { display: true, text: 'Counter', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' } },
-      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' }, min: 0, max: 260 }
+      x: { title: { display: true, text: 'Meter Progress', color: '#d1d5db' }, ticks: { color: '#d1d5db' } },
+      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, ticks: { color: '#d1d5db' }, min: 0 }
     },
-    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    plugins: { legend: { display: false } }
   }
-
-  useEffect(() => {
-    let baseOverall = 91
-    if (denom <= 0.02) baseOverall = 88
-    else if (denom === 0.05) baseOverall = 88.25
-    else if (denom === 0.10) baseOverall = 88.4
-    else if (denom === 0.25) baseOverall = 88.6
-    else if (denom > 1) baseOverall = 91.5
-    const finalOverall = maxMajor ? baseOverall + 0.5 : baseOverall
-    setOverallRTP(finalOverall)
-  }, [denom, maxMajor])
-
-  const calculate = () => {
-    const oRTP = overallRTP / 100
-    const inc = increment
-    const avgTrig = avgTrigger
-    const X = currentX || 0
-    const bet = betSize || 25
-    const B = avgBonusPay
-    const houseEdge = 1 - oRTP
-    const spinsAvg = Math.max(0, (avgTrig - X) / inc)
-    const spinsFull = Math.max(0, (MUST_HIT - X) / inc)
-    const avgEV = B - houseEdge * spinsAvg
-    const fullEV = B - houseEdge * spinsFull
-    const baseHouseEdge = 1 - (28 / 100)
-    const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
-    const maxExpFull = Math.round(spinsFull * baseHouseEdge)
-    const breakevenAvg = Math.round(avgTrig - (B / houseEdge) * inc)
-    const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
-    setEvAvg(avgEV)
-    setEvFullRun(fullEV)
-    setMaxExposureAvg(maxExpAvg)
-    setMaxExposureFull(maxExpFull)
-    setBeAvg(breakevenAvg)
-    setBeFullRun(breakevenFull)
-    let rtp = oRTP * 100
-    if (spinsAvg > 0) {
-      const evPerSpin = avgEV / spinsAvg
-      rtp = 100 + (evPerSpin * 100)
-    }
-    setCurrentRTP(Math.round(rtp * 10) / 10)
-    const alreadyPositive = avgEV >= 0
-    setIsAlreadyPositive(alreadyPositive)
-    if (alreadyPositive) {
-      setFpDollarsNeeded(0)
-    } else {
-      const spinsNeeded = Math.max(0, breakevenAvg - X)
-      const dollarsNeeded = Math.round(spinsNeeded * bet)
-      setFpDollarsNeeded(dollarsNeeded)
-    }
-    const table = []
-    for (let c = 1150; c <= 1875; c += 25) {
-      const avgSpins = Math.max(0, (avgTrig - c) / inc)
-      const fullSpins = Math.max(0, (MUST_HIT - c) / inc)
-      table.push({
-        counter: c,
-        avgEV: B - houseEdge * avgSpins,
-        fullEV: B - houseEdge * fullSpins,
-        avgDollar: (B - houseEdge * avgSpins) * bet,
-        fullDollar: (B - houseEdge * fullSpins) * bet
-      })
-    }
-    setEvTable(table)
-  }
-
-  useEffect(() => {
-    calculate()
-  }, [overallRTP, avgBonusPay, increment, avgTrigger, currentX, betSize, denom, maxMajor])
-
-  const handleFloatChange = (setter, defaultVal) => (e) => {
-    const val = e.target.value.replace(/[^0-9.]/g, '');
-    setter(val);
-  };
-
-  const handleFloatBlur = (setter, defaultVal) => (e) => {
-    let val = e.target.value.trim();
-    if (val === '' || isNaN(parseFloat(val))) {
-      setter(defaultVal);
-    } else {
-      setter(parseFloat(val));
-    }
-  };
-
-  const handleIntegerChange = (setter, defaultVal) => (e) => {
-    const val = e.target.value.replace(/[^0-9]/g, '');
-    setter(val);
-  };
-
-  const handleIntegerBlur = (setter, defaultVal) => (e) => {
-    let val = e.target.value.trim();
-    if (val === '' || isNaN(parseInt(val, 10))) {
-      setter(defaultVal);
-    } else {
-      setter(parseInt(val, 10));
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-gray-950 pb-12">
-      {/* pt-8 as you liked it */}
-      <div className="pt-8 max-w-lg mx-auto px-4">
-
-        {/* Phoenix Link Title + Logo - no back button */}
-        <div className="flex items-center justify-center mb-6">
-          <img 
-            src="/phoenix-link-logo.png" 
-            alt="Phoenix Link" 
-            className="w-12 h-12 flex-shrink-0 rounded-xl object-contain mr-4" 
-          />
-          <h1 
-            className="text-[29px] font-black tracking-[-1.6px] text-black"
-            style={{ 
-              textShadow: `-1.6px -1.6px 0 #f97316, 1.6px -1.6px 0 #f97316, -1.6px 1.6px 0 #f97316, 1.6px 1.6px 0 #f97316` 
-            }}
+    <div className="min-h-screen bg-slate-950 pb-12">
+      <div className="max-w-lg mx-auto px-4 pt-6">
+        <div className="flex items-center justify-center mb-8">
+          <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
+            🌊
+          </div>
+          <h1
+            className="text-[27px] font-black tracking-[-1px] text-cyan-100"
+            style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
           >
-            PHOENIX LINK EV CALC
+            STACK UP PAYS
           </h1>
         </div>
 
-        {/* Counter */}
-        <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
-          <div>
-            <label className="block text-gray-400 mb-1 text-xs">Counter</label>
-            <input type="text" inputMode="numeric" value={currentX} onChange={(e) => {
-              const val = e.target.value.replace(/[^0-9]/g, '');
-              setCurrentX(val === '' ? '' : parseInt(val, 10));
-            }} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" />
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
+          {[
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400', min: 100 },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400', min: 75 },
+          ].map((m, i) => (
+            <div key={i}>
+              <div className="flex justify-between mb-1.5">
+                <div className={`font-semibold ${m.text}`}>{m.label}</div>
+                <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
+              </div>
+              <input
+                type="range"
+                min={m.min}
+                max={MUST_HIT[m.label.toLowerCase()]}
+                value={m.value}
+                onChange={(e) => m.setter(Number(e.target.value))}
+                className={`w-full ${m.accent} accent-opacity-100`}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
+          <div className="relative">
+            <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
+            <div className="absolute left-4 top-10 text-2xl text-slate-400">$</div>
+            <input
+              type="text"
+              value={betSize}
+              onChange={(e) => setBetSize(e.target.value.replace(/[^0-9.]/g, ''))}
+              onBlur={(e) => setBetSize(parseFloat(e.target.value) || 25)}
+              className="w-full pl-8 p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
+            />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="relative">
-              <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
-              <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input type="text" value={betSize} onChange={handleFloatChange(setBetSize, 25)} onBlur={handleFloatBlur(setBetSize, 25)} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
-            </div>
-            <div>
-              <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
-              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
-                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-slate-400 text-xs mb-1">Denomination</label>
+            <select 
+              value={denom} 
+              onChange={(e) => setDenom(parseFloat(e.target.value))} 
+              className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
+            >
+              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                <option key={d} value={d}>${d}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Advanced Settings */}
-        <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
-          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
-            <span className="text-base font-semibold">Advanced Settings</span>
-            <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
+        <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
+          <button 
+            onClick={() => setShowAdvanced(!showAdvanced)} 
+            className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800"
+          >
+            <span className="font-semibold">Advanced Settings</span>
+            <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="p-4 pt-0 space-y-4 border-t border-gray-800">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Max Major</span>
-                <button onClick={() => setMaxMajor(!maxMajor)} className={`px-6 py-2 rounded-xl font-semibold text-sm ${maxMajor ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-                  {maxMajor ? 'YES' : 'NO'}
-                </button>
+            <div className="p-5 pt-0 space-y-6 border-t border-slate-800">
+              <div>
+                <label className="block text-slate-400 text-xs mb-1">Overall RTP (%)</label>
+                <input 
+                  type="text" 
+                  value={overallRTP} 
+                  onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
+                  className="w-full p-4 bg-slate-800 rounded-2xl text-center" 
+                />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
-                <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">Avg Bonus Pay (bets)</label>
-                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 31)} onBlur={handleFloatBlur(setAvgBonusPay, 31)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
-                <input type="text" value={increment} onChange={handleFloatChange(setIncrement, 1.2)} onBlur={handleFloatBlur(setIncrement, 1.2)} className="w-full p-3 bg-gray-800 rounded-xl" />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
-                <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1795)} onBlur={handleFloatBlur(setAvgTrigger, 1795)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <label className="block text-slate-400 text-xs mb-1">Max Major Bonus</label>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setMaxMajor(false)} 
+                    className={`flex-1 py-3 rounded-2xl ${!maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    No
+                  </button>
+                  <button 
+                    onClick={() => setMaxMajor(true)} 
+                    className={`flex-1 py-3 rounded-2xl ${maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    Yes (+0.5%)
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Current EV */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-orange-400">Current EV</h2>
-            <div className={`text-lg font-bold ${currentRTP >= 100 ? 'text-green-400' : 'text-red-400'}`}>
+        <div className="bg-slate-900 p-6 rounded-3xl mb-8">
+          <div className="flex justify-between items-center mb-5">
+            <h2 className="text-xl font-semibold text-cyan-400">Current EV</h2>
+            <div className={`text-lg font-bold ${currentRTP >= 100 ? 'text-emerald-400' : 'text-red-400'}`}>
               {currentRTP.toFixed(1)}% RTP
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-gray-800 p-4 rounded-2xl">
-              <div className="text-gray-400 text-sm">Average Case</div>
-              <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
-              <div className="text-sm">${(evAvg * betSize).toFixed(2)}</div>
-              <div className="mt-3 pt-3 border-t border-gray-700">
-                <div className="text-xs text-gray-400">Max Exposure</div>
-                <div className="text-red-400 font-bold">{maxExposureAvg} bets (${(maxExposureAvg * betSize).toFixed(0)})</div>
-              </div>
-            </div>
-            <div className="bg-gray-800 p-4 rounded-2xl">
-              <div className="text-gray-400 text-sm">Full Run (to 1888)</div>
-              <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
-              <div className="text-sm">${(evFullRun * betSize).toFixed(2)}</div>
-              <div className="mt-3 pt-3 border-t border-gray-700">
-                <div className="text-xs text-gray-400">Max Exposure</div>
-                <div className="text-red-400 font-bold">{maxExposureFull} bets (${(maxExposureFull * betSize).toFixed(0)})</div>
-              </div>
-            </div>
-          </div>
-          <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
-          </div>
-          <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
+
           <div className="grid grid-cols-2 gap-4">
-            <div><div className="text-gray-400 text-sm">Average</div><div className="text-4xl font-bold text-green-400">{beAvg}</div></div>
-            <div><div className="text-gray-400 text-sm">Full Run (to 1888)</div><div className="text-4xl font-bold text-yellow-400">{beFullRun}</div></div>
-          </div>
-          {!isAlreadyPositive && (
-            <div className="mt-6 pt-4 border-t border-gray-700 text-center text-sm italic text-orange-400">
-              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
+            <div className="bg-slate-800 p-5 rounded-2xl">
+              <div className="text-slate-400 text-sm">Average Case</div>
+              <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
+              <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
             </div>
-          )}
+            <div className="bg-slate-800 p-5 rounded-2xl">
+              <div className="text-slate-400 text-sm">Best Case (Combo)</div>
+              <div className={`text-4xl font-bold ${evBest >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evBest.toFixed(1)}×</div>
+              <div className="text-sm text-slate-300">${(evBest * betSize).toFixed(0)}</div>
+            </div>
+          </div>
+
+          <div className={`mt-6 p-4 rounded-2xl text-center font-bold ${isAlreadyPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
+            {isAlreadyPositive ? '✅ PLAY — Strong +EV' : '❌ Still -EV — Keep Waiting'}
+          </div>
         </div>
 
-        {/* Acquisition Fee Calculator */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-400">Acquisition Fee Calculator</h2>
-          <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-gray-400 mb-1 text-xs">EV Basis</label>
-              <div className="flex bg-gray-800 rounded-2xl p-1">
-                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Average</button>
-                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Full Run</button>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-gray-400 text-xs">Scout Share</label>
-                <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
-              </div>
-              <div className="bg-gray-800 rounded-2xl px-4 py-3">
-                <input type="range" min="10" max="15" step="1" value={scoutPercentage} onChange={(e) => setScoutPercentage(Number(e.target.value))} className="w-full accent-orange-500" />
-              </div>
-            </div>
+        <div className="bg-slate-900 p-6 rounded-3xl mb-8">
+          <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
+          <div className="flex justify-between mb-4">
+            <button onClick={() => setUseBestCaseForFee(false)} className={`flex-1 py-3 rounded-l-2xl text-sm font-semibold ${!useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Average</button>
+            <button onClick={() => setUseBestCaseForFee(true)} className={`flex-1 py-3 rounded-r-2xl text-sm font-semibold ${useBestCaseForFee ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Best Case</button>
           </div>
-          <div className="bg-gray-800 rounded-2xl p-5 text-center mb-4">
-            <div className="text-gray-400 text-sm mb-1">Expected Profit</div>
+
+          <div className="bg-slate-800 rounded-2xl p-5 text-center mb-4">
+            <div className="text-slate-400 text-sm">Expected Profit</div>
             <div className="text-4xl font-bold text-white">
-              ${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}
-            </div>
-            <div className="text-xs text-gray-400">
-              {useFullRunForFee ? 'Full Run EV' : 'Average Case EV'}
+              ${((useBestCaseForFee ? evBest : evAvg) * betSize).toFixed(0)}
             </div>
           </div>
-          <div className="bg-gray-800 rounded-2xl p-5 text-center">
-            <div className="text-gray-400 text-sm mb-1">Recommended Finder's Fee</div>
-            <div className="text-5xl font-black text-green-400">
-              ${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}
+
+          <div className="bg-slate-800 rounded-2xl p-5 text-center">
+            <div className="text-slate-400 text-sm">Recommended Scout Fee</div>
+            <div className="text-5xl font-black text-emerald-400">
+              ${(((useBestCaseForFee ? evBest : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(0)}
             </div>
-            <div className="text-xs text-gray-400 mt-1">to scout</div>
+            <div className="text-xs text-slate-400 mt-1">{scoutPercentage}% of expected profit</div>
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
-        <div className="bg-gray-900 p-6 rounded-3xl mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-orange-400">Walk-Away Advisor</h2>
-            <button onClick={() => setShowInfoModal(true)} className="w-8 h-8 flex items-center justify-center text-orange-400 hover:text-orange-300 transition-colors text-xl">ℹ️</button>
+        <div className="bg-slate-900 p-6 rounded-3xl mb-8">
+          <div className="flex justify-between mb-4">
+            <h2 className="text-xl font-semibold text-cyan-400">Walk-Away Advisor</h2>
+            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-cyan-400">ℹ️</button>
           </div>
-          <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
-            <div className="flex-1">
-              <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
-              <input type="text" inputMode="numeric" value={testCounter} onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setTestCounter(val === '' ? '' : parseInt(val, 10));
-              }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-400 mb-1">Walk-away</div>
-              <div className="text-4xl font-bold text-green-400">+{testCounter ? getRecommendedWalkAway(testCounter) : 0} bets</div>
-              <div className="text-sm text-green-400">
-                ${((testCounter ? getRecommendedWalkAway(testCounter) : 0) * betSize).toFixed(0)}
-              </div>
-            </div>
-          </div>
-          <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
+          <div className="h-72 bg-slate-950 rounded-2xl p-4 mb-6">
             <Line data={chartData} options={chartOptions} />
           </div>
-          <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
-            {hoverCounter !== null ? (
-              <>At <span className="text-orange-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
-            ) : (
-              <>At <span className="text-orange-400 font-semibold mx-1">{currentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span></>
-            )}
+          <div className="bg-slate-800 p-5 rounded-2xl text-center text-lg">
+            Recommended Walk-Away: <span className="text-emerald-400 font-bold">+{getRecommendedWalkAway()} bets</span>
           </div>
         </div>
 
-        {/* EV Table */}
-        <div className="bg-gray-900 p-6 rounded-3xl">
-          <h2 className="text-xl font-semibold mb-5 text-orange-400">EV Table — 1150 to 1875 (+25)</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[540px]">
-              <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="py-4 px-4 text-gray-400 font-medium w-[92px]">Counter</th>
-                  <th className="py-4 px-3 text-gray-400 font-medium w-[155px]">EV Avg (Bets | $)</th>
-                  <th className="py-4 px-5 text-gray-400 font-medium">Full Run (to 1888) (Bets | $)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {evTable.map((row, index) => (
-                  <tr key={index} className="border-b border-gray-800">
-                    <td className="py-4 px-4 font-semibold">{row.counter}</td>
-                    <td className={`py-4 px-3 font-bold ${row.avgEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {row.avgEV.toFixed(1)} | ${row.avgDollar.toFixed(0)}
-                    </td>
-                    <td className={`py-4 px-5 font-bold ${row.fullEV >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {row.fullEV.toFixed(1)} | ${row.fullDollar.toFixed(0)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="text-center text-slate-500 text-sm mt-12">
+          Stack Up Pays • Blue Surfer Edition
         </div>
       </div>
 
-      {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
-            <h3 className="text-xl font-semibold text-orange-400 mb-4">Walk-Away Advisor</h3>
-            <div className="text-gray-300 text-[15px] leading-relaxed space-y-4">
-              <p>This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
-              <p>Phoenix Link has extreme <strong>volatility drag</strong> and <strong>drawdown risk</strong>. Even with strong positive remainingEV, 100–300 bet drawdowns occur frequently.</p>
-              <p>The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining remainingEV and a logistic S-curve calibrated through Monte Carlo simulations.</p>
-              <p>In short: it converts raw theoretical EV into a practical, utility-aware stopping rule.</p>
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
+            <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
+            <div className="text-slate-300 leading-relaxed">
+              Low-end RTP now has a realistic floor so overall RTP never collapses when meters are at reset.
             </div>
-            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors">
-              Got it
-            </button>
+            <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
         </div>
       )}
@@ -440,4 +375,4 @@ function PhoenixLink({ onBack }) {
   )
 }
 
-export default PhoenixLink
+export default StackUpPays
