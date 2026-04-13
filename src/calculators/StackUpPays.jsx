@@ -85,7 +85,7 @@ function StackUpPays({ onBack }) {
     else if (denom === 0.10) base = 89
     else if (denom === 0.25) base = 90
     else if (denom >= 0.50) base = 92
-    setOverallRTP(base)   // Removed Max Major logic
+    setOverallRTP(base)
   }, [denom])
 
   const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
@@ -183,7 +183,7 @@ function StackUpPays({ onBack }) {
     // Floor the displayed RTP at 78%
     const displayedRTP = Math.max(78, combinedRTP)
 
-    const bestEV = totalEV * 2.1   // Combo multiplier for best-case
+    const bestEV = totalEV * 2.1
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
     setEvAvg(totalEV)
@@ -243,7 +243,8 @@ function StackUpPays({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-6">
+      <div className="max-w-lg mx-auto px-4 pt-10">   {/* Increased top padding from pt-6 to pt-10 for more breathing room */}
+
         {/* Title - Blue Surfer Theme */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
@@ -257,7 +258,7 @@ function StackUpPays({ onBack }) {
           </h1>
         </div>
 
-        {/* Bet Size + Denomination - MOVED TO TOP */}
+        {/* Bet Size + Denomination - At the top */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
@@ -284,7 +285,7 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Meter Sliders - Color matched + locked mins */}
+        {/* Meter Sliders */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
@@ -310,7 +311,7 @@ function StackUpPays({ onBack }) {
           ))}
         </div>
 
-        {/* Advanced Settings - Max Major removed */}
+        {/* Advanced Settings */}
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
           <button 
             onClick={() => setShowAdvanced(!showAdvanced)} 
