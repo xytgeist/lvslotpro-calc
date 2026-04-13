@@ -45,28 +45,6 @@ const SPINS_PER_INCREMENT = {
   mini: 25,
 }
 
-// Exact RTP lookup tables you approved (midpoint = 90%, above +EV = exact formula)
-const MEGA_RTP = {
-  250: 74.0, 260: 77.0, 270: 80.0, 280: 83.0, 290: 86.0, 300: 90.0,
-  310: 94.0, 320: 98.0, 330: 103.125, 340: 116.25, 349: 352.5
-};
-
-const GRAND_RTP = {
-  200: 76.0, 210: 80.0, 225: 90.0, 230: 93.5, 238: 102.44, 245: 125.0, 249: 185.0
-};
-
-const MAJOR_RTP = {
-  150: 77.0, 160: 81.0, 175: 90.0, 185: 95.0, 192: 105.0, 197: 130.0, 199: 160.0
-};
-
-const MINOR_RTP = {
-  100: 78.0, 110: 82.5, 125: 90.0, 135: 95.0, 146: 102.5, 148: 125.0, 149: 145.0
-};
-
-const MINI_RTP = {
-  75: 79.0, 85: 83.5, 100: 90.0, 110: 95.0, 123: 105.0, 124: 130.0
-};
-
 function StackUpPays({ onBack }) {
   const [mega, setMega] = useState(300)
   const [grand, setGrand] = useState(225)
@@ -77,12 +55,12 @@ function StackUpPays({ onBack }) {
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [overallRTP, setOverallRTP] = useState(90)
+  const [overallRTP, setOverallRTP] = useState(89)   // changed default to 89%
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
   const [evBest, setEvBest] = useState(0)
-  const [currentRTP, setCurrentRTP] = useState(90)
+  const [currentRTP, setCurrentRTP] = useState(89)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
@@ -94,6 +72,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
+  // Auto base RTP from Advanced Settings
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -104,73 +83,76 @@ function StackUpPays({ onBack }) {
     setOverallRTP(maxMajor ? base + 0.5 : base)
   }, [denom, maxMajor])
 
-  const getMeterRTP = (counter, meter) => {
-    let table;
-    if (meter === 'mega') table = MEGA_RTP;
-    else if (meter === 'grand') table = GRAND_RTP;
-    else if (meter === 'major') table = MAJOR_RTP;
-    else if (meter === 'minor') table = MINOR_RTP;
-    else table = MINI_RTP;
-
-    // Use exact value if available, otherwise linear interpolate
-    const keys = Object.keys(table).map(Number).sort((a,b)=>a-b);
-    if (table[counter]) return table[counter];
-
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (counter > keys[i] && counter < keys[i+1]) {
-        const low = keys[i], high = keys[i+1];
-        const prog = (counter - low) / (high - low);
-        return table[low] + prog * (table[high] - table[low]);
-      }
-    }
-    return table[keys[keys.length-1]]; // fallback
-  };
+  const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
+    const spinsRemaining = Math.max(0.001, (mustHit - counter) * spi)
+    const baseReturn = spinsRemaining * baseRTP
+    const totalReturn = baseReturn + payout
+    return (totalReturn / spinsRemaining) * 100
+  }
 
   const calculate = () => {
-    const bet = Number(betSize) || 25;
-    const base = overallRTP / 100;
+    const bet = Number(betSize) || 25
+    const baseRTP = overallRTP / 100
 
-    const rtpMega = getMeterRTP(mega, 'mega');
-    const rtpGrand = getMeterRTP(grand, 'grand');
-    const rtpMajor = getMeterRTP(major, 'major');
-    const rtpMinor = getMeterRTP(minor, 'minor');
-    const rtpMini = getMeterRTP(mini, 'mini');
+    const meterData = [
+      { counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, plusEV: PLUS_EV.mega, reset: 250 },
+      { counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, plusEV: PLUS_EV.grand, reset: 200 },
+      { counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, plusEV: PLUS_EV.major, reset: 150 },
+      { counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, plusEV: PLUS_EV.minor, reset: 100 },
+      { counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, plusEV: PLUS_EV.mini, reset: 75 },
+    ]
 
-    const combinedRTP = (rtpMega + rtpGrand + rtpMajor + rtpMinor + rtpMini) / 5;
+    let totalRTP = 0
+    let totalEV = 0
 
-    // Simple EV approximation for play decision
-    const totalEV = (rtpMega - 100) * 0.01 * 1000 +   // rough scaling
-                    (rtpGrand - 100) * 0.01 * 800 +
-                    (rtpMajor - 100) * 0.01 * 600 +
-                    (rtpMinor - 100) * 0.01 * 400 +
-                    (rtpMini - 100) * 0.01 * 200;
+    meterData.forEach(m => {
+      let meterRTP
 
-    setCurrentRTP(Math.round(combinedRTP * 10) / 10);
-    setEvAvg(totalEV);
-    setEvBest(totalEV * 2.1);
+      if (m.counter >= m.plusEV) {
+        meterRTP = getMeterRTP(m.counter, m.mustHit, m.payout, m.spi, baseRTP)
+      } else {
+        const plusEV_RTP = getMeterRTP(m.plusEV, m.mustHit, m.payout, m.spi, baseRTP)
+        const reset_RTP = 2 * (baseRTP * 100) - plusEV_RTP
+        const progress = (m.counter - m.reset) / (m.plusEV - m.reset)
+        meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
+      }
 
-    const alreadyPositive = totalEV >= 0;
-    setIsAlreadyPositive(alreadyPositive);
+      totalRTP += meterRTP
+
+      const spinsRem = (m.mustHit - m.counter) * m.spi
+      const meterEV = m.payout - (1 - baseRTP) * spinsRem
+      totalEV += meterEV
+    })
+
+    const combinedRTP = totalRTP / 5
+    const bestEV = totalEV * 2.1
+
+    setCurrentRTP(Math.round(combinedRTP * 10) / 10)
+    setEvAvg(totalEV)
+    setEvBest(bestEV)
+
+    const alreadyPositive = totalEV >= 0
+    setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
-      setFpDollarsNeeded(Math.round(68 * bet));
+      setFpDollarsNeeded(Math.round(68 * bet))
     } else {
-      setFpDollarsNeeded(0);
+      setFpDollarsNeeded(0)
     }
-  };
+  }
 
   useEffect(() => {
-    calculate();
-  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP, maxMajor]);
+    calculate()
+  }, [mega, grand, major, minor, mini, betSize, denom, overallRTP, maxMajor])
 
   const getRecommendedWalkAway = () => {
-    const meters = [mini, minor, major, grand, mega];
-    const hits = Object.values(MUST_HIT);
-    let totalProgress = 0;
-    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]));
-    const avgProgress = totalProgress / 5;
-    return Math.round(55 + avgProgress * 165);
-  };
+    const meters = [mini, minor, major, grand, mega]
+    const hits = Object.values(MUST_HIT)
+    let totalProgress = 0
+    meters.forEach((val, i) => totalProgress += Math.max(0, val / hits[i]))
+    const avgProgress = totalProgress / 5
+    return Math.round(55 + avgProgress * 165)
+  }
 
   const chartData = {
     labels: Array.from({ length: 16 }, (_, i) => 40 + i * 15),
@@ -182,7 +164,7 @@ function StackUpPays({ onBack }) {
       tension: 0.4,
       borderWidth: 3.5,
     }]
-  };
+  }
 
   const chartOptions = {
     responsive: true,
@@ -192,7 +174,7 @@ function StackUpPays({ onBack }) {
       y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#d1d5db' }, ticks: { color: '#d1d5db' }, min: 0 }
     },
     plugins: { legend: { display: false } }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
@@ -201,18 +183,21 @@ function StackUpPays({ onBack }) {
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
             🌊
           </div>
-          <h1 className="text-[27px] font-black tracking-[-1px] text-cyan-100" style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}>
+          <h1
+            className="text-[27px] font-black tracking-[-1px] text-cyan-100"
+            style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
+          >
             STACK UP PAYS
           </h1>
         </div>
 
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
-            { label: 'Mega', value: mega, setter: setMega, accent: 'accent-red-500', text: 'text-red-400', min: 250 },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400', min: 250 },
             { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
             { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500', text: 'text-green-400', min: 100 },
-            { label: 'Mini', value: mini, setter: setMini, accent: 'accent-blue-500', text: 'text-blue-400', min: 75 },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400', min: 100 },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400', min: 75 },
           ].map((m, i) => (
             <div key={i}>
               <div className="flex justify-between mb-1.5">
@@ -231,7 +216,6 @@ function StackUpPays({ onBack }) {
           ))}
         </div>
 
-        {/* Bet Size + Denom */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
@@ -246,15 +230,23 @@ function StackUpPays({ onBack }) {
           </div>
           <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
-            <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center">
-              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
+            <select 
+              value={denom} 
+              onChange={(e) => setDenom(parseFloat(e.target.value))} 
+              className="w-full p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
+            >
+              {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                <option key={d} value={d}>${d}</option>
+              ))}
             </select>
           </div>
         </div>
 
-        {/* Advanced Settings */}
         <div className="bg-slate-900 rounded-3xl mb-8 overflow-hidden">
-          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800">
+          <button 
+            onClick={() => setShowAdvanced(!showAdvanced)} 
+            className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-800"
+          >
             <span className="font-semibold">Advanced Settings</span>
             <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
@@ -262,20 +254,34 @@ function StackUpPays({ onBack }) {
             <div className="p-5 pt-0 space-y-6 border-t border-slate-800">
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Overall RTP (%)</label>
-                <input type="text" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 90)} className="w-full p-4 bg-slate-800 rounded-2xl text-center" />
+                <input 
+                  type="text" 
+                  value={overallRTP} 
+                  onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
+                  className="w-full p-4 bg-slate-800 rounded-2xl text-center" 
+                />
               </div>
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Max Major Bonus</label>
                 <div className="flex gap-3">
-                  <button onClick={() => setMaxMajor(false)} className={`flex-1 py-3 rounded-2xl ${!maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>No</button>
-                  <button onClick={() => setMaxMajor(true)} className={`flex-1 py-3 rounded-2xl ${maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}>Yes (+0.5%)</button>
+                  <button 
+                    onClick={() => setMaxMajor(false)} 
+                    className={`flex-1 py-3 rounded-2xl ${!maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    No
+                  </button>
+                  <button 
+                    onClick={() => setMaxMajor(true)} 
+                    className={`flex-1 py-3 rounded-2xl ${maxMajor ? 'bg-cyan-600 text-white' : 'bg-slate-800'}`}
+                  >
+                    Yes (+0.5%)
+                  </button>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Current EV */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-semibold text-cyan-400">Current EV</h2>
@@ -302,7 +308,6 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Acquisition Fee */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
           <div className="flex justify-between mb-4">
@@ -326,7 +331,6 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Walk-Away Advisor */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold text-cyan-400">Walk-Away Advisor</h2>
@@ -350,7 +354,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              This version uses the exact RTP values you approved for every counter point.
+              The Overall RTP now correctly uses the value from Advanced Settings as the base.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
