@@ -72,11 +72,6 @@ function StackUpPays({ onBack }) {
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
-  const [testCounter, setTestCounter] = useState(1400)
-  const [hoverCounter, setHoverCounter] = useState(null)
-  const [hoverWalkAway, setHoverWalkAway] = useState(null)
-  const [showInfoModal, setShowInfoModal] = useState(false)
-
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
@@ -121,8 +116,11 @@ function StackUpPays({ onBack }) {
         const plusEV_RTP = getMeterRTP(m.plusEV, m.mustHit, m.payout, m.spi, baseRTP)
         const p_mid = (m.mid - m.reset) / (m.plusEV - m.reset)
         const midRTP = baseRTP * 100
+
+        // Fixed reset RTP calculation with realistic bounds
         let reset_RTP = (midRTP - p_mid * plusEV_RTP) / (1 - p_mid)
-        reset_RTP = Math.max(72, reset_RTP)   // ← FLOOR to prevent unrealistic drops below reset
+        reset_RTP = Math.max(78, Math.min(88, reset_RTP))   // realistic floor/ceiling
+
         const progress = (m.counter - m.reset) / (m.plusEV - m.reset)
         meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
       }
@@ -365,7 +363,7 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Low-end RTP now has a realistic floor so overall RTP never collapses when meters are at reset.
+              Low-end curve fixed so reset values stay realistic (~78-88%). Mega at 330 + others at reset should now give sensible overall RTP.
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
