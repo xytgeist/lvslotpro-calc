@@ -1,17 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Line } from 'react-chartjs-2'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js'
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 const MUST_HIT = {
   mega: 350,
@@ -38,7 +25,7 @@ const AVG_PAYOUT = {
 }
 
 const SPINS_PER_INCREMENT = {
-  mega: 80,
+  mega: 100,     // Changed from 80 → 100 as requested
   grand: 67,
   major: 50,
   minor: 40,
@@ -198,8 +185,8 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Meters - Tighter spacing */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">   {/* Reduced from space-y-6 to space-y-4 */}
+        {/* Meters - Tight spacing */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-4">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
             { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
@@ -208,7 +195,7 @@ function StackUpPays({ onBack }) {
             { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
           ].map((m, i) => (
             <div key={i}>
-              <div className="flex justify-between mb-1">   {/* Reduced margin */}
+              <div className="flex justify-between mb-1">
                 <div className={`font-semibold ${m.text}`}>{m.label}</div>
                 <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
               </div>
@@ -248,7 +235,7 @@ function StackUpPays({ onBack }) {
           )}
         </div>
 
-        {/* Current EV - Now visible with less scrolling */}
+        {/* Current EV */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl font-semibold text-cyan-400">Current EV</h2>
@@ -268,7 +255,7 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Acquisition Fee Calculator */}
+        {/* Acquisition Fee */}
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
 
@@ -299,7 +286,8 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Average Case shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.
+              Average Case shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.<br/><br/>
+              Mega now requires ~100 spins per increment (Mega should reach +EV right around 330).
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
