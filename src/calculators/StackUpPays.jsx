@@ -145,14 +145,13 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title - Smaller font + Blue Volcano graphic */}
+        {/* Title - Flat font + Blue Volcano */}
         <div className="flex items-center justify-center mb-8">
-          <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 mr-4 shadow-lg shadow-cyan-500/40">
-            <span className="text-4xl">🌋</span>   {/* Blue volcano emoji – matches Sakura Riches volcano theme */}
+          <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 mr-4 shadow-lg shadow-cyan-500/40">
+            <span className="text-4xl">🌋</span>
           </div>
           <h1
-            className="text-[22px] font-black tracking-[-1.2px] text-cyan-100"   {/* Smaller, tighter font */}
-            style={{ textShadow: `0 0 10px #67e8f9, -1.5px -1.5px 0 #0ea5e9` }}
+            className="text-[23px] font-bold tracking-[-0.5px] text-cyan-100"   {/* Flat, clean, smaller font - no extra weight or shadow flair */}
           >
             STACK UP PAYS
           </h1>
