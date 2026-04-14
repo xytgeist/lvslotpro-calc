@@ -87,7 +87,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Main Content - No top nav bar */}
       <div>
         {currentView === 'dashboard' ? (
           <div className="max-w-lg mx-auto px-4 py-8">
@@ -96,10 +95,10 @@ function App() {
               <p className="text-zinc-400 mt-3">Select a calculator</p>
             </div>
 
-            {/* Phoenix Link - Bigger */}
+            {/* Phoenix Link */}
             <button
               onClick={() => setCurrentView('phoenix')}
-              className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4"
+              className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28"
             >
               <img 
                 src="/phoenix-link-logo.png" 
@@ -112,10 +111,10 @@ function App() {
               </div>
             </button>
 
-            {/* Buffalo Link - Bigger */}
+            {/* Buffalo Link */}
             <button
               onClick={() => setCurrentView('buffalo')}
-              className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 transition-all active:scale-[0.985]"
+              className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
             >
               <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner flex-shrink-0">
                 <img 
@@ -130,10 +129,10 @@ function App() {
               </div>
             </button>
 
-            {/* Stack Up Pays - Bigger with new image + Blue Surfer theme */}
+            {/* Stack Up Pays - now same height */}
             <button
               onClick={() => setCurrentView('stackup')}
-              className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 transition-all active:scale-[0.985]"
+              className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
             >
               <img 
                 src="/stackup-icon.jpg" 
@@ -142,7 +141,7 @@ function App() {
               />
               <div>
                 <div className="font-semibold text-2xl text-cyan-100">Stack Up Pays</div>
-                <div className="text-base text-cyan-200">Ascending Fortunes • 5-meter expansion analyzer</div>
+                <div className="text-base text-cyan-200">Ascending Fortunes • 5-meter analyzer</div>
               </div>
             </button>
           </div>
