@@ -16,7 +16,7 @@ const MUST_HIT = 1800
 const RTP_FLOOR_COUNTER = 850
 
 function BuffaloLink({ onBack }) {
-  const [currentX, setCurrentX] = useState(1400)
+  const [currentX, setCurrentX] = useState(1234)   // Changed default to 1234
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -206,10 +206,10 @@ function BuffaloLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-8">
+      <div className="max-w-lg mx-auto px-4 pt-4">
 
-        {/* Large back chevron + Title - taller text, less top padding */}
-        <div className="flex items-center mb-8">
+        {/* Large back chevron + Title with reduced padding */}
+        <div className="flex items-center mb-4">
           <button
             onClick={onBack}
             className="text-[52px] leading-none text-amber-400 hover:text-amber-300 -mt-1 mr-4 font-light active:opacity-70"
@@ -240,8 +240,8 @@ function BuffaloLink({ onBack }) {
               type="text"
               inputMode="numeric"
               value={currentX}
-              onChange={handleIntegerChange(setCurrentX, 1400)}
-              onBlur={handleIntegerBlur(setCurrentX, 1400)}
+              onChange={handleIntegerChange(setCurrentX, 1234)}
+              onBlur={handleIntegerBlur(setCurrentX, 1234)}
               className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-amber-500"
             />
           </div>
