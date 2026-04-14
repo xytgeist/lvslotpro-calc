@@ -58,7 +58,6 @@ function StackUpPays({ onBack }) {
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
-
   const [showInfoModal, setShowInfoModal] = useState(false)
 
   // Auto RTP based on denomination
@@ -122,7 +121,7 @@ function StackUpPays({ onBack }) {
     let combinedRTP = (baseRTP * 100) + sumExtras
     const displayedRTP = Math.max(78, combinedRTP)
 
-    const averageEV = Math.max(...meterEVs)
+    const averageEV = Math.max(...meterEVs)   // Strongest meter only
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
     setEvAvg(averageEV)
@@ -145,7 +144,7 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title with cropped square rounded icon + bigger title */}
+        {/* Title with back button */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
@@ -158,7 +157,7 @@ function StackUpPays({ onBack }) {
             <img 
               src="/stackup-icon.jpg" 
               alt="Stack Up Volcano" 
-              className="w-14 h-14 object-cover rounded-2xl shadow-lg"   {/* Square crop + rounded corners */}
+              className="w-14 h-14 object-cover rounded-2xl shadow-lg" 
             />
             <h1 className="font-montserrat text-[26px] font-semibold tracking-tight text-cyan-100">
               STACK UP PAYS
@@ -195,7 +194,7 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Meters - Tight spacing */}
+        {/* Meters */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-2.5">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
