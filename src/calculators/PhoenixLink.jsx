@@ -196,7 +196,7 @@ function PhoenixLink({ onBack }) {
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-8">
 
-        {/* Large back chevron + Original Phoenix title style */}
+        {/* Large back chevron + Bigger Phoenix title */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
@@ -212,12 +212,12 @@ function PhoenixLink({ onBack }) {
               className="w-14 h-14 rounded-xl object-contain" 
             />
             <h1 
-              className="text-[29px] font-black tracking-[-1.6px] text-black"
+              className="text-[33px] font-black tracking-[-1.6px] text-black"
               style={{ 
                 textShadow: `-1.6px -1.6px 0 #f97316, 1.6px -1.6px 0 #f97316, -1.6px 1.6px 0 #f97316, 1.6px 1.6px 0 #f97316` 
               }}
             >
-              PHOENIX LINK
+              PHOENIX LINK EV CALC
             </h1>
           </div>
 
