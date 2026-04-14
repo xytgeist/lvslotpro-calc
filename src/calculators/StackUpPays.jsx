@@ -145,11 +145,11 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Back Button + Title - Using ‹ as requested */}
+        {/* Back Button + Title - Bigger and thicker ‹ */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
-            className="text-4xl text-cyan-400 hover:text-cyan-300 mr-4 font-light active:opacity-70"
+            className="text-5xl leading-none text-cyan-400 hover:text-cyan-300 mr-4 font-light active:opacity-70"
           >
             ‹
           </button>
