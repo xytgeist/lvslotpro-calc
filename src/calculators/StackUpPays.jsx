@@ -59,7 +59,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Auto-update RTP when denomination changes (but allow manual override)
+  // Auto-update RTP when denomination changes
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -140,7 +140,7 @@ function StackUpPays({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-4">
+      <div className="max-w-lg mx-auto px-4 pt-6">
 
         {/* Title block */}
         <div className="flex items-center mb-4">
@@ -170,7 +170,7 @@ function StackUpPays({ onBack }) {
           <div className="w-12" />
         </div>
 
-        {/* Bet Size + Denomination + RTP Override (clean row) */}
+        {/* Bet Size + Denomination + RTP Override */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-3 gap-4">
           <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
