@@ -217,7 +217,7 @@ function PhoenixLink({ onBack }) {
                 textShadow: `-1.6px -1.6px 0 #f97316, 1.6px -1.6px 0 #f97316, -1.6px 1.6px 0 #f97316, 1.6px 1.6px 0 #f97316` 
               }}
             >
-              PHOENIX LINK EV CALC
+              PHOENIX LINK
             </h1>
           </div>
 
