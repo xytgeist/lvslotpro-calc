@@ -91,7 +91,6 @@ function StackUpPays({ onBack }) {
     ]
 
     let sumExtras = 0
-    let totalEV = 0
     let meterEVs = []
 
     meterData.forEach(m => {
@@ -114,14 +113,13 @@ function StackUpPays({ onBack }) {
       const spinsRem = (m.mustHit - m.counter) * m.spi
       const meterEV = m.payout - (1 - baseRTP) * spinsRem
 
-      totalEV += meterEV
       meterEVs.push(meterEV)
     })
 
     let combinedRTP = (baseRTP * 100) + sumExtras
     const displayedRTP = Math.max(78, combinedRTP)
 
-    const averageEV = Math.max(...meterEVs)   // Strongest meter only
+    const averageEV = Math.max(...meterEVs)
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
     setEvAvg(averageEV)
@@ -144,7 +142,7 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title with back button */}
+        {/* Title with back button - font size matched to icon */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
@@ -159,7 +157,7 @@ function StackUpPays({ onBack }) {
               alt="Stack Up Volcano" 
               className="w-14 h-14 object-cover rounded-2xl shadow-lg" 
             />
-            <h1 className="font-montserrat text-[26px] font-semibold tracking-tight text-cyan-100">
+            <h1 className="font-montserrat text-[22px] font-semibold tracking-[-0.5px] text-cyan-100">
               STACK UP PAYS
             </h1>
           </div>
