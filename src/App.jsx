@@ -87,24 +87,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Title Bar */}
-      {currentView !== 'dashboard' && (
-        <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
-          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className="text-3xl text-orange-400 hover:text-orange-300 font-light"
-            >
-              ←
-            </button>
-            <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
-            <div className="w-8" />
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className={currentView !== 'dashboard' ? 'pt-12' : ''}>
+      {/* Main Content - No top nav bar */}
+      <div>
         {currentView === 'dashboard' ? (
           <div className="max-w-lg mx-auto px-4 py-8">
             <div className="text-center mb-12">
