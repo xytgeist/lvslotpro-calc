@@ -13,7 +13,7 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 const MUST_HIT = 1800
-const RTP_FLOOR_COUNTER = 850   // Below this counter, RTP stays flat at overallRTP
+const RTP_FLOOR_COUNTER = 850
 
 function BuffaloLink({ onBack }) {
   const [currentX, setCurrentX] = useState(1400)
@@ -127,7 +127,6 @@ function BuffaloLink({ onBack }) {
     const maxExpAvg = Math.round(spinsAvg * baseHouseEdge)
     const maxExpFull = Math.round(spinsFull * baseHouseEdge)
 
-    // Stable Average Break Even
     const breakevenAvg = Math.round(MUST_HIT - (B / houseEdge) * (inc / midpointFactor))
     const breakevenFull = Math.round(MUST_HIT - (B / houseEdge) * inc)
 
@@ -138,26 +137,22 @@ function BuffaloLink({ onBack }) {
     setBeAvg(breakevenAvg)
     setBeFullRun(breakevenFull)
 
-    // ==================== SMOOTH CURRENT RTP ====================
     const spinsToExpectedHit = Math.max(1, spinsAvg)
     const rawRTP = 100 + 100 * (B / spinsToExpectedHit - houseEdge)
 
     let finalRTP
     if (X >= breakevenAvg) {
-      finalRTP = rawRTP                                      // Full calculated value when +EV
+      finalRTP = rawRTP
     } else if (X <= RTP_FLOOR_COUNTER) {
-      finalRTP = overallRTP                                  // Flat at machine RTP below 850
+      finalRTP = overallRTP
     } else {
-      // Smooth linear decrease from 100% at break-even down to overallRTP at 850
       const distanceFromFloor = breakevenAvg - RTP_FLOOR_COUNTER
       const distanceFromBE = breakevenAvg - X
-      const progress = distanceFromBE / distanceFromFloor     // 0 = at BE, 1 = at 850
-
+      const progress = distanceFromBE / distanceFromFloor
       finalRTP = 100 - (100 - overallRTP) * progress
     }
 
     setCurrentRTP(Math.round(finalRTP * 10) / 10)
-    // ========================================================
 
     const alreadyPositive = avgEV >= 0
     setIsAlreadyPositive(alreadyPositive)
@@ -169,7 +164,6 @@ function BuffaloLink({ onBack }) {
       setFpDollarsNeeded(0)
     }
 
-    // EV Table
     const table = []
     for (let c = 1150; c <= 1775; c += 25) {
       const midTrig = c + (MUST_HIT - c) * midpointFactor
@@ -190,7 +184,6 @@ function BuffaloLink({ onBack }) {
     calculate()
   }, [currentX, betSize, denom, overallRTP, avgBonusPay, buffalosPerSpin, midpointFactor, maxMajor])
 
-  // Input handlers
   const handleFloatChange = (setter, defaultVal) => (e) => {
     const val = e.target.value.replace(/[^0-9.]/g, '')
     setter(val)
@@ -213,18 +206,30 @@ function BuffaloLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="pt-8 max-w-lg mx-auto px-4">
-        {/* Title */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 mr-4">
-            <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
-          </div>
-          <h1
-            className="text-[29px] font-black tracking-[-1.6px] text-amber-100"
-            style={{ textShadow: `-2px -2px 0 #b45309, 2px -2px 0 #b45309, -2px 2px 0 #b45309, 2px 2px 0 #b45309` }}
+      <div className="max-w-lg mx-auto px-4 pt-10">
+
+        {/* Large back chevron + Title - matching Stack Up Pays style */}
+        <div className="flex items-center mb-8">
+          <button
+            onClick={onBack}
+            className="text-[52px] leading-none text-amber-400 hover:text-amber-300 -mt-1 mr-4 font-light active:opacity-70"
           >
-            BUFFALO LINK EV CALC
-          </h1>
+            ‹
+          </button>
+
+          <div className="flex items-center flex-1 justify-center gap-3">
+            <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600">
+              <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
+            </div>
+            <h1
+              className="text-[29px] font-black tracking-[-1.6px] text-amber-100"
+              style={{ textShadow: `-2px -2px 0 #b45309, 2px -2px 0 #b45309, -2px 2px 0 #b45309, 2px 2px 0 #b45309` }}
+            >
+              BUFFALO LINK
+            </h1>
+          </div>
+
+          <div className="w-12" /> {/* spacer */}
         </div>
 
         {/* Counter + Bet + Denom */}
@@ -243,7 +248,7 @@ function BuffaloLink({ onBack }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
-              <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400">$</div>
+              <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
               <input
                 type="text"
                 value={betSize}
