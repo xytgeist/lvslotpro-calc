@@ -140,10 +140,10 @@ function StackUpPays({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-10">
+      <div className="max-w-lg mx-auto px-4 pt-4">
 
-        {/* Title block with larger, centered back chevron */}
-        <div className="flex items-center mb-8">
+        {/* Title block - matching tight padding on Phoenix & Buffalo */}
+        <div className="flex items-center mb-4">
           <button
             onClick={onBack}
             className="text-[52px] leading-none text-cyan-400 hover:text-cyan-300 -mt-1 mr-4 font-light active:opacity-70"
