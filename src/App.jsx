@@ -97,7 +97,7 @@ function App() {
             >
               ←
             </button>
-            <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
+            <div className="text-white text-xl font-montserrat">LAS VEGAS SLOT PRO</div>
             <div className="w-8" />
           </div>
         </div>
