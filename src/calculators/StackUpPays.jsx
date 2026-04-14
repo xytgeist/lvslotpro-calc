@@ -49,7 +49,7 @@ function StackUpPays({ onBack }) {
 
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(0.10)
-  const [overallRTP, setOverallRTP] = useState(89)   // Now always visible
+  const [overallRTP, setOverallRTP] = useState(89)   // User override
 
   const [evAvg, setEvAvg] = useState(0)
   const [currentRTP, setCurrentRTP] = useState(89)
@@ -59,7 +59,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Auto RTP based on denomination (still runs, but can be overridden)
+  // Auto RTP based on denomination (as fallback)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -67,8 +67,7 @@ function StackUpPays({ onBack }) {
     else if (denom === 0.10) base = 89
     else if (denom === 0.25) base = 90
     else if (denom >= 0.50) base = 92
-    // Only update if user hasn't manually changed it yet (or we can remove this if you want full manual control)
-    // For now, keeping auto as fallback
+    // Only update if user hasn't changed it manually (optional - remove if you want pure manual control)
   }, [denom])
 
   const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
@@ -170,9 +169,9 @@ function StackUpPays({ onBack }) {
           <div className="w-12" />
         </div>
 
-        {/* Bet Size + Denomination + RTP Override */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-4">
-          <div className="relative">
+        {/* Bet Size + Denomination + subtle RTP override */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-3 gap-4">
+          <div className="relative col-span-1">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
             <div className="absolute left-4 top-10 text-2xl text-slate-400">$</div>
             <input
@@ -183,7 +182,8 @@ function StackUpPays({ onBack }) {
               className="w-full pl-8 p-3.5 bg-slate-800 rounded-2xl text-2xl font-bold text-center"
             />
           </div>
-          <div>
+
+          <div className="col-span-1">
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
             <select 
               value={denom} 
@@ -195,18 +195,17 @@ function StackUpPays({ onBack }) {
               ))}
             </select>
           </div>
-        </div>
 
-        {/* User RTP Override - Always visible */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6">
-          <label className="block text-slate-400 text-xs mb-1">Overall RTP (%)</label>
-          <input 
-            type="text" 
-            value={overallRTP} 
-            onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
-            className="w-full p-4 bg-slate-800 rounded-2xl text-center text-2xl font-bold" 
-          />
-          <p className="text-xs text-slate-500 mt-2 text-center">Manual override • Auto value based on denomination</p>
+          {/* Subtle RTP Override */}
+          <div className="col-span-1">
+            <label className="block text-slate-400 text-xs mb-1">RTP %</label>
+            <input 
+              type="text" 
+              value={overallRTP} 
+              onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
+              className="w-full p-3.5 bg-slate-800 rounded-2xl text-center text-xl font-bold" 
+            />
+          </div>
         </div>
 
         {/* Meters */}
