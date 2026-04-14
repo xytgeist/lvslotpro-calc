@@ -142,11 +142,11 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title with back button + Ascending Fortunes subtitle - vertically aligned with image */}
+        {/* Title block with larger, centered back chevron */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
-            className="text-5xl leading-none text-cyan-400 hover:text-cyan-300 mr-4 font-light active:opacity-70"
+            className="text-[52px] leading-none text-cyan-400 hover:text-cyan-300 -mt-1 mr-4 font-light active:opacity-70"
           >
             ‹
           </button>
