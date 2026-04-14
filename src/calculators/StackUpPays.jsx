@@ -142,8 +142,8 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
 
-        {/* Title block */}
-        <div className="flex items-center mb-4">
+        {/* Title block with balanced padding */}
+        <div className="flex items-center mb-6">
           <button
             onClick={onBack}
             className="text-[52px] leading-none text-cyan-400 hover:text-cyan-300 -mt-1 mr-4 font-light active:opacity-70"
