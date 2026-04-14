@@ -206,9 +206,9 @@ function BuffaloLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-10">
+      <div className="max-w-lg mx-auto px-4 pt-8">
 
-        {/* Large back chevron + Title - matching Stack Up Pays style */}
+        {/* Large back chevron + Title - taller text, less top padding */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
@@ -222,7 +222,7 @@ function BuffaloLink({ onBack }) {
               <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
             </div>
             <h1
-              className="text-[29px] font-black tracking-[-1.6px] text-amber-100"
+              className="text-[32px] font-black tracking-[-1.6px] text-amber-100"
               style={{ textShadow: `-2px -2px 0 #b45309, 2px -2px 0 #b45309, -2px 2px 0 #b45309, 2px 2px 0 #b45309` }}
             >
               BUFFALO LINK
