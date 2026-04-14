@@ -145,14 +145,14 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title */}
+        {/* Title - Smaller font + Blue Volcano graphic */}
         <div className="flex items-center justify-center mb-8">
-          <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
-            🌊
+          <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 mr-4 shadow-lg shadow-cyan-500/40">
+            <span className="text-4xl">🌋</span>   {/* Blue volcano emoji – matches Sakura Riches volcano theme */}
           </div>
           <h1
-            className="text-[27px] font-black tracking-[-1px] text-cyan-100"
-            style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
+            className="text-[22px] font-black tracking-[-1.2px] text-cyan-100"   {/* Smaller, tighter font */}
+            style={{ textShadow: `0 0 10px #67e8f9, -1.5px -1.5px 0 #0ea5e9` }}
           >
             STACK UP PAYS
           </h1>
@@ -185,8 +185,8 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Meters - Further tightened spacing */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-2.5">   {/* Tightened from space-y-3 to space-y-2.5 */}
+        {/* Meters - Tight spacing */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-2.5">
           {[
             { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
             { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
@@ -195,7 +195,7 @@ function StackUpPays({ onBack }) {
             { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
           ].map((m, i) => (
             <div key={i}>
-              <div className="flex justify-between mb-0.5">   {/* Even tighter label spacing */}
+              <div className="flex justify-between mb-0.5">
                 <div className={`font-semibold ${m.text}`}>{m.label}</div>
                 <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
               </div>
