@@ -87,8 +87,24 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Main Content - No navigation bar */}
-      <div>
+      {/* Title Bar */}
+      {currentView !== 'dashboard' && (
+        <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
+          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className="text-3xl text-orange-400 hover:text-orange-300 font-light"
+            >
+              ←
+            </button>
+            <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
+            <div className="w-8" />
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className={currentView !== 'dashboard' ? 'pt-12' : ''}>
         {currentView === 'dashboard' ? (
           <div className="max-w-lg mx-auto px-4 py-8">
             <div className="text-center mb-12">
@@ -122,17 +138,19 @@ function App() {
               </div>
             </button>
 
-            {/* Stack Up Pays - Blue Surfer Theme */}
+            {/* Stack Up Pays - Updated with new image + Blue Surfer theme */}
             <button
               onClick={() => setCurrentView('stackup')}
               className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-4 transition-all active:scale-[0.985]"
             >
-              <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-sky-400 shadow-inner text-4xl">
-                🌊
-              </div>
+              <img 
+                src="/stackup-icon.jpg" 
+                alt="Stack Up Pays" 
+                className="w-12 h-12 object-cover rounded-2xl shadow-lg" 
+              />
               <div>
                 <div className="font-semibold text-xl text-cyan-100">Stack Up Pays</div>
-                <div className="text-sm text-cyan-200">5-meter expansion analyzer</div>
+                <div className="text-sm text-cyan-200">Ascending Fortunes • 5-meter expansion analyzer</div>
               </div>
             </button>
           </div>
