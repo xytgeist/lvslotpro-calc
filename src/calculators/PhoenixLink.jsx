@@ -26,7 +26,7 @@ function PhoenixLink({ onBack }) {
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
-  const [avgBonusPay, setAvgBonusPay] = useState(35)
+  const [avgBonusPay, setAvgBonusPay] = useState(31)
   const [increment, setIncrement] = useState(1.2)
   const [avgTrigger, setAvgTrigger] = useState(1795)
   const [maxMajor, setMaxMajor] = useState(false)
@@ -46,7 +46,6 @@ function PhoenixLink({ onBack }) {
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
   const [scoutPercentage, setScoutPercentage] = useState(10)
-  const [showMenu, setShowMenu] = useState(false)
 
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100
@@ -195,45 +194,73 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      {/* Very tight spacing under title bar */}
-      <div className="pt-8 max-w-lg mx-auto px-4">
+      <div className="max-w-lg mx-auto px-4 pt-8">
 
-        {/* Phoenix Link Title + Logo */}
-        <div className="flex items-center justify-center mb-4 pt-1">
-          <img 
-            src="/phoenix-link-logo.png" 
-            alt="Phoenix Link" 
-            className="w-12 h-12 flex-shrink-0 rounded-xl object-contain mr-4" 
-          />
-          <h1 
-            className="text-[29px] font-black tracking-[-1.6px] text-black"
-            style={{ 
-              textShadow: `-1.6px -1.6px 0 #f97316, 1.6px -1.6px 0 #f97316, -1.6px 1.6px 0 #f97316, 1.6px 1.6px 0 #f97316` 
-            }}
+        {/* Large back chevron + Title - matching Stack Up Pays / Buffalo style */}
+        <div className="flex items-center mb-8">
+          <button
+            onClick={onBack}
+            className="text-[52px] leading-none text-orange-400 hover:text-orange-300 -mt-1 mr-4 font-light active:opacity-70"
           >
-            PHOENIX LINK EV CALC
-          </h1>
+            ‹
+          </button>
+
+          <div className="flex items-center flex-1 justify-center gap-3">
+            <img 
+              src="/phoenix-link-logo.png" 
+              alt="Phoenix Link" 
+              className="w-14 h-14 rounded-xl object-contain" 
+            />
+            <h1 
+              className="text-[32px] font-black tracking-[-1.6px] text-orange-400"
+              style={{ 
+                textShadow: `-2px -2px 0 #f97316, 2px -2px 0 #f97316, -2px 2px 0 #f97316, 2px 2px 0 #f97316` 
+              }}
+            >
+              PHOENIX LINK
+            </h1>
+          </div>
+
+          <div className="w-12" /> {/* spacer */}
         </div>
 
-        {/* Counter */}
+        {/* Counter + Bet + Denom */}
         <div className="bg-gray-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-gray-400 mb-1 text-xs">Counter</label>
-            <input type="text" inputMode="numeric" value={currentX} onChange={(e) => {
-              const val = e.target.value.replace(/[^0-9]/g, '');
-              setCurrentX(val === '' ? '' : parseInt(val, 10));
-            }} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" />
+            <input 
+              type="text" 
+              inputMode="numeric" 
+              value={currentX} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setCurrentX(val === '' ? '' : parseInt(val, 10));
+              }} 
+              className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center border-2 border-orange-500" 
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-gray-400 mb-1 text-xs">Bet Size</label>
               <div className="absolute left-4 top-9 text-2xl font-bold text-gray-400 pointer-events-none">$</div>
-              <input type="text" value={betSize} onChange={handleFloatChange(setBetSize, 25)} onBlur={handleFloatBlur(setBetSize, 25)} className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" />
+              <input 
+                type="text" 
+                value={betSize} 
+                onChange={handleFloatChange(setBetSize, 25)} 
+                onBlur={handleFloatBlur(setBetSize, 25)} 
+                className="w-full pl-8 p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
+              />
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
-              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
-                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
+              <select 
+                value={denom} 
+                onChange={(e) => setDenom(parseFloat(e.target.value))} 
+                className="w-full p-3 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              >
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                  <option key={d} value={d}>${d}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -241,7 +268,10 @@ function PhoenixLink({ onBack }) {
 
         {/* Advanced Settings */}
         <div className="bg-gray-900 rounded-3xl mb-6 overflow-hidden">
-          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors">
+          <button 
+            onClick={() => setShowAdvanced(!showAdvanced)} 
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800 transition-colors"
+          >
             <span className="text-base font-semibold">Advanced Settings</span>
             <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
@@ -249,25 +279,52 @@ function PhoenixLink({ onBack }) {
             <div className="p-4 pt-0 space-y-4 border-t border-gray-800">
               <div className="flex items-center justify-between">
                 <span className="text-sm">Max Major</span>
-                <button onClick={() => setMaxMajor(!maxMajor)} className={`px-6 py-2 rounded-xl font-semibold text-sm ${maxMajor ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
+                <button 
+                  onClick={() => setMaxMajor(!maxMajor)} 
+                  className={`px-6 py-2 rounded-xl font-semibold text-sm ${maxMajor ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                >
                   {maxMajor ? 'YES' : 'NO'}
                 </button>
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Overall RTP (%)</label>
-                <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input 
+                  type="text" 
+                  value={overallRTP} 
+                  onChange={handleFloatChange(setOverallRTP, 91)} 
+                  onBlur={handleFloatBlur(setOverallRTP, 91)} 
+                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Bonus Pay (bets)</label>
-                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 31)} onBlur={handleFloatBlur(setAvgBonusPay, 31)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input 
+                  type="text" 
+                  value={avgBonusPay} 
+                  onChange={handleFloatChange(setAvgBonusPay, 31)} 
+                  onBlur={handleFloatBlur(setAvgBonusPay, 31)} 
+                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Balls per Spin</label>
-                <input type="text" value={increment} onChange={handleFloatChange(setIncrement, 1.2)} onBlur={handleFloatBlur(setIncrement, 1.2)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input 
+                  type="text" 
+                  value={increment} 
+                  onChange={handleFloatChange(setIncrement, 1.2)} 
+                  onBlur={handleFloatBlur(setIncrement, 1.2)} 
+                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                />
               </div>
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">Avg Counter Trigger</label>
-                <input type="text" value={avgTrigger} onChange={handleFloatChange(setAvgTrigger, 1795)} onBlur={handleFloatBlur(setAvgTrigger, 1795)} className="w-full p-3 bg-gray-800 rounded-xl" />
+                <input 
+                  type="text" 
+                  value={avgTrigger} 
+                  onChange={handleFloatChange(setAvgTrigger, 1795)} 
+                  onBlur={handleFloatBlur(setAvgTrigger, 1795)} 
+                  className="w-full p-3 bg-gray-800 rounded-xl" 
+                />
               </div>
             </div>
           )}
@@ -324,8 +381,18 @@ function PhoenixLink({ onBack }) {
             <div>
               <label className="block text-gray-400 mb-1 text-xs">EV Basis</label>
               <div className="flex bg-gray-800 rounded-2xl p-1">
-                <button onClick={() => setUseFullRunForFee(false)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Average</button>
-                <button onClick={() => setUseFullRunForFee(true)} className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>Full Run</button>
+                <button 
+                  onClick={() => setUseFullRunForFee(false)} 
+                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${!useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
+                >
+                  Average
+                </button>
+                <button 
+                  onClick={() => setUseFullRunForFee(true)} 
+                  className={`flex-1 py-3 text-sm font-semibold rounded-[14px] ${useFullRunForFee ? 'bg-orange-600 text-white' : 'text-gray-400'}`}
+                >
+                  Full Run
+                </button>
               </div>
             </div>
             <div>
@@ -334,7 +401,15 @@ function PhoenixLink({ onBack }) {
                 <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
               </div>
               <div className="bg-gray-800 rounded-2xl px-4 py-3">
-                <input type="range" min="10" max="15" step="1" value={scoutPercentage} onChange={(e) => setScoutPercentage(Number(e.target.value))} className="w-full accent-orange-500" />
+                <input 
+                  type="range" 
+                  min="10" 
+                  max="15" 
+                  step="1" 
+                  value={scoutPercentage} 
+                  onChange={(e) => setScoutPercentage(Number(e.target.value))} 
+                  className="w-full accent-orange-500" 
+                />
               </div>
             </div>
           </div>
@@ -365,10 +440,16 @@ function PhoenixLink({ onBack }) {
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-1 text-xs">Test Counter</label>
-              <input type="text" inputMode="numeric" value={testCounter} onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setTestCounter(val === '' ? '' : parseInt(val, 10));
-              }} className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" />
+              <input 
+                type="text" 
+                inputMode="numeric" 
+                value={testCounter} 
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setTestCounter(val === '' ? '' : parseInt(val, 10));
+                }} 
+                className="w-full p-3 bg-gray-700 rounded-2xl text-2xl font-bold text-center border border-orange-400" 
+              />
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-1">Walk-away</div>
@@ -419,32 +500,6 @@ function PhoenixLink({ onBack }) {
           </div>
         </div>
       </div>
-
-      {/* Hamburger Menu Dropdown */}
-      {showMenu && (
-        <div
-          className="fixed inset-0 bg-black/70 z-[60] flex items-start justify-center pt-24"
-          onClick={() => setShowMenu(false)}
-        >
-          <div
-            className="bg-gray-900 rounded-3xl w-full max-w-xs mx-4 overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowMenu(false)}
-              className="w-full text-left px-6 py-5 hover:bg-gray-800 border-b border-gray-700 flex items-center gap-3 text-white"
-            >
-              🔥 Phoenix Link EV Calc
-            </button>
-            <button
-              onClick={() => setShowMenu(false)}
-              className="w-full text-left px-6 py-5 hover:bg-gray-800 flex items-center gap-3 text-white"
-            >
-              🦬 Buffalo Link Calculator
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Info Modal */}
       {showInfoModal && (
