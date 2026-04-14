@@ -142,7 +142,7 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title with back button + Ascending Fortunes subtitle (larger, same length) */}
+        {/* Title with back button + tighter Ascending Fortunes subtitle */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
@@ -157,11 +157,11 @@ function StackUpPays({ onBack }) {
               alt="Stack Up Volcano" 
               className="w-14 h-14 object-cover rounded-2xl shadow-lg" 
             />
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center -space-y-1">
               <h1 className="font-montserrat text-[31px] font-black tracking-[-1.5px] text-cyan-100">
                 STACK UP PAYS
               </h1>
-              <p className="text-cyan-300/90 text-[17px] font-semibold tracking-[1px] mt-[-2px]">
+              <p className="text-cyan-300/90 text-[17px] font-semibold tracking-[1px]">
                 ASCENDING FORTUNES
               </p>
             </div>
