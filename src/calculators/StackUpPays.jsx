@@ -145,7 +145,7 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Back Button + Title - Bigger and thicker ‹ */}
+        {/* Title with your new volcano icon + color-matched palette */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
@@ -153,11 +153,18 @@ function StackUpPays({ onBack }) {
           >
             ‹
           </button>
-          <div className="flex-1 text-center">
+
+          <div className="flex items-center flex-1 justify-center gap-3">
+            <img 
+              src="/stackup-icon.jpg" 
+              alt="Stack Up Volcano" 
+              className="w-12 h-12 object-contain drop-shadow-md"
+            />
             <h1 className="font-montserrat text-[23px] font-semibold tracking-tight text-cyan-100">
               STACK UP PAYS
             </h1>
           </div>
+
           <div className="w-12" /> {/* spacer to keep title centered */}
         </div>
 
