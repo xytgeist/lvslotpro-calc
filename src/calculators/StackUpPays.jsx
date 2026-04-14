@@ -142,7 +142,7 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title with back button - font size matched to icon */}
+        {/* Title with back button - EVEN LARGER title */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
@@ -157,7 +157,7 @@ function StackUpPays({ onBack }) {
               alt="Stack Up Volcano" 
               className="w-14 h-14 object-cover rounded-2xl shadow-lg" 
             />
-            <h1 className="font-montserrat text-[22px] font-semibold tracking-[-0.5px] text-cyan-100">
+            <h1 className="font-montserrat text-[31px] font-black tracking-[-1.5px] text-cyan-100">
               STACK UP PAYS
             </h1>
           </div>
