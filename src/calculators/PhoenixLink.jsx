@@ -194,10 +194,10 @@ function PhoenixLink({ onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-8">
+      <div className="max-w-lg mx-auto px-4 pt-4">
 
-        {/* Large back chevron + Bigger Phoenix title */}
-        <div className="flex items-center mb-8">
+        {/* Large back chevron + Title with reduced padding */}
+        <div className="flex items-center mb-4">
           <button
             onClick={onBack}
             className="text-[52px] leading-none text-orange-400 hover:text-orange-300 -mt-1 mr-4 font-light active:opacity-70"
