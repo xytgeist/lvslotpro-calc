@@ -49,7 +49,7 @@ function StackUpPays({ onBack }) {
 
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(0.10)
-  const [overallRTP, setOverallRTP] = useState(89)   // User override
+  const [overallRTP, setOverallRTP] = useState(89)
 
   const [evAvg, setEvAvg] = useState(0)
   const [currentRTP, setCurrentRTP] = useState(89)
@@ -59,7 +59,7 @@ function StackUpPays({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Auto RTP based on denomination (as fallback)
+  // Auto-update RTP when denomination changes (but allow manual override)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -67,7 +67,8 @@ function StackUpPays({ onBack }) {
     else if (denom === 0.10) base = 89
     else if (denom === 0.25) base = 90
     else if (denom >= 0.50) base = 92
-    // Only update if user hasn't changed it manually (optional - remove if you want pure manual control)
+
+    setOverallRTP(base)
   }, [denom])
 
   const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
@@ -169,9 +170,9 @@ function StackUpPays({ onBack }) {
           <div className="w-12" />
         </div>
 
-        {/* Bet Size + Denomination + subtle RTP override */}
+        {/* Bet Size + Denomination + RTP Override (clean row) */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-3 gap-4">
-          <div className="relative col-span-1">
+          <div className="relative">
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
             <div className="absolute left-4 top-10 text-2xl text-slate-400">$</div>
             <input
@@ -183,7 +184,7 @@ function StackUpPays({ onBack }) {
             />
           </div>
 
-          <div className="col-span-1">
+          <div>
             <label className="block text-slate-400 text-xs mb-1">Denomination</label>
             <select 
               value={denom} 
@@ -196,8 +197,7 @@ function StackUpPays({ onBack }) {
             </select>
           </div>
 
-          {/* Subtle RTP Override */}
-          <div className="col-span-1">
+          <div>
             <label className="block text-slate-400 text-xs mb-1">RTP %</label>
             <input 
               type="text" 
