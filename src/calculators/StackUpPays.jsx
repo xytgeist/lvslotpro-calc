@@ -157,8 +157,8 @@ function StackUpPays({ onBack }) {
               alt="Stack Up Volcano" 
               className="w-14 h-14 object-cover rounded-2xl shadow-lg" 
             />
-            <div className="flex flex-col items-center -space-y-1">
-              <h1 className="font-montserrat text-[31px] font-semibold tracking-[-1.2px] text-cyan-100">
+            <div className="flex flex-col items-center -space-y-[6px]">
+              <h1 className="font-montserrat text-[31px] font-bold tracking-[-1.3px] text-cyan-100">
                 STACK UP PAYS
               </h1>
               <p className="text-cyan-300/90 text-[17px] font-semibold tracking-[1px]">
