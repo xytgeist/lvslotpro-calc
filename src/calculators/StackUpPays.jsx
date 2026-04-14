@@ -158,7 +158,7 @@ function StackUpPays({ onBack }) {
               className="w-14 h-14 object-cover rounded-2xl shadow-lg" 
             />
             <div className="flex flex-col items-center -space-y-1">
-              <h1 className="font-montserrat text-[31px] font-black tracking-[-1.5px] text-cyan-100">
+              <h1 className="font-montserrat text-[31px] font-semibold tracking-[-1.2px] text-cyan-100">
                 STACK UP PAYS
               </h1>
               <p className="text-cyan-300/90 text-[17px] font-semibold tracking-[1px]">
