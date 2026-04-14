@@ -145,20 +145,20 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Simple Back Button + Title */}
+        {/* Back Button + Title - Using ‹ as requested */}
         <div className="flex items-center mb-8">
           <button
             onClick={onBack}
-            className="text-4xl text-cyan-400 hover:text-cyan-300 mr-4 font-light"
+            className="text-4xl text-cyan-400 hover:text-cyan-300 mr-4 font-light active:opacity-70"
           >
-            ←
+            ‹
           </button>
           <div className="flex-1 text-center">
             <h1 className="font-montserrat text-[23px] font-semibold tracking-tight text-cyan-100">
               STACK UP PAYS
             </h1>
           </div>
-          <div className="w-10" /> {/* spacer to balance the back button */}
+          <div className="w-12" /> {/* spacer to keep title centered */}
         </div>
 
         {/* Bet Size + Denomination */}
