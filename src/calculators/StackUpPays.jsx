@@ -145,14 +145,12 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-10">
 
-        {/* Title - Flat font + Blue Volcano */}
+        {/* Title - Bare flat font, no shadow, no extra styling */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 mr-4 shadow-lg shadow-cyan-500/40">
             <span className="text-4xl">🌋</span>
           </div>
-          <h1
-            className="text-[23px] font-bold tracking-[-0.5px] text-cyan-100"   {/* Flat, clean, smaller font - no extra weight or shadow flair */}
-          >
+          <h1 className="text-[23px] font-bold tracking-tight text-cyan-100">
             STACK UP PAYS
           </h1>
         </div>
