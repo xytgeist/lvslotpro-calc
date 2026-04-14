@@ -8,7 +8,7 @@ const MUST_HIT = {
   mini: 125,
 }
 
-const PLUS_EV = {
+const PLUS_EV = {   // These are your approximate break-even counters
   mega: 330,
   grand: 238,
   major: 192,
@@ -142,7 +142,7 @@ function StackUpPays({ onBack }) {
     <div className="min-h-screen bg-slate-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
 
-        {/* Title block with balanced padding */}
+        {/* Title block */}
         <div className="flex items-center mb-6">
           <button
             onClick={onBack}
@@ -208,18 +208,20 @@ function StackUpPays({ onBack }) {
           </div>
         </div>
 
-        {/* Meters */}
+        {/* Meters - with break-even in parentheses */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-2.5">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250 },
-            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200 },
-            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150 },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: 100 },
-            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75 },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250, be: PLUS_EV.mega },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200, be: PLUS_EV.grand },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150, be: PLUS_EV.major },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: 100, be: PLUS_EV.minor },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75,  be: PLUS_EV.mini },
           ].map((m, i) => (
             <div key={i}>
               <div className="flex justify-between mb-0.5">
-                <div className={`font-semibold ${m.text}`}>{m.label}</div>
+                <div className={`font-semibold ${m.text}`}>
+                  {m.label} <span className="text-slate-500 font-normal">({m.be})</span>
+                </div>
                 <div className={`font-mono text-lg font-bold ${m.text}`}>{m.value}</div>
               </div>
               <input
