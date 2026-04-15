@@ -26,9 +26,9 @@ function MysteryMustHit({ onBack }) {
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [overallRTP, setOverallRTP] = useState(91) // base game RTP floor
-  const [minorRise, setMinorRise] = useState(0.45) // % of bet to minor meter
-  const [majorRise, setMajorRise] = useState(0.20) // % of bet to major meter
+  const [overallRTP, setOverallRTP] = useState(91)
+  const [minorRise, setMinorRise] = useState(0.45)
+  const [majorRise, setMajorRise] = useState(0.20)
   const [maxMajor, setMaxMajor] = useState(false)
 
   const [evAvg, setEvAvg] = useState(0)
@@ -37,15 +37,10 @@ function MysteryMustHit({ onBack }) {
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
 
-  const [testCounter, setTestCounter] = useState(1400) // reused for walk-away testing
-  const [hoverCounter, setHoverCounter] = useState(null)
-  const [hoverWalkAway, setHoverWalkAway] = useState(null)
-  const [showInfoModal, setShowInfoModal] = useState(false)
-
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
-  // Auto RTP based on denomination (same logic as other calcs)
+  // Auto RTP based on denomination
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -64,7 +59,7 @@ function MysteryMustHit({ onBack }) {
     // Minor
     const minorRemaining = Math.max(0, MUST_HIT.minor - minor)
     const minorAvgToHit = minorRemaining / 2
-    const minorCost = (minorAvgToHit / (minorRise / 100)) * bet   // dollars to move meter
+    const minorCost = (minorAvgToHit / (minorRise / 100)) * bet
     const minorEV = minorAvgToHit - (minorCost * houseEdge)
 
     // Major
@@ -73,11 +68,10 @@ function MysteryMustHit({ onBack }) {
     const majorCost = (majorAvgToHit / (majorRise / 100)) * bet
     const majorEV = majorAvgToHit - (majorCost * houseEdge)
 
-    // Combined (realistic when chasing both)
+    // Combined
     const totalEV = minorEV + majorEV
-
-    const avgEV = totalEV / bet   // in multiples of bet
-    const bestEV = avgEV * 1.8    // rough best-case (closer to must-hit)
+    const avgEV = totalEV / bet
+    const bestEV = avgEV * 1.8
 
     setEvAvg(avgEV)
     setEvBest(bestEV)
@@ -135,7 +129,21 @@ function MysteryMustHit({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-6">
+      {/* Fixed Back Button Bar - Same as other calculators */}
+      <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
+        <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="text-3xl text-orange-400 hover:text-orange-300 font-light"
+          >
+            ←
+          </button>
+          <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
+          <div className="w-8" />
+        </div>
+      </div>
+
+      <div className="pt-12 max-w-lg mx-auto px-4">
         {/* Title */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
