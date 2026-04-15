@@ -130,35 +130,31 @@ function MysteryMustHit({ onBack }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-12">
-      {/* Simple Back Button Only - matching other calculators exactly */}
-      <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
-        <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="text-3xl text-orange-400 hover:text-orange-300 font-light"
-          >
-            ←
-          </button>
-          <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
-          <div className="w-8" />
-        </div>
+    <div className="min-h-screen bg-slate-950 pb-12 pt-4">
+      {/* ONLY the simple back button - no nav bar */}
+      <div className="max-w-lg mx-auto px-4 mb-6">
+        <button
+          onClick={onBack}
+          className="text-3xl text-orange-400 hover:text-orange-300 font-light"
+        >
+          ←
+        </button>
       </div>
 
-      <div className="pt-12 max-w-lg mx-auto px-4">
-        {/* Title */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
-            🎰
-          </div>
-          <h1
-            className="text-[27px] font-black tracking-[-1px] text-cyan-100"
-            style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
-          >
-            MUST HIT BY
-          </h1>
+      {/* Title */}
+      <div className="flex items-center justify-center mb-8 px-4">
+        <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
+          🎰
         </div>
+        <h1
+          className="text-[27px] font-black tracking-[-1px] text-cyan-100"
+          style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
+        >
+          MUST HIT BY
+        </h1>
+      </div>
 
+      <div className="max-w-lg mx-auto px-4">
         {/* Meter Sliders */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
