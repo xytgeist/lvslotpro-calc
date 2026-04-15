@@ -42,7 +42,7 @@ function MysteryMustHit({ onBack }) {
 
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Auto RTP based on denomination (same as StackUpPays)
+  // Auto RTP based on denomination
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -58,19 +58,16 @@ function MysteryMustHit({ onBack }) {
     const oRTP = overallRTP / 100
     const houseEdge = 1 - oRTP
 
-    // Minor
     const minorRemaining = Math.max(0, MUST_HIT.minor - minor)
     const minorAvgToHit = minorRemaining / 2
     const minorCost = (minorAvgToHit / (minorRise / 100)) * bet
     const minorEV = minorAvgToHit - (minorCost * houseEdge)
 
-    // Major
     const majorRemaining = Math.max(0, MUST_HIT.major - major)
     const majorAvgToHit = majorRemaining / 2
     const majorCost = (majorAvgToHit / (majorRise / 100)) * bet
     const majorEV = majorAvgToHit - (majorCost * houseEdge)
 
-    // Combined
     const totalEV = minorEV + majorEV
     const avgEV = totalEV / bet
     const bestEV = avgEV * 1.8
@@ -78,7 +75,6 @@ function MysteryMustHit({ onBack }) {
     setEvAvg(avgEV)
     setEvBest(bestEV)
 
-    // Smooth RTP curve
     const combinedProgress = (minor / MUST_HIT.minor + major / MUST_HIT.major) / 2
     let finalRTP = overallRTP
     if (combinedProgress > 0.75) {
@@ -131,20 +127,34 @@ function MysteryMustHit({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      {/* Title - exact same style as StackUpPays */}
-      <div className="flex items-center justify-center mb-8 pt-6">
-        <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
-          🎰
+      {/* Back Button Bar - This is what the other calculators actually use */}
+      <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
+        <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="text-3xl text-orange-400 hover:text-orange-300 font-light"
+          >
+            ←
+          </button>
+          <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
+          <div className="w-8" />
         </div>
-        <h1
-          className="text-[27px] font-black tracking-[-1px] text-cyan-100"
-          style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
-        >
-          MUST HIT BY
-        </h1>
       </div>
 
-      <div className="max-w-lg mx-auto px-4">
+      <div className="pt-12 max-w-lg mx-auto px-4">
+        {/* Title */}
+        <div className="flex items-center justify-center mb-8">
+          <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
+            🎰
+          </div>
+          <h1
+            className="text-[27px] font-black tracking-[-1px] text-cyan-100"
+            style={{ textShadow: `0 0 12px #67e8f9, -2px -2px 0 #0ea5e9` }}
+          >
+            MUST HIT BY
+          </h1>
+        </div>
+
         {/* Meter Sliders */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-6">
           {[
