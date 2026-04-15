@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 import PhoenixLink from './calculators/PhoenixLink'
 import BuffaloLink from './calculators/BuffaloLink'
 import StackUpPays from './calculators/StackUpPays'
-import MysteryMustHit from './calculators/MysteryMustHit'   // ← New
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -88,24 +87,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Title Bar */}
-      {currentView !== 'dashboard' && (
-        <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
-          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className="text-3xl text-orange-400 hover:text-orange-300 font-light"
-            >
-              ←
-            </button>
-            <div className="text-white text-xl font-semibold tracking-wide">LAS VEGAS SLOT PRO</div>
-            <div className="w-8" />
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className={currentView !== 'dashboard' ? 'pt-12' : ''}>
+      <div>
         {currentView === 'dashboard' ? (
           <div className="max-w-lg mx-auto px-4 py-8">
             <div className="text-center mb-12">
@@ -116,54 +98,50 @@ function App() {
             {/* Phoenix Link */}
             <button
               onClick={() => setCurrentView('phoenix')}
-              className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-4 mb-4"
+              className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28"
             >
-              <img src="/phoenix-link-logo.png" alt="Phoenix" className="w-12 h-12 rounded-xl" />
+              <img 
+                src="/phoenix-link-logo.png" 
+                alt="Phoenix" 
+                className="w-16 h-16 rounded-xl flex-shrink-0" 
+              />
               <div>
-                <div className="font-semibold text-xl text-orange-400">Phoenix Link EV Calc</div>
-                <div className="text-sm text-gray-400">Must-hit counter bonus analyzer</div>
+                <div className="font-semibold text-2xl text-orange-400">Phoenix Link EV Calc</div>
+                <div className="text-base text-gray-400">Must-hit counter bonus analyzer</div>
               </div>
             </button>
 
             {/* Buffalo Link */}
             <button
               onClick={() => setCurrentView('buffalo')}
-              className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-4 mb-4 transition-all active:scale-[0.985]"
+              className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
             >
-              <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner">
-                <img src="/buffalo-icon.png" alt="Buffalo" className="w-11 h-11 object-contain" />
+              <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner flex-shrink-0">
+                <img 
+                  src="/buffalo-icon.png" 
+                  alt="Buffalo" 
+                  className="w-14 h-14 object-contain" 
+                />
               </div>
               <div>
-                <div className="font-semibold text-xl text-amber-100">Buffalo Link EV Calc</div>
-                <div className="text-sm text-amber-200">Midpoint-based counter analyzer</div>
+                <div className="font-semibold text-2xl text-amber-100">Buffalo Link EV Calc</div>
+                <div className="text-base text-amber-200">Midpoint-based counter analyzer</div>
               </div>
             </button>
 
-            {/* Stack Up Pays - Blue Surfer Theme */}
+            {/* Stack Up Pays - now same height */}
             <button
               onClick={() => setCurrentView('stackup')}
-              className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-4 mb-4 transition-all active:scale-[0.985]"
+              className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
             >
-              <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-sky-400 shadow-inner text-4xl">
-                🌊
-              </div>
+              <img 
+                src="/stackup-icon.jpg" 
+                alt="Stack Up Pays" 
+                className="w-16 h-16 object-cover rounded-2xl shadow-lg flex-shrink-0" 
+              />
               <div>
-                <div className="font-semibold text-xl text-cyan-100">Stack Up Pays</div>
-                <div className="text-sm text-cyan-200">5-meter expansion analyzer</div>
-              </div>
-            </button>
-
-            {/* Mystery Must Hit By - New */}
-            <button
-              onClick={() => setCurrentView('mystery')}
-              className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-4 transition-all active:scale-[0.985]"
-            >
-              <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 shadow-inner text-4xl">
-                🎰
-              </div>
-              <div>
-                <div className="font-semibold text-xl text-purple-100">Must Hit By Jackpot</div>
-                <div className="text-sm text-purple-200">Ainsworth / AGS mystery progressive</div>
+                <div className="font-semibold text-2xl text-cyan-100">Stack Up Pays</div>
+                <div className="text-base text-cyan-200">Ascending Fortunes • 5-meter analyzer</div>
               </div>
             </button>
           </div>
@@ -171,10 +149,8 @@ function App() {
           <PhoenixLink onBack={() => setCurrentView('dashboard')} />
         ) : currentView === 'buffalo' ? (
           <BuffaloLink onBack={() => setCurrentView('dashboard')} />
-        ) : currentView === 'stackup' ? (
-          <StackUpPays onBack={() => setCurrentView('dashboard')} />
         ) : (
-          <MysteryMustHit onBack={() => setCurrentView('dashboard')} />
+          <StackUpPays onBack={() => setCurrentView('dashboard')} />
         )}
       </div>
     </div>
