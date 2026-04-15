@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import PhoenixLink from './calculators/PhoenixLink'
 import BuffaloLink from './calculators/BuffaloLink'
 import StackUpPays from './calculators/StackUpPays'
+import MysteryMustHit from './calculators/MysteryMustHit'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -144,13 +145,29 @@ function App() {
                 <div className="text-base text-cyan-200">Ascending Fortunes • 5-meter analyzer</div>
               </div>
             </button>
+
+            {/* Mystery Must Hit By */}
+            <button
+              onClick={() => setCurrentView('mystery')}
+              className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
+            >
+              <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 shadow-inner flex-shrink-0 text-5xl">
+                🎰
+              </div>
+              <div>
+                <div className="font-semibold text-2xl text-purple-100">Must Hit By Jackpot</div>
+                <div className="text-base text-purple-200">Ainsworth mystery progressive</div>
+              </div>
+            </button>
           </div>
         ) : currentView === 'phoenix' ? (
           <PhoenixLink onBack={() => setCurrentView('dashboard')} />
         ) : currentView === 'buffalo' ? (
           <BuffaloLink onBack={() => setCurrentView('dashboard')} />
-        ) : (
+        ) : currentView === 'stackup' ? (
           <StackUpPays onBack={() => setCurrentView('dashboard')} />
+        ) : (
+          <MysteryMustHit onBack={() => setCurrentView('dashboard')} />
         )}
       </div>
     </div>
