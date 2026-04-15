@@ -40,6 +40,9 @@ function MysteryMustHit({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [useBestCaseForFee, setUseBestCaseForFee] = useState(true)
 
+  // Missing state that was causing the error
+  const [showInfoModal, setShowInfoModal] = useState(false)
+
   // Auto RTP based on denomination
   useEffect(() => {
     let base = 91
@@ -129,7 +132,7 @@ function MysteryMustHit({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      {/* Fixed Back Button Bar - Same as other calculators */}
+      {/* Fixed Back Button Bar */}
       <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
           <button
@@ -334,7 +337,12 @@ function MysteryMustHit({ onBack }) {
         <div className="bg-slate-900 p-6 rounded-3xl mb-8">
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold text-cyan-400">Walk-Away Advisor</h2>
-            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-cyan-400">ℹ️</button>
+            <button 
+              onClick={() => setShowInfoModal(true)} 
+              className="text-2xl text-cyan-400"
+            >
+              ℹ️
+            </button>
           </div>
           <div className="h-72 bg-slate-950 rounded-2xl p-4 mb-6">
             <Line data={chartData} options={chartOptions} />
@@ -358,7 +366,12 @@ function MysteryMustHit({ onBack }) {
               Calculates expected value assuming uniform hit distribution (Ainsworth-style). 
               Meter rise rates and base RTP are fully editable. Play when combined EV turns positive.
             </div>
-            <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
+            <button 
+              onClick={() => setShowInfoModal(false)} 
+              className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold"
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}
