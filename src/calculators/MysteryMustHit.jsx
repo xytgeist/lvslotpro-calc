@@ -131,7 +131,7 @@ function MysteryMustHit({ onBack }) {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-12">
-      {/* Simple Back Button - exactly like the other calculators */}
+      {/* Simple Back Button Only - matching other calculators exactly */}
       <div className="fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-50">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
           <button
