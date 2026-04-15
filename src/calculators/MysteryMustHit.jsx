@@ -42,7 +42,7 @@ function MysteryMustHit({ onBack }) {
 
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Auto RTP based on denomination
+  // Auto RTP based on denomination (same as StackUpPays)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -130,19 +130,9 @@ function MysteryMustHit({ onBack }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-12 pt-4">
-      {/* ONLY the simple back button - no nav bar */}
-      <div className="max-w-lg mx-auto px-4 mb-6">
-        <button
-          onClick={onBack}
-          className="text-3xl text-orange-400 hover:text-orange-300 font-light"
-        >
-          ←
-        </button>
-      </div>
-
-      {/* Title */}
-      <div className="flex items-center justify-center mb-8 px-4">
+    <div className="min-h-screen bg-slate-950 pb-12">
+      {/* Title - exact same style as StackUpPays */}
+      <div className="flex items-center justify-center mb-8 pt-6">
         <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 mr-4 shadow-lg shadow-cyan-500/30">
           🎰
         </div>
