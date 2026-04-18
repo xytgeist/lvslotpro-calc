@@ -7,7 +7,7 @@ function MHBCalculator({ onBack }) {
   const [denom, setDenom] = useState(1.00)
 
   // Advanced Settings
-  const [overallRTP, setOverallRTP] = useState(86)     // ← Default changed to 86%
+  const [overallRTP, setOverallRTP] = useState(86)     // Locked default at 86%
   const [meterRise, setMeterRise] = useState(2.50)
   const [resetValue, setResetValue] = useState(350)
   const [useMidpoint, setUseMidpoint] = useState(true)
@@ -21,16 +21,7 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // Auto RTP fallback based on denomination
-  useEffect(() => {
-    let base = 91
-    if (denom <= 0.02) base = 88
-    else if (denom === 0.05) base = 88.5
-    else if (denom === 0.10) base = 89
-    else if (denom === 0.25) base = 90
-    else if (denom >= 1) base = 92
-    setOverallRTP(base)
-  }, [denom])
+  // No more auto-RTP override — 86% will stay as default
 
   const calculate = () => {
     const baseRTP = overallRTP / 100
