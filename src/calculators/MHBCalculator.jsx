@@ -52,6 +52,7 @@ function MHBCalculator({ onBack }) {
     const remainingDollars = mhb - currentVal
     const spinsToHit = remainingDollars / riseDollars
 
+    // Midpoint logic
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -64,12 +65,16 @@ function MHBCalculator({ onBack }) {
     const fullEV = 1 - houseEdge * spinsFull
     const finalEV = useMidpoint ? avgEV : fullEV
 
+    // Breakeven entry
     const beEntry = Math.round(mhb - (1 / houseEdge) * riseDollars)
+
+    // Coin in required (in dollars)
     const coinInToBE = Math.max(0, Math.round((beEntry - currentVal) / riseDollars * denom))
 
-    // Correct JP Contribution using Reset Value
-    const jpContrib = 0.4 * mhb / (mhb - resetVal)
+    // ✅ EXACT FORMULA YOU WANTED
+    const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
+    // Max exposure
     const maxExposureBets = Math.round(spinsFull * houseEdge)
 
     setEv(Number(finalEV.toFixed(2)))
@@ -84,10 +89,9 @@ function MHBCalculator({ onBack }) {
     calculate()
   }, [current, mustHitBy, meterRise, resetValue, denom, overallRTP, useMidpoint])
 
-  // Improved input handlers that allow full deletion
+  // Better input handlers
   const handleIntegerChange = (setter, defaultVal) => (e) => {
-    const val = e.target.value.replace(/[^0-9]/g, '')
-    setter(val)                    // Allow empty string during typing
+    setter(e.target.value.replace(/[^0-9]/g, ''))
   }
 
   const handleIntegerBlur = (setter, defaultVal) => (e) => {
@@ -96,8 +100,7 @@ function MHBCalculator({ onBack }) {
   }
 
   const handleFloatChange = (setter, defaultVal) => (e) => {
-    const val = e.target.value.replace(/[^0-9.]/g, '')
-    setter(val)
+    setter(e.target.value.replace(/[^0-9.]/g, ''))
   }
 
   const handleFloatBlur = (setter, defaultVal) => (e) => {
@@ -129,28 +132,12 @@ function MHBCalculator({ onBack }) {
           <div className="bg-gray-900 p-5 rounded-3xl space-y-5">
             <div>
               <label className="block text-gray-400 text-xs mb-1">JP Meter (Current)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={current}
-                onChange={handleIntegerChange(setCurrent, 475)}
-                onBlur={handleIntegerBlur(setCurrent, 475)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300"
-              />
+              <input type="text" value={current} onChange={handleIntegerChange(setCurrent, 475)} onBlur={handleIntegerBlur(setCurrent, 475)} className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300" />
             </div>
-
             <div>
               <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={mustHitBy}
-                onChange={handleIntegerChange(setMustHitBy, 500)}
-                onBlur={handleIntegerBlur(setMustHitBy, 500)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center"
-              />
+              <input type="text" value={mustHitBy} onChange={handleIntegerChange(setMustHitBy, 500)} onBlur={handleIntegerBlur(setMustHitBy, 500)} className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center" />
             </div>
-
             <div>
               <label className="block text-gray-400 text-xs mb-1">Denomination</label>
               <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
@@ -165,40 +152,21 @@ function MHBCalculator({ onBack }) {
               <span className="font-semibold text-purple-300">Advanced Settings</span>
               <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
             </button>
-
             {showAdvanced && (
               <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Overall RTP (%)</label>
-                  <input 
-                    type="text" 
-                    value={overallRTP} 
-                    onChange={handleFloatChange(setOverallRTP, 91)} 
-                    onBlur={handleFloatBlur(setOverallRTP, 91)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
+                  <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
 
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per increment)</label>
-                  <input 
-                    type="text" 
-                    value={meterRise} 
-                    onChange={handleFloatChange(setMeterRise, 2.50)} 
-                    onBlur={handleFloatBlur(setMeterRise, 2.50)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
+                  <input type="text" value={meterRise} onChange={handleFloatChange(setMeterRise, 2.50)} onBlur={handleFloatBlur(setMeterRise, 2.50)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
 
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Reset Value</label>
-                  <input 
-                    type="text" 
-                    value={resetValue} 
-                    onChange={handleIntegerChange(setResetValue, 350)} 
-                    onBlur={handleIntegerBlur(setResetValue, 350)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
+                  <input type="text" value={resetValue} onChange={handleIntegerChange(setResetValue, 350)} onBlur={handleIntegerBlur(setResetValue, 350)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
 
                 <div className="flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
@@ -212,10 +180,10 @@ function MHBCalculator({ onBack }) {
           </div>
         </div>
 
-        {/* Outputs - unchanged */}
+        {/* Outputs */}
         <div className="mt-8 bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold text-purple-400 mb-6 text-center">MHB Analysis</h2>
-          
+
           <div className="grid grid-cols-2 gap-4 text-center">
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Expected Value</div>
