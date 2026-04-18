@@ -38,7 +38,7 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // === YOUR EXACT LOGIC ===
+    // Midpoint and EV calculation (your logic)
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -50,27 +50,24 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = midpoint - expectedLoss
 
-    // === BREAKEVEN ENTRY (solved so finalEV = 0) ===
-    // C = M * [100 * S * (1-R) - 1] / [1 + 100 * S * (1-R)]
+    // Breakeven Entry — solved, then rounded UP so it shows "just above" +EV
     const houseEdge = 1 - rtp
-    const factor = 100 * riseDollars * houseEdge
-    let breakevenCurrent;
+    let breakevenCurrent = useMidpoint
+      ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
+      : mhb - (riseDollars * 0.01 / houseEdge)
 
-    if (useMidpoint) {
-      breakevenCurrent = mhb * (factor - 1) / (factor + 1)
-    } else {
-      breakevenCurrent = mhb - (riseDollars * 0.01 / houseEdge)
-    }
+    // Round UP to the next whole dollar so it is the first point that is +EV
+    breakevenCurrent = Math.ceil(breakevenCurrent)
 
-    // JP Contribution (your formula)
+    // JP Contribution
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure (full run)
+    // Max exposure
     const fullIncrements = (mhb - currentVal) / 0.01
     const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge / denom)
 
     setEv(Number(finalEV.toFixed(2)))
-    setBreakeven(Math.round(breakevenCurrent))
+    setBreakeven(breakevenCurrent)
     setCoinInRequired(Math.round(coinInToMidpoint))
     setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(maxExposureBets)
