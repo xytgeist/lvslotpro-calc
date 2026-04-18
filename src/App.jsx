@@ -21,6 +21,11 @@ function App() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
 
+  // Reset password page states
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [resetMessage, setResetMessage] = useState('')
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -52,15 +57,13 @@ function App() {
     if (error) alert(error.message)
   }
 
-
-    const handleForgotPassword = async (e) => {
+  const handleForgotPassword = async (e) => {
     e.preventDefault()
     if (!forgotEmail) {
       alert("Please enter your email")
       return
     }
 
-    // Use the exact path Supabase expects
     const redirectTo = `${window.location.origin}/reset-password`
 
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
@@ -68,11 +71,39 @@ function App() {
     })
 
     if (error) {
-      console.error(error)
-      alert("Error sending reset link: " + error.message)
+      alert("Error: " + error.message)
     } else {
-      alert("Password reset link sent! Check your inbox (and spam folder).")
-      setShowForgotPassword(false)   // go back to login screen
+      alert("Password reset link sent! Check your inbox (and spam).")
+      setShowForgotPassword(false)
+      setForgotEmail('')
+    }
+  }
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+
+    if (newPassword !== confirmPassword) {
+      setResetMessage("Passwords do not match")
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setResetMessage("Password must be at least 6 characters")
+      return
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+
+    if (error) {
+      setResetMessage("Error: " + error.message)
+    } else {
+      setResetMessage("✅ Password updated successfully! You can now log in with your new password.")
+      setNewPassword('')
+      setConfirmPassword('')
+      // Optional: auto redirect to login after 2 seconds
+      setTimeout(() => {
+        window.location.href = window.location.origin
+      }, 2000)
     }
   }
 
@@ -85,6 +116,56 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
   }
 
+  // ====================== RESET PASSWORD PAGE ======================
+  if (currentView === 'reset-password') {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
+          <h2 className="text-2xl font-bold text-white mb-6 text-center">Reset Password</h2>
+
+          <form onSubmit={handlePasswordReset} className="space-y-4">
+            <input
+              type="password"
+              placeholder="New Password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+              required
+            />
+            <input
+              type="password"
+              placeholder="Confirm New Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+              required
+            />
+            <button 
+              type="submit" 
+              className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold"
+            >
+              Update Password
+            </button>
+          </form>
+
+          {resetMessage && (
+            <div className={`mt-4 text-center text-sm ${resetMessage.includes('✅') ? 'text-emerald-400' : 'text-red-400'}`}>
+              {resetMessage}
+            </div>
+          )}
+
+          <button
+            onClick={() => window.location.href = window.location.origin}
+            className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm"
+          >
+            ← Back to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ====================== NORMAL LOGIN / DASHBOARD ======================
   if (!user || !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -148,6 +229,7 @@ function App() {
     )
   }
 
+  // Dashboard + Calculators
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
@@ -158,7 +240,10 @@ function App() {
           </div>
 
           {/* Phoenix Link */}
-          <button onClick={() => setCurrentView('phoenix')} className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28">
+          <button
+            onClick={() => setCurrentView('phoenix')}
+            className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28"
+          >
             <img src="/phoenix-link-logo.png" alt="Phoenix" className="w-16 h-16 rounded-xl flex-shrink-0" />
             <div>
               <div className="font-semibold text-2xl text-orange-400">Phoenix Link EV Calc</div>
@@ -167,7 +252,10 @@ function App() {
           </button>
 
           {/* Buffalo Link */}
-          <button onClick={() => setCurrentView('buffalo')} className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
+          <button
+            onClick={() => setCurrentView('buffalo')}
+            className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
+          >
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner flex-shrink-0">
               <img src="/buffalo-icon.png" alt="Buffalo" className="w-14 h-14 object-contain" />
             </div>
@@ -178,7 +266,10 @@ function App() {
           </button>
 
           {/* Stack Up Pays */}
-          <button onClick={() => setCurrentView('stackup')} className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
+          <button
+            onClick={() => setCurrentView('stackup')}
+            className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
+          >
             <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="w-16 h-16 object-cover rounded-2xl shadow-lg flex-shrink-0" />
             <div>
               <div className="font-semibold text-2xl text-cyan-100">Stack Up Pays</div>
@@ -187,7 +278,10 @@ function App() {
           </button>
 
           {/* MHB Calculator */}
-          <button onClick={() => setCurrentView('mhb')} className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
+          <button
+            onClick={() => setCurrentView('mhb')}
+            className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
+          >
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 shadow-inner flex-shrink-0 text-5xl">
               🎰
             </div>
@@ -197,9 +291,12 @@ function App() {
             </div>
           </button>
 
-          {/* Logout at bottom */}
+          {/* Logout */}
           <div className="mt-12 text-center">
-            <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 text-sm underline transition-colors">
+            <button
+              onClick={handleLogout}
+              className="text-gray-400 hover:text-red-400 text-sm underline transition-colors"
+            >
               Logout
             </button>
           </div>
@@ -210,9 +307,9 @@ function App() {
         <BuffaloLink onBack={() => setCurrentView('dashboard')} />
       ) : currentView === 'stackup' ? (
         <StackUpPays onBack={() => setCurrentView('dashboard')} />
-      ) : (
+      ) : currentView === 'mhb' ? (
         <MHBCalculator onBack={() => setCurrentView('dashboard')} />
-      )}
+      ) : null}
     </div>
   )
 }
