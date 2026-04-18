@@ -13,13 +13,12 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 function MHBCalculator({ onBack }) {
-  const [currentViewCounter, setCurrentViewCounter] = useState(1200) // placeholder - we'll customize later
+  const [currentViewCounter, setCurrentViewCounter] = useState(1200)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
 
-  // Placeholder states - we'll build real MHB logic next
   const [evAvg, setEvAvg] = useState(0)
   const [currentRTP, setCurrentRTP] = useState(91)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
@@ -28,7 +27,7 @@ function MHBCalculator({ onBack }) {
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  // Keep Phoenix-style auto RTP for now
+  // Auto RTP based on denomination
   useEffect(() => {
     let baseOverall = 91
     if (denom <= 0.02) baseOverall = 88
@@ -39,11 +38,10 @@ function MHBCalculator({ onBack }) {
     setOverallRTP(baseOverall)
   }, [denom])
 
-  // Temporary placeholder calculation
+  // Placeholder calculation
   useEffect(() => {
-    // We'll replace this with real MHB math soon
     setCurrentRTP(overallRTP)
-    setEvAvg(2.5) // placeholder
+    setEvAvg(2.5)
     setIsAlreadyPositive(true)
   }, [currentViewCounter, betSize, overallRTP])
 
@@ -51,7 +49,7 @@ function MHBCalculator({ onBack }) {
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
 
-        {/* Title block - matching your current Phoenix style */}
+        {/* Title block - back button now vertically centered with title */}
         <div className="flex items-center mb-6">
           <button
             onClick={onBack}
@@ -61,8 +59,7 @@ function MHBCalculator({ onBack }) {
           </button>
 
           <div className="flex items-center flex-1 justify-center gap-3">
-            <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-600">
-              {/* We'll add a real MHB icon later - placeholder for now */}
+            <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-600 flex-shrink-0">
               <span className="text-4xl">🎰</span>
             </div>
             <h1
@@ -78,11 +75,11 @@ function MHBCalculator({ onBack }) {
           <div className="w-12" />
         </div>
 
-        {/* Rest of the UI is still Phoenix structure for now - we'll customize next */}
+        {/* Placeholder content */}
         <div className="bg-gray-900 p-5 rounded-3xl mb-6">
           <div className="text-center text-purple-400 text-sm mb-8">
             Must-Hit-By Progressive Analyzer<br />
-            <span className="text-purple-300/70">Coming soon — building from Phoenix base</span>
+            <span className="text-purple-300/70">Building from Phoenix base — MHB logic coming next</span>
           </div>
         </div>
 
