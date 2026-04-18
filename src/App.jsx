@@ -28,10 +28,12 @@ function App() {
   const [resetError, setResetError] = useState('')
 
   useEffect(() => {
-    // Check for recovery token in URL hash on mount (handles the magic link)
+    // Check URL hash for recovery token (this is the key fix)
     const hash = window.location.hash
     if (hash.includes('type=recovery') || hash.includes('access_token')) {
       setCurrentView('reset-password')
+      // Clean the URL after detecting the token
+      window.history.replaceState({}, document.title, window.location.pathname)
     }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -71,7 +73,6 @@ function App() {
       return
     }
 
-    // Force non-www production URL (most reliable)
     const redirectTo = 'https://lvslotpro.com/reset-password'
 
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
@@ -81,7 +82,7 @@ function App() {
     if (error) {
       alert("Error sending link: " + error.message)
     } else {
-      alert("Reset link sent! Check your inbox (and spam folder). Click it quickly before any email scanner touches it.")
+      alert("✅ Reset link sent! Check your inbox (and spam folder).\n\nClick it quickly — some email providers scan links automatically and expire them.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -90,18 +91,18 @@ function App() {
   const handlePasswordReset = async (e) => {
     e.preventDefault()
     if (newPassword !== confirmPassword) {
-      setResetMessage("Passwords do not match")
+      setResetError("Passwords do not match")
       return
     }
     if (newPassword.length < 6) {
-      setResetMessage("Password must be at least 6 characters")
+      setResetError("Password must be at least 6 characters")
       return
     }
 
     const { error } = await supabase.auth.updateUser({ password: newPassword })
 
     if (error) {
-      setResetMessage("Error: " + error.message)
+      setResetError("Error: " + error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
       setTimeout(() => {
@@ -132,32 +133,34 @@ function App() {
             </div>
           )}
 
-          <form onSubmit={handlePasswordReset} className="space-y-4">
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-              required
-            />
-            <input
-              type="password"
-              placeholder="Confirm New Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-              required
-            />
-            <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">
-              Update Password
-            </button>
-          </form>
-
-          {resetMessage && (
-            <div className={`mt-4 text-center text-sm ${resetMessage.includes('✅') ? 'text-emerald-400' : 'text-red-400'}`}>
-              {resetMessage}
+          {resetMessage ? (
+            <div className="text-center py-8">
+              <div className="text-emerald-400 text-2xl mb-4">✅</div>
+              <p className="text-emerald-400 text-lg font-medium">{resetMessage}</p>
+              <p className="text-gray-400 mt-2">Redirecting to login...</p>
             </div>
+          ) : (
+            <form onSubmit={handlePasswordReset} className="space-y-4">
+              <input
+                type="password"
+                placeholder="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+                required
+              />
+              <input
+                type="password"
+                placeholder="Confirm New Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+                required
+              />
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">
+                Update Password
+              </button>
+            </form>
           )}
 
           <button
@@ -171,7 +174,7 @@ function App() {
     )
   }
 
-  // Login screen
+  // ====================== LOGIN SCREEN ======================
   if (!user || !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
