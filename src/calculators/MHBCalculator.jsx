@@ -7,8 +7,8 @@ function MHBCalculator({ onBack }) {
   const [denom, setDenom] = useState(1.00)
 
   // Advanced Settings
-  const [overallRTP, setOverallRTP] = useState(86)     // Locked default at 86%
-  const [meterRise, setMeterRise] = useState(2.50)
+  const [overallRTP, setOverallRTP] = useState(86)
+  const [meterRise, setMeterRise] = useState(2.50)   // $ wagered per $0.01 meter rise
   const [resetValue, setResetValue] = useState(350)
   const [useMidpoint, setUseMidpoint] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -21,13 +21,11 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // No more auto-RTP override — 86% will stay as default
-
   const calculate = () => {
-    const baseRTP = overallRTP / 100
+    const rtp = overallRTP / 100
     const currentVal = Number(current) || 475
     const mhb = Number(mustHitBy) || 500
-    const riseDollars = Number(meterRise) || 2.50
+    const risePerCent = Number(meterRise) || 2.50   // $ wagered to move meter $0.01
     const resetVal = Number(resetValue) || 350
 
     if (mhb <= currentVal) {
@@ -40,32 +38,36 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    const remainingDollars = mhb - currentVal
-    const spinsToHit = remainingDollars / riseDollars
-
+    // Midpoint calculation
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
 
-    const spinsAvg = (midpoint - currentVal) / riseDollars
-    const spinsFull = spinsToHit
+    const dollarDistanceToMidpoint = midpoint - currentVal
 
-    const houseEdge = 1 - baseRTP
-    const avgEV = 1 - houseEdge * spinsAvg
-    const fullEV = 1 - houseEdge * spinsFull
-    const finalEV = useMidpoint ? avgEV : fullEV
+    // Coin-in required to reach midpoint
+    const centsNeeded = dollarDistanceToMidpoint / 0.01          // how many $0.01 increments
+    const coinInToMidpoint = centsNeeded * risePerCent           // total $ wagered
 
-    const beEntry = Math.round(mhb - (1 / houseEdge) * riseDollars * (useMidpoint ? 0.5 : 1))
-    const coinInToBE = Math.max(0, Math.round((beEntry - currentVal) / riseDollars * denom))
+    // Expected loss on the way there
+    const expectedLoss = coinInToMidpoint * (1 - rtp)
 
-    // JP Contribution using your exact formula
+    // Net EV when we hit at midpoint
+    const finalEV = midpoint - expectedLoss
+
+    // Breakeven entry point (approximate)
+    const beEntry = Math.round(mhb - (1 / (1 - rtp)) * 0.01 * risePerCent * (useMidpoint ? 0.5 : 1))
+
+    // JP Contribution %
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    const maxExposureBets = Math.round(spinsFull * houseEdge)
+    // Max exposure (full run to MHB)
+    const spinsFull = (mhb - currentVal) / 0.01
+    const maxExposureBets = Math.round(spinsFull * risePerCent * (1 - rtp) / denom)
 
     setEv(Number(finalEV.toFixed(2)))
     setBreakeven(beEntry)
-    setCoinInRequired(coinInToBE)
+    setCoinInRequired(Math.round(coinInToMidpoint))
     setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(maxExposureBets)
     setIsPositive(finalEV >= 0)
@@ -75,7 +77,7 @@ function MHBCalculator({ onBack }) {
     calculate()
   }, [current, mustHitBy, meterRise, resetValue, denom, overallRTP, useMidpoint])
 
-  // Input handlers
+  // Input handlers (allow full deletion)
   const handleIntegerChange = (setter, defaultVal) => (e) => {
     setter(e.target.value.replace(/[^0-9]/g, ''))
   }
@@ -142,13 +144,7 @@ function MHBCalculator({ onBack }) {
               <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">RTP %</label>
-                  <input 
-                    type="text" 
-                    value={overallRTP} 
-                    onChange={handleFloatChange(setOverallRTP, 86)} 
-                    onBlur={handleFloatBlur(setOverallRTP, 86)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
+                  <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 86)} onBlur={handleFloatBlur(setOverallRTP, 86)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
 
                 <div>
