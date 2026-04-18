@@ -28,36 +28,13 @@ function App() {
   const [resetError, setResetError] = useState('')
 
   useEffect(() => {
-    const handleRecovery = async () => {
-      const hash = window.location.hash
-      if (!hash) return
-
-      if (hash.includes('type=recovery') || hash.includes('access_token')) {
-        setCurrentView('reset-password')
-
-        // Extract token_hash more reliably
-        const tokenHashMatch = hash.match(/access_token=([^&]+)/)
-        const tokenHash = tokenHashMatch ? tokenHashMatch[1] : null
-
-        if (tokenHash) {
-          const { error } = await supabase.auth.verifyOtp({
-            token_hash: tokenHash,
-            type: 'recovery'
-          })
-
-          if (error) {
-            setResetError('This reset link has expired or has already been used. Please request a new one.')
-          }
-        } else {
-          setResetError('Invalid reset link. Please request a new one.')
-        }
-
-        // Clean the URL
-        window.history.replaceState({}, document.title, '/reset-password')
-      }
+    // Detect recovery token in URL and show reset page
+    const hash = window.location.hash
+    if (hash.includes('type=recovery') || hash.includes('access_token')) {
+      setCurrentView('reset-password')
+      // Clean URL (remove hash)
+      window.history.replaceState({}, document.title, '/reset-password')
     }
-
-    handleRecovery()
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -102,7 +79,7 @@ function App() {
 
     if (error) alert("Error: " + error.message)
     else {
-      alert("Reset link sent! Check your inbox (and spam folder).\n\nClick it as soon as possible — email scanners can expire it.")
+      alert("Reset link sent! Check your inbox (and spam folder). Click it quickly.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -140,7 +117,7 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
   }
 
-  // Reset Password Page
+  // ====================== RESET PASSWORD PAGE ======================
   if (currentView === 'reset-password') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -190,7 +167,7 @@ function App() {
     )
   }
 
-  // Login Screen
+  // ====================== LOGIN SCREEN ======================
   if (!user || !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -202,8 +179,11 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
+
               <div className="text-center pt-2">
-                <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">Forgot Password?</button>
+                <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">
+                  Forgot Password?
+                </button>
               </div>
             </form>
           ) : (
@@ -218,7 +198,7 @@ function App() {
     )
   }
 
-  // Dashboard + Calculators
+  // Dashboard
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
