@@ -25,8 +25,15 @@ function App() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetMessage, setResetMessage] = useState('')
+  const [resetError, setResetError] = useState('')
 
   useEffect(() => {
+    // Check for recovery token in URL hash on mount (handles the magic link)
+    const hash = window.location.hash
+    if (hash.includes('type=recovery') || hash.includes('access_token')) {
+      setCurrentView('reset-password')
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) checkWhitelist(session.user.email)
@@ -64,16 +71,17 @@ function App() {
       return
     }
 
-    // Force non-www version for consistency (recommended)
+    // Force non-www production URL (most reliable)
     const redirectTo = 'https://lvslotpro.com/reset-password'
 
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
       redirectTo
     })
 
-    if (error) alert("Error sending link: " + error.message)
-    else {
-      alert("Reset link sent! Check your inbox (and spam folder).")
+    if (error) {
+      alert("Error sending link: " + error.message)
+    } else {
+      alert("Reset link sent! Check your inbox (and spam folder). Click it quickly before any email scanner touches it.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -98,7 +106,7 @@ function App() {
       setResetMessage("✅ Password updated successfully!")
       setTimeout(() => {
         window.location.href = 'https://lvslotpro.com'
-      }, 1500)
+      }, 2000)
     }
   }
 
@@ -117,6 +125,12 @@ function App() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Reset Your Password</h2>
+
+          {resetError && (
+            <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-sm text-center">
+              {resetError}
+            </div>
+          )}
 
           <form onSubmit={handlePasswordReset} className="space-y-4">
             <input
@@ -157,7 +171,7 @@ function App() {
     )
   }
 
-  // ====================== LOGIN SCREEN ======================
+  // Login screen
   if (!user || !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -166,54 +180,21 @@ function App() {
 
           {!showForgotPassword ? (
             <form onSubmit={handleLogin} className="space-y-4">
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
 
               <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="text-orange-400 hover:text-orange-300 text-sm underline"
-                >
+                <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">
                   Forgot Password?
                 </button>
               </div>
             </form>
           ) : (
             <form onSubmit={handleForgotPassword} className="space-y-4">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">
-                Send Reset Link
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForgotPassword(false)}
-                className="w-full text-gray-400 hover:text-white py-3 text-sm"
-              >
-                ← Back to Login
-              </button>
+              <input type="email" placeholder="Enter your email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Send Reset Link</button>
+              <button type="button" onClick={() => setShowForgotPassword(false)} className="w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
             </form>
           )}
         </div>
@@ -221,7 +202,7 @@ function App() {
     )
   }
 
-  // ====================== DASHBOARD ======================
+  // Dashboard + Calculators
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
@@ -232,10 +213,7 @@ function App() {
           </div>
 
           {/* Phoenix Link */}
-          <button
-            onClick={() => setCurrentView('phoenix')}
-            className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28"
-          >
+          <button onClick={() => setCurrentView('phoenix')} className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28">
             <img src="/phoenix-link-logo.png" alt="Phoenix" className="w-16 h-16 rounded-xl flex-shrink-0" />
             <div>
               <div className="font-semibold text-2xl text-orange-400">Phoenix Link EV Calc</div>
@@ -244,10 +222,7 @@ function App() {
           </button>
 
           {/* Buffalo Link */}
-          <button
-            onClick={() => setCurrentView('buffalo')}
-            className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
-          >
+          <button onClick={() => setCurrentView('buffalo')} className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner flex-shrink-0">
               <img src="/buffalo-icon.png" alt="Buffalo" className="w-14 h-14 object-contain" />
             </div>
@@ -258,10 +233,7 @@ function App() {
           </button>
 
           {/* Stack Up Pays */}
-          <button
-            onClick={() => setCurrentView('stackup')}
-            className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
-          >
+          <button onClick={() => setCurrentView('stackup')} className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="w-16 h-16 object-cover rounded-2xl shadow-lg flex-shrink-0" />
             <div>
               <div className="font-semibold text-2xl text-cyan-100">Stack Up Pays</div>
@@ -270,10 +242,7 @@ function App() {
           </button>
 
           {/* MHB Calculator */}
-          <button
-            onClick={() => setCurrentView('mhb')}
-            className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
-          >
+          <button onClick={() => setCurrentView('mhb')} className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 shadow-inner flex-shrink-0 text-5xl">🎰</div>
             <div>
               <div className="font-semibold text-2xl text-purple-100">Must Hit By Jackpot</div>
@@ -281,14 +250,8 @@ function App() {
             </div>
           </button>
 
-          {/* Logout */}
           <div className="mt-12 text-center">
-            <button
-              onClick={handleLogout}
-              className="text-gray-400 hover:text-red-400 text-sm underline transition-colors"
-            >
-              Logout
-            </button>
+            <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 text-sm underline transition-colors">Logout</button>
           </div>
         </div>
       ) : currentView === 'phoenix' ? (
