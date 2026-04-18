@@ -58,9 +58,11 @@ function App() {
       alert("Please enter your email")
       return
     }
+
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: window.location.origin + '/reset-password'
+      redirectTo: `${window.location.origin}/reset-password`   // ← This must match your allowed redirect URLs in Supabase dashboard
     })
+
     if (error) alert(error.message)
     else alert("Password reset link has been sent to your email!")
   }
