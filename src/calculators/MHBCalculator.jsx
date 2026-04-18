@@ -49,7 +49,7 @@ function MHBCalculator({ onBack }) {
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
 
-        {/* Title block - back button now vertically centered with title */}
+        {/* Title block - responsive font size so it always stays on one line */}
         <div className="flex items-center mb-6">
           <button
             onClick={onBack}
@@ -63,7 +63,7 @@ function MHBCalculator({ onBack }) {
               <span className="text-4xl">🎰</span>
             </div>
             <h1
-              className="text-[33px] font-black tracking-[-1.6px] text-white"
+              className="font-black tracking-[-1.4px] text-white text-[28px] sm:text-[31px] md:text-[33px]"
               style={{
                 textShadow: `-2px -2px 0 #7e22ce, 2px -2px 0 #7e22ce, -2px 2px 0 #7e22ce, 2px 2px 0 #7e22ce`
               }}
