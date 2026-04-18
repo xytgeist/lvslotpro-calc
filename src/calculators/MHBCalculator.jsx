@@ -37,7 +37,7 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Midpoint and EV calculation
+    // Midpoint and EV calculation (your logic)
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -165,7 +165,9 @@ function MHBCalculator({ onBack }) {
           <div className="grid grid-cols-2 gap-4 text-center">
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Expected Value</div>
-              <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{ev.toFixed(2)}×</div>
+              <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                ${ev.toFixed(0)}
+              </div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Breakeven Entry</div>
