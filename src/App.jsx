@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import PhoenixLink from './calculators/PhoenixLink'
 import BuffaloLink from './calculators/BuffaloLink'
 import StackUpPays from './calculators/StackUpPays'
-import MysteryMustHit from './calculators/MysteryMustHit'
+import MHBCalculator from './calculators/MHBCalculator'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
