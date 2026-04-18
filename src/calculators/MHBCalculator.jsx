@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 function MHBCalculator({ onBack }) {
   // Main fields
   const [current, setCurrent] = useState(475)
-  const [mustHitBy, setMustHitBy] = useState(500)   // default to Ainsworth 500
+  const [mustHitBy, setMustHitBy] = useState(500)
 
   // Advanced Settings
   const [overallRTP, setOverallRTP] = useState(85)
@@ -21,6 +21,15 @@ function MHBCalculator({ onBack }) {
   const [jpContribution, setJpContribution] = useState(0)
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
+
+  // Auto-adjust Current JP when MHB changes
+  useEffect(() => {
+    if (mustHitBy === 10000) {
+      setCurrent(9802)
+    } else if (mustHitBy === 500) {
+      setCurrent(475)
+    }
+  }, [mustHitBy])
 
   const calculate = () => {
     const rtp = overallRTP / 100
@@ -138,8 +147,8 @@ function MHBCalculator({ onBack }) {
                 onChange={(e) => setMustHitBy(Number(e.target.value))}
                 className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300"
               >
-                <option value={500}>Ainsworth 500</option>
-                <option value={10000}>Ainsworth 10000</option>
+                <option value={500}>500</option>
+                <option value={10000}>10000</option>
               </select>
             </div>
           </div>
