@@ -38,7 +38,7 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Midpoint and EV calculation (your logic)
+    // Midpoint and EV calculation
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -50,13 +50,12 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = midpoint - expectedLoss
 
-    // Breakeven Entry — solved, then rounded UP so it shows "just above" +EV
+    // Breakeven Entry (rounded up so it shows just above +EV)
     const houseEdge = 1 - rtp
     let breakevenCurrent = useMidpoint
       ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
       : mhb - (riseDollars * 0.01 / houseEdge)
 
-    // Round UP to the next whole dollar so it is the first point that is +EV
     breakevenCurrent = Math.ceil(breakevenCurrent)
 
     // JP Contribution
@@ -67,7 +66,7 @@ function MHBCalculator({ onBack }) {
     const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge / denom)
 
     setEv(Number(finalEV.toFixed(2)))
-    setBreakeven(breakevenCurrent)
+    setBreakeven(Math.round(breakevenCurrent))
     setCoinInRequired(Math.round(coinInToMidpoint))
     setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(maxExposureBets)
@@ -180,7 +179,7 @@ function MHBCalculator({ onBack }) {
               <div className="text-4xl font-bold text-purple-300">{breakeven}</div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
-              <div className="text-gray-400 text-sm">Coin In Required</div>
+              <div className="text-gray-400 text-sm">Coin in expected</div>
               <div className="text-4xl font-bold text-amber-400">${coinInRequired}</div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
