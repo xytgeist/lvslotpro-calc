@@ -27,14 +27,21 @@ function App() {
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
 
+  // Stronger hash detection for recovery links
   useEffect(() => {
-    // Check URL hash for recovery token (this is the key fix)
-    const hash = window.location.hash
-    if (hash.includes('type=recovery') || hash.includes('access_token')) {
-      setCurrentView('reset-password')
-      // Clean the URL after detecting the token
-      window.history.replaceState({}, document.title, window.location.pathname)
+    const checkForRecoveryToken = () => {
+      const hash = window.location.hash
+      if (hash.includes('type=recovery') || hash.includes('access_token')) {
+        setCurrentView('reset-password')
+        // Clean the URL so it looks nice
+        window.history.replaceState({}, document.title, '/reset-password')
+      }
     }
+
+    checkForRecoveryToken()
+
+    // Also listen for hash changes (in case user refreshes or something)
+    window.addEventListener('hashchange', checkForRecoveryToken)
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -51,7 +58,7 @@ function App() {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => window.removeEventListener('hashchange', checkForRecoveryToken)
   }, [])
 
   const checkWhitelist = async (userEmail) => {
@@ -79,10 +86,9 @@ function App() {
       redirectTo
     })
 
-    if (error) {
-      alert("Error sending link: " + error.message)
-    } else {
-      alert("✅ Reset link sent! Check your inbox (and spam folder).\n\nClick it quickly — some email providers scan links automatically and expire them.")
+    if (error) alert("Error: " + error.message)
+    else {
+      alert("Reset link sent! Check your inbox (and spam folder). Click it quickly.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -102,7 +108,7 @@ function App() {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
 
     if (error) {
-      setResetError("Error: " + error.message)
+      setResetError(error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
       setTimeout(() => {
@@ -120,7 +126,7 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
   }
 
-  // ====================== RESET PASSWORD PAGE ======================
+  // Reset Password Page
   if (currentView === 'reset-password') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -134,10 +140,9 @@ function App() {
           )}
 
           {resetMessage ? (
-            <div className="text-center py-8">
-              <div className="text-emerald-400 text-2xl mb-4">✅</div>
-              <p className="text-emerald-400 text-lg font-medium">{resetMessage}</p>
-              <p className="text-gray-400 mt-2">Redirecting to login...</p>
+            <div className="text-center py-8 text-emerald-400">
+              <div className="text-4xl mb-4">✅</div>
+              <p className="text-lg font-medium">{resetMessage}</p>
             </div>
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
@@ -174,7 +179,7 @@ function App() {
     )
   }
 
-  // ====================== LOGIN SCREEN ======================
+  // Login Screen
   if (!user || !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -205,7 +210,7 @@ function App() {
     )
   }
 
-  // Dashboard + Calculators
+  // Dashboard
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
