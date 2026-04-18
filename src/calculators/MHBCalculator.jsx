@@ -7,7 +7,7 @@ function MHBCalculator({ onBack }) {
   const [denom, setDenom] = useState(1.00)
 
   // Advanced Settings
-  const [overallRTP, setOverallRTP] = useState(86)
+  const [overallRTP, setOverallRTP] = useState(86)   // Changed default to 86%
   const [meterRise, setMeterRise] = useState(2.50)
   const [resetValue, setResetValue] = useState(350)
   const [useMidpoint, setUseMidpoint] = useState(true)
@@ -21,7 +21,7 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // Auto RTP fallback
+  // Auto RTP based on denomination (still runs as fallback)
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -52,7 +52,6 @@ function MHBCalculator({ onBack }) {
     const remainingDollars = mhb - currentVal
     const spinsToHit = remainingDollars / riseDollars
 
-    // Midpoint logic for realistic EV and breakeven
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -65,16 +64,12 @@ function MHBCalculator({ onBack }) {
     const fullEV = 1 - houseEdge * spinsFull
     const finalEV = useMidpoint ? avgEV : fullEV
 
-    // Breakeven entry using midpoint when enabled
-    const beEntry = Math.round(mhb - (1 / houseEdge) * riseDollars * (useMidpoint ? 0.5 : 1))
-
-    // Coin in required to reach breakeven (in dollars)
+    const beEntry = Math.round(mhb - (1 / houseEdge) * riseDollars)
     const coinInToBE = Math.max(0, Math.round((beEntry - currentVal) / riseDollars * denom))
 
-    // JP Contribution using your exact formula
+    // JP Contribution using your specified formula
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure (full run)
     const maxExposureBets = Math.round(spinsFull * houseEdge)
 
     setEv(Number(finalEV.toFixed(2)))
@@ -156,21 +151,39 @@ function MHBCalculator({ onBack }) {
               <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">RTP %</label>
-                  <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 86)} onBlur={handleFloatBlur(setOverallRTP, 86)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
+                  <input 
+                    type="text" 
+                    value={overallRTP} 
+                    onChange={handleFloatChange(setOverallRTP, 86)} 
+                    onBlur={handleFloatBlur(setOverallRTP, 86)} 
+                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                  />
                 </div>
 
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per $0.01 increment)</label>
-                  <input type="text" value={meterRise} onChange={handleFloatChange(setMeterRise, 2.50)} onBlur={handleFloatBlur(setMeterRise, 2.50)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
+                  <input 
+                    type="text" 
+                    value={meterRise} 
+                    onChange={handleFloatChange(setMeterRise, 2.50)} 
+                    onBlur={handleFloatBlur(setMeterRise, 2.50)} 
+                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                  />
                 </div>
 
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Reset Value</label>
-                  <input type="text" value={resetValue} onChange={handleIntegerChange(setResetValue, 350)} onBlur={handleIntegerBlur(setResetValue, 350)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
+                  <input 
+                    type="text" 
+                    value={resetValue} 
+                    onChange={handleIntegerChange(setResetValue, 350)} 
+                    onBlur={handleIntegerBlur(setResetValue, 350)} 
+                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                  />
                 </div>
 
                 <div className="flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
-                  <span className="text-gray-300">Use Midpoint for EV & Breakeven</span>
+                  <span className="text-gray-300">Use Midpoint for EV</span>
                   <button onClick={() => setUseMidpoint(!useMidpoint)} className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>
                     {useMidpoint ? 'YES' : 'NO'}
                   </button>
