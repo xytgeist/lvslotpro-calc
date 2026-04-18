@@ -27,24 +27,28 @@ function App() {
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
 
-  // === STRONG RECOVERY TOKEN DETECTION ===
+  // === AGGRESSIVE RECOVERY DETECTION ===
   useEffect(() => {
-    const checkRecovery = () => {
-      const hash = window.location.hash
+    const detectRecovery = () => {
+      const hash = window.location.hash || ''
       if (hash.includes('type=recovery') || hash.includes('access_token')) {
+        console.log('🔑 Recovery token detected – switching to reset view')
         setCurrentView('reset-password')
-        // Clean the URL (remove hash so it looks clean)
+        // Clean hash from URL
         window.history.replaceState({}, document.title, '/reset-password')
       }
     }
 
-    // Run on mount
-    checkRecovery()
+    // Run immediately
+    detectRecovery()
 
-    // Also run if hash changes
-    window.addEventListener('hashchange', checkRecovery)
+    // Run again after a tiny delay (helps with Vercel hydration)
+    const timeout = setTimeout(detectRecovery, 100)
 
-    // Supabase session handling
+    // Also listen for hash changes
+    window.addEventListener('hashchange', detectRecovery)
+
+    // Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) checkWhitelist(session.user.email)
@@ -60,7 +64,10 @@ function App() {
       }
     })
 
-    return () => window.removeEventListener('hashchange', checkRecovery)
+    return () => {
+      window.removeEventListener('hashchange', detectRecovery)
+      clearTimeout(timeout)
+    }
   }, [])
 
   const checkWhitelist = async (userEmail) => {
@@ -88,7 +95,7 @@ function App() {
 
     if (error) alert("Error: " + error.message)
     else {
-      alert("Reset link sent! Check your inbox (and spam). Click it quickly.")
+      alert("Reset link sent! Check your inbox (and spam folder). Click it quickly before any scanner touches it.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -111,7 +118,9 @@ function App() {
       setResetError(error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
-      setTimeout(() => window.location.href = 'https://lvslotpro.com', 1800)
+      setTimeout(() => {
+        window.location.href = 'https://lvslotpro.com'
+      }, 1800)
     }
   }
 
@@ -124,26 +133,54 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
   }
 
-  // Reset Password Page
+  // ====================== RESET PASSWORD PAGE ======================
   if (currentView === 'reset-password') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Reset Your Password</h2>
 
-          {resetError && <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-center">{resetError}</div>}
+          {resetError && (
+            <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-sm text-center">
+              {resetError}
+            </div>
+          )}
 
           {resetMessage ? (
-            <div className="text-center py-8 text-emerald-400 text-lg">{resetMessage}</div>
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">✅</div>
+              <p className="text-emerald-400 text-lg font-medium">{resetMessage}</p>
+            </div>
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
-              <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
-              <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
-              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Update Password</button>
+              <input
+                type="password"
+                placeholder="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+                required
+              />
+              <input
+                type="password"
+                placeholder="Confirm New Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
+                required
+              />
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">
+                Update Password
+              </button>
             </form>
           )}
 
-          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
+          <button
+            onClick={() => window.location.href = 'https://lvslotpro.com'}
+            className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm"
+          >
+            ← Back to Login
+          </button>
         </div>
       </div>
     )
@@ -177,7 +214,7 @@ function App() {
     )
   }
 
-  // Dashboard
+  // Dashboard + Calculators
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
@@ -187,7 +224,7 @@ function App() {
             <p className="text-zinc-400 mt-3">Select a calculator</p>
           </div>
 
-          {/* Your 4 calculator buttons — unchanged */}
+          {/* Phoenix Link */}
           <button onClick={() => setCurrentView('phoenix')} className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28">
             <img src="/phoenix-link-logo.png" alt="Phoenix" className="w-16 h-16 rounded-xl flex-shrink-0" />
             <div>
@@ -196,6 +233,7 @@ function App() {
             </div>
           </button>
 
+          {/* Buffalo Link */}
           <button onClick={() => setCurrentView('buffalo')} className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner flex-shrink-0">
               <img src="/buffalo-icon.png" alt="Buffalo" className="w-14 h-14 object-contain" />
@@ -206,6 +244,7 @@ function App() {
             </div>
           </button>
 
+          {/* Stack Up Pays */}
           <button onClick={() => setCurrentView('stackup')} className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="w-16 h-16 object-cover rounded-2xl shadow-lg flex-shrink-0" />
             <div>
@@ -214,6 +253,7 @@ function App() {
             </div>
           </button>
 
+          {/* MHB Calculator */}
           <button onClick={() => setCurrentView('mhb')} className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 shadow-inner flex-shrink-0 text-5xl">🎰</div>
             <div>
