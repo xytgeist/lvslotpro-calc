@@ -14,7 +14,7 @@ function MHBCalculator({ onBack }) {
 
   // Outputs
   const [ev, setEv] = useState(0)
-  const [evExact, setEvExact] = useState(0)           // new: exact EV to the penny
+  const [evExact, setEvExact] = useState(0)
   const [breakeven, setBreakeven] = useState(0)
   const [breakevenExact, setBreakevenExact] = useState(0)
   const [coinInExpected, setCoinInExpected] = useState(0)
@@ -68,8 +68,8 @@ function MHBCalculator({ onBack }) {
     const fullIncrements = (mhb - currentVal) / 0.01
     const maxExposureDollars = fullIncrements * riseDollars * houseEdge
 
-    setEv(Math.round(finalEV))                    // large rounded dollar
-    setEvExact(Number(finalEV.toFixed(2)))        // exact to the penny
+    setEv(Math.round(finalEV))
+    setEvExact(Number(finalEV.toFixed(2)))
     setBreakeven(breakevenRounded)
     setBreakevenExact(Number(breakevenCurrent.toFixed(2)))
     setCoinInExpected(Math.round(coinInToTarget))
@@ -174,7 +174,7 @@ function MHBCalculator({ onBack }) {
               <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 ${ev.toFixed(0)}
               </div>
-              <div className="text-xs text-emerald-400/70 mt-1">
+              <div className={`text-xs mt-1 ${ev >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
                 ${evExact.toFixed(2)}
               </div>
             </div>
