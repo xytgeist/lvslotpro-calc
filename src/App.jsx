@@ -52,22 +52,28 @@ function App() {
     if (error) alert(error.message)
   }
 
-  const handleForgotPassword = async (e) => {
+
+    const handleForgotPassword = async (e) => {
     e.preventDefault()
     if (!forgotEmail) {
       alert("Please enter your email")
       return
     }
 
-    // Use the exact path where you will handle the reset
+    // Use the exact path Supabase expects
     const redirectTo = `${window.location.origin}/reset-password`
 
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
       redirectTo: redirectTo
     })
 
-    if (error) alert(error.message)
-    else alert("Password reset link has been sent to your email. Check your inbox (and spam folder).")
+    if (error) {
+      console.error(error)
+      alert("Error sending reset link: " + error.message)
+    } else {
+      alert("Password reset link sent! Check your inbox (and spam folder).")
+      setShowForgotPassword(false)   // go back to login screen
+    }
   }
 
   const handleLogout = async () => {
