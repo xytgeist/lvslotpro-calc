@@ -52,7 +52,6 @@ function MHBCalculator({ onBack }) {
     const remainingDollars = mhb - currentVal
     const spinsToHit = remainingDollars / riseDollars
 
-    // Midpoint logic
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -65,16 +64,12 @@ function MHBCalculator({ onBack }) {
     const fullEV = 1 - houseEdge * spinsFull
     const finalEV = useMidpoint ? avgEV : fullEV
 
-    // Breakeven entry
     const beEntry = Math.round(mhb - (1 / houseEdge) * riseDollars)
-
-    // Coin in required (in dollars)
     const coinInToBE = Math.max(0, Math.round((beEntry - currentVal) / riseDollars * denom))
 
-    // ✅ EXACT FORMULA YOU WANTED
+    // JP Contribution using the formula you specified
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure
     const maxExposureBets = Math.round(spinsFull * houseEdge)
 
     setEv(Number(finalEV.toFixed(2)))
@@ -89,7 +84,7 @@ function MHBCalculator({ onBack }) {
     calculate()
   }, [current, mustHitBy, meterRise, resetValue, denom, overallRTP, useMidpoint])
 
-  // Better input handlers
+  // Input handlers
   const handleIntegerChange = (setter, defaultVal) => (e) => {
     setter(e.target.value.replace(/[^0-9]/g, ''))
   }
@@ -160,7 +155,7 @@ function MHBCalculator({ onBack }) {
                 </div>
 
                 <div>
-                  <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per increment)</label>
+                  <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per $0.01 increment)</label>
                   <input type="text" value={meterRise} onChange={handleFloatChange(setMeterRise, 2.50)} onBlur={handleFloatBlur(setMeterRise, 2.50)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
 
