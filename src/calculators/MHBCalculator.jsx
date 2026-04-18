@@ -14,8 +14,9 @@ function MHBCalculator({ onBack }) {
 
   // Outputs
   const [ev, setEv] = useState(0)
+  const [evExact, setEvExact] = useState(0)           // new: exact EV to the penny
   const [breakeven, setBreakeven] = useState(0)
-  const [breakevenExact, setBreakevenExact] = useState(0)   // new: exact to the penny
+  const [breakevenExact, setBreakevenExact] = useState(0)
   const [coinInExpected, setCoinInExpected] = useState(0)
   const [jpContribution, setJpContribution] = useState(0)
   const [exposure, setExposure] = useState(0)
@@ -30,6 +31,7 @@ function MHBCalculator({ onBack }) {
 
     if (mhb <= currentVal) {
       setEv(999)
+      setEvExact(999)
       setBreakeven(currentVal)
       setBreakevenExact(currentVal)
       setCoinInExpected(0)
@@ -51,7 +53,7 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = target - expectedLoss
 
-    // Breakeven Entry (rounded up for display)
+    // Breakeven Entry (rounded up)
     const houseEdge = 1 - rtp
     let breakevenCurrent = useMidpoint
       ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
@@ -66,9 +68,10 @@ function MHBCalculator({ onBack }) {
     const fullIncrements = (mhb - currentVal) / 0.01
     const maxExposureDollars = fullIncrements * riseDollars * houseEdge
 
-    setEv(Number(finalEV.toFixed(2)))
+    setEv(Math.round(finalEV))                    // large rounded dollar
+    setEvExact(Number(finalEV.toFixed(2)))        // exact to the penny
     setBreakeven(breakevenRounded)
-    setBreakevenExact(Number(breakevenCurrent.toFixed(2)))   // exact to the penny
+    setBreakevenExact(Number(breakevenCurrent.toFixed(2)))
     setCoinInExpected(Math.round(coinInToTarget))
     setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(Math.round(maxExposureDollars))
@@ -170,6 +173,9 @@ function MHBCalculator({ onBack }) {
               <div className="text-gray-400 text-sm">Expected Value</div>
               <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 ${ev.toFixed(0)}
+              </div>
+              <div className="text-xs text-emerald-400/70 mt-1">
+                ${evExact.toFixed(2)}
               </div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
