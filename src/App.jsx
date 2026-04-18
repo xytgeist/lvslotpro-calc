@@ -27,21 +27,29 @@ function App() {
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
 
-  // === RECOVERY TOKEN HANDLING ===
   useEffect(() => {
-    const handleRecoveryToken = async () => {
+    const handleRecovery = async () => {
       const hash = window.location.hash
+      if (!hash) return
+
       if (hash.includes('type=recovery') || hash.includes('access_token')) {
         setCurrentView('reset-password')
 
-        // Exchange the recovery token for a real session
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: hash.split('access_token=')[1]?.split('&')[0] || '',
-          type: 'recovery'
-        })
+        // Extract token_hash more reliably
+        const tokenHashMatch = hash.match(/access_token=([^&]+)/)
+        const tokenHash = tokenHashMatch ? tokenHashMatch[1] : null
 
-        if (error) {
-          setResetError('This link has expired or is invalid. Please request a new reset link.')
+        if (tokenHash) {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery'
+          })
+
+          if (error) {
+            setResetError('This reset link has expired or has already been used. Please request a new one.')
+          }
+        } else {
+          setResetError('Invalid reset link. Please request a new one.')
         }
 
         // Clean the URL
@@ -49,7 +57,7 @@ function App() {
       }
     }
 
-    handleRecoveryToken()
+    handleRecovery()
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -94,7 +102,7 @@ function App() {
 
     if (error) alert("Error: " + error.message)
     else {
-      alert("Reset link sent! Check your inbox (and spam). Click it quickly.")
+      alert("Reset link sent! Check your inbox (and spam folder).\n\nClick it as soon as possible — email scanners can expire it.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -114,7 +122,7 @@ function App() {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
 
     if (error) {
-      setResetError(error.message)
+      setResetError("Error: " + error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
       setTimeout(() => {
@@ -146,7 +154,7 @@ function App() {
           )}
 
           {resetMessage ? (
-            <div className="text-center py-8 text-emerald-400 text-lg">{resetMessage}</div>
+            <div className="text-center py-8 text-emerald-400 text-lg font-medium">{resetMessage}</div>
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
               <input
@@ -210,7 +218,7 @@ function App() {
     )
   }
 
-  // Dashboard
+  // Dashboard + Calculators
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
