@@ -7,7 +7,7 @@ function MHBCalculator({ onBack }) {
   const [denom, setDenom] = useState(1.00)
 
   // Advanced Settings
-  const [overallRTP, setOverallRTP] = useState(86)
+  const [overallRTP, setOverallRTP] = useState(85)      // changed to 85% as per your test case
   const [meterRise, setMeterRise] = useState(2.50)
   const [resetValue, setResetValue] = useState(350)
   const [useMidpoint, setUseMidpoint] = useState(true)
@@ -50,18 +50,21 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = midpoint - expectedLoss
 
-    // Breakeven Current JP (solved so that finalEV = 0)
-    // Formula: breakevenCurrent = mhb - (riseDollars * 0.01 * 0.5 / (1 - rtp))
-    const breakevenCurrent = useMidpoint 
-      ? mhb - (riseDollars * 0.01 * 0.5 / (1 - rtp))
-      : mhb - (riseDollars * 0.01 / (1 - rtp))
+    // Solve for Breakeven Current JP (where finalEV = 0)
+    // finalEV = midpoint - (coinIn * (1-rtp)) = 0
+    // midpoint = current + (mhb - current) * 0.5
+    // coinIn = ((midpoint - current) / 0.01) * riseDollars
+    const houseEdge = 1 - rtp
+    const breakevenCurrent = useMidpoint
+      ? mhb - (riseDollars * 0.01 * 0.5 / houseEdge)
+      : mhb - (riseDollars * 0.01 / houseEdge)
 
-    // JP Contribution using your formula
+    // JP Contribution (your formula)
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
     // Max exposure (full run)
     const fullIncrements = (mhb - currentVal) / 0.01
-    const maxExposureBets = Math.round(fullIncrements * riseDollars * (1 - rtp) / denom)
+    const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge / denom)
 
     setEv(Number(finalEV.toFixed(2)))
     setBreakeven(Math.round(breakevenCurrent))
@@ -139,7 +142,7 @@ function MHBCalculator({ onBack }) {
               <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">RTP %</label>
-                  <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 86)} onBlur={handleFloatBlur(setOverallRTP, 86)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
+                  <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 85)} onBlur={handleFloatBlur(setOverallRTP, 85)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
 
                 <div>
