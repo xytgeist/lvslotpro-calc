@@ -17,18 +17,18 @@ function App() {
   const [isChecking, setIsChecking] = useState(true)
   const [currentView, setCurrentView] = useState('dashboard')
 
-  // Forgot password
+  // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
 
-  // Reset password
+  // Reset password states
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
 
   useEffect(() => {
-    // Detect recovery link
+    // Simple detection – just show the reset form when the magic link arrives
     const hash = window.location.hash
     if (hash.includes('type=recovery') || hash.includes('access_token')) {
       setCurrentView('reset-password')
@@ -75,7 +75,7 @@ function App() {
 
     if (error) alert("Error: " + error.message)
     else {
-      alert("Reset link sent! Check inbox/spam and click it quickly.")
+      alert("Reset link sent! Check inbox/spam and click it QUICKLY.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -101,9 +101,7 @@ function App() {
     window.location.reload()
   }
 
-  if (isChecking) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
-  }
+  if (isChecking) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
 
   // Reset Password Page
   if (currentView === 'reset-password') {
@@ -115,34 +113,16 @@ function App() {
           {resetError && <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-center">{resetError}</div>}
 
           {resetMessage ? (
-            <div className="text-center py-8 text-emerald-400 text-lg">{resetMessage}</div>
+            <div className="text-center py-8 text-emerald-400 text-lg font-medium">{resetMessage}</div>
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
-              <input
-                type="password"
-                placeholder="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Confirm New Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">
-                Update Password
-              </button>
+              <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Update Password</button>
             </form>
           )}
 
-          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">
-            ← Back to Login
-          </button>
+          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
         </div>
       </div>
     )
