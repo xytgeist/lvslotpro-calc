@@ -8,7 +8,7 @@ function MHBCalculator({ onBack }) {
 
   // Advanced Settings
   const [overallRTP, setOverallRTP] = useState(86)
-  const [meterRise, setMeterRise] = useState(2.50)   // $ wagered per $0.01 meter rise
+  const [meterRise, setMeterRise] = useState(2.50)
   const [resetValue, setResetValue] = useState(350)
   const [useMidpoint, setUseMidpoint] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -25,7 +25,7 @@ function MHBCalculator({ onBack }) {
     const rtp = overallRTP / 100
     const currentVal = Number(current) || 475
     const mhb = Number(mustHitBy) || 500
-    const risePerCent = Number(meterRise) || 2.50   // $ wagered to move meter $0.01
+    const riseDollars = Number(meterRise) || 2.50
     const resetVal = Number(resetValue) || 350
 
     if (mhb <= currentVal) {
@@ -38,36 +38,33 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Midpoint calculation
+    // === YOUR EXACT LOGIC ===
     const midpoint = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
 
-    const dollarDistanceToMidpoint = midpoint - currentVal
-
-    // Coin-in required to reach midpoint
-    const centsNeeded = dollarDistanceToMidpoint / 0.01          // how many $0.01 increments
-    const coinInToMidpoint = centsNeeded * risePerCent           // total $ wagered
-
-    // Expected loss on the way there
-    const expectedLoss = coinInToMidpoint * (1 - rtp)
-
-    // Net EV when we hit at midpoint
+    const dollarDistance = midpoint - currentVal
+    const incrementsNeeded = dollarDistance / 0.01
+    const coinIn = incrementsNeeded * riseDollars
+    const expectedLoss = coinIn * (1 - rtp)
     const finalEV = midpoint - expectedLoss
 
-    // Breakeven entry point (approximate)
-    const beEntry = Math.round(mhb - (1 / (1 - rtp)) * 0.01 * risePerCent * (useMidpoint ? 0.5 : 1))
+    // Breakeven Entry = the JP current value where EV = 0 (solved analytically)
+    const houseEdge = 1 - rtp
+    const breakevenCurrent = useMidpoint 
+      ? mhb - (riseDollars * 0.01 * (0.5 / houseEdge)) 
+      : mhb - (riseDollars * 0.01 / houseEdge)
 
-    // JP Contribution %
+    // JP Contribution (your formula)
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
     // Max exposure (full run to MHB)
-    const spinsFull = (mhb - currentVal) / 0.01
-    const maxExposureBets = Math.round(spinsFull * risePerCent * (1 - rtp) / denom)
+    const fullIncrements = (mhb - currentVal) / 0.01
+    const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge / denom)
 
     setEv(Number(finalEV.toFixed(2)))
-    setBreakeven(beEntry)
-    setCoinInRequired(Math.round(coinInToMidpoint))
+    setBreakeven(Math.round(breakevenCurrent))
+    setCoinInRequired(Math.round(coinIn))
     setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(maxExposureBets)
     setIsPositive(finalEV >= 0)
@@ -81,16 +78,13 @@ function MHBCalculator({ onBack }) {
   const handleIntegerChange = (setter, defaultVal) => (e) => {
     setter(e.target.value.replace(/[^0-9]/g, ''))
   }
-
   const handleIntegerBlur = (setter, defaultVal) => (e) => {
     let val = parseInt(e.target.value, 10)
     setter(isNaN(val) ? defaultVal : val)
   }
-
   const handleFloatChange = (setter, defaultVal) => (e) => {
     setter(e.target.value.replace(/[^0-9.]/g, ''))
   }
-
   const handleFloatBlur = (setter, defaultVal) => (e) => {
     let val = parseFloat(e.target.value)
     setter(isNaN(val) ? defaultVal : val)
