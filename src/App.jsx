@@ -81,7 +81,7 @@ function App() {
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Las Vegas Slot Pro</h2>
 
           {!showForgotPassword ? (
-            /* Normal Login Form */
+            /* Normal Login */
             <form onSubmit={handleLogin} className="space-y-4">
               <input
                 type="email"
@@ -199,6 +199,16 @@ function App() {
               <div className="text-base text-purple-200">Progressive must-hit analyzer</div>
             </div>
           </button>
+
+          {/* Logout Link at bottom */}
+          <div className="mt-12 text-center">
+            <button
+              onClick={handleLogout}
+              className="text-gray-400 hover:text-red-400 text-sm underline transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       ) : currentView === 'phoenix' ? (
         <PhoenixLink onBack={() => setCurrentView('dashboard')} />
