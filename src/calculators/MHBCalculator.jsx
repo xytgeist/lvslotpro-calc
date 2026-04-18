@@ -4,7 +4,6 @@ function MHBCalculator({ onBack }) {
   // Main fields
   const [current, setCurrent] = useState(475)
   const [mustHitBy, setMustHitBy] = useState(500)
-  const [denom, setDenom] = useState(1.00)
 
   // Advanced Settings
   const [overallRTP, setOverallRTP] = useState(85)
@@ -16,7 +15,7 @@ function MHBCalculator({ onBack }) {
   // Outputs
   const [ev, setEv] = useState(0)
   const [breakeven, setBreakeven] = useState(0)
-  const [coinInRequired, setCoinInRequired] = useState(0)
+  const [coinInExpected, setCoinInExpected] = useState(0)
   const [jpContribution, setJpContribution] = useState(0)
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
@@ -31,7 +30,7 @@ function MHBCalculator({ onBack }) {
     if (mhb <= currentVal) {
       setEv(999)
       setBreakeven(currentVal)
-      setCoinInRequired(0)
+      setCoinInExpected(0)
       setJpContribution(0)
       setExposure(0)
       setIsPositive(true)
@@ -50,7 +49,7 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = midpoint - expectedLoss
 
-    // Breakeven Entry (rounded up so it shows just above +EV)
+    // Breakeven Entry (rounded up)
     const houseEdge = 1 - rtp
     let breakevenCurrent = useMidpoint
       ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
@@ -61,13 +60,13 @@ function MHBCalculator({ onBack }) {
     // JP Contribution
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure
+    // Max exposure (full run)
     const fullIncrements = (mhb - currentVal) / 0.01
-    const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge / denom)
+    const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge)
 
     setEv(Number(finalEV.toFixed(2)))
     setBreakeven(Math.round(breakevenCurrent))
-    setCoinInRequired(Math.round(coinInToMidpoint))
+    setCoinInExpected(Math.round(coinInToMidpoint))
     setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(maxExposureBets)
     setIsPositive(finalEV >= 0)
@@ -75,7 +74,7 @@ function MHBCalculator({ onBack }) {
 
   useEffect(() => {
     calculate()
-  }, [current, mustHitBy, meterRise, resetValue, denom, overallRTP, useMidpoint])
+  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint])
 
   // Input handlers
   const handleIntegerChange = (setter, defaultVal) => (e) => {
@@ -122,12 +121,6 @@ function MHBCalculator({ onBack }) {
             <div>
               <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
               <input type="text" value={mustHitBy} onChange={handleIntegerChange(setMustHitBy, 500)} onBlur={handleIntegerBlur(setMustHitBy, 500)} className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center" />
-            </div>
-            <div>
-              <label className="block text-gray-400 text-xs mb-1">Denomination</label>
-              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
-                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
-              </select>
             </div>
           </div>
 
@@ -180,7 +173,7 @@ function MHBCalculator({ onBack }) {
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Coin in expected</div>
-              <div className="text-4xl font-bold text-amber-400">${coinInRequired}</div>
+              <div className="text-4xl font-bold text-amber-400">${coinInExpected}</div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">JP Contribution</div>
