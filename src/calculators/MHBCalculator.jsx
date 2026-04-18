@@ -7,7 +7,7 @@ function MHBCalculator({ onBack }) {
   const [denom, setDenom] = useState(1.00)
 
   // Advanced Settings
-  const [overallRTP, setOverallRTP] = useState(85)      // changed to 85% as per your test case
+  const [overallRTP, setOverallRTP] = useState(85)
   const [meterRise, setMeterRise] = useState(2.50)
   const [resetValue, setResetValue] = useState(350)
   const [useMidpoint, setUseMidpoint] = useState(true)
@@ -50,14 +50,17 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = midpoint - expectedLoss
 
-    // Solve for Breakeven Current JP (where finalEV = 0)
-    // finalEV = midpoint - (coinIn * (1-rtp)) = 0
-    // midpoint = current + (mhb - current) * 0.5
-    // coinIn = ((midpoint - current) / 0.01) * riseDollars
+    // === BREAKEVEN ENTRY (solved so finalEV = 0) ===
+    // C = M * [100 * S * (1-R) - 1] / [1 + 100 * S * (1-R)]
     const houseEdge = 1 - rtp
-    const breakevenCurrent = useMidpoint
-      ? mhb - (riseDollars * 0.01 * 0.5 / houseEdge)
-      : mhb - (riseDollars * 0.01 / houseEdge)
+    const factor = 100 * riseDollars * houseEdge
+    let breakevenCurrent;
+
+    if (useMidpoint) {
+      breakevenCurrent = mhb * (factor - 1) / (factor + 1)
+    } else {
+      breakevenCurrent = mhb - (riseDollars * 0.01 / houseEdge)
+    }
 
     // JP Contribution (your formula)
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
