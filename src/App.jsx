@@ -26,40 +26,15 @@ function App() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
-  const [isVerifying, setIsVerifying] = useState(false)
 
-  // === RECOVERY TOKEN HANDLING ===
   useEffect(() => {
-    const handleRecoveryToken = async () => {
-      const hash = window.location.hash
-      if (!hash.includes('type=recovery') && !hash.includes('access_token')) return
-
+    // Detect recovery token in URL
+    const hash = window.location.hash
+    if (hash.includes('type=recovery') || hash.includes('access_token')) {
       setCurrentView('reset-password')
-      setIsVerifying(true)
-
-      // Extract token_hash reliably
-      const tokenHashMatch = hash.match(/access_token=([^&]+)/)
-      const tokenHash = tokenHashMatch ? tokenHashMatch[1] : null
-
-      if (tokenHash) {
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: 'recovery'
-        })
-
-        if (error) {
-          setResetError('This reset link has expired or has already been used.\nPlease request a new one.')
-        }
-      } else {
-        setResetError('Invalid reset link. Please request a new one.')
-      }
-
-      setIsVerifying(false)
-      // Clean URL
+      // Clean the URL
       window.history.replaceState({}, document.title, '/reset-password')
     }
-
-    handleRecoveryToken()
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -104,7 +79,7 @@ function App() {
 
     if (error) alert("Error: " + error.message)
     else {
-      alert("✅ Reset link sent! Check your inbox (and spam folder).\n\nClick it quickly before any email scanner touches it.")
+      alert("✅ Reset link sent! Check your inbox (and spam). Click it quickly.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -124,7 +99,7 @@ function App() {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
 
     if (error) {
-      setResetError("Error: " + error.message)
+      setResetError(error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
       setTimeout(() => {
@@ -152,13 +127,17 @@ function App() {
           {resetError && (
             <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-center">
               {resetError}
+              <button
+                onClick={() => setShowForgotPassword(true)}
+                className="mt-4 block mx-auto text-orange-400 hover:text-orange-300 underline text-sm"
+              >
+                Send a new reset link
+              </button>
             </div>
           )}
 
           {resetMessage ? (
             <div className="text-center py-8 text-emerald-400 text-lg font-medium">{resetMessage}</div>
-          ) : isVerifying ? (
-            <div className="text-center py-8 text-gray-400">Verifying link...</div>
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
               <input
@@ -206,8 +185,11 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
+
               <div className="text-center pt-2">
-                <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">Forgot Password?</button>
+                <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">
+                  Forgot Password?
+                </button>
               </div>
             </form>
           ) : (
