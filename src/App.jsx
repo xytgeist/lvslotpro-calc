@@ -28,11 +28,10 @@ function App() {
   const [resetError, setResetError] = useState('')
 
   useEffect(() => {
-    // Detect recovery token in URL
+    // Simple hash detection for recovery link
     const hash = window.location.hash
     if (hash.includes('type=recovery') || hash.includes('access_token')) {
       setCurrentView('reset-password')
-      // Clean the URL
       window.history.replaceState({}, document.title, '/reset-password')
     }
 
@@ -68,18 +67,15 @@ function App() {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault()
-    if (!forgotEmail) {
-      alert("Please enter your email")
-      return
-    }
+    if (!forgotEmail) return alert("Please enter your email")
 
-    const redirectTo = 'https://lvslotpro.com/reset-password'
-
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, { redirectTo })
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: 'https://lvslotpro.com/reset-password'
+    })
 
     if (error) alert("Error: " + error.message)
     else {
-      alert("✅ Reset link sent! Check your inbox (and spam). Click it quickly.")
+      alert("Reset link sent! Check inbox/spam. Click it immediately.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -87,14 +83,8 @@ function App() {
 
   const handlePasswordReset = async (e) => {
     e.preventDefault()
-    if (newPassword !== confirmPassword) {
-      setResetError("Passwords do not match")
-      return
-    }
-    if (newPassword.length < 6) {
-      setResetError("Password must be at least 6 characters")
-      return
-    }
+    if (newPassword !== confirmPassword) return setResetError("Passwords do not match")
+    if (newPassword.length < 6) return setResetError("Password must be at least 6 characters")
 
     const { error } = await supabase.auth.updateUser({ password: newPassword })
 
@@ -102,9 +92,7 @@ function App() {
       setResetError(error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
-      setTimeout(() => {
-        window.location.href = 'https://lvslotpro.com'
-      }, 2000)
+      setTimeout(() => window.location.href = 'https://lvslotpro.com', 2000)
     }
   }
 
@@ -113,67 +101,34 @@ function App() {
     window.location.reload()
   }
 
-  if (isChecking) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
-  }
+  if (isChecking) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
 
-  // ====================== RESET PASSWORD PAGE ======================
+  // Reset Password Page
   if (currentView === 'reset-password') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Reset Your Password</h2>
 
-          {resetError && (
-            <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-center">
-              {resetError}
-              <button
-                onClick={() => setShowForgotPassword(true)}
-                className="mt-4 block mx-auto text-orange-400 hover:text-orange-300 underline text-sm"
-              >
-                Send a new reset link
-              </button>
-            </div>
-          )}
+          {resetError && <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-center">{resetError}</div>}
 
           {resetMessage ? (
             <div className="text-center py-8 text-emerald-400 text-lg font-medium">{resetMessage}</div>
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
-              <input
-                type="password"
-                placeholder="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Confirm New Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">
-                Update Password
-              </button>
+              <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Update Password</button>
             </form>
           )}
 
-          <button
-            onClick={() => window.location.href = 'https://lvslotpro.com'}
-            className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm"
-          >
-            ← Back to Login
-          </button>
+          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
         </div>
       </div>
     )
   }
 
-  // ====================== LOGIN SCREEN ======================
+  // Login Screen
   if (!user || !isAllowed) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -185,11 +140,8 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
-
               <div className="text-center pt-2">
-                <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">
-                  Forgot Password?
-                </button>
+                <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">Forgot Password?</button>
               </div>
             </form>
           ) : (
@@ -204,7 +156,7 @@ function App() {
     )
   }
 
-  // ====================== DASHBOARD ======================
+  // Dashboard
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
@@ -214,7 +166,6 @@ function App() {
             <p className="text-zinc-400 mt-3">Select a calculator</p>
           </div>
 
-          {/* Phoenix Link */}
           <button onClick={() => setCurrentView('phoenix')} className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28">
             <img src="/phoenix-link-logo.png" alt="Phoenix" className="w-16 h-16 rounded-xl flex-shrink-0" />
             <div>
@@ -223,7 +174,6 @@ function App() {
             </div>
           </button>
 
-          {/* Buffalo Link */}
           <button onClick={() => setCurrentView('buffalo')} className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner flex-shrink-0">
               <img src="/buffalo-icon.png" alt="Buffalo" className="w-14 h-14 object-contain" />
@@ -234,7 +184,6 @@ function App() {
             </div>
           </button>
 
-          {/* Stack Up Pays */}
           <button onClick={() => setCurrentView('stackup')} className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="w-16 h-16 object-cover rounded-2xl shadow-lg flex-shrink-0" />
             <div>
@@ -243,7 +192,6 @@ function App() {
             </div>
           </button>
 
-          {/* MHB Calculator */}
           <button onClick={() => setCurrentView('mhb')} className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 shadow-inner flex-shrink-0 text-5xl">🎰</div>
             <div>
