@@ -167,7 +167,7 @@ function App() {
         ) : currentView === 'stackup' ? (
           <StackUpPays onBack={() => setCurrentView('dashboard')} />
         ) : (
-          <MysteryMustHit onBack={() => setCurrentView('dashboard')} />
+          <MHBCalculator onBack={() => setCurrentView('dashboard')} />
         )}
       </div>
     </div>
