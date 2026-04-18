@@ -1,55 +1,99 @@
 import { useState, useEffect } from 'react'
-import { Line } from 'react-chartjs-2'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js'
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 function MHBCalculator({ onBack }) {
-  const [currentViewCounter, setCurrentViewCounter] = useState(1200)
+  // User definable fields
+  const [current, setCurrent] = useState(1450)
+  const [mustHitBy, setMustHitBy] = useState(1800)
+  const [meterRise, setMeterRise] = useState(42)        // spins per increment (how fast it rises)
+
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
-  const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRTP, setOverallRTP] = useState(91)
+  const [useMidpoint, setUseMidpoint] = useState(true)
 
-  const [evAvg, setEvAvg] = useState(0)
-  const [currentRTP, setCurrentRTP] = useState(91)
-  const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
-  const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
+  // Outputs
+  const [ev, setEv] = useState(0)
+  const [breakeven, setBreakeven] = useState(0)
+  const [coinInRequired, setCoinInRequired] = useState(0)
+  const [jpContribution, setJpContribution] = useState(0)
+  const [exposure, setExposure] = useState(0)
 
-  const [scoutPercentage, setScoutPercentage] = useState(10)
-  const [showInfoModal, setShowInfoModal] = useState(false)
+  const [isPositive, setIsPositive] = useState(false)
 
   // Auto RTP based on denomination
   useEffect(() => {
-    let baseOverall = 91
-    if (denom <= 0.02) baseOverall = 88
-    else if (denom === 0.05) baseOverall = 88.25
-    else if (denom === 0.10) baseOverall = 88.4
-    else if (denom === 0.25) baseOverall = 88.6
-    else if (denom > 1) baseOverall = 91.5
-    setOverallRTP(baseOverall)
+    let base = 91
+    if (denom <= 0.02) base = 88
+    else if (denom === 0.05) base = 88.5
+    else if (denom === 0.10) base = 89
+    else if (denom === 0.25) base = 90
+    else if (denom >= 1) base = 92
+    setOverallRTP(base)
   }, [denom])
 
-  // Placeholder calculation
+  // Main MHB Calculation
+  const calculate = () => {
+    const bet = Number(betSize) || 25
+    const baseRTP = overallRTP / 100
+    const currentVal = Number(current) || 0
+    const mhb = Number(mustHitBy) || 1800
+    const risePerSpin = Number(meterRise) || 40   // spins per increment
+
+    if (mhb <= currentVal) {
+      setEv(999)
+      setBreakeven(currentVal)
+      setCoinInRequired(0)
+      setJpContribution(0)
+      setExposure(0)
+      setIsPositive(true)
+      return
+    }
+
+    const spinsToHit = (mhb - currentVal) / risePerSpin
+
+    // Midpoint logic (same style as Buffalo)
+    const midpoint = useMidpoint 
+      ? currentVal + (mhb - currentVal) * 0.5 
+      : mhb
+
+    const spinsAvg = (midpoint - currentVal) / risePerSpin
+    const spinsFull = spinsToHit
+
+    const houseEdge = 1 - baseRTP
+    const avgEV = 1 - houseEdge * spinsAvg          // assuming 1× jackpot payout for simplicity (we'll refine)
+    const fullEV = 1 - houseEdge * spinsFull
+
+    const finalEV = useMidpoint ? avgEV : fullEV
+
+    // Breakeven entry point
+    const beEntry = Math.round(mhb - (1 / houseEdge) * risePerSpin)
+
+    // Coin in required to reach breakeven
+    const coinInToBE = Math.max(0, Math.round((beEntry - currentVal) / risePerSpin * bet))
+
+    // JP contribution to RTP
+    const jpContrib = ((1 / spinsToHit) * 100).toFixed(2)
+
+    // Max exposure (worst case full run)
+    const maxExposureBets = Math.round(spinsFull * houseEdge)
+
+    setEv(Number(finalEV.toFixed(2)))
+    setBreakeven(beEntry)
+    setCoinInRequired(coinInToBE)
+    setJpContribution(Number(jpContrib))
+    setExposure(maxExposureBets)
+    setIsPositive(finalEV >= 0)
+  }
+
   useEffect(() => {
-    setCurrentRTP(overallRTP)
-    setEvAvg(2.5)
-    setIsAlreadyPositive(true)
-  }, [currentViewCounter, betSize, overallRTP])
+    calculate()
+  }, [current, mustHitBy, meterRise, betSize, denom, overallRTP, useMidpoint])
 
   return (
     <div className="min-h-screen bg-gray-950 pb-12">
       <div className="max-w-lg mx-auto px-4 pt-6">
 
-        {/* Title block - stronger responsive sizing to prevent wrapping */}
+        {/* Title */}
         <div className="flex items-center mb-6">
           <button
             onClick={onBack}
@@ -76,11 +120,133 @@ function MHBCalculator({ onBack }) {
           <div className="w-12" />
         </div>
 
-        {/* Placeholder content */}
-        <div className="bg-gray-900 p-5 rounded-3xl mb-6">
-          <div className="text-center text-purple-400 text-sm mb-8">
-            Must-Hit-By Progressive Analyzer<br />
-            <span className="text-purple-300/70">Building from Phoenix base — MHB logic coming next</span>
+        {/* Input Section */}
+        <div className="space-y-6">
+
+          {/* Jackpot Current + Must Hit By + Meter Rise */}
+          <div className="bg-gray-900 p-5 rounded-3xl space-y-5">
+            <div>
+              <label className="block text-gray-400 text-xs mb-1">Jackpot Current</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value.replace(/[^0-9]/g, ''))}
+                onBlur={(e) => setCurrent(parseInt(e.target.value) || 1450)}
+                className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={mustHitBy}
+                  onChange={(e) => setMustHitBy(e.target.value.replace(/[^0-9]/g, ''))}
+                  onBlur={(e) => setMustHitBy(parseInt(e.target.value) || 1800)}
+                  className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">Meter Rise (spins per inc)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={meterRise}
+                  onChange={(e) => setMeterRise(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onBlur={(e) => setMeterRise(parseFloat(e.target.value) || 42)}
+                  className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bet Size + Denom + RTP + Midpoint */}
+          <div className="bg-gray-900 p-5 rounded-3xl grid grid-cols-2 gap-4">
+            <div className="relative">
+              <label className="block text-gray-400 text-xs mb-1">Bet Size</label>
+              <div className="absolute left-4 top-10 text-2xl text-gray-400">$</div>
+              <input
+                type="text"
+                value={betSize}
+                onChange={(e) => setBetSize(e.target.value.replace(/[^0-9.]/g, ''))}
+                onBlur={(e) => setBetSize(parseFloat(e.target.value) || 25)}
+                className="w-full pl-8 p-4 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              />
+            </div>
+
+            <div>
+              <label className="block text-gray-400 text-xs mb-1">Denomination</label>
+              <select 
+                value={denom} 
+                onChange={(e) => setDenom(parseFloat(e.target.value))}
+                className="w-full p-4 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
+              >
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
+                  <option key={d} value={d}>${d}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-gray-400 text-xs mb-1">Overall RTP (%)</label>
+              <input 
+                type="text" 
+                value={overallRTP} 
+                onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} 
+                className="w-full p-4 bg-gray-800 rounded-2xl text-2xl font-bold text-center" 
+              />
+            </div>
+
+            <div className="col-span-2 flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
+              <span className="text-gray-300">Use Midpoint for EV</span>
+              <button
+                onClick={() => setUseMidpoint(!useMidpoint)}
+                className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
+              >
+                {useMidpoint ? 'YES' : 'NO'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Outputs */}
+        <div className="mt-8 bg-gray-900 p-6 rounded-3xl">
+          <h2 className="text-xl font-semibold text-purple-400 mb-6 text-center">MHB Analysis</h2>
+
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div className="bg-gray-800 p-5 rounded-2xl">
+              <div className="text-gray-400 text-sm">Expected Value</div>
+              <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {ev.toFixed(2)}×
+              </div>
+            </div>
+
+            <div className="bg-gray-800 p-5 rounded-2xl">
+              <div className="text-gray-400 text-sm">Breakeven Entry</div>
+              <div className="text-4xl font-bold text-purple-300">{breakeven}</div>
+            </div>
+
+            <div className="bg-gray-800 p-5 rounded-2xl">
+              <div className="text-gray-400 text-sm">Coin In Required</div>
+              <div className="text-4xl font-bold text-amber-400">${coinInRequired}</div>
+            </div>
+
+            <div className="bg-gray-800 p-5 rounded-2xl">
+              <div className="text-gray-400 text-sm">JP Contribution</div>
+              <div className="text-4xl font-bold text-purple-300">+{jpContribution}%</div>
+            </div>
+          </div>
+
+          <div className="mt-6 bg-gray-800 p-5 rounded-2xl text-center">
+            <div className="text-gray-400 text-sm">Max Exposure (Full Run)</div>
+            <div className="text-3xl font-bold text-red-400">{exposure} bets</div>
+          </div>
+
+          <div className={`mt-6 p-4 rounded-2xl text-center font-bold text-lg ${isPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
+            {isPositive ? '✅ +EV — PLAY THIS ONE' : '❌ Still -EV — Keep Waiting'}
           </div>
         </div>
 
@@ -88,16 +254,6 @@ function MHBCalculator({ onBack }) {
           MHB Calculator • Purple Edition
         </div>
       </div>
-
-      {/* Info Modal placeholder */}
-      {showInfoModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
-            <h3 className="text-xl font-semibold text-purple-400 mb-4">MHB Calculator</h3>
-            <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-purple-600 py-4 rounded-2xl font-bold">Got it</button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
