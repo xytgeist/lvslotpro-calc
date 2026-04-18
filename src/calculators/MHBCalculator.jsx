@@ -37,36 +37,35 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Midpoint and EV calculation (your logic)
-    const midpoint = useMidpoint 
+    // Target = midpoint when checked, full MHB when unchecked
+    const target = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
 
-    const dollarDistance = midpoint - currentVal
+    const dollarDistance = target - currentVal
     const incrementsNeeded = dollarDistance / 0.01
-    const coinInToMidpoint = incrementsNeeded * riseDollars
-    const expectedLoss = coinInToMidpoint * (1 - rtp)
+    const coinInToTarget = incrementsNeeded * riseDollars
+    const expectedLoss = coinInToTarget * (1 - rtp)
 
-    const finalEV = midpoint - expectedLoss
+    const finalEV = target - expectedLoss
 
-    // Breakeven Entry (rounded up)
+    // Breakeven Entry (solved for the Current JP where EV = 0)
     const houseEdge = 1 - rtp
     let breakevenCurrent = useMidpoint
       ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
       : mhb - (riseDollars * 0.01 / houseEdge)
-
     breakevenCurrent = Math.ceil(breakevenCurrent)
 
     // JP Contribution
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure (full run)
+    // Max exposure (full run to MHB)
     const fullIncrements = (mhb - currentVal) / 0.01
     const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge)
 
     setEv(Number(finalEV.toFixed(2)))
     setBreakeven(Math.round(breakevenCurrent))
-    setCoinInExpected(Math.round(coinInToMidpoint))
+    setCoinInExpected(Math.round(coinInToTarget))
     setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(maxExposureBets)
     setIsPositive(finalEV >= 0)
