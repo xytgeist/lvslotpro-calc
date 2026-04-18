@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 function MHBCalculator({ onBack }) {
   // Main fields
   const [current, setCurrent] = useState(475)
-  const [mustHitBy, setMustHitBy] = useState(500)
+  const [mustHitBy, setMustHitBy] = useState(500)   // default to Ainsworth 500
 
   // Advanced Settings
   const [overallRTP, setOverallRTP] = useState(85)
@@ -122,11 +122,25 @@ function MHBCalculator({ onBack }) {
           <div className="bg-gray-900 p-5 rounded-3xl space-y-5">
             <div>
               <label className="block text-gray-400 text-xs mb-1">JP Meter (Current)</label>
-              <input type="text" value={current} onChange={handleIntegerChange(setCurrent, 475)} onBlur={handleIntegerBlur(setCurrent, 475)} className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300" />
+              <input 
+                type="text" 
+                value={current} 
+                onChange={handleIntegerChange(setCurrent, 475)} 
+                onBlur={handleIntegerBlur(setCurrent, 475)} 
+                className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300" 
+              />
             </div>
+
             <div>
               <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
-              <input type="text" value={mustHitBy} onChange={handleIntegerChange(setMustHitBy, 500)} onBlur={handleIntegerBlur(setMustHitBy, 500)} className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center" />
+              <select 
+                value={mustHitBy} 
+                onChange={(e) => setMustHitBy(Number(e.target.value))}
+                className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300"
+              >
+                <option value={500}>Ainsworth 500</option>
+                <option value={10000}>Ainsworth 10000</option>
+              </select>
             </div>
           </div>
 
@@ -140,22 +154,43 @@ function MHBCalculator({ onBack }) {
               <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">RTP %</label>
-                  <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 85)} onBlur={handleFloatBlur(setOverallRTP, 85)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
+                  <input 
+                    type="text" 
+                    value={overallRTP} 
+                    onChange={handleFloatChange(setOverallRTP, 85)} 
+                    onBlur={handleFloatBlur(setOverallRTP, 85)} 
+                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                  />
                 </div>
 
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per $0.01 increment)</label>
-                  <input type="text" value={meterRise} onChange={handleFloatChange(setMeterRise, 2.50)} onBlur={handleFloatBlur(setMeterRise, 2.50)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
+                  <input 
+                    type="text" 
+                    value={meterRise} 
+                    onChange={handleFloatChange(setMeterRise, 2.50)} 
+                    onBlur={handleFloatBlur(setMeterRise, 2.50)} 
+                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                  />
                 </div>
 
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Reset Value</label>
-                  <input type="text" value={resetValue} onChange={handleIntegerChange(setResetValue, 350)} onBlur={handleIntegerBlur(setResetValue, 350)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
+                  <input 
+                    type="text" 
+                    value={resetValue} 
+                    onChange={handleIntegerChange(setResetValue, 350)} 
+                    onBlur={handleIntegerBlur(setResetValue, 350)} 
+                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                  />
                 </div>
 
                 <div className="flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
                   <span className="text-gray-300">Use Midpoint for EV & Breakeven</span>
-                  <button onClick={() => setUseMidpoint(!useMidpoint)} className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>
+                  <button 
+                    onClick={() => setUseMidpoint(!useMidpoint)} 
+                    className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
+                  >
                     {useMidpoint ? 'YES' : 'NO'}
                   </button>
                 </div>
