@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react'
 
 function MHBCalculator({ onBack }) {
   // Main fields
-  const [current, setCurrent] = useState(9350)      // Default JP Meter
-  const [mustHitBy, setMustHitBy] = useState(10000) // Default MHB
+  const [current, setCurrent] = useState(9350)      // JP Meter (Current)
+  const [mustHitBy, setMustHitBy] = useState(10000)
   const [denom, setDenom] = useState(1.00)
 
   // Advanced Settings
   const [overallRTP, setOverallRTP] = useState(91)
-  const [meterRise, setMeterRise] = useState(6.666666) // $ per increment (default)
+  const [meterRise, setMeterRise] = useState(6.666666)
   const [useMidpoint, setUseMidpoint] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -20,7 +20,7 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // Auto RTP based on denomination
+  // Auto RTP
   useEffect(() => {
     let base = 91
     if (denom <= 0.02) base = 88
@@ -31,7 +31,6 @@ function MHBCalculator({ onBack }) {
     setOverallRTP(base)
   }, [denom])
 
-  // Main MHB Calculation
   const calculate = () => {
     const baseRTP = overallRTP / 100
     const currentVal = Number(current) || 9350
@@ -48,9 +47,8 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Spins to hit = dollar distance / dollar rise per spin
-    const dollarDistance = mhb - currentVal
-    const spinsToHit = dollarDistance / riseDollars
+    const remainingDollars = mhb - currentVal
+    const spinsToHit = remainingDollars / riseDollars
 
     // Midpoint logic
     const midpoint = useMidpoint 
@@ -63,25 +61,24 @@ function MHBCalculator({ onBack }) {
     const houseEdge = 1 - baseRTP
     const avgEV = 1 - houseEdge * spinsAvg
     const fullEV = 1 - houseEdge * spinsFull
-
     const finalEV = useMidpoint ? avgEV : fullEV
 
     // Breakeven entry
     const beEntry = Math.round(mhb - (1 / houseEdge) * riseDollars)
 
-    // Coin in required to reach breakeven
-    const coinInToBE = Math.max(0, Math.round((beEntry - currentVal) / riseDollars * denom * 100)) // convert to coins
+    // Coin in required (in dollars)
+    const coinInToBE = Math.max(0, Math.round((beEntry - currentVal) / riseDollars * denom))
 
-    // JP contribution to RTP
-    const jpContrib = ((1 / spinsToHit) * 100).toFixed(2)
+    // CORRECT JP Contribution % (exact match to your reference calculator)
+    const jpContrib = 0.4 * (mhb + currentVal) / (mhb - currentVal)
 
-    // Max exposure (full run)
+    // Max exposure (full run in bets)
     const maxExposureBets = Math.round(spinsFull * houseEdge)
 
     setEv(Number(finalEV.toFixed(2)))
     setBreakeven(beEntry)
     setCoinInRequired(coinInToBE)
-    setJpContribution(Number(jpContrib))
+    setJpContribution(Number(jpContrib.toFixed(2)))
     setExposure(maxExposureBets)
     setIsPositive(finalEV >= 0)
   }
@@ -96,28 +93,16 @@ function MHBCalculator({ onBack }) {
 
         {/* Title */}
         <div className="flex items-center mb-6">
-          <button
-            onClick={onBack}
-            className="text-[52px] leading-none text-purple-400 hover:text-purple-300 -mt-1 mr-4 font-light active:opacity-70"
-          >
-            ‹
-          </button>
-
+          <button onClick={onBack} className="text-[52px] leading-none text-purple-400 hover:text-purple-300 -mt-1 mr-4 font-light active:opacity-70">‹</button>
           <div className="flex items-center flex-1 justify-center gap-3">
             <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-600 flex-shrink-0">
               <span className="text-4xl">🎰</span>
             </div>
-            <h1
-              className="font-black text-white tracking-[-1.8px] 
-                         text-[26px] xs:text-[27px] sm:text-[29px] md:text-[32px] lg:text-[33px]"
-              style={{
-                textShadow: `-2px -2px 0 #7e22ce, 2px -2px 0 #7e22ce, -2px 2px 0 #7e22ce, 2px 2px 0 #7e22ce`
-              }}
-            >
+            <h1 className="font-black text-white tracking-[-1.8px] text-[26px] xs:text-[27px] sm:text-[29px] md:text-[32px] lg:text-[33px]"
+                style={{ textShadow: `-2px -2px 0 #7e22ce, 2px -2px 0 #7e22ce, -2px 2px 0 #7e22ce, 2px 2px 0 #7e22ce` }}>
               MHB CALCULATOR
             </h1>
           </div>
-
           <div className="w-12" />
         </div>
 
@@ -126,82 +111,39 @@ function MHBCalculator({ onBack }) {
           <div className="bg-gray-900 p-5 rounded-3xl space-y-5">
             <div>
               <label className="block text-gray-400 text-xs mb-1">JP Meter (Current)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={current}
-                onChange={(e) => setCurrent(e.target.value.replace(/[^0-9]/g, ''))}
-                onBlur={(e) => setCurrent(parseInt(e.target.value) || 9350)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300"
-              />
+              <input type="text" value={current} onChange={(e) => setCurrent(e.target.value.replace(/[^0-9]/g, ''))} onBlur={(e) => setCurrent(parseInt(e.target.value) || 9350)} className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300" />
             </div>
-
             <div>
               <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={mustHitBy}
-                onChange={(e) => setMustHitBy(e.target.value.replace(/[^0-9]/g, ''))}
-                onBlur={(e) => setMustHitBy(parseInt(e.target.value) || 10000)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center"
-              />
+              <input type="text" value={mustHitBy} onChange={(e) => setMustHitBy(e.target.value.replace(/[^0-9]/g, ''))} onBlur={(e) => setMustHitBy(parseInt(e.target.value) || 10000)} className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center" />
             </div>
-
             <div>
               <label className="block text-gray-400 text-xs mb-1">Denomination</label>
-              <select 
-                value={denom} 
-                onChange={(e) => setDenom(parseFloat(e.target.value))}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-2xl font-bold text-center"
-              >
-                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => (
-                  <option key={d} value={d}>${d}</option>
-                ))}
+              <select value={denom} onChange={(e) => setDenom(parseFloat(e.target.value))} className="w-full p-4 bg-gray-800 rounded-2xl text-2xl font-bold text-center">
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => <option key={d} value={d}>${d}</option>)}
               </select>
             </div>
           </div>
 
           {/* Advanced Settings */}
           <div className="bg-gray-900 rounded-3xl overflow-hidden">
-            <button 
-              onClick={() => setShowAdvanced(!showAdvanced)} 
-              className="w-full flex justify-between items-center p-5 text-left hover:bg-gray-800"
-            >
+            <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-gray-800">
               <span className="font-semibold text-purple-300">Advanced Settings</span>
               <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
             </button>
-
             {showAdvanced && (
               <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Overall RTP (%)</label>
-                  <input 
-                    type="text" 
-                    value={overallRTP} 
-                    onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
+                  <input type="text" value={overallRTP} onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 91)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
-
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per increment)</label>
-                  <input 
-                    type="text" 
-                    value={meterRise} 
-                    onChange={(e) => setMeterRise(e.target.value.replace(/[^0-9.]/g, ''))} 
-                    onBlur={(e) => setMeterRise(parseFloat(e.target.value) || 6.666666)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
-                  <p className="text-xs text-gray-500 mt-1 text-center">Default: $6.666666 (for $0.01 increments)</p>
+                  <input type="text" value={meterRise} onChange={(e) => setMeterRise(e.target.value.replace(/[^0-9.]/g, ''))} onBlur={(e) => setMeterRise(parseFloat(e.target.value) || 6.666666)} className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" />
                 </div>
-
                 <div className="flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
-                  <span className="text-gray-300">Use Midpoint for EV Calculation</span>
-                  <button
-                    onClick={() => setUseMidpoint(!useMidpoint)}
-                    className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
-                  >
+                  <span className="text-gray-300">Use Midpoint for EV</span>
+                  <button onClick={() => setUseMidpoint(!useMidpoint)} className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>
                     {useMidpoint ? 'YES' : 'NO'}
                   </button>
                 </div>
@@ -213,25 +155,20 @@ function MHBCalculator({ onBack }) {
         {/* Outputs */}
         <div className="mt-8 bg-gray-900 p-6 rounded-3xl">
           <h2 className="text-xl font-semibold text-purple-400 mb-6 text-center">MHB Analysis</h2>
-
+          
           <div className="grid grid-cols-2 gap-4 text-center">
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Expected Value</div>
-              <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {ev.toFixed(2)}×
-              </div>
+              <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{ev.toFixed(2)}×</div>
             </div>
-
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Breakeven Entry</div>
               <div className="text-4xl font-bold text-purple-300">{breakeven}</div>
             </div>
-
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Coin In Required</div>
               <div className="text-4xl font-bold text-amber-400">${coinInRequired}</div>
             </div>
-
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">JP Contribution</div>
               <div className="text-4xl font-bold text-purple-300">+{jpContribution}%</div>
