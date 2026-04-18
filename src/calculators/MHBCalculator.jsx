@@ -37,7 +37,7 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Target = midpoint when checked, full MHB when unchecked
+    // Midpoint / Full Run logic
     const target = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -49,25 +49,26 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = target - expectedLoss
 
-    // Breakeven Entry (solved for the Current JP where EV = 0)
+    // Breakeven Entry (rounded up)
     const houseEdge = 1 - rtp
     let breakevenCurrent = useMidpoint
       ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
       : mhb - (riseDollars * 0.01 / houseEdge)
+
     breakevenCurrent = Math.ceil(breakevenCurrent)
 
     // JP Contribution
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure (full run to MHB)
+    // Max exposure (full run to MHB) - now with $ amount
     const fullIncrements = (mhb - currentVal) / 0.01
-    const maxExposureBets = Math.round(fullIncrements * riseDollars * houseEdge)
+    const maxExposureDollars = fullIncrements * riseDollars * houseEdge
 
     setEv(Number(finalEV.toFixed(2)))
     setBreakeven(Math.round(breakevenCurrent))
     setCoinInExpected(Math.round(coinInToTarget))
     setJpContribution(Number(jpContrib.toFixed(2)))
-    setExposure(maxExposureBets)
+    setExposure(Math.round(maxExposureDollars))   // now in dollars
     setIsPositive(finalEV >= 0)
   }
 
@@ -184,7 +185,9 @@ function MHBCalculator({ onBack }) {
 
           <div className="mt-6 bg-gray-800 p-5 rounded-2xl text-center">
             <div className="text-gray-400 text-sm">Max Exposure (Full Run)</div>
-            <div className="text-3xl font-bold text-red-400">{exposure} bets</div>
+            <div className="text-3xl font-bold text-red-400">
+              ${exposure.toLocaleString()}
+            </div>
           </div>
 
           <div className={`mt-6 p-4 rounded-2xl text-center font-bold text-lg ${isPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
