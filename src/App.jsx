@@ -59,12 +59,15 @@ function App() {
       return
     }
 
+    // Use the exact path where you will handle the reset
+    const redirectTo = `${window.location.origin}/reset-password`
+
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: `${window.location.origin}/reset-password`   // ← This must match your allowed redirect URLs in Supabase dashboard
+      redirectTo: redirectTo
     })
 
     if (error) alert(error.message)
-    else alert("Password reset link has been sent to your email!")
+    else alert("Password reset link has been sent to your email. Check your inbox (and spam folder).")
   }
 
   const handleLogout = async () => {
@@ -83,7 +86,6 @@ function App() {
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Las Vegas Slot Pro</h2>
 
           {!showForgotPassword ? (
-            /* Normal Login */
             <form onSubmit={handleLogin} className="space-y-4">
               <input
                 type="email"
@@ -114,7 +116,6 @@ function App() {
               </div>
             </form>
           ) : (
-            /* Forgot Password Form */
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <input
                 type="email"
@@ -151,10 +152,7 @@ function App() {
           </div>
 
           {/* Phoenix Link */}
-          <button
-            onClick={() => setCurrentView('phoenix')}
-            className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28"
-          >
+          <button onClick={() => setCurrentView('phoenix')} className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28">
             <img src="/phoenix-link-logo.png" alt="Phoenix" className="w-16 h-16 rounded-xl flex-shrink-0" />
             <div>
               <div className="font-semibold text-2xl text-orange-400">Phoenix Link EV Calc</div>
@@ -163,10 +161,7 @@ function App() {
           </button>
 
           {/* Buffalo Link */}
-          <button
-            onClick={() => setCurrentView('buffalo')}
-            className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
-          >
+          <button onClick={() => setCurrentView('buffalo')} className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner flex-shrink-0">
               <img src="/buffalo-icon.png" alt="Buffalo" className="w-14 h-14 object-contain" />
             </div>
@@ -177,10 +172,7 @@ function App() {
           </button>
 
           {/* Stack Up Pays */}
-          <button
-            onClick={() => setCurrentView('stackup')}
-            className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
-          >
+          <button onClick={() => setCurrentView('stackup')} className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="w-16 h-16 object-cover rounded-2xl shadow-lg flex-shrink-0" />
             <div>
               <div className="font-semibold text-2xl text-cyan-100">Stack Up Pays</div>
@@ -189,10 +181,7 @@ function App() {
           </button>
 
           {/* MHB Calculator */}
-          <button
-            onClick={() => setCurrentView('mhb')}
-            className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]"
-          >
+          <button onClick={() => setCurrentView('mhb')} className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-8 rounded-3xl text-left flex items-center gap-5 mb-4 h-28 transition-all active:scale-[0.985]">
             <div className="w-16 h-16 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 shadow-inner flex-shrink-0 text-5xl">
               🎰
             </div>
@@ -202,12 +191,9 @@ function App() {
             </div>
           </button>
 
-          {/* Logout Link at bottom */}
+          {/* Logout at bottom */}
           <div className="mt-12 text-center">
-            <button
-              onClick={handleLogout}
-              className="text-gray-400 hover:text-red-400 text-sm underline transition-colors"
-            >
+            <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 text-sm underline transition-colors">
               Logout
             </button>
           </div>
