@@ -15,6 +15,7 @@ function MHBCalculator({ onBack }) {
   // Outputs
   const [ev, setEv] = useState(0)
   const [breakeven, setBreakeven] = useState(0)
+  const [breakevenExact, setBreakevenExact] = useState(0)   // new: exact to the penny
   const [coinInExpected, setCoinInExpected] = useState(0)
   const [jpContribution, setJpContribution] = useState(0)
   const [exposure, setExposure] = useState(0)
@@ -30,6 +31,7 @@ function MHBCalculator({ onBack }) {
     if (mhb <= currentVal) {
       setEv(999)
       setBreakeven(currentVal)
+      setBreakevenExact(currentVal)
       setCoinInExpected(0)
       setJpContribution(0)
       setExposure(0)
@@ -37,7 +39,7 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Midpoint / Full Run logic
+    // Midpoint / Full Run
     const target = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -49,26 +51,27 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = target - expectedLoss
 
-    // Breakeven Entry (rounded up)
+    // Breakeven Entry (rounded up for display)
     const houseEdge = 1 - rtp
     let breakevenCurrent = useMidpoint
       ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
       : mhb - (riseDollars * 0.01 / houseEdge)
 
-    breakevenCurrent = Math.ceil(breakevenCurrent)
+    const breakevenRounded = Math.ceil(breakevenCurrent)
 
     // JP Contribution
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure (full run to MHB) - now with $ amount
+    // Max exposure (full run)
     const fullIncrements = (mhb - currentVal) / 0.01
     const maxExposureDollars = fullIncrements * riseDollars * houseEdge
 
     setEv(Number(finalEV.toFixed(2)))
-    setBreakeven(Math.round(breakevenCurrent))
+    setBreakeven(breakevenRounded)
+    setBreakevenExact(Number(breakevenCurrent.toFixed(2)))   // exact to the penny
     setCoinInExpected(Math.round(coinInToTarget))
     setJpContribution(Number(jpContrib.toFixed(2)))
-    setExposure(Math.round(maxExposureDollars))   // now in dollars
+    setExposure(Math.round(maxExposureDollars))
     setIsPositive(finalEV >= 0)
   }
 
@@ -172,6 +175,9 @@ function MHBCalculator({ onBack }) {
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Breakeven Entry</div>
               <div className="text-4xl font-bold text-purple-300">{breakeven}</div>
+              <div className="text-xs text-purple-400/70 mt-1">
+                ${breakevenExact.toFixed(2)}
+              </div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Coin in expected</div>
