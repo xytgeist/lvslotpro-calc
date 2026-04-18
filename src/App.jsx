@@ -27,28 +27,20 @@ function App() {
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
 
-  // === AGGRESSIVE RECOVERY DETECTION ===
+  // Aggressive recovery token detection
   useEffect(() => {
-    const detectRecovery = () => {
-      const hash = window.location.hash || ''
+    const checkRecovery = () => {
+      const hash = window.location.hash
       if (hash.includes('type=recovery') || hash.includes('access_token')) {
-        console.log('🔑 Recovery token detected – switching to reset view')
         setCurrentView('reset-password')
-        // Clean hash from URL
+        // Clean URL
         window.history.replaceState({}, document.title, '/reset-password')
       }
     }
 
-    // Run immediately
-    detectRecovery()
+    checkRecovery()
+    window.addEventListener('hashchange', checkRecovery)
 
-    // Run again after a tiny delay (helps with Vercel hydration)
-    const timeout = setTimeout(detectRecovery, 100)
-
-    // Also listen for hash changes
-    window.addEventListener('hashchange', detectRecovery)
-
-    // Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) checkWhitelist(session.user.email)
@@ -64,10 +56,7 @@ function App() {
       }
     })
 
-    return () => {
-      window.removeEventListener('hashchange', detectRecovery)
-      clearTimeout(timeout)
-    }
+    return () => window.removeEventListener('hashchange', checkRecovery)
   }, [])
 
   const checkWhitelist = async (userEmail) => {
@@ -95,7 +84,7 @@ function App() {
 
     if (error) alert("Error: " + error.message)
     else {
-      alert("Reset link sent! Check your inbox (and spam folder). Click it quickly before any scanner touches it.")
+      alert("Reset link sent! Check inbox/spam and click it quickly.")
       setShowForgotPassword(false)
       setForgotEmail('')
     }
@@ -118,9 +107,7 @@ function App() {
       setResetError(error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
-      setTimeout(() => {
-        window.location.href = 'https://lvslotpro.com'
-      }, 1800)
+      setTimeout(() => window.location.href = 'https://lvslotpro.com', 2000)
     }
   }
 
@@ -133,54 +120,26 @@ function App() {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
   }
 
-  // ====================== RESET PASSWORD PAGE ======================
+  // Reset Password Page
   if (currentView === 'reset-password') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 p-8 rounded-3xl max-w-sm w-full">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Reset Your Password</h2>
 
-          {resetError && (
-            <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-sm text-center">
-              {resetError}
-            </div>
-          )}
+          {resetError && <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-center">{resetError}</div>}
 
           {resetMessage ? (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-4">✅</div>
-              <p className="text-emerald-400 text-lg font-medium">{resetMessage}</p>
-            </div>
+            <div className="text-center py-8 text-emerald-400 text-lg">{resetMessage}</div>
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
-              <input
-                type="password"
-                placeholder="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Confirm New Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl text-white"
-                required
-              />
-              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">
-                Update Password
-              </button>
+              <input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Update Password</button>
             </form>
           )}
 
-          <button
-            onClick={() => window.location.href = 'https://lvslotpro.com'}
-            className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm"
-          >
-            ← Back to Login
-          </button>
+          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
         </div>
       </div>
     )
@@ -195,8 +154,8 @@ function App() {
 
           {!showForgotPassword ? (
             <form onSubmit={handleLogin} className="space-y-4">
-              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
               <div className="text-center pt-2">
                 <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">Forgot Password?</button>
@@ -204,7 +163,7 @@ function App() {
             </form>
           ) : (
             <form onSubmit={handleForgotPassword} className="space-y-4">
-              <input type="email" placeholder="Enter your email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="email" placeholder="Enter your email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Send Reset Link</button>
               <button type="button" onClick={() => setShowForgotPassword(false)} className="w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
             </form>
@@ -214,7 +173,7 @@ function App() {
     )
   }
 
-  // Dashboard + Calculators
+  // Dashboard
   return (
     <div className="min-h-screen bg-gray-950">
       {currentView === 'dashboard' ? (
