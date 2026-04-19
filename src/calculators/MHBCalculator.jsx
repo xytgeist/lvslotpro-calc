@@ -22,7 +22,7 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // Auto-adjust Current JP and Meter Rise when MHB changes
+  // Auto-adjust when MHB changes
   useEffect(() => {
     if (mustHitBy === 10000) {
       setCurrent(9802)
@@ -52,7 +52,6 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    // Midpoint / Full Run
     const target = useMidpoint 
       ? currentVal + (mhb - currentVal) * 0.5 
       : mhb
@@ -64,7 +63,6 @@ function MHBCalculator({ onBack }) {
 
     const finalEV = target - expectedLoss
 
-    // Breakeven Entry (rounded up)
     const houseEdge = 1 - rtp
     let breakevenCurrent = useMidpoint
       ? mhb * (100 * riseDollars * houseEdge - 1) / (100 * riseDollars * houseEdge + 1)
@@ -72,10 +70,8 @@ function MHBCalculator({ onBack }) {
 
     const breakevenRounded = Math.ceil(breakevenCurrent)
 
-    // JP Contribution
     const jpContrib = 0.4 * (mhb + resetVal) / (mhb - resetVal)
 
-    // Max exposure (full run)
     const fullIncrements = (mhb - currentVal) / 0.01
     const maxExposureDollars = fullIncrements * riseDollars * houseEdge
 
@@ -128,9 +124,9 @@ function MHBCalculator({ onBack }) {
           <div className="w-12" />
         </div>
 
-        {/* Main Inputs */}
-        <div className="space-y-6">
-          <div className="bg-gray-900 p-5 rounded-3xl space-y-5">
+        {/* Main Inputs - Now side by side */}
+        <div className="bg-gray-900 p-5 rounded-3xl">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-gray-400 text-xs mb-1">JP Meter (Current)</label>
               <input 
@@ -154,60 +150,60 @@ function MHBCalculator({ onBack }) {
               </select>
             </div>
           </div>
+        </div>
 
-          {/* Advanced Settings */}
-          <div className="bg-gray-900 rounded-3xl overflow-hidden">
-            <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-gray-800">
-              <span className="font-semibold text-purple-300">Advanced Settings</span>
-              <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
-            </button>
-            {showAdvanced && (
-              <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
-                <div>
-                  <label className="block text-gray-400 text-xs mb-1">RTP %</label>
-                  <input 
-                    type="text" 
-                    value={overallRTP} 
-                    onChange={handleFloatChange(setOverallRTP, 85)} 
-                    onBlur={handleFloatBlur(setOverallRTP, 85)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per $0.01 increment)</label>
-                  <input 
-                    type="text" 
-                    value={meterRise} 
-                    onChange={handleFloatChange(setMeterRise, 2.50)} 
-                    onBlur={handleFloatBlur(setMeterRise, 2.50)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-400 text-xs mb-1">Reset Value</label>
-                  <input 
-                    type="text" 
-                    value={resetValue} 
-                    onChange={handleIntegerChange(setResetValue, 350)} 
-                    onBlur={handleIntegerBlur(setResetValue, 350)} 
-                    className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
-                  />
-                </div>
-
-                <div className="flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
-                  <span className="text-gray-300">Use Midpoint for EV & Breakeven</span>
-                  <button 
-                    onClick={() => setUseMidpoint(!useMidpoint)} 
-                    className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
-                  >
-                    {useMidpoint ? 'YES' : 'NO'}
-                  </button>
-                </div>
+        {/* Advanced Settings */}
+        <div className="mt-6 bg-gray-900 rounded-3xl overflow-hidden">
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex justify-between items-center p-5 text-left hover:bg-gray-800">
+            <span className="font-semibold text-purple-300">Advanced Settings</span>
+            <span className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
+          </button>
+          {showAdvanced && (
+            <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">RTP %</label>
+                <input 
+                  type="text" 
+                  value={overallRTP} 
+                  onChange={handleFloatChange(setOverallRTP, 85)} 
+                  onBlur={handleFloatBlur(setOverallRTP, 85)} 
+                  className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                />
               </div>
-            )}
-          </div>
+
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per $0.01 increment)</label>
+                <input 
+                  type="text" 
+                  value={meterRise} 
+                  onChange={handleFloatChange(setMeterRise, 2.50)} 
+                  onBlur={handleFloatBlur(setMeterRise, 2.50)} 
+                  className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">Reset Value</label>
+                <input 
+                  type="text" 
+                  value={resetValue} 
+                  onChange={handleIntegerChange(setResetValue, 350)} 
+                  onBlur={handleIntegerBlur(setResetValue, 350)} 
+                  className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
+                />
+              </div>
+
+              <div className="flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
+                <span className="text-gray-300">Use Midpoint for EV & Breakeven</span>
+                <button 
+                  onClick={() => setUseMidpoint(!useMidpoint)} 
+                  className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
+                >
+                  {useMidpoint ? 'YES' : 'NO'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Outputs */}
