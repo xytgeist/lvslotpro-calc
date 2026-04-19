@@ -22,12 +22,14 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // Auto-adjust Current JP when MHB changes
+  // Auto-adjust Current JP and Meter Rise when MHB changes
   useEffect(() => {
     if (mustHitBy === 10000) {
       setCurrent(9802)
+      setMeterRise(6.66666)
     } else if (mustHitBy === 500) {
       setCurrent(475)
+      setMeterRise(2.50)
     }
   }, [mustHitBy])
 
