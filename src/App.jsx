@@ -76,6 +76,7 @@ function App() {
   }
 
   const handleLogin = async () => {
+    console.log('handleLogin called')
     setLoginError('')
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
