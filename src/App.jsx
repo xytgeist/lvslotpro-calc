@@ -157,7 +157,7 @@ function App() {
               <button 
                 type="button" 
                 onClick={handleSignUp}
-                className="w-full bg-orange-700 hover:bg-orange-600 py-4 rounded-2xl font-bold mt-2"
+                className="w-full bg-gray-700 hover:bg-gray-600 border border-orange-600 py-4 rounded-2xl font-bold text-white mt-2"
               >
                 Create Account
               </button>
