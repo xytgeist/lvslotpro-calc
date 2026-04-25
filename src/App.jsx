@@ -78,17 +78,20 @@ function App() {
   const handleLogin = async () => {
     setLoginError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    
     if (error) {
       alert(error.message)
+      return
+    }
+
+    const { data: whitelistData } = await supabase.from('allowed_emails').select('email').eq('email', email).single()
+    
+    if (whitelistData) {
+      setUser(data.user)
+      setIsAllowed(true)
     } else {
-      const { data: whitelistData } = await supabase.from('allowed_emails').select('email').eq('email', email).single()
-      if (whitelistData) {
-        setUser(data.user)
-        setIsAllowed(true)
-      } else {
-        setLoginError("Unauthorized - please contact Ryan to be whitelisted.")
-      }
+      setLoginError("Unauthorized - please contact Ryan to be whitelisted.")
     }
   }
 
