@@ -27,20 +27,20 @@ function App() {
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
 
-  // New states for verification + whitelist error
+  // Login error (only shown after failed login attempt)
   const [loginError, setLoginError] = useState('')
+
+  // Verification success message
   const [verificationSuccess, setVerificationSuccess] = useState(false)
 
   useEffect(() => {
     const hash = window.location.hash
 
-    // Handle email verification (signup confirmation)
     if (hash.includes('type=signup') || hash.includes('type=confirmation')) {
       setVerificationSuccess(true)
       window.history.replaceState({}, document.title, '/')
     }
 
-    // Handle password reset (unchanged)
     if (hash.includes('type=recovery') || hash.includes('access_token')) {
       setCurrentView('reset-password')
       window.history.replaceState({}, document.title, '/reset-password')
@@ -48,14 +48,18 @@ function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) checkWhitelist(session.user.email)
-      else setIsChecking(false)
+      if (session?.user) {
+        checkWhitelistOnLoad(session.user.email)
+      } else {
+        setIsChecking(false)
+      }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) checkWhitelist(session.user.email)
-      else {
+      if (session?.user) {
+        checkWhitelistOnLoad(session.user.email)
+      } else {
         setIsAllowed(false)
         setIsChecking(false)
       }
@@ -64,7 +68,15 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const checkWhitelist = async (userEmail) => {
+  // Separate function for initial load (no error message)
+  const checkWhitelistOnLoad = async (userEmail) => {
+    const { data } = await supabase.from('allowed_emails').select('email').eq('email', userEmail).single()
+    setIsAllowed(!!data)
+    setIsChecking(false)
+  }
+
+  // Full check used after login attempt (shows error if not whitelisted)
+  const checkWhitelistAfterLogin = async (userEmail) => {
     const { data } = await supabase.from('allowed_emails').select('email').eq('email', userEmail).single()
     
     if (data) {
@@ -80,8 +92,15 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoginError('')
+    
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) alert(error.message)
+    
+    if (error) {
+      alert(error.message)
+    } else {
+      // Check whitelist after successful Supabase login
+      await checkWhitelistAfterLogin(email)
+    }
   }
 
   const handleSignUp = async (e) => {
@@ -135,7 +154,7 @@ function App() {
 
   if (isChecking) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
 
-  // Reset Password Page (unchanged)
+  // Reset Password Page
   if (currentView === 'reset-password') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
