@@ -65,6 +65,19 @@ function App() {
     if (error) alert(error.message)
   }
 
+  const handleSignUp = async (e) => {
+    e.preventDefault()
+    const { error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: 'https://lvslotpro.com'
+      }
+    })
+    if (error) alert("Error: " + error.message)
+    else alert("✅ Account created! Please check your email for the confirmation link.")
+  }
+
   const handleForgotPassword = async (e) => {
     e.preventDefault()
     if (!forgotEmail) return alert("Please enter your email")
@@ -140,6 +153,15 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
+
+              <button 
+                type="button" 
+                onClick={handleSignUp}
+                className="w-full bg-orange-700 hover:bg-orange-600 py-4 rounded-2xl font-bold mt-2"
+              >
+                Create Account
+              </button>
+
               <div className="text-center pt-2">
                 <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">Forgot Password?</button>
               </div>
