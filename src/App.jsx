@@ -40,12 +40,12 @@ function App() {
     if (hash.includes('type=signup') || hash.includes('type=confirmation')) {
       setVerificationSuccess(true)
       window.history.replaceState({}, document.title, '/')
-      setIsChecking(false) // Force exit loading state after verification
+      setIsChecking(false)
       return
     }
 
-    // Only trigger reset password for actual recovery links
-    if (hash.includes('type=recovery')) {
+    // Show reset password form if landing on /reset-password (with or without token)
+    if (window.location.pathname === '/reset-password' || hash.includes('type=recovery')) {
       setCurrentView('reset-password')
       window.history.replaceState({}, document.title, '/reset-password')
     }
@@ -135,7 +135,7 @@ function App() {
     if (!forgotEmail) return alert("Please enter your email")
 
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: 'https://lvslotpro.com/reset-password'
+      redirectTo: 'https://www.lvslotpro.com/reset-password'
     })
 
     if (error) alert("Error: " + error.message)
@@ -157,7 +157,7 @@ function App() {
       setResetError("Error: " + error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
-      setTimeout(() => window.location.href = 'https://lvslotpro.com', 2000)
+      setTimeout(() => window.location.href = 'https://www.lvslotpro.com', 2000)
     }
   }
 
@@ -187,7 +187,7 @@ function App() {
             </form>
           )}
 
-          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
+          <button onClick={() => window.location.href = 'https://www.lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
         </div>
       </div>
     )
