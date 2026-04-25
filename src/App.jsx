@@ -123,7 +123,7 @@ function App() {
       email, 
       password,
       options: {
-        emailRedirectTo: 'https://www.lvslotpro.com'   // ← Now using www to match reset password
+        emailRedirectTo: 'https://lvslotpro.com'   // ← Reverted to non-www (working version)
       }
     })
     if (error) alert("Error: " + error.message)
@@ -135,7 +135,7 @@ function App() {
     if (!forgotEmail) return alert("Please enter your email")
 
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: 'https://www.lvslotpro.com/reset-password'
+      redirectTo: 'https://lvslotpro.com/reset-password'   // ← Reverted to non-www (working version)
     })
 
     if (error) alert("Error: " + error.message)
@@ -181,7 +181,7 @@ function App() {
         setResetError("Error: " + error.message)
       } else {
         setResetMessage("✅ Password updated successfully!")
-        setTimeout(() => window.location.href = 'https://www.lvslotpro.com', 2000)
+        setTimeout(() => window.location.href = 'https://lvslotpro.com', 2000)
       }
     } catch (err) {
       setResetError("Error: " + err.message)
@@ -214,7 +214,7 @@ function App() {
             </form>
           )}
 
-          <button onClick={() => window.location.href = 'https://www.lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
+          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
         </div>
       </div>
     )
