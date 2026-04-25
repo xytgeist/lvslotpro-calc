@@ -27,6 +27,9 @@ function App() {
   const [resetMessage, setResetMessage] = useState('')
   const [resetError, setResetError] = useState('')
 
+  // New: Login error for non-whitelisted users
+  const [loginError, setLoginError] = useState('')
+
   useEffect(() => {
     // Simple detection – just show the reset form when the magic link arrives
     const hash = window.location.hash
@@ -55,12 +58,20 @@ function App() {
 
   const checkWhitelist = async (userEmail) => {
     const { data } = await supabase.from('allowed_emails').select('email').eq('email', userEmail).single()
-    setIsAllowed(!!data)
+    
+    if (data) {
+      setIsAllowed(true)
+      setLoginError('') // Clear any previous error
+    } else {
+      setIsAllowed(false)
+      setLoginError("Unauthorized - please contact Ryan to be whitelisted.")
+    }
     setIsChecking(false)
   }
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    setLoginError('') // Clear previous error on new attempt
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) alert(error.message)
   }
@@ -153,6 +164,12 @@ function App() {
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Log In</button>
+
+              {loginError && (
+                <div className="mt-3 p-3 bg-red-900/50 border border-red-500 rounded-xl text-red-300 text-sm text-center">
+                  {loginError}
+                </div>
+              )}
 
               <button 
                 type="button" 
