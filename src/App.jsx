@@ -95,7 +95,8 @@ function App() {
         const { data: whitelistData } = await supabase.from('allowed_emails').select('email').eq('email', email).single()
         console.log('Whitelist check result:', whitelistData)
         if (whitelistData) {
-          console.log('User is whitelisted, setting isAllowed = true')
+          console.log('User is whitelisted, setting user and isAllowed = true')
+          setUser(data.user)
           setIsAllowed(true)
         } else {
           setLoginError("Unauthorized - please contact Ryan to be whitelisted.")
