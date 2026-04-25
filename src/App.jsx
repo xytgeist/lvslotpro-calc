@@ -152,24 +152,27 @@ function App() {
     if (newPassword.length < 6) return setResetError("Password must be at least 6 characters")
 
     try {
-      // Extract the token from the URL hash
-      const hash = window.location.hash
-      const tokenMatch = hash.match(/access_token=([^&]*)/)
-      
-      if (!tokenMatch) {
+      // Extract tokens from URL hash
+      const hash = window.location.hash.substring(1)
+      const params = new URLSearchParams(hash)
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+
+      if (!accessToken || !refreshToken) {
         setResetError("Invalid or expired reset link. Please request a new one.")
         return
       }
 
-      const token = tokenMatch[1]
-
-      // Verify the recovery token and establish session
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash: token,
-        type: 'recovery'
+      // Establish the session from the recovery tokens
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
       })
 
-      if (verifyError) throw verifyError
+      if (sessionError) {
+        setResetError("Invalid or expired reset link. Please request a new one.")
+        return
+      }
 
       // Now update the password
       const { error } = await supabase.auth.updateUser({ password: newPassword })
