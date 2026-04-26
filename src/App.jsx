@@ -20,6 +20,10 @@ function App() {
   // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
+  const [showCreateAccount, setShowCreateAccount] = useState(false)
+  const [signupEmail, setSignupEmail] = useState('')
+  const [signupPassword, setSignupPassword] = useState('')
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState('')
 
   // Reset password states
   const [newPassword, setNewPassword] = useState('')
@@ -109,16 +113,26 @@ function App() {
 
   const handleSignUp = async (e) => {
     e.preventDefault()
+    if (!signupEmail || !signupPassword || !signupConfirmPassword) return alert("Please fill in all fields")
+    if (signupPassword !== signupConfirmPassword) return alert("Passwords do not match")
+    if (signupPassword.length < 6) return alert("Password must be at least 6 characters")
+
     const { error } = await supabase.auth.signUp({ 
-      email, 
-      password,
+      email: signupEmail, 
+      password: signupPassword,
       options: {
         emailRedirectTo: window.location.origin
 
       }
     })
     if (error) alert("Error: " + error.message)
-    else alert("✅ Account created! Please check your email for the confirmation link.")
+    else {
+      alert("✅ Account created! Please check your email for the confirmation link.")
+      setShowCreateAccount(false)
+      setSignupEmail('')
+      setSignupPassword('')
+      setSignupConfirmPassword('')
+    }
   }
 
   const handleForgotPassword = async (e) => {
@@ -199,7 +213,7 @@ function App() {
             </div>
           )}
 
-          {!showForgotPassword ? (
+          {!showForgotPassword && !showCreateAccount ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
@@ -219,15 +233,23 @@ function App() {
 
               <button 
                 type="button" 
-                onClick={handleSignUp}
+                onClick={() => setShowCreateAccount(true)}
                 className="w-full bg-gray-700 hover:bg-gray-600 border border-orange-600 py-4 rounded-2xl font-bold text-white mt-2"
               >
-                Create Account
+                Signup
               </button>
 
               <div className="text-center pt-2">
                 <button type="button" onClick={() => setShowForgotPassword(true)} className="text-orange-400 hover:text-orange-300 text-sm underline">Forgot Password?</button>
               </div>
+            </form>
+          ) : showCreateAccount ? (
+            <form onSubmit={handleSignUp} className="space-y-4">
+              <input type="email" placeholder="Email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="password" placeholder="Password" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <input type="password" placeholder="Confirm Password" value={signupConfirmPassword} onChange={(e) => setSignupConfirmPassword(e.target.value)} className="w-full p-4 bg-gray-800 rounded-2xl text-white" required />
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold">Create Account</button>
+              <button type="button" onClick={() => setShowCreateAccount(false)} className="w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
             </form>
           ) : (
             <form onSubmit={handleForgotPassword} className="space-y-4">
