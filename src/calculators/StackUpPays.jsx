@@ -8,14 +8,6 @@ const MUST_HIT = {
   mini: 125,
 }
 
-const PLUS_EV = {   // These are your approximate break-even counters
-  mega: 330,
-  grand: 238,
-  major: 192,
-  minor: 146,
-  mini: 123,
-}
-
 const AVG_PAYOUT = {
   mega: 210,
   grand: 100,
@@ -62,6 +54,25 @@ function dynamicPlusEvCounter(mustHit, payout, spi, baseRTP, reset) {
   return Math.ceil(clamped)
 }
 
+function meterRtpWithFloor(meter, baseRTP, getMeterRTP) {
+  const dynamicPlusEV = dynamicPlusEvCounter(meter.mustHit, meter.payout, meter.spi, baseRTP, meter.reset)
+  let meterRTP
+
+  if (meter.counter >= dynamicPlusEV) {
+    meterRTP = getMeterRTP(meter.counter, meter.mustHit, meter.payout, meter.spi, baseRTP)
+  } else {
+    const plusEV_RTP = getMeterRTP(dynamicPlusEV, meter.mustHit, meter.payout, meter.spi, baseRTP)
+    const denom = Math.max(0.0001, dynamicPlusEV - meter.reset)
+    const p_mid = (meter.mid - meter.reset) / denom
+    const midRTP = baseRTP * 100
+    const reset_RTP = (midRTP - p_mid * plusEV_RTP) / Math.max(0.0001, (1 - p_mid))
+    const progress = (meter.counter - meter.reset) / denom
+    meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
+  }
+
+  return Math.max(baseRTP * 100, meterRTP)
+}
+
 function StackUpPays({ onBack }) {
   const [mega, setMega] = useState(300)
   const [grand, setGrand] = useState(225)
@@ -78,6 +89,8 @@ function StackUpPays({ onBack }) {
   const [currentRTP, setCurrentRTP] = useState(89)
   const [fpDollarsNeeded, setFpDollarsNeeded] = useState(0)
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
+  const [projectedHits, setProjectedHits] = useState(0)
+  const [projectedSpins, setProjectedSpins] = useState(0)
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
@@ -114,44 +127,64 @@ function StackUpPays({ onBack }) {
       { label: 'Mini',  counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, reset: 75,  mid: MIDPOINT.mini },
     ]
 
-    let sumExtras = 0
-    let meterEVs = []
+    const calcDisplayedRTP = (meters) => {
+      const sumExtras = meters.reduce((sum, m) => {
+        const meterRTP = meterRtpWithFloor(m, baseRTP, getMeterRTP)
+        const extra = Math.max(0, meterRTP - (baseRTP * 100))
+        return sum + extra
+      }, 0)
+      const combinedRTP = (baseRTP * 100) + sumExtras
+      return Math.max(baseRTP * 100, combinedRTP)
+    }
 
-    meterData.forEach(m => {
-      const dynamicPlusEV = dynamicPlusEvCounter(m.mustHit, m.payout, m.spi, baseRTP, m.reset)
-      let meterRTP
+    const displayedRTP = calcDisplayedRTP(meterData)
 
-      if (m.counter >= dynamicPlusEV) {
-        meterRTP = getMeterRTP(m.counter, m.mustHit, m.payout, m.spi, baseRTP)
-      } else {
-        const plusEV_RTP = getMeterRTP(dynamicPlusEV, m.mustHit, m.payout, m.spi, baseRTP)
-        const p_mid = (m.mid - m.reset) / (dynamicPlusEV - m.reset)
-        const midRTP = baseRTP * 100
-        const reset_RTP = (midRTP - p_mid * plusEV_RTP) / (1 - p_mid)
-        const progress = (m.counter - m.reset) / (dynamicPlusEV - m.reset)
-        meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
-      }
+    // Average case simulation: play until machine RTP drops below +EV.
+    // Strongest meter = the one expected to hit first given current counters.
+    let projectedSessionEV = 0
+    const simMeters = meterData.map(m => ({ ...m }))
+    const maxHits = 50
+    let hits = 0
+    let totalSpins = 0
 
-      // Meters should only add upside over the configured base RTP.
-      const extra = Math.max(0, meterRTP - (baseRTP * 100))
-      sumExtras += extra
+    while (hits < maxHits) {
+      const simRTP = calcDisplayedRTP(simMeters)
+      if (simRTP < 100) break
 
-      const spinsRem = (m.mustHit - m.counter) * m.spi
-      const meterEV = m.payout - (1 - baseRTP) * spinsRem
+      let hitIndex = -1
+      let spinsToHit = Number.POSITIVE_INFINITY
 
-      meterEVs.push(meterEV)
-    })
+      simMeters.forEach((m, idx) => {
+        const spins = Math.max(0, (m.mustHit - m.counter) * m.spi)
+        if (spins < spinsToHit) {
+          spinsToHit = spins
+          hitIndex = idx
+        }
+      })
 
-    const combinedRTP = (baseRTP * 100) + sumExtras
-    // Never show RTP below the configured machine/base RTP.
-    const displayedRTP = Math.max(baseRTP * 100, combinedRTP)
+      if (!Number.isFinite(spinsToHit) || hitIndex < 0) break
 
-    const averageEV = Math.max(...meterEVs)
+      // Base game drift during spins to next must-hit.
+      projectedSessionEV += -spinsToHit * (1 - baseRTP)
+      totalSpins += spinsToHit
+
+      // Advance all meters as expected during those spins.
+      simMeters.forEach(m => {
+        m.counter = Math.min(m.mustHit, m.counter + (spinsToHit / m.spi))
+      })
+
+      // Add jackpot hit for strongest meter and reset it.
+      projectedSessionEV += simMeters[hitIndex].payout
+      simMeters[hitIndex].counter = simMeters[hitIndex].reset
+      hits += 1
+    }
 
     setCurrentRTP(Math.round(displayedRTP * 10) / 10)
-    setEvAvg(averageEV)
+    setEvAvg(projectedSessionEV)
+    setProjectedHits(hits)
+    setProjectedSpins(totalSpins)
 
-    const alreadyPositive = averageEV >= 0
+    const alreadyPositive = displayedRTP >= 100
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
@@ -307,7 +340,7 @@ function StackUpPays({ onBack }) {
           </div>
 
           <div className="bg-slate-800 p-5 rounded-2xl">
-            <div className="text-slate-400 text-sm">Average Case (Strongest Meter)</div>
+            <div className="text-slate-400 text-sm">Average Case (Projected Session)</div>
             <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
             <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
           </div>
@@ -322,7 +355,7 @@ function StackUpPays({ onBack }) {
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Acquisition Fee Calculator</h2>
 
           <div className="bg-slate-800 rounded-2xl p-5 text-center mb-4">
-            <div className="text-slate-400 text-sm">Expected Profit (Strongest Meter)</div>
+            <div className="text-slate-400 text-sm">Expected Profit (Projected Session)</div>
             <div className="text-4xl font-bold text-white">
               ${(evAvg * betSize).toFixed(0)}
             </div>
@@ -348,7 +381,11 @@ function StackUpPays({ onBack }) {
           <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-cyan-400 mb-4">Stack Up Pays Advisor</h3>
             <div className="text-slate-300 leading-relaxed">
-              Average Case shows only the EV of the single strongest meter — the one you will actually sit and play until it hits.
+              Average Case simulates expected play from the current counters, following the strongest meter to hit next and continuing until projected RTP is no longer +EV.
+            </div>
+            <div className="mt-4 rounded-2xl bg-slate-800/70 p-4 text-sm text-slate-300 space-y-1">
+              <div>Projected hits simulated: <span className="font-semibold text-cyan-300">{projectedHits}</span></div>
+              <div>Projected spins until stop: <span className="font-semibold text-cyan-300">{Math.round(projectedSpins).toLocaleString()}</span></div>
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
