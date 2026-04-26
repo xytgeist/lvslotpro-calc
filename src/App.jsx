@@ -101,7 +101,7 @@ function App() {
       email, 
       password,
       options: {
-        emailRedirectTo: 'https://lvslotpro.com'
+        emailRedirectTo: window.location.origin
       }
     })
     if (error) alert("Error: " + error.message)
@@ -113,7 +113,7 @@ function App() {
     if (!forgotEmail) return alert("Please enter your email")
 
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: 'https://lvslotpro.com/reset-password'
+      redirectTo: '$window.location.origin/reset-password'
     })
 
     if (error) alert("Error: " + error.message)
