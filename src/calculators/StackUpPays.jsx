@@ -125,8 +125,6 @@ function StackUpPays({ onBack }) {
       return Math.max(baseRTP * 100, combinedRTP)
     }
 
-    const displayedRTP = calcDisplayedRTP(meterData)
-
     // Average case simulation: play until machine RTP drops below +EV.
     // Strongest meter = the one expected to hit first given current counters.
     let projectedSessionEV = 0
@@ -167,12 +165,17 @@ function StackUpPays({ onBack }) {
       hits += 1
     }
 
-    setCurrentRTP(Math.round(displayedRTP * 10) / 10)
+    // Keep Current EV aligned with Average Case by deriving RTP from projected session outcome.
+    const projectedRTP = totalSpins > 0
+      ? (1 + (projectedSessionEV / totalSpins)) * 100
+      : calcDisplayedRTP(meterData)
+
+    setCurrentRTP(Math.round(projectedRTP * 10) / 10)
     setEvAvg(projectedSessionEV)
     setProjectedHits(hits)
     setProjectedSpins(totalSpins)
 
-    const alreadyPositive = displayedRTP >= 100
+    const alreadyPositive = projectedSessionEV > 0
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
