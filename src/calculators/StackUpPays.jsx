@@ -107,7 +107,8 @@ function StackUpPays({ onBack }) {
         meterRTP = reset_RTP + progress * (plusEV_RTP - reset_RTP)
       }
 
-      const extra = meterRTP - (baseRTP * 100)
+      // Meters should only add upside over the configured base RTP.
+      const extra = Math.max(0, meterRTP - (baseRTP * 100))
       sumExtras += extra
 
       const spinsRem = (m.mustHit - m.counter) * m.spi
@@ -116,8 +117,9 @@ function StackUpPays({ onBack }) {
       meterEVs.push(meterEV)
     })
 
-    let combinedRTP = (baseRTP * 100) + sumExtras
-    const displayedRTP = Math.max(78, combinedRTP)
+    const combinedRTP = (baseRTP * 100) + sumExtras
+    // Never show RTP below the configured machine/base RTP.
+    const displayedRTP = Math.max(baseRTP * 100, combinedRTP)
 
     const averageEV = Math.max(...meterEVs)
 
