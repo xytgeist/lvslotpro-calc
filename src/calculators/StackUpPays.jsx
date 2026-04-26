@@ -228,7 +228,15 @@ function StackUpPays({ onBack }) {
             <input 
               type="text" 
               value={rtpInput}
-              onChange={(e) => setRtpInput(e.target.value.replace(/[^0-9.]/g, ''))}
+              onChange={(e) => {
+                const next = e.target.value.replace(/[^0-9.]/g, '')
+                setRtpInput(next)
+                const parsed = parseFloat(next)
+                if (Number.isFinite(parsed) && parsed > 0) {
+                  // Live-update calculations/markers while user types a valid RTP override.
+                  setOverallRTP(parsed)
+                }
+              }}
               onBlur={() => {
                 const parsed = parseFloat(rtpInput)
                 const safeRtp = Number.isFinite(parsed) && parsed > 0 ? parsed : 89
