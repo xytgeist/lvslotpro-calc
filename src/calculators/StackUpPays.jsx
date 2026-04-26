@@ -56,6 +56,7 @@ function StackUpPays({ onBack }) {
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(0.10)
   const [overallRTP, setOverallRTP] = useState(89)
+  const [rtpInput, setRtpInput] = useState('89')
 
   const [evAvg, setEvAvg] = useState(0)
   const [currentRTP, setCurrentRTP] = useState(89)
@@ -75,6 +76,7 @@ function StackUpPays({ onBack }) {
     else if (denom >= 0.50) base = 92
 
     setOverallRTP(base)
+    setRtpInput(String(base))
   }, [denom])
 
   const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
@@ -209,8 +211,14 @@ function StackUpPays({ onBack }) {
             <label className="block text-slate-400 text-xs mb-1">RTP %</label>
             <input 
               type="text" 
-              value={overallRTP} 
-              onChange={(e) => setOverallRTP(parseFloat(e.target.value) || 89)} 
+              value={rtpInput}
+              onChange={(e) => setRtpInput(e.target.value.replace(/[^0-9.]/g, ''))}
+              onBlur={() => {
+                const parsed = parseFloat(rtpInput)
+                const safeRtp = Number.isFinite(parsed) && parsed > 0 ? parsed : 89
+                setOverallRTP(safeRtp)
+                setRtpInput(String(safeRtp))
+              }}
               className="w-full p-3.5 bg-slate-800 rounded-2xl text-center text-xl font-bold" 
             />
           </div>
