@@ -148,7 +148,9 @@ function App() {
       setResetError("Error: " + error.message)
     } else {
       setResetMessage("✅ Password updated successfully!")
-      setTimeout(() => window.location.href = 'https://lvslotpro.com', 2000)
+      setTimeout(() => {
+        window.location.href = window.location.origin
+      }, 2000)
     }
   }
 
@@ -178,7 +180,7 @@ function App() {
             </form>
           )}
 
-          <button onClick={() => window.location.href = 'https://lvslotpro.com'} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
+          <button onClick={() => window.location.href = window.location.origin} className="mt-6 w-full text-gray-400 hover:text-white py-3 text-sm">← Back to Login</button>
         </div>
       </div>
     )
