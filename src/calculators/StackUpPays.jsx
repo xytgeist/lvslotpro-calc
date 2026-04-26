@@ -102,6 +102,13 @@ function StackUpPays({ onBack }) {
       { label: 'Mini',  counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, reset: 75,  mid: MIDPOINT.mini },
     ]
 
+    // State RTP model (per-spin estimate):
+    // RTP_state = baseRTP + sum_i( avgPayout_i / spinsRemaining_i )
+    const stateRTP = meterData.reduce((rtp, m) => {
+      const spinsRemaining = Math.max(0.001, (m.mustHit - m.counter) * m.spi)
+      return rtp + ((m.payout / spinsRemaining) * 100)
+    }, baseRTP * 100)
+
     // Event-driven combo simulation:
     // Move forward to each expected next must-hit event, advancing all meters in between.
     // Then choose the best positive stopping point (combo plays naturally emerge here).
@@ -169,18 +176,13 @@ function StackUpPays({ onBack }) {
     const projectedSpinsToStop = cumulativeSpins
     const projectedHitsToStop = hits
 
-    // Keep Current EV aligned with Average Case by deriving RTP from chosen projected outcome.
-    const projectedRTP = projectedSpinsToStop > 0
-      ? (1 + (projectedSessionEV / projectedSpinsToStop)) * 100
-      : baseRTP * 100
-
-    setCurrentRTP(Math.round(projectedRTP * 10) / 10)
+    setCurrentRTP(Math.round(stateRTP * 10) / 10)
     setEvAvg(projectedSessionEV)
     setProjectedHits(projectedHitsToStop)
     setProjectedSpins(projectedSpinsToStop)
     setSimulationSteps(steps)
 
-    const alreadyPositive = projectedSessionEV > 0
+    const alreadyPositive = stateRTP >= 100
     setIsAlreadyPositive(alreadyPositive)
 
     if (!alreadyPositive) {
