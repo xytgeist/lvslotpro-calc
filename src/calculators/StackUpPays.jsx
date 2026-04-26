@@ -271,7 +271,7 @@ function StackUpPays({ onBack }) {
               {/* +EV tick aligned to slider min→max (same scale as the range input) */}
               <div className="relative w-full h-5 mb-0.5" aria-hidden>
                 <div
-                  className="absolute -top-0.5 -translate-x-1/2 text-[11px] italic text-emerald-400 whitespace-nowrap"
+                  className="absolute -top-1.5 -translate-x-1/2 text-[11px] italic text-emerald-400 whitespace-nowrap"
                   style={{ left: `${bePct}%` }}
                 >
                   {dynamicBe}
