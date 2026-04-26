@@ -54,13 +54,6 @@ function dynamicPlusEvCounter(mustHit, payout, spi, baseRTP, reset) {
   return Math.ceil(clamped)
 }
 
-function meterRtpWithFloor(meter, baseRTP, getMeterRTP) {
-  const dynamicPlusEV = dynamicPlusEvCounter(meter.mustHit, meter.payout, meter.spi, baseRTP, meter.reset)
-  // For Current EV/RTP, do not grant RTP boost until meter reaches +EV threshold.
-  if (meter.counter < dynamicPlusEV) return baseRTP * 100
-  return Math.max(baseRTP * 100, getMeterRTP(meter.counter, meter.mustHit, meter.payout, meter.spi, baseRTP))
-}
-
 function StackUpPays({ onBack }) {
   const [mega, setMega] = useState(300)
   const [grand, setGrand] = useState(225)
@@ -96,13 +89,6 @@ function StackUpPays({ onBack }) {
     setRtpInput(String(base))
   }, [denom])
 
-  const getMeterRTP = (counter, mustHit, payout, spi, baseRTP) => {
-    const spinsRemaining = Math.max(0.001, (mustHit - counter) * spi)
-    const baseReturn = spinsRemaining * baseRTP
-    const totalReturn = baseReturn + payout
-    return (totalReturn / spinsRemaining) * 100
-  }
-
   const calculate = () => {
     const bet = Number(betSize) || 25
     const baseRTP = overallRTP / 100
@@ -115,28 +101,17 @@ function StackUpPays({ onBack }) {
       { label: 'Mini',  counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, reset: 75,  mid: MIDPOINT.mini },
     ]
 
-    const calcDisplayedRTP = (meters) => {
-      const sumExtras = meters.reduce((sum, m) => {
-        const meterRTP = meterRtpWithFloor(m, baseRTP, getMeterRTP)
-        const extra = Math.max(0, meterRTP - (baseRTP * 100))
-        return sum + extra
-      }, 0)
-      const combinedRTP = (baseRTP * 100) + sumExtras
-      return Math.max(baseRTP * 100, combinedRTP)
-    }
-
-    // Average case simulation: play until machine RTP drops below +EV.
-    // Strongest meter = the one expected to hit first given current counters.
-    let projectedSessionEV = 0
+    // Event-driven combo simulation:
+    // Move forward to each expected next must-hit event, advancing all meters in between.
+    // Then choose the best positive stopping point (combo plays naturally emerge here).
     const simMeters = meterData.map(m => ({ ...m }))
-    const maxHits = 50
-    let hits = 0
-    let totalSpins = 0
+    const maxEvents = 60
+    let cumulativeEV = 0
+    let cumulativeSpins = 0
+    const checkpoints = []
+    const spinEpsilon = 0.0001
 
-    while (hits < maxHits) {
-      const simRTP = calcDisplayedRTP(simMeters)
-      if (simRTP < 100) break
-
+    for (let eventIndex = 0; eventIndex < maxEvents; eventIndex += 1) {
       let hitIndex = -1
       let spinsToHit = Number.POSITIVE_INFINITY
 
@@ -149,31 +124,48 @@ function StackUpPays({ onBack }) {
       })
 
       if (!Number.isFinite(spinsToHit) || hitIndex < 0) break
+      const safeSpins = Math.max(spinEpsilon, spinsToHit)
 
-      // Base game drift during spins to next must-hit.
-      projectedSessionEV += -spinsToHit * (1 - baseRTP)
-      totalSpins += spinsToHit
+      // Base-game expectation during spins to next event.
+      cumulativeEV += -safeSpins * (1 - baseRTP)
+      cumulativeSpins += safeSpins
 
       // Advance all meters as expected during those spins.
       simMeters.forEach(m => {
-        m.counter = Math.min(m.mustHit, m.counter + (spinsToHit / m.spi))
+        m.counter = Math.min(m.mustHit, m.counter + (safeSpins / m.spi))
       })
 
-      // Add jackpot hit for strongest meter and reset it.
-      projectedSessionEV += simMeters[hitIndex].payout
+      // Event payout: the soonest meter hits and resets.
+      cumulativeEV += simMeters[hitIndex].payout
       simMeters[hitIndex].counter = simMeters[hitIndex].reset
-      hits += 1
+      checkpoints.push({
+        hits: eventIndex + 1,
+        spins: cumulativeSpins,
+        ev: cumulativeEV,
+      })
     }
 
-    // Keep Current EV aligned with Average Case by deriving RTP from projected session outcome.
-    const projectedRTP = totalSpins > 0
-      ? (1 + (projectedSessionEV / totalSpins)) * 100
-      : calcDisplayedRTP(meterData)
+    // Stop policy: take the best positive checkpoint (max EV) across the lookahead.
+    const positiveCheckpoints = checkpoints.filter(c => c.ev > 0)
+    const bestPositive = positiveCheckpoints.reduce((best, c) => {
+      if (!best) return c
+      return c.ev > best.ev ? c : best
+    }, null)
+    const fallbackCheckpoint = checkpoints.length > 0 ? checkpoints[0] : null
+    const chosen = bestPositive || fallbackCheckpoint
+    const projectedSessionEV = chosen ? chosen.ev : 0
+    const projectedSpinsToStop = chosen ? chosen.spins : 0
+    const projectedHitsToStop = chosen ? chosen.hits : 0
+
+    // Keep Current EV aligned with Average Case by deriving RTP from chosen projected outcome.
+    const projectedRTP = projectedSpinsToStop > 0
+      ? (1 + (projectedSessionEV / projectedSpinsToStop)) * 100
+      : baseRTP * 100
 
     setCurrentRTP(Math.round(projectedRTP * 10) / 10)
     setEvAvg(projectedSessionEV)
-    setProjectedHits(hits)
-    setProjectedSpins(totalSpins)
+    setProjectedHits(projectedHitsToStop)
+    setProjectedSpins(projectedSpinsToStop)
 
     const alreadyPositive = projectedSessionEV > 0
     setIsAlreadyPositive(alreadyPositive)
