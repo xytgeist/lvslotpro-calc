@@ -72,6 +72,7 @@ function StackUpPays({ onBack }) {
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
   const [projectedHits, setProjectedHits] = useState(0)
   const [projectedSpins, setProjectedSpins] = useState(0)
+  const [simulationSteps, setSimulationSteps] = useState([])
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
@@ -108,7 +109,8 @@ function StackUpPays({ onBack }) {
     const maxEvents = 60
     let cumulativeEV = 0
     let cumulativeSpins = 0
-    const checkpoints = []
+    let hits = 0
+    const steps = []
     const spinEpsilon = 0.0001
 
     for (let eventIndex = 0; eventIndex < maxEvents; eventIndex += 1) {
@@ -126,8 +128,16 @@ function StackUpPays({ onBack }) {
       if (!Number.isFinite(spinsToHit) || hitIndex < 0) break
       const safeSpins = Math.max(spinEpsilon, spinsToHit)
 
-      // Base-game expectation during spins to next event.
-      cumulativeEV += -safeSpins * (1 - baseRTP)
+      // Immediate leg EV from current state to the next expected hit.
+      const legBaseEV = -safeSpins * (1 - baseRTP)
+      const legPayoutEV = simMeters[hitIndex].payout
+      const legEV = legBaseEV + legPayoutEV
+      const legRTP = (1 + (legEV / safeSpins)) * 100
+
+      // Conservative sequential stop: if next leg is not +EV, do not continue.
+      if (legEV <= 0) break
+
+      cumulativeEV += legEV
       cumulativeSpins += safeSpins
 
       // Advance all meters as expected during those spins.
@@ -135,32 +145,29 @@ function StackUpPays({ onBack }) {
         m.counter = Math.min(m.mustHit, m.counter + (safeSpins / m.spi))
       })
 
-      // Event payout: the soonest meter hits and resets.
-      cumulativeEV += simMeters[hitIndex].payout
+      // Soonest meter hits and resets.
       simMeters[hitIndex].counter = simMeters[hitIndex].reset
-      checkpoints.push({
-        hits: eventIndex + 1,
-        spins: cumulativeSpins,
-        ev: cumulativeEV,
+      hits += 1
+      steps.push({
+        step: eventIndex + 1,
+        hit: simMeters[hitIndex].label,
+        spins: safeSpins,
+        legEV,
+        legRTP,
+        cumulativeEV,
+        counters: {
+          mega: Number(simMeters[0].counter.toFixed(1)),
+          grand: Number(simMeters[1].counter.toFixed(1)),
+          major: Number(simMeters[2].counter.toFixed(1)),
+          minor: Number(simMeters[3].counter.toFixed(1)),
+          mini: Number(simMeters[4].counter.toFixed(1)),
+        },
       })
     }
 
-    // Stop policy (conservative combo handling):
-    // - If the very first leg to the next event is not +EV, do not treat as a playable combo.
-    // - If first leg is +EV, choose the best positive checkpoint while average RTP stays >= 100.
-    const firstCheckpoint = checkpoints.length > 0 ? checkpoints[0] : null
-    const canEnter = !!firstCheckpoint && firstCheckpoint.ev > 0
-    const validPositiveCheckpoints = canEnter
-      ? checkpoints.filter(c => c.ev > 0 && (1 + (c.ev / c.spins)) * 100 >= 100)
-      : []
-    const bestPositive = validPositiveCheckpoints.reduce((best, c) => {
-      if (!best) return c
-      return c.ev > best.ev ? c : best
-    }, null)
-    const chosen = bestPositive || null
-    const projectedSessionEV = chosen ? chosen.ev : 0
-    const projectedSpinsToStop = chosen ? chosen.spins : 0
-    const projectedHitsToStop = chosen ? chosen.hits : 0
+    const projectedSessionEV = cumulativeEV
+    const projectedSpinsToStop = cumulativeSpins
+    const projectedHitsToStop = hits
 
     // Keep Current EV aligned with Average Case by deriving RTP from chosen projected outcome.
     const projectedRTP = projectedSpinsToStop > 0
@@ -171,6 +178,7 @@ function StackUpPays({ onBack }) {
     setEvAvg(projectedSessionEV)
     setProjectedHits(projectedHitsToStop)
     setProjectedSpins(projectedSpinsToStop)
+    setSimulationSteps(steps)
 
     const alreadyPositive = projectedSessionEV > 0
     setIsAlreadyPositive(alreadyPositive)
@@ -375,6 +383,18 @@ function StackUpPays({ onBack }) {
               <div>Projected hits simulated: <span className="font-semibold text-cyan-300">{projectedHits}</span></div>
               <div>Projected spins until stop: <span className="font-semibold text-cyan-300">{Math.round(projectedSpins).toLocaleString()}</span></div>
             </div>
+            {simulationSteps.length > 0 && (
+              <div className="mt-4 rounded-2xl bg-slate-800/70 p-4 text-xs text-slate-300">
+                <div className="font-semibold text-cyan-300 mb-2">Shared-Spin Step Trace (first 6)</div>
+                <div className="space-y-1">
+                  {simulationSteps.slice(0, 6).map((s) => (
+                    <div key={s.step} className="leading-relaxed">
+                      <span className="text-slate-400">#{s.step}</span> hit <span className="text-cyan-300">{s.hit}</span> in {Math.round(s.spins)} spins, leg {s.legEV.toFixed(1)}x ({s.legRTP.toFixed(1)}%), cumulative {s.cumulativeEV.toFixed(1)}x
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <button onClick={() => setShowInfoModal(false)} className="mt-8 w-full bg-cyan-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
         </div>
