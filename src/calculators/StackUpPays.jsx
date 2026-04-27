@@ -62,16 +62,12 @@ function dynamicPlusEvCounter(mustHit, payout, spi, baseRTP, reset) {
   return Math.ceil(clamped)
 }
 
-/**
- * Calibrated current-state RTP:
- * 1) Compute bonus share from reset-cycle math.
- * 2) Split that bonus share across meters by long-run weight.
- * 3) Scale each meter by current position (must-reset)/(must-counter).
- */
-function getCalibratedStateRTP(overallRTP, meters) {
+function getCalibrationFromCycle(overallRTP, meters) {
   const megaMeter = meters.find(m => m.label === 'Mega') || meters[0]
   const megaCycleSpins = (megaMeter.mustHit - megaMeter.reset) * megaMeter.spi
-  if (!Number.isFinite(megaCycleSpins) || megaCycleSpins <= 0) return overallRTP
+  if (!Number.isFinite(megaCycleSpins) || megaCycleSpins <= 0) {
+    return { baseRTP: overallRTP, bonusRTP: 0, totalBonusBets: 0, megaCycleSpins: 1, meterCycleData: [] }
+  }
 
   const meterCycleData = meters.map((m) => {
     const cycleSpins = (m.mustHit - m.reset) * m.spi
@@ -84,6 +80,18 @@ function getCalibratedStateRTP(overallRTP, meters) {
   const bonusShare = totalBonusBets / megaCycleSpins
   const bonusRTP = overallRTP * bonusShare
   const baseRTP = overallRTP - bonusRTP
+
+  return { baseRTP, bonusRTP, totalBonusBets, megaCycleSpins, meterCycleData }
+}
+
+/**
+ * Calibrated current-state RTP:
+ * 1) Compute bonus share from reset-cycle math.
+ * 2) Split that bonus share across meters by long-run weight.
+ * 3) Scale each meter by current position (must-reset)/(must-counter).
+ */
+function getCalibratedStateRTP(overallRTP, meters) {
+  const { baseRTP, bonusRTP, totalBonusBets, meterCycleData } = getCalibrationFromCycle(overallRTP, meters)
 
   const stateBonusRTP = meterCycleData.reduce((sum, m) => {
     const meterWeight = totalBonusBets > 0 ? (m.bonusBetsPerMegaCycle / totalBonusBets) : 0
@@ -116,6 +124,7 @@ function StackUpPays({ onBack }) {
   const [isAlreadyPositive, setIsAlreadyPositive] = useState(false)
   const [projectedHits, setProjectedHits] = useState(0)
   const [projectedSpins, setProjectedSpins] = useState(0)
+  const [spinsToPositive, setSpinsToPositive] = useState(null)
   const [simulationSteps, setSimulationSteps] = useState([])
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
@@ -147,15 +156,20 @@ function StackUpPays({ onBack }) {
     ]
 
     const stateRTP = getCalibratedStateRTP(overallRTP, meterData)
+    const { baseRTP: calibratedBaseRTP } = getCalibrationFromCycle(overallRTP, meterData)
+    const baseSpinRTP = calibratedBaseRTP / 100
 
     // Event-driven combo simulation:
     // Move forward to each expected next must-hit event, advancing all meters in between.
-    // Then choose the best positive stopping point (combo plays naturally emerge here).
+    // If starting below +EV, estimate cost (negative EV) to reach +EV.
+    // If starting above +EV, play until state RTP falls below 100%.
     const simMeters = meterData.map(m => ({ ...m }))
     const maxEvents = 60
     let cumulativeEV = 0
     let cumulativeSpins = 0
     let hits = 0
+    let reachedPositive = stateRTP >= 100
+    let spinsUntilPositive = reachedPositive ? 0 : null
     const steps = []
     const spinEpsilon = 0.0001
 
@@ -175,13 +189,10 @@ function StackUpPays({ onBack }) {
       const safeSpins = Math.max(spinEpsilon, spinsToHit)
 
       // Immediate leg EV from current state to the next expected hit.
-      const legBaseEV = -safeSpins * (1 - baseRTP)
+      const legBaseEV = safeSpins * (baseSpinRTP - 1)
       const legPayoutEV = simMeters[hitIndex].payout
       const legEV = legBaseEV + legPayoutEV
       const legRTP = (1 + (legEV / safeSpins)) * 100
-
-      // Conservative sequential stop: if next leg is not +EV, do not continue.
-      if (legEV <= 0) break
 
       cumulativeEV += legEV
       cumulativeSpins += safeSpins
@@ -194,6 +205,20 @@ function StackUpPays({ onBack }) {
       // Soonest meter hits and resets.
       simMeters[hitIndex].counter = simMeters[hitIndex].reset
       hits += 1
+      const rtpAfterEvent = getCalibratedStateRTP(overallRTP, simMeters)
+
+      if (!reachedPositive && rtpAfterEvent >= 100) {
+        reachedPositive = true
+        spinsUntilPositive = cumulativeSpins
+        // If we started negative, Average Case is the cost to reach playable state.
+        break
+      }
+
+      if (reachedPositive && rtpAfterEvent < 100) {
+        // Started playable: stop once state drops below +EV.
+        break
+      }
+
       steps.push({
         step: eventIndex + 1,
         hit: simMeters[hitIndex].label,
@@ -219,6 +244,7 @@ function StackUpPays({ onBack }) {
     setEvAvg(projectedSessionEV)
     setProjectedHits(projectedHitsToStop)
     setProjectedSpins(projectedSpinsToStop)
+    setSpinsToPositive(spinsUntilPositive)
     setSimulationSteps(steps)
 
     const alreadyPositive = stateRTP >= 100
@@ -423,6 +449,9 @@ function StackUpPays({ onBack }) {
             <div className="mt-4 rounded-2xl bg-slate-800/70 p-4 text-sm text-slate-300 space-y-1">
               <div>Projected hits simulated: <span className="font-semibold text-cyan-300">{projectedHits}</span></div>
               <div>Projected spins until stop: <span className="font-semibold text-cyan-300">{Math.round(projectedSpins).toLocaleString()}</span></div>
+              {spinsToPositive !== null && currentRTP < 100 && (
+                <div>Projected spins to reach +EV: <span className="font-semibold text-cyan-300">{Math.round(spinsToPositive).toLocaleString()}</span></div>
+              )}
             </div>
             {simulationSteps.length > 0 && (
               <div className="mt-4 rounded-2xl bg-slate-800/70 p-4 text-xs text-slate-300">
