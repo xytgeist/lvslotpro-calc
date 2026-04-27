@@ -32,6 +32,14 @@ const MIDPOINT = {
   mini: 100,
 }
 
+const RESET = {
+  mega: 250,
+  grand: 200,
+  major: 150,
+  minor: 100,
+  mini: 75,
+}
+
 /** Where to draw the +EV tick (0–100%) along the range min→max. */
 function plusEvMarkerPercent(min, max, plusEv) {
   if (max <= min) return 0
@@ -52,6 +60,42 @@ function dynamicPlusEvCounter(mustHit, payout, spi, baseRTP, reset) {
   const clamped = Math.min(mustHit, Math.max(reset, rawCounter))
   // Round up so the displayed threshold is the first whole number at or above +EV.
   return Math.ceil(clamped)
+}
+
+/**
+ * Calibrated current-state RTP:
+ * 1) Compute bonus share from reset-cycle math.
+ * 2) Split that bonus share across meters by long-run weight.
+ * 3) Scale each meter by current position (must-reset)/(must-counter).
+ */
+function getCalibratedStateRTP(overallRTP, meters) {
+  const megaMeter = meters.find(m => m.label === 'Mega') || meters[0]
+  const megaCycleSpins = (megaMeter.mustHit - megaMeter.reset) * megaMeter.spi
+  if (!Number.isFinite(megaCycleSpins) || megaCycleSpins <= 0) return overallRTP
+
+  const meterCycleData = meters.map((m) => {
+    const cycleSpins = (m.mustHit - m.reset) * m.spi
+    const hitsPerMegaCycle = megaCycleSpins / cycleSpins
+    const bonusBetsPerMegaCycle = hitsPerMegaCycle * m.payout
+    return { ...m, cycleSpins, bonusBetsPerMegaCycle }
+  })
+
+  const totalBonusBets = meterCycleData.reduce((sum, m) => sum + m.bonusBetsPerMegaCycle, 0)
+  const bonusShare = totalBonusBets / megaCycleSpins
+  const bonusRTP = overallRTP * bonusShare
+  const baseRTP = overallRTP - bonusRTP
+
+  const stateBonusRTP = meterCycleData.reduce((sum, m) => {
+    const meterWeight = totalBonusBets > 0 ? (m.bonusBetsPerMegaCycle / totalBonusBets) : 0
+    const meterBaselineRTP = bonusRTP * meterWeight
+
+    // Prevent explosive values when a meter is extremely close to must-hit.
+    const remainingTicks = Math.max(0.5, m.mustHit - m.counter)
+    const scale = (m.mustHit - m.reset) / remainingTicks
+    return sum + (meterBaselineRTP * scale)
+  }, 0)
+
+  return baseRTP + stateBonusRTP
 }
 
 function StackUpPays({ onBack }) {
@@ -95,19 +139,14 @@ function StackUpPays({ onBack }) {
     const baseRTP = overallRTP / 100
 
     const meterData = [
-      { label: 'Mega',  counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, reset: 250, mid: MIDPOINT.mega },
-      { label: 'Grand', counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, reset: 200, mid: MIDPOINT.grand },
-      { label: 'Major', counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, reset: 150, mid: MIDPOINT.major },
-      { label: 'Minor', counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, reset: 100, mid: MIDPOINT.minor },
-      { label: 'Mini',  counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, reset: 75,  mid: MIDPOINT.mini },
+      { label: 'Mega',  counter: mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega, reset: RESET.mega,  mid: MIDPOINT.mega },
+      { label: 'Grand', counter: grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand, reset: RESET.grand, mid: MIDPOINT.grand },
+      { label: 'Major', counter: major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major, reset: RESET.major, mid: MIDPOINT.major },
+      { label: 'Minor', counter: minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor, reset: RESET.minor, mid: MIDPOINT.minor },
+      { label: 'Mini',  counter: mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini, reset: RESET.mini,  mid: MIDPOINT.mini },
     ]
 
-    // State RTP model (per-spin estimate):
-    // RTP_state = baseRTP + sum_i( avgPayout_i / spinsRemaining_i )
-    const stateRTP = meterData.reduce((rtp, m) => {
-      const spinsRemaining = Math.max(0.001, (m.mustHit - m.counter) * m.spi)
-      return rtp + ((m.payout / spinsRemaining) * 100)
-    }, baseRTP * 100)
+    const stateRTP = getCalibratedStateRTP(overallRTP, meterData)
 
     // Event-driven combo simulation:
     // Move forward to each expected next must-hit event, advancing all meters in between.
@@ -283,11 +322,11 @@ function StackUpPays({ onBack }) {
         {/* Meters — gold tick = approx +EV; number in ( ) matches tick position */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-2.5">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: 250, mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega },
-            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: 200, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand },
-            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: 150, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major },
-            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: 100, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor },
-            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: 75,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: RESET.mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: RESET.grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: RESET.major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: RESET.minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: RESET.mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini },
           ].map((m, i) => {
             const dynamicBe = dynamicPlusEvCounter(m.mustHit, m.payout, m.spi, overallRTP / 100, m.min)
             const bePct = plusEvMarkerPercent(m.min, m.mustHit, dynamicBe)
