@@ -174,6 +174,15 @@ function StackUpPays({ onBack }) {
     const spinEpsilon = 0.0001
 
     for (let eventIndex = 0; eventIndex < maxEvents; eventIndex += 1) {
+      const rtpBeforeEvent = getCalibratedStateRTP(overallRTP, simMeters)
+
+      if (reachedPositive && rtpBeforeEvent < 100) break
+      if (!reachedPositive && rtpBeforeEvent >= 100) {
+        reachedPositive = true
+        spinsUntilPositive = cumulativeSpins
+        break
+      }
+
       let hitIndex = -1
       let spinsToHit = Number.POSITIVE_INFINITY
 
@@ -188,11 +197,9 @@ function StackUpPays({ onBack }) {
       if (!Number.isFinite(spinsToHit) || hitIndex < 0) break
       const safeSpins = Math.max(spinEpsilon, spinsToHit)
 
-      // Immediate leg EV from current state to the next expected hit.
-      const legBaseEV = safeSpins * (baseSpinRTP - 1)
-      const legPayoutEV = simMeters[hitIndex].payout
-      const legEV = legBaseEV + legPayoutEV
-      const legRTP = (1 + (legEV / safeSpins)) * 100
+      // Keep leg EV consistent with calibrated state-RTP model.
+      const legRTP = rtpBeforeEvent
+      const legEV = safeSpins * ((legRTP / 100) - 1)
 
       cumulativeEV += legEV
       cumulativeSpins += safeSpins
