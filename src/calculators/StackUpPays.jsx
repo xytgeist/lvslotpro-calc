@@ -166,6 +166,7 @@ function StackUpPays({ onBack }) {
     const simMeters = meterData.map(m => ({ ...m }))
     const maxEvents = 60
     let projectedSpinsToStop = 0
+    let projectedSessionEV = 0
     let hits = 0
     let spinsUntilPositive = null
     const steps = []
@@ -190,6 +191,8 @@ function StackUpPays({ onBack }) {
         if (!Number.isFinite(spinsToHit) || hitIndex < 0) break
         const safeSpins = Math.max(spinEpsilon, spinsToHit)
 
+        // Use per-leg RTP (before the event) for EV accumulation.
+        projectedSessionEV += safeSpins * ((rtpBeforeEvent / 100) - 1)
         projectedSpinsToStop += safeSpins
 
         // Advance all meters as expected during those spins.
@@ -222,7 +225,6 @@ function StackUpPays({ onBack }) {
       }
     }
 
-    const projectedSessionEV = projectedSpinsToStop * ((stateRTP / 100) - 1)
     const projectedHitsToStop = hits
 
     setCurrentRTP(Math.round(stateRTP * 10) / 10)
@@ -391,10 +393,10 @@ function StackUpPays({ onBack }) {
             <div className="text-slate-400 text-sm">Average Case (Projected Session)</div>
             <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
             <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
-            <div className="mt-2 text-xs text-slate-400">
+            <div className="mt-3 text-sm text-slate-300">
               Expected spins before stop: <span className="font-semibold text-cyan-300">{Math.round(projectedSpins).toLocaleString()}</span>
             </div>
-            <div className="mt-1 text-[11px] italic text-slate-500 leading-relaxed">
+            <div className="mt-1.5 text-xs italic text-slate-400 leading-relaxed">
               Expected spins before stop means the projected number of spins until the machine's calibrated current RTP drops below 100%, at which point play is stopped.
             </div>
           </div>
