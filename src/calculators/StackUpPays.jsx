@@ -334,11 +334,11 @@ function StackUpPays({ onBack }) {
         {/* Meters — gold tick = approx +EV; number in ( ) matches tick position */}
         <div className="bg-slate-900 p-5 rounded-3xl mb-6 space-y-2.5">
           {[
-            { label: 'Mega',  value: mega,  setter: setMega,  thumbHex: '#ef4444', text: 'text-red-400',    min: RESET.mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega },
-            { label: 'Grand', value: grand, setter: setGrand, thumbHex: '#f97316', text: 'text-orange-400', min: RESET.grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand },
-            { label: 'Major', value: major, setter: setMajor, thumbHex: '#a855f7', text: 'text-purple-400', min: RESET.major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major },
-            { label: 'Minor', value: minor, setter: setMinor, thumbHex: '#22c55e', text: 'text-green-400',  min: RESET.minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor },
-            { label: 'Mini',  value: mini,  setter: setMini,  thumbHex: '#3b82f6', text: 'text-blue-400',   min: RESET.mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini },
+            { label: 'Mega',  value: mega,  setter: setMega,  accent: 'accent-red-500',    text: 'text-red-400',   min: RESET.mega,  mustHit: MUST_HIT.mega,  payout: AVG_PAYOUT.mega,  spi: SPINS_PER_INCREMENT.mega },
+            { label: 'Grand', value: grand, setter: setGrand, accent: 'accent-orange-500', text: 'text-orange-400', min: RESET.grand, mustHit: MUST_HIT.grand, payout: AVG_PAYOUT.grand, spi: SPINS_PER_INCREMENT.grand },
+            { label: 'Major', value: major, setter: setMajor, accent: 'accent-purple-500', text: 'text-purple-400', min: RESET.major, mustHit: MUST_HIT.major, payout: AVG_PAYOUT.major, spi: SPINS_PER_INCREMENT.major },
+            { label: 'Minor', value: minor, setter: setMinor, accent: 'accent-green-500',  text: 'text-green-400',  min: RESET.minor, mustHit: MUST_HIT.minor, payout: AVG_PAYOUT.minor, spi: SPINS_PER_INCREMENT.minor },
+            { label: 'Mini',  value: mini,  setter: setMini,  accent: 'accent-blue-500',   text: 'text-blue-400',   min: RESET.mini,  mustHit: MUST_HIT.mini,  payout: AVG_PAYOUT.mini,  spi: SPINS_PER_INCREMENT.mini },
           ].map((m, i) => {
             const dynamicBe = dynamicPlusEvCounter(m.mustHit, m.payout, m.spi, overallRTP / 100, m.min)
             const bePct = plusEvMarkerPercent(m.min, m.mustHit, dynamicBe)
@@ -372,8 +372,7 @@ function StackUpPays({ onBack }) {
                 max={m.mustHit}
                 value={m.value}
                 onChange={(e) => m.setter(Number(e.target.value))}
-                className="range-touch w-full relative z-10"
-                style={{ '--range-accent': m.thumbHex }}
+                className={`range-touch-target w-full ${m.accent} relative z-10`}
               />
             </div>
             )
@@ -427,8 +426,7 @@ function StackUpPays({ onBack }) {
               step="1"
               value={scoutPercentage}
               onChange={(e) => setScoutPercentage(Number(e.target.value))}
-              className="range-touch w-full"
-              style={{ '--range-accent': '#06b6d4' }}
+              className="range-touch-target w-full accent-cyan-500"
             />
           </div>
 
