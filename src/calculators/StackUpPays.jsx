@@ -41,6 +41,9 @@ const RESET = {
   mini: 75,
 }
 
+/** Denoms available in the UI (no options above $2). */
+const DENOM_OPTIONS = [0.01, 0.02, 0.05, 0.1, 0.25, 1, 2]
+
 /** Where to draw the +EV tick (0–100%) along the range min→max. */
 function plusEvMarkerPercent(min, max, plusEv) {
   if (max <= min) return 0
@@ -130,6 +133,12 @@ function StackUpPays({ onBack }) {
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
+
+  useEffect(() => {
+    if (!DENOM_OPTIONS.some((d) => Math.abs(d - denom) < 1e-9)) {
+      setDenom(2)
+    }
+  }, [denom])
 
   // Auto-update RTP when denomination changes
   useEffect(() => {
@@ -306,7 +315,7 @@ function StackUpPays({ onBack }) {
               onChange={(e) => setDenom(parseFloat(e.target.value))}
               className="h-14 w-full cursor-pointer rounded-2xl border-0 bg-slate-800 px-2 text-center text-2xl font-bold leading-none text-white outline-none focus:ring-2 focus:ring-cyan-500/25"
             >
-              {[0.01, 0.02, 0.05, 0.1, 0.25, 1, 2, 5, 10, 25, 50, 100].map((d) => (
+              {DENOM_OPTIONS.map((d) => (
                 <option key={d} value={d}>
                   ${d}
                 </option>
