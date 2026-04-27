@@ -392,11 +392,8 @@ function StackUpPays({ onBack }) {
             <div className="text-slate-400 text-sm">Average Case (Projected Session)</div>
             <div className={`text-4xl font-bold ${evAvg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
             <div className="text-sm text-slate-300">${(evAvg * betSize).toFixed(0)}</div>
-            <div className="mt-3 text-sm text-slate-300">
-              Expected spins before stop: <span className="font-semibold text-cyan-300">{Math.round(projectedSpins).toLocaleString()}</span>
-            </div>
             <div className="mt-1.5 text-xs italic text-slate-400 leading-relaxed">
-              Expected spins before stop means the projected number of spins until the machine's calibrated current RTP drops below 100%, at which point play is stopped.
+              Expected bets won is based on the number of spins until the machine's calibrated current RTP drops below 100%, at which point play is stopped.
             </div>
           </div>
 
@@ -440,7 +437,6 @@ function StackUpPays({ onBack }) {
             </div>
             <div className="mt-4 rounded-2xl bg-slate-800/70 p-4 text-sm text-slate-300 space-y-1">
               <div>Projected hits simulated: <span className="font-semibold text-cyan-300">{projectedHits}</span></div>
-              <div>Projected spins until stop: <span className="font-semibold text-cyan-300">{Math.round(projectedSpins).toLocaleString()}</span></div>
               {spinsToPositive !== null && currentRTP < 100 && (
                 <div>Projected spins to reach +EV: <span className="font-semibold text-cyan-300">{Math.round(spinsToPositive).toLocaleString()}</span></div>
               )}
