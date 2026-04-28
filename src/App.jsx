@@ -80,13 +80,316 @@ function GoogleIcon() {
   )
 }
 
+function TabButton({ active, onClick, label, icon }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 touch-manipulation ${
+        active ? 'text-white' : 'text-zinc-400'
+      }`}
+      aria-current={active ? 'page' : undefined}
+    >
+      <span className={`text-xl leading-none ${active ? 'opacity-100' : 'opacity-80'}`} aria-hidden>
+        {icon}
+      </span>
+      <span className={`text-[11px] leading-none ${active ? 'font-semibold' : 'font-medium'}`}>{label}</span>
+    </button>
+  )
+}
+
+function AppShell({ onLogout }) {
+  const [tab, setTab] = useState('home')
+  const [activeCalculator, setActiveCalculator] = useState(null) // 'phoenix' | 'buffalo' | 'stackup' | 'mhb' | null
+
+  const openCalculator = (key) => {
+    setActiveCalculator(key)
+    setTab('calculators')
+  }
+
+  const renderCalculatorsHome = () => (
+    <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
+      <div className="text-center mb-10 sm:mb-12">
+        <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Las Vegas Slot Pro</h1>
+        <p className="text-zinc-400 mt-3 text-base">Select a calculator</p>
+      </div>
+
+      <button
+        onClick={() => setActiveCalculator('phoenix')}
+        className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation active:scale-[0.99]"
+      >
+        <img src="/phoenix-link-logo.png" alt="Phoenix" className="h-16 w-16 flex-shrink-0 rounded-xl" />
+        <div className="min-w-0 flex-1 self-center">
+          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-orange-400">Phoenix Link EV Calc</div>
+          <p className="mt-0.5 line-clamp-1 text-base leading-snug text-gray-400 sm:line-clamp-2">
+            Must-hit counter bonus analyzer
+          </p>
+        </div>
+      </button>
+
+      <button
+        onClick={() => setActiveCalculator('buffalo')}
+        className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]"
+      >
+        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner">
+          <img src="/buffalo-icon.png" alt="Buffalo" className="h-14 w-14 object-contain" />
+        </div>
+        <div className="min-w-0 flex-1 self-center">
+          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-amber-100">Buffalo Link EV Calc</div>
+          <p className="mt-0.5 line-clamp-1 text-base leading-snug text-amber-200 sm:line-clamp-2">
+            Midpoint-based counter analyzer
+          </p>
+        </div>
+      </button>
+
+      <button
+        onClick={() => setActiveCalculator('stackup')}
+        className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]"
+      >
+        <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="h-16 w-16 flex-shrink-0 rounded-2xl object-cover shadow-lg" />
+        <div className="min-w-0 flex-1 self-center">
+          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-cyan-100">Stack Up Pays</div>
+          <p
+            className="mt-0.5 line-clamp-1 text-base leading-snug text-cyan-200 sm:line-clamp-2"
+            title="Ascending Fortunes • 5-meter analyzer"
+          >
+            Ascending Fortunes • 5-meter analyzer
+          </p>
+        </div>
+      </button>
+
+      <button
+        onClick={() => setActiveCalculator('mhb')}
+        className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]"
+      >
+        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 text-5xl shadow-inner">
+          🎰
+        </div>
+        <div className="min-w-0 flex-1 self-center">
+          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-purple-100">Must Hit By Jackpot</div>
+          <p className="mt-0.5 line-clamp-1 text-base leading-snug text-purple-200 sm:line-clamp-2">
+            Progressive must-hit analyzer
+          </p>
+        </div>
+      </button>
+
+      <div className="mt-10 sm:mt-12 text-center">
+        <button
+          onClick={onLogout}
+          className="min-h-12 inline-flex items-center justify-center text-base text-gray-400 hover:text-red-400 underline touch-manipulation transition-colors px-4 py-2"
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+  )
+
+  const renderTabContent = () => {
+    if (tab === 'calculators') {
+      if (!activeCalculator) return renderCalculatorsHome()
+      if (activeCalculator === 'phoenix') return <PhoenixLink onBack={() => setActiveCalculator(null)} />
+      if (activeCalculator === 'buffalo') return <BuffaloLink onBack={() => setActiveCalculator(null)} />
+      if (activeCalculator === 'stackup') return <StackUpPays onBack={() => setActiveCalculator(null)} />
+      if (activeCalculator === 'mhb') return <MHBCalculator onBack={() => setActiveCalculator(null)} />
+      return renderCalculatorsHome()
+    }
+
+    if (tab === 'home') {
+      return (
+        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="text-white text-2xl font-black tracking-tight">Las Vegas Slot Pro</div>
+              <div className="text-zinc-400 text-sm mt-0.5">Home</div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="min-h-10 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-semibold touch-manipulation"
+            >
+              Logout
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <button
+              onClick={() => setTab('calculators')}
+              className="bg-zinc-900 rounded-3xl p-4 text-left touch-manipulation active:scale-[0.99]"
+            >
+              <div className="text-zinc-400 text-xs">Quick action</div>
+              <div className="text-white font-bold text-lg mt-1">Open calculators</div>
+              <div className="text-zinc-500 text-xs mt-1">Favorites + recent</div>
+            </button>
+            <button
+              onClick={() => openCalculator('stackup')}
+              className="bg-zinc-900 rounded-3xl p-4 text-left touch-manipulation active:scale-[0.99]"
+            >
+              <div className="text-zinc-400 text-xs">Quick eval</div>
+              <div className="text-white font-bold text-lg mt-1">Stack Up Pays</div>
+              <div className="text-zinc-500 text-xs mt-1">Jump into meters</div>
+            </button>
+          </div>
+
+          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white font-bold">Feed (placeholder)</div>
+              <button
+                onClick={() => setTab('community')}
+                className="text-cyan-300 text-sm font-semibold hover:text-cyan-200"
+              >
+                View community →
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { title: 'Big win post', body: 'Photo + caption + tags (coming soon).' },
+                { title: 'News/update', body: 'Machine changes, rules, resets (coming soon).' },
+              ].map((p) => (
+                <div key={p.title} className="rounded-2xl bg-zinc-800/70 p-4">
+                  <div className="text-zinc-200 font-semibold">{p.title}</div>
+                  <div className="text-zinc-400 text-sm mt-1 leading-relaxed">{p.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (tab === 'guides') {
+      return (
+        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="mb-6">
+            <div className="text-white text-2xl font-black tracking-tight">Guides</div>
+            <div className="text-zinc-400 text-sm mt-0.5">How-to playbooks (skeleton)</div>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { id: 'stackup', title: 'Stack Up Pays (Ascending Fortunes)', subtitle: 'What to look for + meter workflow' },
+              { id: 'phoenix', title: 'Phoenix Link', subtitle: 'Counter basics + volatility notes' },
+              { id: 'buffalo', title: 'Buffalo Link', subtitle: 'Midpoint method + walk-away' },
+            ].map((g) => (
+              <div key={g.id} className="bg-zinc-900 rounded-3xl p-5">
+                <div className="text-white font-bold text-lg">{g.title}</div>
+                <div className="text-zinc-400 text-sm mt-1">{g.subtitle}</div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => openCalculator(g.id)}
+                    className="flex-1 min-h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold touch-manipulation"
+                  >
+                    Open calculator
+                  </button>
+                  <button
+                    onClick={() => setTab('community')}
+                    className="flex-1 min-h-11 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold touch-manipulation"
+                  >
+                    Ask community
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    if (tab === 'community') {
+      return (
+        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="mb-6">
+            <div className="text-white text-2xl font-black tracking-tight">Community</div>
+            <div className="text-zinc-400 text-sm mt-0.5">Forum + posts (skeleton)</div>
+          </div>
+
+          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
+            <div className="text-white font-bold">Create</div>
+            <div className="text-zinc-400 text-sm mt-1">Post templates + photo uploads coming next.</div>
+            <button
+              type="button"
+              className="mt-4 w-full min-h-12 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold touch-manipulation"
+            >
+              New post (coming soon)
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {['Is this +EV?', 'Walk-away advice', 'Trip report'].map((t) => (
+              <div key={t} className="bg-zinc-900 rounded-3xl p-5">
+                <div className="text-zinc-200 font-semibold">{t}</div>
+                <div className="text-zinc-500 text-sm mt-1">Thread list placeholder.</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    if (tab === 'team') {
+      return (
+        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="mb-6">
+            <div className="text-white text-2xl font-black tracking-tight">Team / Deals</div>
+            <div className="text-zinc-400 text-sm mt-0.5">Bring our team in (skeleton)</div>
+          </div>
+
+          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
+            <div className="text-white font-bold">Request help on a play</div>
+            <div className="text-zinc-400 text-sm mt-1">
+              Intake flow for large plays you can’t take solo. (Run it / buy it / partner.)
+            </div>
+            <button
+              type="button"
+              className="mt-4 w-full min-h-12 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold touch-manipulation"
+            >
+              Start intake (coming soon)
+            </button>
+          </div>
+
+          <div className="bg-zinc-900 rounded-3xl p-5">
+            <div className="text-white font-bold">Submission status</div>
+            <div className="text-zinc-500 text-sm mt-1">Submitted → Reviewing → Accepted → Coordinating</div>
+          </div>
+        </div>
+      )
+    }
+
+    return null
+  }
+
+  return (
+    <div className="min-h-dvh bg-gray-950 pb-[max(5rem,env(safe-area-inset-bottom))]">
+      {renderTabContent()}
+
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-800/80 bg-zinc-950/95 backdrop-blur">
+        <div className="mx-auto max-w-lg px-3 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          <div className="flex">
+            <TabButton active={tab === 'home'} onClick={() => setTab('home')} label="Home" icon="🏠" />
+            <TabButton
+              active={tab === 'calculators'}
+              onClick={() => {
+                setTab('calculators')
+                if (activeCalculator) setActiveCalculator(null)
+              }}
+              label="Calcs"
+              icon="🧮"
+            />
+            <TabButton active={tab === 'guides'} onClick={() => setTab('guides')} label="Guides" icon="📘" />
+            <TabButton active={tab === 'community'} onClick={() => setTab('community')} label="Forum" icon="💬" />
+            <TabButton active={tab === 'team'} onClick={() => setTab('team')} label="Team" icon="🤝" />
+          </div>
+        </div>
+      </nav>
+    </div>
+  )
+}
+
 function App() {
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isAllowed, setIsAllowed] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-  const [currentView, setCurrentView] = useState('dashboard')
+  const [currentView, setCurrentView] = useState('app')
 
   // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -573,76 +876,12 @@ function App() {
     )
   }
 
-  // Dashboard
-  return (
-    <div className="min-h-dvh bg-gray-950 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-      {currentView === 'dashboard' ? (
-        <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <div className="text-center mb-10 sm:mb-12">
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Las Vegas Slot Pro</h1>
-            <p className="text-zinc-400 mt-3 text-base">Select a calculator</p>
-          </div>
+  // Logged-in app shell
+  if (currentView === 'app') {
+    return <AppShell onLogout={handleLogout} />
+  }
 
-          <button onClick={() => setCurrentView('phoenix')} className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation active:scale-[0.99]">
-            <img src="/phoenix-link-logo.png" alt="Phoenix" className="h-16 w-16 flex-shrink-0 rounded-xl" />
-            <div className="min-w-0 flex-1 self-center">
-              <div className="line-clamp-2 font-semibold text-2xl leading-snug text-orange-400">Phoenix Link EV Calc</div>
-              <p className="mt-0.5 line-clamp-1 text-base leading-snug text-gray-400 sm:line-clamp-2">
-                Must-hit counter bonus analyzer
-              </p>
-            </div>
-          </button>
-
-          <button onClick={() => setCurrentView('buffalo')} className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]">
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner">
-              <img src="/buffalo-icon.png" alt="Buffalo" className="h-14 w-14 object-contain" />
-            </div>
-            <div className="min-w-0 flex-1 self-center">
-              <div className="line-clamp-2 font-semibold text-2xl leading-snug text-amber-100">Buffalo Link EV Calc</div>
-              <p className="mt-0.5 line-clamp-1 text-base leading-snug text-amber-200 sm:line-clamp-2">
-                Midpoint-based counter analyzer
-              </p>
-            </div>
-          </button>
-
-          <button onClick={() => setCurrentView('stackup')} className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]">
-            <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="h-16 w-16 flex-shrink-0 rounded-2xl object-cover shadow-lg" />
-            <div className="min-w-0 flex-1 self-center">
-              <div className="line-clamp-2 font-semibold text-2xl leading-snug text-cyan-100">Stack Up Pays</div>
-              <p
-                className="mt-0.5 line-clamp-1 text-base leading-snug text-cyan-200 sm:line-clamp-2"
-                title="Ascending Fortunes • 5-meter analyzer"
-              >
-                Ascending Fortunes • 5-meter analyzer
-              </p>
-            </div>
-          </button>
-
-          <button onClick={() => setCurrentView('mhb')} className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]">
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 text-5xl shadow-inner">🎰</div>
-            <div className="min-w-0 flex-1 self-center">
-              <div className="line-clamp-2 font-semibold text-2xl leading-snug text-purple-100">Must Hit By Jackpot</div>
-              <p className="mt-0.5 line-clamp-1 text-base leading-snug text-purple-200 sm:line-clamp-2">
-                Progressive must-hit analyzer
-              </p>
-            </div>
-          </button>
-
-          <div className="mt-10 sm:mt-12 text-center">
-            <button onClick={handleLogout} className="min-h-12 inline-flex items-center justify-center text-base text-gray-400 hover:text-red-400 underline touch-manipulation transition-colors px-4 py-2">Logout</button>
-          </div>
-        </div>
-      ) : currentView === 'phoenix' ? (
-        <PhoenixLink onBack={() => setCurrentView('dashboard')} />
-      ) : currentView === 'buffalo' ? (
-        <BuffaloLink onBack={() => setCurrentView('dashboard')} />
-      ) : currentView === 'stackup' ? (
-        <StackUpPays onBack={() => setCurrentView('dashboard')} />
-      ) : currentView === 'mhb' ? (
-        <MHBCalculator onBack={() => setCurrentView('dashboard')} />
-      ) : null}
-    </div>
-  )
+  return null
 }
 
 export default App
