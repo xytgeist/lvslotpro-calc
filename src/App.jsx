@@ -1095,52 +1095,62 @@ function AppShell({ onLogout, supabaseClient }) {
                   <>
                     <div className="mt-3">
                       <label className="block text-zinc-400 text-xs mb-1">Start</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => {
-                          const v = combineDatetimeLocalValue(e.target.value, startTime)
-                          setDraft((d) => ({ ...d, startAt: v }))
-                        }}
-                        className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                      />
-                      <div className="mt-3">
-                        <input
-                          type="time"
-                          value={startTime}
-                          onChange={(e) => {
-                            const v = combineDatetimeLocalValue(startDate, e.target.value)
-                            setDraft((d) => ({ ...d, startAt: v }))
-                          }}
-                          className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                        />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="min-w-0">
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => {
+                              const v = combineDatetimeLocalValue(e.target.value, startTime)
+                              setDraft((d) => ({ ...d, startAt: v }))
+                            }}
+                            className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <input
+                            type="time"
+                            value={startTime}
+                            onChange={(e) => {
+                              const v = combineDatetimeLocalValue(startDate, e.target.value)
+                              setDraft((d) => ({ ...d, startAt: v }))
+                            }}
+                            step="900"
+                            className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                          />
+                        </div>
                       </div>
                     </div>
 
                     <div className="mt-3">
                       <label className="block text-zinc-400 text-xs mb-1">End (optional)</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => {
-                          const dateV = e.target.value
-                          const v = dateV ? combineDatetimeLocalValue(dateV, endTime) : ''
-                          setDraft((d) => ({ ...d, endAt: v }))
-                        }}
-                        className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                      />
-                      <div className="mt-3">
-                        <input
-                          type="time"
-                          value={endDate ? endTime : ''}
-                          onChange={(e) => {
-                            const timeV = e.target.value
-                            const v = endDate ? combineDatetimeLocalValue(endDate, timeV) : ''
-                            setDraft((d) => ({ ...d, endAt: v }))
-                          }}
-                          className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                          disabled={!endDate}
-                        />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="min-w-0">
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => {
+                              const dateV = e.target.value
+                              const v = dateV ? combineDatetimeLocalValue(dateV, endTime) : ''
+                              setDraft((d) => ({ ...d, endAt: v }))
+                            }}
+                            className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <input
+                            type="time"
+                            value={endDate ? endTime : ''}
+                            onChange={(e) => {
+                              const timeV = e.target.value
+                              const v = endDate ? combineDatetimeLocalValue(endDate, timeV) : ''
+                              setDraft((d) => ({ ...d, endAt: v }))
+                            }}
+                            step="900"
+                            className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                            disabled={!endDate}
+                          />
+                        </div>
                       </div>
                     </div>
                   </>
