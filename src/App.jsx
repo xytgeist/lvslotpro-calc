@@ -753,20 +753,30 @@ function AppShell({ onLogout, supabaseClient }) {
       setSaving(true)
       setError('')
       try {
+        let payloadDebug = null
         if (!draft.casinoName.trim()) throw new Error('Casino name is required.')
         if (!draft.title.trim()) throw new Error('Title is required.')
         if (!draft.startAt) throw new Error('Start date/time is required.')
+
+        const startDt = new Date(draft.startAt)
+        if (Number.isNaN(startDt.getTime())) throw new Error('Start date/time is invalid.')
+        const endDt = draft.endAt ? new Date(draft.endAt) : null
+        if (endDt && Number.isNaN(endDt.getTime())) throw new Error('End date/time is invalid.')
+        if (endDt && endDt.getTime() < startDt.getTime()) {
+          throw new Error('End date/time must be later than (or the same as) start.')
+        }
 
         const payload = {
           casino_name: draft.casinoName.trim(),
           offer_type: draft.offerType,
           title: draft.title.trim(),
-          start_at: new Date(draft.startAt).toISOString(),
-          end_at: draft.endAt ? new Date(draft.endAt).toISOString() : null,
+          start_at: startDt.toISOString(),
+          end_at: endDt ? endDt.toISOString() : null,
           value_amount: draft.valueAmount !== '' ? Number(draft.valueAmount) : null,
           value_text: draft.valueText.trim() || null,
           notes: draft.notes.trim() || null
         }
+        payloadDebug = payload
 
         if (editingId) {
           const { error: e } = await supabaseClient.from('offer_events').update(payload).eq('id', editingId)
@@ -788,6 +798,14 @@ function AppShell({ onLogout, supabaseClient }) {
         // Supabase errors are often structured; logging helps diagnose "Load failed" cases.
         // eslint-disable-next-line no-console
         console.error('saveEvent error:', e)
+        // eslint-disable-next-line no-console
+        console.error('saveEvent payload (partial):', {
+          offer_type: draft?.offerType,
+          startAt: draft?.startAt,
+          endAt: draft?.endAt,
+          valueAmount: draft?.valueAmount,
+          valueText: draft?.valueText
+        })
         const parts = []
         if (e?.message) parts.push(e.message)
         if (e?.code) parts.push(`code: ${e.code}`)
