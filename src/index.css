@@ -55,6 +55,18 @@ input[type="range"].range-touch-target {
   border-radius: 0.25rem !important;
 }
 
+/* react-datepicker sometimes doesn't inherit our calendarClassName scope on iOS.
+   Apply the selected-day override globally as a fallback. */
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: 2px solid #7c3aed !important;
+  color: #fff !important;
+  border-radius: 0.25rem !important;
+}
+
 .offer-datepicker .react-datepicker__time-list-item--selected {
   background-color: #7c3aed;
   color: #fff;
