@@ -629,8 +629,7 @@ function AppShell({ onLogout, supabaseClient }) {
       return new Date(n.getFullYear(), n.getMonth(), 1)
     })
     const [draft, setDraft] = useState(() => emptyOfferDraft())
-    const [startAllDay, setStartAllDay] = useState(true)
-    const [endAllDay, setEndAllDay] = useState(true)
+    const [allDay, setAllDay] = useState(true)
 
     const offerTypeMeta = useMemo(
       () => ({
@@ -708,8 +707,7 @@ function AppShell({ onLogout, supabaseClient }) {
       setShowForm(false)
       setEditingId(null)
       setDraft(emptyOfferDraft())
-      setStartAllDay(true)
-      setEndAllDay(true)
+      setAllDay(true)
     }
 
     const openForm = (dayKey = null) => {
@@ -718,12 +716,10 @@ function AppShell({ onLogout, supabaseClient }) {
       if (dayKey) {
         // Default to an all-day event when opening from a calendar day
         setDraft((d) => ({ ...emptyOfferDraft(), startAt: `${dayKey}T00:00` }))
-        setStartAllDay(true)
-        setEndAllDay(true)
+        setAllDay(true)
       } else {
         setDraft(emptyOfferDraft())
-        setStartAllDay(true)
-        setEndAllDay(true)
+        setAllDay(true)
       }
     }
 
@@ -734,8 +730,7 @@ function AppShell({ onLogout, supabaseClient }) {
       const stHasVisibleTime = st.getHours() !== 0 || st.getMinutes() !== 0
       const en = ev.end_at ? new Date(ev.end_at) : null
       const enHasVisibleTime = en ? en.getHours() !== 0 || en.getMinutes() !== 0 : false
-      setStartAllDay(!stHasVisibleTime)
-      setEndAllDay(!enHasVisibleTime)
+      setAllDay(!(stHasVisibleTime || enHasVisibleTime))
       setDraft({
         casinoName: ev.casino_name || '',
         offerType: ev.offer_type || 'free_play',
@@ -1127,16 +1122,19 @@ function AppShell({ onLogout, supabaseClient }) {
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={startAllDay}
+                      checked={allDay}
                       onChange={(e) => {
                         const v = e.target.checked
-                        setStartAllDay(v)
+                        setAllDay(v)
                         setDraft((cur) => {
-                          if (!v || !cur.startAt) return cur
-                          const dt = dateFromDatetimeLocalValue(cur.startAt)
-                          if (!dt) return cur
-                          const midnight = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0)
-                          return { ...cur, startAt: datetimeLocalValueFromDate(midnight) }
+                          if (!cur.startAt) return cur
+                          if (v) {
+                            const dt = dateFromDatetimeLocalValue(cur.startAt)
+                            if (!dt) return cur
+                            const midnight = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0)
+                            return { ...cur, startAt: datetimeLocalValueFromDate(midnight), endAt: cur.endAt ? datetimeLocalValueFromDate(dateFromDatetimeLocalValue(cur.endAt) || midnight) : cur.endAt }
+                          }
+                          return cur
                         })
                       }}
                       className="h-4 w-4 accent-violet-600"
@@ -1147,10 +1145,10 @@ function AppShell({ onLogout, supabaseClient }) {
                 <DatePicker
                   selected={dateFromDatetimeLocalValue(draft.startAt)}
                   onChange={(d) => setDraft((cur) => ({ ...cur, startAt: d ? datetimeLocalValueFromDate(d) : '' }))}
-                  showTimeSelect={!startAllDay}
+                  showTimeSelect={!allDay}
                   timeIntervals={15}
                   timeCaption="Time"
-                  dateFormat={startAllDay ? 'MMM d, yyyy' : 'MMM d, yyyy h:mm aa'}
+                  dateFormat={allDay ? 'MMM d, yyyy' : 'MMM d, yyyy h:mm aa'}
                   popperPlacement="bottom-start"
                   wrapperClassName="w-full"
                   calendarClassName="offer-datepicker"
@@ -1161,35 +1159,14 @@ function AppShell({ onLogout, supabaseClient }) {
               </div>
 
               <div className="mt-3">
-                <div className="flex items-center justify-between gap-3 mb-1">
-                  <label className="block text-zinc-400 text-xs">End (optional)</label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={endAllDay}
-                      onChange={(e) => {
-                        const v = e.target.checked
-                        setEndAllDay(v)
-                        setDraft((cur) => {
-                          if (!v || !cur.endAt) return cur
-                          const dt = dateFromDatetimeLocalValue(cur.endAt)
-                          if (!dt) return cur
-                          const midnight = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0)
-                          return { ...cur, endAt: datetimeLocalValueFromDate(midnight) }
-                        })
-                      }}
-                      className="h-4 w-4 accent-violet-600"
-                    />
-                    <span className="text-zinc-400 text-[11px] leading-none">All day</span>
-                  </label>
-                </div>
+                <label className="block text-zinc-400 text-xs mb-1">End (optional)</label>
                 <DatePicker
                   selected={dateFromDatetimeLocalValue(draft.endAt)}
                   onChange={(d) => setDraft((cur) => ({ ...cur, endAt: d ? datetimeLocalValueFromDate(d) : '' }))}
-                  showTimeSelect={!endAllDay}
+                  showTimeSelect={!allDay}
                   timeIntervals={15}
                   timeCaption="Time"
-                  dateFormat={endAllDay ? 'MMM d, yyyy' : 'MMM d, yyyy h:mm aa'}
+                  dateFormat={allDay ? 'MMM d, yyyy' : 'MMM d, yyyy h:mm aa'}
                   popperPlacement="bottom-start"
                   wrapperClassName="w-full"
                   calendarClassName="offer-datepicker"
