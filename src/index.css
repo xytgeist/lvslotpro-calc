@@ -117,3 +117,25 @@ input[type="range"].range-touch-target {
 .offer-datepicker .react-datepicker__time-header {
   color: #e4e4e7 !important;
 }
+
+/* Last-resort selected-day override (match react-datepicker's own selectors). */
+.react-datepicker__day--selected:not([aria-disabled=true]),
+.react-datepicker__day--keyboard-selected:not([aria-disabled=true]) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.react-datepicker__day--selected:not([aria-disabled=true]):hover,
+.react-datepicker__day--keyboard-selected:not([aria-disabled=true]):hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* If the calendar is showing a "selected range" state, remove the fill too. */
+.react-datepicker__day--in-range:not([aria-disabled=true]),
+.react-datepicker__day--in-selecting-range:not([aria-disabled=true]),
+.react-datepicker__day--in-range:not([aria-disabled=true]):hover,
+.react-datepicker__day--in-selecting-range:not([aria-disabled=true]):hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
