@@ -152,6 +152,13 @@ input[type="range"].range-touch-target {
 }
 
 /* Selected day indicator: purple outline (works even when fill styling is overridden). */
+.react-datepicker__day--today {
+  background: transparent !important;
+  outline: 2px solid #7c3aed !important; /* violet-600 */
+  outline-offset: -1px !important;
+  box-shadow: none !important;
+}
+
 .react-datepicker__day--selected,
 .react-datepicker__day--keyboard-selected,
 .react-datepicker__day--selected:hover,
