@@ -43,32 +43,6 @@ input[type="range"].range-touch-target {
   background-color: rgba(124, 58, 237, 0.15); /* violet-600/15 */
 }
 
-.offer-datepicker .react-datepicker__day--selected:hover {
-  background-color: transparent !important;
-}
-
-.offer-datepicker .react-datepicker__day--selected,
-.offer-datepicker .react-datepicker__day--keyboard-selected {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 2px solid #7c3aed !important; /* violet-600 */
-  color: #fff !important;
-  border-radius: 0.25rem !important;
-}
-
-/* react-datepicker sometimes doesn't inherit our calendarClassName scope on iOS.
-   Apply the selected-day override globally as a fallback. */
-.react-datepicker__day--selected,
-.react-datepicker__day--keyboard-selected {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  border: 2px solid #7c3aed !important;
-  color: #fff !important;
-  border-radius: 0.25rem !important;
-}
-
 .offer-datepicker .react-datepicker__time-list-item--selected {
   background-color: #7c3aed;
   color: #fff;
@@ -118,28 +92,6 @@ input[type="range"].range-touch-target {
   color: #e4e4e7 !important;
 }
 
-/* Last-resort selected-day override (match react-datepicker's own selectors). */
-.react-datepicker__day--selected:not([aria-disabled=true]),
-.react-datepicker__day--keyboard-selected:not([aria-disabled=true]) {
-  background-color: transparent !important;
-  background: transparent !important;
-}
-
-.react-datepicker__day--selected:not([aria-disabled=true]):hover,
-.react-datepicker__day--keyboard-selected:not([aria-disabled=true]):hover {
-  background-color: transparent !important;
-  background: transparent !important;
-}
-
-/* If the calendar is showing a "selected range" state, remove the fill too. */
-.react-datepicker__day--in-range:not([aria-disabled=true]),
-.react-datepicker__day--in-selecting-range:not([aria-disabled=true]),
-.react-datepicker__day--in-range:not([aria-disabled=true]):hover,
-.react-datepicker__day--in-selecting-range:not([aria-disabled=true]):hover {
-  background-color: transparent !important;
-  background: transparent !important;
-}
-
 /* Force all day cells to be transparent so no state can render a filled white box. */
 .react-datepicker__day,
 .react-datepicker__month-text,
@@ -153,11 +105,12 @@ input[type="range"].range-touch-target {
   box-sizing: border-box;
 }
 
-/* Today indicator: purple rounded border */
+/* Today indicator: purple rounded ring (keeps selected border style intact) */
 .react-datepicker__day--today,
 .react-datepicker__day--today:hover {
   background: transparent !important;
-  border: 2px solid #7c3aed !important; /* violet-600 */
+  border: none !important;
+  box-shadow: 0 0 0 2px #7c3aed !important; /* violet-600 */
 }
 
 /* Selected indicator: white rounded border */
@@ -176,8 +129,8 @@ input[type="range"].range-touch-target {
   border: 2px solid #ffffff !important;
 }
 
-/* Hover indicator: apply white rounded border unless it's today or selected */
-.react-datepicker__day:not([aria-disabled=true]):hover:not(.react-datepicker__day--today):not(.react-datepicker__day--selected):not(.react-datepicker__day--keyboard-selected) {
+/* Hover indicator: apply white rounded border unless it's selected */
+.react-datepicker__day:not([aria-disabled=true]):hover:not(.react-datepicker__day--selected):not(.react-datepicker__day--keyboard-selected) {
   background: transparent !important;
   border: 2px solid #ffffff !important;
 }
