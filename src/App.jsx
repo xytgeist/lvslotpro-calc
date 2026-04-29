@@ -1131,7 +1131,7 @@ function AppShell({ onLogout, supabaseClient }) {
                       value={draft.casinoName}
                       onChange={(e) => setDraft((d) => ({ ...d, casinoName: e.target.value }))}
                       list="offers-casino-options"
-                      className="w-full h-12 bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                      className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
                       placeholder="e.g. Bellagio"
                     />
                     <span
