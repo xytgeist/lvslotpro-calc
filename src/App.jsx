@@ -1168,12 +1168,15 @@ function AppShell({ onLogout, supabaseClient }) {
                       className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
                       placeholder="e.g. Bellagio"
                     />
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
+                    <button
+                      type="button"
+                      aria-label="Toggle casino suggestions"
+                      onMouseDown={(ev) => ev.preventDefault()}
+                      onClick={() => setShowCasinoSuggestions((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm hover:text-zinc-200"
                     >
                       ▾
-                    </span>
+                    </button>
                     {showCasinoSuggestions && filteredCasinoOptions.length > 0 && (
                       <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
                         {filteredCasinoOptions.map((name) => (
@@ -1235,12 +1238,15 @@ function AppShell({ onLogout, supabaseClient }) {
                     className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
                     placeholder="e.g. Weekly Free Play"
                   />
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
+                  <button
+                    type="button"
+                    aria-label="Toggle title suggestions"
+                    onMouseDown={(ev) => ev.preventDefault()}
+                    onClick={() => setShowTitleSuggestions((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm hover:text-zinc-200"
                   >
                     ▾
-                  </span>
+                  </button>
                   {showTitleSuggestions && filteredTitleOptions.length > 0 && (
                     <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
                       {filteredTitleOptions.map((title) => (
