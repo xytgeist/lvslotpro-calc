@@ -49,6 +49,7 @@ input[type="range"].range-touch-target {
 
 .offer-datepicker .react-datepicker__day--selected,
 .offer-datepicker .react-datepicker__day--keyboard-selected {
+  background: transparent !important;
   background-color: transparent !important;
   border: 2px solid #7c3aed !important; /* violet-600 */
   color: #fff !important;
@@ -59,6 +60,7 @@ input[type="range"].range-touch-target {
    Apply the selected-day override globally as a fallback. */
 .react-datepicker__day--selected,
 .react-datepicker__day--keyboard-selected {
+  background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
