@@ -1038,24 +1038,24 @@ function AppShell({ onLogout, supabaseClient }) {
                           <div className="text-zinc-100 text-xl leading-tight">{dayNum}</div>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`h-2.5 w-2.5 rounded-full ${meta.dot}`} />
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${meta.chip}`}>
-                              {meta.label}
-                            </span>
-                          </div>
                           <div className="text-zinc-100 text-base mt-0.5 leading-tight truncate">
                             {timeLabel ? `${timeLabel} ` : ''}
                             {e.title}
                           </div>
-                          <div className="text-zinc-400 text-xs mt-0.5 truncate">{e.casino_name}</div>
-                          {(e.value_amount !== null || e.value_text) && (
-                            <div className="text-emerald-300 text-xs mt-0.5 truncate">
-                              {e.value_amount !== null ? `$${Number(e.value_amount).toFixed(0)}` : ''}
-                              {e.value_amount !== null && e.value_text ? ' • ' : ''}
-                              {e.value_text || ''}
-                            </div>
-                          )}
+                          <div className="mt-0.5 flex items-center gap-2 text-xs min-w-0">
+                            <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${meta.dot}`} />
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wide shrink-0 ${meta.chip}`}>
+                              {meta.label}
+                            </span>
+                            <span className="text-zinc-400 truncate min-w-0">{e.casino_name}</span>
+                            {(e.value_amount !== null || e.value_text) && (
+                              <span className="text-emerald-300 truncate min-w-0">
+                                {e.value_amount !== null ? `$${Number(e.value_amount).toFixed(0)}` : ''}
+                                {e.value_amount !== null && e.value_text ? ' • ' : ''}
+                                {e.value_text || ''}
+                              </span>
+                            )}
+                          </div>
                           {e.notes && <div className="text-zinc-400 text-xs mt-0.5 truncate">{e.notes}</div>}
                         </div>
                       </div>
