@@ -43,10 +43,16 @@ input[type="range"].range-touch-target {
   background-color: rgba(124, 58, 237, 0.15); /* violet-600/15 */
 }
 
+.offer-datepicker .react-datepicker__day--selected:hover {
+  background-color: transparent !important;
+}
+
 .offer-datepicker .react-datepicker__day--selected,
 .offer-datepicker .react-datepicker__day--keyboard-selected {
-  background-color: #7c3aed; /* violet-600 */
-  color: #fff;
+  background-color: transparent !important;
+  border: 2px solid #7c3aed !important; /* violet-600 */
+  color: #fff !important;
+  border-radius: 0.25rem !important;
 }
 
 .offer-datepicker .react-datepicker__time-list-item--selected {
