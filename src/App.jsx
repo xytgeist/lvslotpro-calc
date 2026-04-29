@@ -630,6 +630,8 @@ function AppShell({ onLogout, supabaseClient }) {
     })
     const [draft, setDraft] = useState(() => emptyOfferDraft())
     const [allDay, setAllDay] = useState(true)
+    const [useCustomCasino, setUseCustomCasino] = useState(false)
+    const [useCustomTitle, setUseCustomTitle] = useState(false)
 
     const offerTypeMeta = useMemo(
       () => ({
@@ -708,6 +710,8 @@ function AppShell({ onLogout, supabaseClient }) {
       setEditingId(null)
       setDraft(emptyOfferDraft())
       setAllDay(true)
+      setUseCustomCasino(false)
+      setUseCustomTitle(false)
     }
 
     const openForm = (dayKey = null) => {
@@ -717,9 +721,13 @@ function AppShell({ onLogout, supabaseClient }) {
         // Default to an all-day event when opening from a calendar day
         setDraft((d) => ({ ...emptyOfferDraft(), startAt: `${dayKey}T00:00` }))
         setAllDay(true)
+        setUseCustomCasino(false)
+        setUseCustomTitle(false)
       } else {
         setDraft(emptyOfferDraft())
         setAllDay(true)
+        setUseCustomCasino(false)
+        setUseCustomTitle(false)
       }
     }
 
@@ -742,6 +750,8 @@ function AppShell({ onLogout, supabaseClient }) {
         valueText: ev.value_text || '',
         notes: ev.notes || ''
       })
+      setUseCustomCasino(false)
+      setUseCustomTitle(false)
       setError('')
     }
 
@@ -1134,26 +1144,52 @@ function AppShell({ onLogout, supabaseClient }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-zinc-400 text-xs mb-1">Casino</label>
-                  <div className="relative">
-                    <input
-                      value={draft.casinoName}
-                      onChange={(e) => setDraft((d) => ({ ...d, casinoName: e.target.value }))}
-                      list="offers-casino-options"
-                      className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                      placeholder="e.g. Bellagio"
-                    />
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
-                    >
-                      ▾
-                    </span>
-                  </div>
-                  <datalist id="offers-casino-options">
-                    {casinoNameOptions.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
+                  {useCustomCasino ? (
+                    <div className="space-y-2">
+                      <input
+                        value={draft.casinoName}
+                        onChange={(e) => setDraft((d) => ({ ...d, casinoName: e.target.value }))}
+                        className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                        placeholder="e.g. Bellagio"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setUseCustomCasino(false)}
+                        className="text-xs text-zinc-400 hover:text-zinc-200"
+                      >
+                        Back to list
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <select
+                        value={draft.casinoName || ''}
+                        onChange={(e) => {
+                          if (e.target.value === '__custom__') {
+                            setUseCustomCasino(true)
+                            setDraft((d) => ({ ...d, casinoName: '' }))
+                            return
+                          }
+                          setDraft((d) => ({ ...d, casinoName: e.target.value }))
+                        }}
+                        className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                      >
+                        <option value="">Select casino</option>
+                        {casinoNameOptions.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                        <option value="__custom__">Custom...</option>
+                      </select>
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
+                      >
+                        ▾
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-zinc-400 text-xs mb-1">Type</label>
@@ -1184,26 +1220,52 @@ function AppShell({ onLogout, supabaseClient }) {
 
               <div className="mt-3">
                 <label className="block text-zinc-400 text-xs mb-1">Title</label>
-                <div className="relative">
-                  <input
-                    value={draft.title}
-                    onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-                    list="offers-title-options"
-                    className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                    placeholder="e.g. Weekly Free Play"
-                  />
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
-                  >
-                    ▾
-                  </span>
-                </div>
-                <datalist id="offers-title-options">
-                  {titleOptions.map((title) => (
-                    <option key={title} value={title} />
-                  ))}
-                </datalist>
+                {useCustomTitle ? (
+                  <div className="space-y-2">
+                    <input
+                      value={draft.title}
+                      onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                      className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                      placeholder="e.g. Weekly Free Play"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setUseCustomTitle(false)}
+                      className="text-xs text-zinc-400 hover:text-zinc-200"
+                    >
+                      Back to list
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <select
+                      value={draft.title || ''}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setUseCustomTitle(true)
+                          setDraft((d) => ({ ...d, title: '' }))
+                          return
+                        }
+                        setDraft((d) => ({ ...d, title: e.target.value }))
+                      }}
+                      className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                    >
+                      <option value="">Select title</option>
+                      {titleOptions.map((title) => (
+                        <option key={title} value={title}>
+                          {title}
+                        </option>
+                      ))}
+                      <option value="__custom__">Custom...</option>
+                    </select>
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
+                    >
+                      ▾
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-3">
