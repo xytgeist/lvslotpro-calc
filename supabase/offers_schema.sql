@@ -65,3 +65,21 @@ before update on public.offer_events
 for each row
 execute function public.set_offer_events_updated_at();
 
+-- Default user_id from the signed-in user so inserts satisfy RLS (auth.uid() = user_id)
+create or replace function public.set_offer_events_user_id()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.user_id is null then
+    new.user_id := auth.uid();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_set_offer_events_user_id on public.offer_events;
+create trigger trg_set_offer_events_user_id
+before insert on public.offer_events
+for each row
+execute function public.set_offer_events_user_id();

@@ -697,9 +697,14 @@ function AppShell({ onLogout, supabaseClient }) {
           if (e) throw e
           cancelEdit()
         } else {
-          const { error: e } = await supabaseClient
-            .from('offer_events')
-            .insert({ ...payload, source_type: 'manual' })
+          const { data: sessionData } = await supabaseClient.auth.getSession()
+          const user = sessionData?.session?.user
+          if (!user) throw new Error('Sign in to save offers to your calendar.')
+          const { error: e } = await supabaseClient.from('offer_events').insert({
+            ...payload,
+            user_id: user.id,
+            source_type: 'manual'
+          })
           if (e) throw e
           setDraft(emptyOfferDraft())
         }
