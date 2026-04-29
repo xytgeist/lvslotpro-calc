@@ -1126,13 +1126,21 @@ function AppShell({ onLogout, supabaseClient }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-zinc-400 text-xs mb-1">Casino</label>
-                  <input
-                    value={draft.casinoName}
-                    onChange={(e) => setDraft((d) => ({ ...d, casinoName: e.target.value }))}
-                    list="offers-casino-options"
-                    className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                    placeholder="e.g. Bellagio"
-                  />
+                  <div className="relative">
+                    <input
+                      value={draft.casinoName}
+                      onChange={(e) => setDraft((d) => ({ ...d, casinoName: e.target.value }))}
+                      list="offers-casino-options"
+                      className="w-full h-12 bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                      placeholder="e.g. Bellagio"
+                    />
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
+                    >
+                      ▾
+                    </span>
+                  </div>
                   <datalist id="offers-casino-options">
                     {casinoNameOptions.map((name) => (
                       <option key={name} value={name} />
@@ -1141,20 +1149,28 @@ function AppShell({ onLogout, supabaseClient }) {
                 </div>
                 <div>
                   <label className="block text-zinc-400 text-xs mb-1">Type</label>
-                  <select
-                    value={draft.offerType}
-                    onChange={(e) => setDraft((d) => ({ ...d, offerType: e.target.value }))}
-                    className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                  >
-                    <option value="free_play">Free play</option>
-                    <option value="hotel">Hotel stay</option>
-                    <option value="dining">Dining credit</option>
-                    <option value="gift">Gift day</option>
-                    <option value="multiplier">Tier multiplier</option>
-                    <option value="tournament">Tournament</option>
-                    <option value="drawing">Drawing</option>
-                    <option value="other">Other</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={draft.offerType}
+                      onChange={(e) => setDraft((d) => ({ ...d, offerType: e.target.value }))}
+                      className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                    >
+                      <option value="free_play">Free play</option>
+                      <option value="hotel">Hotel stay</option>
+                      <option value="dining">Dining credit</option>
+                      <option value="gift">Gift day</option>
+                      <option value="multiplier">Tier multiplier</option>
+                      <option value="tournament">Tournament</option>
+                      <option value="drawing">Drawing</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
+                    >
+                      ▾
+                    </span>
+                  </div>
                 </div>
               </div>
 
