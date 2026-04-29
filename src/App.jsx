@@ -1076,22 +1076,22 @@ function AppShell({ onLogout, supabaseClient }) {
               </div>
 
               <div className="grid grid-cols-2 gap-1 mt-2">
-                <div>
+                <div className="min-w-0">
                   <label className="block text-zinc-400 text-[10px] mb-0.5 leading-none">Start</label>
                   <input
                     type="datetime-local"
                     value={draft.startAt}
                     onChange={(e) => setDraft((d) => ({ ...d, startAt: e.target.value }))}
-                    className="w-full h-9 bg-zinc-800 rounded-lg px-3 text-sm leading-none text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                    className="w-full min-w-0 bg-zinc-800 rounded-lg px-2 text-[13px] text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
                   />
                 </div>
-                <div>
-                  <label className="block text-zinc-400 text-[10px] mb-0.5 leading-none">End (optional)</label>
+                <div className="min-w-0">
+                  <label className="block text-zinc-400 text-[10px] mb-0.5 leading-none">End</label>
                   <input
                     type="datetime-local"
                     value={draft.endAt}
                     onChange={(e) => setDraft((d) => ({ ...d, endAt: e.target.value }))}
-                    className="w-full h-9 bg-zinc-800 rounded-lg px-3 text-sm leading-none text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                    className="w-full min-w-0 bg-zinc-800 rounded-lg px-2 text-[13px] text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
                   />
                 </div>
               </div>
@@ -1109,9 +1109,6 @@ function AppShell({ onLogout, supabaseClient }) {
                 </div>
                 <div>
                   <label className="block text-zinc-400 text-xs mb-0.5">Value text</label>
-                  <div className="text-zinc-500 text-[10px] -mt-1 mb-1 leading-relaxed">
-                    Optional: non-numeric value like “$150 FP + gift”. Otherwise use Notes.
-                  </div>
                   <input
                     value={draft.valueText}
                     onChange={(e) => setDraft((d) => ({ ...d, valueText: e.target.value }))}
