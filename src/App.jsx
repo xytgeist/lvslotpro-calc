@@ -1021,21 +1021,21 @@ function AppShell({ onLogout, supabaseClient }) {
             ) : filteredEvents.length === 0 ? (
               <div className="text-zinc-500 text-sm">No events for the current filter.</div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {filteredEvents.map((e) => {
                   const meta = offerTypeMeta[e.offer_type] || offerTypeMeta.other
-      const showTime = hasVisibleTime(e.start_at) || (e.end_at ? hasVisibleTime(e.end_at) : false)
+                  const showTime = hasVisibleTime(e.start_at) || (e.end_at ? hasVisibleTime(e.end_at) : false)
                   const timeLabel = showTime
                     ? new Date(e.start_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
                     : ''
                   const dayLabel = new Date(e.start_at).toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
                   const dayNum = new Date(e.start_at).getDate()
                   return (
-                    <div key={e.id} className={`${meta.card} rounded-2xl p-3`}>
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 shrink-0 text-center">
-                          <div className="text-zinc-500 text-[10px] font-semibold tracking-wide">{dayLabel}</div>
-                          <div className="text-zinc-100 text-2xl leading-tight">{dayNum}</div>
+                    <div key={e.id} className={`${meta.card} rounded-2xl p-2.5`}>
+                      <div className="flex items-start gap-2">
+                        <div className="w-10 shrink-0 text-center">
+                          <div className="text-zinc-500 text-[9px] font-semibold tracking-wide">{dayLabel}</div>
+                          <div className="text-zinc-100 text-xl leading-tight">{dayNum}</div>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
@@ -1044,33 +1044,33 @@ function AppShell({ onLogout, supabaseClient }) {
                               {meta.label}
                             </span>
                           </div>
-                          <div className="text-zinc-100 text-lg mt-1 leading-tight break-words">
+                          <div className="text-zinc-100 text-base mt-0.5 leading-tight truncate">
                             {timeLabel ? `${timeLabel} ` : ''}
                             {e.title}
                           </div>
-                          <div className="text-zinc-400 text-sm mt-1">{e.casino_name}</div>
+                          <div className="text-zinc-400 text-xs mt-0.5 truncate">{e.casino_name}</div>
                           {(e.value_amount !== null || e.value_text) && (
-                            <div className="text-emerald-300 text-sm mt-1">
+                            <div className="text-emerald-300 text-xs mt-0.5 truncate">
                               {e.value_amount !== null ? `$${Number(e.value_amount).toFixed(0)}` : ''}
                               {e.value_amount !== null && e.value_text ? ' • ' : ''}
                               {e.value_text || ''}
                             </div>
                           )}
-                          {e.notes && <div className="text-zinc-400 text-sm mt-1 leading-relaxed">{e.notes}</div>}
+                          {e.notes && <div className="text-zinc-400 text-xs mt-0.5 truncate">{e.notes}</div>}
                         </div>
                       </div>
-                      <div className="mt-2 flex justify-end gap-3">
+                      <div className="mt-1 flex justify-end gap-3">
                         <button
                           type="button"
                           onClick={() => beginEdit(e)}
-                          className="text-cyan-300 hover:text-cyan-200 text-xs font-semibold touch-manipulation"
+                          className="text-cyan-300 hover:text-cyan-200 text-[11px] font-semibold touch-manipulation"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => deleteEvent(e.id)}
-                          className="text-red-300 hover:text-red-200 text-xs font-semibold touch-manipulation"
+                          className="text-red-300 hover:text-red-200 text-[11px] font-semibold touch-manipulation"
                         >
                           Delete
                         </button>
