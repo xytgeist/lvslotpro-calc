@@ -139,3 +139,13 @@ input[type="range"].range-touch-target {
   background-color: transparent !important;
   background: transparent !important;
 }
+
+/* Force all day cells to be transparent so no state can render a filled white box. */
+.react-datepicker__day,
+.react-datepicker__month-text,
+.react-datepicker__quarter-text,
+.react-datepicker__year-text {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
