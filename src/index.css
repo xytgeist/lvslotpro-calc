@@ -80,6 +80,16 @@ input[type="range"].range-touch-target {
   color: #ffffff !important;
 }
 
+.offer-datepicker .react-datepicker-time__header {
+  color: #e4e4e7 !important;
+  font-weight: 700 !important;
+}
+
+.offer-datepicker .react-datepicker__header--time {
+  color: #e4e4e7 !important;
+  background-color: transparent !important;
+}
+
 .offer-datepicker .react-datepicker__time-caption {
   color: #e4e4e7 !important;
 }
