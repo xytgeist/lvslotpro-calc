@@ -876,6 +876,12 @@ function AppShell({ onLogout, supabaseClient }) {
       )
     }, [events])
 
+    const titleOptions = useMemo(() => {
+      return Array.from(new Set(events.map((ev) => ev.title?.trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      )
+    }, [events])
+
     const startDayPress = (dayKey) => {
       longPressTimerRef.current = window.setTimeout(() => {
         openForm(dayKey)
@@ -1176,12 +1182,26 @@ function AppShell({ onLogout, supabaseClient }) {
 
               <div className="mt-3">
                 <label className="block text-zinc-400 text-xs mb-1">Title</label>
-                <input
-                  value={draft.title}
-                  onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-                  className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                  placeholder="e.g. Weekly Free Play"
-                />
+                <div className="relative">
+                  <input
+                    value={draft.title}
+                    onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                    list="offers-title-options"
+                    className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                    placeholder="e.g. Weekly Free Play"
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
+                  >
+                    ▾
+                  </span>
+                </div>
+                <datalist id="offers-title-options">
+                  {titleOptions.map((title) => (
+                    <option key={title} value={title} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="mt-3">
