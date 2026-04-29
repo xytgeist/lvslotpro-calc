@@ -1075,25 +1075,24 @@ function AppShell({ onLogout, supabaseClient }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-1 mt-2">
-                <div className="min-w-0">
-                  <label className="block text-zinc-400 text-[10px] mb-0.5 leading-none">Start</label>
-                  <input
-                    type="datetime-local"
-                    value={draft.startAt}
-                    onChange={(e) => setDraft((d) => ({ ...d, startAt: e.target.value }))}
-                    className="w-full min-w-0 bg-zinc-800 rounded-lg px-2 text-[13px] text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <label className="block text-zinc-400 text-[10px] mb-0.5 leading-none">End</label>
-                  <input
-                    type="datetime-local"
-                    value={draft.endAt}
-                    onChange={(e) => setDraft((d) => ({ ...d, endAt: e.target.value }))}
-                    className="w-full min-w-0 bg-zinc-800 rounded-lg px-2 text-[13px] text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                  />
-                </div>
+              <div className="mt-3">
+                <label className="block text-zinc-400 text-xs mb-1">Start</label>
+                <input
+                  type="datetime-local"
+                  value={draft.startAt}
+                  onChange={(e) => setDraft((d) => ({ ...d, startAt: e.target.value }))}
+                  className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                />
+              </div>
+
+              <div className="mt-3">
+                <label className="block text-zinc-400 text-xs mb-1">End (optional)</label>
+                <input
+                  type="datetime-local"
+                  value={draft.endAt}
+                  onChange={(e) => setDraft((d) => ({ ...d, endAt: e.target.value }))}
+                  className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3 mt-3">
