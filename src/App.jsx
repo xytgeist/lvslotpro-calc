@@ -1077,12 +1077,21 @@ function AppShell({ onLogout, supabaseClient }) {
                 {filteredEvents.map((e) => {
                   const meta = offerTypeMeta[e.offer_type] || offerTypeMeta.other
                   const isExpanded = expandedEventId === e.id
+                  const startDate = new Date(e.start_at)
+                  const endDate = e.end_at ? new Date(e.end_at) : null
                   const showTime = hasVisibleTime(e.start_at) || (e.end_at ? hasVisibleTime(e.end_at) : false)
+                  const isMultiDay =
+                    !!endDate &&
+                    new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime() !==
+                      new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime()
+                  const dateRangeLabel = isMultiDay
+                    ? `${startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                    : ''
                   const timeLabel = showTime
                     ? new Date(e.start_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
                     : ''
-                  const dayLabel = new Date(e.start_at).toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
-                  const dayNum = new Date(e.start_at).getDate()
+                  const dayLabel = startDate.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
+                  const dayNum = startDate.getDate()
                   return (
                     <button
                       key={e.id}
@@ -1107,6 +1116,7 @@ function AppShell({ onLogout, supabaseClient }) {
                             {timeLabel ? `${timeLabel} ` : ''}
                             {e.title}
                           </div>
+                          {dateRangeLabel && <div className="text-zinc-300 text-xs mt-0.5">{dateRangeLabel}</div>}
                           <div className={`mt-0.5 flex items-center gap-2 text-xs min-w-0 ${isExpanded ? 'flex-wrap' : ''}`}>
                             <span className={`text-zinc-400 min-w-0 ${isExpanded ? 'whitespace-normal break-words' : 'truncate'}`}>{e.casino_name}</span>
                             {(e.value_amount !== null || e.value_text) && (
