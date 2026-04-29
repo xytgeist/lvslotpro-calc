@@ -1173,7 +1173,7 @@ function AppShell({ onLogout, supabaseClient }) {
           type="button"
           onClick={() => openForm(null)}
           aria-label="Add event"
-          className="fixed right-20 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-50 h-12 w-12 rounded-full bg-zinc-900/95 text-white text-2xl shadow-lg backdrop-blur touch-manipulation"
+          className="fixed right-[4.25rem] bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-50 flex h-12 w-12 items-center justify-center rounded-full bg-violet-600 text-white text-3xl leading-none shadow-lg touch-manipulation hover:bg-violet-500"
         >
           +
         </button>
@@ -1717,7 +1717,7 @@ function AppShell({ onLogout, supabaseClient }) {
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
           aria-label="Open navigation menu"
-          className="h-12 w-12 rounded-full bg-zinc-900/95 text-white text-xl shadow-lg backdrop-blur touch-manipulation"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/95 text-white text-xl leading-none shadow-lg backdrop-blur touch-manipulation"
         >
           {menuOpen ? '×' : '☰'}
         </button>
