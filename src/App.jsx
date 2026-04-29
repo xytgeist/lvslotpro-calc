@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import PhoenixLink from './calculators/PhoenixLink'
 import BuffaloLink from './calculators/BuffaloLink'
@@ -54,6 +54,39 @@ function getOAuthCallbackMessage(error, errorCode, errorDescription) {
     return 'This email already has an account. Please sign in with your email and password, or use Forgot password if you need to reset it.'
   }
   return errorDescription || 'Sign-in with Google could not be completed. Please try again or use your email and password.'
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function localDateKeyFromIso(iso) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+function localDateKeyFromDate(d) {
+  if (!d) return ''
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+function toDatetimeLocalValue(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+function emptyOfferDraft() {
+  return {
+    casinoName: '',
+    offerType: 'free_play',
+    title: '',
+    startAt: '',
+    endAt: '',
+    valueAmount: '',
+    valueText: '',
+    notes: ''
+  }
 }
 
 function OAuthDivider() {
@@ -555,6 +588,548 @@ function AppShell({ onLogout, supabaseClient }) {
     return null
   }
 
+  const OffersCalendar = () => {
+    const fileInputRef = useRef(null)
+    const [events, setEvents] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [uploading, setUploading] = useState(false)
+    const [error, setError] = useState('')
+    const [uploadMessage, setUploadMessage] = useState('')
+    const [filter, setFilter] = useState('all')
+    const [viewMode, setViewMode] = useState('list')
+    const [cursorMonth, setCursorMonth] = useState(() => {
+      const n = new Date()
+      return new Date(n.getFullYear(), n.getMonth(), 1)
+    })
+    const [dayFilter, setDayFilter] = useState(null)
+    const [editingId, setEditingId] = useState(null)
+    const [draft, setDraft] = useState(() => emptyOfferDraft())
+
+    const countByDay = useMemo(() => {
+      const m = {}
+      for (const ev of events) {
+        const k = localDateKeyFromIso(ev.start_at)
+        m[k] = (m[k] || 0) + 1
+      }
+      return m
+    }, [events])
+
+    const calendarCells = useMemo(() => {
+      const y = cursorMonth.getFullYear()
+      const month = cursorMonth.getMonth()
+      const first = new Date(y, month, 1)
+      const lastDay = new Date(y, month + 1, 0).getDate()
+      const startDow = first.getDay()
+      const cells = []
+      for (let i = 0; i < startDow; i++) cells.push(null)
+      for (let d = 1; d <= lastDay; d++) cells.push(new Date(y, month, d))
+      while (cells.length % 7 !== 0) cells.push(null)
+      return cells
+    }, [cursorMonth])
+
+    const monthTitle = cursorMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' })
+
+    const loadEvents = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const { data, error: e } = await supabaseClient
+          .from('offer_events')
+          .select('id,casino_name,offer_type,title,start_at,end_at,value_amount,value_text,notes,created_at')
+          .order('start_at', { ascending: true })
+          .limit(300)
+        if (e) throw e
+        setEvents(data || [])
+      } catch (e) {
+        setError(e?.message || 'Failed to load offers.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    useEffect(() => {
+      void loadEvents()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    const cancelEdit = () => {
+      setEditingId(null)
+      setDraft(emptyOfferDraft())
+    }
+
+    const beginEdit = (ev) => {
+      setEditingId(ev.id)
+      setDraft({
+        casinoName: ev.casino_name || '',
+        offerType: ev.offer_type || 'free_play',
+        title: ev.title || '',
+        startAt: toDatetimeLocalValue(ev.start_at),
+        endAt: ev.end_at ? toDatetimeLocalValue(ev.end_at) : '',
+        valueAmount:
+          ev.value_amount !== null && ev.value_amount !== undefined ? String(ev.value_amount) : '',
+        valueText: ev.value_text || '',
+        notes: ev.notes || ''
+      })
+      setError('')
+    }
+
+    const saveEvent = async () => {
+      setSaving(true)
+      setError('')
+      try {
+        if (!draft.casinoName.trim()) throw new Error('Casino name is required.')
+        if (!draft.title.trim()) throw new Error('Title is required.')
+        if (!draft.startAt) throw new Error('Start date/time is required.')
+
+        const payload = {
+          casino_name: draft.casinoName.trim(),
+          offer_type: draft.offerType,
+          title: draft.title.trim(),
+          start_at: new Date(draft.startAt).toISOString(),
+          end_at: draft.endAt ? new Date(draft.endAt).toISOString() : null,
+          value_amount: draft.valueAmount !== '' ? Number(draft.valueAmount) : null,
+          value_text: draft.valueText.trim() || null,
+          notes: draft.notes.trim() || null
+        }
+        if (editingId) {
+          const { error: e } = await supabaseClient.from('offer_events').update(payload).eq('id', editingId)
+          if (e) throw e
+          cancelEdit()
+        } else {
+          const { error: e } = await supabaseClient
+            .from('offer_events')
+            .insert({ ...payload, source_type: 'manual' })
+          if (e) throw e
+          setDraft(emptyOfferDraft())
+        }
+        await loadEvents()
+      } catch (e) {
+        setError(e?.message || 'Failed to save offer.')
+      } finally {
+        setSaving(false)
+      }
+    }
+
+    const deleteEvent = async (id) => {
+      const { error: e } = await supabaseClient.from('offer_events').delete().eq('id', id)
+      if (e) {
+        setError(e?.message || 'Failed to delete event.')
+        return
+      }
+      if (editingId === id) cancelEdit()
+      await loadEvents()
+    }
+
+    const handleImportPhoto = async (ev) => {
+      const file = ev.target.files?.[0]
+      ev.target.value = ''
+      if (!file) return
+      setUploading(true)
+      setError('')
+      setUploadMessage('')
+      try {
+        const { data: sessionData } = await supabaseClient.auth.getSession()
+        const user = sessionData?.session?.user
+        if (!user) throw new Error('Sign in to upload mailer photos.')
+        const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : ''
+        const safeName = `${crypto.randomUUID()}${ext}`
+        const path = `${user.id}/${safeName}`
+        const { error: upErr } = await supabaseClient.storage.from('offer-mailers').upload(path, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+        if (upErr) throw upErr
+        const { error: rowErr } = await supabaseClient.from('offer_uploads').insert({
+          storage_path: path,
+          file_name: file.name,
+          mime_type: file.type || null,
+          status: 'uploaded'
+        })
+        if (rowErr) throw rowErr
+        setUploadMessage('Photo saved. AI parsing for auto-filled offers is coming soon.')
+      } catch (err) {
+        setError(
+          err?.message ||
+            'Upload failed. Run supabase/offer_uploads.sql and storage_offer_mailers.sql if the table or bucket is missing.'
+        )
+      } finally {
+        setUploading(false)
+      }
+    }
+
+    const filtered = useMemo(() => {
+      return events.filter((ev) => {
+        if (filter !== 'all' && ev.offer_type !== filter) return false
+        if (dayFilter && localDateKeyFromIso(ev.start_at) !== dayFilter) return false
+        return true
+      })
+    }, [events, filter, dayFilter])
+
+    const dayFilterLabel =
+      dayFilter &&
+      (() => {
+        const [yy, mm, dd] = dayFilter.split('-').map(Number)
+        return new Date(yy, mm - 1, dd).toLocaleDateString(undefined, {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        })
+      })()
+
+    return (
+      <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="mb-5">
+          <div className="text-white text-2xl font-black tracking-tight">Offers Calendar</div>
+          <div className="text-zinc-400 text-sm mt-0.5">List, month view, edit offers, and photo uploads for future AI import</div>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-500/40 rounded-3xl p-4 mb-4">
+          <div className="text-amber-200 text-sm leading-relaxed space-y-2">
+            <p>
+              If you see “relation does not exist”, run <span className="font-semibold">supabase/offers_schema.sql</span> for
+              offers, then <span className="font-semibold">supabase/offer_uploads.sql</span> and{' '}
+              <span className="font-semibold">supabase/storage_offer_mailers.sql</span> for photo uploads.
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
+            {error}
+          </div>
+        )}
+
+        {uploadMessage && (
+          <div className="mb-4 p-4 rounded-3xl bg-emerald-900/30 border border-emerald-500/40 text-emerald-100 text-sm leading-relaxed">
+            {uploadMessage}
+          </div>
+        )}
+
+        <div className="flex rounded-2xl bg-zinc-800/80 p-1 mb-4">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`flex-1 min-h-11 rounded-xl text-sm font-semibold touch-manipulation ${
+              viewMode === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-400'
+            }`}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('month')}
+            className={`flex-1 min-h-11 rounded-xl text-sm font-semibold touch-manipulation ${
+              viewMode === 'month' ? 'bg-zinc-700 text-white' : 'text-zinc-400'
+            }`}
+          >
+            Month
+          </button>
+        </div>
+
+        {viewMode === 'month' && (
+          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() =>
+                  setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
+                }
+                className="min-h-10 min-w-10 rounded-xl bg-zinc-800 text-zinc-200 font-bold touch-manipulation"
+                aria-label="Previous month"
+              >
+                ‹
+              </button>
+              <div className="text-white font-bold text-center flex-1 truncate">{monthTitle}</div>
+              <button
+                type="button"
+                onClick={() =>
+                  setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
+                }
+                className="min-h-10 min-w-10 rounded-xl bg-zinc-800 text-zinc-200 font-bold touch-manipulation"
+                aria-label="Next month"
+              >
+                ›
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((w) => (
+                <div key={w} className="py-1">
+                  {w}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1 mt-1">
+              {calendarCells.map((cell, idx) => {
+                if (!cell) {
+                  return <div key={`e-${idx}`} className="h-12" />
+                }
+                const key = localDateKeyFromDate(cell)
+                const n = countByDay[key] || 0
+                const isSelected = dayFilter === key
+                return (
+                  <button
+                    key={`${key}-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      setDayFilter(key)
+                      setViewMode('list')
+                    }}
+                    className={`h-12 rounded-xl text-sm font-medium touch-manipulation flex flex-col items-center justify-center gap-0.5 ${
+                      isSelected
+                        ? 'bg-cyan-600 text-white'
+                        : n > 0
+                          ? 'bg-cyan-900/35 text-zinc-100 hover:bg-cyan-900/50'
+                          : 'bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span>{cell.getDate()}</span>
+                    {n > 0 ? (
+                      <span className="text-[10px] leading-none font-semibold text-cyan-200">{n} offer{n !== 1 ? 's' : ''}</span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-zinc-500 text-xs mt-3 leading-relaxed">
+              Tap a day to jump to the list filtered to that date (by offer start).
+            </p>
+          </div>
+        )}
+
+        {viewMode === 'list' && dayFilter && (
+          <div className="flex items-center justify-between gap-3 mb-4 rounded-2xl bg-zinc-800/80 px-4 py-3">
+            <span className="text-zinc-200 text-sm">
+              Filter: <span className="font-semibold text-white">{dayFilterLabel}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setDayFilter(null)}
+              className="text-cyan-300 text-sm font-semibold touch-manipulation"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
+          <div className="text-white font-bold mb-2">Import from photo</div>
+          <p className="text-zinc-500 text-xs mb-3 leading-relaxed">
+            Upload a mailer or app screenshot. Files go to your private storage folder; a row is recorded for future AI
+            parsing.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => void handleImportPhoto(e)}
+          />
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full min-h-12 rounded-2xl border border-zinc-600 bg-zinc-800 text-zinc-100 font-semibold hover:bg-zinc-700 disabled:opacity-60 touch-manipulation"
+          >
+            {uploading ? 'Uploading…' : 'Choose photo'}
+          </button>
+        </div>
+
+        <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="text-white font-bold">{editingId ? 'Edit offer' : 'Add offer'}</div>
+            {editingId && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="text-zinc-400 text-sm font-semibold touch-manipulation shrink-0"
+              >
+                Cancel edit
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Casino</label>
+              <input
+                value={draft.casinoName}
+                onChange={(e) => setDraft((d) => ({ ...d, casinoName: e.target.value }))}
+                className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+                placeholder="e.g. Bellagio"
+              />
+            </div>
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Type</label>
+              <select
+                value={draft.offerType}
+                onChange={(e) => setDraft((d) => ({ ...d, offerType: e.target.value }))}
+                className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+              >
+                <option value="free_play">Free play</option>
+                <option value="hotel">Hotel stay</option>
+                <option value="dining">Dining credit</option>
+                <option value="gift">Gift day</option>
+                <option value="multiplier">Tier multiplier</option>
+                <option value="tournament">Tournament</option>
+                <option value="drawing">Drawing</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-zinc-400 text-xs mb-1">Title</label>
+            <input
+              value={draft.title}
+              onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+              className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+              placeholder="e.g. Weekly Free Play"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Start</label>
+              <input
+                type="datetime-local"
+                value={draft.startAt}
+                onChange={(e) => setDraft((d) => ({ ...d, startAt: e.target.value }))}
+                className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+              />
+            </div>
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">End (optional)</label>
+              <input
+                type="datetime-local"
+                value={draft.endAt}
+                onChange={(e) => setDraft((d) => ({ ...d, endAt: e.target.value }))}
+                className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Value amount ($)</label>
+              <input
+                type="number"
+                value={draft.valueAmount}
+                onChange={(e) => setDraft((d) => ({ ...d, valueAmount: e.target.value }))}
+                className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+                placeholder="e.g. 150"
+              />
+            </div>
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Value text</label>
+              <input
+                value={draft.valueText}
+                onChange={(e) => setDraft((d) => ({ ...d, valueText: e.target.value }))}
+                className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+                placeholder="e.g. $150 FP + gift"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-zinc-400 text-xs mb-1">Notes</label>
+            <textarea
+              value={draft.notes}
+              onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+              className="w-full min-h-20 bg-zinc-800 rounded-2xl px-3 py-2 text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/30"
+              placeholder="Any restrictions, swipe times, or details"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={saveEvent}
+            disabled={saving}
+            className="mt-4 w-full min-h-12 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
+          >
+            {saving ? 'Saving…' : editingId ? 'Update offer' : 'Save offer'}
+          </button>
+        </div>
+
+        <div className="bg-zinc-900 rounded-3xl p-5">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="text-white font-bold">{dayFilter ? 'Offers (filtered)' : 'Upcoming offers'}</div>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="h-10 bg-zinc-800 rounded-xl px-3 text-zinc-100 text-sm outline-none"
+            >
+              <option value="all">All</option>
+              <option value="free_play">Free play</option>
+              <option value="hotel">Hotel</option>
+              <option value="dining">Dining</option>
+              <option value="gift">Gift</option>
+              <option value="multiplier">Multiplier</option>
+              <option value="tournament">Tournament</option>
+              <option value="drawing">Drawing</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {loading ? (
+            <div className="text-zinc-400 text-sm">Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-zinc-500 text-sm">
+              {events.length === 0 ? 'No offers yet.' : 'No offers match this filter.'}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((e) => (
+                <div
+                  key={e.id}
+                  className={`rounded-2xl p-4 ${
+                    editingId === e.id ? 'bg-cyan-900/25 ring-1 ring-cyan-500/40' : 'bg-zinc-800/70'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-zinc-200 font-semibold truncate">{e.title}</div>
+                      <div className="text-zinc-500 text-xs mt-0.5 uppercase tracking-wide">{e.offer_type}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => beginEdit(e)}
+                        className="text-cyan-300 hover:text-cyan-200 text-xs font-semibold touch-manipulation"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteEvent(e.id)}
+                        className="text-red-300 hover:text-red-200 text-xs font-semibold touch-manipulation"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-zinc-300 text-sm mt-2">{e.casino_name}</div>
+                  <div className="text-zinc-400 text-xs mt-1">
+                    {new Date(e.start_at).toLocaleString()}
+                    {e.end_at ? ` → ${new Date(e.end_at).toLocaleString()}` : ''}
+                  </div>
+                  {(e.value_amount !== null || e.value_text) && (
+                    <div className="text-emerald-300 text-sm mt-1">
+                      {e.value_amount !== null ? `$${Number(e.value_amount).toFixed(0)}` : ''}
+                      {e.value_amount !== null && e.value_text ? ' • ' : ''}
+                      {e.value_text || ''}
+                    </div>
+                  )}
+                  {e.notes && <div className="text-zinc-400 text-sm mt-2 leading-relaxed">{e.notes}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   const renderCalculatorsHome = () => (
     <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
       <div className="text-center mb-10 sm:mb-12">
@@ -681,10 +1256,10 @@ function AppShell({ onLogout, supabaseClient }) {
             <div className="flex items-center justify-between mb-2">
               <div className="text-white font-bold">Feed (placeholder)</div>
               <button
-                onClick={() => setTab('community')}
+                onClick={() => setTab('offers')}
                 className="text-cyan-300 text-sm font-semibold hover:text-cyan-200"
               >
-                View community →
+                View offers →
               </button>
             </div>
             <div className="space-y-3">
@@ -728,10 +1303,10 @@ function AppShell({ onLogout, supabaseClient }) {
                     Open calculator
                   </button>
                   <button
-                    onClick={() => setTab('community')}
+                    onClick={() => setTab('intel')}
                     className="flex-1 min-h-11 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold touch-manipulation"
                   >
-                    Ask community
+                    Ask locals
                   </button>
                 </div>
               </div>
@@ -741,6 +1316,7 @@ function AppShell({ onLogout, supabaseClient }) {
       )
     }
 
+    if (tab === 'offers') return <OffersCalendar />
     if (tab === 'intel') return <LocalIntel />
 
     if (tab === 'team') {
@@ -792,6 +1368,7 @@ function AppShell({ onLogout, supabaseClient }) {
               label="Calcs"
               icon="🧮"
             />
+            <TabButton active={tab === 'offers'} onClick={() => setTab('offers')} label="Offers" icon="📅" />
             <TabButton active={tab === 'guides'} onClick={() => setTab('guides')} label="Guides" icon="📘" />
             <TabButton active={tab === 'intel'} onClick={() => setTab('intel')} label="Intel" icon="📍" />
             <TabButton active={tab === 'team'} onClick={() => setTab('team')} label="Team" icon="🤝" />
