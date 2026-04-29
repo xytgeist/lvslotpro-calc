@@ -634,6 +634,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const [allDay, setAllDay] = useState(true)
     const [showCasinoSuggestions, setShowCasinoSuggestions] = useState(false)
     const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
+    const [expandedEventId, setExpandedEventId] = useState(null)
 
     const offerTypeMeta = useMemo(
       () => ({
@@ -729,6 +730,10 @@ function AppShell({ onLogout, supabaseClient }) {
       setAllDay(true)
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
+    }
+
+    const toggleExpandedEvent = (eventId) => {
+      setExpandedEventId((id) => (id === eventId ? null : eventId))
     }
 
     const openForm = (dayKey = null) => {
@@ -1063,6 +1068,7 @@ function AppShell({ onLogout, supabaseClient }) {
               <div className="space-y-2">
                 {filteredEvents.map((e) => {
                   const meta = offerTypeMeta[e.offer_type] || offerTypeMeta.other
+                  const isExpanded = expandedEventId === e.id
                   const showTime = hasVisibleTime(e.start_at) || (e.end_at ? hasVisibleTime(e.end_at) : false)
                   const timeLabel = showTime
                     ? new Date(e.start_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
@@ -1070,7 +1076,13 @@ function AppShell({ onLogout, supabaseClient }) {
                   const dayLabel = new Date(e.start_at).toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
                   const dayNum = new Date(e.start_at).getDate()
                   return (
-                    <div key={e.id} className={`${meta.card} rounded-2xl p-2.5`}>
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => toggleExpandedEvent(e.id)}
+                      aria-expanded={isExpanded}
+                      className={`${meta.card} block w-full rounded-2xl p-2.5 text-left transition-colors hover:bg-opacity-90`}
+                    >
                       <div className="flex items-start gap-2">
                         <div className="w-10 shrink-0 text-center">
                           <div className="text-zinc-500 text-[9px] font-semibold tracking-wide">{dayLabel}</div>
@@ -1083,40 +1095,55 @@ function AppShell({ onLogout, supabaseClient }) {
                               {meta.label}
                             </span>
                           </div>
-                          <div className="text-zinc-100 text-base mt-0.5 leading-tight truncate">
+                          <div className={`text-zinc-100 text-base mt-0.5 leading-tight ${isExpanded ? 'whitespace-normal break-words' : 'truncate'}`}>
                             {timeLabel ? `${timeLabel} ` : ''}
                             {e.title}
                           </div>
-                          <div className="mt-0.5 flex items-center gap-2 text-xs min-w-0">
-                            <span className="text-zinc-400 truncate min-w-0">{e.casino_name}</span>
+                          <div className={`mt-0.5 flex items-center gap-2 text-xs min-w-0 ${isExpanded ? 'flex-wrap' : ''}`}>
+                            <span className={`text-zinc-400 min-w-0 ${isExpanded ? 'whitespace-normal break-words' : 'truncate'}`}>{e.casino_name}</span>
                             {(e.value_amount !== null || e.value_text) && (
-                              <span className="text-emerald-300 truncate min-w-0">
+                              <span className={`text-emerald-300 min-w-0 ${isExpanded ? 'whitespace-normal break-words' : 'truncate'}`}>
                                 {e.value_amount !== null ? `$${Number(e.value_amount).toFixed(0)}` : ''}
                                 {e.value_amount !== null && e.value_text ? ' • ' : ''}
                                 {e.value_text || ''}
                               </span>
                             )}
                           </div>
-                          {e.notes && <div className="text-zinc-400 text-xs mt-0.5 truncate">{e.notes}</div>}
+                          {e.notes && (
+                            <div className={`text-zinc-400 text-xs mt-0.5 ${isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
+                              {e.notes}
+                            </div>
+                          )}
+                          {e.notes && !isExpanded && (
+                            <div className="text-zinc-500 text-[10px] mt-0.5">Tap card to expand</div>
+                          )}
                         </div>
                       </div>
                       <div className="mt-1 flex justify-end gap-3">
                         <button
                           type="button"
-                          onClick={() => beginEdit(e)}
+                          onMouseDown={(ev) => ev.stopPropagation()}
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            beginEdit(e)
+                          }}
                           className="text-cyan-300 hover:text-cyan-200 text-[11px] font-semibold touch-manipulation"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
-                          onClick={() => deleteEvent(e.id)}
+                          onMouseDown={(ev) => ev.stopPropagation()}
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            deleteEvent(e.id)
+                          }}
                           className="text-red-300 hover:text-red-200 text-[11px] font-semibold touch-manipulation"
                         >
                           Delete
                         </button>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
