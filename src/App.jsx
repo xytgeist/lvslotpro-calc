@@ -790,16 +790,6 @@ function AppShell({ onLogout, supabaseClient }) {
           <div className="text-zinc-400 text-sm mt-0.5">List, month view, edit offers, and photo uploads for future AI import</div>
         </div>
 
-        <div className="bg-amber-900/30 border border-amber-500/40 rounded-3xl p-4 mb-4">
-          <div className="text-amber-200 text-sm leading-relaxed space-y-2">
-            <p>
-              If you see “relation does not exist”, run <span className="font-semibold">supabase/offers_schema.sql</span> for
-              offers, then <span className="font-semibold">supabase/offer_uploads.sql</span> and{' '}
-              <span className="font-semibold">supabase/storage_offer_mailers.sql</span> for photo uploads.
-            </p>
-          </div>
-        </div>
-
         {error && (
           <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
             {error}
