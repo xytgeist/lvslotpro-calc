@@ -635,6 +635,8 @@ function AppShell({ onLogout, supabaseClient }) {
     const [showCasinoSuggestions, setShowCasinoSuggestions] = useState(false)
     const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
     const [expandedEventId, setExpandedEventId] = useState(null)
+    const notesPreviewRefs = useRef({})
+    const [notesOverflowById, setNotesOverflowById] = useState({})
 
     const offerTypeMeta = useMemo(
       () => ({
@@ -722,6 +724,16 @@ function AppShell({ onLogout, supabaseClient }) {
       document.addEventListener('pointerdown', handlePointerDown)
       return () => document.removeEventListener('pointerdown', handlePointerDown)
     }, [])
+
+    useEffect(() => {
+      const next = {}
+      for (const ev of filteredEvents) {
+        const el = notesPreviewRefs.current[ev.id]
+        if (!el) continue
+        next[ev.id] = el.scrollWidth > el.clientWidth
+      }
+      setNotesOverflowById(next)
+    }, [events, selectedDays, expandedEventId])
 
     const closeForm = () => {
       setShowForm(false)
@@ -1128,11 +1140,20 @@ function AppShell({ onLogout, supabaseClient }) {
                             )}
                           </div>
                           {e.notes && (
-                            <div className={`text-zinc-400 text-xs mt-0.5 ${isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
+                            <div
+                              ref={
+                                isExpanded
+                                  ? undefined
+                                  : (el) => {
+                                      notesPreviewRefs.current[e.id] = el
+                                    }
+                              }
+                              className={`text-zinc-400 text-xs mt-0.5 ${isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}
+                            >
                               {e.notes}
                             </div>
                           )}
-                          {e.notes && !isExpanded && (
+                          {e.notes && !isExpanded && notesOverflowById[e.id] && (
                             <div className="text-zinc-500 text-[10px] mt-0.5">Tap card to expand</div>
                           )}
                         </div>
