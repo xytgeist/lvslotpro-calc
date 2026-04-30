@@ -640,6 +640,7 @@ function AppShell({ onLogout, supabaseClient }) {
     /** 'auto' = week in landscape, month in portrait; 'month' | 'week' | 'agenda' = forced */
     const [calendarMode, setCalendarMode] = useState('auto')
     const [weekDetailEvent, setWeekDetailEvent] = useState(null)
+    const [showWeekPortraitHint, setShowWeekPortraitHint] = useState(false)
     const [viewMenuOpen, setViewMenuOpen] = useState(false)
     const viewMenuRef = useRef(null)
     const [isLandscape, setIsLandscape] = useState(() =>
@@ -954,6 +955,14 @@ function AppShell({ onLogout, supabaseClient }) {
       if (activeCalendarView !== 'week') setWeekDetailEvent(null)
     }, [activeCalendarView])
 
+    useEffect(() => {
+      if (calendarMode !== 'week') setShowWeekPortraitHint(false)
+    }, [calendarMode])
+
+    useEffect(() => {
+      if (isLandscape) setShowWeekPortraitHint(false)
+    }, [isLandscape])
+
     const startOfWeekMonday = (d) => {
       const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate())
       const day = dt.getDay()
@@ -1139,6 +1148,9 @@ function AppShell({ onLogout, supabaseClient }) {
                       onClick={() => {
                         setCalendarMode('week')
                         setViewMenuOpen(false)
+                        if (typeof window !== 'undefined' && !window.matchMedia('(orientation: landscape)').matches) {
+                          setShowWeekPortraitHint(true)
+                        }
                       }}
                       className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
                     >
@@ -1222,7 +1234,7 @@ function AppShell({ onLogout, supabaseClient }) {
               </>
             ) : (
               <div className={`flex min-h-0 flex-col rounded-2xl bg-zinc-900/60 p-1.5 ${isWeekView ? 'flex-1' : ''}`}>
-                <div className="grid shrink-0 grid-cols-7 gap-0.5 text-center text-[9px] font-semibold text-zinc-500">
+                <div className="grid shrink-0 grid-cols-7 gap-0 divide-x divide-zinc-500/20 border-b border-zinc-600/25 text-center text-[9px] font-semibold text-zinc-500">
                   {weekDays.map((d) => (
                     <div key={d.toISOString()} className="py-0.5">
                       {d.toLocaleDateString(undefined, { weekday: 'short' })}
@@ -1231,25 +1243,52 @@ function AppShell({ onLogout, supabaseClient }) {
                 </div>
                 <div className="mt-0.5 flex min-h-0 flex-1 flex-col space-y-0.5 overflow-y-auto">
                   {weekEvents.length === 0 ? (
-                    <div className="text-zinc-500 text-xs px-1 py-2">No events this week.</div>
+                    <div className="relative grid min-h-[2.5rem] grid-cols-7 gap-0">
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                          <div key={i} className="border-r border-zinc-500/15 last:border-r-0" />
+                        ))}
+                      </div>
+                      <div className="relative z-[1] col-span-7 flex items-center px-2 text-zinc-500 text-xs">No events this week.</div>
+                    </div>
                   ) : (
                     weekEvents.map((ev) => {
                       const meta = offerTypeMeta[ev.offer_type] || offerTypeMeta.other
                       return (
-                        <div key={`wk-${ev.id}-${ev._startCol}`} className="grid grid-cols-7 gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => setWeekDetailEvent(ev)}
-                            className={`${meta.card} flex h-8 min-h-0 items-center gap-1 overflow-hidden rounded-lg pl-2 pr-2 text-left text-[11px] leading-tight touch-manipulation`}
-                            style={{ gridColumn: `${ev._startCol + 1} / span ${ev._span}` }}
+                        <div key={`wk-${ev.id}-${ev._startCol}`} className="relative min-h-[3.75rem]">
+                          <div
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
                           >
-                            <span className="min-w-0 flex-1 truncate font-bold text-zinc-100">{ev.casino_name || 'Event'}</span>
-                            {(ev.value_amount !== null || ev.value_text) && (
-                              <span className="shrink-0 truncate font-semibold tabular-nums text-emerald-400">
-                                {ev.value_amount !== null ? `$${Number(ev.value_amount).toFixed(0)}` : ev.value_text}
+                            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                              <div key={i} className="border-r border-zinc-500/15 last:border-r-0" />
+                            ))}
+                          </div>
+                          <div className="relative z-[1] grid grid-cols-7 gap-0">
+                            <button
+                              type="button"
+                              onClick={() => setWeekDetailEvent(ev)}
+                              className={`${meta.card} flex min-h-[3.5rem] min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg px-2 py-1.5 text-left text-[10px] leading-tight touch-manipulation`}
+                              style={{ gridColumn: `${ev._startCol + 1} / span ${ev._span}` }}
+                            >
+                              <span className="w-full truncate text-left font-bold text-zinc-100">
+                                {ev.casino_name || 'Event'}
                               </span>
-                            )}
-                          </button>
+                              {ev.title ? (
+                                <span className="w-full truncate text-left italic text-zinc-300">{ev.title}</span>
+                              ) : null}
+                              {(ev.value_amount !== null || ev.value_text) && (
+                                <span className="w-full truncate text-left font-semibold tabular-nums text-emerald-400">
+                                  {ev.value_amount !== null ? `$${Number(ev.value_amount).toFixed(0)}` : ''}
+                                  {ev.value_amount !== null && ev.value_text ? ' · ' : ''}
+                                  {ev.value_text || ''}
+                                </span>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       )
                     })
@@ -1258,6 +1297,38 @@ function AppShell({ onLogout, supabaseClient }) {
               </div>
             )}
           </div>
+
+        {showWeekPortraitHint && activeCalendarView === 'week' && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="week-portrait-hint-title"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-6 backdrop-blur-sm"
+            onClick={() => setShowWeekPortraitHint(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-3xl border border-violet-500/35 bg-gradient-to-b from-zinc-900 to-zinc-950 p-6 text-center shadow-2xl shadow-black/50"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/20 text-2xl text-violet-200" aria-hidden>
+                ↻
+              </div>
+              <p id="week-portrait-hint-title" className="text-lg font-bold tracking-tight text-zinc-50">
+                Rotate phone for better Week view
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                Week view has more room in landscape. Tap outside, press OK, or rotate your device to dismiss.
+              </p>
+              <button
+                type="button"
+                className="mt-6 w-full min-h-12 rounded-2xl bg-violet-600 text-base font-bold text-white shadow-lg shadow-violet-900/30 hover:bg-violet-500 touch-manipulation"
+                onClick={() => setShowWeekPortraitHint(false)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
 
         {activeCalendarView === 'month' && selectedDays.length > 0 && (
           <div className="mb-3 flex items-center justify-between gap-3 px-1 py-1">
