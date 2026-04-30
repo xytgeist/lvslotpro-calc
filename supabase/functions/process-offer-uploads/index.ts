@@ -26,6 +26,7 @@ type ParsedOffer = {
 const OPENAI_MODEL = Deno.env.get('OPENAI_VISION_MODEL') ?? 'gpt-4o-mini'
 const AUTO_CREATE_CONFIDENCE = Number(Deno.env.get('AI_AUTO_CREATE_CONFIDENCE') ?? '0.78')
 const MAX_BATCH_SIZE = Number(Deno.env.get('AI_PROCESS_BATCH_SIZE') ?? '20')
+const MAX_EVENTS_PER_IMAGE = Number(Deno.env.get('AI_MAX_EVENTS_PER_IMAGE') ?? '30')
 const DEFAULT_TIMEZONE = Deno.env.get('AI_DEFAULT_TIMEZONE') ?? 'America/Los_Angeles'
 
 function normalizeText(value: string | null | undefined): string {
@@ -68,6 +69,27 @@ function inferOfferTypeFromText(parts: Array<string | null | undefined>): string
   if (/\btournament\b/.test(text)) return 'tournament'
   if (/\bgift\b/.test(text)) return 'gift'
   return null
+}
+
+function defaultTitleForOfferType(offerType: string | null | undefined): string {
+  switch (offerType) {
+    case 'free_play':
+      return 'Free play'
+    case 'hotel':
+      return 'Hotel stay'
+    case 'dining':
+      return 'Dining credit'
+    case 'gift':
+      return 'Gift'
+    case 'multiplier':
+      return 'Tier multiplier'
+    case 'tournament':
+      return 'Tournament'
+    case 'drawing':
+      return 'Drawing'
+    default:
+      return 'Offer'
+  }
 }
 
 function maybeIso(value: unknown): string | null {
@@ -117,28 +139,53 @@ function outputTextFromResponsesApi(payload: any): string {
   return ''
 }
 
-async function parseOfferFromImage(openaiApiKey: string, mimeType: string, bytes: Uint8Array): Promise<ParsedOffer> {
+function normalizeParsedOffer(raw: Record<string, unknown>): ParsedOffer {
+  return {
+    confidence: typeof raw.confidence === 'number' ? raw.confidence : 0,
+    warnings: Array.isArray(raw.warnings) ? raw.warnings.map((w) => String(w)) : [],
+    has_specific_time: raw.has_specific_time === true,
+    time_evidence: textOrNull(raw.time_evidence),
+    has_explicit_year: raw.has_explicit_year === true,
+    year_evidence: textOrNull(raw.year_evidence),
+    casino_name: textOrNull(raw.casino_name) ?? undefined,
+    offer_type: normalizeOfferType(raw.offer_type),
+    title: textOrNull(raw.title) ?? undefined,
+    start_at: maybeIso(raw.start_at) ?? undefined,
+    end_at: maybeIso(raw.end_at),
+    value_amount: numberOrNull(raw.value_amount),
+    notes: textOrNull(raw.notes)
+  }
+}
+
+async function parseOffersFromImage(openaiApiKey: string, mimeType: string, bytes: Uint8Array): Promise<ParsedOffer[]> {
   const base64 = bytesToBase64(bytes)
   const prompt = `
-Extract one casino offer event from this image.
+Extract all casino offer events visible in this image.
 Return strict JSON (no markdown, no prose) with this shape:
 {
-  "confidence": 0.0-1.0,
-  "warnings": ["optional warning strings"],
-  "has_specific_time": true or false,
-  "time_evidence": "exact text snippet showing the visible time, or null",
-  "has_explicit_year": true or false,
-  "year_evidence": "exact text snippet showing the year, or null",
-  "casino_name": "string or null",
-  "offer_type": "free_play|hotel|dining|gift|multiplier|tournament|drawing|other",
-  "title": "string or null",
-  "start_at": "ISO8601 datetime or null",
-  "end_at": "ISO8601 datetime or null",
-  "value_amount": number or null,
-  "notes": "string or null"
+  "events": [
+    {
+      "confidence": 0.0-1.0,
+      "warnings": ["optional warning strings"],
+      "has_specific_time": true or false,
+      "time_evidence": "exact text snippet showing the visible time, or null",
+      "has_explicit_year": true or false,
+      "year_evidence": "exact text snippet showing the year, or null",
+      "casino_name": "string or null",
+      "offer_type": "free_play|hotel|dining|gift|multiplier|tournament|drawing|other",
+      "title": "string or null",
+      "start_at": "ISO8601 datetime or null",
+      "end_at": "ISO8601 datetime or null",
+      "value_amount": number or null,
+      "notes": "string or null"
+    }
+  ],
+  "image_warnings": ["optional image-level warnings"]
 }
 
 Rules:
+- Return one event object per distinct offer/date range from the image.
+- For calendar-style mailers, expand repeated dates/ranges into separate event objects.
 - Use local date text from the flyer and infer year if needed.
 - If a field is uncertain, keep it null and add a warning.
 - confidence should reflect how complete and reliable the extraction is.
@@ -184,22 +231,19 @@ Rules:
 
   const parsed = extractJsonObject(outputText)
   if (!parsed) throw new Error('Could not parse JSON from OpenAI output.')
+  const eventsRaw = Array.isArray(parsed.events) ? parsed.events : []
+  const normalized = eventsRaw
+    .filter((e) => e && typeof e === 'object')
+    .slice(0, Math.max(1, MAX_EVENTS_PER_IMAGE))
+    .map((e) => normalizeParsedOffer(e as Record<string, unknown>))
 
-  return {
-    confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
-    warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map((w) => String(w)) : [],
-    has_specific_time: parsed.has_specific_time === true,
-    time_evidence: textOrNull(parsed.time_evidence),
-    has_explicit_year: parsed.has_explicit_year === true,
-    year_evidence: textOrNull(parsed.year_evidence),
-    casino_name: textOrNull(parsed.casino_name) ?? undefined,
-    offer_type: normalizeOfferType(parsed.offer_type),
-    title: textOrNull(parsed.title) ?? undefined,
-    start_at: maybeIso(parsed.start_at) ?? undefined,
-    end_at: maybeIso(parsed.end_at),
-    value_amount: numberOrNull(parsed.value_amount),
-    notes: textOrNull(parsed.notes)
+  // Backward-compatible fallback if model returns old single-event shape.
+  if (normalized.length === 0) {
+    const single = normalizeParsedOffer(parsed)
+    const hasAnySignal = !!(single.casino_name || single.title || single.start_at || single.notes || single.value_amount !== null)
+    if (hasAnySignal) return [single]
   }
+  return normalized
 }
 
 function hasExplicitTimeEvidence(value: string | null | undefined): boolean {
@@ -428,81 +472,110 @@ Deno.serve(async (req) => {
         const { data: fileBlob, error: fileError } = await admin.storage.from(bucketId).download(upload.storage_path)
         if (fileError || !fileBlob) throw fileError || new Error('Image download failed.')
 
-        const parsedRaw = await parseOfferFromImage(openaiApiKey, upload.mime_type || 'image/jpeg', new Uint8Array(await fileBlob.arrayBuffer()))
-        const parsed = applyImplicitCurrentYear(
-          enforceOfferTypeConsistency(normalizeToAllDayIfNeeded(parsedRaw, timezoneOffsetMinutes))
-        )
-        const confidence = Number.isFinite(parsed.confidence) ? Math.max(0, Math.min(1, Number(parsed.confidence))) : 0
-        const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.filter(Boolean) : []
-        const hasRequiredFields = !!(parsed.casino_name && parsed.title && parsed.start_at)
-        const shouldAutoCreate = confidence >= AUTO_CREATE_CONFIDENCE && hasRequiredFields
+        const parsedRawList = await parseOffersFromImage(openaiApiKey, upload.mime_type || 'image/jpeg', new Uint8Array(await fileBlob.arrayBuffer()))
+        const parsedList = parsedRawList
+          .map((p) => applyImplicitCurrentYear(enforceOfferTypeConsistency(normalizeToAllDayIfNeeded(p, timezoneOffsetMinutes))))
+          .map((p) => {
+            if (!p.title || !p.title.trim()) p.title = defaultTitleForOfferType(p.offer_type)
+            return p
+          })
 
-        if (shouldAutoCreate) {
-          const dup = await findPotentialDuplicateEvent(admin, userId, parsed)
-          if (dup) {
-            const duplicateWarnings = [
-              `Possible duplicate of existing event ${dup.id}; auto-create skipped.`,
-              ...warnings
-            ]
-            const { error: reviewError } = await admin.from('offer_ai_review_items').insert({
-              user_id: userId,
-              upload_id: upload.id,
-              batch_id: upload.batch_id ?? null,
-              draft: toDraftPayload(parsed),
-              warnings: duplicateWarnings
-            })
-            if (reviewError) throw reviewError
-            await admin
-              .from('offer_uploads')
-              .update({ status: 'parsed', parse_error: 'Skipped auto-create: potential duplicate.', review_required: true })
-              .eq('id', upload.id)
-              .eq('user_id', userId)
-            queuedForReview += 1
-            continue
-          }
-
-          const eventRow = {
+        if (parsedList.length === 0) {
+          const { error: reviewError } = await admin.from('offer_ai_review_items').insert({
             user_id: userId,
-            casino_name: parsed.casino_name,
-            offer_type: parsed.offer_type ?? 'other',
-            title: parsed.title,
-            start_at: parsed.start_at,
-            end_at: parsed.end_at,
-            value_amount: parsed.value_amount ?? null,
-            notes: parsed.notes ?? null,
-            source_type: 'image_ai',
-            source_image_path: upload.storage_path,
-            ai_confidence: Number((confidence * 100).toFixed(2))
-          }
-          const { error: eventError } = await admin.from('offer_events').insert(eventRow)
-          if (eventError) throw eventError
+            upload_id: upload.id,
+            batch_id: upload.batch_id ?? null,
+            draft: toDraftPayload({ offer_type: 'other', title: 'Offer', warnings: ['No casino offer event visible in the image.'] }),
+            warnings: ['No casino offer event visible in the image.']
+          })
+          if (reviewError) throw reviewError
           await admin
             .from('offer_uploads')
-            .update({ status: 'parsed', parse_error: null, review_required: false })
+            .update({ status: 'parsed', parse_error: null, review_required: true })
             .eq('id', upload.id)
             .eq('user_id', userId)
-          created += 1
+          queuedForReview += 1
           continue
         }
 
-        const reviewRow = {
-          user_id: userId,
-          upload_id: upload.id,
-          batch_id: upload.batch_id ?? null,
-          draft: toDraftPayload(parsed),
-          warnings: warnings.length
-            ? warnings
-            : [`Auto-create skipped: confidence ${confidence.toFixed(2)} below threshold ${AUTO_CREATE_CONFIDENCE.toFixed(2)}.`]
+        let createdForUpload = 0
+        let reviewForUpload = 0
+
+        for (let idx = 0; idx < parsedList.length; idx++) {
+          const parsed = parsedList[idx]
+          const confidence = Number.isFinite(parsed.confidence) ? Math.max(0, Math.min(1, Number(parsed.confidence))) : 0
+          const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.filter(Boolean) : []
+          const hasCasino = !!(parsed.casino_name && parsed.casino_name.trim())
+          const hasTitle = !!(parsed.title && parsed.title.trim())
+          const hasStart = !!parsed.start_at
+          const hasRequiredFields = hasCasino && hasTitle && hasStart
+          const shouldAutoCreate = confidence >= AUTO_CREATE_CONFIDENCE && hasRequiredFields
+
+          if (shouldAutoCreate) {
+            const dup = await findPotentialDuplicateEvent(admin, userId, parsed)
+            if (dup) {
+              const duplicateWarnings = [`Possible duplicate of existing event ${dup.id}; auto-create skipped.`, ...warnings]
+              const { error: reviewError } = await admin.from('offer_ai_review_items').insert({
+                user_id: userId,
+                upload_id: upload.id,
+                batch_id: upload.batch_id ?? null,
+                draft: { ...toDraftPayload(parsed), ai_sequence: idx + 1 },
+                warnings: duplicateWarnings
+              })
+              if (reviewError) throw reviewError
+              reviewForUpload += 1
+              continue
+            }
+
+            const eventRow = {
+              user_id: userId,
+              casino_name: parsed.casino_name,
+              offer_type: parsed.offer_type ?? 'other',
+              title: parsed.title,
+              start_at: parsed.start_at,
+              end_at: parsed.end_at,
+              value_amount: parsed.value_amount ?? null,
+              notes: parsed.notes ?? null,
+              source_type: 'image_ai',
+              source_image_path: upload.storage_path,
+              ai_confidence: Number((confidence * 100).toFixed(2))
+            }
+            const { error: eventError } = await admin.from('offer_events').insert(eventRow)
+            if (eventError) throw eventError
+            createdForUpload += 1
+            continue
+          }
+
+          const reviewRow = {
+            user_id: userId,
+            upload_id: upload.id,
+            batch_id: upload.batch_id ?? null,
+            draft: { ...toDraftPayload(parsed), ai_sequence: idx + 1 },
+            warnings:
+              warnings.length > 0
+                ? warnings
+                : hasRequiredFields
+                  ? [`Auto-create skipped: confidence ${confidence.toFixed(2)} below threshold ${AUTO_CREATE_CONFIDENCE.toFixed(2)}.`]
+                  : [
+                      `Auto-create skipped: missing required field(s): ${
+                        [hasCasino ? null : 'casino_name', hasTitle ? null : 'title', hasStart ? null : 'start_at']
+                          .filter(Boolean)
+                          .join(', ') || 'unknown'
+                      }.`
+                    ]
+          }
+          const { error: reviewError } = await admin.from('offer_ai_review_items').insert(reviewRow)
+          if (reviewError) throw reviewError
+          reviewForUpload += 1
         }
-        const { error: reviewError } = await admin.from('offer_ai_review_items').insert(reviewRow)
-        if (reviewError) throw reviewError
 
         await admin
           .from('offer_uploads')
-          .update({ status: 'parsed', parse_error: null, review_required: true })
+          .update({ status: 'parsed', parse_error: null, review_required: reviewForUpload > 0 })
           .eq('id', upload.id)
           .eq('user_id', userId)
-        queuedForReview += 1
+        created += createdForUpload
+        queuedForReview += reviewForUpload
       } catch (err) {
         failed += 1
         const message = err instanceof Error ? err.message : String(err)

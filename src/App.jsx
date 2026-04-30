@@ -1408,11 +1408,20 @@ function AppShell({ onLogout, supabaseClient }) {
               {reviewQueue.map((item) => {
                 const up = item.offer_uploads
                 const fileName = Array.isArray(up) ? up[0]?.file_name : up?.file_name
+                const itemTitle = String(item?.draft?.title || '').trim()
+                const itemSeq = Number(item?.draft?.ai_sequence || 0)
                 const warns = (item.warnings || []).filter(Boolean)
                 return (
                   <li key={item.id} className="rounded-2xl bg-zinc-900/90 px-3 py-2.5 border border-zinc-700/80">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0 text-sm font-medium text-zinc-100 truncate">{fileName || 'Image'}</div>
+                      <div className="min-w-0">
+                        <div className="min-w-0 text-sm font-medium text-zinc-100 truncate">{fileName || 'Image'}</div>
+                        {(itemTitle || itemSeq > 0) && (
+                          <div className="text-[11px] text-zinc-400 truncate">
+                            {itemSeq > 0 ? `Item ${itemSeq}` : 'Item'}{itemTitle ? ` - ${itemTitle}` : ''}
+                          </div>
+                        )}
+                      </div>
                       <div className="flex shrink-0 items-center gap-3">
                         <button
                           type="button"
