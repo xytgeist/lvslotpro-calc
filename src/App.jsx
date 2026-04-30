@@ -693,6 +693,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const [uploadingMessageOrder, setUploadingMessageOrder] = useState([])
     const [syncingImportResults, setSyncingImportResults] = useState(false)
     const [error, setError] = useState('')
+    const [notice, setNotice] = useState('')
     const [reviewQueue, setReviewQueue] = useState([])
     const [completingReviewItemId, setCompletingReviewItemId] = useState(null)
     const [completingReviewUploadId, setCompletingReviewUploadId] = useState(null)
