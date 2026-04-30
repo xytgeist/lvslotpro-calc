@@ -24,6 +24,13 @@ const OPENAI_MODEL = Deno.env.get('OPENAI_VISION_MODEL') ?? 'gpt-4o-mini'
 const AUTO_CREATE_CONFIDENCE = Number(Deno.env.get('AI_AUTO_CREATE_CONFIDENCE') ?? '0.78')
 const MAX_BATCH_SIZE = Number(Deno.env.get('AI_PROCESS_BATCH_SIZE') ?? '20')
 
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
 function textOrNull(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
@@ -177,6 +184,42 @@ function toDraftPayload(offer: ParsedOffer): Record<string, unknown> {
   }
 }
 
+async function findPotentialDuplicateEvent(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  parsed: ParsedOffer
+): Promise<{ id: string } | null> {
+  if (!parsed.start_at || !parsed.casino_name || !parsed.title) return null
+
+  const start = new Date(parsed.start_at)
+  if (Number.isNaN(start.getTime())) return null
+  const from = new Date(start.getTime() - 24 * 60 * 60 * 1000).toISOString()
+  const to = new Date(start.getTime() + 24 * 60 * 60 * 1000).toISOString()
+  const offerType = parsed.offer_type ?? 'other'
+
+  const { data, error } = await admin
+    .from('offer_events')
+    .select('id, casino_name, title, offer_type, start_at')
+    .eq('user_id', userId)
+    .eq('offer_type', offerType)
+    .gte('start_at', from)
+    .lte('start_at', to)
+    .limit(50)
+
+  if (error) throw error
+  if (!data?.length) return null
+
+  const targetCasino = normalizeText(parsed.casino_name)
+  const targetTitle = normalizeText(parsed.title)
+  const targetDay = start.toISOString().slice(0, 10)
+
+  const dup = data.find((row) => {
+    const rowDay = new Date(row.start_at).toISOString().slice(0, 10)
+    return normalizeText(row.casino_name) === targetCasino && normalizeText(row.title) === targetTitle && rowDay === targetDay
+  })
+  return dup ? { id: dup.id } : null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -253,6 +296,29 @@ Deno.serve(async (req) => {
         const shouldAutoCreate = confidence >= AUTO_CREATE_CONFIDENCE && hasRequiredFields
 
         if (shouldAutoCreate) {
+          const dup = await findPotentialDuplicateEvent(admin, userId, parsed)
+          if (dup) {
+            const duplicateWarnings = [
+              `Possible duplicate of existing event ${dup.id}; auto-create skipped.`,
+              ...warnings
+            ]
+            const { error: reviewError } = await admin.from('offer_ai_review_items').insert({
+              user_id: userId,
+              upload_id: upload.id,
+              batch_id: upload.batch_id ?? null,
+              draft: toDraftPayload(parsed),
+              warnings: duplicateWarnings
+            })
+            if (reviewError) throw reviewError
+            await admin
+              .from('offer_uploads')
+              .update({ status: 'parsed', parse_error: 'Skipped auto-create: potential duplicate.', review_required: true })
+              .eq('id', upload.id)
+              .eq('user_id', userId)
+            queuedForReview += 1
+            continue
+          }
+
           const eventRow = {
             user_id: userId,
             casino_name: parsed.casino_name,
