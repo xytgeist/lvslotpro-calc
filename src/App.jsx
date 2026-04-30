@@ -163,10 +163,22 @@ function draftFromAiReviewPayload(raw) {
   const va = o.valueAmount ?? o.value_amount
   const ot = o.offerType ?? o.offer_type ?? 'free_play'
   const allowedTypes = new Set(['free_play', 'hotel', 'dining', 'gift', 'multiplier', 'tournament', 'drawing', 'other'])
+  const titleFromPayload = String(o.title ?? '').trim()
+  const fallbackTitleByType = {
+    free_play: 'Free play',
+    hotel: 'Hotel stay',
+    dining: 'Dining credit',
+    gift: 'Gift',
+    multiplier: 'Tier multiplier',
+    tournament: 'Tournament',
+    drawing: 'Drawing',
+    other: 'Other'
+  }
+  const normalizedType = allowedTypes.has(ot) ? ot : 'free_play'
   return {
     casinoName: String(o.casinoName ?? o.casino_name ?? ''),
-    offerType: allowedTypes.has(ot) ? ot : 'free_play',
-    title: String(o.title ?? ''),
+    offerType: normalizedType,
+    title: titleFromPayload || fallbackTitleByType[normalizedType] || 'Offer',
     startAt: String(o.startAt ?? o.start_at ?? ''),
     endAt: String(o.endAt ?? o.end_at ?? ''),
     valueAmount: va !== undefined && va !== null ? String(va) : '',
@@ -1989,10 +2001,15 @@ function AppShell({ onLogout, supabaseClient }) {
         </button>
 
         {showForm && (
-          <div className="fixed inset-0 z-30 bg-black/70 backdrop-blur-[1px] px-4 py-6 overflow-y-auto">
+          <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-[1px] px-4 py-6 overflow-y-auto">
             <div className="max-w-lg mx-auto bg-zinc-900 rounded-3xl p-5 border border-zinc-700">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="text-white font-bold text-lg">{editingId ? 'Edit event' : 'Add event'}</div>
+                <div className="text-white font-bold text-lg">
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden>📅</span>
+                    <span>{editingId ? 'Edit event' : 'Add event'}</span>
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={closeForm}
@@ -2004,9 +2021,8 @@ function AppShell({ onLogout, supabaseClient }) {
 
               <div className="mb-4">
                 <div className="text-white font-semibold mb-1">Import from photos (bulk)</div>
-                <p className="text-zinc-400 text-xs mb-3 leading-relaxed flex items-center gap-1.5">
-                  <span aria-hidden>🪄</span>
-                  <span>We&apos;ll use AI to auto-magically create events from your casino mailers.</span>
+                <p className="text-zinc-400 text-xs mb-3 leading-relaxed">
+                  We&apos;ll use AI to auto-magically create events from your casino mailers. <span aria-hidden>🤖</span>
                 </p>
                 <input
                   ref={fileInputRef}
