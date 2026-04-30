@@ -238,6 +238,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const [posts, setPosts] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [notice, setNotice] = useState('')
     const [draft, setDraft] = useState({ postType: 'conditions', title: '', body: '' })
     const [isPosting, setIsPosting] = useState(false)
     const [follows, setFollows] = useState({ city: new Set(), casino: new Set() })
@@ -694,6 +695,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const [error, setError] = useState('')
     const [reviewQueue, setReviewQueue] = useState([])
     const [completingReviewItemId, setCompletingReviewItemId] = useState(null)
+    const [completingReviewUploadId, setCompletingReviewUploadId] = useState(null)
     const [reviewSourceImagePath, setReviewSourceImagePath] = useState(null)
     const [reviewSourceImageUrl, setReviewSourceImageUrl] = useState('')
     const [reviewSourceImageLoading, setReviewSourceImageLoading] = useState(false)
@@ -917,6 +919,7 @@ function AppShell({ onLogout, supabaseClient }) {
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
       setCompletingReviewItemId(null)
+      setCompletingReviewUploadId(null)
       setReviewSourceImagePath(null)
       setReviewSourceImageUrl('')
       setReviewSourceImageLoading(false)
@@ -928,6 +931,7 @@ function AppShell({ onLogout, supabaseClient }) {
 
     const openForm = (dayKey = null) => {
       setCompletingReviewItemId(null)
+      setCompletingReviewUploadId(null)
       setReviewSourceImagePath(null)
       setReviewSourceImageUrl('')
       setReviewSourceImageLoading(false)
@@ -949,6 +953,7 @@ function AppShell({ onLogout, supabaseClient }) {
 
     const beginEdit = (ev) => {
       setCompletingReviewItemId(null)
+      setCompletingReviewUploadId(null)
       setReviewSourceImagePath(null)
       setReviewSourceImageUrl('')
       setReviewSourceImageLoading(false)
@@ -980,6 +985,7 @@ function AppShell({ onLogout, supabaseClient }) {
       setAllDay(!hasSpecificTime)
       setDraft({ ...emptyOfferDraft(), ...row })
       setCompletingReviewItemId(item.id)
+      setCompletingReviewUploadId(item.upload_id || null)
       const up = item.offer_uploads
       const path = Array.isArray(up) ? up[0]?.storage_path : up?.storage_path
       setReviewSourceImagePath(path || null)
@@ -1006,35 +1012,10 @@ function AppShell({ onLogout, supabaseClient }) {
 
     const skipReviewItem = async (id) => {
       try {
-        const { data: row, error: rowErr } = await supabaseClient
-          .from('offer_ai_review_items')
-          .select('id, upload_id, offer_uploads ( bucket_id, storage_path )')
-          .eq('id', id)
-          .single()
-        if (rowErr) {
-          if (rowErr.code === '42P01') return
-          throw rowErr
-        }
-
-        const uploadId = row?.upload_id || null
-        const up = row?.offer_uploads
-        const bucketId = (Array.isArray(up) ? up[0]?.bucket_id : up?.bucket_id) || 'offer-mailers'
-        const storagePath = Array.isArray(up) ? up[0]?.storage_path : up?.storage_path
-
-        if (storagePath) {
-          const { error: rmErr } = await supabaseClient.storage.from(bucketId).remove([storagePath])
-          if (rmErr) {
-            // eslint-disable-next-line no-console
-            console.warn('Could not delete skipped review image from storage:', rmErr)
-          }
-        }
-
-        if (uploadId) {
-          const { error: delUploadErr } = await supabaseClient.from('offer_uploads').delete().eq('id', uploadId)
-          if (delUploadErr) throw delUploadErr
-        } else {
-          const { error: delReviewErr } = await supabaseClient.from('offer_ai_review_items').delete().eq('id', id)
-          if (delReviewErr) throw delReviewErr
+        const { error: delReviewErr } = await supabaseClient.from('offer_ai_review_items').delete().eq('id', id)
+        if (delReviewErr) {
+          if (delReviewErr.code === '42P01') return
+          throw delReviewErr
         }
         await loadReviewQueue()
       } catch (e) {
@@ -1046,6 +1027,57 @@ function AppShell({ onLogout, supabaseClient }) {
       if (!completingReviewItemId) return
       await skipReviewItem(completingReviewItemId)
       closeForm()
+    }
+
+    const applyCurrentFieldsToAssociatedReviewItems = async () => {
+      if (!completingReviewUploadId || !completingReviewItemId) return
+      try {
+        setNotice('')
+        const { data: rows, error: rowsErr } = await supabaseClient
+          .from('offer_ai_review_items')
+          .select('id,draft')
+          .eq('upload_id', completingReviewUploadId)
+          .eq('status', 'open')
+          .neq('id', completingReviewItemId)
+        if (rowsErr) throw rowsErr
+
+        const updates = []
+        for (const row of rows || []) {
+          const target = draftFromAiReviewPayload(row.draft || {})
+          const merged = { ...target }
+          if (!merged.casinoName?.trim() && draft.casinoName?.trim()) merged.casinoName = draft.casinoName.trim()
+          if (!merged.offerType && draft.offerType) merged.offerType = draft.offerType
+          if (!merged.title?.trim() && draft.title?.trim()) merged.title = draft.title.trim()
+          if (!merged.startAt && draft.startAt) merged.startAt = draft.startAt
+          if (!merged.endAt && draft.endAt) merged.endAt = draft.endAt
+          if ((!merged.valueAmount || merged.valueAmount === '') && draft.valueAmount !== '') merged.valueAmount = draft.valueAmount
+          if (!merged.notes?.trim() && draft.notes?.trim()) merged.notes = draft.notes.trim()
+
+          const nextDraft = {
+            casino_name: merged.casinoName || '',
+            offer_type: merged.offerType || 'other',
+            title: merged.title || '',
+            start_at: merged.startAt || '',
+            end_at: merged.endAt || '',
+            value_amount: merged.valueAmount !== '' ? Number(merged.valueAmount) : null,
+            notes: merged.notes || ''
+          }
+          updates.push(
+            supabaseClient.from('offer_ai_review_items').update({ draft: nextDraft }).eq('id', row.id)
+          )
+        }
+        if (updates.length) {
+          await Promise.all(updates)
+          setNotice(`Updated ${updates.length} associated item${updates.length > 1 ? 's' : ''}.`)
+          window.setTimeout(() => setNotice(''), 3200)
+        } else {
+          setNotice('No associated items needed updates.')
+          window.setTimeout(() => setNotice(''), 2400)
+        }
+        await loadReviewQueue()
+      } catch (e) {
+        setError(e?.message || 'Could not apply values to associated review items.')
+      }
     }
 
     const toggleSelectedDay = (dayKey) => {
@@ -1398,6 +1430,12 @@ function AppShell({ onLogout, supabaseClient }) {
         {error && (
           <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
             {error}
+          </div>
+        )}
+
+        {notice && (
+          <div className="mb-4 p-3 rounded-2xl border border-emerald-500/35 bg-emerald-950/35 text-emerald-100 text-xs leading-relaxed">
+            {notice}
           </div>
         )}
 
@@ -2316,11 +2354,21 @@ function AppShell({ onLogout, supabaseClient }) {
               {completingReviewItemId && !editingId && (
                 <button
                   type="button"
+                  onClick={() => void applyCurrentFieldsToAssociatedReviewItems()}
+                  disabled={saving || !completingReviewUploadId}
+                  className="mt-2 w-full min-h-11 rounded-2xl border border-violet-500/45 bg-violet-950/35 text-violet-100 font-semibold hover:bg-violet-900/35 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
+                >
+                  Update all associated items (fills missing fields)
+                </button>
+              )}
+              {completingReviewItemId && !editingId && (
+                <button
+                  type="button"
                   onClick={() => void skipCurrentReviewFromForm()}
                   disabled={saving}
                   className="mt-2 w-full min-h-11 rounded-2xl border border-zinc-600 bg-zinc-800 text-zinc-200 font-semibold hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
                 >
-                  Not needed — remove from queue
+                  Not needed — remove this item
                 </button>
               )}
             </div>
