@@ -690,6 +690,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const [uploading, setUploading] = useState(false)
     const [uploadingTick, setUploadingTick] = useState(0)
     const [uploadingMessageOrder, setUploadingMessageOrder] = useState([])
+    const [syncingImportResults, setSyncingImportResults] = useState(false)
     const [error, setError] = useState('')
     const [reviewQueue, setReviewQueue] = useState([])
     const [completingReviewItemId, setCompletingReviewItemId] = useState(null)
@@ -848,6 +849,20 @@ function AppShell({ onLogout, supabaseClient }) {
         setReviewQueue(data || [])
       } catch {
         setReviewQueue([])
+      }
+    }
+
+    const refreshImportResults = async (attempts = 18, intervalMs = 2500) => {
+      setSyncingImportResults(true)
+      try {
+        for (let i = 0; i < attempts; i++) {
+          await Promise.all([loadEvents(), loadReviewQueue()])
+          if (i < attempts - 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, intervalMs))
+          }
+        }
+      } finally {
+        setSyncingImportResults(false)
       }
     }
 
@@ -1200,18 +1215,7 @@ function AppShell({ onLogout, supabaseClient }) {
           if (invokeErr) {
             setError('Uploaded successfully, but AI parsing could not be started right now. Try again in a moment.')
           }
-          window.setTimeout(() => {
-            void loadEvents()
-            void loadReviewQueue()
-          }, 2500)
-          window.setTimeout(() => {
-            void loadEvents()
-            void loadReviewQueue()
-          }, 7000)
-          window.setTimeout(() => {
-            void loadEvents()
-            void loadReviewQueue()
-          }, 14000)
+          void refreshImportResults()
         } else {
           setError('Uploaded successfully, but batch metadata is unavailable. Run supabase/offer_ai_import.sql.')
         }
@@ -1394,6 +1398,12 @@ function AppShell({ onLogout, supabaseClient }) {
         {error && (
           <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
             {error}
+          </div>
+        )}
+
+        {syncingImportResults && (
+          <div className="mb-4 p-3 rounded-2xl border border-violet-500/35 bg-violet-950/35 text-violet-100 text-xs leading-relaxed">
+            Syncing AI results... new events and review items will pop in automatically.
           </div>
         )}
 

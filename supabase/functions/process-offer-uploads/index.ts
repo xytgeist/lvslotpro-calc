@@ -368,7 +368,7 @@ async function findPotentialDuplicateEvent(
   userId: string,
   parsed: ParsedOffer
 ): Promise<{ id: string } | null> {
-  if (!parsed.start_at || !parsed.casino_name || !parsed.title) return null
+  if (!parsed.start_at || !parsed.title) return null
 
   const start = new Date(parsed.start_at)
   if (Number.isNaN(start.getTime())) return null
@@ -394,7 +394,9 @@ async function findPotentialDuplicateEvent(
 
   const dup = data.find((row) => {
     const rowDay = new Date(row.start_at).toISOString().slice(0, 10)
-    return normalizeText(row.casino_name) === targetCasino && normalizeText(row.title) === targetTitle && rowDay === targetDay
+    const rowCasino = normalizeText(row.casino_name)
+    const casinoMatch = targetCasino ? rowCasino === targetCasino : true
+    return casinoMatch && normalizeText(row.title) === targetTitle && rowDay === targetDay
   })
   return dup ? { id: dup.id } : null
 }
@@ -508,7 +510,7 @@ Deno.serve(async (req) => {
           const hasCasino = !!(parsed.casino_name && parsed.casino_name.trim())
           const hasTitle = !!(parsed.title && parsed.title.trim())
           const hasStart = !!parsed.start_at
-          const hasRequiredFields = hasCasino && hasTitle && hasStart
+          const hasRequiredFields = hasTitle && hasStart
           const shouldAutoCreate = confidence >= AUTO_CREATE_CONFIDENCE && hasRequiredFields
 
           if (shouldAutoCreate) {
@@ -529,7 +531,7 @@ Deno.serve(async (req) => {
 
             const eventRow = {
               user_id: userId,
-              casino_name: parsed.casino_name,
+              casino_name: hasCasino ? parsed.casino_name : 'Unknown casino',
               offer_type: parsed.offer_type ?? 'other',
               title: parsed.title,
               start_at: parsed.start_at,
@@ -539,6 +541,9 @@ Deno.serve(async (req) => {
               source_type: 'image_ai',
               source_image_path: upload.storage_path,
               ai_confidence: Number((confidence * 100).toFixed(2))
+            }
+            if (!hasCasino) {
+              eventRow.notes = [eventRow.notes, 'AI note: casino name was not clear in image.'].filter(Boolean).join('\n')
             }
             const { error: eventError } = await admin.from('offer_events').insert(eventRow)
             if (eventError) throw eventError
