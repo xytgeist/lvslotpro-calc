@@ -1985,9 +1985,9 @@ function AppShell({ onLogout, supabaseClient }) {
 
               <div className="mb-4">
                 <div className="text-white font-semibold mb-1">Import from photos (bulk)</div>
-                <p className="text-zinc-500 text-xs mb-3 leading-relaxed">
-                  Choose one or more mailer images. They are stored and queued for OCR. When the worker runs, confident
-                  rows become events; partial parses appear below for you to finish.
+                <p className="text-zinc-400 text-xs mb-3 leading-relaxed flex items-center gap-1.5">
+                  <span aria-hidden>🪄</span>
+                  <span>We&apos;ll use AI to auto-magically create events from your casino mailers.</span>
                 </p>
                 <input
                   ref={fileInputRef}
