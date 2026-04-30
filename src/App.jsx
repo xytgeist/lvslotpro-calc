@@ -1079,7 +1079,7 @@ function AppShell({ onLogout, supabaseClient }) {
           await supabaseClient.from('offer_import_batches').update({ status: 'awaiting_parse' }).eq('id', batchId)
           // Fire-and-forget parse kickoff; queued rows remain safe if function is not deployed yet.
           const { error: invokeErr } = await supabaseClient.functions.invoke('process-offer-uploads', {
-            body: { batchId }
+            body: { batchId, timezoneOffsetMinutes: new Date().getTimezoneOffset() }
           })
           setUploadMessage(
             invokeErr

@@ -187,7 +187,7 @@ function hasExplicitTimeEvidence(value: string | null | undefined): boolean {
   return ampm || twentyFourHour
 }
 
-function normalizeToAllDayIfNeeded(offer: ParsedOffer): ParsedOffer {
+function normalizeToAllDayIfNeeded(offer: ParsedOffer, timezoneOffsetMinutes = 0): ParsedOffer {
   const keepTime = offer.has_specific_time === true && hasExplicitTimeEvidence(offer.time_evidence)
   if (keepTime) return offer
 
@@ -195,8 +195,10 @@ function normalizeToAllDayIfNeeded(offer: ParsedOffer): ParsedOffer {
     if (!iso) return iso
     const dt = new Date(iso)
     if (Number.isNaN(dt.getTime())) return iso
-    const midnight = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0)
-    return midnight.toISOString()
+    // Convert to the user's local midnight (based on client offset), then store as UTC ISO.
+    const utcMs =
+      Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), 0, 0, 0, 0) + timezoneOffsetMinutes * 60 * 1000
+    return new Date(utcMs).toISOString()
   }
 
   return {
@@ -291,6 +293,9 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const batchId = typeof body?.batchId === 'string' ? body.batchId : null
+    const timezoneOffsetMinutes = Number.isFinite(Number(body?.timezoneOffsetMinutes))
+      ? Number(body.timezoneOffsetMinutes)
+      : 0
 
     let query = admin
       .from('offer_uploads')
@@ -327,7 +332,7 @@ Deno.serve(async (req) => {
         if (fileError || !fileBlob) throw fileError || new Error('Image download failed.')
 
         const parsedRaw = await parseOfferFromImage(openaiApiKey, upload.mime_type || 'image/jpeg', new Uint8Array(await fileBlob.arrayBuffer()))
-        const parsed = normalizeToAllDayIfNeeded(parsedRaw)
+        const parsed = normalizeToAllDayIfNeeded(parsedRaw, timezoneOffsetMinutes)
         const confidence = Number.isFinite(parsed.confidence) ? Math.max(0, Math.min(1, Number(parsed.confidence))) : 0
         const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.filter(Boolean) : []
         const hasRequiredFields = !!(parsed.casino_name && parsed.title && parsed.start_at)
