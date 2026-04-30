@@ -1257,7 +1257,7 @@ function AppShell({ onLogout, supabaseClient }) {
                 </div>
                 <div className="mt-0.5 flex min-h-0 flex-1 flex-col space-y-0.5 overflow-y-auto">
                   {weekEvents.length === 0 ? (
-                    <div className="relative grid min-h-[2.5rem] grid-cols-7 gap-0">
+                    <div className="relative min-h-[12rem] flex-1">
                       <div
                         aria-hidden
                         className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
@@ -1266,46 +1266,117 @@ function AppShell({ onLogout, supabaseClient }) {
                           <div key={i} className="border-r border-zinc-500/15 last:border-r-0" />
                         ))}
                       </div>
-                      <div className="relative z-[1] col-span-7 flex items-center px-2 text-zinc-500 text-xs">No events this week.</div>
+                      <div className="absolute inset-0 z-[1] grid grid-cols-7 gap-0">
+                        {weekDays.map((d, i) => {
+                          const dk = localDateKeyFromDate(d)
+                          return (
+                            <button
+                              key={`empty-day-${i}`}
+                              type="button"
+                              aria-label={`Add event on ${dk}`}
+                              className="min-h-full touch-manipulation bg-transparent outline-none hover:bg-zinc-800/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500/30"
+                              onMouseDown={() => startDayPress(dk)}
+                              onMouseUp={endDayPress}
+                              onMouseLeave={endDayPress}
+                              onTouchStart={() => startDayPress(dk)}
+                              onTouchEnd={endDayPress}
+                              onTouchCancel={endDayPress}
+                            />
+                          )
+                        })}
+                      </div>
+                      <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center px-2 text-center text-zinc-500 text-xs">
+                        No events this week.
+                      </div>
                     </div>
                   ) : (
-                    weekEvents.map((ev) => {
-                      const meta = offerTypeMeta[ev.offer_type] || offerTypeMeta.other
-                      return (
-                        <div key={`wk-${ev.id}-${ev._startCol}`} className="relative min-h-[3.75rem]">
-                          <div
-                            aria-hidden
-                            className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
-                          >
-                            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                              <div key={i} className="border-r border-zinc-500/15 last:border-r-0" />
-                            ))}
-                          </div>
-                          <div className="relative z-[1] grid grid-cols-7 gap-0">
-                            <button
-                              type="button"
-                              onClick={() => setWeekDetailEvent(ev)}
-                              className={`${meta.card} flex min-h-[3.5rem] min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg px-2 py-1.5 text-left text-[10px] leading-tight touch-manipulation`}
-                              style={{ gridColumn: `${ev._startCol + 1} / span ${ev._span}` }}
+                    <>
+                      {weekEvents.map((ev) => {
+                        const meta = offerTypeMeta[ev.offer_type] || offerTypeMeta.other
+                        return (
+                          <div key={`wk-${ev.id}-${ev._startCol}`} className="relative min-h-[3.75rem]">
+                            <div
+                              aria-hidden
+                              className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
                             >
-                              <span className="w-full truncate text-left font-bold text-zinc-100">
-                                {ev.casino_name || 'Event'}
-                              </span>
-                              {ev.title ? (
-                                <span className="w-full truncate text-left italic text-zinc-300">{ev.title}</span>
-                              ) : null}
-                              {(ev.value_amount !== null || ev.value_text) && (
-                                <span className="w-full truncate text-left font-semibold tabular-nums text-emerald-400">
-                                  {ev.value_amount !== null ? `$${Number(ev.value_amount).toFixed(0)}` : ''}
-                                  {ev.value_amount !== null && ev.value_text ? ' · ' : ''}
-                                  {ev.value_text || ''}
+                              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                                <div key={i} className="border-r border-zinc-500/15 last:border-r-0" />
+                              ))}
+                            </div>
+                            <div className="absolute inset-0 z-[1] grid grid-cols-7 gap-0">
+                              {weekDays.map((d, i) => {
+                                const dk = localDateKeyFromDate(d)
+                                return (
+                                  <button
+                                    key={`row-${ev.id}-day-${i}`}
+                                    type="button"
+                                    aria-label={`Add event on ${dk}`}
+                                    className="min-h-full touch-manipulation bg-transparent outline-none hover:bg-zinc-800/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500/30"
+                                    onMouseDown={() => startDayPress(dk)}
+                                    onMouseUp={endDayPress}
+                                    onMouseLeave={endDayPress}
+                                    onTouchStart={() => startDayPress(dk)}
+                                    onTouchEnd={endDayPress}
+                                    onTouchCancel={endDayPress}
+                                  />
+                                )
+                              })}
+                            </div>
+                            <div className="relative z-[2] grid grid-cols-7 gap-0">
+                              <button
+                                type="button"
+                                onClick={() => setWeekDetailEvent(ev)}
+                                className={`${meta.card} flex min-h-[3.5rem] min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg px-2 py-1.5 text-left text-[10px] leading-tight touch-manipulation`}
+                                style={{ gridColumn: `${ev._startCol + 1} / span ${ev._span}` }}
+                              >
+                                <span className="w-full truncate text-left font-bold text-zinc-100">
+                                  {ev.casino_name || 'Event'}
                                 </span>
-                              )}
-                            </button>
+                                {ev.title ? (
+                                  <span className="w-full truncate text-left italic text-zinc-300">{ev.title}</span>
+                                ) : null}
+                                {(ev.value_amount !== null || ev.value_text) && (
+                                  <span className="w-full truncate text-left font-semibold tabular-nums text-emerald-400">
+                                    {ev.value_amount !== null ? `$${Number(ev.value_amount).toFixed(0)}` : ''}
+                                    {ev.value_amount !== null && ev.value_text ? ' · ' : ''}
+                                    {ev.value_text || ''}
+                                  </span>
+                                )}
+                              </button>
+                            </div>
                           </div>
+                        )
+                      })}
+                      <div className="relative min-h-[10rem] flex-1 shrink-0">
+                        <div
+                          aria-hidden
+                          className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
+                        >
+                          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                            <div key={`pad-${i}`} className="border-r border-zinc-500/15 last:border-r-0" />
+                          ))}
                         </div>
-                      )
-                    })
+                        <div className="absolute inset-0 z-[1] grid grid-cols-7 gap-0">
+                          {weekDays.map((d, i) => {
+                            const dk = localDateKeyFromDate(d)
+                            return (
+                              <button
+                                key={`footer-day-${i}`}
+                                type="button"
+                                aria-label={`Add event on ${dk}`}
+                                className="min-h-full touch-manipulation bg-transparent outline-none hover:bg-zinc-800/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500/30"
+                                onMouseDown={() => startDayPress(dk)}
+                                onMouseUp={endDayPress}
+                                onMouseLeave={endDayPress}
+                                onTouchStart={() => startDayPress(dk)}
+                                onTouchEnd={endDayPress}
+                                onTouchCancel={endDayPress}
+                              />
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
