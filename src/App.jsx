@@ -702,6 +702,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const [reviewQueue, setReviewQueue] = useState([])
     const [completingReviewItemId, setCompletingReviewItemId] = useState(null)
     const [completingReviewUploadId, setCompletingReviewUploadId] = useState(null)
+    const [applyToAssociatedOnSave, setApplyToAssociatedOnSave] = useState(false)
     const [reviewSourceImagePath, setReviewSourceImagePath] = useState(null)
     const [reviewSourceImageUrl, setReviewSourceImageUrl] = useState('')
     const [reviewSourceImageLoading, setReviewSourceImageLoading] = useState(false)
@@ -961,6 +962,7 @@ function AppShell({ onLogout, supabaseClient }) {
       setShowTitleSuggestions(false)
       setCompletingReviewItemId(null)
       setCompletingReviewUploadId(null)
+      setApplyToAssociatedOnSave(false)
       setReviewSourceImagePath(null)
       setReviewSourceImageUrl('')
       setReviewSourceImageLoading(false)
@@ -973,6 +975,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const openForm = (dayKey = null) => {
       setCompletingReviewItemId(null)
       setCompletingReviewUploadId(null)
+      setApplyToAssociatedOnSave(false)
       setReviewSourceImagePath(null)
       setReviewSourceImageUrl('')
       setReviewSourceImageLoading(false)
@@ -995,6 +998,7 @@ function AppShell({ onLogout, supabaseClient }) {
     const beginEdit = (ev) => {
       setCompletingReviewItemId(null)
       setCompletingReviewUploadId(null)
+      setApplyToAssociatedOnSave(false)
       setReviewSourceImagePath(null)
       setReviewSourceImageUrl('')
       setReviewSourceImageLoading(false)
@@ -1026,7 +1030,9 @@ function AppShell({ onLogout, supabaseClient }) {
       setAllDay(!hasSpecificTime)
       setDraft({ ...emptyOfferDraft(), ...row })
       setCompletingReviewItemId(item.id)
-      setCompletingReviewUploadId(item.upload_id || null)
+      const uploadId = item.upload_id || null
+      setCompletingReviewUploadId(uploadId)
+      setApplyToAssociatedOnSave(false)
       const up = item.offer_uploads
       const path = Array.isArray(up) ? up[0]?.storage_path : up?.storage_path
       setReviewSourceImagePath(path || null)
@@ -1036,6 +1042,20 @@ function AppShell({ onLogout, supabaseClient }) {
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
       setError('')
+      if (uploadId) {
+        try {
+          const { count } = await supabaseClient
+            .from('offer_ai_review_items')
+            .select('id', { head: true, count: 'exact' })
+            .eq('upload_id', uploadId)
+            .eq('status', 'open')
+          if (typeof count === 'number' && count >= 3) {
+            setApplyToAssociatedOnSave(true)
+          }
+        } catch {
+          // ignore auto-toggle failures; manual checkbox still available
+        }
+      }
       if (!path) return
       setReviewSourceImageLoading(true)
       try {
@@ -1082,7 +1102,7 @@ function AppShell({ onLogout, supabaseClient }) {
           .neq('id', completingReviewItemId)
         if (rowsErr) throw rowsErr
 
-        const updates = []
+        let changedCount = 0
         for (const row of rows || []) {
           const target = draftFromAiReviewPayload(row.draft || {})
           const merged = { ...target }
@@ -1103,21 +1123,39 @@ function AppShell({ onLogout, supabaseClient }) {
             value_amount: merged.valueAmount !== '' ? Number(merged.valueAmount) : null,
             notes: merged.notes || ''
           }
-          updates.push(
-            supabaseClient.from('offer_ai_review_items').update({ draft: nextDraft }).eq('id', row.id)
-          )
+
+          const prevDraft = row.draft || {}
+          const prevNorm = JSON.stringify({
+            casino_name: String(prevDraft.casino_name ?? prevDraft.casinoName ?? ''),
+            offer_type: String(prevDraft.offer_type ?? prevDraft.offerType ?? 'other'),
+            title: String(prevDraft.title ?? ''),
+            start_at: String(prevDraft.start_at ?? prevDraft.startAt ?? ''),
+            end_at: String(prevDraft.end_at ?? prevDraft.endAt ?? ''),
+            value_amount: prevDraft.value_amount ?? prevDraft.valueAmount ?? null,
+            notes: String(prevDraft.notes ?? '')
+          })
+          const nextNorm = JSON.stringify(nextDraft)
+          if (prevNorm === nextNorm) continue
+
+          const { error: updateErr } = await supabaseClient
+            .from('offer_ai_review_items')
+            .update({ draft: nextDraft })
+            .eq('id', row.id)
+          if (updateErr) throw updateErr
+          changedCount += 1
         }
-        if (updates.length) {
-          await Promise.all(updates)
-          setNotice(`Updated ${updates.length} associated item${updates.length > 1 ? 's' : ''}.`)
+        if (changedCount > 0) {
+          setNotice(`Updated ${changedCount} associated item${changedCount > 1 ? 's' : ''}.`)
           window.setTimeout(() => setNotice(''), 3200)
         } else {
-          setNotice('No associated items needed updates.')
+          setNotice('No associated items changed (they may already be filled).')
           window.setTimeout(() => setNotice(''), 2400)
         }
         await loadReviewQueue()
+        return changedCount
       } catch (e) {
         setError(e?.message || 'Could not apply values to associated review items.')
+        return 0
       }
     }
 
@@ -1170,6 +1208,9 @@ function AppShell({ onLogout, supabaseClient }) {
           if (!user) throw new Error('Sign in to save offers to your calendar.')
           const pendingReviewId = completingReviewItemId
           const pendingImg = reviewSourceImagePath
+          if (pendingReviewId && applyToAssociatedOnSave) {
+            await applyCurrentFieldsToAssociatedReviewItems()
+          }
           const insertPayload = {
             ...payload,
             user_id: user.id,
@@ -2393,15 +2434,23 @@ function AppShell({ onLogout, supabaseClient }) {
               >
                 {saving ? 'Saving…' : editingId ? 'Update event' : 'Save event'}
               </button>
+              {completingReviewItemId && !editingId && notice && (
+                <div className="mt-2 rounded-xl border border-emerald-500/35 bg-emerald-950/35 px-3 py-2 text-xs text-emerald-100">
+                  {notice}
+                </div>
+              )}
               {completingReviewItemId && !editingId && (
-                <button
-                  type="button"
-                  onClick={() => void applyCurrentFieldsToAssociatedReviewItems()}
-                  disabled={saving || !completingReviewUploadId}
-                  className="mt-2 w-full min-h-11 rounded-2xl border border-violet-500/45 bg-violet-950/35 text-violet-100 font-semibold hover:bg-violet-900/35 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
-                >
-                  Update all associated items (fills missing fields)
-                </button>
+                <label className="mt-2 flex w-full items-center gap-2 rounded-2xl border border-violet-500/45 bg-violet-950/35 px-3 py-2 text-violet-100">
+                  <input
+                    type="checkbox"
+                    checked={applyToAssociatedOnSave}
+                    onChange={(e) => setApplyToAssociatedOnSave(e.target.checked)}
+                    className="h-4 w-4 accent-violet-500"
+                  />
+                  <span className="text-xs font-semibold leading-relaxed">
+                    Apply missing fields to all associated items from this image when I save
+                  </span>
+                </label>
               )}
               {completingReviewItemId && !editingId && (
                 <button
