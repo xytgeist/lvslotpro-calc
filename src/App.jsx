@@ -949,18 +949,46 @@ function AppShell({ onLogout, supabaseClient }) {
 
     const skipReviewItem = async (id) => {
       try {
-        const { error } = await supabaseClient
+        const { data: row, error: rowErr } = await supabaseClient
           .from('offer_ai_review_items')
-          .update({ status: 'skipped', resolved_at: new Date().toISOString() })
+          .select('id, upload_id, offer_uploads ( bucket_id, storage_path )')
           .eq('id', id)
-        if (error) {
-          if (error.code === '42P01') return
-          throw error
+          .single()
+        if (rowErr) {
+          if (rowErr.code === '42P01') return
+          throw rowErr
+        }
+
+        const uploadId = row?.upload_id || null
+        const up = row?.offer_uploads
+        const bucketId = (Array.isArray(up) ? up[0]?.bucket_id : up?.bucket_id) || 'offer-mailers'
+        const storagePath = Array.isArray(up) ? up[0]?.storage_path : up?.storage_path
+
+        if (storagePath) {
+          const { error: rmErr } = await supabaseClient.storage.from(bucketId).remove([storagePath])
+          if (rmErr) {
+            // eslint-disable-next-line no-console
+            console.warn('Could not delete skipped review image from storage:', rmErr)
+          }
+        }
+
+        if (uploadId) {
+          const { error: delUploadErr } = await supabaseClient.from('offer_uploads').delete().eq('id', uploadId)
+          if (delUploadErr) throw delUploadErr
+        } else {
+          const { error: delReviewErr } = await supabaseClient.from('offer_ai_review_items').delete().eq('id', id)
+          if (delReviewErr) throw delReviewErr
         }
         await loadReviewQueue()
       } catch (e) {
-        setError(e?.message || 'Could not update review item.')
+        setError(e?.message || 'Could not remove review item.')
       }
+    }
+
+    const skipCurrentReviewFromForm = async () => {
+      if (!completingReviewItemId) return
+      await skipReviewItem(completingReviewItemId)
+      closeForm()
     }
 
     const toggleSelectedDay = (dayKey) => {
@@ -2200,6 +2228,16 @@ function AppShell({ onLogout, supabaseClient }) {
               >
                 {saving ? 'Saving…' : editingId ? 'Update event' : 'Save event'}
               </button>
+              {completingReviewItemId && !editingId && (
+                <button
+                  type="button"
+                  onClick={() => void skipCurrentReviewFromForm()}
+                  disabled={saving}
+                  className="mt-2 w-full min-h-11 rounded-2xl border border-zinc-600 bg-zinc-800 text-zinc-200 font-semibold hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
+                >
+                  Not needed — remove from queue
+                </button>
+              )}
             </div>
           </div>
         )}
