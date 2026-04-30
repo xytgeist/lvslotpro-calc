@@ -135,7 +135,8 @@ function draftFromAiReviewPayload(raw) {
     endAt: String(o.endAt ?? o.end_at ?? ''),
     valueAmount: va !== undefined && va !== null ? String(va) : '',
     valueText: String(o.valueText ?? o.value_text ?? ''),
-    notes: String(o.notes ?? '')
+    notes: String(o.notes ?? ''),
+    hasSpecificTime: o.hasSpecificTime === true || o.has_specific_time === true
   }
 }
 
@@ -870,11 +871,8 @@ function AppShell({ onLogout, supabaseClient }) {
 
     const beginReviewItem = async (item) => {
       const row = draftFromAiReviewPayload(item.draft || {})
-      const st = row.startAt ? dateFromDatetimeLocalValue(row.startAt) : null
-      const en = row.endAt ? dateFromDatetimeLocalValue(row.endAt) : null
-      const stHasVisibleTime = st ? st.getHours() !== 0 || st.getMinutes() !== 0 : false
-      const enHasVisibleTime = en ? en.getHours() !== 0 || en.getMinutes() !== 0 : false
-      setAllDay(!(stHasVisibleTime || enHasVisibleTime))
+      const hasSpecificTime = row.hasSpecificTime === true
+      setAllDay(!hasSpecificTime)
       setDraft({ ...emptyOfferDraft(), ...row })
       setCompletingReviewItemId(item.id)
       const up = item.offer_uploads

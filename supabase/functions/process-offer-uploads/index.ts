@@ -11,6 +11,7 @@ type ParsedOffer = {
   confidence?: number
   warnings?: string[]
   has_specific_time?: boolean
+  time_evidence?: string | null
   casino_name?: string
   offer_type?: string
   title?: string
@@ -106,6 +107,7 @@ Return strict JSON (no markdown, no prose) with this shape:
   "confidence": 0.0-1.0,
   "warnings": ["optional warning strings"],
   "has_specific_time": true or false,
+  "time_evidence": "exact text snippet showing the visible time, or null",
   "casino_name": "string or null",
   "offer_type": "free_play|hotel|dining|gift|multiplier|tournament|drawing|other",
   "title": "string or null",
@@ -121,6 +123,7 @@ Rules:
 - If a field is uncertain, keep it null and add a warning.
 - confidence should reflect how complete and reliable the extraction is.
 - Set has_specific_time to true ONLY when an explicit clock time is visible in the image.
+- If has_specific_time is true, include time_evidence copied from the image (example: "5:00 PM").
 `.trim()
 
   const res = await fetch('https://api.openai.com/v1/responses', {
@@ -164,6 +167,7 @@ Rules:
     confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
     warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map((w) => String(w)) : [],
     has_specific_time: parsed.has_specific_time === true,
+    time_evidence: textOrNull(parsed.time_evidence),
     casino_name: textOrNull(parsed.casino_name) ?? undefined,
     offer_type: normalizeOfferType(parsed.offer_type),
     title: textOrNull(parsed.title) ?? undefined,
@@ -175,8 +179,16 @@ Rules:
   }
 }
 
+function hasExplicitTimeEvidence(value: string | null | undefined): boolean {
+  if (!value) return false
+  const s = value.toLowerCase()
+  const ampm = /\b([1-9]|1[0-2])(?::[0-5]\d)?\s?(am|pm)\b/.test(s)
+  const twentyFourHour = /\b([01]?\d|2[0-3]):[0-5]\d\b/.test(s)
+  return ampm || twentyFourHour
+}
+
 function normalizeToAllDayIfNeeded(offer: ParsedOffer): ParsedOffer {
-  const keepTime = offer.has_specific_time === true
+  const keepTime = offer.has_specific_time === true && hasExplicitTimeEvidence(offer.time_evidence)
   if (keepTime) return offer
 
   const normalize = (iso?: string | null): string | null | undefined => {
@@ -189,6 +201,7 @@ function normalizeToAllDayIfNeeded(offer: ParsedOffer): ParsedOffer {
 
   return {
     ...offer,
+    has_specific_time: false,
     start_at: normalize(offer.start_at) ?? undefined,
     end_at: normalize(offer.end_at) ?? null
   }
@@ -196,6 +209,7 @@ function normalizeToAllDayIfNeeded(offer: ParsedOffer): ParsedOffer {
 
 function toDraftPayload(offer: ParsedOffer): Record<string, unknown> {
   return {
+    has_specific_time: offer.has_specific_time === true,
     casino_name: offer.casino_name ?? '',
     offer_type: offer.offer_type ?? 'other',
     title: offer.title ?? '',
