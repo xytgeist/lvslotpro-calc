@@ -702,7 +702,9 @@ function AppShell({ onLogout, supabaseClient }) {
     const [reviewQueue, setReviewQueue] = useState([])
     const [completingReviewItemId, setCompletingReviewItemId] = useState(null)
     const [completingReviewUploadId, setCompletingReviewUploadId] = useState(null)
-    const [applyToAssociatedOnSave, setApplyToAssociatedOnSave] = useState(false)
+    const [propagateCasinoOnSave, setPropagateCasinoOnSave] = useState(false)
+    const [propagateTitleOnSave, setPropagateTitleOnSave] = useState(false)
+    const [propagateValueOnSave, setPropagateValueOnSave] = useState(false)
     const [overwriteCasinoOnSave, setOverwriteCasinoOnSave] = useState(false)
     const [overwriteValueOnSave, setOverwriteValueOnSave] = useState(false)
     const [reviewSourceImagePath, setReviewSourceImagePath] = useState(null)
@@ -964,7 +966,9 @@ function AppShell({ onLogout, supabaseClient }) {
       setShowTitleSuggestions(false)
       setCompletingReviewItemId(null)
       setCompletingReviewUploadId(null)
-      setApplyToAssociatedOnSave(false)
+      setPropagateCasinoOnSave(false)
+      setPropagateTitleOnSave(false)
+      setPropagateValueOnSave(false)
       setOverwriteCasinoOnSave(false)
       setOverwriteValueOnSave(false)
       setReviewSourceImagePath(null)
@@ -979,7 +983,9 @@ function AppShell({ onLogout, supabaseClient }) {
     const openForm = (dayKey = null) => {
       setCompletingReviewItemId(null)
       setCompletingReviewUploadId(null)
-      setApplyToAssociatedOnSave(false)
+      setPropagateCasinoOnSave(false)
+      setPropagateTitleOnSave(false)
+      setPropagateValueOnSave(false)
       setOverwriteCasinoOnSave(false)
       setOverwriteValueOnSave(false)
       setReviewSourceImagePath(null)
@@ -1004,7 +1010,9 @@ function AppShell({ onLogout, supabaseClient }) {
     const beginEdit = (ev) => {
       setCompletingReviewItemId(null)
       setCompletingReviewUploadId(null)
-      setApplyToAssociatedOnSave(false)
+      setPropagateCasinoOnSave(false)
+      setPropagateTitleOnSave(false)
+      setPropagateValueOnSave(false)
       setOverwriteCasinoOnSave(false)
       setOverwriteValueOnSave(false)
       setReviewSourceImagePath(null)
@@ -1040,7 +1048,9 @@ function AppShell({ onLogout, supabaseClient }) {
       setCompletingReviewItemId(item.id)
       const uploadId = item.upload_id || null
       setCompletingReviewUploadId(uploadId)
-      setApplyToAssociatedOnSave(false)
+      setPropagateCasinoOnSave(false)
+      setPropagateTitleOnSave(false)
+      setPropagateValueOnSave(false)
       setOverwriteCasinoOnSave(false)
       setOverwriteValueOnSave(false)
       const up = item.offer_uploads
@@ -1060,7 +1070,7 @@ function AppShell({ onLogout, supabaseClient }) {
             .eq('upload_id', uploadId)
             .eq('status', 'open')
           if (typeof count === 'number' && count >= 3) {
-            setApplyToAssociatedOnSave(true)
+            setPropagateCasinoOnSave(true)
           }
         } catch {
           // ignore auto-toggle failures; manual checkbox still available
@@ -1121,15 +1131,16 @@ function AppShell({ onLogout, supabaseClient }) {
           const target = draftFromAiReviewPayload(row.draft || {})
           const merged = { ...target }
           const sameType = (target.offerType || 'other') === (draft.offerType || 'other')
-          if (!merged.casinoName?.trim() && draft.casinoName?.trim()) merged.casinoName = draft.casinoName.trim()
-          if (!merged.offerType && draft.offerType) merged.offerType = draft.offerType
-          if (!merged.title?.trim() && draft.title?.trim()) merged.title = draft.title.trim()
-          if (!merged.startAt && draft.startAt) merged.startAt = draft.startAt
-          if (!merged.endAt && draft.endAt) merged.endAt = draft.endAt
-          if ((!merged.valueAmount || merged.valueAmount === '') && draft.valueAmount !== '') merged.valueAmount = draft.valueAmount
-          if (!merged.notes?.trim() && draft.notes?.trim()) merged.notes = draft.notes.trim()
-          if (sameType && overwriteCasinoOnSave && draft.casinoName?.trim()) merged.casinoName = draft.casinoName.trim()
-          if (sameType && overwriteValueOnSave && draft.valueAmount !== '') merged.valueAmount = draft.valueAmount
+          if (sameType && !merged.offerType && draft.offerType) merged.offerType = draft.offerType
+          if (sameType && propagateCasinoOnSave && draft.casinoName?.trim()) {
+            if (overwriteCasinoOnSave || !merged.casinoName?.trim()) merged.casinoName = draft.casinoName.trim()
+          }
+          if (sameType && propagateTitleOnSave && draft.title?.trim()) {
+            merged.title = draft.title.trim()
+          }
+          if (sameType && propagateValueOnSave && draft.valueAmount !== '') {
+            if (overwriteValueOnSave || !merged.valueAmount || merged.valueAmount === '') merged.valueAmount = draft.valueAmount
+          }
 
           const nextDraft = {
             casino_name: merged.casinoName || '',
@@ -1284,7 +1295,7 @@ function AppShell({ onLogout, supabaseClient }) {
           if (!user) throw new Error('Sign in to save offers to your calendar.')
           const pendingReviewId = completingReviewItemId
           const pendingImg = reviewSourceImagePath
-          if (pendingReviewId && applyToAssociatedOnSave) {
+          if (pendingReviewId && (propagateCasinoOnSave || propagateTitleOnSave || propagateValueOnSave)) {
             await applyCurrentFieldsToAssociatedReviewItems()
           }
           const insertPayload = {
@@ -2538,45 +2549,55 @@ function AppShell({ onLogout, supabaseClient }) {
                 </div>
               )}
               {completingReviewItemId && !editingId && (
-                <label className="mt-2 flex w-full items-center gap-2 rounded-2xl border border-violet-500/45 bg-violet-950/35 px-3 py-2 text-violet-100">
-                  <input
-                    type="checkbox"
-                    checked={applyToAssociatedOnSave}
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      setApplyToAssociatedOnSave(checked)
-                      if (!checked) {
-                        setOverwriteCasinoOnSave(false)
-                        setOverwriteValueOnSave(false)
-                      }
-                    }}
-                    className="h-4 w-4 accent-violet-500"
-                  />
-                  <span className="text-xs font-semibold leading-relaxed">
-                    Apply missing fields to all associated items from this image when I save
-                  </span>
-                </label>
-              )}
-              {completingReviewItemId && !editingId && applyToAssociatedOnSave && (
                 <div className="mt-2 rounded-2xl border border-zinc-700 bg-zinc-900/70 px-3 py-2">
-                  <div className="text-[11px] text-zinc-400 mb-2">Optional overwrite (same Type only)</div>
+                  <div className="text-[11px] text-zinc-400 mb-2">Apply to associated items (same Type only)</div>
                   <label className="flex items-center gap-2 text-zinc-200 text-xs">
                     <input
                       type="checkbox"
-                      checked={overwriteCasinoOnSave}
-                      onChange={(e) => setOverwriteCasinoOnSave(e.target.checked)}
+                      checked={propagateCasinoOnSave}
+                      onChange={(e) => setPropagateCasinoOnSave(e.target.checked)}
                       className="h-4 w-4 accent-violet-500"
                     />
-                    Overwrite casino name on same Type items
+                    Casino
                   </label>
                   <label className="mt-2 flex items-center gap-2 text-zinc-200 text-xs">
                     <input
                       type="checkbox"
-                      checked={overwriteValueOnSave}
-                      onChange={(e) => setOverwriteValueOnSave(e.target.checked)}
+                      checked={propagateTitleOnSave}
+                      onChange={(e) => setPropagateTitleOnSave(e.target.checked)}
                       className="h-4 w-4 accent-violet-500"
                     />
-                    Overwrite value amount on same Type items
+                    Title
+                  </label>
+                  <label className="mt-2 flex items-center gap-2 text-zinc-200 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={propagateValueOnSave}
+                      onChange={(e) => setPropagateValueOnSave(e.target.checked)}
+                      className="h-4 w-4 accent-violet-500"
+                    />
+                    Value amount
+                  </label>
+                  <div className="mt-2 text-[11px] text-zinc-500">Overwrite behavior</div>
+                  <label className="mt-1 flex items-center gap-2 text-zinc-300 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={overwriteCasinoOnSave}
+                      onChange={(e) => setOverwriteCasinoOnSave(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-violet-500"
+                      disabled={!propagateCasinoOnSave}
+                    />
+                    Overwrite casino if already populated
+                  </label>
+                  <label className="mt-1 flex items-center gap-2 text-zinc-300 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={overwriteValueOnSave}
+                      onChange={(e) => setOverwriteValueOnSave(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-violet-500"
+                      disabled={!propagateValueOnSave}
+                    />
+                    Overwrite value if already populated
                   </label>
                 </div>
               )}
