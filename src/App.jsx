@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useMemo, forwardRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import PhoenixLink from './calculators/PhoenixLink'
 import BuffaloLink from './calculators/BuffaloLink'
@@ -13,10 +12,15 @@ import {
   dateFromDatetimeLocalValue,
   datetimeLocalValueFromDate,
   normalizeLoadedEvent,
-  shuffledCopy,
   emptyOfferDraft,
   draftFromAiReviewPayload
 } from './features/offers/utils'
+import ReviewQueuePanel from './features/offers/components/ReviewQueuePanel'
+import UploadProgressOverlay from './features/offers/components/UploadProgressOverlay'
+import OfferFormModal from './features/offers/components/OfferFormModal'
+import WeekEventDetailModal from './features/offers/components/WeekEventDetailModal'
+import AddEventFab from './features/offers/components/AddEventFab'
+import useOffersCalendarState from './features/offers/hooks/useOffersCalendarState'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -68,19 +72,6 @@ function getOAuthCallbackMessage(error, errorCode, errorDescription) {
   }
   return errorDescription || 'Sign-in with Google could not be completed. Please try again or use your email and password.'
 }
-
-const DateTimeInput = forwardRef(({ value, onClick, placeholder }, ref) => {
-  return (
-    <input
-      ref={ref}
-      value={value || ''}
-      onClick={onClick}
-      readOnly
-      placeholder={placeholder}
-      className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer box-border"
-    />
-  )
-})
 
 function OAuthDivider() {
   return (
@@ -576,158 +567,88 @@ function AppShell({ onLogout, supabaseClient }) {
   }
 
   const OffersCalendar = () => {
-    const fileInputRef = useRef(null)
-    const longPressTimerRef = useRef(null)
-    const casinoFieldRef = useRef(null)
-    const titleFieldRef = useRef(null)
-    const importSyncRunningRef = useRef(false)
-    const [events, setEvents] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [saving, setSaving] = useState(false)
-    const [uploading, setUploading] = useState(false)
-    const [uploadingTick, setUploadingTick] = useState(0)
-    const [uploadingMessageOrder, setUploadingMessageOrder] = useState([])
-    const [syncingImportResults, setSyncingImportResults] = useState(false)
-    const [activeImportBatchId, setActiveImportBatchId] = useState(() => {
-      if (typeof window === 'undefined') return null
-      return window.localStorage.getItem('offers_active_import_batch_id')
-    })
-    const [error, setError] = useState('')
-    const [notice, setNotice] = useState('')
-    const [reviewQueue, setReviewQueue] = useState([])
-    const [completingReviewItemId, setCompletingReviewItemId] = useState(null)
-    const [completingReviewUploadId, setCompletingReviewUploadId] = useState(null)
-    const [propagateCasinoOnSave, setPropagateCasinoOnSave] = useState(false)
-    const [propagateTitleOnSave, setPropagateTitleOnSave] = useState(false)
-    const [propagateValueOnSave, setPropagateValueOnSave] = useState(false)
-    const [reviewSourceImagePath, setReviewSourceImagePath] = useState(null)
-    const [reviewSourceImageUrl, setReviewSourceImageUrl] = useState('')
-    const [reviewSourceImageLoading, setReviewSourceImageLoading] = useState(false)
-    const [showForm, setShowForm] = useState(false)
-    const [editingId, setEditingId] = useState(null)
-    const [selectedDays, setSelectedDays] = useState([])
-    const [cursorMonth, setCursorMonth] = useState(() => {
-      const n = new Date()
-      return new Date(n.getFullYear(), n.getMonth(), 1)
-    })
-    const [draft, setDraft] = useState(() => emptyOfferDraft())
-    const [allDay, setAllDay] = useState(true)
-    const [showCasinoSuggestions, setShowCasinoSuggestions] = useState(false)
-    const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
-    const [expandedEventId, setExpandedEventId] = useState(null)
-    const notesPreviewRefs = useRef({})
-    const [notesOverflowById, setNotesOverflowById] = useState({})
-    /** 'auto' = week in landscape, month in portrait; 'month' | 'week' | 'agenda' = forced */
-    const [calendarMode, setCalendarMode] = useState('auto')
-    const [weekDetailEvent, setWeekDetailEvent] = useState(null)
-    const [showWeekPortraitHint, setShowWeekPortraitHint] = useState(false)
-    const [viewMenuOpen, setViewMenuOpen] = useState(false)
-    const viewMenuRef = useRef(null)
-    const [isLandscape, setIsLandscape] = useState(() =>
-      typeof window !== 'undefined' ? window.matchMedia('(orientation: landscape)').matches : false
-    )
-    const [weekAnchor, setWeekAnchor] = useState(() => new Date())
-    const uploadSpinnerMessages = useMemo(
-      () => [
-        'Doing funky stuff... one sec.',
-        'Teaching robots to read casino mailers...',
-        'Summoning OCR goblins...',
-        'Sorting winners from weird blurry photos...',
-        'Almost there, polishing your events...',
-        'WTF is that image quality...',
-        'Please no more dick pics...',
-        'Translating casino hieroglyphics...',
-        'OCR is squinting aggressively...',
-        'Convincing AI this is not a tournament...',
-        'Unblurring the blur. Sort of.',
-        'Cooking events with extra chaos...',
-        'Stealing dates from tiny print...',
-        'Checking if this is free play or free pain...',
-        'Shaking snacks out of these pixels...',
-        'Bribing the parser with virtual coffee...',
-        'Reading mailers so you do not have to...',
-        'Almost done. Nobody panic.'
-      ],
-      []
-    )
-    const uploadMessageIndex = Math.min(uploadingTick, Math.max(0, uploadingMessageOrder.length - 1))
-    const uploadBaseMessage = uploadingMessageOrder[uploadMessageIndex] || uploadSpinnerMessages[0]
-    const atLastUploadMessage = uploadingMessageOrder.length > 0 && uploadMessageIndex === uploadingMessageOrder.length - 1
-    const uploadEllipsis = atLastUploadMessage ? '.'.repeat((uploadingTick % 3) + 1) : ''
-    const uploadSpinnerMessage = `${uploadBaseMessage}${uploadEllipsis}`
-
-    useEffect(() => {
-      if (!uploading) {
-        setUploadingTick(0)
-        setUploadingMessageOrder([])
-        return undefined
-      }
-      const order = shuffledCopy(uploadSpinnerMessages)
-      setUploadingMessageOrder(order)
-      setUploadingTick(0)
-      const id = window.setInterval(() => {
-        setUploadingTick((n) => n + 1)
-      }, 1600)
-      return () => window.clearInterval(id)
-    }, [uploading, uploadSpinnerMessages])
-
-    const offerTypeMeta = useMemo(
-      () => ({
-        free_play: { label: 'Free play', dot: 'bg-violet-400', chip: 'bg-violet-500/15 text-violet-200 border-violet-500/40', card: 'bg-violet-500/18' },
-        hotel: { label: 'Hotel stay', dot: 'bg-sky-400', chip: 'bg-sky-500/15 text-sky-200 border-sky-500/40', card: 'bg-sky-500/16' },
-        dining: { label: 'Dining credit', dot: 'bg-emerald-400', chip: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/40', card: 'bg-emerald-500/16' },
-        gift: { label: 'Gift day', dot: 'bg-amber-400', chip: 'bg-amber-500/15 text-amber-200 border-amber-500/40', card: 'bg-amber-500/16' },
-        multiplier: { label: 'Tier multiplier', dot: 'bg-fuchsia-400', chip: 'bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-500/40', card: 'bg-fuchsia-500/16' },
-        tournament: { label: 'Tournament', dot: 'bg-rose-400', chip: 'bg-rose-500/15 text-rose-200 border-rose-500/40', card: 'bg-rose-500/16' },
-        drawing: { label: 'Drawing', dot: 'bg-cyan-400', chip: 'bg-cyan-500/15 text-cyan-200 border-cyan-500/40', card: 'bg-cyan-500/16' },
-        other: { label: 'Other', dot: 'bg-zinc-400', chip: 'bg-zinc-500/15 text-zinc-200 border-zinc-500/40', card: 'bg-zinc-700/45' }
-      }),
-      []
-    )
-
-    const dayBuckets = useMemo(() => {
-      const map = {}
-      for (const ev of events) {
-        const key = localDateKeyFromIso(ev.start_at)
-        if (!map[key]) map[key] = []
-        map[key].push(ev)
-      }
-      return map
-    }, [events])
-
-    const dayTypeDots = useMemo(() => {
-      const map = {}
-      for (const [dayKey, dayEvents] of Object.entries(dayBuckets)) {
-        const seen = new Set(dayEvents.map((ev) => ev.offer_type || 'other'))
-        map[dayKey] = Array.from(seen).slice(0, 4)
-      }
-      return map
-    }, [dayBuckets])
-
-    const calendarCells = useMemo(() => {
-      const y = cursorMonth.getFullYear()
-      const month = cursorMonth.getMonth()
-      const first = new Date(y, month, 1)
-      const lastDay = new Date(y, month + 1, 0).getDate()
-      const startDow = first.getDay()
-      const cells = []
-      for (let i = 0; i < startDow; i++) cells.push(null)
-      for (let d = 1; d <= lastDay; d++) cells.push(new Date(y, month, d))
-      while (cells.length % 7 !== 0) cells.push(null)
-      return cells
-    }, [cursorMonth])
-
-    const monthTitle = cursorMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' })
-    const todayKey = localDateKeyFromDate(new Date())
-
-    useEffect(() => {
-      if (typeof window === 'undefined') return
-      if (activeImportBatchId) {
-        window.localStorage.setItem('offers_active_import_batch_id', activeImportBatchId)
-      } else {
-        window.localStorage.removeItem('offers_active_import_batch_id')
-      }
-    }, [activeImportBatchId])
+    const {
+      fileInputRef,
+      longPressTimerRef,
+      casinoFieldRef,
+      titleFieldRef,
+      importSyncRunningRef,
+      events,
+      setEvents,
+      loading,
+      setLoading,
+      saving,
+      setSaving,
+      uploading,
+      setUploading,
+      syncingImportResults,
+      setSyncingImportResults,
+      activeImportBatchId,
+      setActiveImportBatchId,
+      error,
+      setError,
+      notice,
+      setNotice,
+      reviewQueue,
+      setReviewQueue,
+      completingReviewItemId,
+      setCompletingReviewItemId,
+      completingReviewUploadId,
+      setCompletingReviewUploadId,
+      propagateCasinoOnSave,
+      setPropagateCasinoOnSave,
+      propagateTitleOnSave,
+      setPropagateTitleOnSave,
+      propagateValueOnSave,
+      setPropagateValueOnSave,
+      reviewSourceImagePath,
+      setReviewSourceImagePath,
+      reviewSourceImageUrl,
+      setReviewSourceImageUrl,
+      reviewSourceImageLoading,
+      setReviewSourceImageLoading,
+      showForm,
+      setShowForm,
+      editingId,
+      setEditingId,
+      selectedDays,
+      setSelectedDays,
+      cursorMonth,
+      setCursorMonth,
+      draft,
+      setDraft,
+      allDay,
+      setAllDay,
+      showCasinoSuggestions,
+      setShowCasinoSuggestions,
+      showTitleSuggestions,
+      setShowTitleSuggestions,
+      expandedEventId,
+      setExpandedEventId,
+      notesPreviewRefs,
+      notesOverflowById,
+      setNotesOverflowById,
+      calendarMode,
+      setCalendarMode,
+      weekDetailEvent,
+      setWeekDetailEvent,
+      showWeekPortraitHint,
+      setShowWeekPortraitHint,
+      viewMenuOpen,
+      setViewMenuOpen,
+      viewMenuRef,
+      isLandscape,
+      setIsLandscape,
+      weekAnchor,
+      setWeekAnchor,
+      offerTypeMeta,
+      dayBuckets,
+      dayTypeDots,
+      calendarCells,
+      monthTitle,
+      todayKey,
+      uploadSpinnerMessage
+    } = useOffersCalendarState()
 
     const loadEvents = async () => {
       setLoading(true)
@@ -1517,57 +1438,7 @@ function AppShell({ onLogout, supabaseClient }) {
           </div>
         )}
 
-        {reviewQueue.length > 0 && (
-          <div className="mb-4 rounded-3xl border border-amber-500/35 bg-amber-950/35 p-4">
-            <div className="text-amber-100 font-semibold text-sm">Needs your input ({reviewQueue.length})</div>
-            <p className="mt-1 text-amber-100/80 text-xs leading-relaxed">
-              Partial OCR results — complete the form for each image, or skip. Successful images from the same batch can
-              already be on your calendar.
-            </p>
-            <ul className="mt-3 space-y-2">
-              {reviewQueue.map((item) => {
-                const up = item.offer_uploads
-                const fileName = Array.isArray(up) ? up[0]?.file_name : up?.file_name
-                const itemTitle = String(item?.draft?.title || '').trim()
-                const itemSeq = Number(item?.draft?.ai_sequence || 0)
-                const warns = (item.warnings || []).filter(Boolean)
-                return (
-                  <li key={item.id} className="rounded-2xl bg-zinc-900/90 px-3 py-2.5 border border-zinc-700/80">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="min-w-0 text-sm font-medium text-zinc-100 truncate">{fileName || 'Image'}</div>
-                        {(itemTitle || itemSeq > 0) && (
-                          <div className="text-[11px] text-zinc-400 truncate">
-                            {itemSeq > 0 ? `Item ${itemSeq}` : 'Item'}{itemTitle ? ` - ${itemTitle}` : ''}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => beginReviewItem(item)}
-                          className="text-cyan-300 hover:text-cyan-200 text-xs font-semibold touch-manipulation"
-                        >
-                          Complete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void skipReviewItem(item.id)}
-                          className="text-zinc-400 hover:text-zinc-300 text-xs font-semibold touch-manipulation"
-                        >
-                          Skip
-                        </button>
-                      </div>
-                    </div>
-                    {warns.length > 0 && (
-                      <div className="mt-1 text-[11px] leading-snug text-amber-200/85">{warns.join(' · ')}</div>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
+        <ReviewQueuePanel reviewQueue={reviewQueue} onComplete={beginReviewItem} onSkip={(itemId) => void skipReviewItem(itemId)} />
 
         <div className={isWeekView ? 'flex flex-1 min-h-0 flex-col gap-2' : 'mb-2'}>
             <div className={`flex shrink-0 items-center justify-between gap-2 ${isWeekView ? '' : 'mb-2'}`}>
@@ -2026,478 +1897,63 @@ function AppShell({ onLogout, supabaseClient }) {
         </div>
         )}
 
-        {weekDetailEvent &&
-          (() => {
-            const e = weekDetailEvent
-            const meta = offerTypeMeta[e.offer_type] || offerTypeMeta.other
-            const startDate = new Date(e.start_at)
-            const endDate = e.end_at ? new Date(e.end_at) : null
-            const showTime = hasVisibleTime(e.start_at) || (e.end_at ? hasVisibleTime(e.end_at) : false)
-            const isMultiDay =
-              !!endDate &&
-              new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime() !==
-                new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime()
-            const dateRangeLabel = isMultiDay
-              ? `${startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-              : ''
-            const timeLabel = showTime
-              ? new Date(e.start_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-              : ''
-            const dayLabel = startDate.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
-            const dayNum = startDate.getDate()
-            return (
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="week-detail-heading"
-                className="fixed inset-0 z-[55] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-[1px]"
-                onClick={() => setWeekDetailEvent(null)}
-              >
-                <div
-                  className={`w-full max-w-lg max-h-[min(85dvh,calc(100dvh-6rem))] overflow-y-auto rounded-3xl border border-zinc-700 p-5 shadow-2xl ${meta.card}`}
-                  onClick={(ev) => ev.stopPropagation()}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div id="week-detail-heading" className="text-white font-bold text-lg">
-                      Event details
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setWeekDetailEvent(null)}
-                      className="text-zinc-400 hover:text-zinc-200 text-sm font-semibold touch-manipulation"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 shrink-0 text-center">
-                      <div className="text-zinc-500 text-[10px] font-semibold tracking-wide">{dayLabel}</div>
-                      <div className="text-zinc-100 text-2xl font-black leading-tight">{dayNum}</div>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${meta.dot}`} />
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${meta.chip}`}
-                        >
-                          {meta.label}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-lg font-semibold leading-snug text-zinc-100">
-                        {timeLabel ? `${timeLabel} ` : ''}
-                        {e.title}
-                      </div>
-                      {dateRangeLabel && <div className="mt-1 text-sm text-zinc-300">{dateRangeLabel}</div>}
-                      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-                        <span className="font-bold text-zinc-100">{e.casino_name || '—'}</span>
-                        {e.value_amount !== null && (
-                          <span className="font-semibold tabular-nums text-emerald-400">
-                            {e.value_amount !== null ? `$${Number(e.value_amount).toFixed(0)}` : ''}
-                          </span>
-                        )}
-                      </div>
-                      {e.notes && (
-                        <div className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-400">{e.notes}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-zinc-700/80 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWeekDetailEvent(null)
-                        beginEdit(e)
-                      }}
-                      className="text-cyan-300 hover:text-cyan-200 text-sm font-semibold touch-manipulation"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWeekDetailEvent(null)
-                        deleteEvent(e.id)
-                      }}
-                      className="text-red-300 hover:text-red-200 text-sm font-semibold touch-manipulation"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
+        <WeekEventDetailModal
+          event={weekDetailEvent}
+          offerTypeMeta={offerTypeMeta}
+          hasVisibleTime={hasVisibleTime}
+          onClose={() => setWeekDetailEvent(null)}
+          onEdit={(event) => {
+            setWeekDetailEvent(null)
+            beginEdit(event)
+          }}
+          onDelete={(eventId) => {
+            setWeekDetailEvent(null)
+            deleteEvent(eventId)
+          }}
+        />
 
-        <button
-          type="button"
-          onClick={() => openForm(null)}
-          aria-label="Add event"
-          className="fixed right-[4.25rem] bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-50 grid h-12 w-12 place-items-center rounded-full bg-violet-600 text-white shadow-lg touch-manipulation hover:bg-violet-500"
-        >
-          <span aria-hidden className="block leading-none text-[2rem] -translate-y-px">+</span>
-        </button>
+        <AddEventFab onClick={() => openForm(null)} />
 
-        {showForm && (
-          <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-[1px] px-4 py-6 overflow-y-auto">
-            <div className="max-w-lg mx-auto bg-zinc-900 rounded-3xl p-5 border border-zinc-700">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="text-white font-bold text-lg">
-                  <span className="inline-flex items-center gap-2">
-                    <span aria-hidden>📅</span>
-                    <span>{editingId ? 'Edit event' : 'Add event'}</span>
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="text-zinc-400 hover:text-zinc-200 text-sm font-semibold touch-manipulation"
-                >
-                  Close
-                </button>
-              </div>
-
-              {!completingReviewItemId && (
-                <div className="mb-4">
-                  <div className="text-white font-semibold mb-1">Import from photos (bulk)</div>
-                  <p className="text-zinc-400 text-xs mb-3 leading-relaxed">
-                    We&apos;ll use AI to auto-magically create events from your casino mailers. <span aria-hidden>🤖</span>
-                  </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => void handleImportPhotos(e)}
-                  />
-                  <button
-                    type="button"
-                    disabled={uploading}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full min-h-11 rounded-2xl border border-zinc-600 bg-zinc-800 text-zinc-100 font-semibold hover:bg-zinc-700 disabled:opacity-60 touch-manipulation"
-                  >
-                    {uploading ? 'Uploading…' : 'Choose photo(s)'}
-                  </button>
-                </div>
-              )}
-
-              {completingReviewItemId && (
-                <div className="mb-4 rounded-2xl border border-amber-700/60 bg-amber-950/30 p-3">
-                  <div className="text-amber-100 text-xs font-semibold mb-2">Source image for this AI draft</div>
-                  {reviewSourceImageLoading ? (
-                    <div className="text-amber-200/80 text-xs">Loading image preview...</div>
-                  ) : reviewSourceImageUrl ? (
-                    <a
-                      href={reviewSourceImageUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block"
-                      title="Open full image"
-                    >
-                      <img
-                        src={reviewSourceImageUrl}
-                        alt="Source upload for AI draft"
-                        className="w-full max-h-64 object-contain rounded-xl border border-amber-700/50 bg-black/20"
-                      />
-                    </a>
-                  ) : (
-                    <div className="text-amber-200/80 text-xs">Image preview unavailable. You can still complete this draft manually.</div>
-                  )}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-400 text-xs mb-1">Casino</label>
-                  <div ref={casinoFieldRef} className="relative">
-                    <input
-                      value={draft.casinoName}
-                      onChange={(e) => {
-                        setDraft((d) => ({ ...d, casinoName: e.target.value }))
-                        if (completingReviewItemId && !editingId) setPropagateCasinoOnSave(true)
-                        setShowCasinoSuggestions(true)
-                      }}
-                      onFocus={() => setShowCasinoSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowCasinoSuggestions(false), 120)}
-                      className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                      placeholder="e.g. Bellagio"
-                    />
-                    <button
-                      type="button"
-                      aria-label="Toggle casino suggestions"
-                      onMouseDown={(ev) => ev.preventDefault()}
-                      onClick={() => setShowCasinoSuggestions((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm hover:text-zinc-200"
-                    >
-                      ▾
-                    </button>
-                    {showCasinoSuggestions && filteredCasinoOptions.length > 0 && (
-                      <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
-                        {filteredCasinoOptions.map((name) => (
-                          <button
-                            key={name}
-                            type="button"
-                            onMouseDown={(ev) => ev.preventDefault()}
-                            onClick={() => {
-                              setDraft((d) => ({ ...d, casinoName: name }))
-                              if (completingReviewItemId && !editingId) setPropagateCasinoOnSave(true)
-                              setShowCasinoSuggestions(false)
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                          >
-                            {name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-zinc-400 text-xs mb-1">Type</label>
-                  <div className="relative">
-                    <select
-                      value={draft.offerType}
-                      onChange={(e) => setDraft((d) => ({ ...d, offerType: e.target.value }))}
-                      className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                    >
-                      <option value="free_play">Free play</option>
-                      <option value="hotel">Hotel stay</option>
-                      <option value="dining">Dining credit</option>
-                      <option value="gift">Gift day</option>
-                      <option value="multiplier">Tier multiplier</option>
-                      <option value="tournament">Tournament</option>
-                      <option value="drawing">Drawing</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"
-                    >
-                      ▾
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <label className="block text-zinc-400 text-xs mb-1">Title</label>
-                <div ref={titleFieldRef} className="relative">
-                  <input
-                    value={draft.title}
-                    onChange={(e) => {
-                      setDraft((d) => ({ ...d, title: e.target.value }))
-                      if (completingReviewItemId && !editingId) setPropagateTitleOnSave(true)
-                      setShowTitleSuggestions(true)
-                    }}
-                    onFocus={() => setShowTitleSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 120)}
-                    className="w-full h-12 appearance-none bg-zinc-800 rounded-2xl pl-3 pr-10 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                    placeholder="e.g. Weekly Free Play"
-                  />
-                  <button
-                    type="button"
-                    aria-label="Toggle title suggestions"
-                    onMouseDown={(ev) => ev.preventDefault()}
-                    onClick={() => setShowTitleSuggestions((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm hover:text-zinc-200"
-                  >
-                    ▾
-                  </button>
-                  {showTitleSuggestions && filteredTitleOptions.length > 0 && (
-                    <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
-                      {filteredTitleOptions.map((title) => (
-                        <button
-                          key={title}
-                          type="button"
-                          onMouseDown={(ev) => ev.preventDefault()}
-                          onClick={() => {
-                            setDraft((d) => ({ ...d, title }))
-                            if (completingReviewItemId && !editingId) setPropagateTitleOnSave(true)
-                            setShowTitleSuggestions(false)
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                        >
-                          {title}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <div className="flex items-center justify-between gap-3 mb-1">
-                  <label className="block text-zinc-400 text-xs">Start</label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={allDay}
-                      onChange={(e) => {
-                        const v = e.target.checked
-                        setAllDay(v)
-                        setDraft((cur) => {
-                          if (!cur.startAt) return cur
-                          if (v) {
-                            const dt = dateFromDatetimeLocalValue(cur.startAt)
-                            if (!dt) return cur
-                            const midnight = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0)
-                            const curEnd = dateFromDatetimeLocalValue(cur.endAt)
-                            const endMidnight = curEnd
-                              ? new Date(curEnd.getFullYear(), curEnd.getMonth(), curEnd.getDate(), 0, 0, 0, 0)
-                              : null
-                            return {
-                              ...cur,
-                              startAt: datetimeLocalValueFromDate(midnight),
-                              endAt: endMidnight ? datetimeLocalValueFromDate(endMidnight) : cur.endAt
-                            }
-                          }
-                          return cur
-                        })
-                      }}
-                      className="h-4 w-4 accent-violet-600"
-                    />
-                    <span className="text-zinc-400 text-[11px] leading-none">All day</span>
-                  </label>
-                </div>
-                <DatePicker
-                  selected={startSelected}
-                  onChange={(d) =>
-                    setDraft((cur) => {
-                      if (!d) return { ...cur, startAt: '' }
-                      const nextStart = datetimeLocalValueFromDate(d)
-                      const curEnd = dateFromDatetimeLocalValue(cur.endAt)
-                      const shouldClearEnd = !!curEnd && curEnd.getTime() < d.getTime()
-                      return { ...cur, startAt: nextStart, endAt: shouldClearEnd ? '' : cur.endAt }
-                    })
-                  }
-                  showTimeSelect={!allDay}
-                  timeIntervals={15}
-                  timeCaption="Time"
-                  dateFormat={allDay ? 'MMM d, yyyy' : 'MMM d, yyyy h:mm aa'}
-                  popperPlacement="bottom-start"
-                  wrapperClassName="w-full"
-                  calendarClassName="offer-datepicker"
-                  withPortal
-                  placeholderText="Select start"
-                  customInput={<DateTimeInput />}
-                />
-              </div>
-
-              <div className="mt-3">
-                <label className="block text-zinc-400 text-xs mb-1">End (optional)</label>
-                <DatePicker
-                  selected={endSelected}
-                  onChange={(d) => setDraft((cur) => ({ ...cur, endAt: d ? datetimeLocalValueFromDate(d) : '' }))}
-                  showTimeSelect={!allDay}
-                  timeIntervals={15}
-                  timeCaption="Time"
-                  dateFormat={allDay ? 'MMM d, yyyy' : 'MMM d, yyyy h:mm aa'}
-                  minDate={startSelected || undefined}
-                  minTime={!allDay && startSelected ? endMinTime : undefined}
-                  maxTime={!allDay && startSelected ? endMaxTime : undefined}
-                  popperPlacement="bottom-start"
-                  wrapperClassName="w-full"
-                  calendarClassName="offer-datepicker"
-                  withPortal
-                  placeholderText="Select end"
-                  isClearable
-                  customInput={<DateTimeInput />}
-                />
-              </div>
-
-              <div className="mt-3">
-                <label className="block text-zinc-400 text-xs mb-1">Value amount ($)</label>
-                <input
-                  type="number"
-                  value={draft.valueAmount}
-                  onChange={(e) => {
-                    setDraft((d) => ({ ...d, valueAmount: e.target.value }))
-                    if (completingReviewItemId && !editingId) setPropagateValueOnSave(true)
-                  }}
-                  className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                  placeholder="e.g. 150"
-                />
-              </div>
-
-              <div className="mt-3">
-                <label className="block text-zinc-400 text-xs mb-1">Notes</label>
-                <textarea
-                  value={draft.notes}
-                  onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-                  className="w-full min-h-20 bg-zinc-800 rounded-2xl px-3 py-2 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                  placeholder="Any restrictions, swipe times, or details"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={saveEvent}
-                disabled={saving}
-                className="mt-4 w-full min-h-12 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-bold disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
-              >
-                {saving ? 'Saving…' : editingId ? 'Update event' : 'Save event'}
-              </button>
-              {completingReviewItemId && !editingId && notice && (
-                <div className="mt-2 rounded-xl border border-emerald-500/35 bg-emerald-950/35 px-3 py-2 text-xs text-emerald-100">
-                  {notice}
-                </div>
-              )}
-              {completingReviewItemId && !editingId && (
-                <div className="mt-2 rounded-2xl border border-zinc-700 bg-zinc-900/70 px-3 py-2">
-                  <div className="text-[11px] text-zinc-400 mb-2">Apply to associated items (same Type only)</div>
-                  <label className="flex items-center gap-2 text-zinc-200 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={propagateCasinoOnSave}
-                      onChange={(e) => setPropagateCasinoOnSave(e.target.checked)}
-                      className="h-4 w-4 accent-violet-500"
-                    />
-                    Casino
-                  </label>
-                  <label className="mt-2 flex items-center gap-2 text-zinc-200 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={propagateTitleOnSave}
-                      onChange={(e) => setPropagateTitleOnSave(e.target.checked)}
-                      className="h-4 w-4 accent-violet-500"
-                    />
-                    Title
-                  </label>
-                  <label className="mt-2 flex items-center gap-2 text-zinc-200 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={propagateValueOnSave}
-                      onChange={(e) => setPropagateValueOnSave(e.target.checked)}
-                      className="h-4 w-4 accent-violet-500"
-                    />
-                    Value amount
-                  </label>
-                </div>
-              )}
-              {completingReviewItemId && !editingId && (
-                <button
-                  type="button"
-                  onClick={() => void skipCurrentReviewFromForm()}
-                  disabled={saving}
-                  className="mt-2 w-full min-h-11 rounded-2xl border border-zinc-600 bg-zinc-800 text-zinc-200 font-semibold hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
-                >
-                  Not needed — remove this item
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        {uploading && (
-          <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-center justify-center px-6">
-            <div className="w-full max-w-sm rounded-3xl border border-violet-500/40 bg-zinc-950/95 p-5 shadow-2xl shadow-black/60">
-              <div className="mb-3 flex items-center gap-3">
-                <span className="h-3 w-3 rounded-full bg-violet-400 animate-pulse" />
-                <span className="text-violet-200 text-xs font-semibold uppercase tracking-wide">Bulk import in progress</span>
-              </div>
-              <div className="text-white text-base font-semibold leading-relaxed">{uploadSpinnerMessage}</div>
-            </div>
-          </div>
-        )}
+        <OfferFormModal
+          showForm={showForm}
+          editingId={editingId}
+          closeForm={closeForm}
+          completingReviewItemId={completingReviewItemId}
+          fileInputRef={fileInputRef}
+          handleImportPhotos={handleImportPhotos}
+          uploading={uploading}
+          reviewSourceImageLoading={reviewSourceImageLoading}
+          reviewSourceImageUrl={reviewSourceImageUrl}
+          draft={draft}
+          setDraft={setDraft}
+          setPropagateCasinoOnSave={setPropagateCasinoOnSave}
+          setShowCasinoSuggestions={setShowCasinoSuggestions}
+          showCasinoSuggestions={showCasinoSuggestions}
+          filteredCasinoOptions={filteredCasinoOptions}
+          setPropagateTitleOnSave={setPropagateTitleOnSave}
+          setShowTitleSuggestions={setShowTitleSuggestions}
+          showTitleSuggestions={showTitleSuggestions}
+          filteredTitleOptions={filteredTitleOptions}
+          allDay={allDay}
+          setAllDay={setAllDay}
+          startSelected={startSelected}
+          endSelected={endSelected}
+          endMinTime={endMinTime}
+          endMaxTime={endMaxTime}
+          saveEvent={saveEvent}
+          saving={saving}
+          notice={notice}
+          propagateCasinoOnSave={propagateCasinoOnSave}
+          setPropagateCasinoOnSaveChecked={setPropagateCasinoOnSave}
+          propagateTitleOnSave={propagateTitleOnSave}
+          setPropagateTitleOnSaveChecked={setPropagateTitleOnSave}
+          propagateValueOnSave={propagateValueOnSave}
+          setPropagateValueOnSaveChecked={setPropagateValueOnSave}
+          skipCurrentReviewFromForm={skipCurrentReviewFromForm}
+          casinoFieldRef={casinoFieldRef}
+          titleFieldRef={titleFieldRef}
+        />
+        <UploadProgressOverlay show={uploading} message={uploadSpinnerMessage} />
       </div>
     )
   }
