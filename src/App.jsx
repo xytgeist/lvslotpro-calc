@@ -2147,26 +2147,15 @@ function AppShell({ onLogout, supabaseClient }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div>
-                  <label className="block text-zinc-400 text-xs mb-1">Value amount ($)</label>
-                  <input
-                    type="number"
-                    value={draft.valueAmount}
-                    onChange={(e) => setDraft((d) => ({ ...d, valueAmount: e.target.value }))}
-                    className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                    placeholder="e.g. 150"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-400 text-xs mb-0.5">Value text</label>
-                  <input
-                    value={draft.valueText}
-                    onChange={(e) => setDraft((d) => ({ ...d, valueText: e.target.value }))}
-                    className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
-                    placeholder="e.g. $150 FP + gift"
-                  />
-                </div>
+              <div className="mt-3">
+                <label className="block text-zinc-400 text-xs mb-1">Value amount ($)</label>
+                <input
+                  type="number"
+                  value={draft.valueAmount}
+                  onChange={(e) => setDraft((d) => ({ ...d, valueAmount: e.target.value }))}
+                  className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
+                  placeholder="e.g. 150"
+                />
               </div>
 
               <div className="mt-3">

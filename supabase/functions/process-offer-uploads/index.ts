@@ -12,6 +12,8 @@ type ParsedOffer = {
   warnings?: string[]
   has_specific_time?: boolean
   time_evidence?: string | null
+  has_explicit_year?: boolean
+  year_evidence?: string | null
   casino_name?: string
   offer_type?: string
   title?: string
@@ -25,6 +27,7 @@ type ParsedOffer = {
 const OPENAI_MODEL = Deno.env.get('OPENAI_VISION_MODEL') ?? 'gpt-4o-mini'
 const AUTO_CREATE_CONFIDENCE = Number(Deno.env.get('AI_AUTO_CREATE_CONFIDENCE') ?? '0.78')
 const MAX_BATCH_SIZE = Number(Deno.env.get('AI_PROCESS_BATCH_SIZE') ?? '20')
+const DEFAULT_TIMEZONE = Deno.env.get('AI_DEFAULT_TIMEZONE') ?? 'America/Los_Angeles'
 
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '')
@@ -49,6 +52,23 @@ function numberOrNull(value: unknown): number | null {
 function normalizeOfferType(value: unknown): string {
   const raw = textOrNull(value)?.toLowerCase().replace(/\s+/g, '_')
   return raw && OFFER_TYPES.has(raw) ? raw : 'other'
+}
+
+function inferOfferTypeFromText(parts: Array<string | null | undefined>): string | null {
+  const text = parts
+    .filter(Boolean)
+    .map((p) => String(p).toLowerCase())
+    .join(' ')
+  if (!text) return null
+
+  if (/\b(free\s*slot\s*play|free\s*play|slot\s*credits?)\b/.test(text)) return 'free_play'
+  if (/\b(food|beverage|dining|restaurant|meal)\b/.test(text)) return 'dining'
+  if (/\bhotel|room|suite|stay\b/.test(text)) return 'hotel'
+  if (/\bmultiplier|tier\s*x|point\s*multiplier\b/.test(text)) return 'multiplier'
+  if (/\bdrawing|raffle\b/.test(text)) return 'drawing'
+  if (/\btournament\b/.test(text)) return 'tournament'
+  if (/\bgift\b/.test(text)) return 'gift'
+  return null
 }
 
 function maybeIso(value: unknown): string | null {
@@ -108,6 +128,8 @@ Return strict JSON (no markdown, no prose) with this shape:
   "warnings": ["optional warning strings"],
   "has_specific_time": true or false,
   "time_evidence": "exact text snippet showing the visible time, or null",
+  "has_explicit_year": true or false,
+  "year_evidence": "exact text snippet showing the year, or null",
   "casino_name": "string or null",
   "offer_type": "free_play|hotel|dining|gift|multiplier|tournament|drawing|other",
   "title": "string or null",
@@ -124,6 +146,8 @@ Rules:
 - confidence should reflect how complete and reliable the extraction is.
 - Set has_specific_time to true ONLY when an explicit clock time is visible in the image.
 - If has_specific_time is true, include time_evidence copied from the image (example: "5:00 PM").
+- Set has_explicit_year to true ONLY if a 4-digit year appears in the image.
+- If has_explicit_year is true, include year_evidence copied from the image (example: "2026").
 `.trim()
 
   const res = await fetch('https://api.openai.com/v1/responses', {
@@ -168,6 +192,8 @@ Rules:
     warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map((w) => String(w)) : [],
     has_specific_time: parsed.has_specific_time === true,
     time_evidence: textOrNull(parsed.time_evidence),
+    has_explicit_year: parsed.has_explicit_year === true,
+    year_evidence: textOrNull(parsed.year_evidence),
     casino_name: textOrNull(parsed.casino_name) ?? undefined,
     offer_type: normalizeOfferType(parsed.offer_type),
     title: textOrNull(parsed.title) ?? undefined,
@@ -187,7 +213,30 @@ function hasExplicitTimeEvidence(value: string | null | undefined): boolean {
   return ampm || twentyFourHour
 }
 
-function normalizeToAllDayIfNeeded(offer: ParsedOffer, timezoneOffsetMinutes = 0): ParsedOffer {
+function offsetMinutesForTimeZone(date: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  })
+  const parts = dtf.formatToParts(date)
+  const pick = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? '0')
+  const y = pick('year')
+  const m = pick('month')
+  const d = pick('day')
+  const hh = pick('hour')
+  const mm = pick('minute')
+  const ss = pick('second')
+  const asUtc = Date.UTC(y, m - 1, d, hh, mm, ss)
+  return Math.round((date.getTime() - asUtc) / 60000)
+}
+
+function normalizeToAllDayIfNeeded(offer: ParsedOffer, timezoneOffsetMinutes?: number): ParsedOffer {
   const keepTime = offer.has_specific_time === true && hasExplicitTimeEvidence(offer.time_evidence)
   if (keepTime) return offer
 
@@ -195,9 +244,13 @@ function normalizeToAllDayIfNeeded(offer: ParsedOffer, timezoneOffsetMinutes = 0
     if (!iso) return iso
     const dt = new Date(iso)
     if (Number.isNaN(dt.getTime())) return iso
+    const effectiveOffset =
+      typeof timezoneOffsetMinutes === 'number' && Number.isFinite(timezoneOffsetMinutes)
+        ? timezoneOffsetMinutes
+        : offsetMinutesForTimeZone(dt, DEFAULT_TIMEZONE)
     // Convert to the user's local midnight (based on client offset), then store as UTC ISO.
     const utcMs =
-      Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), 0, 0, 0, 0) + timezoneOffsetMinutes * 60 * 1000
+      Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), 0, 0, 0, 0) + effectiveOffset * 60 * 1000
     return new Date(utcMs).toISOString()
   }
 
@@ -206,6 +259,53 @@ function normalizeToAllDayIfNeeded(offer: ParsedOffer, timezoneOffsetMinutes = 0
     has_specific_time: false,
     start_at: normalize(offer.start_at) ?? undefined,
     end_at: normalize(offer.end_at) ?? null
+  }
+}
+
+function enforceOfferTypeConsistency(offer: ParsedOffer): ParsedOffer {
+  const inferred = inferOfferTypeFromText([offer.title, offer.value_text, offer.notes])
+  if (!inferred || inferred === offer.offer_type) return offer
+  return {
+    ...offer,
+    offer_type: inferred,
+    warnings: [
+      ...(offer.warnings || []),
+      `Offer type adjusted to "${inferred}" from text cues.`
+    ]
+  }
+}
+
+function applyImplicitCurrentYear(offer: ParsedOffer): ParsedOffer {
+  if (offer.has_explicit_year === true || !offer.start_at) return offer
+  const start = new Date(offer.start_at)
+  if (Number.isNaN(start.getTime())) return offer
+  const nowYear = new Date().getFullYear()
+
+  const startAdjusted = new Date(start)
+  startAdjusted.setUTCFullYear(nowYear)
+
+  let endAdjustedIso = offer.end_at ?? null
+  if (offer.end_at) {
+    const end = new Date(offer.end_at)
+    if (!Number.isNaN(end.getTime())) {
+      const endAdjusted = new Date(end)
+      endAdjusted.setUTCFullYear(nowYear)
+      // If same-year adjustment flips range backwards, assume it crosses year-end.
+      if (endAdjusted.getTime() < startAdjusted.getTime()) {
+        endAdjusted.setUTCFullYear(nowYear + 1)
+      }
+      endAdjustedIso = endAdjusted.toISOString()
+    }
+  }
+
+  return {
+    ...offer,
+    start_at: startAdjusted.toISOString(),
+    end_at: endAdjustedIso,
+    warnings: [
+      ...(offer.warnings || []),
+      `No explicit year found; assumed ${nowYear}.`
+    ]
   }
 }
 
@@ -293,9 +393,10 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const batchId = typeof body?.batchId === 'string' ? body.batchId : null
-    const timezoneOffsetMinutes = Number.isFinite(Number(body?.timezoneOffsetMinutes))
-      ? Number(body.timezoneOffsetMinutes)
-      : 0
+    const timezoneOffsetMinutes =
+      body && Object.prototype.hasOwnProperty.call(body, 'timezoneOffsetMinutes') && Number.isFinite(Number(body?.timezoneOffsetMinutes))
+        ? Number(body.timezoneOffsetMinutes)
+        : undefined
 
     let query = admin
       .from('offer_uploads')
@@ -332,7 +433,9 @@ Deno.serve(async (req) => {
         if (fileError || !fileBlob) throw fileError || new Error('Image download failed.')
 
         const parsedRaw = await parseOfferFromImage(openaiApiKey, upload.mime_type || 'image/jpeg', new Uint8Array(await fileBlob.arrayBuffer()))
-        const parsed = normalizeToAllDayIfNeeded(parsedRaw, timezoneOffsetMinutes)
+        const parsed = applyImplicitCurrentYear(
+          enforceOfferTypeConsistency(normalizeToAllDayIfNeeded(parsedRaw, timezoneOffsetMinutes))
+        )
         const confidence = Number.isFinite(parsed.confidence) ? Math.max(0, Math.min(1, Number(parsed.confidence))) : 0
         const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.filter(Boolean) : []
         const hasRequiredFields = !!(parsed.casino_name && parsed.title && parsed.start_at)
