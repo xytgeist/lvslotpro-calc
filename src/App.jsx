@@ -1245,6 +1245,7 @@ function AppShell({ onLogout, supabaseClient }) {
       setError('')
       try {
         let payloadDebug = null
+        const pendingReviewId = completingReviewItemId
         if (!draft.casinoName.trim()) throw new Error('Casino name is required.')
         if (!draft.title.trim()) throw new Error('Title is required.')
         if (!draft.startAt) throw new Error('Start date/time is required.')
@@ -1283,7 +1284,6 @@ function AppShell({ onLogout, supabaseClient }) {
           const { data: sessionData } = await supabaseClient.auth.getSession()
           const user = sessionData?.session?.user
           if (!user) throw new Error('Sign in to save offers to your calendar.')
-          const pendingReviewId = completingReviewItemId
           const pendingImg = reviewSourceImagePath
           if (pendingReviewId && (propagateCasinoOnSave || propagateTitleOnSave || propagateValueOnSave)) {
             await applyCurrentFieldsToAssociatedReviewItems()
@@ -1311,7 +1311,7 @@ function AppShell({ onLogout, supabaseClient }) {
             }
           }
         }
-        if (!editingId) {
+        if (!editingId && !pendingReviewId) {
           const focusDate = new Date(normalizedStart.getFullYear(), normalizedStart.getMonth(), normalizedStart.getDate())
           setCursorMonth(new Date(focusDate.getFullYear(), focusDate.getMonth(), 1))
           setWeekAnchor(focusDate)
@@ -2319,6 +2319,7 @@ function AppShell({ onLogout, supabaseClient }) {
                       value={draft.casinoName}
                       onChange={(e) => {
                         setDraft((d) => ({ ...d, casinoName: e.target.value }))
+                        if (completingReviewItemId && !editingId) setPropagateCasinoOnSave(true)
                         setShowCasinoSuggestions(true)
                       }}
                       onFocus={() => setShowCasinoSuggestions(true)}
@@ -2344,6 +2345,7 @@ function AppShell({ onLogout, supabaseClient }) {
                             onMouseDown={(ev) => ev.preventDefault()}
                             onClick={() => {
                               setDraft((d) => ({ ...d, casinoName: name }))
+                              if (completingReviewItemId && !editingId) setPropagateCasinoOnSave(true)
                               setShowCasinoSuggestions(false)
                             }}
                             className="w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
@@ -2389,6 +2391,7 @@ function AppShell({ onLogout, supabaseClient }) {
                     value={draft.title}
                     onChange={(e) => {
                       setDraft((d) => ({ ...d, title: e.target.value }))
+                      if (completingReviewItemId && !editingId) setPropagateTitleOnSave(true)
                       setShowTitleSuggestions(true)
                     }}
                     onFocus={() => setShowTitleSuggestions(true)}
@@ -2414,6 +2417,7 @@ function AppShell({ onLogout, supabaseClient }) {
                           onMouseDown={(ev) => ev.preventDefault()}
                           onClick={() => {
                             setDraft((d) => ({ ...d, title }))
+                            if (completingReviewItemId && !editingId) setPropagateTitleOnSave(true)
                             setShowTitleSuggestions(false)
                           }}
                           className="w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
@@ -2511,7 +2515,10 @@ function AppShell({ onLogout, supabaseClient }) {
                 <input
                   type="number"
                   value={draft.valueAmount}
-                  onChange={(e) => setDraft((d) => ({ ...d, valueAmount: e.target.value }))}
+                  onChange={(e) => {
+                    setDraft((d) => ({ ...d, valueAmount: e.target.value }))
+                    if (completingReviewItemId && !editingId) setPropagateValueOnSave(true)
+                  }}
                   className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 outline-none focus:ring-2 focus:ring-violet-500/30"
                   placeholder="e.g. 150"
                 />
