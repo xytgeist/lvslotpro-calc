@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { emptyOfferDraft, localDateKeyFromDate, localDateKeyFromIso, shuffledCopy } from '../utils'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { draftFromAiReviewPayload, emptyOfferDraft, localDateKeyFromDate, localDateKeyFromIso, shuffledCopy, toDatetimeLocalValue } from '../utils'
 
-export default function useOffersCalendarState() {
+export default function useOffersCalendarState({ supabaseClient, normalizeLoadedEvent }) {
   const fileInputRef = useRef(null)
   const longPressTimerRef = useRef(null)
   const casinoFieldRef = useRef(null)
@@ -158,6 +158,245 @@ export default function useOffersCalendarState() {
     }
   }, [activeImportBatchId])
 
+  const loadEvents = useCallback(async () => {
+    if (!supabaseClient) return
+    setLoading(true)
+    setError('')
+    try {
+      const { data, error: e } = await supabaseClient
+        .from('offer_events')
+        .select('id,casino_name,offer_type,title,start_at,end_at,value_amount,notes,created_at,source_type,source_image_path')
+        .order('start_at', { ascending: true })
+        .limit(500)
+      if (e) throw e
+      setEvents((data || []).map(normalizeLoadedEvent))
+    } catch (e) {
+      setError(e?.message || 'Failed to load offers.')
+    } finally {
+      setLoading(false)
+    }
+  }, [normalizeLoadedEvent, supabaseClient])
+
+  const loadReviewQueue = useCallback(async () => {
+    if (!supabaseClient) return
+    try {
+      const { data, error } = await supabaseClient
+        .from('offer_ai_review_items')
+        .select('id,upload_id,batch_id,draft,warnings,created_at, offer_uploads ( file_name, storage_path )')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+      if (error) {
+        if (error.code === '42P01' || String(error.message || '').toLowerCase().includes('relation')) {
+          setReviewQueue([])
+          return
+        }
+        throw error
+      }
+      setReviewQueue(data || [])
+    } catch {
+      setReviewQueue([])
+    }
+  }, [supabaseClient])
+
+  const refreshImportResults = useCallback(
+    async (batchId = null, attempts = 18, intervalMs = 2500) => {
+      if (!supabaseClient) return
+      if (importSyncRunningRef.current) return
+      importSyncRunningRef.current = true
+      setSyncingImportResults(true)
+      try {
+        for (let i = 0; i < attempts; i++) {
+          await Promise.all([loadEvents(), loadReviewQueue()])
+          if (batchId) {
+            const { data: batchRow, error: batchErr } = await supabaseClient
+              .from('offer_import_batches')
+              .select('status')
+              .eq('id', batchId)
+              .maybeSingle()
+            if (!batchErr && batchRow?.status) {
+              const doneStatuses = new Set(['completed', 'completed_with_errors', 'failed'])
+              if (doneStatuses.has(batchRow.status)) {
+                // One extra sync pass after completion to avoid stale UI.
+                await Promise.all([loadEvents(), loadReviewQueue()])
+                setActiveImportBatchId(null)
+                break
+              }
+            }
+          }
+          if (i < attempts - 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, intervalMs))
+          }
+        }
+      } finally {
+        setSyncingImportResults(false)
+        importSyncRunningRef.current = false
+      }
+    },
+    [loadEvents, loadReviewQueue, supabaseClient]
+  )
+
+  useEffect(() => {
+    void loadEvents()
+    void loadReviewQueue()
+  }, [loadEvents, loadReviewQueue])
+
+  useEffect(() => {
+    if (!activeImportBatchId) return
+    if (importSyncRunningRef.current) return
+    void refreshImportResults(activeImportBatchId, 24, 2500)
+  }, [activeImportBatchId, refreshImportResults])
+
+  const beginReviewItem = useCallback(
+    async (item) => {
+      if (!supabaseClient) return
+      const row = draftFromAiReviewPayload(item.draft || {})
+      const hasSpecificTime = row.hasSpecificTime === true
+      setAllDay(!hasSpecificTime)
+      setDraft({ ...emptyOfferDraft(), ...row })
+      setCompletingReviewItemId(item.id)
+      const uploadId = item.upload_id || null
+      setCompletingReviewUploadId(uploadId)
+      setPropagateCasinoOnSave(false)
+      setPropagateTitleOnSave(false)
+      setPropagateValueOnSave(false)
+      const up = item.offer_uploads
+      const path = Array.isArray(up) ? up[0]?.storage_path : up?.storage_path
+      setReviewSourceImagePath(path || null)
+      setReviewSourceImageUrl('')
+      setEditingId(null)
+      setShowForm(true)
+      setShowCasinoSuggestions(false)
+      setShowTitleSuggestions(false)
+      setError('')
+      if (uploadId) {
+        try {
+          const { count } = await supabaseClient
+            .from('offer_ai_review_items')
+            .select('id', { head: true, count: 'exact' })
+            .eq('upload_id', uploadId)
+            .eq('status', 'open')
+          if (typeof count === 'number' && count >= 3) {
+            setPropagateCasinoOnSave(true)
+          }
+        } catch {
+          // ignore auto-toggle failures; manual checkbox still available
+        }
+      }
+      if (!path) return
+      setReviewSourceImageLoading(true)
+      try {
+        const { data, error: signedErr } = await supabaseClient.storage.from('offer-mailers').createSignedUrl(path, 60 * 30)
+        if (signedErr) throw signedErr
+        setReviewSourceImageUrl(data?.signedUrl || '')
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('Could not create signed URL for review image:', e)
+        setReviewSourceImageUrl('')
+      } finally {
+        setReviewSourceImageLoading(false)
+      }
+    },
+    [supabaseClient]
+  )
+
+  const closeForm = useCallback(() => {
+    setShowForm(false)
+    setEditingId(null)
+    setDraft(emptyOfferDraft())
+    setAllDay(true)
+    setShowCasinoSuggestions(false)
+    setShowTitleSuggestions(false)
+    setCompletingReviewItemId(null)
+    setCompletingReviewUploadId(null)
+    setPropagateCasinoOnSave(false)
+    setPropagateTitleOnSave(false)
+    setPropagateValueOnSave(false)
+    setReviewSourceImagePath(null)
+    setReviewSourceImageUrl('')
+    setReviewSourceImageLoading(false)
+  }, [])
+
+  const openForm = useCallback((dayKey = null) => {
+    setCompletingReviewItemId(null)
+    setCompletingReviewUploadId(null)
+    setPropagateCasinoOnSave(false)
+    setPropagateTitleOnSave(false)
+    setPropagateValueOnSave(false)
+    setReviewSourceImagePath(null)
+    setReviewSourceImageUrl('')
+    setReviewSourceImageLoading(false)
+    setShowForm(true)
+    setEditingId(null)
+    if (dayKey) {
+      // Default to an all-day event when opening from a calendar day
+      setDraft((d) => ({ ...emptyOfferDraft(), startAt: `${dayKey}T00:00` }))
+      setAllDay(true)
+      setShowCasinoSuggestions(false)
+      setShowTitleSuggestions(false)
+    } else {
+      setDraft(emptyOfferDraft())
+      setAllDay(true)
+      setShowCasinoSuggestions(false)
+      setShowTitleSuggestions(false)
+    }
+  }, [])
+
+  const beginEdit = useCallback((ev) => {
+    setCompletingReviewItemId(null)
+    setCompletingReviewUploadId(null)
+    setPropagateCasinoOnSave(false)
+    setPropagateTitleOnSave(false)
+    setPropagateValueOnSave(false)
+    setReviewSourceImagePath(null)
+    setReviewSourceImageUrl('')
+    setReviewSourceImageLoading(false)
+    setEditingId(ev.id)
+    setShowForm(true)
+    const st = new Date(ev.start_at)
+    const stHasVisibleTime = st.getHours() !== 0 || st.getMinutes() !== 0
+    const en = ev.end_at ? new Date(ev.end_at) : null
+    const enHasVisibleTime = en ? en.getHours() !== 0 || en.getMinutes() !== 0 : false
+    setAllDay(!(stHasVisibleTime || enHasVisibleTime))
+    setDraft({
+      casinoName: ev.casino_name || '',
+      offerType: ev.offer_type || 'free_play',
+      title: ev.title || '',
+      startAt: toDatetimeLocalValue(ev.start_at),
+      endAt: ev.end_at ? toDatetimeLocalValue(ev.end_at) : '',
+      valueAmount: ev.value_amount !== null && ev.value_amount !== undefined ? String(ev.value_amount) : '',
+      notes: ev.notes || ''
+    })
+    setShowCasinoSuggestions(false)
+    setShowTitleSuggestions(false)
+    setError('')
+  }, [])
+
+  const skipReviewItem = useCallback(
+    async (id) => {
+      if (!supabaseClient) return
+      try {
+        const { error: delReviewErr } = await supabaseClient.from('offer_ai_review_items').delete().eq('id', id)
+        if (delReviewErr) {
+          if (delReviewErr.code === '42P01') return
+          throw delReviewErr
+        }
+        await loadReviewQueue()
+      } catch (e) {
+        setError(e?.message || 'Could not remove review item.')
+      }
+    },
+    [loadReviewQueue, supabaseClient]
+  )
+
+  const skipCurrentReviewFromForm = useCallback(
+    async () => {
+      if (!completingReviewItemId) return
+      await skipReviewItem(completingReviewItemId)
+      closeForm()
+    },
+    [closeForm, completingReviewItemId, skipReviewItem]
+  )
+
   return {
     fileInputRef,
     longPressTimerRef,
@@ -238,6 +477,15 @@ export default function useOffersCalendarState() {
     calendarCells,
     monthTitle,
     todayKey,
-    uploadSpinnerMessage
+    uploadSpinnerMessage,
+    loadEvents,
+    loadReviewQueue,
+    refreshImportResults,
+    beginReviewItem,
+    skipReviewItem,
+    skipCurrentReviewFromForm,
+    closeForm,
+    openForm,
+    beginEdit
   }
 }
