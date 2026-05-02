@@ -28,7 +28,11 @@ function cursorProjectSlugFromWorkspace(absWorkspace) {
   const parts = path.resolve(absWorkspace).split(path.sep).filter(Boolean);
   if (parts.length === 0) return "unknown-workspace";
   const drive = parts[0].replace(":", "").toLowerCase();
-  const rest = parts.slice(1).join("-");
+  // Cursor's project folder replaces spaces in each path segment with hyphens.
+  const rest = parts
+    .slice(1)
+    .map((p) => p.replace(/\s+/g, "-"))
+    .join("-");
   return `${drive}-${rest}`;
 }
 
