@@ -136,7 +136,7 @@ function AppShell({ onLogout, supabaseClient }) {
     { id: 'home', label: 'Home', icon: '🏠' },
     { id: 'calculators', label: 'Calcs', icon: '🧮' },
     { id: 'offers', label: 'Offers', icon: '📅' },
-    { id: 'guides', label: 'Guides', icon: '📘' },
+    { id: 'guides', label: 'AP Guides', icon: '📗', menuHint: 'Search · +EV cards · ask' },
     { id: 'intel', label: 'Intel', icon: '📍' },
     { id: 'team', label: 'Team', icon: '🤝' }
   ]
@@ -1725,22 +1725,28 @@ function AppShell({ onLogout, supabaseClient }) {
 
       <div className="fixed right-4 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-50 flex flex-col items-end gap-2">
         {menuOpen && (
-          <div className="w-44 rounded-2xl bg-zinc-950/95 backdrop-blur px-2 py-2 shadow-xl">
+          <div className="min-w-[11.5rem] max-w-[15rem] w-max rounded-2xl bg-zinc-950/95 backdrop-blur px-2 py-2 shadow-xl">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => {
+                  if (item.id !== 'calculators') setActiveCalculator(null)
+                  else if (activeCalculator) setActiveCalculator(null)
                   setTab(item.id)
-                  if (item.id === 'calculators' && activeCalculator) setActiveCalculator(null)
                   setMenuOpen(false)
                 }}
-                className={`w-full rounded-xl px-3 py-2.5 text-left text-sm flex items-center gap-2 touch-manipulation ${
+                className={`w-full rounded-xl px-3 py-2.5 text-left text-sm touch-manipulation ${
                   tab === item.id ? 'bg-zinc-800 text-white' : 'text-zinc-300 hover:bg-zinc-900'
-                }`}
+                } ${item.menuHint ? 'pb-2' : ''}`}
               >
-                <span aria-hidden>{item.icon}</span>
-                <span>{item.label}</span>
+                <span className="flex items-center gap-2">
+                  <span aria-hidden>{item.icon}</span>
+                  <span className="font-semibold">{item.label}</span>
+                </span>
+                {item.menuHint ? (
+                  <span className="mt-0.5 block pl-8 text-[11px] leading-snug text-zinc-500">{item.menuHint}</span>
+                ) : null}
               </button>
             ))}
           </div>

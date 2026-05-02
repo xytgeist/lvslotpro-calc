@@ -344,7 +344,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
   return (
     <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))] pb-24">
       <div className="mb-5">
-        <div className="text-white text-2xl font-black tracking-tight">Guides</div>
+        <div className="text-white text-2xl font-black tracking-tight">AP Guides</div>
         <div className="text-zinc-400 text-sm mt-0.5">+EV quick read · expand for full playbook</div>
       </div>
 
