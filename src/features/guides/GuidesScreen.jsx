@@ -17,6 +17,20 @@ import {
   stackUpPaysGuideMarkdown,
 } from './stackUpPaysGuideDemo'
 import {
+  AGS_MHB_KNOWN_TITLES_LINE,
+  AGS_MHB_SEARCH_KEYWORDS,
+  AGS_MUST_HIT_BY_DEMO_SLUG,
+  agsMustHitByCardBullets,
+  agsMustHitByGuideMarkdown,
+} from './agsMustHitByGuideDemo'
+import {
+  IGT_MHB_KNOWN_TITLES_LINE,
+  IGT_MHB_SEARCH_KEYWORDS,
+  IGT_MUST_HIT_BY_DEMO_SLUG,
+  igtMustHitByCardBullets,
+  igtMustHitByGuideMarkdown,
+} from './igtMustHitByGuideDemo'
+import {
   AINSWORTH_MHB_KNOWN_TITLES_LINE,
   AINSWORTH_MHB_SEARCH_KEYWORDS,
   AINSWORTH_MUST_HIT_BY_DEMO_SLUG,
@@ -40,7 +54,14 @@ function resolveCalculatorKey(machine) {
   if (slug === 'buffalo-link' || calc === 'buffalo') return 'buffalo'
   if (slug === 'stack-up-pays' || calc === 'stack-up-pays') return 'stackup'
   if (slug === 'phoenix-link' || calc === 'phoenix-link') return 'phoenix'
-  if (slug === 'ainsworth-must-hit-by' || calc === 'mhb') return 'mhb'
+  if (
+    slug === 'ainsworth-must-hit-by' ||
+    slug === 'ags-must-hit-by' ||
+    slug === 'igt-must-hit-by' ||
+    calc === 'mhb'
+  ) {
+    return 'mhb'
+  }
   if (slug === 'cash-machine-lock' || calc === 'cash-machine-lock') return null
   if (has && calc === 'mhb') return 'mhb'
   if (has && calc && ['buffalo', 'stackup', 'phoenix', 'mhb'].includes(calc)) return calc
@@ -145,6 +166,7 @@ function mergeLocalGuideDemos(rows) {
       slug: 'ainsworth-must-hit-by',
       title: 'Ainsworth Must Hit By (Mystery Progressives)',
       content_markdown: ainsworthMustHitByGuideMarkdown,
+      known_titles_line: AINSWORTH_MHB_KNOWN_TITLES_LINE,
       /** Client-only: substring search in AP Guides (not a Supabase column). */
       guide_search_text: AINSWORTH_MHB_SEARCH_KEYWORDS,
       last_updated: null,
@@ -170,6 +192,68 @@ function mergeLocalGuideDemos(rows) {
     })
   }
 
+  if (!slugs.has(AGS_MUST_HIT_BY_DEMO_SLUG)) {
+    extras.push({
+      id: 'local-demo-ags-must-hit-by',
+      slug: 'ags-must-hit-by',
+      title: 'AGS Must Hit By (Mystery Progressives)',
+      content_markdown: agsMustHitByGuideMarkdown,
+      known_titles_line: AGS_MHB_KNOWN_TITLES_LINE,
+      guide_search_text: AGS_MHB_SEARCH_KEYWORDS,
+      last_updated: null,
+      created_at: null,
+      updated_at: null,
+      thumbnail_url: null,
+      published: true,
+      machines: {
+        id: null,
+        slug: AGS_MUST_HIT_BY_DEMO_SLUG,
+        name: 'AGS Must Hit By',
+        manufacturer: 'AGS',
+        type: 'Must-Hit-By Mystery Progressive',
+        difficulty: 'Advanced',
+        vegas_availability: 'Common',
+        nerf_risk: 'High',
+        has_calculator: true,
+        calculator_slug: 'mhb',
+        thumbnail_url: null,
+        created_at: null,
+        updated_at: null,
+      },
+    })
+  }
+
+  if (!slugs.has(IGT_MUST_HIT_BY_DEMO_SLUG)) {
+    extras.push({
+      id: 'local-demo-igt-must-hit-by',
+      slug: 'igt-must-hit-by',
+      title: 'IGT Must Hit By (Mystery / WMS-Style)',
+      content_markdown: igtMustHitByGuideMarkdown,
+      known_titles_line: IGT_MHB_KNOWN_TITLES_LINE,
+      guide_search_text: IGT_MHB_SEARCH_KEYWORDS,
+      last_updated: null,
+      created_at: null,
+      updated_at: null,
+      thumbnail_url: null,
+      published: true,
+      machines: {
+        id: null,
+        slug: IGT_MUST_HIT_BY_DEMO_SLUG,
+        name: 'IGT Must Hit By',
+        manufacturer: 'IGT',
+        type: 'Must-Hit-By Mystery Progressive',
+        difficulty: 'Intermediate',
+        vegas_availability: 'Very Common',
+        nerf_risk: 'Medium',
+        has_calculator: true,
+        calculator_slug: 'mhb',
+        thumbnail_url: null,
+        created_at: null,
+        updated_at: null,
+      },
+    })
+  }
+
   const merged = [...extras, ...base]
   merged.sort((a, b) =>
     (a.machines?.name || a.title || '').localeCompare(b.machines?.name || b.title || '', undefined, {
@@ -185,6 +269,8 @@ function cardBulletsForRow(row) {
   if (ms === PHOENIX_LINK_DEMO_SLUG) return phoenixLinkCardBullets
   if (ms === STACK_UP_PAYS_DEMO_SLUG) return stackUpPaysCardBullets
   if (ms === AINSWORTH_MUST_HIT_BY_DEMO_SLUG) return ainsworthMustHitByCardBullets
+  if (ms === AGS_MUST_HIT_BY_DEMO_SLUG) return agsMustHitByCardBullets
+  if (ms === IGT_MUST_HIT_BY_DEMO_SLUG) return igtMustHitByCardBullets
   const first = (row.content_markdown || '').split(/\n##/)[0].trim()
   if (first.length > 400) return [first.slice(0, 360).trim() + '…']
   if (first) return [first]
@@ -201,7 +287,11 @@ function makeGuideMarkdownComponents(machineSlug) {
           ? 'text-cyan-100'
           : machineSlug === 'ainsworth-must-hit-by'
             ? 'text-violet-100'
-            : 'text-amber-100'
+            : machineSlug === 'ags-must-hit-by'
+              ? 'text-rose-100'
+              : machineSlug === 'igt-must-hit-by'
+                ? 'text-sky-100'
+                : 'text-amber-100'
   return {
     h2: ({ children }) => <h2 className={`text-lg font-black ${h2Tone} mt-6 first:mt-0 mb-2`}>{children}</h2>,
     h3: ({ children }) => <h3 className="text-base font-bold text-zinc-100 mt-4 mb-1.5">{children}</h3>,
@@ -238,6 +328,8 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
   if (machineSlug === 'stack-up-pays') return '/stackup-icon.jpg'
   if (machineSlug === 'ainsworth-must-hit-by') return '/ainsworth-must-hit-by-hero.png'
+  if (machineSlug === 'ags-must-hit-by') return '/ags-must-hit-by-hero.png'
+  if (machineSlug === 'igt-must-hit-by') return '/igt-must-hit-by-hero.png'
   return '/buffalo-icon.png'
 }
 
@@ -250,6 +342,8 @@ function heroGradientClass(machineSlug) {
   if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
   if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'ainsworth-must-hit-by') return 'from-violet-950/85 via-fuchsia-950/35 to-zinc-950'
+  if (machineSlug === 'ags-must-hit-by') return 'from-rose-950/85 via-red-950/40 to-zinc-950'
+  if (machineSlug === 'igt-must-hit-by') return 'from-sky-950/80 via-blue-950/45 to-zinc-950'
   return 'from-amber-900/40 to-zinc-950'
 }
 
@@ -276,6 +370,22 @@ function cardAccent(machineSlug) {
       strong: 'text-violet-100',
       subtitle: 'text-fuchsia-200/90',
       expandedBorder: 'border-violet-500/50 shadow-lg shadow-fuchsia-950/30',
+    }
+  }
+  if (machineSlug === 'ags-must-hit-by') {
+    return {
+      chevron: 'text-rose-400',
+      strong: 'text-rose-100',
+      subtitle: 'text-rose-200/90',
+      expandedBorder: 'border-rose-500/50 shadow-lg shadow-rose-950/35',
+    }
+  }
+  if (machineSlug === 'igt-must-hit-by') {
+    return {
+      chevron: 'text-sky-400',
+      strong: 'text-sky-100',
+      subtitle: 'text-sky-200/90',
+      expandedBorder: 'border-sky-500/50 shadow-lg shadow-blue-950/30',
     }
   }
   return {
@@ -574,7 +684,11 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                   ? 'focus-visible:ring-cyan-500/60'
                   : slug === 'ainsworth-must-hit-by'
                     ? 'focus-visible:ring-violet-500/60'
-                    : 'focus-visible:ring-amber-500/60'
+                    : slug === 'ags-must-hit-by'
+                      ? 'focus-visible:ring-rose-500/60'
+                      : slug === 'igt-must-hit-by'
+                        ? 'focus-visible:ring-sky-500/60'
+                        : 'focus-visible:ring-amber-500/60'
 
             return (
               <li key={row.id || row.slug}>
@@ -622,10 +736,10 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                           <div className="text-zinc-500 font-semibold uppercase tracking-wide">Type</div>
                           <div className="text-zinc-200 font-semibold mt-0.5">{row.machines?.type || '—'}</div>
                         </div>
-                        {slug === AINSWORTH_MUST_HIT_BY_DEMO_SLUG ? (
+                        {row.known_titles_line ? (
                           <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800 col-span-2">
                             <div className="text-zinc-500 font-semibold uppercase tracking-wide">Known titles</div>
-                            <div className="text-zinc-300 text-xs font-medium mt-1 leading-snug">{AINSWORTH_MHB_KNOWN_TITLES_LINE}</div>
+                            <div className="text-zinc-300 text-xs font-medium mt-1 leading-snug">{row.known_titles_line}</div>
                           </div>
                         ) : null}
                       </div>
