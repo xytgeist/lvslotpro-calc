@@ -17,6 +17,8 @@ import {
   stackUpPaysGuideMarkdown,
 } from './stackUpPaysGuideDemo'
 import {
+  AINSWORTH_MHB_KNOWN_TITLES_LINE,
+  AINSWORTH_MHB_SEARCH_KEYWORDS,
   AINSWORTH_MUST_HIT_BY_DEMO_SLUG,
   ainsworthMustHitByCardBullets,
   ainsworthMustHitByGuideMarkdown,
@@ -143,6 +145,8 @@ function mergeLocalGuideDemos(rows) {
       slug: 'ainsworth-must-hit-by',
       title: 'Ainsworth Must Hit By (Mystery Progressives)',
       content_markdown: ainsworthMustHitByGuideMarkdown,
+      /** Client-only: substring search in AP Guides (not a Supabase column). */
+      guide_search_text: AINSWORTH_MHB_SEARCH_KEYWORDS,
       last_updated: null,
       created_at: null,
       updated_at: null,
@@ -233,7 +237,7 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'phoenix-link') return '/phoenix-link-logo.png'
   if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
   if (machineSlug === 'stack-up-pays') return '/stackup-icon.jpg'
-  if (machineSlug === 'ainsworth-must-hit-by') return '/mhb-jackpot-hero.svg'
+  if (machineSlug === 'ainsworth-must-hit-by') return '/ainsworth-must-hit-by-hero.png'
   return '/buffalo-icon.png'
 }
 
@@ -513,7 +517,18 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
       const title = (r.title || '').toLowerCase()
       const slug = (r.slug || '').toLowerCase()
       const manu = (r.machines?.manufacturer || '').toLowerCase()
-      return name.includes(q) || title.includes(q) || slug.includes(q) || manu.includes(q)
+      const typ = (r.machines?.type || '').toLowerCase()
+      const keywords = (r.guide_search_text || '').toLowerCase()
+      const body = (r.content_markdown || '').toLowerCase()
+      return (
+        name.includes(q) ||
+        title.includes(q) ||
+        slug.includes(q) ||
+        manu.includes(q) ||
+        typ.includes(q) ||
+        keywords.includes(q) ||
+        body.includes(q)
+      )
     })
   }, [rows, query])
 
@@ -607,6 +622,12 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                           <div className="text-zinc-500 font-semibold uppercase tracking-wide">Type</div>
                           <div className="text-zinc-200 font-semibold mt-0.5">{row.machines?.type || '—'}</div>
                         </div>
+                        {slug === AINSWORTH_MUST_HIT_BY_DEMO_SLUG ? (
+                          <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800 col-span-2">
+                            <div className="text-zinc-500 font-semibold uppercase tracking-wide">Known titles</div>
+                            <div className="text-zinc-300 text-xs font-medium mt-1 leading-snug">{AINSWORTH_MHB_KNOWN_TITLES_LINE}</div>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="space-y-2">
