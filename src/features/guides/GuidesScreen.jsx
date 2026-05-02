@@ -11,6 +11,11 @@ import {
   phoenixLinkCardBullets,
   phoenixLinkGuideMarkdown,
 } from './phoenixLinkGuideDemo'
+import {
+  STACK_UP_PAYS_DEMO_SLUG,
+  stackUpPaysCardBullets,
+  stackUpPaysGuideMarkdown,
+} from './stackUpPaysGuideDemo'
 
 function formatGuideDate(iso) {
   if (!iso) return '—'
@@ -97,6 +102,35 @@ function mergeLocalGuideDemos(rows) {
     })
   }
 
+  if (!slugs.has(STACK_UP_PAYS_DEMO_SLUG)) {
+    extras.push({
+      id: 'local-demo-stack-up-pays',
+      slug: 'stack-up-pays',
+      title: 'Stack Up Pays (Ascending Fortunes)',
+      content_markdown: stackUpPaysGuideMarkdown,
+      last_updated: null,
+      created_at: null,
+      updated_at: null,
+      thumbnail_url: null,
+      published: true,
+      machines: {
+        id: null,
+        slug: STACK_UP_PAYS_DEMO_SLUG,
+        name: 'Stack Up Pays (Ascending Fortunes)',
+        manufacturer: 'IGT',
+        type: 'Persistent State',
+        difficulty: 'Intermediate',
+        vegas_availability: 'Very Common',
+        nerf_risk: 'Medium',
+        has_calculator: true,
+        calculator_slug: 'stack-up-pays',
+        thumbnail_url: null,
+        created_at: null,
+        updated_at: null,
+      },
+    })
+  }
+
   const merged = [...extras, ...base]
   merged.sort((a, b) =>
     (a.machines?.name || a.title || '').localeCompare(b.machines?.name || b.title || '', undefined, {
@@ -110,6 +144,7 @@ function cardBulletsForRow(row) {
   const ms = row.machines?.slug
   if (ms === BUFFALO_LINK_DEMO_SLUG) return buffaloLinkCardBullets
   if (ms === PHOENIX_LINK_DEMO_SLUG) return phoenixLinkCardBullets
+  if (ms === STACK_UP_PAYS_DEMO_SLUG) return stackUpPaysCardBullets
   const first = (row.content_markdown || '').split(/\n##/)[0].trim()
   if (first.length > 400) return [first.slice(0, 360).trim() + '…']
   if (first) return [first]
@@ -118,7 +153,13 @@ function cardBulletsForRow(row) {
 
 function makeGuideMarkdownComponents(machineSlug) {
   const h2Tone =
-    machineSlug === 'phoenix-link' ? 'text-orange-100' : machineSlug === 'buffalo-link' ? 'text-amber-100' : 'text-amber-100'
+    machineSlug === 'phoenix-link'
+      ? 'text-orange-100'
+      : machineSlug === 'buffalo-link'
+        ? 'text-amber-100'
+        : machineSlug === 'stack-up-pays'
+          ? 'text-cyan-100'
+          : 'text-amber-100'
   return {
     h2: ({ children }) => <h2 className={`text-lg font-black ${h2Tone} mt-6 first:mt-0 mb-2`}>{children}</h2>,
     h3: ({ children }) => <h3 className="text-base font-bold text-zinc-100 mt-4 mb-1.5">{children}</h3>,
@@ -153,6 +194,7 @@ function popularityLabel(row) {
 function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'phoenix-link') return '/phoenix-link-logo.png'
   if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
+  if (machineSlug === 'stack-up-pays') return '/stackup-icon.jpg'
   return '/buffalo-icon.png'
 }
 
@@ -163,6 +205,7 @@ function heroImage(row) {
 
 function heroGradientClass(machineSlug) {
   if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
+  if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
   return 'from-amber-900/40 to-zinc-950'
 }
 
@@ -173,6 +216,14 @@ function cardAccent(machineSlug) {
       strong: 'text-orange-100',
       subtitle: 'text-orange-200/90',
       expandedBorder: 'border-orange-500/50 shadow-lg shadow-orange-900/20',
+    }
+  }
+  if (machineSlug === 'stack-up-pays') {
+    return {
+      chevron: 'text-cyan-500',
+      strong: 'text-cyan-100',
+      subtitle: 'text-cyan-200/90',
+      expandedBorder: 'border-cyan-500/50 shadow-lg shadow-cyan-900/25',
     }
   }
   return {
@@ -454,7 +505,11 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
             const bullets = cardBulletsForRow(row)
             const accent = cardAccent(slug)
             const ringFocus =
-              slug === 'phoenix-link' ? 'focus-visible:ring-orange-500/60' : 'focus-visible:ring-amber-500/60'
+              slug === 'phoenix-link'
+                ? 'focus-visible:ring-orange-500/60'
+                : slug === 'stack-up-pays'
+                  ? 'focus-visible:ring-cyan-500/60'
+                  : 'focus-visible:ring-amber-500/60'
 
             return (
               <li key={row.id || row.slug}>

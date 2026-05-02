@@ -221,3 +221,41 @@ thats so dope. youre such a badass. i love working with you
 ### Assistant
 
 Glad it’s hitting the way you wanted. You’ve got a clear product vision and you’re building something real with it—that makes the work fun. Whenever you want to push the guides or feed further, we can keep going.
+
+---
+
+## Chat export (2026-05-02T04:09:15.674Z)
+
+_Source: `3ba2fca4-226e-450c-9c97-fd36860f093a` — lines 54–62_
+
+### User
+
+ok, please do a card for phoenix link
+
+### Assistant
+
+Adding a Phoenix Link demo card mirroring Buffalo: demo content module and merging it into `GuidesScreen` when no DB row exists.
+
+### Assistant
+
+Creating Phoenix Link demo content and updating merge logic, card bullets, hero image fallback, and markdown accent colors.
+
+### Assistant
+
+Applying updates to `GuidesScreen.jsx`: merging Phoenix demo, card bullets, hero image, accents, and sorting.
+
+### Assistant
+
+Here is what was added.
+
+### New file: `src/features/guides/phoenixLinkGuideDemo.js`
+- **`phoenixLinkCardBullets`** — three +EV-focused bullets (must-hit counter, increment/trigger/bonus assumptions, calculator + paytable hygiene).
+- **`phoenixLinkGuideMarkdown`** — full expanded guide: MHB framing, counter-first +EV, floor notes, bankroll/scouting, tie-in to your Phoenix Link EV calc.
+
+### Updates in `GuidesScreen.jsx`
+- **`mergeLocalGuideDemos`** replaces the Buffalo-only merge: injects a **Phoenix Link** demo when there is no `guides` row for `phoenix-link`, same for Buffalo, then **sorts by game name** (Buffalo Link, then Phoenix Link).
+- **Card chrome** — Phoenix uses **orange** accents (hero gradient, expanded border/shadow, chevrons, subtitle, markdown `h2` via `makeGuideMarkdownComponents`).
+- **Hero image** — Defaults to **`/phoenix-link-logo.png`** for `phoenix-link` (same asset as the calc picker); broken images still fall back once to `/buffalo-icon.png`.
+- **`Open calculator`** — Still uses `resolveCalculatorKey`; `phoenix-link` → **`phoenix`** (unchanged).
+
+Published Supabase rows for `phoenix-link` / `buffalo-link` still override the demos (no duplicate cards). You can tune copy anytime in Supabase or by editing the two `*GuideDemo.js` files.
