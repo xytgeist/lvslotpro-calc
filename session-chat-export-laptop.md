@@ -457,3 +457,195 @@ Here is what changed.
 - Styling/hero paths updated from `must-hit-by-jackpot` → `ainsworth-must-hit-by` (same purple hero SVG).
 
 Content is **paraphrased** plus explicit credit and links to WOO; numbers and formula match what they publish for that article. If you later add a Supabase `machines` row, use slug **`ainsworth-must-hit-by`** and `calculator_slug: 'mhb'` so it stays consistent.
+
+---
+
+## Chat export (2026-05-02T10:01:40.696Z)
+
+_Source: `59774193-29d3-41af-a4a4-47a4f2877a68` — lines 21–57_
+
+### User
+
+please redo the card with the appropriate image saved in the Must Hit By AIG directory. Also please add Mustang Money, Winning Wolf, Dollar Action, Glitter Gems, Ming Warrior, Thunder Cash as named slot machine games (searchable)
+
+### Assistant
+
+Copying the hero image into `public` for Vite, wiring the card to it, and adding a searchable keyword blob plus visible game names in the guide content.
+
+### Assistant
+
+Updating the demo module, GuidesScreen (hero path, search, card “Known titles” row), and removing the unused SVG.
+
+### Assistant
+
+Here is what was done.
+
+### Hero image
+- **`Slots/Must Hit By AIG/Main Image.png`** was copied to **`public/ainsworth-must-hit-by-hero.png`** so Vite can serve it as **`/ainsworth-must-hit-by-hero.png`** (no spaces in the URL).
+- **`GuidesScreen.jsx`** `defaultHeroSrc` for `ainsworth-must-hit-by` now points at that PNG.
+- Removed the old placeholder **`public/mhb-jackpot-hero.svg`**.
+
+If you replace the art under `Slots/Must Hit By AIG/`, run the same copy again (or we can add a small script later).
+
+### Named games (search + UI)
+- **`mustHitByGuideDemo.js`**
+  - **`AINSWORTH_MHB_SEARCH_KEYWORDS`** — all six titles plus family terms, used only for search.
+  - **`AINSWORTH_MHB_KNOWN_TITLES_LINE`** — one line for the card.
+  - New markdown section **“Games you may see with this mystery MHB package”** listing Mustang Money, Winning Wolf, Dollar Action, Glitter Gems, Ming Warrior, Thunder Cash (with a short “verify on glass” caveat).
+  - Card bullets refreshed (four bullets): WOO model, **cabinet titles + search**, Red Rock sample, AGS warning.
+- **`GuidesScreen.jsx`**
+  - Local demo row includes **`guide_search_text: AINSWORTH_MHB_SEARCH_KEYWORDS`** (client-only, not a DB column).
+  - Search now also checks **`guide_search_text`**, **`content_markdown`**, and **`machines.type`** so queries like **mustang**, **ming warrior**, **thunder cash**, etc. surface this guide.
+  - Collapsed card shows a **Known titles** row with the six names.
+
+Supabase-backed guides do not get `guide_search_text` unless you add it later; for this demo, search is fully covered by the keywords field plus the new markdown body.
+
+### User
+
+Build Failed
+Command "npm run build" exited with 1
+
+### Assistant
+
+Escaping backticks inside the template literal — they prematurely closed the string.
+
+### Assistant
+
+Fixed the syntax error. `react-markdown` is listed in `package.json` but missing from `node_modules`. Running `npm install` to restore dependencies.
+
+### Assistant
+
+Here’s what was going wrong and what we changed.
+
+### 1. **Parse error in `mustHitByGuideDemo.js`**
+The guide body is a **template literal** (backticks). This line used **inline backticks** for paths:
+
+```text
+**`Slots/Must Hit By AIG/Main Image.png`**
+```
+
+That **closed** the template string early, so the parser blew up around “Hero art…”. Those inner backticks were removed so the paths are only **bold** (no nested `` ` ``), which is valid JS and still fine in Markdown.
+
+### 2. **`react-markdown` could not be resolved**
+`react-markdown` is in **`package.json`** but it was **not installed** under `node_modules` (79 packages were added when we ran **`npm install`**). After that, **`npm run build`** completed successfully.
+
+**For CI / Vercel:** ensure the install step runs with a lockfile in sync, e.g. **`npm ci`** (preferred in CI) or **`npm install`**, and that **`package-lock.json`** is committed if you use it.
+
+If your deploy still fails, run **`npm install`** locally, commit any **`package-lock.json`** updates, and redeploy.
+
+### User
+
+lets do the cards for AGS and IGT must hit bys
+
+### Assistant
+
+Exploring the Slots folder and the Ainsworth demo pattern so we can add AGS and IGT must-hit-by guide cards.
+
+### Assistant
+
+Copying hero images and adding AGS and IGT demo modules plus GuidesScreen wiring. Refactoring the “Known titles” row to use `row.known_titles_line`.
+
+### Assistant
+
+Here’s what was added.
+
+### Assets
+- **`Slots/Must Hit By AGS/Main IMage.png`** → **`public/ags-must-hit-by-hero.png`**
+- **`Slots/Must Hit By IGT/IGT_Main_Image.png`** → **`public/igt-must-hit-by-hero.png`**
+
+### New demo modules
+- **`src/features/guides/agsMustHitByGuideDemo.js`** — slug **`ags-must-hit-by`**, AGS / Orion focus, **non-uniform / near-cap** behavior with a cite to [Wizard of Odds — Ainsworth mystery MHB](https://wizardofodds.com/games/slots/mystery-jackpot-ainsworth/) for the AGS caveat, searchable keywords, **Known titles** line (Emerald Princess, Dragon’s Jackpots, Gold Inferno, Orion family).
+- **`src/features/guides/igtMustHitByGuideDemo.js`** — slug **`igt-must-hit-by`**, IGT + legacy **WMS-style** uniform mystery framing with cites to [Wizard of Odds — Must-Hit-By / mystery jackpot](https://wizardofodds.com/games/slots/mystery-jackpot/), Coyote Moon / Money Storm / Lobstermania as search anchors, note that not every cabinet is MHB.
+
+Both wire to the existing **`mhb`** calculator like Ainsworth.
+
+### **`GuidesScreen.jsx`**
+- Merges both demos when those slugs are missing from Supabase.
+- **`resolveCalculatorKey`:** `ags-must-hit-by`, `igt-must-hit-by`, `ainsworth-must-hit-by`, or **`calculator_slug === 'mhb'`** → **`mhb`**.
+- Card bullets, **rose** (AGS) and **sky/blue** (IGT) accents, hero gradients, focus rings, default hero paths.
+- **`known_titles_line`** on Ainsworth, AGS, and IGT rows; the **Known titles** UI now uses **`row.known_titles_line`** so any future demo can opt in the same way.
+
+`npm run build` completes successfully.
+
+### User
+
+ok lets work on the MHB calculator a bit. FIrst i noticed theres an error with the reset value when changing the Must Hit By value to 10000. The Reset Value should cahnge to 9000
+
+### Assistant
+
+Adding `setResetValue(9000)` when switching to the 10000 preset and `setResetValue(350)` when switching back to 500 — the effect already updates current and meter rise but omitted reset.
+
+### Assistant
+
+Updating the Reset field's blur fallback so clearing it restores 9000 when Must Hit By is 10000, not 350.
+
+### Assistant
+
+Here’s what was wrong and what we changed.
+
+**Issue:** The `useEffect` that runs when **Must Hit By** switches between **500** and **10000** updated **JP Meter (Current)** and **Meter Rise**, but never **Reset Value**, so it stayed at **350** after choosing **10000**.
+
+**Change:**
+1. When **Must Hit By** is **10000**, the effect now also calls **`setResetValue(9000)`**.
+2. When it’s **500** again, it calls **`setResetValue(350)`** so the low-tier preset matches.
+3. **Reset Value** `onChange` / `onBlur` defaults use **9000** vs **350** depending on the selected **Must Hit By**, so if the field is cleared and blurred, it snaps back to the right preset default.
+
+```26:38:c:\Users\inves\Documents\LVSlotPro\src\calculators\MHBCalculator.jsx
+  // Auto-adjust when MHB changes (paired presets: current, meter rise, reset)
+  useEffect(() => {
+    if (mustHitBy === 10000) {
+      setCurrent(9802)
+      setMeterRise(6.66666)
+      setResetValue(9000)
+    } else if (mustHitBy === 500) {
+      setCurrent(475)
+      setMeterRise(2.50)
+      setResetValue(350)
+    }
+  }, [mustHitBy])
+```
+
+---
+
+## Chat export (2026-05-02T10:31:40.784Z)
+
+_Source: `59774193-29d3-41af-a4a4-47a4f2877a68` — lines 58–64_
+
+### User
+
+lets add a drop down selector that allows the user to select from Ainsworth, AGS, IGT and changes the default MHB value (and all other values associated) when the user changes this
+
+### Assistant
+
+Adding a manufacturer dropdown and a preset table that updates current, must-hit-by tier, meter rise, reset, and RTP when the manufacturer or MHB tier changes.
+
+### Assistant
+
+Adding a preset map and manufacturer state, replacing the old `mustHitBy`-only effect, and wiring blur/calculate fallbacks to the active preset.
+
+### Assistant
+
+Here’s what was implemented.
+
+### Manufacturer dropdown
+Top of the main input card: **Ainsworth (uniform mystery)**, **AGS (late-band / near-cap)**, **IGT / WMS-style mystery)**, plus a short note that values are examples and should be checked on the glass.
+
+### Preset table (`MHB_PRESETS`)
+Changing **Manufacturer** or **Must Hit By (500 / 10000)** reapplies the bundle: **JP current**, **meter rise**, **reset**, and **RTP %** via a single `useEffect`.
+
+| Maker      | Cap     | Current | Meter rise | Reset | RTP |
+|-----------|---------|---------|------------|-------|-----|
+| Ainsworth | 500     | 475     | 2.50       | 350   | 85  |
+| Ainsworth | 10000   | 9802    | 6.66666    | 9000  | 85  |
+| AGS       | 500     | 488     | 2.72       | 365   | 87  |
+| AGS       | 10000   | 9895    | 7.05       | 9150  | 87  |
+| IGT       | 500     | 462     | 2.35       | 338   | 85  |
+| IGT       | 10000   | 9740    | 6.42       | 8850  | 85  |
+
+AGS uses a **higher default RTP (87%)** and **tighter meter / rise** as a slightly more conservative illustration; you can change any number after it loads.
+
+### Other behavior
+- **`activePreset`** drives blur / empty-field fallbacks for current, RTP, meter rise, and reset.
+- **`calculate()`** uses preset fallbacks when a numeric field is invalid, and **`overallRTP`** falls back to the active preset’s RTP if it’s not a number.
+
+If you want these numbers tied to specific games or PAR sheets, say which and we can tune the table.

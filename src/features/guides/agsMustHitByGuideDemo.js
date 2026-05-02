@@ -6,14 +6,14 @@
 export const AGS_MUST_HIT_BY_DEMO_SLUG = 'ags-must-hit-by'
 
 export const AGS_MHB_SEARCH_KEYWORDS =
-  'AGS Orion must hit by mystery progressive MHB Emerald Princess Dragons Jackpots Gold Inferno Fa Cai Shu Colossal near cap'
+  'AGS Orion must hit by mystery progressive MHB Emerald Princess Dragons Jackpots Gold Inferno Fa Cai Shu Colossal near cap River Dragons 5000'
 
 export const AGS_MHB_KNOWN_TITLES_LINE =
-  'Emerald Princess · Dragon’s Jackpots · Gold Inferno · Orion family (verify your bank)'
+  'River Dragons · Emerald Princess · Dragon’s Jackpots · Gold Inferno · Orion family (verify your bank)'
 
 export const agsMustHitByCardBullets = [
   '**AGS mystery MHBs** are **not** the same math story as **uniform** Ainsworth-style meters — community and **[Wizard of Odds](https://wizardofodds.com/games/slots/mystery-jackpot-ainsworth/)** warn hits often **cluster just below the cap**, so midpoint-style targets can **overstate** edge.',
-  '**Search:** **Emerald Princess**, **Dragon’s Jackpots**, **Gold Inferno**, **Orion** cabinet family — meter bands and rise **differ by title and install**; always read the **glass**.',
+  '**Search:** **River Dragons** (5k MHB preset in calc), **Emerald Princess**, **Dragon’s Jackpots**, **Gold Inferno**, **Orion** — meter bands and rise **differ by install**; always read the **glass**.',
   'Use **Must Hit By Jackpot** in-app as a **single-meter sensitivity** tool only — if your model assumes uniform draw through the band, **discount** conclusions for AGS until you have **floor-specific** behavior notes.',
 ]
 
@@ -29,6 +29,7 @@ Hero art for this card is sourced from **Slots/Must Hit By AGS/Main IMage.png** 
 
 Marketing and links change by casino, but AP discussions often mention **AGS Orion** titles and progressives such as:
 
+- **River Dragons** (example **$5k** must-hit band in-app under **AGS → 5000** preset—cap can read **4995** on some glass)
 - **Emerald Princess** (Fa Cai Shu family / linked progressives on some installs)
 - **Dragon’s Jackpots**
 - **Gold Inferno**

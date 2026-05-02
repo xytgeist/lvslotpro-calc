@@ -1,7 +1,42 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import CalculatorDisclaimer from '../components/CalculatorDisclaimer'
 
+/** Example defaults per maker & cap—floor math still wins over these numbers. */
+const MHB_PRESETS = {
+  ainsworth: {
+    500: { current: 475, meterRise: 2.5, reset: 350, rtp: 85 },
+    /** Mid cap: interpolated between 500 and 10k tiers (illustrative). */
+    5000: { current: 4894, meterRise: 4.46842, reset: 4446, rtp: 85 },
+    10000: { current: 9802, meterRise: 6.66666, reset: 9000, rtp: 85 },
+  },
+  ags: {
+    500: { current: 488, meterRise: 2.72, reset: 365, rtp: 87 },
+    /** River Dragons–style bank: meter $3.75 per $0.01, reset $4k (verify glass; some installs show 4995 cap). */
+    5000: { current: 4911.76, meterRise: 3.75, reset: 4000, rtp: 87 },
+  },
+  igt: {
+    500: { current: 462, meterRise: 2.35, reset: 338, rtp: 85 },
+    5000: { current: 4820, meterRise: 4.33, reset: 4050, rtp: 85 },
+    10000: { current: 9740, meterRise: 6.42, reset: 8850, rtp: 85 },
+  },
+}
+
+/** AGS does not use a 10k cap in-app; 10k coerces to 5k for presets and math. */
+function effectiveCap(manufacturer, mustHitBy) {
+  const v = Number(mustHitBy) || 500
+  if (manufacturer === 'ags' && v === 10000) return 5000
+  return v
+}
+
+function presetFor(manufacturer, mustHitBy) {
+  const m = MHB_PRESETS[manufacturer] || MHB_PRESETS.ainsworth
+  const cap = effectiveCap(manufacturer, mustHitBy)
+  return m[cap] || m[500]
+}
+
 function MHBCalculator({ onBack }) {
+  const [manufacturer, setManufacturer] = useState('ainsworth')
+
   // Main fields
   const [current, setCurrent] = useState(475)
   const [mustHitBy, setMustHitBy] = useState(500)
@@ -13,6 +48,8 @@ function MHBCalculator({ onBack }) {
   const [useMidpoint, setUseMidpoint] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
+  const activePreset = useMemo(() => presetFor(manufacturer, mustHitBy), [manufacturer, mustHitBy])
+
   // Outputs
   const [ev, setEv] = useState(0)
   const [evExact, setEvExact] = useState(0)
@@ -23,25 +60,34 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // Auto-adjust when MHB changes (paired presets: current, meter rise, reset)
+  // Load maker + cap bundle (current, rise, reset, RTP defaults)
   useEffect(() => {
-    if (mustHitBy === 10000) {
-      setCurrent(9802)
-      setMeterRise(6.66666)
-      setResetValue(9000)
-    } else if (mustHitBy === 500) {
-      setCurrent(475)
-      setMeterRise(2.50)
-      setResetValue(350)
+    const p = presetFor(manufacturer, mustHitBy)
+    setCurrent(p.current)
+    setMeterRise(p.meterRise)
+    setResetValue(p.reset)
+    setOverallRTP(p.rtp)
+  }, [manufacturer, mustHitBy])
+
+  // Keep select value valid: AGS has no 10k tier.
+  useEffect(() => {
+    if (manufacturer === 'ags' && mustHitBy === 10000) {
+      setMustHitBy(5000)
     }
-  }, [mustHitBy])
+  }, [manufacturer, mustHitBy])
+
+  // AGS defaults to full run (no midpoint); other makers default to midpoint.
+  useEffect(() => {
+    setUseMidpoint(manufacturer !== 'ags')
+  }, [manufacturer])
 
   const calculate = () => {
-    const rtp = overallRTP / 100
-    const currentVal = Number(current) || 475
-    const mhb = Number(mustHitBy) || 500
-    const riseDollars = Number(meterRise) || 2.50
-    const resetVal = Number(resetValue) || 350
+    const p = presetFor(manufacturer, mustHitBy)
+    const rtp = (Number(overallRTP) || p.rtp) / 100
+    const currentVal = Number(current) || p.current
+    const mhb = effectiveCap(manufacturer, mustHitBy)
+    const riseDollars = Number(meterRise) || p.meterRise
+    const resetVal = Number(resetValue) || p.reset
 
     if (mhb <= currentVal) {
       setEv(999)
@@ -90,7 +136,7 @@ function MHBCalculator({ onBack }) {
 
   useEffect(() => {
     calculate()
-  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint])
+  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint, manufacturer])
 
   // Input handlers
   const handleIntegerChange = (setter, defaultVal) => (e) => {
@@ -127,16 +173,36 @@ function MHBCalculator({ onBack }) {
           <div className="w-12" />
         </div>
 
-        {/* Main Inputs - Now side by side */}
+        {/* Main Inputs */}
         <div className="bg-gray-900 p-5 rounded-3xl">
+          <div className="mb-4">
+            <label className="block text-gray-400 text-xs mb-1">Manufacturer</label>
+            <select
+              value={manufacturer}
+              onChange={(e) => setManufacturer(e.target.value)}
+              className="w-full p-3.5 bg-gray-800 rounded-2xl text-lg font-bold text-center text-purple-200"
+            >
+              <option value="ainsworth">Ainsworth (uniform mystery)</option>
+              <option value="ags">AGS (late-band / near-cap)</option>
+              <option value="igt">IGT / WMS-style mystery</option>
+            </select>
+            <p className="text-gray-500 text-[11px] mt-2 leading-snug">
+              Switches example meter, rise, reset, and RTP for this maker and cap—always verify on the glass.
+              {manufacturer === 'ags' ? (
+                <span className="block mt-1 text-gray-500">AGS uses 500 / 5000 caps only (no 10k preset).</span>
+              ) : null}
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-gray-400 text-xs mb-1">JP Meter (Current)</label>
               <input 
                 type="text" 
+                inputMode="decimal"
                 value={current} 
-                onChange={handleIntegerChange(setCurrent, 475)} 
-                onBlur={handleIntegerBlur(setCurrent, 475)} 
+                onChange={handleFloatChange(setCurrent, activePreset.current)} 
+                onBlur={handleFloatBlur(setCurrent, activePreset.current)} 
                 className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300" 
               />
             </div>
@@ -149,7 +215,8 @@ function MHBCalculator({ onBack }) {
                 className="w-full p-4 bg-gray-800 rounded-2xl text-3xl font-bold text-center text-purple-300"
               >
                 <option value={500}>500</option>
-                <option value={10000}>10000</option>
+                <option value={5000}>5000 (e.g. River Dragons)</option>
+                {manufacturer !== 'ags' ? <option value={10000}>10000</option> : null}
               </select>
             </div>
           </div>
@@ -168,8 +235,8 @@ function MHBCalculator({ onBack }) {
                 <input 
                   type="text" 
                   value={overallRTP} 
-                  onChange={handleFloatChange(setOverallRTP, 85)} 
-                  onBlur={handleFloatBlur(setOverallRTP, 85)} 
+                  onChange={handleFloatChange(setOverallRTP, activePreset.rtp)} 
+                  onBlur={handleFloatBlur(setOverallRTP, activePreset.rtp)} 
                   className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
                 />
               </div>
@@ -179,8 +246,8 @@ function MHBCalculator({ onBack }) {
                 <input 
                   type="text" 
                   value={meterRise} 
-                  onChange={handleFloatChange(setMeterRise, 2.50)} 
-                  onBlur={handleFloatBlur(setMeterRise, 2.50)} 
+                  onChange={handleFloatChange(setMeterRise, activePreset.meterRise)} 
+                  onBlur={handleFloatBlur(setMeterRise, activePreset.meterRise)} 
                   className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
                 />
               </div>
@@ -190,21 +257,23 @@ function MHBCalculator({ onBack }) {
                 <input 
                   type="text" 
                   value={resetValue} 
-                  onChange={handleIntegerChange(setResetValue, mustHitBy === 10000 ? 9000 : 350)} 
-                  onBlur={handleIntegerBlur(setResetValue, mustHitBy === 10000 ? 9000 : 350)} 
+                  onChange={handleIntegerChange(setResetValue, activePreset.reset)} 
+                  onBlur={handleIntegerBlur(setResetValue, activePreset.reset)} 
                   className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
                 />
               </div>
 
-              <div className="flex items-center justify-between bg-gray-800 p-4 rounded-2xl">
-                <span className="text-gray-300">Use Midpoint for EV & Breakeven</span>
-                <button 
-                  onClick={() => setUseMidpoint(!useMidpoint)} 
-                  className={`px-6 py-2 rounded-xl font-semibold ${useMidpoint ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
-                >
-                  {useMidpoint ? 'YES' : 'NO'}
-                </button>
-              </div>
+              <label className="flex items-center gap-3 cursor-pointer bg-gray-800 p-4 rounded-2xl touch-manipulation">
+                <input
+                  type="checkbox"
+                  checked={useMidpoint}
+                  onChange={(e) => setUseMidpoint(e.target.checked)}
+                  className="h-5 w-5 shrink-0 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-0 focus:ring-offset-gray-800 accent-purple-600"
+                />
+                <span className="text-gray-300 text-sm leading-snug">
+                  Use Midpoint for EV & Breakeven
+                </span>
+              </label>
             </div>
           )}
         </div>
