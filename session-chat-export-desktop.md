@@ -125,3 +125,99 @@ ok i want to start working on some AP slot guides. Ill give you an idea of what 
 Sounds good. From the handoff you already have **`machines`** (the checklist) and **`guides`** (markdown tied to a machine), with schema in `supabase/machines_guides_schema.sql` and the app not necessarily fully wired to those yet.
 
 Walk me through how you picture it end to end: who the user is (you-only admin vs logged-in members), how they pick a machine, how drafts vs published works, and any must-haves (search, TOC, images, versioning, etc.). Once you lay out the UI/UX and process flow, we can map it to concrete screens, routes, and Supabase fields—or flag gaps in the current schema early.
+
+---
+
+## Chat export (2026-05-02T03:39:15.715Z)
+
+_Source: `3ba2fca4-226e-450c-9c97-fd36860f093a` — lines 20–53_
+
+### User
+
+I want the guides screen to have a search bar that allows a user to quickly search a slot name and have the slot guides filter down to matches. I want the slot guides to appear as "cards" that show just the absolute pertinent information so a slot pro can simply look at the card and understnad what hes looking for to find a +EV play. The card should have an image of the slot across the top. The card should have a button to open the associated calculator if one exists for that game. Next to this button "ask community" or something like that...the button should open a form that references the game title/card/guide, allows the user to ask a question, and creates a post in the feed (home screen). The card should display the title of the game, the volatility index of the game, game distributor (ie: Aristocrat), popularity, and added and updated section. Use buffalo link as an example and build one. When the card is clicked, it expands to reveal the full guide of exactly what youre looking for, how the game is played, etc. Then we can refine. You can use machinepro.club's Buffalo Link guide as an example. I have a login for you as its behind a paywall.
+
+### Assistant
+
+Exploring the codebase and schema so we can implement the guides screen with Buffalo Link as the first example. We won't use or store paywall credentials — we'll use public structure and placeholder or publicly known facts where needed; you can paste guide copy later.
+
+### Assistant
+
+Implementing the guides UI with a Buffalo Link example: original guide copy (not from machinepro.club). Adding a `community_feed_posts` table so “Ask community” can persist to the home feed when the migration is applied; merging a local Buffalo demo when the DB has no guide row.
+
+### Assistant
+
+Creating guide demo content, `GuidesScreen`, SQL migration, and wiring `App.jsx`.
+
+### Assistant
+
+Here is what was implemented and how it fits your request.
+
+### What you get
+
+1. **`Guides` tab** — Search filters by game name, guide title, slug, or manufacturer.
+2. **Buffalo Link card** — Hero image (uses `thumbnail_url` when set, otherwise `/buffalo-icon.png` with `onError` fallback), volatility / popularity / type, **+EV-oriented bullets** on the card, **Added / Updated** dates (from Supabase when present; demo shows `—` until you have rows).
+3. **Tap the card** — Toggles the **full guide** (markdown rendered with `react-markdown`). Copy is **original for this app**, structured like a serious AP playbook—not pasted from machinepro.club. You can replace it anytime via the `guides` row in Supabase.
+4. **Open calculator** — Buffalo Link maps to your existing **`buffalo`** calculator (slug `buffalo-link` is handled in code even though seed `has_calculator` is still false).
+5. **Ask community** — Modal tags the game and posts to **`community_feed_posts`** (after you run the SQL). On success it refreshes the feed and switches to **Home**.
+6. **Home** — **Community feed** lists those posts (replaces the old placeholder block). If the table is missing or empty, you see a short explanation.
+
+### New / changed files
+
+| File | Role |
+|------|------|
+| `src/features/guides/GuidesScreen.jsx` | Search, cards, expand, modal, Supabase load + fallbacks |
+| `src/features/guides/buffaloLinkGuideDemo.js` | Buffalo card bullets + long-form markdown |
+| `supabase/community_feed_posts.sql` | Table + RLS + `user_id` trigger (same pattern as offers) |
+| `supabase/guides_machine_card_fields.sql` | Optional `volatility_index` / `popularity_summary` on `machines` |
+| `src/App.jsx` | Home feed load + `GuidesScreen` wiring |
+| `package.json` | `react-markdown` dependency |
+
+### What you should run in Supabase
+
+1. **`supabase/community_feed_posts.sql`** — Required for “Ask community” → Home.
+2. **`supabase/guides_machine_card_fields.sql`** — Optional; fills nicer volatility/popularity on the card when columns exist.
+
+If `guides` has **no** Buffalo row yet, the UI still shows **one merged Buffalo Link demo** from `buffaloLinkGuideDemo.js`. When you add a published `guides` row joined to `buffalo-link`, that DB version wins and the demo merge is skipped.
+
+### Paywall / machinepro.club
+
+I did **not** use member-only text. You can align wording with machinepro later by editing **`guides.content_markdown`** (and thumbnails on `machines` / `guides`) yourself so licensing stays clean.
+
+If you want the next refinement pass (e.g. TOC, “pin” games, or splitting `react-markdown` behind `lazy()` to shrink the main chunk), say what to prioritize.
+
+### User
+
+the guides button (from hamburger menu in app) didnt change
+
+### Assistant
+
+Checking how the hamburger menu wires the Guides tab and whether another code path still shows the old UI.
+
+### Assistant
+
+Updating the hamburger nav item so it reflects the new AP guides experience (label + short hint). Checking for a duplicate `App.jsx` path on Windows.
+
+### Assistant
+
+Updating the hamburger menu: the Guides entry still shows the old "Guides" / 📘 label. Making it "AP Guides" with a short hint and clearing the calculator when navigating away so the menu reflects the new flow.
+
+### Assistant
+
+Here is what was going on: the **hamburger list** was still the original entry (`Guides` + 📘). Only the **Guides tab content** had been switched to the new screen, so the menu looked unchanged.
+
+Updates:
+
+1. **Menu row** — Label is now **AP Guides**, icon **📗**, with a second line: **Search · +EV cards · ask**.
+2. **Menu panel** — Slightly wider so that hint fits (`min-w` / `max-w`).
+3. **Navigation behavior** — Choosing any tab other than **Calcs** clears `activeCalculator`, so leaving a calculator for **AP Guides** (or Home, etc.) does not leave odd calculator state behind.
+4. **Screen title** — The guides view heading is **AP Guides** so it matches the menu.
+
+Restart or hard-refresh the dev server if the bundle was cached (`npm run dev` again or Ctrl+Shift+R). If something still looks old after that, say what you see (menu label vs screen).
+
+### User
+
+thats so dope. youre such a badass. i love working with you
+
+### Assistant
+
+Glad it’s hitting the way you wanted. You’ve got a clear product vision and you’re building something real with it—that makes the work fun. Whenever you want to push the guides or feed further, we can keep going.

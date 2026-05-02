@@ -6,6 +6,11 @@ import {
   buffaloLinkCardBullets,
   buffaloLinkGuideMarkdown,
 } from './buffaloLinkGuideDemo'
+import {
+  PHOENIX_LINK_DEMO_SLUG,
+  phoenixLinkCardBullets,
+  phoenixLinkGuideMarkdown,
+} from './phoenixLinkGuideDemo'
 
 function formatGuideDate(iso) {
   if (!iso) return '—'
@@ -29,12 +34,42 @@ function resolveCalculatorKey(machine) {
   return null
 }
 
-function mergeDemoBuffalo(rows) {
-  const hasBuffalo = (rows || []).some((r) => r.machines?.slug === BUFFALO_LINK_DEMO_SLUG)
-  if (hasBuffalo) return rows || []
+function mergeLocalGuideDemos(rows) {
+  const base = [...(rows || [])]
+  const slugs = new Set(base.map((r) => r.machines?.slug).filter(Boolean))
+  const extras = []
 
-  return [
-    {
+  if (!slugs.has(PHOENIX_LINK_DEMO_SLUG)) {
+    extras.push({
+      id: 'local-demo-phoenix-link',
+      slug: 'phoenix-link',
+      title: 'Phoenix Link',
+      content_markdown: phoenixLinkGuideMarkdown,
+      last_updated: null,
+      created_at: null,
+      updated_at: null,
+      thumbnail_url: null,
+      published: true,
+      machines: {
+        id: null,
+        slug: PHOENIX_LINK_DEMO_SLUG,
+        name: 'Phoenix Link',
+        manufacturer: 'Aristocrat',
+        type: 'Must-Hit-By',
+        difficulty: 'Beginner',
+        vegas_availability: 'Very Common',
+        nerf_risk: 'Medium',
+        has_calculator: false,
+        calculator_slug: null,
+        thumbnail_url: null,
+        created_at: null,
+        updated_at: null,
+      },
+    })
+  }
+
+  if (!slugs.has(BUFFALO_LINK_DEMO_SLUG)) {
+    extras.push({
       id: 'local-demo-buffalo-link',
       slug: 'buffalo-link',
       title: 'Buffalo Link',
@@ -59,32 +94,45 @@ function mergeDemoBuffalo(rows) {
         created_at: null,
         updated_at: null,
       },
-    },
-    ...(rows || []),
-  ]
+    })
+  }
+
+  const merged = [...extras, ...base]
+  merged.sort((a, b) =>
+    (a.machines?.name || a.title || '').localeCompare(b.machines?.name || b.title || '', undefined, {
+      sensitivity: 'base',
+    })
+  )
+  return merged
 }
 
 function cardBulletsForRow(row) {
-  if (row.machines?.slug === BUFFALO_LINK_DEMO_SLUG) return buffaloLinkCardBullets
+  const ms = row.machines?.slug
+  if (ms === BUFFALO_LINK_DEMO_SLUG) return buffaloLinkCardBullets
+  if (ms === PHOENIX_LINK_DEMO_SLUG) return phoenixLinkCardBullets
   const first = (row.content_markdown || '').split(/\n##/)[0].trim()
   if (first.length > 400) return [first.slice(0, 360).trim() + '…']
   if (first) return [first]
   return ['Open the full guide for play notes and +EV context.']
 }
 
-const guideMarkdownComponents = {
-  h2: ({ children }) => <h2 className="text-lg font-black text-amber-100 mt-6 first:mt-0 mb-2">{children}</h2>,
-  h3: ({ children }) => <h3 className="text-base font-bold text-zinc-100 mt-4 mb-1.5">{children}</h3>,
-  p: ({ children }) => <p className="text-zinc-300 leading-relaxed mb-3 last:mb-0">{children}</p>,
-  ul: ({ children }) => <ul className="list-disc pl-5 space-y-1.5 text-zinc-300 mb-3">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1.5 text-zinc-300 mb-3">{children}</ol>,
-  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-  strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
-  a: ({ href, children }) => (
-    <a href={href} className="text-cyan-400 underline font-medium hover:text-cyan-300">
-      {children}
-    </a>
-  ),
+function makeGuideMarkdownComponents(machineSlug) {
+  const h2Tone =
+    machineSlug === 'phoenix-link' ? 'text-orange-100' : machineSlug === 'buffalo-link' ? 'text-amber-100' : 'text-amber-100'
+  return {
+    h2: ({ children }) => <h2 className={`text-lg font-black ${h2Tone} mt-6 first:mt-0 mb-2`}>{children}</h2>,
+    h3: ({ children }) => <h3 className="text-base font-bold text-zinc-100 mt-4 mb-1.5">{children}</h3>,
+    p: ({ children }) => <p className="text-zinc-300 leading-relaxed mb-3 last:mb-0">{children}</p>,
+    ul: ({ children }) => <ul className="list-disc pl-5 space-y-1.5 text-zinc-300 mb-3">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1.5 text-zinc-300 mb-3">{children}</ol>,
+    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+    strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
+    a: ({ href, children }) => (
+      <a href={href} className="text-cyan-400 underline font-medium hover:text-cyan-300">
+        {children}
+      </a>
+    ),
+  }
 }
 
 function volatilityLabel(row) {
@@ -102,8 +150,37 @@ function popularityLabel(row) {
   return m.vegas_availability || '—'
 }
 
+function defaultHeroSrc(machineSlug) {
+  if (machineSlug === 'phoenix-link') return '/phoenix-link-logo.png'
+  if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
+  return '/buffalo-icon.png'
+}
+
 function heroImage(row) {
-  return row.thumbnail_url || row.machines?.thumbnail_url || '/buffalo-icon.png'
+  const ms = row.machines?.slug
+  return row.thumbnail_url || row.machines?.thumbnail_url || defaultHeroSrc(ms)
+}
+
+function heroGradientClass(machineSlug) {
+  if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
+  return 'from-amber-900/40 to-zinc-950'
+}
+
+function cardAccent(machineSlug) {
+  if (machineSlug === 'phoenix-link') {
+    return {
+      chevron: 'text-orange-500',
+      strong: 'text-orange-100',
+      subtitle: 'text-orange-200/90',
+      expandedBorder: 'border-orange-500/50 shadow-lg shadow-orange-900/20',
+    }
+  }
+  return {
+    chevron: 'text-amber-500',
+    strong: 'text-amber-100',
+    subtitle: 'text-amber-200/90',
+    expandedBorder: 'border-amber-500/50 shadow-lg shadow-amber-900/20',
+  }
 }
 
 function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }) {
@@ -310,16 +387,16 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
             .eq('published', true)
             .order('title')
           if (e2) throw e2
-          setRows(mergeDemoBuffalo(d2 || []))
+          setRows(mergeLocalGuideDemos(d2 || []))
         } else {
           throw error
         }
       } else {
-        setRows(mergeDemoBuffalo(data || []))
+        setRows(mergeLocalGuideDemos(data || []))
       }
     } catch (e) {
       setLoadErr(e?.message || 'Could not load guides.')
-      setRows(mergeDemoBuffalo([]))
+      setRows(mergeLocalGuideDemos([]))
     } finally {
       setLoading(false)
     }
@@ -375,33 +452,39 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
             const expanded = expandedSlug === slug
             const calcKey = resolveCalculatorKey(row.machines)
             const bullets = cardBulletsForRow(row)
+            const accent = cardAccent(slug)
+            const ringFocus =
+              slug === 'phoenix-link' ? 'focus-visible:ring-orange-500/60' : 'focus-visible:ring-amber-500/60'
 
             return (
               <li key={row.id || row.slug}>
                 <article
                   className={`rounded-3xl border overflow-hidden transition-shadow bg-zinc-900 ${
-                    expanded ? 'border-amber-500/50 shadow-lg shadow-amber-900/20' : 'border-zinc-800'
+                    expanded ? accent.expandedBorder : 'border-zinc-800'
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => setExpandedSlug((s) => (s === slug ? null : slug))}
-                    className="w-full text-left touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+                    className={`w-full text-left touch-manipulation focus:outline-none focus-visible:ring-2 ${ringFocus}`}
                     aria-expanded={expanded}
                   >
-                    <div className="relative h-36 w-full bg-gradient-to-br from-amber-900/40 to-zinc-950">
+                    <div className={`relative h-36 w-full bg-gradient-to-br ${heroGradientClass(slug)}`}>
                       <img
                         src={heroImage(row)}
                         alt=""
                         className="h-full w-full object-cover opacity-95"
                         onError={(e) => {
-                          e.currentTarget.src = '/buffalo-icon.png'
+                          const el = e.currentTarget
+                          if (el.dataset.fallback === '1') return
+                          el.dataset.fallback = '1'
+                          el.src = '/buffalo-icon.png'
                         }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
                       <div className="absolute bottom-3 left-4 right-4">
                         <h2 className="text-white font-black text-xl tracking-tight drop-shadow-md">{row.machines?.name || row.title}</h2>
-                        <div className="text-amber-200/90 text-xs font-semibold mt-0.5">{row.machines?.manufacturer || '—'}</div>
+                        <div className={`${accent.subtitle} text-xs font-semibold mt-0.5`}>{row.machines?.manufacturer || '—'}</div>
                       </div>
                     </div>
 
@@ -424,12 +507,14 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                       <div className="space-y-2">
                         {bullets.map((b, i) => (
                           <div key={i} className="text-sm text-zinc-300 leading-relaxed flex gap-2">
-                            <span className="text-amber-500 shrink-0 font-bold">▸</span>
+                            <span className={`${accent.chevron} shrink-0 font-bold`}>▸</span>
                             <span>
                               <ReactMarkdown
                                 components={{
                                   p: ({ children }) => <span className="inline">{children}</span>,
-                                  strong: ({ children }) => <strong className="text-amber-100 font-bold">{children}</strong>,
+                                  strong: ({ children }) => (
+                                    <strong className={`${accent.strong} font-bold`}>{children}</strong>
+                                  ),
                                 }}
                               >
                                 {b}
@@ -485,7 +570,9 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
 
                   {expanded ? (
                     <div className="border-t border-zinc-800 px-4 py-5 bg-zinc-950/90 text-sm max-w-none">
-                      <ReactMarkdown components={guideMarkdownComponents}>{row.content_markdown || ''}</ReactMarkdown>
+                      <ReactMarkdown components={makeGuideMarkdownComponents(slug)}>
+                        {row.content_markdown || ''}
+                      </ReactMarkdown>
                     </div>
                   ) : null}
                 </article>
