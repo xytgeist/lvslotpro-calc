@@ -23,14 +23,16 @@ function MHBCalculator({ onBack }) {
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
-  // Auto-adjust when MHB changes
+  // Auto-adjust when MHB changes (paired presets: current, meter rise, reset)
   useEffect(() => {
     if (mustHitBy === 10000) {
       setCurrent(9802)
       setMeterRise(6.66666)
+      setResetValue(9000)
     } else if (mustHitBy === 500) {
       setCurrent(475)
       setMeterRise(2.50)
+      setResetValue(350)
     }
   }, [mustHitBy])
 
@@ -188,8 +190,8 @@ function MHBCalculator({ onBack }) {
                 <input 
                   type="text" 
                   value={resetValue} 
-                  onChange={handleIntegerChange(setResetValue, 350)} 
-                  onBlur={handleIntegerBlur(setResetValue, 350)} 
+                  onChange={handleIntegerChange(setResetValue, mustHitBy === 10000 ? 9000 : 350)} 
+                  onBlur={handleIntegerBlur(setResetValue, mustHitBy === 10000 ? 9000 : 350)} 
                   className="w-full p-4 bg-gray-800 rounded-2xl text-center text-2xl font-bold" 
                 />
               </div>
