@@ -429,6 +429,297 @@ function cardAccent(machineSlug) {
   }
 }
 
+const GUIDE_CARD_VARIANT_BY_SLUG = {
+  'adventures-of-sinbad': 'aurora',
+  'ags-must-hit-by': 'nova',
+  'ainsworth-must-hit-by': 'violet',
+  'aladdins-fortune': 'lamp',
+  'aztec-banner': 'temple',
+  'buffalo-ascension': 'trail',
+}
+
+function guideCardDesignVariant(slug) {
+  return GUIDE_CARD_VARIANT_BY_SLUG[slug] ?? 'ember'
+}
+
+function StatPill({ emoji, children, className = '' }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-tight text-zinc-100 bg-zinc-950/55 border-zinc-700/55 ${className}`.trim()}
+    >
+      <span className="opacity-90" aria-hidden>
+        {emoji}
+      </span>
+      <span className="min-w-0 break-words">{children}</span>
+    </span>
+  )
+}
+
+function MetaDatesRow({ row, m }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+      <span className="inline-flex items-center gap-1">
+        <span aria-hidden>📝</span>
+        <span>
+          Added <span className="text-zinc-400">{formatGuideDate(row.created_at || m?.created_at)}</span>
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span aria-hidden>🔄</span>
+        <span>
+          Updated <span className="text-zinc-400">{formatGuideDate(row.updated_at || row.last_updated)}</span>
+        </span>
+      </span>
+    </div>
+  )
+}
+
+/** Softer card bodies: showcase layouts for selected slugs + fresh default for everyone else. */
+function GuideCardMetaBlock({ variant, row, m, gistLine, accent }) {
+  const vol = volatilityLabel(row)
+  const pop = popularityLabel(row)
+  const typ = m?.type || '—'
+  const yr = m?.release_year ?? '—'
+  const known = row.known_titles_line
+
+  const gistBlock = (extraClass = '') => (
+    <div className={`rounded-2xl px-3.5 py-3 ${extraClass}`.trim()}>
+      <p className={`text-sm leading-snug font-semibold ${accent.strong}`}>{gistLine}</p>
+    </div>
+  )
+
+  const knownSoft = known ? (
+    <p className="text-[12px] leading-snug text-zinc-400 italic px-0.5">
+      <span aria-hidden>📋 </span>
+      {known}
+    </p>
+  ) : null
+
+  if (variant === 'aurora') {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl bg-gradient-to-br from-amber-950/50 via-violet-950/25 to-cyan-950/20 border border-white/10 p-3 shadow-inner">
+          <div className="flex flex-wrap gap-2">
+            <StatPill emoji="🌊" className="bg-white/10 border-white/10 backdrop-blur-sm">
+              {vol}
+            </StatPill>
+            <StatPill emoji="👀" className="bg-white/10 border-white/10 backdrop-blur-sm">
+              {pop}
+            </StatPill>
+            <StatPill emoji="🗺️" className="bg-white/10 border-white/10 backdrop-blur-sm">
+              {typ}
+            </StatPill>
+            <StatPill emoji="📆" className="bg-white/10 border-white/10 backdrop-blur-sm">
+              {yr}
+            </StatPill>
+          </div>
+        </div>
+        {knownSoft}
+        <div className="rounded-2xl bg-zinc-950/60 border border-amber-400/20 px-3 py-3 relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 text-5xl opacity-20 pointer-events-none select-none" aria-hidden>
+            ✨
+          </div>
+          <div className="flex gap-2 relative">
+            <span className="text-xl shrink-0" aria-hidden>
+              ⚓
+            </span>
+            <p className={`text-sm leading-snug ${accent.strong}`}>{gistLine}</p>
+          </div>
+        </div>
+        <MetaDatesRow row={row} m={m} />
+      </div>
+    )
+  }
+
+  if (variant === 'nova') {
+    return (
+      <div className="space-y-3">
+        <div className="-mx-1 rounded-2xl bg-gradient-to-r from-rose-950/35 via-zinc-950 to-rose-950/20 border border-rose-500/20 p-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[['🎯', vol], ['🔥', pop], ['🎰', typ], ['📅', yr]].map(([emoji, val], i) => (
+              <StatPill key={i} emoji={emoji} className="snap-start shrink-0 border-rose-500/25 bg-rose-950/40">
+                {val}
+              </StatPill>
+            ))}
+          </div>
+        </div>
+        {knownSoft}
+        <div className="rounded-2xl border border-rose-400/30 bg-gradient-to-br from-rose-950/40 to-zinc-950 px-3 py-3 shadow-lg shadow-rose-950/20 flex gap-2">
+          <span className="text-lg shrink-0" aria-hidden>
+            💥
+          </span>
+          <p className={`text-sm leading-snug ${accent.strong}`}>{gistLine}</p>
+        </div>
+        <MetaDatesRow row={row} m={m} />
+      </div>
+    )
+  }
+
+  if (variant === 'violet') {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-x-3 gap-y-2 text-[13px] text-zinc-200 items-center">
+          <span className="inline-flex items-center gap-1 rounded-lg bg-fuchsia-950/35 px-2 py-1 border border-fuchsia-500/25">
+            <span aria-hidden>🔮</span>
+            <span className="font-semibold">{vol}</span>
+          </span>
+          <span className="text-zinc-600">·</span>
+          <span className="inline-flex items-center gap-1">
+            <span aria-hidden>🎡</span>
+            <span>{pop}</span>
+          </span>
+          <span className="text-zinc-600">·</span>
+          <span className="inline-flex items-center gap-1">
+            <span aria-hidden>💠</span>
+            <span>{typ}</span>
+          </span>
+          <span className="text-zinc-600">·</span>
+          <span className="inline-flex items-center gap-1 text-zinc-300">
+            <span aria-hidden>🕰️</span>
+            <span className="font-medium">{yr}</span>
+          </span>
+        </div>
+        {knownSoft}
+        <div className="rounded-2xl ring-2 ring-fuchsia-500/35 ring-offset-2 ring-offset-zinc-900 bg-zinc-950/80 px-3.5 py-3 flex gap-2">
+          <span className="text-fuchsia-400 shrink-0" aria-hidden>
+            ✦
+          </span>
+          <p className={`text-sm leading-snug ${accent.strong}`}>{gistLine}</p>
+        </div>
+        <MetaDatesRow row={row} m={m} />
+      </div>
+    )
+  }
+
+  if (variant === 'lamp') {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl border border-amber-400/25 bg-gradient-to-br from-amber-900/25 via-zinc-950 to-yellow-950/20 px-3 py-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-black/25 px-2.5 py-2 flex items-start gap-2">
+              <span className="text-lg" aria-hidden>
+                🪔
+              </span>
+              <div>
+                <div className="text-[11px] text-amber-200/75 font-medium">Swing</div>
+                <div className="text-sm font-bold text-amber-50">{vol}</div>
+              </div>
+            </div>
+            <div className="rounded-xl bg-black/25 px-2.5 py-2 flex items-start gap-2">
+              <span className="text-lg" aria-hidden>
+                👥
+              </span>
+              <div>
+                <div className="text-[11px] text-amber-200/75 font-medium">Spots</div>
+                <div className="text-sm font-bold text-amber-50 leading-snug">{pop}</div>
+              </div>
+            </div>
+            <div className="rounded-xl bg-black/25 px-2.5 py-2 flex items-start gap-2 col-span-2 sm:col-span-1">
+              <span className="text-lg" aria-hidden>
+                🕌
+              </span>
+              <div>
+                <div className="text-[11px] text-amber-200/75 font-medium">Format</div>
+                <div className="text-sm font-semibold text-zinc-100">{typ}</div>
+              </div>
+            </div>
+            <div className="rounded-xl bg-black/25 px-2.5 py-2 flex items-start gap-2 col-span-2 sm:col-span-1">
+              <span className="text-lg" aria-hidden>
+                ✳️
+              </span>
+              <div>
+                <div className="text-[11px] text-amber-200/75 font-medium">Era</div>
+                <div className="text-sm font-bold text-amber-50">{yr}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {knownSoft}
+        <div className="border-l-[3px] border-amber-400/70 pl-3 py-1 flex gap-2">
+          <span className="text-amber-300/90 text-lg shrink-0" aria-hidden>
+            ✨
+          </span>
+          <p className={`text-sm leading-snug ${accent.strong}`}>{gistLine}</p>
+        </div>
+        <MetaDatesRow row={row} m={m} />
+      </div>
+    )
+  }
+
+  if (variant === 'temple') {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-col items-center gap-2">
+          <StatPill emoji="🗿" className="bg-emerald-950/35 border-emerald-500/30">
+            {vol}
+          </StatPill>
+          <div className="flex flex-wrap justify-center gap-2 w-full">
+            <StatPill emoji="🌴" className="bg-teal-950/30 border-teal-500/25">
+              {pop}
+            </StatPill>
+            <StatPill emoji="🎴" className="bg-teal-950/30 border-teal-500/25">
+              {typ}
+            </StatPill>
+          </div>
+          <StatPill emoji="☀️" className="bg-emerald-950/35 border-emerald-500/30 opacity-95">
+            {yr}
+          </StatPill>
+        </div>
+        {knownSoft}
+        <div className="rounded-2xl bg-gradient-to-t from-emerald-950/25 to-zinc-950 border-t-2 border-emerald-400/35 px-3 py-3">
+          <p className={`text-sm leading-snug ${accent.strong}`}>{gistLine}</p>
+        </div>
+        <MetaDatesRow row={row} m={m} />
+      </div>
+    )
+  }
+
+  if (variant === 'trail') {
+    return (
+      <div className="space-y-3">
+        <div className="relative rounded-2xl overflow-hidden border border-amber-800/40">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-600/10 via-transparent to-sky-500/10" />
+          <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 text-[13px]">
+            <span className="text-lg" aria-hidden>
+              🦬
+            </span>
+            <span className="text-zinc-500">—</span>
+            <span className="font-bold text-white">{vol}</span>
+            <span className="text-amber-500/70">›</span>
+            <span className="text-zinc-300">{pop}</span>
+            <span className="text-amber-500/70">›</span>
+            <span className="text-zinc-400">{typ}</span>
+            <span className="text-amber-500/70">›</span>
+            <span className="text-zinc-200 font-semibold">{yr}</span>
+            <span className="text-amber-400/90 text-[10px] font-black tracking-[0.3em] ml-auto uppercase"> Ascent </span>
+          </div>
+        </div>
+        {knownSoft}
+        <div className="rounded-2xl bg-zinc-950/70 px-3 py-3 border border-zinc-800 flex gap-3">
+          <span className="text-2xl shrink-0 select-none">⛰️</span>
+          <p className={`text-sm leading-snug ${accent.strong}`}>{gistLine}</p>
+        </div>
+        <MetaDatesRow row={row} m={m} />
+      </div>
+    )
+  }
+
+  /* ember — default modern layout */
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <StatPill emoji="⚡">{vol}</StatPill>
+        <StatPill emoji="📍">{pop}</StatPill>
+        <StatPill emoji="🎰">{typ}</StatPill>
+        <StatPill emoji="📅">{String(yr)}</StatPill>
+      </div>
+      {knownSoft}
+      {gistBlock('bg-zinc-950/45 border border-zinc-800/70 shadow-sm')}
+      <MetaDatesRow row={row} m={m} />
+    </div>
+  )
+}
+
 function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -661,11 +952,12 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
     const q = query.trim().toLowerCase()
     if (!q) return rows
     return rows.filter((r) => {
-      const name = (r.machines?.name || '').toLowerCase()
+      const mx = machineForGuide(r)
+      const name = (mx?.name || '').toLowerCase()
       const title = (r.title || '').toLowerCase()
       const slug = (r.slug || '').toLowerCase()
-      const manu = (r.machines?.manufacturer || '').toLowerCase()
-      const typ = (r.machines?.type || '').toLowerCase()
+      const manu = (mx?.manufacturer || '').toLowerCase()
+      const typ = (mx?.type || '').toLowerCase()
       const keywords = (r.guide_search_text || '').toLowerCase()
       const body = (r.content_markdown || '').toLowerCase()
       return (
@@ -716,6 +1008,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
             const calcKey = resolveCalculatorKey(m)
             const gistLine = cardGistForRow(row)
             const accent = cardAccent(slug)
+            const cardVariant = guideCardDesignVariant(slug)
             const ringFocus =
               slug === 'phoenix-link'
                 ? 'focus-visible:ring-orange-500/60'
@@ -758,48 +1051,12 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                     </div>
 
                     <div className="p-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800">
-                          <div className="text-zinc-500 font-semibold uppercase tracking-wide">Volatility</div>
-                          <div className="text-zinc-100 font-bold mt-0.5">{volatilityLabel(row)}</div>
-                        </div>
-                        <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800">
-                          <div className="text-zinc-500 font-semibold uppercase tracking-wide">Popularity</div>
-                          <div className="text-zinc-100 font-bold mt-0.5 leading-snug">{popularityLabel(row)}</div>
-                        </div>
-                        <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800">
-                          <div className="text-zinc-500 font-semibold uppercase tracking-wide">Type</div>
-                          <div className="text-zinc-200 font-semibold mt-0.5 leading-snug">{m?.type || '—'}</div>
-                        </div>
-                        <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800">
-                          <div className="text-zinc-500 font-semibold uppercase tracking-wide">Released</div>
-                          <div className="text-zinc-100 font-bold mt-0.5">{m?.release_year ?? '—'}</div>
-                        </div>
-                        {row.known_titles_line ? (
-                          <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800 col-span-2">
-                            <div className="text-zinc-500 font-semibold uppercase tracking-wide">Known titles</div>
-                            <div className="text-zinc-300 text-xs font-medium mt-1 leading-snug">{row.known_titles_line}</div>
-                          </div>
-                        ) : null}
-                      </div>
+                      <GuideCardMetaBlock variant={cardVariant} row={row} m={m} gistLine={gistLine} accent={accent} />
 
-                      <div className="rounded-xl bg-zinc-950/70 px-3 py-2.5 border border-zinc-800/90">
-                        <div className="text-zinc-500 text-[11px] font-semibold uppercase tracking-wide">Gist</div>
-                        <p className={`text-sm text-zinc-100 font-semibold leading-snug mt-1 ${accent.strong}`}>
-                          {gistLine}
-                        </p>
+                      <div className="flex items-center gap-2 text-zinc-500 text-xs font-medium pt-1">
+                        <span aria-hidden>👆</span>
+                        <span>{expanded ? 'Tap to collapse' : 'Tap for full guide'}</span>
                       </div>
-
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500 pt-1 border-t border-zinc-800/80">
-                        <span>
-                          Added <span className="text-zinc-400">{formatGuideDate(row.created_at || m?.created_at)}</span>
-                        </span>
-                        <span>
-                          Updated <span className="text-zinc-400">{formatGuideDate(row.updated_at || row.last_updated)}</span>
-                        </span>
-                      </div>
-
-                      <div className="text-zinc-500 text-xs font-medium">{expanded ? 'Tap to collapse' : 'Tap for full guide'}</div>
                     </div>
                   </button>
 
