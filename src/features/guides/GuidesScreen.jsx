@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { format, parseISO } from 'date-fns'
 import {
@@ -541,6 +541,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
   const [loadErr, setLoadErr] = useState('')
   const [expandedSlug, setExpandedSlug] = useState(null)
   const [askFor, setAskFor] = useState(null)
+  const guideCardRefs = useRef(Object.create(null))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -638,6 +639,15 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
     void load()
   }, [load])
 
+  useLayoutEffect(() => {
+    if (!expandedSlug) return
+    const el = guideCardRefs.current[expandedSlug]
+    if (!(el instanceof HTMLElement)) return
+    const reduceMotion =
+      typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    el.scrollIntoView({ block: 'start', inline: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' })
+  }, [expandedSlug])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return rows
@@ -714,7 +724,11 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
             return (
               <li key={row.id || row.slug}>
                 <article
-                  className={`rounded-3xl border overflow-hidden transition-shadow bg-zinc-900 ${
+                  ref={(el) => {
+                    if (el) guideCardRefs.current[slug] = el
+                    else delete guideCardRefs.current[slug]
+                  }}
+                  className={`rounded-3xl border overflow-hidden transition-shadow bg-zinc-900 scroll-mt-[max(0.5rem,env(safe-area-inset-top))] ${
                     expanded ? accent.expandedBorder : 'border-zinc-800'
                   }`}
                 >
