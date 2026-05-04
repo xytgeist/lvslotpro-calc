@@ -942,10 +942,12 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                     <div className="p-4 space-y-3">
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <div className="text-zinc-500 font-semibold uppercase tracking-wide">Volatility</div>
+                          <div className="flex flex-nowrap items-center gap-1 whitespace-nowrap overflow-hidden">
+                            <span className="text-zinc-500 font-semibold uppercase tracking-wide text-[10px] shrink-0">
+                              Volatility
+                            </span>
                             <span
-                              className="text-sm leading-none text-amber-300"
+                              className="inline-block origin-left scale-[0.65] text-sm leading-none text-amber-300 whitespace-nowrap"
                               title={`${volatilityLightningCount(row)} of 5`}
                               aria-hidden
                             >
@@ -955,10 +957,12 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                           <div className="text-zinc-100 font-bold mt-0.5 leading-snug">{volatilityLabel(row)}</div>
                         </div>
                         <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <div className="text-zinc-500 font-semibold uppercase tracking-wide">Popularity</div>
+                          <div className="flex flex-nowrap items-center gap-1 whitespace-nowrap overflow-hidden">
+                            <span className="text-zinc-500 font-semibold uppercase tracking-wide text-[10px] shrink-0">
+                              Popularity
+                            </span>
                             <span
-                              className="text-sm leading-none"
+                              className="inline-block origin-left scale-[0.65] text-sm leading-none whitespace-nowrap"
                               title={`${popularityFireCount(row)} of 5`}
                               aria-hidden
                             >
