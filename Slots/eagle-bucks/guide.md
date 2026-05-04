@@ -4,7 +4,7 @@ _Generated seed — edit freely. Sync to Supabase with `npm run slots:sync` when
 
 ## What you are hunting
 
-Eagle Bucks is catalogued as **Must-Hit-By** (Ainsworth). Edge lives where **state on the glass** lines up with **correct denom / bet qualification** and **fresh paytable truth** for this bank.
+Eagle Bucks is catalogued as **Must Hit By** (Ainsworth). Edge lives where **state on the glass** lines up with **correct denom / bet qualification** and **fresh paytable truth** for this bank.
 
 ## +EV checklist
 

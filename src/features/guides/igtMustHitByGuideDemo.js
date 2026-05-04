@@ -12,14 +12,14 @@ export const IGT_MHB_KNOWN_TITLES_LINE =
   'Coyote Moon · Money Storm · Lucky Larry’s Lobstermania (family names — confirm MHB on your cabinet)'
 
 export const igtMustHitByCardBullets = [
-  '**IGT / legacy WMS** “mystery” must-hit-by meters are often modeled as **uniform** draw between **reset** and **cap** plus a **% meter rise** — see **[Wizard of Odds — Must-Hit-By / WMS mystery jackpots](https://wizardofodds.com/games/slots/mystery-jackpot/)** for the classic target-point framing.',
+  '**IGT / legacy WMS** “mystery” must-hit-by meters are often modeled as **uniform** draw between **reset** and **cap** plus a **% meter rise** — see **[Wizard of Odds — Must Hit By / WMS mystery jackpots](https://wizardofodds.com/games/slots/mystery-jackpot/)** for the classic target-point framing.',
   '**Search:** **Coyote Moon**, **Money Storm**, **Lucky Larry’s Lobstermania** — many hits are **theme names**; only some installs carry **must-hit-by** packages; confirm **meters and glass**.',
   'Use **Must Hit By Jackpot** in-app for **meter rise**, **RTP**, **midpoint vs cap** stops — then sanity-check against **WOO tables** and your **floor** paytable.',
 ]
 
 export const igtMustHitByGuideMarkdown = `## What you are looking at
 
-**IGT** (and **legacy WMS** content often found on IGT-managed floors) has a long line of **mystery / must-hit-by** style progressives: a **published ceiling**, a **meter that climbs with qualifying coin-in**, and a **hidden trigger threshold** chosen inside the band. Public **target-point** math is laid out on **[Must-Hit-By Progressives (WMS mystery jackpots)](https://wizardofodds.com/games/slots/mystery-jackpot/)** (Michael Shackleford, Wizard of Odds). That page assumes a **uniform** distribution between seed and cap—**do not** paste those conclusions onto **AGS** meters without a separate model.
+**IGT** (and **legacy WMS** content often found on IGT-managed floors) has a long line of **mystery / must-hit-by** style progressives: a **published ceiling**, a **meter that climbs with qualifying coin-in**, and a **hidden trigger threshold** chosen inside the band. Public **target-point** math is laid out on **[Must Hit By Progressives (WMS mystery jackpots)](https://wizardofodds.com/games/slots/mystery-jackpot/)** (Michael Shackleford, Wizard of Odds). That page assumes a **uniform** distribution between seed and cap—**do not** paste those conclusions onto **AGS** meters without a separate model.
 
 Hero art for this card is sourced from **Slots/igt-must-hit-by/hero.webp** (bundled **/igt-must-hit-by-hero.webp** in the app **public** folder). A reference strip JPG in **Slots/igt-must-hit-by/** (Coyote Moon / Money Storm / Lobstermania) is useful for **visual ID**, not for PAR.
 

@@ -5,7 +5,7 @@
     "slug": "igt-must-hit-by",
     "name": "IGT Must Hit By",
     "manufacturer": "IGT",
-    "type": "Must-Hit-By",
+    "type": "Must Hit By",
     "difficulty": "Intermediate",
     "vegas_availability": "Very Common",
     "nerf_risk": "Medium",

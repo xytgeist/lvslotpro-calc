@@ -132,7 +132,13 @@ function apBlock(m) {
   const bankroll_angle =
     "Size sessions for worst-case drawdown before the persistent / bonus state pays you back; confirm denom and max-bet rules the same visit you scout.";
 
-  if (type === "Must-Hit-By") {
+  const typeStr = typeof type === "string" ? type : "";
+  if (
+    typeStr === "Must Hit By" ||
+    typeStr === "Must-Hit-By" ||
+    typeStr.includes("Must-Hit-By") ||
+    /\bmust\s+hit\s+by\b/i.test(typeStr)
+  ) {
     edge_vectors.push(
       "Counter / must-hit distance vs cost-per-increment is the primary +EV lens; verify increment and reset on the glass.",
       "Average bonus / must-hit pay assumptions dominate — stale assumptions lie.",

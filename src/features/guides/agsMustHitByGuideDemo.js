@@ -21,7 +21,7 @@ export const agsMustHitByGuideMarkdown = `## What you are looking at
 
 **AGS** ships multiple **must-hit-by** and **mystery progressive** packages (often on **Orion** and related cabinets). The meters look similar to other makers—**reset**, **must-hit ceiling**, **visible climb**—but **advantage players widely report** that the **random trigger is not “flat”** across the whole range: **large awards may rarely fire far below the cap**, which breaks the **uniform target-point** shortcuts used for some other manufacturers.
 
-The **AGS caveat** is spelled out in context on **[Must-Hit-By Progressives on Ainsworth Slots](https://wizardofodds.com/games/slots/mystery-jackpot-ainsworth/)** (Michael Shackleford, Wizard of Odds), because that page contrasts **Ainsworth-style uniform** behavior with **AGS-style** behavior.
+The **AGS caveat** is spelled out in context on **[Must Hit By Progressives on Ainsworth Slots](https://wizardofodds.com/games/slots/mystery-jackpot-ainsworth/)** (Michael Shackleford, Wizard of Odds), because that page contrasts **Ainsworth-style uniform** behavior with **AGS-style** behavior.
 
 Hero art for this card is sourced from **Slots/ags-must-hit-by/hero.webp** in your repo (bundled fallback: **/ags-must-hit-by-hero.webp** in the app **public** folder).
 

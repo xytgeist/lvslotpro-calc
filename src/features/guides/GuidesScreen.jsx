@@ -217,7 +217,7 @@ function mergeLocalGuideDemos(rows) {
         slug: PHOENIX_LINK_DEMO_SLUG,
         name: 'Phoenix Link',
         manufacturer: 'Aristocrat',
-        type: 'Must-Hit-By',
+        type: 'Must Hit By',
         difficulty: 'Beginner',
         vegas_availability: 'Very Common',
         nerf_risk: 'Medium',
@@ -307,7 +307,7 @@ function mergeLocalGuideDemos(rows) {
         slug: AINSWORTH_MUST_HIT_BY_DEMO_SLUG,
         name: 'Ainsworth Must Hit By',
         manufacturer: 'Ainsworth',
-        type: 'Must-Hit-By Mystery Progressive',
+        type: 'Must Hit By Mystery Progressive',
         difficulty: 'Intermediate',
         vegas_availability: 'Common',
         nerf_risk: 'Medium',
@@ -338,7 +338,7 @@ function mergeLocalGuideDemos(rows) {
         slug: AGS_MUST_HIT_BY_DEMO_SLUG,
         name: 'AGS Must Hit By',
         manufacturer: 'AGS',
-        type: 'Must-Hit-By Mystery Progressive',
+        type: 'Must Hit By Mystery Progressive',
         difficulty: 'Advanced',
         vegas_availability: 'Common',
         nerf_risk: 'High',
@@ -369,7 +369,7 @@ function mergeLocalGuideDemos(rows) {
         slug: IGT_MUST_HIT_BY_DEMO_SLUG,
         name: 'IGT Must Hit By',
         manufacturer: 'IGT',
-        type: 'Must-Hit-By Mystery Progressive',
+        type: 'Must Hit By Mystery Progressive',
         difficulty: 'Intermediate',
         vegas_availability: 'Very Common',
         nerf_risk: 'Medium',
@@ -518,6 +518,124 @@ function IconTarget({ className }) {
   )
 }
 
+function IconGauge({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M3.75 13.75a6.75 6.75 0 1112.5 0"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10 7.5v3.25l2 1.1"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function IconLayers({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M3.5 7.5L10 4.25 16.5 7.5 10 10.75 3.5 7.5z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path d="M3.5 11.25L10 14.5l6.5-3.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconSparkles({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M10 2.5l1.05 4.95 4.95 1.05-4.95 1.05L10 14.5 8.95 9.55 4 8.5l4.95-1.05L10 2.5z" opacity="0.92" />
+      <path
+        d="M16 12.25l.45 1.8 1.8.45-1.8.45-.45 1.8-.45-1.8-1.8-.45 1.8-.45.45-1.8z"
+        opacity="0.55"
+      />
+    </svg>
+  )
+}
+
+/** UI experiment: distinct +EV panels for a few guides; everyone else keeps the bordered gradient panel. */
+function evThresholdPanelKind(machineSlug) {
+  const s = typeof machineSlug === 'string' ? machineSlug.trim().toLowerCase() : ''
+  if (s === 'ags-must-hit-by' || s === 'must-hit-by-ags') return 'agsStrip'
+  if (s === 'ainsworth-must-hit-by' || s === 'must-hit-by-aig') return 'ainsworthTables'
+  if (s === 'aladdins-fortune') return 'aladdinEmerald'
+  return 'default'
+}
+
+function GuideEvThresholdPanel({ kind, line, accent }) {
+  if (kind === 'agsStrip') {
+    return (
+      <div className="relative overflow-hidden rounded-xl border border-rose-500/35 border-l-[3px] border-l-rose-400 bg-zinc-950/90 px-3.5 py-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 gap-y-1">
+          <span className="inline-flex items-center gap-1.5 text-rose-400/95">
+            <IconGauge className="h-3.5 w-3.5 shrink-0 opacity-90" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.18em]">Calculator anchor</span>
+          </span>
+          <span className="rounded-md bg-rose-500/15 px-2 py-0.5 text-[9px] font-semibold text-rose-200/90 ring-1 ring-rose-400/30">
+            MHB math
+          </span>
+        </div>
+        <p className={`mt-2 text-[15px] font-medium leading-snug ${accent.strong}`}>{line}</p>
+      </div>
+    )
+  }
+
+  if (kind === 'ainsworthTables') {
+    return (
+      <div className="rounded-xl border border-dashed border-violet-400/55 bg-gradient-to-br from-violet-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5">
+        <div className="flex items-center gap-2 text-violet-300">
+          <IconLayers className="h-3.5 w-3.5 shrink-0 opacity-90" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">Tables vs glass</span>
+        </div>
+        <div className="relative mt-2 border-l-2 border-violet-400/65 pl-3">
+          <p className={`text-base font-normal leading-snug ${accent.strong}`}>{line}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (kind === 'aladdinEmerald') {
+    return (
+      <div className="flex gap-3 rounded-2xl border border-emerald-500/35 bg-emerald-950/25 px-4 py-3.5 shadow-sm shadow-black/25 ring-1 ring-emerald-500/10">
+        <div
+          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400"
+          aria-hidden
+        >
+          <IconSparkles className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="inline-flex items-center gap-1.5 text-emerald-400/95">
+            <IconTarget className="h-3 w-3 shrink-0 opacity-95" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">+EV threshold</span>
+          </div>
+          <p className="mt-1.5 text-base font-normal leading-snug tracking-tight text-emerald-50">{line}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border-2 px-4 py-3.5 ${accent.evPanel}`}>
+      <div className={`inline-flex items-center gap-2 ${accent.evLabel}`}>
+        <IconTarget className="h-3.5 w-3.5 shrink-0 opacity-95" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">+EV Threshold</span>
+      </div>
+      <p className={`mt-2 text-base font-normal leading-snug tracking-tight ${accent.strong}`}>{line}</p>
+    </div>
+  )
+}
+
 function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'phoenix-link') return '/phoenix-link-logo.png'
   if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
@@ -532,11 +650,21 @@ function defaultHeroSrc(machineSlug) {
   return '/buffalo-icon.png'
 }
 
-/** Supabase may return `machines` as an object or a one-element array depending on FK metadata. */
+/** Supabase may return `machines` as an object or an array depending on FK metadata — pick the embed that matches `guides.slug` or carries `volatility_index`. */
 function machineForGuide(row) {
   const m = row?.machines
   if (m == null) return null
-  return Array.isArray(m) ? m[0] ?? null : m
+  if (!Array.isArray(m)) return m
+
+  const list = m.filter(Boolean)
+  if (list.length === 0) return null
+  const gs = typeof row.slug === 'string' ? row.slug.trim().toLowerCase() : ''
+  const slugMatch =
+    gs && list.find((x) => typeof x.slug === 'string' && x.slug.trim().toLowerCase() === gs)
+  const withVi = list.find(
+    (x) => x.volatility_index != null && String(x.volatility_index).trim() !== ''
+  )
+  return slugMatch ?? withVi ?? list[0]
 }
 
 function heroImage(row) {
@@ -1047,19 +1175,11 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                         ) : null}
                       </div>
 
-                      <div
-                        className={`relative overflow-hidden rounded-2xl border-2 px-4 py-3.5 ${accent.evPanel}`}
-                      >
-                        <div className={`inline-flex items-center gap-2 ${accent.evLabel}`}>
-                          <IconTarget className="h-3.5 w-3.5 shrink-0 opacity-95" />
-                          <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">+EV Threshold</span>
-                        </div>
-                        <p
-                          className={`mt-2 text-base font-normal leading-snug tracking-tight ${accent.strong}`}
-                        >
-                          {evThresholdLine}
-                        </p>
-                      </div>
+                      <GuideEvThresholdPanel
+                        kind={evThresholdPanelKind(slug)}
+                        line={evThresholdLine}
+                        accent={accent}
+                      />
 
                       <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/80 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         {isLocalDemoGuide(row) ? (

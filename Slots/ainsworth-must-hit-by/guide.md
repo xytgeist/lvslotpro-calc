@@ -6,7 +6,7 @@ Slug **`ainsworth-must-hit-by`** matches the app’s MH calculator pairing and *
 
 ## What you are hunting
 
-**Ainsworth** paired **minor/major mystery** ladders: meters **must award** before printed ceilings, with a hidden trigger inside the reset–cap band. Public **target-point** framing plus photos is **[Must-Hit-By Progressives on Ainsworth Slots](https://wizardofodds.com/games/slots/mystery-jackpot-ainsworth/)** (Wizard of Odds).
+**Ainsworth** paired **minor/major mystery** ladders: meters **must award** before printed ceilings, with a hidden trigger inside the reset–cap band. Public **target-point** framing plus photos is **[Must Hit By Progressives on Ainsworth Slots](https://wizardofodds.com/games/slots/mystery-jackpot-ainsworth/)** (Wizard of Odds).
 
 ## Hero asset
 

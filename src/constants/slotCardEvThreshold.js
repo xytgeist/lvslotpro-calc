@@ -4,7 +4,7 @@
  */
 
 export const TYPE_DEFAULT_CARD_EV_THRESHOLD = {
-  'Must-Hit-By': 'Counter tight vs cost per increment',
+  'Must Hit By': 'Counter tight vs cost per increment',
   'Persistent State': 'Strong meters / state vs cost to clear',
   'Lock Game': 'Lock package worth the buy-in',
   Accumulator: 'Progress far along vs price to finish',
@@ -31,7 +31,7 @@ export const SLUG_RELEASE_YEAR = {
 export function evThresholdTypeKey(type) {
   if (!type) return 'Other'
   const raw = String(type)
-  if (raw.includes('Must-Hit-By') || /\bmust\s+hit\s+by\b/i.test(raw)) return 'Must-Hit-By'
+  if (raw.includes('Must-Hit-By') || /\bmust\s+hit\s+by\b/i.test(raw)) return 'Must Hit By'
   if (TYPE_DEFAULT_CARD_EV_THRESHOLD[type] != null) return type
   return 'Other'
 }

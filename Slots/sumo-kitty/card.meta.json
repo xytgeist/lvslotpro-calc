@@ -5,7 +5,7 @@
     "slug": "sumo-kitty",
     "name": "Sumo Kitty",
     "manufacturer": "Ainsworth",
-    "type": "Must-Hit-By",
+    "type": "Must Hit By",
     "difficulty": "Beginner",
     "vegas_availability": "Common",
     "nerf_risk": "Low",
@@ -20,7 +20,7 @@
     "title": "Sumo Kitty",
     "published": true,
     "card_summary_bullets": [
-      "Must-Hit-By: Counter / must-hit distance vs cost-per-increment is the primary +EV lens; verify increment and reset on the glass.",
+      "Must Hit By: Counter / must-hit distance vs cost-per-increment is the primary +EV lens; verify increment and reset on the glass.",
       "Floor / rarity: Common — re-verify same visit.",
       "Nerf: Low — Ainsworth / jurisdictional packaging changes outcomes."
     ],

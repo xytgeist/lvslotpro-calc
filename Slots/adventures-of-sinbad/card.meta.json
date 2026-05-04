@@ -11,7 +11,7 @@
     "nerf_risk": "Low",
     "has_calculator": false,
     "calculator_slug": null,
-    "volatility_index": null,
+    "volatility_index": "Medium",
     "popularity_summary": null,
     "release_year": 2017
   },
@@ -20,7 +20,7 @@
     "title": "Adventures of Sinbad!",
     "published": true,
     "card_summary_bullets": [],
-    "card_gist": "30 or fewer steps from GOAL",
+    "card_gist": "30 or fewer steps from 'GOAL'",
     "content_markdown_file": "guide.md",
     "last_updated": null
   },
