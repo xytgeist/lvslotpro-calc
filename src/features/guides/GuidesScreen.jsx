@@ -319,6 +319,7 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'phoenix-link') return '/phoenix-link-logo.png'
   if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
   if (machineSlug === 'stack-up-pays') return '/stackup-icon.jpg'
+  if (machineSlug === 'adventures-of-sinbad') return '/adventures-of-sinbad-hero.webp'
   if (machineSlug === 'ainsworth-must-hit-by') return '/ainsworth-must-hit-by-hero.png'
   if (machineSlug === 'ags-must-hit-by') return '/ags-must-hit-by-hero.png'
   if (machineSlug === 'igt-must-hit-by') return '/igt-must-hit-by-hero.png'
@@ -333,6 +334,7 @@ function heroImage(row) {
 function heroGradientClass(machineSlug) {
   if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
   if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
+  if (machineSlug === 'adventures-of-sinbad') return 'from-amber-950/85 via-orange-950/35 to-zinc-950'
   if (machineSlug === 'ainsworth-must-hit-by') return 'from-violet-950/85 via-fuchsia-950/35 to-zinc-950'
   if (machineSlug === 'ags-must-hit-by') return 'from-rose-950/85 via-red-950/40 to-zinc-950'
   if (machineSlug === 'igt-must-hit-by') return 'from-sky-950/80 via-blue-950/45 to-zinc-950'
