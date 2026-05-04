@@ -33,12 +33,6 @@ import {
 } from './mustHitByGuideDemo'
 import { defaultCardEvThresholdForSlug } from '../../constants/slotCardEvThreshold'
 
-/**
- * Visual-only subscriber paywall (+EV body blur, modal on “open” card). Not wired to billing.
- * Turn off: `VITE_GUIDES_PAYWALL_DEMO=0` in env (Vercel / local).
- */
-const GUIDES_PAYWALL_DEMO = import.meta.env.VITE_GUIDES_PAYWALL_DEMO !== '0'
-
 function formatGuideDate(iso) {
   if (!iso) return '—'
   try {
@@ -577,72 +571,6 @@ function cardAccent(machineSlug) {
   }
 }
 
-function GuidesSubscriberPreviewModal({ open, guideTitle, onClose }) {
-  if (!open) return null
-
-  const stubLogin = () => {
-    /** TODO: navigate to login / open auth modal */
-    onClose?.()
-  }
-  const stubRegister = () => {
-    /** TODO: navigate to register / checkout */
-    onClose?.()
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-[120] flex items-end justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-4 bg-black/70 backdrop-blur-[4px]"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="guides-paywall-title"
-      onClick={() => onClose?.()}
-    >
-      <div
-        className="w-full max-w-md rounded-[1.35rem] border border-amber-500/30 bg-gradient-to-b from-zinc-900 to-zinc-950 px-6 py-7 shadow-[0_28px_80px_rgba(0,0,0,0.55)] ring-1 ring-amber-400/15"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-center text-[10px] font-bold uppercase tracking-[0.38em] text-amber-400/95">Subscriber access</p>
-        <h2 id="guides-paywall-title" className="mt-3 text-center text-white font-black text-[1.35rem] leading-tight tracking-tight">
-          {'Unlock this guide & +EV line'}
-        </h2>
-        {guideTitle ? (
-          <p className="mt-2.5 text-center text-zinc-400 text-sm font-semibold line-clamp-2">{guideTitle}</p>
-        ) : null}
-        <p className="mt-4 text-center text-zinc-300 text-[13px] leading-relaxed">
-          Game titles and card context stay visible. The actionable +EV Threshold and playbook are subscriber-only —
-          preview below.
-        </p>
-        <div className="mt-6 flex flex-col gap-2.5 sm:flex-row-reverse sm:justify-center sm:gap-3">
-          <button
-            type="button"
-            onClick={stubRegister}
-            className="min-h-12 w-full rounded-2xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-sm font-black touch-manipulation shadow-lg shadow-amber-950/30 sm:flex-1 sm:max-w-[11rem]"
-          >
-            Register
-          </button>
-          <button
-            type="button"
-            onClick={stubLogin}
-            className="min-h-12 w-full rounded-2xl border border-zinc-600 bg-zinc-800/90 hover:bg-zinc-700 text-white text-sm font-bold touch-manipulation sm:flex-1 sm:max-w-[11rem]"
-          >
-            Log in
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => onClose?.()}
-          className="mt-5 w-full text-center text-[12px] font-semibold text-zinc-500 hover:text-zinc-400 touch-manipulation"
-        >
-          Not now
-        </button>
-        <p className="mt-3 text-center text-[10px] text-zinc-600 font-medium uppercase tracking-wider">
-          UI preview — billing not connected
-        </p>
-      </div>
-    </div>
-  )
-}
-
 function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -774,26 +702,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
   const [loadErr, setLoadErr] = useState('')
   const [expandedSlug, setExpandedSlug] = useState(null)
   const [askFor, setAskFor] = useState(null)
-  const [guidesPaywallPreview, setGuidesPaywallPreview] = useState(null)
   const guideCardRefs = useRef(Object.create(null))
-
-  useEffect(() => {
-    if (!guidesPaywallPreview) return
-    const onEsc = (e) => {
-      if (e.key === 'Escape') setGuidesPaywallPreview(null)
-    }
-    window.addEventListener('keydown', onEsc)
-    return () => window.removeEventListener('keydown', onEsc)
-  }, [guidesPaywallPreview])
-
-  useEffect(() => {
-    if (!guidesPaywallPreview) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [guidesPaywallPreview])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -945,14 +854,6 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
         />
       </label>
 
-      {GUIDES_PAYWALL_DEMO ? (
-        <div className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-950/20 px-3.5 py-2.5 text-amber-100/95 text-xs leading-snug">
-          <span className="font-black uppercase tracking-wide text-amber-400/95">Preview</span> Subscriber paywall mock:
-          titles stay readable; +EV Threshold line is blurred; opening the full guide shows a gate modal. Set{' '}
-          <span className="font-mono text-[11px] text-amber-200/85">VITE_GUIDES_PAYWALL_DEMO=0</span> to hide.
-        </div>
-      ) : null}
-
       {loadErr ? (
         <div className="mb-4 rounded-2xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-amber-100 text-sm">{loadErr}</div>
       ) : null}
@@ -996,20 +897,9 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                 >
                   <button
                     type="button"
-                    onClick={() => {
-                      if (GUIDES_PAYWALL_DEMO) {
-                        if (expanded) {
-                          setExpandedSlug(null)
-                          return
-                        }
-                        setGuidesPaywallPreview({ guideTitle: m?.name || row.title })
-                        return
-                      }
-                      setExpandedSlug((s) => (s === slug ? null : slug))
-                    }}
+                    onClick={() => setExpandedSlug((s) => (s === slug ? null : slug))}
                     className={`w-full text-left touch-manipulation focus:outline-none focus-visible:ring-2 ${ringFocus}`}
                     aria-expanded={expanded}
-                    {...(GUIDES_PAYWALL_DEMO ? { 'aria-haspopup': 'dialog' } : {})}
                   >
                     <div
                       className={`relative w-full bg-gradient-to-br ${heroGradientClass(slug)} ${
@@ -1089,58 +979,18 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                         ) : null}
                       </div>
 
-                      <div className={`relative overflow-hidden rounded-2xl border-2 px-4 py-3.5 ${accent.evPanel}`}>
-                        <div className={`relative z-10 inline-flex items-center gap-2 ${accent.evLabel}`}>
+                      <div
+                        className={`relative overflow-hidden rounded-2xl border-2 px-4 py-3.5 ${accent.evPanel}`}
+                      >
+                        <div className={`inline-flex items-center gap-2 ${accent.evLabel}`}>
                           <IconTarget className="h-3.5 w-3.5 shrink-0 opacity-95" />
                           <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">+EV Threshold</span>
-                          {GUIDES_PAYWALL_DEMO ? (
-                            <span className="ml-1 rounded-md border border-amber-500/35 bg-zinc-950/60 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-200/95">
-                              Locked preview
-                            </span>
-                          ) : null}
                         </div>
-                        <div className={`relative mt-2 ${GUIDES_PAYWALL_DEMO ? 'min-h-[4rem]' : ''}`}>
-                          <p
-                            className={`text-base font-normal leading-snug tracking-tight ${accent.strong} ${
-                              GUIDES_PAYWALL_DEMO
-                                ? 'blur-[9px] select-none opacity-[0.38]'
-                                : ''
-                            }`}
-                            aria-hidden={GUIDES_PAYWALL_DEMO}
-                          >
-                            {evThresholdLine}
-                          </p>
-                          {GUIDES_PAYWALL_DEMO ? (
-                            <div
-                              className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 rounded-xl border border-white/10 bg-zinc-950/55 px-3 py-3 backdrop-blur-[2px]"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span className="text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-200/95">
-                                Subscribers only
-                              </span>
-                              <div className="flex w-full max-w-[16rem] flex-wrap justify-center gap-2">
-                                <button
-                                  type="button"
-                                  className="min-h-9 min-w-[5.5rem] flex-1 rounded-xl border border-zinc-500/60 bg-zinc-800/95 px-3 text-[12px] font-bold text-white touch-manipulation hover:bg-zinc-700"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                  }}
-                                >
-                                  Log in
-                                </button>
-                                <button
-                                  type="button"
-                                  className="min-h-9 min-w-[5.75rem] flex-1 rounded-xl bg-amber-500 px-3 text-[12px] font-black text-zinc-950 touch-manipulation hover:bg-amber-400"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                  }}
-                                >
-                                  Register
-                                </button>
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
+                        <p
+                          className={`mt-2 text-base font-normal leading-snug tracking-tight ${accent.strong}`}
+                        >
+                          {evThresholdLine}
+                        </p>
                       </div>
 
                       <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/80 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -1180,11 +1030,6 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                             <>
                               <IconChevronFold expanded className="h-4 w-4 text-zinc-500" />
                               Tap to collapse
-                            </>
-                          ) : GUIDES_PAYWALL_DEMO ? (
-                            <>
-                              <span aria-hidden>🔒</span>
-                              Tap · unlock full guide (preview)
                             </>
                           ) : (
                             <>
@@ -1228,7 +1073,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                     </div>
                   </div>
 
-                  {expanded && !GUIDES_PAYWALL_DEMO ? (
+                  {expanded ? (
                     <div className="border-t border-zinc-800 px-4 py-5 bg-zinc-950/90 text-sm max-w-none">
                       <ReactMarkdown components={makeGuideMarkdownComponents(slug)}>
                         {row.content_markdown || ''}
@@ -1251,12 +1096,6 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
           onCommunityPosted?.()
           onNavigateHome?.()
         }}
-      />
-
-      <GuidesSubscriberPreviewModal
-        open={!!guidesPaywallPreview}
-        guideTitle={guidesPaywallPreview?.guideTitle ?? ''}
-        onClose={() => setGuidesPaywallPreview(null)}
       />
     </div>
   )
