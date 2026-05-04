@@ -426,48 +426,66 @@ function cardAccent(machineSlug) {
   if (machineSlug === 'phoenix-link') {
     return {
       chevron: 'text-orange-500',
-      strong: 'text-orange-100',
+      strong: 'text-orange-50',
       subtitle: 'text-orange-200/90',
       expandedBorder: 'border-orange-500/50 shadow-lg shadow-orange-900/20',
+      evLabel: 'text-orange-400',
+      evPanel:
+        'border-orange-400/55 bg-gradient-to-br from-orange-950/65 via-zinc-900/50 to-zinc-950 ring-2 ring-orange-500/25 shadow-lg shadow-orange-950/35',
     }
   }
   if (machineSlug === 'stack-up-pays') {
     return {
       chevron: 'text-cyan-500',
-      strong: 'text-cyan-100',
+      strong: 'text-cyan-50',
       subtitle: 'text-cyan-200/90',
       expandedBorder: 'border-cyan-500/50 shadow-lg shadow-cyan-900/25',
+      evLabel: 'text-cyan-400',
+      evPanel:
+        'border-cyan-400/55 bg-gradient-to-br from-cyan-950/60 via-zinc-900/55 to-zinc-950 ring-2 ring-cyan-500/25 shadow-lg shadow-cyan-950/35',
     }
   }
   if (machineSlug === 'ainsworth-must-hit-by') {
     return {
       chevron: 'text-fuchsia-400',
-      strong: 'text-violet-100',
+      strong: 'text-violet-50',
       subtitle: 'text-fuchsia-200/90',
       expandedBorder: 'border-violet-500/50 shadow-lg shadow-fuchsia-950/30',
+      evLabel: 'text-violet-300',
+      evPanel:
+        'border-violet-400/50 bg-gradient-to-br from-violet-950/60 via-fuchsia-950/25 to-zinc-950 ring-2 ring-violet-500/25 shadow-lg shadow-violet-950/40',
     }
   }
-  if (machineSlug === 'ags-must-hit-by') {
+  if (machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags') {
     return {
       chevron: 'text-rose-400',
-      strong: 'text-rose-100',
+      strong: 'text-rose-50',
       subtitle: 'text-rose-200/90',
       expandedBorder: 'border-rose-500/50 shadow-lg shadow-rose-950/35',
+      evLabel: 'text-rose-400',
+      evPanel:
+        'border-rose-400/50 bg-gradient-to-br from-rose-950/65 via-red-950/20 to-zinc-950 ring-2 ring-rose-500/30 shadow-lg shadow-rose-950/40',
     }
   }
-  if (machineSlug === 'igt-must-hit-by') {
+  if (machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt') {
     return {
       chevron: 'text-sky-400',
-      strong: 'text-sky-100',
+      strong: 'text-sky-50',
       subtitle: 'text-sky-200/90',
       expandedBorder: 'border-sky-500/50 shadow-lg shadow-blue-950/30',
+      evLabel: 'text-sky-400',
+      evPanel:
+        'border-sky-400/50 bg-gradient-to-br from-sky-950/58 via-blue-950/28 to-zinc-950 ring-2 ring-sky-500/25 shadow-lg shadow-blue-950/35',
     }
   }
   return {
     chevron: 'text-amber-500',
-    strong: 'text-amber-100',
+    strong: 'text-amber-50',
     subtitle: 'text-amber-200/90',
     expandedBorder: 'border-amber-500/50 shadow-lg shadow-amber-900/20',
+    evLabel: 'text-amber-400',
+    evPanel:
+      'border-amber-400/50 bg-gradient-to-br from-amber-950/55 via-yellow-950/15 to-zinc-950 ring-2 ring-amber-500/30 shadow-lg shadow-amber-950/30',
   }
 }
 
@@ -861,55 +879,57 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                         ) : null}
                       </div>
 
-                      <div className="rounded-xl bg-zinc-950/70 px-3 py-2.5 border border-zinc-800/90">
-                        <div className="text-zinc-500 text-[11px] font-semibold uppercase tracking-wide">+EV Threshold</div>
-                        <p className={`text-sm text-zinc-100 font-semibold leading-snug mt-1 ${accent.strong}`}>{evThresholdLine}</p>
+                      <div
+                        className={`relative overflow-hidden rounded-2xl border-2 px-4 py-3.5 ${accent.evPanel}`}
+                      >
+                        <div
+                          className={`text-[10px] font-extrabold uppercase tracking-[0.2em] ${accent.evLabel}`}
+                        >
+                          +EV Threshold
+                        </div>
+                        <p
+                          className={`mt-2 text-base font-extrabold leading-snug tracking-tight drop-shadow-sm ${accent.strong}`}
+                        >
+                          {evThresholdLine}
+                        </p>
                       </div>
 
-                      <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/80 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                      <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/80 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         {isLocalDemoGuide(row) ? (
                           <span className="text-zinc-400 text-[11px] leading-snug rounded-xl border border-zinc-700/55 bg-zinc-900/50 px-3 py-2">
                             Added / Updated show database dates after this guide exists in Supabase (you are seeing the
                             bundled local demo for now).
                           </span>
                         ) : (
-                          <div className="flex flex-wrap gap-2">
-                            <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-800/35 bg-emerald-950/25 px-2.5 py-1.5 shadow-sm shadow-black/20">
-                              <IconCalendar className="h-3.5 w-3.5 shrink-0 text-emerald-400/90" />
-                              <span className="flex flex-col gap-0.5 leading-none sm:flex-row sm:items-baseline sm:gap-1.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500/90">
-                                  Added
-                                </span>
-                                <span className="text-[11px] font-semibold tabular-nums text-zinc-200">
-                                  {formatGuideDate(row.created_at)}
-                                </span>
+                          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5 text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 text-zinc-500">
+                              <IconCalendar className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                              <span className="font-semibold uppercase tracking-wide">Added</span>
+                              <span className="tabular-nums font-medium text-zinc-300">
+                                {formatGuideDate(row.created_at)}
                               </span>
                             </span>
-                            <span className="inline-flex items-center gap-2 rounded-xl border border-sky-800/35 bg-sky-950/20 px-2.5 py-1.5 shadow-sm shadow-black/20">
-                              <IconClock className="h-3.5 w-3.5 shrink-0 text-sky-400/90" />
-                              <span className="flex flex-col gap-0.5 leading-none sm:flex-row sm:items-baseline sm:gap-1.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-sky-400/90">
-                                  Updated
-                                </span>
-                                <span className="text-[11px] font-semibold tabular-nums text-zinc-200">
-                                  {formatGuideDate(row.updated_at)}
-                                </span>
+                            <span className="inline-flex items-center gap-1.5 text-zinc-500">
+                              <IconClock className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                              <span className="font-semibold uppercase tracking-wide">Updated</span>
+                              <span className="tabular-nums font-medium text-zinc-300">
+                                {formatGuideDate(row.updated_at)}
                               </span>
                             </span>
                           </div>
                         )}
-                        <div
-                          className={`inline-flex items-center justify-center gap-1.5 self-start rounded-xl border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest shadow-sm shadow-black/15 sm:self-auto ${
-                            expanded
-                              ? 'border-zinc-600/60 bg-zinc-800/80 text-zinc-300'
-                              : 'border-amber-600/35 bg-amber-950/30 text-amber-200/90'
-                          }`}
-                        >
-                          <IconChevronFold
-                            expanded={expanded}
-                            className={expanded ? 'h-3.5 w-3.5 text-zinc-400' : 'h-3.5 w-3.5 text-amber-400/90'}
-                          />
-                          {expanded ? 'Tap to collapse' : 'Tap for full guide'}
+                        <div className="inline-flex shrink-0 items-center gap-1.5 text-zinc-500 text-xs font-medium sm:justify-end">
+                          {expanded ? (
+                            <>
+                              <IconChevronFold expanded className="h-4 w-4 text-zinc-500" />
+                              Tap to collapse
+                            </>
+                          ) : (
+                            <>
+                              <span aria-hidden>👆</span>
+                              Tap for full guide
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
