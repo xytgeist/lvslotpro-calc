@@ -201,7 +201,7 @@ function PhoenixLink({ onBack }) {
         {/* Phoenix Link Title + Logo */}
         <div className="flex items-center justify-center mb-4 pt-1">
           <img 
-            src="/phoenix-link-logo.png" 
+            src="/guides/phoenix-link/phoenix-link-calculator-icon.webp" 
             alt="Phoenix Link" 
             className="w-12 h-12 flex-shrink-0 rounded-xl object-contain mr-4" 
           />

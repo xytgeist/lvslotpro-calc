@@ -273,7 +273,7 @@ function StackUpPays({ onBack }) {
 
           <div className="flex items-center flex-1 justify-center gap-3">
             <img 
-              src="/stackup-icon.jpg" 
+              src="/guides/stack-up-pays/stack-up-pays-calculator-icon.webp" 
               alt="Stack Up Volcano" 
               className="w-14 h-14 object-cover rounded-2xl shadow-lg" 
             />

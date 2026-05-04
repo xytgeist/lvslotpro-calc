@@ -15,6 +15,7 @@ export const TYPE_DEFAULT_CARD_EV_THRESHOLD = {
 /** Curated overrides — short operator phrases. */
 export const SLUG_CARD_EV_THRESHOLD = {
   'buffalo-link': 'Play any 1400+',
+  'lightning-buffalo-link': 'Play any 1400+',
   'phoenix-link': 'Cheap path to must-hit award',
   'stack-up-pays': 'Stacks / meters beat the grind tax',
   'plants-vs-zombies-3d': 'Brain meter 150–200+ on your tier',

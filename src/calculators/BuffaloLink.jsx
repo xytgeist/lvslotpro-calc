@@ -221,7 +221,7 @@ function BuffaloLink({ onBack }) {
 
           <div className="flex items-center flex-1 justify-center gap-3">
             <div className="w-14 h-14 flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600">
-              <img src="/buffalo-icon.png" alt="Buffalo" className="w-12 h-12 object-contain" />
+              <img src="/guides/buffalo-link/buffalo-link-calculator-icon.webp" alt="Buffalo" className="w-12 h-12 object-contain" />
             </div>
             <h1
               className="text-[32px] font-black tracking-[-1.6px] text-amber-100"

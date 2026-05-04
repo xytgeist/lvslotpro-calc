@@ -33,6 +33,9 @@ import {
 } from './mustHitByGuideDemo'
 import { defaultCardEvThresholdForSlug } from '../../constants/slotCardEvThreshold'
 
+/** Calculator / generic placeholder art for Buffalo Link — also used when a guide hero fails to load. */
+const BUFFALO_PLACEHOLDER_SRC = '/guides/buffalo-link/buffalo-link-calculator-icon.webp'
+
 function formatGuideDate(iso) {
   if (!iso) return '—'
   try {
@@ -110,7 +113,7 @@ function isLocalDemoGuide(row) {
 function resolveCalculatorKey(machine) {
   if (!machine) return null
   const { slug, calculator_slug: calc, has_calculator: has } = machine
-  if (slug === 'buffalo-link' || calc === 'buffalo') return 'buffalo'
+  if (slug === 'buffalo-link' || slug === 'lightning-buffalo-link' || calc === 'buffalo') return 'buffalo'
   if (slug === 'stack-up-pays' || calc === 'stack-up-pays') return 'stackup'
   if (slug === 'phoenix-link' || calc === 'phoenix-link') return 'phoenix'
   if (
@@ -408,10 +411,14 @@ function makeGuideMarkdownComponents(machineSlug) {
   const h2Tone =
     machineSlug === 'phoenix-link'
       ? 'text-orange-100'
+      : machineSlug === 'lightning-buffalo-link'
+        ? 'text-indigo-100'
       : machineSlug === 'buffalo-link'
         ? 'text-amber-100'
         : machineSlug === 'stack-up-pays'
           ? 'text-cyan-100'
+          : machineSlug === 'aladdins-fortune'
+            ? 'text-emerald-100'
           : machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig'
             ? 'text-violet-100'
             : machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags'
@@ -431,6 +438,15 @@ function makeGuideMarkdownComponents(machineSlug) {
       <a href={href} className="text-cyan-400 underline font-medium hover:text-cyan-300">
         {children}
       </a>
+    ),
+    img: ({ src, alt }) => (
+      <img
+        src={src}
+        alt={alt ?? ''}
+        className="max-w-full h-auto rounded-xl border border-zinc-800/90 my-4 block"
+        loading="lazy"
+        decoding="async"
+      />
     ),
   }
 }
@@ -544,17 +560,19 @@ function GuideEvThresholdPanel({ line, accent }) {
 }
 
 function defaultHeroSrc(machineSlug) {
-  if (machineSlug === 'phoenix-link') return '/phoenix-link-logo.png'
-  if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
-  if (machineSlug === 'stack-up-pays') return '/stackup-icon.jpg'
-  if (machineSlug === 'adventures-of-sinbad') return '/adventures-of-sinbad-hero.webp'
+  if (machineSlug === 'buffalo-link') return '/guides/buffalo-link/hero.webp'
+  if (machineSlug === 'lightning-buffalo-link') return '/guides/lightning-buffalo-link/hero.webp'
+  if (machineSlug === 'phoenix-link') return '/guides/phoenix-link/hero.webp'
+  if (machineSlug === 'stack-up-pays') return '/guides/stack-up-pays/hero.webp'
+  if (machineSlug === 'adventures-of-sinbad') return '/guides/adventures-of-sinbad/hero.webp'
+  if (machineSlug === 'aladdins-fortune') return '/guides/aladdins-fortune/hero.webp'
   if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig')
-    return '/ainsworth-must-hit-by-hero.webp'
+    return '/guides/ainsworth-must-hit-by/hero.webp'
   if (machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags')
-    return '/ags-must-hit-by-hero.webp'
+    return '/guides/ags-must-hit-by/hero.webp'
   if (machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt')
-    return '/igt-must-hit-by-hero.webp'
-  return '/buffalo-icon.png'
+    return '/guides/igt-must-hit-by/hero.webp'
+  return BUFFALO_PLACEHOLDER_SRC
 }
 
 /** Supabase may return `machines` as an object or an array depending on FK metadata — pick the embed that matches `guides.slug` or carries `volatility_index`. */
@@ -577,20 +595,26 @@ function machineForGuide(row) {
 function heroImage(row) {
   const machine = machineForGuide(row)
   const ms = machine?.slug
-  return row.thumbnail_url || machine?.thumbnail_url || defaultHeroSrc(ms)
+  let thumb = row.thumbnail_url || machine?.thumbnail_url
+  if (typeof thumb === 'string' && /buffalo-icon\.png/i.test(thumb)) thumb = null
+  return thumb || defaultHeroSrc(ms)
 }
 
 function guideHeroImgOnError(e) {
   const el = e.currentTarget
   if (el.dataset.fallback === '1') return
   el.dataset.fallback = '1'
-  el.src = '/buffalo-icon.png'
+  el.src = BUFFALO_PLACEHOLDER_SRC
 }
 
 function heroGradientClass(machineSlug) {
+  if (machineSlug === 'lightning-buffalo-link')
+    return 'from-indigo-950/85 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
   if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'adventures-of-sinbad') return 'from-amber-950/85 via-orange-950/35 to-zinc-950'
+  if (machineSlug === 'aladdins-fortune')
+    return 'from-emerald-950/75 via-amber-950/30 to-zinc-950'
   if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig')
     return 'from-violet-950/85 via-fuchsia-950/35 to-zinc-950'
   if (machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags')
@@ -623,6 +647,18 @@ function cardAccent(machineSlug) {
         'rounded-xl border border-dashed border-cyan-400/55 bg-gradient-to-br from-cyan-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
       evTablesHead: 'text-cyan-300',
       evTablesRule: 'border-cyan-400/65',
+    }
+  }
+  if (machineSlug === 'lightning-buffalo-link') {
+    return {
+      chevron: 'text-indigo-400',
+      strong: 'text-indigo-50',
+      subtitle: 'text-amber-200/85',
+      expandedBorder: 'border-indigo-500/50 shadow-lg shadow-indigo-950/35',
+      evTablesBox:
+        'rounded-xl border border-dashed border-indigo-400/55 bg-gradient-to-br from-indigo-950/40 via-blue-950/25 to-zinc-950 px-4 py-3.5',
+      evTablesHead: 'text-indigo-300',
+      evTablesRule: 'border-indigo-400/65',
     }
   }
   if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig') {
@@ -659,6 +695,18 @@ function cardAccent(machineSlug) {
         'rounded-xl border border-dashed border-sky-400/55 bg-gradient-to-br from-sky-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
       evTablesHead: 'text-sky-300',
       evTablesRule: 'border-sky-400/65',
+    }
+  }
+  if (machineSlug === 'aladdins-fortune') {
+    return {
+      chevron: 'text-emerald-400',
+      strong: 'text-emerald-50',
+      subtitle: 'text-emerald-200/90',
+      expandedBorder: 'border-emerald-500/45 shadow-lg shadow-emerald-950/25',
+      evTablesBox:
+        'rounded-xl border border-dashed border-emerald-400/55 bg-gradient-to-br from-emerald-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
+      evTablesHead: 'text-emerald-300',
+      evTablesRule: 'border-emerald-400/65',
     }
   }
   return {
@@ -981,13 +1029,17 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                 ? 'focus-visible:ring-orange-500/60'
                 : slug === 'stack-up-pays'
                   ? 'focus-visible:ring-cyan-500/60'
-                  : slug === 'ainsworth-must-hit-by' || slug === 'must-hit-by-aig'
+                  : slug === 'lightning-buffalo-link'
+                    ? 'focus-visible:ring-indigo-500/60'
+                    : slug === 'ainsworth-must-hit-by' || slug === 'must-hit-by-aig'
                     ? 'focus-visible:ring-violet-500/60'
                     : slug === 'ags-must-hit-by' || slug === 'must-hit-by-ags'
                       ? 'focus-visible:ring-rose-500/60'
                       : slug === 'igt-must-hit-by' || slug === 'must-hit-by-igt'
                         ? 'focus-visible:ring-sky-500/60'
-                        : 'focus-visible:ring-amber-500/60'
+                        : slug === 'aladdins-fortune'
+                          ? 'focus-visible:ring-emerald-500/60'
+                          : 'focus-visible:ring-amber-500/60'
 
             return (
               <li key={row.id || row.slug}>
