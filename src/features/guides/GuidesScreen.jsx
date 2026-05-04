@@ -115,8 +115,11 @@ function resolveCalculatorKey(machine) {
   if (slug === 'phoenix-link' || calc === 'phoenix-link') return 'phoenix'
   if (
     slug === 'ainsworth-must-hit-by' ||
+    slug === 'must-hit-by-aig' ||
     slug === 'ags-must-hit-by' ||
+    slug === 'must-hit-by-ags' ||
     slug === 'igt-must-hit-by' ||
+    slug === 'must-hit-by-igt' ||
     calc === 'mhb'
   ) {
     return 'mhb'
@@ -219,7 +222,7 @@ function mergeLocalGuideDemos(rows) {
     })
   }
 
-  if (!slugs.has(AINSWORTH_MUST_HIT_BY_DEMO_SLUG)) {
+  if (!slugs.has(AINSWORTH_MUST_HIT_BY_DEMO_SLUG) && !slugs.has('must-hit-by-aig')) {
     extras.push({
       id: 'local-demo-ainsworth-must-hit-by',
       slug: 'ainsworth-must-hit-by',
@@ -251,7 +254,7 @@ function mergeLocalGuideDemos(rows) {
     })
   }
 
-  if (!slugs.has(AGS_MUST_HIT_BY_DEMO_SLUG)) {
+  if (!slugs.has(AGS_MUST_HIT_BY_DEMO_SLUG) && !slugs.has('must-hit-by-ags')) {
     extras.push({
       id: 'local-demo-ags-must-hit-by',
       slug: 'ags-must-hit-by',
@@ -282,7 +285,7 @@ function mergeLocalGuideDemos(rows) {
     })
   }
 
-  if (!slugs.has(IGT_MUST_HIT_BY_DEMO_SLUG)) {
+  if (!slugs.has(IGT_MUST_HIT_BY_DEMO_SLUG) && !slugs.has('must-hit-by-igt')) {
     extras.push({
       id: 'local-demo-igt-must-hit-by',
       slug: 'igt-must-hit-by',
@@ -343,11 +346,11 @@ function makeGuideMarkdownComponents(machineSlug) {
         ? 'text-amber-100'
         : machineSlug === 'stack-up-pays'
           ? 'text-cyan-100'
-          : machineSlug === 'ainsworth-must-hit-by'
+          : machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig'
             ? 'text-violet-100'
-            : machineSlug === 'ags-must-hit-by'
+            : machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags'
               ? 'text-rose-100'
-              : machineSlug === 'igt-must-hit-by'
+              : machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt'
                 ? 'text-sky-100'
                 : 'text-amber-100'
   return {
@@ -452,9 +455,12 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'buffalo-link') return '/buffalo-icon.png'
   if (machineSlug === 'stack-up-pays') return '/stackup-icon.jpg'
   if (machineSlug === 'adventures-of-sinbad') return '/adventures-of-sinbad-hero.webp'
-  if (machineSlug === 'ainsworth-must-hit-by') return '/ainsworth-must-hit-by-hero.png'
-  if (machineSlug === 'ags-must-hit-by') return '/ags-must-hit-by-hero.png'
-  if (machineSlug === 'igt-must-hit-by') return '/igt-must-hit-by-hero.png'
+  if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig')
+    return '/ainsworth-must-hit-by-hero.webp'
+  if (machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags')
+    return '/ags-must-hit-by-hero.webp'
+  if (machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt')
+    return '/igt-must-hit-by-hero.webp'
   return '/buffalo-icon.png'
 }
 
@@ -482,9 +488,12 @@ function heroGradientClass(machineSlug) {
   if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
   if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'adventures-of-sinbad') return 'from-amber-950/85 via-orange-950/35 to-zinc-950'
-  if (machineSlug === 'ainsworth-must-hit-by') return 'from-violet-950/85 via-fuchsia-950/35 to-zinc-950'
-  if (machineSlug === 'ags-must-hit-by') return 'from-rose-950/85 via-red-950/40 to-zinc-950'
-  if (machineSlug === 'igt-must-hit-by') return 'from-sky-950/80 via-blue-950/45 to-zinc-950'
+  if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig')
+    return 'from-violet-950/85 via-fuchsia-950/35 to-zinc-950'
+  if (machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags')
+    return 'from-rose-950/85 via-red-950/40 to-zinc-950'
+  if (machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt')
+    return 'from-sky-950/80 via-blue-950/45 to-zinc-950'
   return 'from-amber-900/40 to-zinc-950'
 }
 
@@ -511,7 +520,7 @@ function cardAccent(machineSlug) {
         'border-cyan-400/55 bg-gradient-to-br from-cyan-950/60 via-zinc-900/55 to-zinc-950 ring-2 ring-cyan-500/25 shadow-lg shadow-cyan-950/35',
     }
   }
-  if (machineSlug === 'ainsworth-must-hit-by') {
+  if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig') {
     return {
       chevron: 'text-fuchsia-400',
       strong: 'text-violet-50',
@@ -860,11 +869,11 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
                 ? 'focus-visible:ring-orange-500/60'
                 : slug === 'stack-up-pays'
                   ? 'focus-visible:ring-cyan-500/60'
-                  : slug === 'ainsworth-must-hit-by'
+                  : slug === 'ainsworth-must-hit-by' || slug === 'must-hit-by-aig'
                     ? 'focus-visible:ring-violet-500/60'
-                    : slug === 'ags-must-hit-by'
+                    : slug === 'ags-must-hit-by' || slug === 'must-hit-by-ags'
                       ? 'focus-visible:ring-rose-500/60'
-                      : slug === 'igt-must-hit-by'
+                      : slug === 'igt-must-hit-by' || slug === 'must-hit-by-igt'
                         ? 'focus-visible:ring-sky-500/60'
                         : 'focus-visible:ring-amber-500/60'
 

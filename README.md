@@ -141,7 +141,7 @@ Run sync whenever you add games, change manifests, or update `guide.md` and want
 
 ### Windows note
 
-On a case-insensitive drive, mixed-case legacy folders (for example `Phoenix-Link`) collide with canonical `phoenix-link`. The sync script only reads **lowercase kebab-case** directories (`a-z`, `0-9`, hyphens). Asset-only trees were renamed to match (e.g. `must-hit-by-igt`, `rich-little-hens`, `cash-falls`).
+On a case-insensitive drive, mixed-case legacy folders (for example `Phoenix-Link`) collide with canonical `phoenix-link`. The sync script only reads **lowercase kebab-case** directories (`a-z`, `0-9`, hyphens). Asset-only trees were renamed to match (e.g. `igt-must-hit-by`, `rich-little-hens`, `cash-falls`).
 
 ## Further reading
 
