@@ -1,4 +1,4 @@
-# Desktop only: registers LVSlotPro_CursorChatExport_Desktop (every 30 min) -> session-chat-export-desktop.md
+# Desktop only: registers LVSlotPro_CursorChatExport_Desktop (every 30 min) -> session-chat-export.md
 # Remove: Unregister-ScheduledTask -TaskName 'LVSlotPro_CursorChatExport_Desktop' -Confirm:$false
 
 $ErrorActionPreference = 'Stop'
@@ -13,5 +13,5 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($existing) { Unregister-ScheduledTask -TaskName $taskName -Confirm:$false }
 
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description 'LVSlotPro: append Cursor chat transcript to session-chat-export-desktop.md every 30 minutes.'
-Write-Host "Registered '$taskName'. Log: $(Join-Path $repoRoot 'session-chat-export-desktop.md')"
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description 'LVSlotPro: append Cursor chat transcript to session-chat-export.md every 30 minutes (tag: Desktop).'
+Write-Host "Registered '$taskName'. Log: $(Join-Path $repoRoot 'session-chat-export.md')"

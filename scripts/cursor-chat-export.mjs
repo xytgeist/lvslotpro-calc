@@ -5,7 +5,8 @@
  * Env:
  *   CURSOR_AGENT_TRANSCRIPTS — override folder containing per-chat UUID dirs with *.jsonl
  *   CHAT_EXPORT_HANDOFF — output markdown file (required for machine-specific runners)
- *   CHAT_EXPORT_STATE_ID — suffix for .cursor/chat-export-state-<id>.json (default: default)
+ *   CHAT_EXPORT_STATE_ID — suffix for .cursor/chat-export-state-<id>.json (default: default); also used as export source label (desktop / laptop)
+ *   CHAT_EXPORT_SOURCE_LABEL — optional display label for the meta line (e.g. "Desktop"); defaults from STATE_ID
  */
 
 import fs from "fs";
@@ -23,6 +24,33 @@ const handoffPath = process.env.CHAT_EXPORT_HANDOFF
 
 const stateIdRaw = process.env.CHAT_EXPORT_STATE_ID || "default";
 const stateId = /^[a-zA-Z0-9_-]+$/.test(stateIdRaw) ? stateIdRaw : "default";
+
+/** One-line prefix for each append: local date, time, machine source. */
+function exportMetaLine() {
+  const labelEnv = (process.env.CHAT_EXPORT_SOURCE_LABEL || "").trim();
+  const fromState = {
+    desktop: "Desktop",
+    laptop: "Laptop",
+    default: "Default",
+  }[stateId];
+  const source =
+    labelEnv ||
+    fromState ||
+    (stateId ? stateId.charAt(0).toUpperCase() + stateId.slice(1) : "Unknown");
+  const d = new Date();
+  const datePart = d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const timePart = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  return `**${datePart}, ${timePart} — ${source}**`;
+}
 
 function cursorProjectSlugFromWorkspace(absWorkspace) {
   const parts = path.resolve(absWorkspace).split(path.sep).filter(Boolean);
@@ -133,7 +161,8 @@ async function main() {
   }
 
   const stamp = new Date().toISOString();
-  const header = `\n---\n\n## Chat export (${stamp})\n\n_Source: \`${path.basename(path.dirname(jsonlPath))}\` — lines ${start + 1}–${lines.length}_\n\n`;
+  const meta = exportMetaLine();
+  const header = `\n---\n\n${meta}\n\n## Chat export (${stamp})\n\n_Source: \`${path.basename(path.dirname(jsonlPath))}\` — lines ${start + 1}–${lines.length}_\n\n`;
   const chunk = header + blocks.join("\n");
 
   await fsp.appendFile(handoffPath, chunk, "utf8");
