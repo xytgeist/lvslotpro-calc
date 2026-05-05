@@ -19,7 +19,6 @@ export const SLUG_CARD_EV_THRESHOLD = {
   'phoenix-link': 'Cheap path to must-hit award',
   'stack-up-pays': 'Stacks / meters beat the grind tax',
   'plants-vs-zombies-3d': 'Brain meter 150–200+ on your tier',
-  'adventures-of-sinbad': '2 bosses down; Cyclops close on map',
   'cash-machine-lock': 'Lock EV clears buy-in hurdle',
   'legend-of-the-phoenix': 'Red 12 / Green 13 / Blue 14',
 }

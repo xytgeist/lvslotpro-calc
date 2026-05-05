@@ -106,5 +106,4 @@ INSERT INTO machines (slug, name, manufacturer, type, difficulty, vegas_availabi
 ('lucky-lemmings-stampede', 'Lucky Lemmings Stampede', 'Aristocrat', 'Persistent State', 'Intermediate', 'Common', 'Medium', false, null),
 ('treasure-blast', 'Treasure Blast', 'Aristocrat', 'Persistent State', 'Intermediate', 'Common', 'Medium', false, null),
 ('magic-treasures', 'Magic Treasures', 'Aristocrat', 'Persistent State', 'Intermediate', 'Common', 'Medium', false, null),
-('plants-vs-zombies-3d', 'Plants vs Zombies 3D: Ancient Egypt', 'IGT', 'Accumulator', 'Intermediate', 'Very Common', 'Medium', false, null),
-('adventures-of-sinbad', 'Adventures of Sinbad!', 'Azure Gaming', 'Hybrid', 'Intermediate', 'Common', 'Low', false, null);
+('plants-vs-zombies-3d', 'Plants vs Zombies 3D: Ancient Egypt', 'IGT', 'Accumulator', 'Intermediate', 'Very Common', 'Medium', false, null);

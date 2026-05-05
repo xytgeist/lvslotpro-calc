@@ -682,7 +682,6 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'legend-of-the-phoenix')
     return '/guides/legend-of-the-phoenix/hero.webp'
   if (machineSlug === 'stack-up-pays') return '/guides/stack-up-pays/hero.webp'
-  if (machineSlug === 'adventures-of-sinbad') return '/guides/adventures-of-sinbad/hero.webp'
   if (machineSlug === 'aladdins-fortune') return '/guides/aladdins-fortune/hero.webp'
   if (machineSlug === 'aztec-banner') return '/guides/aztec-banner/hero.webp'
   if (machineSlug === 'pegasus-banner') return '/guides/pegasus-banner/hero.webp'
@@ -734,7 +733,6 @@ function heroGradientClass(machineSlug) {
   if (machineSlug === 'legend-of-the-phoenix')
     return 'from-red-950/80 via-orange-950/40 to-zinc-950'
   if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
-  if (machineSlug === 'adventures-of-sinbad') return 'from-amber-950/85 via-orange-950/35 to-zinc-950'
   if (machineSlug === 'aladdins-fortune')
     return 'from-emerald-950/75 via-amber-950/30 to-zinc-950'
   if (machineSlug === 'aztec-banner')

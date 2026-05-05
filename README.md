@@ -82,7 +82,7 @@ npm run slots:sync:test:dry:quiet        # dry-run, short output only
 Single game only:
 
 ```bash
-node scripts/sync-slot-forms-to-supabase.mjs --target=test --slug=adventures-of-sinbad
+node scripts/sync-slot-forms-to-supabase.mjs --target=test --slug=buffalo-link
 ```
 
 (`--target=production` works the same; use any folder slug under `Slots/`.)
@@ -129,7 +129,7 @@ node scripts/sync-slot-forms-to-supabase.mjs --target=test --slug=adventures-of-
 
    The sync script reads **`Slots/...`** and prints **`Slots sync → <target> → <hostname>`** before writing so you can confirm which Supabase instance you hit.
 
-   **`TypeError: fetch failed`** on upsert means the HTTP client couldn’t reach your project (wrong URL, paused project, DNS, firewall/VPN blocking `*.supabase.co`, TLS issues). Fix connectivity; the slug printed first (e.g. `adventures-of-sinbad`) is alphabetical, not broken data.
+  **`TypeError: fetch failed`** on upsert means the HTTP client couldn’t reach your project (wrong URL, paused project, DNS, firewall/VPN blocking `*.supabase.co`, TLS issues). Fix connectivity; the slug printed first (e.g. `buffalo-link`) is alphabetical, not broken data.
 
 Optional: sync a single game:
 
