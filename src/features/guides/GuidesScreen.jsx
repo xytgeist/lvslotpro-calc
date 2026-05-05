@@ -565,6 +565,7 @@ function GuideEvThresholdPanel({ line, accent }) {
 
 function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'buffalo-link') return '/guides/buffalo-link/hero.webp'
+  if (machineSlug === 'buffalo-ascension') return '/guides/buffalo-ascension/hero.webp'
   if (machineSlug === 'lightning-buffalo-link') return '/guides/lightning-buffalo-link/hero.webp'
   if (machineSlug === 'phoenix-link') return '/guides/phoenix-link/hero.webp'
   if (machineSlug === 'stack-up-pays') return '/guides/stack-up-pays/hero.webp'

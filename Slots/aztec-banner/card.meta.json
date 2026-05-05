@@ -11,8 +11,8 @@
     "nerf_risk": "Medium",
     "has_calculator": false,
     "calculator_slug": null,
-    "volatility_index": null,
-    "popularity_summary": null,
+    "volatility_index": "Low",
+    "popularity_summary": null, 
     "release_year": 2023
   },
   "guide_seed": {
