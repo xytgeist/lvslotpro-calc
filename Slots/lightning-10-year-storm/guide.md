@@ -26,7 +26,7 @@ This is a **HIGHLY VOLATILE** machine. RTP varies significantly by bet/denom - j
 
 Due to the highly volatile nature of this game, I included a **Walk Away Advisor** in the calculator to help gauge optimal stopping points where you can consider walking away or selling off a % - even when the machine remains in a **+EV state**. Yes, +EV is +EV, but run a hundred of these plays and I guarantee you'll start considering it! 
 
-## 🎭 Skins (same game different theme/art)
+## 🎭 Skins (same game, different theme/art)
 
 [Phoenix Link](guide:phoenix-link)
 
