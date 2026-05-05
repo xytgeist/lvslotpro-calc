@@ -34,10 +34,11 @@ This is a **medium to high volatility** machine that can have extreme session sw
 
 **Eagle Ascension** is a **5-reel, ways-to-win** video slot by Aristocrat (released in 2024) that features **persistent reel expansion** on the middle three reels. Reels 1 and 5 stay at 4 positions high, while Reels 2, 3, and 4 can grow up to **7 positions high** as Arrow symbols land.
 
-Every Arrow that lands on a middle reel increases that reel’s height by one position, boosting the total **ways to win** (up to 5,488 maximum). The game clearly displays the current ways count. When a reel hits 7 high and receives another Arrow, it triggers a feature (Golden Eagle or Free Games) and resets to 4 high.
+Every Arrow that lands on a middle reel increases that reel’s height by one position, boosting the total **ways to win** (up to 5,488 maximum). The game clearly displays the current ways count. When a reel hits 7 high and receives another Arrow, it triggers a feature (Golden Eagle/Purple Eagle/Free Games) and resets to 4 high.
 
-- **Golden Eagle**: Eagle symbols fly across the screen turning many positions into high-paying Eagles.
-- **Free Games**: 8–20 spins with multipliers that can retrigger. Reel heights persist into the bonus.
+- **Golden Eagle**: Multiple randomly selected symbols are changed to high-paying Eagle symbols. 
+- **Purple Eagle**: Randomly selected symbols are changed to high-paying Eagle symbols. 
+- **Free Games**: 10 spins with multiplier wilds. Can be retriggered with multiple coins landed. Reel heights persist into the bonus.
 - **Progressive Jackpot**: Awarded via Gold Arrow on Reel 3 at max height.
 
 The persistent growing reels create highly visible +EV opportunities. Higher ways and taller middle reels significantly improve hit frequency and payout potential, making this one of the most popular AP targets on modern casino floors.

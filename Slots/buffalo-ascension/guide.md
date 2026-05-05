@@ -35,7 +35,7 @@ This is a **medium to high volatility** machine that can have extreme session sw
 Every Arrow that lands on a middle reel increases that reel’s height by one position, boosting the total **ways to win** (up to 5,488 maximum). The game clearly displays the current ways count. When a reel hits 7 high and receives another Arrow, it triggers a feature (Stampede, Super Stampede, or Free Games) and resets to 4 high.
 
 - **Stampede / Super Stampede**: Buffalo symbols charge across the screen turning many positions into high-paying Buffalos.
-- **Free Games**: 8–20 spins with multipliers that can retrigger. Reel heights persist into the bonus.
+- **Free Games**: 8 spins with multiplier wilds. Can be retriggered by landing multiple coins. Reel heights persist into the bonus.
 - **Progressive Jackpot**: Awarded via Gold Arrow on Reel 3 at max height.
 
 The persistent growing reels create highly visible +EV opportunities. Higher ways and taller middle reels significantly improve hit frequency and payout potential, making this one of the most popular AP targets on modern casino floors.
