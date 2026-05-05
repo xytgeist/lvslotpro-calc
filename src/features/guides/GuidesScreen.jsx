@@ -407,7 +407,8 @@ function cardEvThresholdForRow(row) {
 
 const TYPE_LINE_FALLBACK_GUIDE_HINT = 'Verify +EV on the glass — open guide'
 
-function makeGuideMarkdownComponents(machineSlug) {
+/** Markdown links `[label](guide:slug)` jump to another guide card (same list). */
+function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
   const h2Tone =
     machineSlug === 'phoenix-link'
       ? 'text-orange-100'
@@ -461,11 +462,30 @@ function makeGuideMarkdownComponents(machineSlug) {
     ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1.5 text-zinc-300 mb-3">{children}</ol>,
     li: ({ children }) => <li className="leading-relaxed">{children}</li>,
     strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
-    a: ({ href, children }) => (
-      <a href={href} className="text-cyan-400 underline font-medium hover:text-cyan-300">
-        {children}
-      </a>
-    ),
+    a: ({ href, children }) => {
+      if (typeof href === 'string') {
+        const m = /^guide:/i.exec(href)
+        if (m) {
+          const target = href.slice(m[0].length).trim().replace(/^\/+|\/+$/g, '')
+          if (target && onOpenGuideSlug) {
+            return (
+              <button
+                type="button"
+                className="text-cyan-400 underline font-medium hover:text-cyan-300 bg-transparent border-0 p-0 cursor-pointer text-left font-[inherit]"
+                onClick={() => onOpenGuideSlug(target)}
+              >
+                {children}
+              </button>
+            )
+          }
+        }
+      }
+      return (
+        <a href={href} className="text-cyan-400 underline font-medium hover:text-cyan-300">
+          {children}
+        </a>
+      )
+    },
     img: ({ src, alt }) => (
       <img
         src={src}
@@ -473,6 +493,12 @@ function makeGuideMarkdownComponents(machineSlug) {
         className="max-w-full h-auto rounded-xl border border-zinc-800/90 my-4 block"
         loading="lazy"
         decoding="async"
+      />
+    ),
+    hr: () => (
+      <hr
+        role="separator"
+        className="my-7 border-0 h-px w-full max-w-full bg-gradient-to-r from-transparent via-zinc-500/45 to-transparent"
       />
     ),
   }
@@ -912,6 +938,15 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
   const [askFor, setAskFor] = useState(null)
   const guideCardRefs = useRef(Object.create(null))
 
+  const openGuideSlug = useCallback((rawSlug) => {
+    const s = String(rawSlug || '')
+      .trim()
+      .toLowerCase()
+    if (!s) return
+    setQuery('')
+    setExpandedSlug(s)
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     setLoadErr('')
@@ -1078,7 +1113,9 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
           {filtered.map((row) => {
             const m = machineForGuide(row)
             const slug = m?.slug || row.slug
-            const expanded = expandedSlug === slug
+            const expanded =
+              expandedSlug != null &&
+              String(expandedSlug).toLowerCase() === String(slug || '').toLowerCase()
             const calcKey = resolveCalculatorKey(m)
             const evThresholdLine = cardEvThresholdForRow(row)
             const accent = cardAccent(slug)
@@ -1281,7 +1318,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
 
                   {expanded ? (
                     <div className="border-t border-zinc-800 px-4 py-5 bg-zinc-950/90 text-sm max-w-none">
-                      <ReactMarkdown components={makeGuideMarkdownComponents(slug)}>
+                      <ReactMarkdown components={makeGuideMarkdownComponents(slug, { onOpenGuideSlug: openGuideSlug })}>
                         {row.content_markdown || ''}
                       </ReactMarkdown>
                     </div>

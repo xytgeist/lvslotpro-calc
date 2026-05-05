@@ -20,6 +20,14 @@ The banners are **clearly visible** on the display.
 
 This is a **very low risk machine** as only **a few spins** are required. You will often get blanked or paid very little, but occasionally you’ll smash for **many units**.
 
+## 🎭 Skins (same game different theme/art)
+
+[Pegasus Banner](guide:pegasus-banner)
+
+---
+
+_Supplemental — everything **below** this line is **optional**. You don’t need it to use what’s above; read on only if you want extra game detail._
+
 ## 🎰 Gameplay Mechanics
 
 The Aztec Banner slot features a **5×4 reel layout** with **40 fixed paylines**, meaning **every spin** plays **all lines**. Bets **start at a minimum of 50 credits** and **scale upward**, with **multi-denomination support** that lets casinos offer it across various **penny and nickel denominations**.
