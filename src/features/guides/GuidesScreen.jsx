@@ -680,6 +680,7 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'eagle-ascension') return '/guides/eagle-ascension/hero.webp'
   if (machineSlug === 'lightning-buffalo-link') return '/guides/lightning-buffalo-link/hero.webp'
   if (machineSlug === 'phoenix-link') return '/guides/phoenix-link/hero.webp'
+  if (machineSlug === 'lightning-10-year-storm') return '/guides/lightning-10-year-storm/hero.webp'
   if (machineSlug === 'legend-of-the-phoenix')
     return '/guides/legend-of-the-phoenix/hero.webp'
   if (machineSlug === 'stack-up-pays') return '/guides/stack-up-pays/hero.webp'

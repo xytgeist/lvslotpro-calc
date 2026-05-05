@@ -30,7 +30,7 @@ Due to the highly volatile nature of this game, I included a **Walk Away Advisor
 
 ## 🎭 Skins (same game different theme/art)
 
-Lightning 10-Year Storm
+[Lightning 10-Year Storm](guide:lightning-10-year-storm)
 
 ![Lightning 10-Year Storm skin: middle crop from Phoenix Link hero](/guides/lightning-10-year-storm/lightning-10-year-storm-skin.webp)
 
