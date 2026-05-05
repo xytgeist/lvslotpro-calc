@@ -2,35 +2,35 @@
   "schema_version": 1,
   "source": "LVSlotPro repo Slots/<slug>/ — edit and run npm run slots:sync",
   "machine": {
-    "slug": "legends-of-the-phoenix",
-    "name": "Legends of the Phoenix",
-    "manufacturer": "Light & Wonder",
+    "slug": "legend-of-the-phoenix",
+    "name": "Legend of the Phoenix",
+    "manufacturer": "IGT",
     "type": "Persistent State",
     "difficulty": "Intermediate",
-    "vegas_availability": "Rare",
+    "vegas_availability": "Common",
     "nerf_risk": "Medium",
     "has_calculator": false,
     "calculator_slug": null,
-    "volatility_index": null,
+    "volatility_index": "Medium",
     "popularity_summary": null,
-    "release_year": null
+    "release_year": 2022
   },
   "guide_seed": {
-    "slug": "legends-of-the-phoenix",
-    "title": "Legends of the Phoenix",
+    "slug": "legend-of-the-phoenix",
+    "title": "Legend of the Phoenix",
     "published": true,
     "card_summary_bullets": [
       "Persistent State: Persistent meters / signatures on the glass — weak state vs strong state is the whole game.",
-      "Floor / rarity: Rare — re-verify same visit.",
-      "Nerf: Medium — Light & Wonder / jurisdictional packaging changes outcomes."
+      "Floor / rarity: Common — re-verify same visit.",
+      "Nerf: Medium — IGT / jurisdictional packaging changes outcomes."
     ],
     "content_markdown_file": "guide.md",
     "last_updated": null,
-    "card_ev_threshold": "Strong meters / state vs cost to clear"
+    "card_ev_threshold": "Red 12 / Green 13 / Blue 14"
   },
   "ap": {
-    "volatility_summary": "Intermediate play profile; nerf risk rated **Medium** for marketing/paytable drift.",
-    "popularity_summary": "Floor presence (from seed): **Rare**. Treat as marketing signal, not proof of edge.",
+    "volatility_summary": "**Medium** volatility; nerf risk rated **Medium** for marketing/paytable drift.",
+    "popularity_summary": "Floor presence (from seed): **Common**. Treat as marketing signal, not proof of edge.",
     "edge_vectors": [
       "Persistent meters / signatures on the glass — weak state vs strong state is the whole game.",
       "Cross-meter correlation: one 'good' meter can be negated by bad neighbors.",
@@ -50,7 +50,7 @@
   "assets": {
     "hero_relative": "hero.webp",
     "thumbnails_relative": [],
-    "diagrams_relative": ["tripledoublediamond.webp"],
+    "diagrams_relative": ["tripledoublediamond.webp", "legend-of-the-peacock.webp"],
     "legacy_slots_subfolder": null
   }
 }

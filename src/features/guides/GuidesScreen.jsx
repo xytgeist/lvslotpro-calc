@@ -36,6 +36,11 @@ import { defaultCardEvThresholdForSlug } from '../../constants/slotCardEvThresho
 /** Calculator / generic placeholder art for Buffalo Link — also used when a guide hero fails to load. */
 const BUFFALO_PLACEHOLDER_SRC = '/guides/buffalo-link/buffalo-link-calculator-icon.webp'
 
+/** Retired slugs → current slug (markdown `guide:` links, bookmarks). */
+const GUIDE_SLUG_CANONICAL = {
+  'legends-of-the-phoenix': 'legend-of-the-phoenix',
+}
+
 function formatGuideDate(iso) {
   if (!iso) return '—'
   try {
@@ -414,12 +419,33 @@ function guideMarkdownUrlTransform(url) {
   return defaultUrlTransform(u)
 }
 
+function flattenMarkdownText(children) {
+  if (typeof children === 'string' || typeof children === 'number') return String(children)
+  if (!Array.isArray(children)) return ''
+  return children
+    .map((c) => {
+      if (typeof c === 'string' || typeof c === 'number') return String(c)
+      if (c && typeof c === 'object' && 'props' in c) return flattenMarkdownText(c.props?.children)
+      return ''
+    })
+    .join('')
+}
+
+function tintRedGreenBlue(children) {
+  const raw = flattenMarkdownText(children).trim()
+  const normalized = raw.toLowerCase()
+  if (normalized === 'red') return <span className="text-red-400 font-semibold">{children}</span>
+  if (normalized === 'green') return <span className="text-emerald-400 font-semibold">{children}</span>
+  if (normalized === 'blue') return <span className="text-sky-400 font-semibold">{children}</span>
+  return children
+}
+
 /** Markdown links `[label](guide:slug)` jump to another guide card (same list). */
 function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
   const h2Tone =
     machineSlug === 'phoenix-link'
       ? 'text-orange-100'
-      : machineSlug === 'legends-of-the-phoenix'
+      : machineSlug === 'legend-of-the-phoenix'
         ? 'text-orange-100'
       : machineSlug === 'lightning-buffalo-link'
         ? 'text-indigo-100'
@@ -447,7 +473,7 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
         ? 'to-sky-500/60'
       : machineSlug === 'aladdins-fortune'
         ? 'to-emerald-500/60'
-      : machineSlug === 'legends-of-the-phoenix'
+      : machineSlug === 'legend-of-the-phoenix'
         ? 'to-orange-500/62'
       : 'to-amber-500/55'
   const guideHrVia =
@@ -457,7 +483,7 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
         ? 'via-sky-500/50'
       : machineSlug === 'aladdins-fortune'
         ? 'via-emerald-500/50'
-      : machineSlug === 'legends-of-the-phoenix'
+      : machineSlug === 'legend-of-the-phoenix'
         ? 'via-orange-500/52'
       : 'via-amber-500/48'
   return {
@@ -516,6 +542,20 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
         decoding="async"
       />
     ),
+    table: ({ children }) => (
+      <div className="my-4 overflow-x-auto rounded-xl border border-zinc-800/90">
+        <table className="min-w-full border-collapse text-sm text-zinc-200">{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => <thead className="bg-zinc-900/80">{children}</thead>,
+    tbody: ({ children }) => <tbody className="divide-y divide-zinc-800/70">{children}</tbody>,
+    tr: ({ children }) => <tr className="odd:bg-zinc-950/55 even:bg-zinc-950/25">{children}</tr>,
+    th: ({ children }) => (
+      <th className="px-3 py-2 text-left font-bold uppercase tracking-wide text-zinc-100">
+        {tintRedGreenBlue(children)}
+      </th>
+    ),
+    td: ({ children }) => <td className="px-3 py-2 align-top">{tintRedGreenBlue(children)}</td>,
     hr: () => (
       <hr
         role="separator"
@@ -638,8 +678,8 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'buffalo-ascension') return '/guides/buffalo-ascension/hero.webp'
   if (machineSlug === 'lightning-buffalo-link') return '/guides/lightning-buffalo-link/hero.webp'
   if (machineSlug === 'phoenix-link') return '/guides/phoenix-link/hero.webp'
-  if (machineSlug === 'legends-of-the-phoenix')
-    return '/guides/legends-of-the-phoenix/hero.webp'
+  if (machineSlug === 'legend-of-the-phoenix')
+    return '/guides/legend-of-the-phoenix/hero.webp'
   if (machineSlug === 'stack-up-pays') return '/guides/stack-up-pays/hero.webp'
   if (machineSlug === 'adventures-of-sinbad') return '/guides/adventures-of-sinbad/hero.webp'
   if (machineSlug === 'aladdins-fortune') return '/guides/aladdins-fortune/hero.webp'
@@ -690,7 +730,7 @@ function heroGradientClass(machineSlug) {
   if (machineSlug === 'lightning-buffalo-link')
     return 'from-indigo-950/85 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
-  if (machineSlug === 'legends-of-the-phoenix')
+  if (machineSlug === 'legend-of-the-phoenix')
     return 'from-red-950/80 via-orange-950/40 to-zinc-950'
   if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'adventures-of-sinbad') return 'from-amber-950/85 via-orange-950/35 to-zinc-950'
@@ -722,7 +762,7 @@ function cardAccent(machineSlug) {
       evTablesRule: 'border-orange-400/65',
     }
   }
-  if (machineSlug === 'legends-of-the-phoenix') {
+  if (machineSlug === 'legend-of-the-phoenix') {
     return {
       chevron: 'text-orange-400',
       strong: 'text-orange-50',
@@ -976,10 +1016,11 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
   const guideCardRefs = useRef(Object.create(null))
 
   const openGuideSlug = useCallback((rawSlug) => {
-    const s = String(rawSlug || '')
+    let s = String(rawSlug || '')
       .trim()
       .toLowerCase()
     if (!s) return
+    s = GUIDE_SLUG_CANONICAL[s] || s
     setQuery('')
     setExpandedSlug(s)
   }, [])
@@ -1159,7 +1200,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
             const ringFocus =
               slug === 'phoenix-link'
                 ? 'focus-visible:ring-orange-500/60'
-                : slug === 'legends-of-the-phoenix'
+                : slug === 'legend-of-the-phoenix'
                   ? 'focus-visible:ring-orange-500/60'
                   : slug === 'stack-up-pays'
                   ? 'focus-visible:ring-cyan-500/60'

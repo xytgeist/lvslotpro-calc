@@ -90,7 +90,7 @@ INSERT INTO machines (slug, name, manufacturer, type, difficulty, vegas_availabi
 ('golden-jungle-grand', 'Golden Jungle Grand', 'Light & Wonder', 'Persistent State', 'Intermediate', 'Rare', 'Medium', false, null),
 ('aladdins-fortune', 'Aladdin''s Fortune', 'Light & Wonder', 'Persistent State', 'Intermediate', 'Rare', 'Medium', false, null),
 ('treasure-box', 'Treasure Box', 'Light & Wonder', 'Persistent State', 'Intermediate', 'Rare', 'Medium', false, null),
-('legends-of-the-phoenix', 'Legends of the Phoenix', 'Light & Wonder', 'Persistent State', 'Intermediate', 'Rare', 'Medium', false, null),
+('legend-of-the-phoenix', 'Legend of the Phoenix', 'IGT', 'Persistent State', 'Intermediate', 'Common', 'Medium', false, null),
 ('sh-green-stamps', 'S&H Green Stamps', 'Classic', 'Accumulator', 'Beginner', 'Rare (nostalgia)', 'Low', false, null),
 ('farmville-style', 'Farmville-style Collector', 'Various', 'Accumulator', 'Intermediate', 'Rare', 'Medium', false, null),
 ('nfl-variable-state', 'NFL Variable State Slot', 'Various', 'Persistent State', 'Advanced', 'Rare', 'High', false, null),

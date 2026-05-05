@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/guides/legends-of-the-phoenix/:path*",
+      "destination": "/guides/legend-of-the-phoenix/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/reset-password", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }

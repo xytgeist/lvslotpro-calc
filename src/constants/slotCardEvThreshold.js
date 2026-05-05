@@ -21,11 +21,13 @@ export const SLUG_CARD_EV_THRESHOLD = {
   'plants-vs-zombies-3d': 'Brain meter 150–200+ on your tier',
   'adventures-of-sinbad': '2 bosses down; Cyclops close on map',
   'cash-machine-lock': 'Lock EV clears buy-in hurdle',
+  'legend-of-the-phoenix': 'Red 12 / Green 13 / Blue 14',
 }
 
 /** Year-only when documented / widely cited — expand as you confirm. */
 export const SLUG_RELEASE_YEAR = {
   'plants-vs-zombies-3d': 2016,
+  'legend-of-the-phoenix': 2022,
 }
 
 /** Map messy DB/UI type strings onto keys in TYPE_DEFAULT_CARD_EV_THRESHOLD. */
