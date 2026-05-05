@@ -25,11 +25,11 @@ Variance on this machine can be high depending on several factors:
 - **Target bonus** - Running a Red at 12 holds significantly less risk than a Green at 13 and massively lower risk than a Blue 14.
 - **RTP / Settings** – Each meter increments at a static frequency – but that frequency can vary wildly based on the machine settings. The possible frequency settings are:
 
-| Setting | **Red** | **Green** | **Blue** |
-| :-- | --: | --: | --: |
-| Profile 1 | 48 | 175 | 600 |
-| Profile 2 | 75 | 250 | 600 |
-| Profile 3 | 110 | 330 | 850 |
+| Red | Green | Blue |
+| --: | --: | --: |
+| 48 | 175 | 600 |
+| 75 | 250 | 600 |
+| 110 | 330 | 850 |
 
 - Did you find the machine **cold**, or was someone playing it and you were able to **count the spins**
 
