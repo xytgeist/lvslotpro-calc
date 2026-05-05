@@ -1,51 +1,41 @@
-# Pegasus Banner — advantage play guide
+# Pegasus Banner
 
-_Sync to Supabase with `npm run slots:sync` when you want the app to pick up edits._
+## 🟢 When to play
 
-Pegasus Banner is built on the **same Banner Series persistent framework** as **Aztec Banner** (suit banners, seven-spin countdowns, mystery replacements, coin-triggered free spins with added wilds). The **advantage criteria and display reads below match both titles**—use the **betting / meter area** exactly as you would on Aztec.
+Look for 3 or more banners with spins remaining.
 
 ![Pegasus Banner glass: suit banner meters above the reels and the next-spin suit-to-paytable-symbol message bar](/guides/pegasus-banner/pegasus-banner-1.webp)
 
-## When to play (and when to stop)
+## 🛑 When to stop
 
-- **Prefer three or more active banners** with spins remaining; **four+** is stronger.
-- **Stop when only two banners stay active**—the game has typically given up most of the stacked-mystery edge by then.
-- **Use the on-screen betting / banner readout** to count active banners; don’t eyeball the grid alone.
+Play until <3 banners remain.
 
-## Game overview
+## 🔍 How to check (quick/easy)
 
-**Pegasus Banner** shares the **Banner Series** package: **5×4** reels, **40 fixed lines**, **50-credit**-style minimum spins in common configs, and **multi-denom** support. The theme is **mythic / celestial** (winged horse, marble columns, bright skies) rather than jungle Aztec, but the **math behavior**—persistent suit banners, mystery reveals, scatter coins into free spins with **wild stacks that can award extra spins**—tracks its sister cabinet.
+The banners are clearly visible on the display.
 
-## Gameplay basics
+## ⚠️ Risk & Warnings
 
-- **All lines in** every spin; no line-select shortcut.
-- **Suits on the reels** work with **banner-high symbols** the same way as Aztec: matching pairs **light a suit for seven spins** and convert that suit to **mysteries** until the counter ends.
-- **Pace** lands in the same **medium-swing** band: grinding base, **bursts** when multiple banners or the bonus overlap.
+Bankroll on hand: 20 units
 
-## Special features
+This is a very low risk machine as only a few spins are required. You will often get blanked or paid very little, but occasionally you’ll smash for many units.
 
-### Persistent Banner Feature
+## 🎭 Skins (same game different theme/art)
 
-**Two matching banner symbols** for a suit **activate that suit for the next seven spins**. While active, **that suit’s positions become mystery symbols** that **reveal** into pays—stacking suits is the goal. The mechanic rewards **sessions where you catch 3+ suits overlapping**, which is exactly what the “when to play” section targets.
+[Aztec Banner](guide:aztec-banner)
 
-### Free Spins Bonus
+---
 
-**Three or more coin scatters** start the bonus; **wilds are injected on the strips**, and **a four-high wild stack** can **add another free spin**. Mysteries from banners and wild-heavy boards can combine for **large connected screens**.
+## 🎰 Gameplay Mechanics
 
-## Bankroll and session math
+The Pegasus Banner slot features a 5×4 reel layout with 40 fixed paylines, meaning every spin plays all lines. Bets start at a minimum of 50 credits and scale upward, with multi-denomination support that lets casinos offer it across various penny and nickel denominations.
 
-Same discipline as Aztec Banner: you’re **taxed in the base** while you **seek or ride** stacked banner state—track **full cost to clear or ride**, not a single lucky line hit. Confirm **denom and bet rules** the same day you play.
+The reels display classic card suits (spades, hearts, diamonds, clubs) alongside higher-paying Pegasus-themed symbols. Gameplay is straightforward: set your bet, spin, and look for winning line combinations and special symbols. What sets it apart from standard line slots is the Persistent Banner feature, which can influence multiple consecutive spins.
 
-## Verify on the floor
+Wins form through standard left-to-right combinations, and the volatility feels medium…long enough dry spells to build tension, balanced by satisfying bursts when banners activate or bonuses trigger. This makes it ideal for players seeking something more engaging than a classic stepper but less overwhelming than heavily featured modern video slots.
 
-- Photo or note the **banner / betting display** at decision time.
-- **Denom, credits-per-spin, and any eligibility fine print** before you load in.
+The standout mechanic is the Persistent Banner Feature. Each reel includes two high banner symbols for the four suits. Landing any two matching banners lights up the corresponding suit and keeps it active for the next seven spins. During this time, every symbol of that suit on the reels transforms into a mystery symbol, which then reveals a paytable symbol. This creates additional winning opportunities while the banner remains lit.
 
-## Pitfalls
+Since the effect persists across multiple spins, the game develops real momentum. You can trigger one banner and then activate another before the first expires, resulting in several reels filled with mystery symbols at once. This encourages longer play sessions as you watch the board “heat up” instead of every spin feeling isolated.
 
-- One **isolated** hot banner while the display shows the rest cold.
-- Trusting **street or marketing** numbers over **what this machine’s glass says today**.
-
-## Nerf / marketing
-
-**Medium nerf risk** for Banner Series titles: packaging and paybacks can shift. Verify on the floor.
+Pegasus Banner also offers a Free Spins bonus triggered by three or more scattered coin symbols. In the bonus round, wild symbols are added to the reels, and landing a 4-high stack of wilds grants an extra spin. The free spins pair especially well with active banners, allowing mystery symbols, wilds, and regular high-paying icons to combine for some impressive, high-potential screens.
