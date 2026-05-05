@@ -10,11 +10,11 @@ Use your Phoenix Link calculator for precise take points. Lower bets on low deno
 
 ## 🛑 When to stop
 
-Play until the bonus triggers or the counter drops significantly below your calculated +EV threshold. Do not chase low counters on poor RTP setups.
+Play until the bonus triggers or the counter drops significantly below your calculated **+EV threshold**. Do not chase **low counters** on **poor RTP setups**.
 
 ## 🔍 How to check (Pain in the ass) 
 
-The **Lightning counter** is **clearly visible** in the top right. Always cycle through **every denomination and bet level** (counters are bet-specific). Insert a checker ticket (smaller than lowest bet) to cycle through all bets and denoms. 
+The **Lightning counter** is **clearly visible** in the top right. Always cycle through **every denomination and bet level** (counters are bet-specific). Insert a **checker ticket** (smaller than lowest bet) to cycle through all bets and denoms. 
 
 **TIP:** *To save time when cycling through bets, on the hand pad there are two "Lines" options, the lowest lines option is selected by default. On lowest lines, check bets **3, 4, & 5**, then change to higher lines option and check bets **2, 3, & 5**. This will save you time by not checking the same bet multiple times across lines options.*
 
@@ -24,7 +24,7 @@ The **Lightning counter** is **clearly visible** in the top right. Always cycle 
 
 This is a **HIGHLY VOLATILE** machine. RTP varies significantly by bet/denom - just a couple % points in RTP drastically affect counter take points. Even at +EV thresholds you can still have rough sessions if you dont hit bonuses along the way or they pay poorly. It is not uncommon to lose 300 units even on counters in the 1400 range. 
 
-Due to the highly volatile nature of this game, I included a "Walk Away Advisor" in the calculator to help gauge optimal stopping points where you can consider walking away or selling off a % - even when the machine remains in a +EV state. Yes, +EV is +EV, but run a hundred of these plays and I guarantee you'll start considering it! 
+Due to the highly volatile nature of this game, I included a **Walk Away Advisor** in the calculator to help gauge optimal stopping points where you can consider walking away or selling off a % - even when the machine remains in a **+EV state**. Yes, +EV is +EV, but run a hundred of these plays and I guarantee you'll start considering it! 
 
 ## 🎭 Skins (same game different theme/art)
 
@@ -45,4 +45,4 @@ Additional features include:
 - **Free Games** with Twin Spins or 2x Wild multipliers (depending on theme)
 - Lightning symbols continue to increment the counter even during the bonus
 
-The combination of a visible must-hit counter + massive RTP variance across bet levels makes this one of the more complex but rewarding AP games when you use proper take points.
+The combination of a visible **must-hit counter** + massive **RTP variance** across bet levels makes this one of the more complex but rewarding AP games when you use proper **take points**.
