@@ -4,6 +4,8 @@ _Sync to Supabase with `npm run slots:sync` when you want the app to pick up edi
 
 Pegasus Banner is built on the **same Banner Series persistent framework** as **Aztec Banner** (suit banners, seven-spin countdowns, mystery replacements, coin-triggered free spins with added wilds). The **advantage criteria and display reads below match both titles**—use the **betting / meter area** exactly as you would on Aztec.
 
+![Pegasus Banner glass: suit banner meters above the reels and the next-spin suit-to-paytable-symbol message bar](/guides/pegasus-banner/pegasus-banner-1.webp)
+
 ## When to play (and when to stop)
 
 - **Prefer three or more active banners** with spins remaining; **four+** is stronger.

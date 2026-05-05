@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import { format, parseISO } from 'date-fns'
 import {
   BUFFALO_LINK_DEMO_SLUG,
@@ -407,6 +407,13 @@ function cardEvThresholdForRow(row) {
 
 const TYPE_LINE_FALLBACK_GUIDE_HINT = 'Verify +EV on the glass — open guide'
 
+/** Keep `guide:` links — react-markdown’s default URL transform strips unknown schemes, leaving `href=""` (clicks jump to `/` / home). */
+function guideMarkdownUrlTransform(url) {
+  const u = String(url ?? '')
+  if (/^guide:/i.test(u)) return u
+  return defaultUrlTransform(u)
+}
+
 /** Markdown links `[label](guide:slug)` jump to another guide card (same list). */
 function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
   const h2Tone =
@@ -439,6 +446,14 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
       : machineSlug === 'aladdins-fortune'
         ? 'to-emerald-500/60'
       : 'to-amber-500/55'
+  const guideHrVia =
+    machineSlug === 'aztec-banner'
+      ? 'via-lime-500/55'
+      : machineSlug === 'pegasus-banner'
+        ? 'via-sky-500/50'
+      : machineSlug === 'aladdins-fortune'
+        ? 'via-emerald-500/50'
+      : 'via-amber-500/48'
   return {
     h1: ({ children }) => (
       <div className="flex items-center gap-3 w-full mb-5 mt-0.5 select-none">
@@ -498,7 +513,7 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
     hr: () => (
       <hr
         role="separator"
-        className="my-7 border-0 h-px w-full max-w-full bg-gradient-to-r from-transparent via-zinc-500/45 to-transparent"
+        className={`my-7 border-0 h-0.5 w-full max-w-full rounded-full bg-gradient-to-r from-zinc-800/30 ${guideHrVia} to-zinc-800/30`}
       />
     ),
   }
@@ -1318,7 +1333,10 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
 
                   {expanded ? (
                     <div className="border-t border-zinc-800 px-4 py-5 bg-zinc-950/90 text-sm max-w-none">
-                      <ReactMarkdown components={makeGuideMarkdownComponents(slug, { onOpenGuideSlug: openGuideSlug })}>
+                      <ReactMarkdown
+                        urlTransform={guideMarkdownUrlTransform}
+                        components={makeGuideMarkdownComponents(slug, { onOpenGuideSlug: openGuideSlug })}
+                      >
                         {row.content_markdown || ''}
                       </ReactMarkdown>
                     </div>
