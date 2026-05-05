@@ -24,6 +24,8 @@ This is a very low risk machine as only a few spins are required. You will often
 
 [Aztec Banner](guide:aztec-banner)
 
+![Aztec Banner: title art, serpent topper, and suit banner gauges with spins remaining](/guides/pegasus-banner/aztec-banner-skin.webp)
+
 ---
 
 ## 🎰 Gameplay Mechanics

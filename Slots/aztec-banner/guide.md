@@ -24,6 +24,8 @@ This is a **very low risk machine** as only **a few spins** are required. You wi
 
 [Pegasus Banner](guide:pegasus-banner)
 
+![Pegasus Banner: title art and suit banner gauges with spins remaining](/guides/aztec-banner/pegasus-banner-skin.webp)
+
 ---
 
 ## 🎰 Gameplay Mechanics

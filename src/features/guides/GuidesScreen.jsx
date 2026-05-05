@@ -419,6 +419,8 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
   const h2Tone =
     machineSlug === 'phoenix-link'
       ? 'text-orange-100'
+      : machineSlug === 'legends-of-the-phoenix'
+        ? 'text-orange-100'
       : machineSlug === 'lightning-buffalo-link'
         ? 'text-indigo-100'
       : machineSlug === 'buffalo-link'
@@ -445,6 +447,8 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
         ? 'to-sky-500/60'
       : machineSlug === 'aladdins-fortune'
         ? 'to-emerald-500/60'
+      : machineSlug === 'legends-of-the-phoenix'
+        ? 'to-orange-500/62'
       : 'to-amber-500/55'
   const guideHrVia =
     machineSlug === 'aztec-banner'
@@ -453,6 +457,8 @@ function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug } = {}) {
         ? 'via-sky-500/50'
       : machineSlug === 'aladdins-fortune'
         ? 'via-emerald-500/50'
+      : machineSlug === 'legends-of-the-phoenix'
+        ? 'via-orange-500/52'
       : 'via-amber-500/48'
   return {
     h1: ({ children }) => (
@@ -632,6 +638,8 @@ function defaultHeroSrc(machineSlug) {
   if (machineSlug === 'buffalo-ascension') return '/guides/buffalo-ascension/hero.webp'
   if (machineSlug === 'lightning-buffalo-link') return '/guides/lightning-buffalo-link/hero.webp'
   if (machineSlug === 'phoenix-link') return '/guides/phoenix-link/hero.webp'
+  if (machineSlug === 'legends-of-the-phoenix')
+    return '/guides/legends-of-the-phoenix/hero.webp'
   if (machineSlug === 'stack-up-pays') return '/guides/stack-up-pays/hero.webp'
   if (machineSlug === 'adventures-of-sinbad') return '/guides/adventures-of-sinbad/hero.webp'
   if (machineSlug === 'aladdins-fortune') return '/guides/aladdins-fortune/hero.webp'
@@ -682,6 +690,8 @@ function heroGradientClass(machineSlug) {
   if (machineSlug === 'lightning-buffalo-link')
     return 'from-indigo-950/85 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
+  if (machineSlug === 'legends-of-the-phoenix')
+    return 'from-red-950/80 via-orange-950/40 to-zinc-950'
   if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
   if (machineSlug === 'adventures-of-sinbad') return 'from-amber-950/85 via-orange-950/35 to-zinc-950'
   if (machineSlug === 'aladdins-fortune')
@@ -708,6 +718,18 @@ function cardAccent(machineSlug) {
       expandedBorder: 'border-orange-500/50 shadow-lg shadow-orange-900/20',
       evTablesBox:
         'rounded-xl border border-dashed border-orange-400/55 bg-gradient-to-br from-orange-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
+      evTablesHead: 'text-orange-300',
+      evTablesRule: 'border-orange-400/65',
+    }
+  }
+  if (machineSlug === 'legends-of-the-phoenix') {
+    return {
+      chevron: 'text-orange-400',
+      strong: 'text-orange-50',
+      subtitle: 'text-amber-200/88',
+      expandedBorder: 'border-orange-500/50 shadow-lg shadow-red-950/30',
+      evTablesBox:
+        'rounded-xl border border-dashed border-orange-400/55 bg-gradient-to-br from-red-950/30 via-orange-950/25 to-zinc-950 px-4 py-3.5',
       evTablesHead: 'text-orange-300',
       evTablesRule: 'border-orange-400/65',
     }
@@ -1137,7 +1159,9 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
             const ringFocus =
               slug === 'phoenix-link'
                 ? 'focus-visible:ring-orange-500/60'
-                : slug === 'stack-up-pays'
+                : slug === 'legends-of-the-phoenix'
+                  ? 'focus-visible:ring-orange-500/60'
+                  : slug === 'stack-up-pays'
                   ? 'focus-visible:ring-cyan-500/60'
                   : slug === 'lightning-buffalo-link'
                     ? 'focus-visible:ring-indigo-500/60'

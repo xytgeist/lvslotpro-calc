@@ -2,6 +2,12 @@
 
 _Generated seed — edit freely. Sync to Supabase with `npm run slots:sync` when ready._
 
+## Skins (same game, different art)
+
+**Triple Double Diamond: Progressive Free Games** uses the same persistent / must-hit-by free-games wheel family as Legends of the Phoenix; art and paytable skin only.
+
+![Triple Double Diamond glass: must-hit-by free-games meters and BONUS reel state](/guides/legends-of-the-phoenix/tripledoublediamond.webp)
+
 ## What you are hunting
 
 Legends of the Phoenix is catalogued as **Persistent State** (Light & Wonder). Edge lives where **state on the glass** lines up with **correct denom / bet qualification** and **fresh paytable truth** for this bank.
