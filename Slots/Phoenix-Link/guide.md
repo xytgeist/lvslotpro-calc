@@ -32,7 +32,7 @@ Due to the highly volatile nature of this game, I included a **Walk Away Advisor
 
 Lightning 10-Year Storm
 
-![Lightning 10-Year Storm skin: middle crop from Phoenix Link hero](/guides/phoenix-link/lightning-10-year-storm-skin.webp)
+![Lightning 10-Year Storm skin: middle crop from Phoenix Link hero](/guides/lightning-10-year-storm/lightning-10-year-storm-skin.webp)
 
 ---
 
@@ -50,3 +50,4 @@ Additional features include:
 - Phoenix symbols continue to increment the counter even during the bonus
 
 The combination of a visible **must-hit counter** + massive **RTP variance** across bet levels makes this one of the more complex but rewarding AP games when you use proper **take points**.
+

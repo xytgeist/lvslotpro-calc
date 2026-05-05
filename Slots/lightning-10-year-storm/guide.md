@@ -30,6 +30,8 @@ Due to the highly volatile nature of this game, I included a **Walk Away Advisor
 
 [Phoenix Link](guide:phoenix-link)
 
+![Phoenix Link skin: middle crop from Phoenix Link hero](/guides/phoenix-link/phoenix-link-skin.webp)
+
 ---
 
 ## 🎰 Gameplay Mechanics

@@ -7,7 +7,7 @@
     "manufacturer": "Aristocrat",
     "type": "MHB Counter",
     "difficulty": "Beginner",
-    "vegas_availability": "Very Common",
+    "vegas_availability": "Extremely Common",
     "nerf_risk": "High",
     "has_calculator": true,
     "calculator_slug": "phoenix",
@@ -50,7 +50,8 @@
   "assets": {
     "hero_relative": "hero.webp",
     "thumbnails_relative": [],
-    "diagrams_relative": ["lightning-10-year-storm-skin.webp"],
+    "diagrams_relative": ["phoenix-link-skin.webp"],
     "legacy_slots_subfolder": null
   }
 }
+
