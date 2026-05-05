@@ -1,14 +1,16 @@
 # Aztec Banner
 
-## 🚦 When to play (and when to stop)
+## 🟢 When to play
 
 Look for **3 or more banners** with spins remaining.
 
 ![Aztec Banner glass: suit banner meters above the reels and the next-spin suit-to-mystery message bar](/guides/aztec-banner/aztec-banner-1.webp)
 
+## 🛑 When to stop
+
 Play until <3 banners remain.
 
-## 🔭 How to check (quick/easy)
+## 🔍 How to check (quick/easy)
 
 The banners are **clearly visible** on the display.
 
