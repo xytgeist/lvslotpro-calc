@@ -12,17 +12,19 @@ Play until the ways drop below **3,000** (or clearly below your personal thresho
 
 The **current number of ways to win** is **large and prominently displayed** on hand pad. Check for Super Stampedes and Free Games by inserting a ticket with the highest bet amount. Cycle through bet levels — progress is persistent per denomination/bet.
 
+![Buffalo Ascension: ways to win by bet level shown on handpay display](/guides/buffalo-ascension/buffalo-ascension-ways-by-bet.webp)
+
 ## ⚠️ Risk & Warnings
 
-**Bankroll on hand: 80–1000 units** *Super Stampedes are long run and can nuke a bankroll
+**Bankroll on hand: 80–1000 units** _Super Stampedes are long run and can nuke a bankroll_
 
-This is a **high volatility** machine with extreme session swings. You can endure long dry spells even on good setups, but when the tall reels hit (especially Super Stampede or a big 3x5x Free Games bonus), the payouts can be massive. The game is very well-known to AP players, so good spots get taken quickly.
+This is a **medium to high volatility** machine that can have extreme session swings, particularly chasing a **Super Stampede**. You can endure long dry spells even on good setups, but when the tall reels hit (especially Super Stampede or a big 3x5x Free Games bonus), the payouts can be massive. The game is very well-known to AP players, so good spots get taken quickly.
 
 ## 🎭 Skins (same game different theme/art)
 
 [Eagle Ascension](guide:eagle-ascension)
 
-![Eagle Ascension: title art](/guides/eagle-ascension/hero.webp)
+![Eagle Ascension: title art](/guides/eagle-ascension/eagle-ascension-1.webp)
 
 ---
 
