@@ -204,7 +204,7 @@ function MHBCalculator({ onBack }) {
     setter(isNaN(val) ? defaultVal : val)
   }
 
-  const jpMeterDisplay = jpMeterFocused ? jpMeterDraft : formatUsd(current)
+  const jpMeterDisplay = jpMeterFocused ? `$${jpMeterDraft}` : formatUsd(current)
 
   const handleJpMeterFocus = () => {
     setJpMeterFocused(true)
