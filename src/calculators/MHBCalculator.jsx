@@ -127,13 +127,60 @@ function presetFor(manufacturer, mustHitBy, igtTier = 'mini', igtLineBet = 1, ig
   return m[cap] || m[500]
 }
 
-function solveBreakevenEntry({ mhb, rtpPercent, riseDollars, resetVal, useMidpoint }) {
+function getConcurrentJackpotConfigs(manufacturer, igtLineBet, igtDenom) {
+  if (manufacturer === 'ainsworth') {
+    const p500 = MHB_PRESETS.ainsworth[500]
+    const p10k = MHB_PRESETS.ainsworth[10000]
+    return [
+      { mhb: 500, reset: p500.reset, meterRise: p500.meterRise },
+      { mhb: 10000, reset: p10k.reset, meterRise: p10k.meterRise },
+    ]
+  }
+
+  if (manufacturer === 'ags') {
+    const p500 = MHB_PRESETS.ags[500]
+    const p5k = MHB_PRESETS.ags[5000]
+    return [
+      { mhb: 500, reset: p500.reset, meterRise: p500.meterRise },
+      { mhb: 5000, reset: p5k.reset, meterRise: p5k.meterRise },
+    ]
+  }
+
+  if (manufacturer === 'igt') {
+    const tiers = ['mini', 'minor', 'major']
+    return tiers.map((tier) => {
+      const mhb = igtMustHitByFor(tier, igtLineBet, igtDenom)
+      const p = igtPresetFor(tier, igtLineBet, igtDenom)
+      return { mhb, reset: p.reset, meterRise: p.meterRise }
+    })
+  }
+
+  return []
+}
+
+function totalJpContributionFraction(manufacturer, useMidpoint, igtLineBet, igtDenom) {
+  const concurrentJackpots = getConcurrentJackpotConfigs(manufacturer, igtLineBet, igtDenom)
+  return concurrentJackpots.reduce((sum, jp) => {
+    const target = useMidpoint ? (jp.reset + jp.mhb) / 2 : jp.mhb
+    const distanceFromReset = target - jp.reset
+    const incrementsFromReset = distanceFromReset / 0.01
+    const coinInFromReset = incrementsFromReset * jp.meterRise
+    const contrib = coinInFromReset > 0 ? target / coinInFromReset : 0
+    return sum + contrib
+  }, 0)
+}
+
+function solveBreakevenEntry({
+  mhb,
+  rtpPercent,
+  riseDollars,
+  useMidpoint,
+  manufacturer,
+  igtLineBet,
+  igtDenom,
+}) {
   const rtp = (Number(rtpPercent) || 0) / 100
-  const targetForJp = useMidpoint ? (resetVal + mhb) / 2 : mhb
-  const jpDistanceFromReset = targetForJp - resetVal
-  const jpIncrementsFromReset = jpDistanceFromReset / 0.01
-  const jpCoinInFromReset = jpIncrementsFromReset * riseDollars
-  const jpContribFraction = jpCoinInFromReset > 0 ? targetForJp / jpCoinInFromReset : 0
+  const jpContribFraction = totalJpContributionFraction(manufacturer, useMidpoint, igtLineBet, igtDenom)
   const effectiveRtp = Math.min(0.999999, Math.max(0, rtp - jpContribFraction))
   const effectiveHouseEdge = 1 - effectiveRtp
 
@@ -146,7 +193,7 @@ function solveBreakevenEntry({ mhb, rtpPercent, riseDollars, resetVal, useMidpoi
     return targetAtEntry - expectedLossAtEntry
   }
 
-  let lo = resetVal
+  let lo = 0
   let hi = mhb
   let loEv = evForEntry(lo)
   let hiEv = evForEntry(hi)
@@ -239,8 +286,10 @@ function MHBCalculator({ onBack }) {
       mhb,
       rtpPercent: p.rtp,
       riseDollars: p.meterRise,
-      resetVal: p.reset,
       useMidpoint: useMidpointDefault,
+      manufacturer,
+      igtLineBet,
+      igtDenom,
     })
     setCurrent(roundToCents(defaultBreakeven))
     setMeterRise(p.meterRise)
@@ -289,12 +338,7 @@ function MHBCalculator({ onBack }) {
     const currentVal = Number(current) || p.current
     const mhb = effectiveCap(manufacturer, mustHitBy)
     const riseDollars = Number(meterRise) || p.meterRise
-    const resetVal = Number(resetValue) || p.reset
-    const jpTarget = useMidpoint ? (resetVal + mhb) / 2 : mhb
-    const jpDistanceFromReset = jpTarget - resetVal
-    const jpIncrementsFromReset = jpDistanceFromReset / 0.01
-    const jpCoinInFromReset = jpIncrementsFromReset * riseDollars
-    const jpContribFraction = jpCoinInFromReset > 0 ? jpTarget / jpCoinInFromReset : 0
+    const jpContribFraction = totalJpContributionFraction(manufacturer, useMidpoint, igtLineBet, igtDenom)
     const jpContrib = jpContribFraction * 100
     const effectiveRtp = Math.min(0.999999, Math.max(0, rtp - jpContribFraction))
     const effectiveHouseEdge = 1 - effectiveRtp
@@ -336,7 +380,7 @@ function MHBCalculator({ onBack }) {
     const finalEV = currentEval.evAtEntry
 
     // Solve breakeven entry from EV(entry) = 0, independent of the current meter input.
-    let lo = resetVal
+    let lo = 0
     let hi = mhb
     let loEv = evForCurrent(lo).evAtEntry
     let hiEv = evForCurrent(hi).evAtEntry
