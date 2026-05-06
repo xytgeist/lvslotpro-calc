@@ -1149,7 +1149,7 @@ function MHBCalculator({ onBack }) {
 
         {showCalcInfo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-            <div className="w-full max-w-md rounded-2xl border border-cyan-500/30 bg-gray-900 p-5 text-white shadow-xl">
+            <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-cyan-500/30 bg-gray-900 p-5 text-white shadow-xl [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.25)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-cyan-300/20 hover:[&::-webkit-scrollbar-thumb]:bg-cyan-300/35">
               <h3 className="border-b border-cyan-500/25 pb-2 text-center text-lg font-semibold tracking-[0.08em] text-cyan-200 [font-family:Georgia,'Times_New_Roman',serif]">
                 Analytical Methodology
               </h3>
@@ -1157,7 +1157,7 @@ function MHBCalculator({ onBack }) {
                 <summary className="cursor-pointer select-none text-sm font-semibold tracking-[0.03em] text-cyan-200 [font-family:Georgia,'Times_New_Roman',serif]">
                   Non-techie version
                 </summary>
-                <div className="mt-2 space-y-2 text-sm leading-relaxed text-gray-300 [font-family:Georgia,'Times_New_Roman',serif]">
+                <div className="mt-2 max-h-40 space-y-2 overflow-y-auto pr-1 text-sm leading-relaxed text-gray-300 [font-family:Georgia,'Times_New_Roman',serif] [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.2)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-cyan-300/15 hover:[&::-webkit-scrollbar-thumb]:bg-cyan-300/30">
                   <p>
                     The calculator estimates whether a jackpot is worth playing right now, based on where the meter currently is and how fast it grows.
                   </p>
@@ -1179,10 +1179,11 @@ function MHBCalculator({ onBack }) {
                 <summary className="cursor-pointer select-none text-sm font-semibold tracking-[0.03em] text-cyan-200 [font-family:Georgia,'Times_New_Roman',serif]">
                   Dweeb-speak
                 </summary>
-                <p className="mt-2 text-sm italic leading-relaxed text-gray-300 [font-family:Georgia,'Times_New_Roman',serif]">
-                  This analyzer is a quantitative framework for progressive-jackpot valuation, breakeven threshold detection, and stressed-loss envelope estimation.
-                </p>
-                <div className="mt-2 space-y-2 text-sm leading-relaxed text-gray-300 [font-family:Georgia,'Times_New_Roman',serif]">
+                <div className="mt-2 max-h-52 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.2)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-cyan-300/15 hover:[&::-webkit-scrollbar-thumb]:bg-cyan-300/30">
+                  <p className="text-sm italic leading-relaxed text-gray-300 [font-family:Georgia,'Times_New_Roman',serif]">
+                    This analyzer is a quantitative framework for progressive-jackpot valuation, breakeven threshold detection, and stressed-loss envelope estimation.
+                  </p>
+                  <div className="mt-2 space-y-2 text-sm leading-relaxed text-gray-300 [font-family:Georgia,'Times_New_Roman',serif]">
                   <p>
                     <span className="font-semibold text-cyan-200">I. State Space:</span> Let x denote entry meter, M the must-hit boundary, m the observed current meter, R the reset baseline, r the meter-rise coefficient ($ coin-in per $0.01 meter increment), and p the total machine RTP.
                   </p>
@@ -1207,6 +1208,7 @@ function MHBCalculator({ onBack }) {
                   <p>
                     <span className="font-semibold text-cyan-200">VIII. Stress-Case Loss Envelope:</span> Under adverse conversion efficiency, p_stress = 0.85 x p_eff. Stress loss is L_stress(x) = C(x) x (1 - p_stress), and downside exposure is Exposure(x) = max(0, L_stress(x) - T(x)).
                   </p>
+                  </div>
                 </div>
               </details>
               <button
