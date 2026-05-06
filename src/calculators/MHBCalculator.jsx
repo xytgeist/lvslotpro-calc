@@ -21,6 +21,24 @@ const MHB_PRESETS = {
   },
 }
 
+const IGT_TIER_LABELS = {
+  mini: 'Mini',
+  minor: 'Minor',
+  major: 'Major',
+}
+
+const IGT_MHB_BY_TIER_AND_LINE_BET = {
+  mini: { 1: 20, 2: 40, 3: 60, 5: 100, 10: 200 },
+  minor: { 1: 50, 2: 100, 3: 150, 5: 250, 10: 500 },
+  major: { 1: 200, 2: 400, 3: 600, 5: 1000, 10: 2000 },
+}
+
+function igtMustHitByFor(tier, lineBet) {
+  const tierMap = IGT_MHB_BY_TIER_AND_LINE_BET[tier]
+  if (!tierMap) return 20
+  return tierMap[lineBet] || 20
+}
+
 /** AGS does not use a 10k cap in-app; 10k coerces to 5k for presets and math. */
 function effectiveCap(manufacturer, mustHitBy) {
   const v = Number(mustHitBy) || 500
@@ -48,6 +66,8 @@ function formatUsd(amount) {
 
 function MHBCalculator({ onBack }) {
   const [manufacturer, setManufacturer] = useState('ainsworth')
+  const [igtTier, setIgtTier] = useState('mini')
+  const [igtLineBet, setIgtLineBet] = useState(1)
 
   // Main fields
   const [current, setCurrent] = useState(475)
@@ -96,6 +116,15 @@ function MHBCalculator({ onBack }) {
       setMustHitBy(500)
     }
   }, [manufacturer, mustHitBy])
+
+  // For IGT, derive must-hit cap from tier + line-bet controls.
+  useEffect(() => {
+    if (manufacturer !== 'igt') return
+    const derived = igtMustHitByFor(igtTier, igtLineBet)
+    if (mustHitBy !== derived) {
+      setMustHitBy(derived)
+    }
+  }, [manufacturer, igtTier, igtLineBet, mustHitBy])
 
   // AGS defaults to full run (no midpoint); other makers default to midpoint.
   useEffect(() => {
@@ -276,34 +305,91 @@ function MHBCalculator({ onBack }) {
               />
             </div>
 
-            <div>
-              <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
-              <div className="relative">
-                <select
-                  value={mustHitBy}
-                  onChange={(e) => setMustHitBy(Number(e.target.value))}
-                  className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
-                >
-                  <option value={500}>{formatUsd(500)}</option>
-                  {manufacturer !== 'ainsworth' ? (
-                    <option value={5000}>{formatUsd(5000)}</option>
-                  ) : null}
-                  {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
-                </select>
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+            {manufacturer === 'igt' ? (
+              <div className="space-y-2">
+                <label className="block text-gray-400 text-xs mb-1">IGT Jackpot Tier</label>
+                <div className="relative">
+                  <select
+                    value={igtTier}
+                    onChange={(e) => setIgtTier(e.target.value)}
+                    className="w-full appearance-none rounded-2xl bg-gray-800 p-3 pr-10 text-center text-base font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                  >
+                    <option value="mini">Mini</option>
+                    <option value="minor">Minor</option>
+                    <option value="major">Major</option>
+                  </select>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="relative">
+                  <select
+                    value={igtLineBet}
+                    onChange={(e) => setIgtLineBet(Number(e.target.value))}
+                    className="w-full appearance-none rounded-2xl bg-gray-800 p-3 pr-10 text-center text-base font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                  >
+                    <option value={1}>Line Bet 1</option>
+                    <option value={2}>Line Bet 2</option>
+                    <option value={3}>Line Bet 3</option>
+                    <option value={5}>Line Bet 5</option>
+                    <option value={10}>Line Bet 10</option>
+                  </select>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <p className="text-[11px] leading-snug text-gray-500">
+                  Must Hit By: {formatUsd(mustHitBy)} ({IGT_TIER_LABELS[igtTier]} - line bet {igtLineBet})
+                </p>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
+                <div className="relative">
+                  <select
+                    value={mustHitBy}
+                    onChange={(e) => setMustHitBy(Number(e.target.value))}
+                    className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                  >
+                    <option value={500}>{formatUsd(500)}</option>
+                    {manufacturer !== 'ainsworth' ? (
+                      <option value={5000}>{formatUsd(5000)}</option>
+                    ) : null}
+                    {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
+                  </select>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
