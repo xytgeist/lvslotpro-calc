@@ -132,8 +132,8 @@ function getConcurrentJackpotConfigs(manufacturer, igtLineBet, igtDenom) {
     const p500 = MHB_PRESETS.ainsworth[500]
     const p10k = MHB_PRESETS.ainsworth[10000]
     return [
-      { mhb: 500, reset: p500.reset, meterRise: p500.meterRise },
-      { mhb: 10000, reset: p10k.reset, meterRise: p10k.meterRise },
+      { key: 'ainsworth-500', label: '$500 MHB', mhb: 500, reset: p500.reset, meterRise: p500.meterRise },
+      { key: 'ainsworth-10000', label: '$10,000 MHB', mhb: 10000, reset: p10k.reset, meterRise: p10k.meterRise },
     ]
   }
 
@@ -141,8 +141,8 @@ function getConcurrentJackpotConfigs(manufacturer, igtLineBet, igtDenom) {
     const p500 = MHB_PRESETS.ags[500]
     const p5k = MHB_PRESETS.ags[5000]
     return [
-      { mhb: 500, reset: p500.reset, meterRise: p500.meterRise },
-      { mhb: 5000, reset: p5k.reset, meterRise: p5k.meterRise },
+      { key: 'ags-500', label: '$500 MHB', mhb: 500, reset: p500.reset, meterRise: p500.meterRise },
+      { key: 'ags-5000', label: '$5,000 MHB', mhb: 5000, reset: p5k.reset, meterRise: p5k.meterRise },
     ]
   }
 
@@ -151,7 +151,13 @@ function getConcurrentJackpotConfigs(manufacturer, igtLineBet, igtDenom) {
     return tiers.map((tier) => {
       const mhb = igtMustHitByFor(tier, igtLineBet, igtDenom)
       const p = igtPresetFor(tier, igtLineBet, igtDenom)
-      return { mhb, reset: p.reset, meterRise: p.meterRise }
+      return {
+        key: `igt-${tier}-${igtDenom}-${igtLineBet}`,
+        label: `${IGT_TIER_LABELS[tier]} ${formatUsd(mhb)} MHB`,
+        mhb,
+        reset: p.reset,
+        meterRise: p.meterRise,
+      }
     })
   }
 
@@ -261,10 +267,15 @@ function MHBCalculator({ onBack }) {
   const [useMidpoint, setUseMidpoint] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showMeterCue, setShowMeterCue] = useState(false)
+  const [includedJpContributions, setIncludedJpContributions] = useState({})
 
   const activePreset = useMemo(
     () => presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom),
     [manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom]
+  )
+  const concurrentJackpots = useMemo(
+    () => getConcurrentJackpotConfigs(manufacturer, igtLineBet, igtDenom),
+    [manufacturer, igtLineBet, igtDenom]
   )
 
   // Outputs
@@ -333,29 +344,38 @@ function MHBCalculator({ onBack }) {
     return () => clearTimeout(timer)
   }, [manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom])
 
+  // Reset include toggles to checked when concurrent jackpot set changes.
+  useEffect(() => {
+    const next = {}
+    for (const jp of concurrentJackpots) next[jp.key] = true
+    setIncludedJpContributions(next)
+  }, [concurrentJackpots])
+
   const calculate = () => {
     const p = presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom)
     const rtp = (Number(overallRTP) || p.rtp) / 100
     const currentVal = Number(current) || p.current
     const mhb = effectiveCap(manufacturer, mustHitBy)
     const riseDollars = Number(meterRise) || p.meterRise
-    const concurrentJackpots = getConcurrentJackpotConfigs(manufacturer, igtLineBet, igtDenom)
     const contributionParts = concurrentJackpots.map((jp) => {
       const target = useMidpoint ? (jp.reset + jp.mhb) / 2 : jp.mhb
       const distanceFromReset = target - jp.reset
       const incrementsFromReset = distanceFromReset / 0.01
       const coinInFromReset = incrementsFromReset * jp.meterRise
       const contributionFraction = coinInFromReset > 0 ? target / coinInFromReset : 0
+      const included = includedJpContributions[jp.key] !== false
       return {
-        label: formatUsd(jp.mhb),
+        key: jp.key,
+        label: jp.label,
+        included,
         percent: contributionFraction * 100,
-        fraction: contributionFraction,
+        fraction: included ? contributionFraction : 0,
       }
     })
     const jpContribFraction = contributionParts.reduce((sum, part) => sum + part.fraction, 0)
     const jpContrib = jpContribFraction * 100
     const jpBreakdown = contributionParts
-      .map((part) => `${part.label}: ${part.percent.toFixed(2)}%`)
+      .map((part) => `${part.label}: ${part.percent.toFixed(2)}%${part.included ? '' : ' (off)'}`)
       .join(' + ')
     const effectiveRtp = Math.min(0.999999, Math.max(0, rtp - jpContribFraction))
     const effectiveHouseEdge = 1 - effectiveRtp
@@ -451,7 +471,7 @@ function MHBCalculator({ onBack }) {
 
   useEffect(() => {
     calculate()
-  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint, manufacturer, igtTier, igtLineBet, igtDenom])
+  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint, manufacturer, igtTier, igtLineBet, igtDenom, includedJpContributions, concurrentJackpots])
 
   // Input handlers
   const handleIntegerChange = (setter, defaultVal) => (e) => {
@@ -826,8 +846,35 @@ function MHBCalculator({ onBack }) {
 
               <div>
                 <label className="block text-gray-400 text-xs mb-1">JP Contribution</label>
-                <div className="w-full rounded-2xl bg-gray-800 p-4 text-center text-sm font-semibold text-white tabular-nums leading-relaxed">
-                  {jpContributionBreakdown || `Total: ${jpContribution.toFixed(2)}%`}
+                <div className="rounded-2xl bg-gray-800 p-3">
+                  <div className="mb-2 text-center text-[11px] font-semibold text-cyan-300">
+                    Include MHB Contribution to RTP
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {concurrentJackpots.map((jp) => {
+                      const checked = includedJpContributions[jp.key] !== false
+                      return (
+                        <label
+                          key={jp.key}
+                          className="flex items-center justify-between gap-2 rounded-xl bg-gray-900/70 px-3 py-2 text-[11px] font-semibold text-white tabular-nums"
+                        >
+                          <span>{jp.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked
+                              setIncludedJpContributions((prev) => ({ ...prev, [jp.key]: isChecked }))
+                            }}
+                            className="h-4 w-4 shrink-0 rounded border-gray-600 bg-gray-700 accent-cyan-500"
+                          />
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-300 tabular-nums">
+                    {jpContributionBreakdown || `Total: ${jpContribution.toFixed(2)}%`}
+                  </div>
                 </div>
               </div>
 
