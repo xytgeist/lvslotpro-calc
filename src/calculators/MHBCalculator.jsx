@@ -306,6 +306,9 @@ function MHBCalculator({ onBack }) {
           </button>
           {showAdvanced && (
             <div className="p-5 pt-4 space-y-6 border-t border-gray-800">
+              <p className="text-[11px] leading-snug text-zinc-500">
+                These defaults are set to known values. Only change if you know what you're doing!
+              </p>
               <div>
                 <label className="block text-gray-400 text-xs mb-1">RTP %</label>
                 <input
@@ -364,7 +367,7 @@ function MHBCalculator({ onBack }) {
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Expected Value</div>
               <div className={`text-3xl font-bold tabular-nums ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                ${ev.toFixed(0)}
+                {formatUsd(ev)}
               </div>
               <div className={`text-xs mt-1 ${ev >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
                 ${evExact.toFixed(2)}
@@ -373,13 +376,15 @@ function MHBCalculator({ onBack }) {
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Breakeven Entry</div>
               <div className="text-3xl font-bold tabular-nums text-amber-300">{formatUsd(breakeven)}</div>
-              <div className="text-xs text-white/70 mt-1">
+              <div className="text-xs text-amber-300/70 mt-1">
                 ${breakevenExact.toFixed(2)}
               </div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Coin-in Expected</div>
-              <div className="text-3xl font-bold tabular-nums text-white">{formatUsd(coinInExpected)}</div>
+              <div className="text-[28px] leading-none font-bold tracking-tight tabular-nums text-white">
+                {formatUsd(coinInExpected)}
+              </div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">JP Contribution</div>
