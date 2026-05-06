@@ -229,10 +229,36 @@ function MHBCalculator({ onBack }) {
     const mhb = effectiveCap(manufacturer, mustHitBy)
     const riseDollars = Number(meterRise) || p.meterRise
     const resetVal = Number(resetValue) || p.reset
-    const target = useMidpoint
-      ? currentVal + (mhb - currentVal) * 0.5
-      : mhb
-    const averageHit = target
+    const evForCurrent = (entry) => {
+      const targetAtEntry = useMidpoint
+        ? entry + (mhb - entry) * 0.5
+        : mhb
+      const averageHitAtEntry = targetAtEntry
+
+      const dollarDistanceAtEntry = Math.max(0, targetAtEntry - entry)
+      const incrementsNeededAtEntry = dollarDistanceAtEntry / 0.01
+      const coinInToTargetAtEntry = incrementsNeededAtEntry * riseDollars
+
+      const distanceFromResetAtEntry = averageHitAtEntry - resetVal
+      const incrementsFromResetAtEntry = distanceFromResetAtEntry / 0.01
+      const coinInFromResetAtEntry = incrementsFromResetAtEntry * riseDollars
+      const jpContribFractionAtEntry = coinInFromResetAtEntry > 0
+        ? averageHitAtEntry / coinInFromResetAtEntry
+        : 0
+
+      const effectiveRtpAtEntry = Math.min(0.999999, Math.max(0, rtp - jpContribFractionAtEntry))
+      const effectiveHouseEdgeAtEntry = 1 - effectiveRtpAtEntry
+      const expectedLossAtEntry = coinInToTargetAtEntry * effectiveHouseEdgeAtEntry
+      const evAtEntry = targetAtEntry - expectedLossAtEntry
+
+      return {
+        targetAtEntry,
+        coinInToTargetAtEntry,
+        jpContribFractionAtEntry,
+        evAtEntry,
+        effectiveHouseEdgeAtEntry,
+      }
+    }
 
     if (mhb <= currentVal) {
       setEv(999)
@@ -246,24 +272,48 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    const dollarDistance = Math.max(0, target - currentVal)
-    const incrementsNeeded = dollarDistance / 0.01
-    const coinInToTarget = incrementsNeeded * riseDollars
-    const distanceFromReset = averageHit - resetVal
-    const incrementsFromReset = distanceFromReset / 0.01
-    const coinInFromReset = incrementsFromReset * riseDollars
-    const jpContribFraction = coinInFromReset > 0 ? averageHit / coinInFromReset : 0
+    const currentEval = evForCurrent(currentVal)
+    const target = currentEval.targetAtEntry
+    const coinInToTarget = currentEval.coinInToTargetAtEntry
+    const jpContribFraction = currentEval.jpContribFractionAtEntry
     const jpContrib = jpContribFraction * 100
-    const effectiveRtp = Math.min(0.999999, Math.max(0, rtp - jpContribFraction))
-    const effectiveHouseEdge = 1 - effectiveRtp
-    const expectedLoss = coinInToTarget * effectiveHouseEdge
+    const finalEV = currentEval.evAtEntry
+    const effectiveHouseEdge = currentEval.effectiveHouseEdgeAtEntry
 
-    const finalEV = target - expectedLoss
+    // Solve breakeven entry from EV(entry) = 0, independent of the current meter input.
+    let lo = resetVal
+    let hi = mhb
+    let loEv = evForCurrent(lo).evAtEntry
+    let hiEv = evForCurrent(hi).evAtEntry
+    let breakevenCurrent
 
-    const breakevenDenominator = 100 * riseDollars * effectiveHouseEdge
-    const breakevenCurrent = breakevenDenominator > 0
-      ? target - target / breakevenDenominator
-      : target
+    if (loEv === 0) {
+      breakevenCurrent = lo
+    } else if (hiEv === 0) {
+      breakevenCurrent = hi
+    } else if (loEv * hiEv > 0) {
+      // No root bracketed: choose the boundary closest to breakeven.
+      breakevenCurrent = Math.abs(loEv) <= Math.abs(hiEv) ? lo : hi
+    } else {
+      for (let i = 0; i < 60; i += 1) {
+        const mid = (lo + hi) / 2
+        const midEv = evForCurrent(mid).evAtEntry
+        if (Math.abs(midEv) < 1e-7 || Math.abs(hi - lo) < 1e-7) {
+          lo = mid
+          hi = mid
+          break
+        }
+        if (loEv * midEv <= 0) {
+          hi = mid
+          hiEv = midEv
+        } else {
+          lo = mid
+          loEv = midEv
+        }
+      }
+      breakevenCurrent = (lo + hi) / 2
+    }
+
     const breakevenRounded = Math.ceil(breakevenCurrent)
 
     const fullIncrements = (mhb - currentVal) / 0.01
