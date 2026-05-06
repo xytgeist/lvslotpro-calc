@@ -1515,8 +1515,12 @@ function AppShell({ onLogout, supabaseClient }) {
         onClick={() => setActiveCalculator('buffalo')}
         className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]"
       >
-        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner">
-          <img src="/guides/buffalo-link/buffalo-link-calculator-icon.webp" alt="Buffalo" className="h-14 w-14 object-contain" />
+        <div className="relative flex h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner ring-1 ring-amber-950/35">
+          <img
+            src="/guides/buffalo-link/buffalo-link-calculator-icon.webp"
+            alt="Buffalo"
+            className="h-full w-full origin-center scale-[1.16] object-cover object-center"
+          />
         </div>
         <div className="min-w-0 flex-1 self-center">
           <div className="line-clamp-2 font-semibold text-2xl leading-snug text-amber-100">Buffalo Link EV Calc</div>
