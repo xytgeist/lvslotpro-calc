@@ -477,7 +477,7 @@ function MHBCalculator({ onBack }) {
                     onChange={handleJpMeterChange}
                     onBlur={handleJpMeterBlur}
                     className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
-                      showMeterCue ? 'ring-2 ring-cyan-400/55 animate-pulse' : ''
+                      showMeterCue ? 'ring-2 ring-cyan-300/80 shadow-[0_0_0_2px_rgba(34,211,238,0.22),0_0_0_6px_rgba(168,85,247,0.16)] animate-pulse' : ''
                     }`}
                   />
                 </div>
@@ -501,7 +501,7 @@ function MHBCalculator({ onBack }) {
                   onChange={handleJpMeterChange}
                   onBlur={handleJpMeterBlur}
                   className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
-                    showMeterCue ? 'ring-2 ring-cyan-400/55 animate-pulse' : ''
+                    showMeterCue ? 'ring-2 ring-cyan-300/80 shadow-[0_0_0_2px_rgba(34,211,238,0.22),0_0_0_6px_rgba(168,85,247,0.16)] animate-pulse' : ''
                   }`}
                 />
               </div>
