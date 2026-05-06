@@ -311,7 +311,9 @@ function MHBCalculator({ onBack }) {
     const breakevenRounded = Math.ceil(breakevenCurrent)
 
     const fullIncrements = (mhb - currentVal) / 0.01
-    const maxExposureDollars = fullIncrements * riseDollars * effectiveHouseEdge
+    const stressedRtp = effectiveRtp * 0.85
+    const stressedHouseEdge = 1 - stressedRtp
+    const maxExposureDollars = fullIncrements * riseDollars * stressedHouseEdge
 
     setEv(Math.round(finalEV))
     setEvExact(Number(finalEV.toFixed(2)))
