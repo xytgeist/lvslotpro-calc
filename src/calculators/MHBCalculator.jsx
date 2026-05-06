@@ -112,7 +112,9 @@ function igtPresetFor(tier, lineBet, denom = 0.01) {
 
 /** AGS does not use a 10k cap in-app; 10k coerces to 5k for presets and math. */
 function effectiveCap(manufacturer, mustHitBy) {
-  const v = Number(mustHitBy) || 500
+  const raw = Number(mustHitBy)
+  if (manufacturer === 'manual' && !Number.isFinite(raw)) return NaN
+  const v = raw || 500
   if (manufacturer === 'ags' && v === 10000) return 5000
   return v
 }
@@ -232,6 +234,17 @@ function roundToCents(value) {
   return Number((Number(value) || 0).toFixed(2))
 }
 
+function formatUsdTwoDecimals(amount) {
+  const n = Number(amount)
+  if (!Number.isFinite(n)) return '$0.00'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n)
+}
+
 /** en-US currency: $10,000 / $4,911.76 */
 function formatUsd(amount) {
   const n = Number(amount)
@@ -255,6 +268,8 @@ function MHBCalculator({ onBack }) {
   const [mustHitBy, setMustHitBy] = useState(500)
   const [jpMeterFocused, setJpMeterFocused] = useState(false)
   const [jpMeterDraft, setJpMeterDraft] = useState('')
+  const [mustHitByFocused, setMustHitByFocused] = useState(false)
+  const [mustHitByDraft, setMustHitByDraft] = useState('')
 
   // Advanced Settings
   const [overallRTP, setOverallRTP] = useState(88)
@@ -267,6 +282,7 @@ function MHBCalculator({ onBack }) {
   const [useMidpoint, setUseMidpoint] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showMeterCue, setShowMeterCue] = useState(false)
+  const [showIgtTierInfo, setShowIgtTierInfo] = useState(false)
   const [includedJpContributions, setIncludedJpContributions] = useState({})
 
   const activePreset = useMemo(
@@ -291,6 +307,7 @@ function MHBCalculator({ onBack }) {
 
   // Load maker + cap bundle (current, rise, reset, RTP defaults)
   useEffect(() => {
+    if (manufacturer === 'manual') return
     const p = presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom)
     const mhb = effectiveCap(manufacturer, mustHitBy)
     const useMidpointDefault = manufacturer === 'ainsworth'
@@ -311,6 +328,7 @@ function MHBCalculator({ onBack }) {
 
   // Keep select value valid: AGS has no 10k tier.
   useEffect(() => {
+    if (manufacturer === 'manual') return
     if (manufacturer === 'ags' && mustHitBy === 10000) {
       setMustHitBy(5000)
     }
@@ -318,6 +336,7 @@ function MHBCalculator({ onBack }) {
 
   // Ainsworth does not offer a $5,000 must-hit option in the UI.
   useEffect(() => {
+    if (manufacturer === 'manual') return
     if (manufacturer === 'ainsworth' && mustHitBy === 5000) {
       setMustHitBy(500)
     }
@@ -334,6 +353,7 @@ function MHBCalculator({ onBack }) {
 
   // AGS and IGT default to full run (no midpoint); Ainsworth defaults to midpoint.
   useEffect(() => {
+    if (manufacturer === 'manual') return
     setUseMidpoint(manufacturer === 'ainsworth')
   }, [manufacturer])
 
@@ -343,6 +363,17 @@ function MHBCalculator({ onBack }) {
     const timer = setTimeout(() => setShowMeterCue(false), 1800)
     return () => clearTimeout(timer)
   }, [manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom])
+
+  // Manual Entry starts with blank money fields and RTP at 85.
+  useEffect(() => {
+    if (manufacturer !== 'manual') return
+    setCurrent('')
+    setMustHitBy('')
+    setMeterRise('')
+    setResetValue('')
+    setOverallRTP(85)
+    setUseMidpoint(false)
+  }, [manufacturer])
 
   // Reset include toggles to checked when concurrent jackpot set changes.
   useEffect(() => {
@@ -361,9 +392,21 @@ function MHBCalculator({ onBack }) {
   const calculate = () => {
     const p = presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom)
     const rtp = (Number(overallRTP) || p.rtp) / 100
-    const currentVal = Number(current) || p.current
+    const currentVal = manufacturer === 'manual' ? Number(current) : (Number(current) || p.current)
     const mhb = effectiveCap(manufacturer, mustHitBy)
-    const riseDollars = Number(meterRise) || p.meterRise
+    const riseDollars = manufacturer === 'manual' ? Number(meterRise) : (Number(meterRise) || p.meterRise)
+    if (manufacturer === 'manual' && (!Number.isFinite(currentVal) || !Number.isFinite(mhb) || !Number.isFinite(riseDollars) || riseDollars <= 0)) {
+      setEv(0)
+      setEvExact(0)
+      setBreakeven(0)
+      setBreakevenExact(0)
+      setCoinInExpected(0)
+      setJpContribution(0)
+      setJpContributionByKey({})
+      setExposure(0)
+      setIsPositive(false)
+      return
+    }
     const contributionParts = concurrentJackpots.map((jp) => {
       const target = useMidpoint ? (jp.reset + jp.mhb) / 2 : jp.mhb
       const distanceFromReset = target - jp.reset
@@ -497,9 +540,14 @@ function MHBCalculator({ onBack }) {
     setter(isNaN(val) ? defaultVal : val)
   }
 
-  const jpMeterDisplay = jpMeterFocused ? `$${jpMeterDraft}` : formatUsd(current)
-  const meterRiseDisplay = meterRiseFocused ? `$${meterRiseDraft}` : formatUsd(meterRise)
-  const resetValueDisplay = resetValueFocused ? `$${resetValueDraft}` : formatUsd(resetValue)
+  const currentBlank = manufacturer === 'manual' && (current === '' || current === null)
+  const mustHitByBlank = manufacturer === 'manual' && (mustHitBy === '' || mustHitBy === null)
+  const meterRiseBlank = manufacturer === 'manual' && (meterRise === '' || meterRise === null)
+  const resetValueBlank = manufacturer === 'manual' && (resetValue === '' || resetValue === null)
+  const jpMeterDisplay = jpMeterFocused ? `$${jpMeterDraft}` : (currentBlank ? '---' : formatUsd(current))
+  const mustHitByDisplay = mustHitByFocused ? `$${mustHitByDraft}` : (mustHitByBlank ? '---' : formatUsd(mustHitBy))
+  const meterRiseDisplay = meterRiseFocused ? `$${meterRiseDraft}` : (meterRiseBlank ? '---' : formatUsdTwoDecimals(meterRise))
+  const resetValueDisplay = resetValueFocused ? `$${resetValueDraft}` : (resetValueBlank ? '---' : formatUsd(resetValue))
 
   const handleJpMeterFocus = () => {
     setJpMeterFocused(true)
@@ -522,7 +570,8 @@ function MHBCalculator({ onBack }) {
   const handleJpMeterBlur = () => {
     const n = parseFloat(jpMeterDraft)
     if (jpMeterDraft === '' || jpMeterDraft === '.' || Number.isNaN(n)) {
-      setCurrent(roundToCents(activePreset.current))
+      if (manufacturer === 'manual') setCurrent('')
+      else setCurrent(roundToCents(activePreset.current))
     } else {
       setCurrent(roundToCents(n))
     }
@@ -530,10 +579,44 @@ function MHBCalculator({ onBack }) {
     setJpMeterDraft('')
   }
 
+  const handleMustHitByFocus = () => {
+    setMustHitByFocused(true)
+    const n = Number(mustHitBy)
+    setMustHitByDraft(Number.isFinite(n) ? String(n) : '')
+  }
+
+  const handleMustHitByChange = (e) => {
+    let v = e.target.value.replace(/[^0-9.]/g, '')
+    const dot = v.indexOf('.')
+    if (dot !== -1) {
+      v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '')
+    }
+    setMustHitByDraft(v)
+    if (v === '' || v === '.') return
+    const num = parseFloat(v)
+    if (!Number.isNaN(num)) setMustHitBy(num)
+  }
+
+  const handleMustHitByBlur = () => {
+    const n = parseFloat(mustHitByDraft)
+    if (mustHitByDraft === '' || mustHitByDraft === '.' || Number.isNaN(n)) {
+      if (manufacturer === 'manual') setMustHitBy('')
+      else setMustHitBy(500)
+    } else {
+      const rounded = roundToCents(n)
+      setMustHitBy(rounded)
+      if (manufacturer === 'manual' && (resetValue === '' || resetValue === null)) {
+        setResetValue(roundToCents(rounded * 0.7))
+      }
+    }
+    setMustHitByFocused(false)
+    setMustHitByDraft('')
+  }
+
   const handleMeterRiseFocus = () => {
     setMeterRiseFocused(true)
     const n = Number(meterRise)
-    setMeterRiseDraft(Number.isFinite(n) ? String(n) : '')
+    setMeterRiseDraft(Number.isFinite(n) ? n.toFixed(2) : '')
   }
 
   const handleMeterRiseChange = (e) => {
@@ -551,7 +634,8 @@ function MHBCalculator({ onBack }) {
   const handleMeterRiseBlur = () => {
     const n = parseFloat(meterRiseDraft)
     if (meterRiseDraft === '' || meterRiseDraft === '.' || Number.isNaN(n)) {
-      setMeterRise(activePreset.meterRise)
+      if (manufacturer === 'manual') setMeterRise('')
+      else setMeterRise(activePreset.meterRise)
     } else {
       setMeterRise(n)
     }
@@ -580,7 +664,8 @@ function MHBCalculator({ onBack }) {
   const handleResetValueBlur = () => {
     const n = parseFloat(resetValueDraft)
     if (resetValueDraft === '' || resetValueDraft === '.' || Number.isNaN(n)) {
-      setResetValue(activePreset.reset)
+      if (manufacturer === 'manual') setResetValue('')
+      else setResetValue(activePreset.reset)
     } else {
       setResetValue(n)
     }
@@ -594,20 +679,27 @@ function MHBCalculator({ onBack }) {
 
         {/* Title */}
         <div className="flex items-center mb-6">
-          <button onClick={onBack} className="text-[52px] leading-none text-violet-400 hover:text-violet-300 -mt-1 mr-4 font-light active:opacity-70">‹</button>
+          <button onClick={onBack} className="text-[52px] leading-none text-cyan-400 hover:text-cyan-300 -mt-1 mr-4 font-light active:opacity-70">‹</button>
           <div className="flex items-center flex-1 justify-center gap-3">
             <img
               src="/guides/mhb/mhb-calculator-icon.webp"
               alt=""
               className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-lg shadow-black/40"
             />
-            <h1 className="font-black text-white tracking-[-1.8px] text-[32px]"
+            <div className="text-center leading-none">
+              <h1
+                className="font-black text-white tracking-[0.5px] text-[32px]"
                 style={{
                   textShadow:
                     '-2px -2px 0 #5b21b6, 2px -2px 0 #5b21b6, -2px 2px 0 #0e7490, 2px 2px 0 #0e7490, 0 0 20px rgba(6,182,212,0.35)',
-                }}>
-              MUST HIT BY
-            </h1>
+                }}
+              >
+                MUST HIT BY
+              </h1>
+              <div className="mt-1 text-[17px] font-semibold tracking-[0.18em] text-cyan-200/90">
+                JACKPOT ANALYZER
+              </div>
+            </div>
           </div>
           <div className="w-12" />
         </div>
@@ -620,11 +712,12 @@ function MHBCalculator({ onBack }) {
               <select
                 value={manufacturer}
                 onChange={(e) => setManufacturer(e.target.value)}
-                className="w-full appearance-none rounded-2xl bg-gray-800 p-3.5 pr-10 text-center text-lg font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
               >
                 <option value="ainsworth">Ainsworth</option>
                 <option value="ags">AGS</option>
                 <option value="igt">IGT</option>
+                <option value="manual">Manual Entry</option>
               </select>
               <svg
                 aria-hidden="true"
@@ -705,7 +798,17 @@ function MHBCalculator({ onBack }) {
                 </div>
 
                 <div>
-                  <label className="block text-gray-400 text-[11px] mb-0.5">Jackpot Tier</label>
+                  <div className="mb-0.5 flex items-center gap-1">
+                    <label className="block text-gray-400 text-[11px]">Jackpot Tier</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowIgtTierInfo(true)}
+                      className="flex h-4 w-4 items-center justify-center rounded-sm border border-cyan-400/45 bg-cyan-500/10 text-[9px] font-bold italic leading-none text-cyan-200 hover:bg-cyan-500/20"
+                      aria-label="Show jackpot tier info"
+                    >
+                      i
+                    </button>
+                  </div>
                   <div className="relative">
                     <select
                       value={igtTier}
@@ -755,7 +858,7 @@ function MHBCalculator({ onBack }) {
                 </div>
               </div>
             </div>
-          ) : (
+            ) : (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-400 text-xs mb-1">MHB Meter (Current)</label>
@@ -764,6 +867,7 @@ function MHBCalculator({ onBack }) {
                   inputMode="decimal"
                   value={jpMeterDisplay}
                   onFocus={handleJpMeterFocus}
+                  onClick={(e) => e.currentTarget.select()}
                   onChange={handleJpMeterChange}
                   onBlur={handleJpMeterBlur}
                   className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-300/80 focus:ring-2 focus:ring-cyan-200/85 ${
@@ -774,38 +878,51 @@ function MHBCalculator({ onBack }) {
 
               <div>
                 <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
-                <div className="relative">
-                  <select
-                    value={mustHitBy}
-                    onChange={(e) => setMustHitBy(Number(e.target.value))}
-                    className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
-                  >
-                    <option value={500}>{formatUsd(500)}</option>
-                    {manufacturer !== 'ainsworth' ? (
-                      <option value={5000}>{formatUsd(5000)}</option>
-                    ) : null}
-                    {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
-                  </select>
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 20 20"
-                    className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
+                  {manufacturer === 'manual' ? (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={mustHitByDisplay}
+                      onFocus={handleMustHitByFocus}
+                      onClick={(e) => e.currentTarget.select()}
+                      onChange={handleMustHitByChange}
+                      onBlur={handleMustHitByBlur}
+                      className="w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
                     />
-                  </svg>
-                </div>
+                  ) : (
+                    <div className="relative">
+                      <select
+                        value={mustHitBy}
+                        onChange={(e) => setMustHitBy(Number(e.target.value))}
+                        className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                      >
+                        <option value={500}>{formatUsd(500)}</option>
+                        {manufacturer !== 'ainsworth' ? (
+                          <option value={5000}>{formatUsd(5000)}</option>
+                        ) : null}
+                        {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
+                      </select>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  )}
               </div>
             </div>
           )}
         </div>
 
         {/* Advanced Settings */}
-        <div className="mt-6 bg-gray-900 rounded-3xl overflow-hidden">
+        <div className="mt-4 bg-gray-900 rounded-3xl overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="flex w-full items-center justify-between p-5 text-left hover:bg-gray-800">
             <span className="font-semibold text-white">Advanced Settings</span>
             <span className={`text-white transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
@@ -813,7 +930,9 @@ function MHBCalculator({ onBack }) {
           {showAdvanced && (
             <div className="p-4 pt-3 space-y-4 border-t border-gray-800">
               <p className="text-[11px] italic leading-snug text-zinc-500">
-                These defaults are set to observed values. Only change if you know what you're doing!
+                {manufacturer === 'manual'
+                  ? 'RTP and Meter Rise are required. Provide Reset Value if possible for more precise analysis - if you don\'t know, we will estimate it based on the Must Hit By value.'
+                  : 'These defaults are set to observed values. Only change if you know what you\'re doing!'}
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -821,6 +940,7 @@ function MHBCalculator({ onBack }) {
                   <input
                     type="text"
                     value={overallRTP}
+                  onFocus={(e) => e.currentTarget.select()}
                     onChange={handleFloatChange(setOverallRTP, activePreset.rtp)}
                     onBlur={handleFloatBlur(setOverallRTP, activePreset.rtp)}
                     className="h-12 w-full rounded-2xl bg-gray-800 px-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
@@ -834,6 +954,7 @@ function MHBCalculator({ onBack }) {
                     inputMode="decimal"
                     value={resetValueDisplay}
                     onFocus={handleResetValueFocus}
+                    onClick={(e) => e.currentTarget.select()}
                     onChange={handleResetValueChange}
                     onBlur={handleResetValueBlur}
                     className="h-12 w-full rounded-2xl bg-gray-800 px-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
@@ -849,6 +970,7 @@ function MHBCalculator({ onBack }) {
                     inputMode="decimal"
                     value={meterRiseDisplay}
                     onFocus={handleMeterRiseFocus}
+                    onClick={(e) => e.currentTarget.select()}
                     onChange={handleMeterRiseChange}
                     onBlur={handleMeterRiseBlur}
                     className="h-12 w-full rounded-2xl bg-gray-800 px-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
@@ -914,7 +1036,7 @@ function MHBCalculator({ onBack }) {
         </div>
 
         {/* Outputs */}
-        <div className="mt-8 bg-gray-900 p-6 rounded-3xl">
+        <div className="mt-5 bg-gray-900 p-6 rounded-3xl">
           <h2
             className="mb-6 text-center font-black text-[26px] tracking-[-1px] text-white"
             style={{
@@ -963,7 +1085,35 @@ function MHBCalculator({ onBack }) {
 
         <CalculatorDisclaimer className="mt-8" />
 
-        
+        {showIgtTierInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+            <div className="w-full max-w-sm rounded-2xl bg-gray-900 p-5 text-white shadow-xl">
+              <h3 className="text-lg font-bold text-cyan-300">IGT Jackpot Tier</h3>
+              <p className="mt-3 text-sm leading-relaxed text-gray-300">
+                This calculator uses
+                <span className="font-semibold text-cyan-200"> Mini</span>,
+                <span className="font-semibold text-cyan-200"> Minor</span>, and
+                <span className="font-semibold text-cyan-200"> Major</span>
+                {' '}
+                as a consistent naming convention to apply across multiple titles (
+                <span className="font-semibold text-cyan-200">Coyote Moon Deluxe</span>,
+                <span className="font-semibold text-cyan-200"> Money Storm Deluxe</span>,
+                <span className="font-semibold text-cyan-200"> Lobstermania Deluxe</span>).
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-gray-300">
+                Many IGT games are the same underlying math with different skins, and the jackpot tier names shown on the cabinet can vary by title. Pick the tier by relative level (lowest/middle/highest).
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowIgtTierInfo(false)}
+                className="mt-5 w-full rounded-xl bg-cyan-600 py-3 font-semibold hover:bg-cyan-500"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   )
