@@ -227,20 +227,31 @@ function MHBCalculator({ onBack }) {
         <div className="bg-gray-900 p-5 rounded-3xl">
           <div className="mb-4">
             <label className="block text-gray-400 text-xs mb-1">Manufacturer</label>
-            <select
-              value={manufacturer}
-              onChange={(e) => setManufacturer(e.target.value)}
-              className="w-full rounded-2xl bg-gray-800 p-3.5 text-center text-lg font-bold text-violet-200 outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
-            >
-              <option value="ainsworth">Ainsworth</option>
-              <option value="ags">AGS</option>
-              <option value="igt">IGT</option>
-            </select>
+            <div className="relative">
+              <select
+                value={manufacturer}
+                onChange={(e) => setManufacturer(e.target.value)}
+                className="w-full appearance-none rounded-2xl bg-gray-800 p-3.5 pr-10 text-center text-lg font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+              >
+                <option value="ainsworth">Ainsworth</option>
+                <option value="ags">AGS</option>
+                <option value="igt">IGT</option>
+              </select>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
             <p className="text-gray-500 text-[11px] mt-2 leading-snug">
-              Switches example meter, rise, reset, and RTP for this maker and cap—always verify on the glass.
-              {manufacturer === 'ags' ? (
-                <span className="block mt-1 text-gray-500">AGS uses {formatUsd(500)} / {formatUsd(5000)} caps only (no 10k preset).</span>
-              ) : null}
+              Switches the default meter, rise, reset, and RTP to typical for the selected manfucaturer.
             </p>
           </div>
 
@@ -254,21 +265,35 @@ function MHBCalculator({ onBack }) {
                 onFocus={handleJpMeterFocus}
                 onChange={handleJpMeterChange}
                 onBlur={handleJpMeterBlur}
-                className="w-full rounded-2xl bg-gray-800 p-4 text-center text-3xl font-bold text-cyan-100 outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                className="w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
               />
             </div>
 
             <div>
               <label className="block text-gray-400 text-xs mb-1">Must Hit By</label>
-              <select
-                value={mustHitBy}
-                onChange={(e) => setMustHitBy(Number(e.target.value))}
-                className="w-full rounded-2xl bg-gray-800 p-4 text-center text-3xl font-bold text-violet-200 outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
-              >
-                <option value={500}>{formatUsd(500)}</option>
-                <option value={5000}>{formatUsd(5000)}</option>
-                {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
-              </select>
+              <div className="relative">
+                <select
+                  value={mustHitBy}
+                  onChange={(e) => setMustHitBy(Number(e.target.value))}
+                  className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                >
+                  <option value={500}>{formatUsd(500)}</option>
+                  <option value={5000}>{formatUsd(5000)}</option>
+                  {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
+                </select>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -347,18 +372,18 @@ function MHBCalculator({ onBack }) {
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Breakeven Entry</div>
-              <div className="text-4xl font-bold text-violet-300">{breakeven}</div>
-              <div className="text-xs text-violet-400/70 mt-1">
+              <div className="text-4xl font-bold text-white">{breakeven}</div>
+              <div className="text-xs text-white/70 mt-1">
                 ${breakevenExact.toFixed(2)}
               </div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
-              <div className="text-gray-400 text-sm">Coin in expected</div>
-              <div className="text-4xl font-bold text-sky-400">${coinInExpected}</div>
+              <div className="text-gray-400 text-sm">Coin-in Expected</div>
+              <div className="text-4xl font-bold text-white">${coinInExpected}</div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">JP Contribution</div>
-              <div className="text-4xl font-bold text-fuchsia-300">+{jpContribution}%</div>
+              <div className="text-4xl font-bold text-white">+{jpContribution}%</div>
             </div>
           </div>
 
