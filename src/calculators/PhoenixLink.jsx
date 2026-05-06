@@ -285,7 +285,7 @@ function PhoenixLink({ onBack }) {
             <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="p-4 pt-0 space-y-4 border-t border-gray-800">
+            <div className="p-4 pt-4 space-y-4 border-t border-gray-800">
               <div className="flex items-center justify-between">
                 <span className="text-sm">Max Major</span>
                 <button 

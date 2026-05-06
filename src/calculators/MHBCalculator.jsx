@@ -205,19 +205,19 @@ function MHBCalculator({ onBack }) {
 
         {/* Title */}
         <div className="flex items-center mb-6">
-          <button onClick={onBack} className="text-[52px] leading-none text-cyan-400 hover:text-cyan-300 -mt-1 mr-4 font-light active:opacity-70">‹</button>
+          <button onClick={onBack} className="text-[52px] leading-none text-violet-400 hover:text-violet-300 -mt-1 mr-4 font-light active:opacity-70">‹</button>
           <div className="flex items-center flex-1 justify-center gap-3">
             <img
               src="/guides/mhb/mhb-calculator-icon.webp"
               alt=""
-              className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-lg shadow-black/40 ring-2 ring-violet-700/50 ring-offset-2 ring-offset-gray-950"
+              className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-lg shadow-black/40"
             />
             <h1 className="font-black text-white tracking-[-1.8px] text-[26px] xs:text-[27px] sm:text-[29px] md:text-[32px] lg:text-[33px]"
                 style={{
                   textShadow:
                     '-2px -2px 0 #5b21b6, 2px -2px 0 #5b21b6, -2px 2px 0 #0e7490, 2px 2px 0 #0e7490, 0 0 20px rgba(6,182,212,0.35)',
                 }}>
-              MHB CALCULATOR
+              MUST HIT BY
             </h1>
           </div>
           <div className="w-12" />
@@ -257,7 +257,7 @@ function MHBCalculator({ onBack }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-gray-400 text-xs mb-1">JP Meter (Current)</label>
+              <label className="block text-gray-400 text-xs mb-1">MHB Meter (Current)</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -301,11 +301,11 @@ function MHBCalculator({ onBack }) {
         {/* Advanced Settings */}
         <div className="mt-6 bg-gray-900 rounded-3xl overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="flex w-full items-center justify-between p-5 text-left hover:bg-gray-800">
-            <span className="font-semibold text-violet-400">Advanced Settings</span>
-            <span className={`text-cyan-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
+            <span className="font-semibold text-white">Advanced Settings</span>
+            <span className={`text-white transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="p-5 pt-0 space-y-6 border-t border-gray-800">
+            <div className="p-5 pt-4 space-y-6 border-t border-gray-800">
               <div>
                 <label className="block text-gray-400 text-xs mb-1">RTP %</label>
                 <input
@@ -363,7 +363,7 @@ function MHBCalculator({ onBack }) {
           <div className="grid grid-cols-2 gap-4 text-center">
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Expected Value</div>
-              <div className={`text-4xl font-bold ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              <div className={`text-3xl font-bold tabular-nums ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 ${ev.toFixed(0)}
               </div>
               <div className={`text-xs mt-1 ${ev >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
@@ -372,18 +372,18 @@ function MHBCalculator({ onBack }) {
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Breakeven Entry</div>
-              <div className="text-4xl font-bold text-white">{breakeven}</div>
+              <div className="text-3xl font-bold tabular-nums text-amber-300">{formatUsd(breakeven)}</div>
               <div className="text-xs text-white/70 mt-1">
                 ${breakevenExact.toFixed(2)}
               </div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">Coin-in Expected</div>
-              <div className="text-4xl font-bold text-white">${coinInExpected}</div>
+              <div className="text-3xl font-bold tabular-nums text-white">{formatUsd(coinInExpected)}</div>
             </div>
             <div className="bg-gray-800 p-5 rounded-2xl">
               <div className="text-gray-400 text-sm">JP Contribution</div>
-              <div className="text-4xl font-bold text-white">+{jpContribution}%</div>
+              <div className="text-3xl font-bold tabular-nums text-white">+{jpContribution}%</div>
             </div>
           </div>
 
@@ -401,9 +401,7 @@ function MHBCalculator({ onBack }) {
 
         <CalculatorDisclaimer className="mt-8" />
 
-        <div className="mt-6 text-center text-xs text-slate-500">
-          MHB Calculator · violet and cyan accents
-        </div>
+        
       </div>
     </div>
   )

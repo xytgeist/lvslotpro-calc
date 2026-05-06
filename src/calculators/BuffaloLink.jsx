@@ -292,7 +292,7 @@ function BuffaloLink({ onBack }) {
             <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="p-4 pt-0 space-y-5 border-t border-gray-800">
+            <div className="p-4 pt-4 space-y-5 border-t border-gray-800">
               <div className="flex justify-between items-center">
                 <span>Max Major</span>
                 <button onClick={() => setMaxMajor(!maxMajor)} className={`px-6 py-2 rounded-xl text-sm font-semibold ${maxMajor ? 'bg-green-600' : 'bg-gray-700'}`}>
