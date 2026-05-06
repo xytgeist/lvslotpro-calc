@@ -90,6 +90,13 @@ function MHBCalculator({ onBack }) {
     }
   }, [manufacturer, mustHitBy])
 
+  // Ainsworth does not offer a $5,000 must-hit option in the UI.
+  useEffect(() => {
+    if (manufacturer === 'ainsworth' && mustHitBy === 5000) {
+      setMustHitBy(500)
+    }
+  }, [manufacturer, mustHitBy])
+
   // AGS defaults to full run (no midpoint); other makers default to midpoint.
   useEffect(() => {
     setUseMidpoint(manufacturer !== 'ags')
@@ -278,7 +285,9 @@ function MHBCalculator({ onBack }) {
                   className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
                 >
                   <option value={500}>{formatUsd(500)}</option>
-                  <option value={5000}>{formatUsd(5000)}</option>
+                  {manufacturer !== 'ainsworth' ? (
+                    <option value={5000}>{formatUsd(5000)}</option>
+                  ) : null}
                   {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
                 </select>
                 <svg
@@ -306,7 +315,7 @@ function MHBCalculator({ onBack }) {
           </button>
           {showAdvanced && (
             <div className="p-5 pt-4 space-y-6 border-t border-gray-800">
-              <p className="text-[11px] leading-snug text-zinc-500">
+              <p className="text-[11px] italic leading-snug text-zinc-500">
                 These defaults are set to known values. Only change if you know what you're doing!
               </p>
               <div>
@@ -342,9 +351,11 @@ function MHBCalculator({ onBack }) {
                 />
               </div>
 
-              <div className="bg-gray-800 rounded-2xl p-4 text-center">
-                <div className="text-gray-400 text-xs mb-1">JP Contribution</div>
-                <div className="text-white font-bold tabular-nums text-xl leading-tight">+{jpContribution}%</div>
+              <div>
+                <label className="block text-gray-400 text-xs mb-1">JP Contribution</label>
+                <div className="w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white tabular-nums">
+                  +{jpContribution}%
+                </div>
               </div>
 
               <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-gray-800 p-4 touch-manipulation">
