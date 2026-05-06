@@ -52,10 +52,62 @@ const IGT_MHB_BY_TIER_AND_LINE_BET = {
   major: { 1: 200, 2: 400, 3: 600, 5: 1000, 10: 2000 },
 }
 
-function igtMustHitByFor(tier, lineBet) {
+const IGT_BASE_PRESETS = {
+  mini: {
+    20: { meterRise: 0.25, reset: 17 },
+    40: { meterRise: 0.25, reset: 34 },
+    60: { meterRise: 0.25, reset: 51 },
+    100: { meterRise: 0.25, reset: 85 },
+    200: { meterRise: 0.25, reset: 170 },
+  },
+  minor: {
+    50: { meterRise: 0.25, reset: 37.5 },
+    100: { meterRise: 0.25, reset: 75 },
+    150: { meterRise: 0.25, reset: 112.5 },
+    250: { meterRise: 0.25, reset: 187.5 },
+    500: { meterRise: 0.25, reset: 375 },
+  },
+  major: {
+    200: { meterRise: 2.5, reset: 125 },
+    400: { meterRise: 2.5, reset: 250 },
+    600: { meterRise: 2.5, reset: 375 },
+    1000: { meterRise: 2.5, reset: 625 },
+    2000: { meterRise: 2.5, reset: 1250 },
+  },
+}
+
+function igtScaleFactorForDenom(denom) {
+  return Number(denom) / 0.01
+}
+
+function igtRtpForDenom(denom) {
+  if (denom === 0.25) return 90
+  if (denom === 1) return 92
+  if (denom === 2) return 94
+  return 88
+}
+
+function igtMustHitByFor(tier, lineBet, denom = 0.01) {
   const tierMap = IGT_MHB_BY_TIER_AND_LINE_BET[tier]
   if (!tierMap) return 20
-  return tierMap[lineBet] || 20
+  const baseCap = tierMap[lineBet] || 20
+  return baseCap * igtScaleFactorForDenom(denom)
+}
+
+function igtPresetFor(tier, lineBet, denom = 0.01) {
+  const normalizedTier = IGT_BASE_PRESETS[tier] ? tier : 'mini'
+  const normalizedLineBet = [1, 2, 3, 5, 10].includes(lineBet) ? lineBet : 1
+  const baseCap = IGT_MHB_BY_TIER_AND_LINE_BET[normalizedTier][normalizedLineBet]
+  const basePreset = IGT_BASE_PRESETS[normalizedTier][baseCap]
+  const factor = igtScaleFactorForDenom(denom)
+  const cap = baseCap * factor
+
+  return {
+    current: defaultCurrentForCap(cap),
+    meterRise: basePreset.meterRise,
+    reset: Number((basePreset.reset * factor).toFixed(2)),
+    rtp: igtRtpForDenom(denom),
+  }
 }
 
 /** AGS does not use a 10k cap in-app; 10k coerces to 5k for presets and math. */
@@ -65,11 +117,9 @@ function effectiveCap(manufacturer, mustHitBy) {
   return v
 }
 
-function presetFor(manufacturer, mustHitBy, igtTier = 'mini') {
+function presetFor(manufacturer, mustHitBy, igtTier = 'mini', igtLineBet = 1, igtDenom = 0.01) {
   if (manufacturer === 'igt') {
-    const tierPresets = MHB_PRESETS.igt[igtTier] || MHB_PRESETS.igt.mini
-    const cap = Number(mustHitBy) || 20
-    return tierPresets[cap] || Object.values(tierPresets)[0]
+    return igtPresetFor(igtTier, igtLineBet, igtDenom)
   }
 
   const m = MHB_PRESETS[manufacturer] || MHB_PRESETS.ainsworth
@@ -93,6 +143,7 @@ function MHBCalculator({ onBack }) {
   const [manufacturer, setManufacturer] = useState('ainsworth')
   const [igtTier, setIgtTier] = useState('mini')
   const [igtLineBet, setIgtLineBet] = useState(1)
+  const [igtDenom, setIgtDenom] = useState(0.01)
 
   // Main fields
   const [current, setCurrent] = useState(475)
@@ -108,8 +159,8 @@ function MHBCalculator({ onBack }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const activePreset = useMemo(
-    () => presetFor(manufacturer, mustHitBy, igtTier),
-    [manufacturer, mustHitBy, igtTier]
+    () => presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom),
+    [manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom]
   )
 
   // Outputs
@@ -124,12 +175,12 @@ function MHBCalculator({ onBack }) {
 
   // Load maker + cap bundle (current, rise, reset, RTP defaults)
   useEffect(() => {
-    const p = presetFor(manufacturer, mustHitBy, igtTier)
+    const p = presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom)
     setCurrent(p.current)
     setMeterRise(p.meterRise)
     setResetValue(p.reset)
     setOverallRTP(p.rtp)
-  }, [manufacturer, mustHitBy, igtTier])
+  }, [manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom])
 
   // Keep select value valid: AGS has no 10k tier.
   useEffect(() => {
@@ -148,11 +199,11 @@ function MHBCalculator({ onBack }) {
   // For IGT, derive must-hit cap from tier + line-bet controls.
   useEffect(() => {
     if (manufacturer !== 'igt') return
-    const derived = igtMustHitByFor(igtTier, igtLineBet)
+    const derived = igtMustHitByFor(igtTier, igtLineBet, igtDenom)
     if (mustHitBy !== derived) {
       setMustHitBy(derived)
     }
-  }, [manufacturer, igtTier, igtLineBet, mustHitBy])
+  }, [manufacturer, igtTier, igtLineBet, igtDenom, mustHitBy])
 
   // AGS defaults to full run (no midpoint); other makers default to midpoint.
   useEffect(() => {
@@ -160,7 +211,7 @@ function MHBCalculator({ onBack }) {
   }, [manufacturer])
 
   const calculate = () => {
-    const p = presetFor(manufacturer, mustHitBy, igtTier)
+    const p = presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom)
     const rtp = (Number(overallRTP) || p.rtp) / 100
     const currentVal = Number(current) || p.current
     const mhb = effectiveCap(manufacturer, mustHitBy)
@@ -214,7 +265,7 @@ function MHBCalculator({ onBack }) {
 
   useEffect(() => {
     calculate()
-  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint, manufacturer, igtTier])
+  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint, manufacturer, igtTier, igtLineBet, igtDenom])
 
   // Input handlers
   const handleIntegerChange = (setter, defaultVal) => (e) => {
@@ -343,6 +394,34 @@ function MHBCalculator({ onBack }) {
               </div>
 
               <div className="space-y-2">
+                <div>
+                  <label className="block text-gray-400 text-xs mb-1">Denom</label>
+                  <div className="relative">
+                    <select
+                      value={igtDenom}
+                      onChange={(e) => setIgtDenom(Number(e.target.value))}
+                      className="w-full appearance-none rounded-2xl bg-gray-800 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                    >
+                      <option value={0.01}>$0.01</option>
+                      <option value={0.25}>$0.25</option>
+                      <option value={1}>$1</option>
+                      <option value={2}>$2</option>
+                    </select>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-gray-400 text-xs mb-1">Jackpot Tier</label>
                   <div className="relative">
