@@ -230,6 +230,9 @@ function MHBCalculator({ onBack }) {
     const riseDollars = Number(meterRise) || p.meterRise
     const resetVal = Number(resetValue) || p.reset
     const averageHit = useMidpoint ? (resetVal + mhb) / 2 : mhb
+    const target = useMidpoint
+      ? (currentVal < averageHit ? averageHit : mhb)
+      : mhb
 
     if (mhb <= currentVal) {
       setEv(999)
@@ -243,7 +246,6 @@ function MHBCalculator({ onBack }) {
       return
     }
 
-    const target = averageHit
     const dollarDistance = Math.max(0, target - currentVal)
     const incrementsNeeded = dollarDistance / 0.01
     const coinInToTarget = incrementsNeeded * riseDollars
