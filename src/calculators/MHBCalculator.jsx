@@ -1,23 +1,42 @@
 import { useState, useEffect, useMemo } from 'react'
 import CalculatorDisclaimer from '../components/CalculatorDisclaimer'
 
-/** Example defaults per maker & cap—floor math still wins over these numbers. */
+function defaultCurrentForCap(cap) {
+  return Math.round(cap * 0.95)
+}
+
+/** Default presets per maker and MHB combination. */
 const MHB_PRESETS = {
   ainsworth: {
-    500: { current: 475, meterRise: 2.5, reset: 350, rtp: 85 },
-    /** Mid cap: interpolated between 500 and 10k tiers (illustrative). */
-    5000: { current: 4894, meterRise: 4.46842, reset: 4446, rtp: 85 },
-    10000: { current: 9802, meterRise: 6.66666, reset: 9000, rtp: 85 },
+    500: { current: defaultCurrentForCap(500), meterRise: 2.5, reset: 350, rtp: 88 },
+    10000: { current: defaultCurrentForCap(10000), meterRise: 6.66666, reset: 9000, rtp: 88 },
   },
   ags: {
-    500: { current: 488, meterRise: 2.72, reset: 365, rtp: 87 },
-    /** River Dragons–style bank: meter $3.75 per $0.01, reset $4k (verify glass; some installs show 4995 cap). */
-    5000: { current: 4911.76, meterRise: 3.75, reset: 4000, rtp: 87 },
+    500: { current: defaultCurrentForCap(500), meterRise: 2.5, reset: 200, rtp: 88 },
+    5000: { current: defaultCurrentForCap(5000), meterRise: 3.75, reset: 4000, rtp: 88 },
   },
   igt: {
-    500: { current: 462, meterRise: 2.35, reset: 338, rtp: 85 },
-    5000: { current: 4820, meterRise: 4.33, reset: 4050, rtp: 85 },
-    10000: { current: 9740, meterRise: 6.42, reset: 8850, rtp: 85 },
+    mini: {
+      20: { current: defaultCurrentForCap(20), meterRise: 0.25, reset: 17, rtp: 88 },
+      40: { current: defaultCurrentForCap(40), meterRise: 0.25, reset: 34, rtp: 88 },
+      60: { current: defaultCurrentForCap(60), meterRise: 0.25, reset: 51, rtp: 88 },
+      100: { current: defaultCurrentForCap(100), meterRise: 0.25, reset: 85, rtp: 88 },
+      200: { current: defaultCurrentForCap(200), meterRise: 0.25, reset: 170, rtp: 88 },
+    },
+    minor: {
+      50: { current: defaultCurrentForCap(50), meterRise: 0.25, reset: 37.5, rtp: 88 },
+      100: { current: defaultCurrentForCap(100), meterRise: 0.25, reset: 75, rtp: 88 },
+      150: { current: defaultCurrentForCap(150), meterRise: 0.25, reset: 112.5, rtp: 88 },
+      250: { current: defaultCurrentForCap(250), meterRise: 0.25, reset: 187.5, rtp: 88 },
+      500: { current: defaultCurrentForCap(500), meterRise: 0.25, reset: 375, rtp: 88 },
+    },
+    major: {
+      200: { current: defaultCurrentForCap(200), meterRise: 2.5, reset: 125, rtp: 88 },
+      400: { current: defaultCurrentForCap(400), meterRise: 2.5, reset: 250, rtp: 88 },
+      600: { current: defaultCurrentForCap(600), meterRise: 2.5, reset: 375, rtp: 88 },
+      1000: { current: defaultCurrentForCap(1000), meterRise: 2.5, reset: 625, rtp: 88 },
+      2000: { current: defaultCurrentForCap(2000), meterRise: 2.5, reset: 1250, rtp: 88 },
+    },
   },
 }
 
@@ -46,7 +65,13 @@ function effectiveCap(manufacturer, mustHitBy) {
   return v
 }
 
-function presetFor(manufacturer, mustHitBy) {
+function presetFor(manufacturer, mustHitBy, igtTier = 'mini') {
+  if (manufacturer === 'igt') {
+    const tierPresets = MHB_PRESETS.igt[igtTier] || MHB_PRESETS.igt.mini
+    const cap = Number(mustHitBy) || 20
+    return tierPresets[cap] || Object.values(tierPresets)[0]
+  }
+
   const m = MHB_PRESETS[manufacturer] || MHB_PRESETS.ainsworth
   const cap = effectiveCap(manufacturer, mustHitBy)
   return m[cap] || m[500]
@@ -76,13 +101,16 @@ function MHBCalculator({ onBack }) {
   const [jpMeterDraft, setJpMeterDraft] = useState('')
 
   // Advanced Settings
-  const [overallRTP, setOverallRTP] = useState(85)
+  const [overallRTP, setOverallRTP] = useState(88)
   const [meterRise, setMeterRise] = useState(2.50)
   const [resetValue, setResetValue] = useState(350)
   const [useMidpoint, setUseMidpoint] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const activePreset = useMemo(() => presetFor(manufacturer, mustHitBy), [manufacturer, mustHitBy])
+  const activePreset = useMemo(
+    () => presetFor(manufacturer, mustHitBy, igtTier),
+    [manufacturer, mustHitBy, igtTier]
+  )
 
   // Outputs
   const [ev, setEv] = useState(0)
@@ -96,12 +124,12 @@ function MHBCalculator({ onBack }) {
 
   // Load maker + cap bundle (current, rise, reset, RTP defaults)
   useEffect(() => {
-    const p = presetFor(manufacturer, mustHitBy)
+    const p = presetFor(manufacturer, mustHitBy, igtTier)
     setCurrent(p.current)
     setMeterRise(p.meterRise)
     setResetValue(p.reset)
     setOverallRTP(p.rtp)
-  }, [manufacturer, mustHitBy])
+  }, [manufacturer, mustHitBy, igtTier])
 
   // Keep select value valid: AGS has no 10k tier.
   useEffect(() => {
@@ -132,7 +160,7 @@ function MHBCalculator({ onBack }) {
   }, [manufacturer])
 
   const calculate = () => {
-    const p = presetFor(manufacturer, mustHitBy)
+    const p = presetFor(manufacturer, mustHitBy, igtTier)
     const rtp = (Number(overallRTP) || p.rtp) / 100
     const currentVal = Number(current) || p.current
     const mhb = effectiveCap(manufacturer, mustHitBy)
@@ -186,7 +214,7 @@ function MHBCalculator({ onBack }) {
 
   useEffect(() => {
     calculate()
-  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint, manufacturer])
+  }, [current, mustHitBy, meterRise, resetValue, overallRTP, useMidpoint, manufacturer, igtTier])
 
   // Input handlers
   const handleIntegerChange = (setter, defaultVal) => (e) => {
