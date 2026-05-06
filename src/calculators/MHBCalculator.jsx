@@ -476,8 +476,8 @@ function MHBCalculator({ onBack }) {
                     onFocus={handleJpMeterFocus}
                     onChange={handleJpMeterChange}
                     onBlur={handleJpMeterBlur}
-                    className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
-                      showMeterCue ? 'ring-2 ring-cyan-300/80 shadow-[0_0_0_2px_rgba(34,211,238,0.22),0_0_0_6px_rgba(168,85,247,0.16)] animate-pulse' : ''
+                    className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-400/45 focus:ring-2 focus:ring-cyan-300/65 ${
+                      showMeterCue ? 'ring-4 ring-cyan-300/95 shadow-[0_0_0_4px_rgba(34,211,238,0.35),0_0_0_10px_rgba(168,85,247,0.24)] animate-pulse' : ''
                     }`}
                   />
                 </div>
@@ -500,8 +500,8 @@ function MHBCalculator({ onBack }) {
                   onFocus={handleJpMeterFocus}
                   onChange={handleJpMeterChange}
                   onBlur={handleJpMeterBlur}
-                  className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
-                    showMeterCue ? 'ring-2 ring-cyan-300/80 shadow-[0_0_0_2px_rgba(34,211,238,0.22),0_0_0_6px_rgba(168,85,247,0.16)] animate-pulse' : ''
+                  className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-400/45 focus:ring-2 focus:ring-cyan-300/65 ${
+                    showMeterCue ? 'ring-4 ring-cyan-300/95 shadow-[0_0_0_4px_rgba(34,211,238,0.35),0_0_0_10px_rgba(168,85,247,0.24)] animate-pulse' : ''
                   }`}
                 />
               </div>
