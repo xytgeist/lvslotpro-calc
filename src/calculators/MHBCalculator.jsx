@@ -285,7 +285,7 @@ function MHBCalculator({ onBack }) {
   const [breakevenExact, setBreakevenExact] = useState(0)
   const [coinInExpected, setCoinInExpected] = useState(0)
   const [jpContribution, setJpContribution] = useState(0)
-  const [jpContributionBreakdown, setJpContributionBreakdown] = useState('')
+  const [jpContributionByKey, setJpContributionByKey] = useState({})
   const [exposure, setExposure] = useState(0)
   const [isPositive, setIsPositive] = useState(false)
 
@@ -348,8 +348,15 @@ function MHBCalculator({ onBack }) {
   useEffect(() => {
     const next = {}
     for (const jp of concurrentJackpots) next[jp.key] = true
+    const selectedCap = effectiveCap(manufacturer, mustHitBy)
+    if (manufacturer === 'ainsworth' && selectedCap !== 10000) {
+      next['ainsworth-10000'] = false
+    }
+    if (manufacturer === 'ags' && selectedCap !== 5000) {
+      next['ags-5000'] = false
+    }
     setIncludedJpContributions(next)
-  }, [concurrentJackpots])
+  }, [concurrentJackpots, manufacturer, mustHitBy])
 
   const calculate = () => {
     const p = presetFor(manufacturer, mustHitBy, igtTier, igtLineBet, igtDenom)
@@ -374,9 +381,10 @@ function MHBCalculator({ onBack }) {
     })
     const jpContribFraction = contributionParts.reduce((sum, part) => sum + part.fraction, 0)
     const jpContrib = jpContribFraction * 100
-    const jpBreakdown = contributionParts
-      .map((part) => `${part.label}: ${part.percent.toFixed(2)}%${part.included ? '' : ' (off)'}`)
-      .join(' + ')
+    const jpByKey = contributionParts.reduce((acc, part) => {
+      acc[part.key] = Number(part.percent.toFixed(2))
+      return acc
+    }, {})
     const effectiveRtp = Math.min(0.999999, Math.max(0, rtp - jpContribFraction))
     const effectiveHouseEdge = 1 - effectiveRtp
 
@@ -464,7 +472,7 @@ function MHBCalculator({ onBack }) {
     setBreakevenExact(Number(breakevenCurrent.toFixed(2)))
     setCoinInExpected(Math.round(coinInToTarget))
     setJpContribution(Number(jpContrib.toFixed(2)))
-    setJpContributionBreakdown(jpBreakdown)
+    setJpContributionByKey(jpByKey)
     setExposure(Math.round(maxExposureDollars))
     setIsPositive(finalEV >= 0)
   }
@@ -853,12 +861,14 @@ function MHBCalculator({ onBack }) {
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {concurrentJackpots.map((jp) => {
                       const checked = includedJpContributions[jp.key] !== false
+                      const pct = jpContributionByKey[jp.key]
+                      const label = Number.isFinite(pct) ? `${jp.label} (${pct.toFixed(2)}%)` : jp.label
                       return (
                         <label
                           key={jp.key}
                           className="flex items-center justify-between gap-2 rounded-xl bg-gray-900/70 px-3 py-2 text-[11px] font-semibold text-white tabular-nums"
                         >
-                          <span>{jp.label}</span>
+                          <span>{label}</span>
                           <input
                             type="checkbox"
                             checked={checked}
@@ -872,9 +882,6 @@ function MHBCalculator({ onBack }) {
                       )
                     })}
                   </div>
-                  <div className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-300 tabular-nums">
-                    {jpContributionBreakdown || `Total: ${jpContribution.toFixed(2)}%`}
-                  </div>
                 </div>
               </div>
 
@@ -883,7 +890,7 @@ function MHBCalculator({ onBack }) {
                   type="checkbox"
                   checked={useMidpoint}
                   onChange={(e) => setUseMidpoint(e.target.checked)}
-                  className="h-5 w-5 shrink-0 rounded border-gray-600 bg-gray-700 accent-violet-600 focus:ring-2 focus:ring-cyan-500/45 focus:ring-offset-0 focus:ring-offset-gray-800"
+                  className="h-5 w-5 shrink-0 rounded border-gray-600 bg-gray-700 accent-cyan-500 focus:ring-2 focus:ring-cyan-500/45 focus:ring-offset-0 focus:ring-offset-gray-800"
                 />
                 <span className="text-gray-300 text-sm leading-snug">
                   Use Midpoint for EV & Breakeven
@@ -895,7 +902,13 @@ function MHBCalculator({ onBack }) {
 
         {/* Outputs */}
         <div className="mt-8 bg-gray-900 p-6 rounded-3xl">
-          <h2 className="mb-6 text-center text-xl font-semibold text-violet-400">
+          <h2
+            className="mb-6 text-center font-black text-[26px] tracking-[-1px] text-white"
+            style={{
+              textShadow:
+                '-1px -1px 0 #5b21b6, 1px -1px 0 #5b21b6, -1px 1px 0 #0e7490, 1px 1px 0 #0e7490, 0 0 12px rgba(6,182,212,0.25)',
+            }}
+          >
             MHB Analysis
           </h2>
 
