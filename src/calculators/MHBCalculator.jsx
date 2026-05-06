@@ -81,10 +81,10 @@ function igtScaleFactorForDenom(denom) {
 }
 
 function igtRtpForDenom(denom) {
-  if (denom === 0.25) return 90
-  if (denom === 1) return 92
-  if (denom === 2) return 94
-  return 88
+  if (denom === 0.25) return 85
+  if (denom === 1) return 86
+  if (denom === 2) return 87
+  return 84
 }
 
 function igtMustHitByFor(tier, lineBet, denom = 0.01) {
@@ -742,8 +742,8 @@ function MHBCalculator({ onBack }) {
                     onFocus={handleJpMeterFocus}
                     onChange={handleJpMeterChange}
                     onBlur={handleJpMeterBlur}
-                    className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-400/45 focus:ring-2 focus:ring-cyan-300/65 ${
-                      showMeterCue ? 'ring-2 ring-cyan-200/95 shadow-[0_0_0_3px_rgba(103,232,249,0.45)] animate-pulse' : ''
+                    className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-300/80 focus:ring-2 focus:ring-cyan-200/85 ${
+                      showMeterCue ? 'ring-2 ring-cyan-100 shadow-[0_0_0_3px_rgba(103,232,249,0.6)] animate-pulse' : ''
                     }`}
                   />
                 </div>
@@ -766,8 +766,8 @@ function MHBCalculator({ onBack }) {
                   onFocus={handleJpMeterFocus}
                   onChange={handleJpMeterChange}
                   onBlur={handleJpMeterBlur}
-                  className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-400/45 focus:ring-2 focus:ring-cyan-300/65 ${
-                    showMeterCue ? 'ring-2 ring-cyan-200/95 shadow-[0_0_0_3px_rgba(103,232,249,0.45)] animate-pulse' : ''
+                  className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-300/80 focus:ring-2 focus:ring-cyan-200/85 ${
+                    showMeterCue ? 'ring-2 ring-cyan-100 shadow-[0_0_0_3px_rgba(103,232,249,0.6)] animate-pulse' : ''
                   }`}
                 />
               </div>
@@ -811,49 +811,62 @@ function MHBCalculator({ onBack }) {
             <span className={`text-white transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
-            <div className="p-5 pt-4 space-y-6 border-t border-gray-800">
+            <div className="p-4 pt-3 space-y-4 border-t border-gray-800">
               <p className="text-[11px] italic leading-snug text-zinc-500">
-                These defaults are set to known values. Only change if you know what you're doing!
+                These defaults are set to observed values. Only change if you know what you're doing!
               </p>
-              <div>
-                <label className="block text-gray-400 text-xs mb-1">RTP %</label>
-                <input
-                  type="text"
-                  value={overallRTP}
-                  onChange={handleFloatChange(setOverallRTP, activePreset.rtp)}
-                  onBlur={handleFloatBlur(setOverallRTP, activePreset.rtp)}
-                  className="w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-400 text-[11px] mb-1">RTP %</label>
+                  <input
+                    type="text"
+                    value={overallRTP}
+                    onChange={handleFloatChange(setOverallRTP, activePreset.rtp)}
+                    onBlur={handleFloatBlur(setOverallRTP, activePreset.rtp)}
+                    className="w-full rounded-2xl bg-gray-800 p-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-400 text-[11px] mb-1">Meter Rise ($ per $0.01 increment)</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={meterRiseDisplay}
+                    onFocus={handleMeterRiseFocus}
+                    onChange={handleMeterRiseChange}
+                    onBlur={handleMeterRiseBlur}
+                    className="w-full rounded-2xl bg-gray-800 p-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="block text-gray-400 text-[11px] mb-1">Reset Value</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={resetValueDisplay}
+                    onFocus={handleResetValueFocus}
+                    onChange={handleResetValueChange}
+                    onBlur={handleResetValueBlur}
+                    className="h-12 w-full rounded-2xl bg-gray-800 px-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
+                  />
+                </div>
+
+                <label className="flex h-12 cursor-pointer items-center gap-3 rounded-2xl bg-gray-800 px-3 touch-manipulation">
+                  <input
+                    type="checkbox"
+                    checked={useMidpoint}
+                    onChange={(e) => setUseMidpoint(e.target.checked)}
+                    className="h-5 w-5 shrink-0 rounded border-gray-600 bg-gray-700 accent-cyan-500 focus:ring-2 focus:ring-cyan-500/45 focus:ring-offset-0 focus:ring-offset-gray-800"
+                  />
+                  <span className="text-gray-300 text-[13px] leading-snug">Use Midpoint</span>
+                </label>
               </div>
 
               <div>
-                <label className="block text-gray-400 text-xs mb-1">Meter Rise ($ per $0.01 increment)</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={meterRiseDisplay}
-                  onFocus={handleMeterRiseFocus}
-                  onChange={handleMeterRiseChange}
-                  onBlur={handleMeterRiseBlur}
-                  className="w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-400 text-xs mb-1">Reset Value</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={resetValueDisplay}
-                  onFocus={handleResetValueFocus}
-                  onChange={handleResetValueChange}
-                  onBlur={handleResetValueBlur}
-                  className="w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-400 text-xs mb-1">JP Contribution</label>
                 <div className="rounded-2xl bg-gray-800 p-3">
                   <div className="mb-2 text-center text-[11px] font-semibold text-cyan-300">
                     Include MHB Contribution to RTP
@@ -885,17 +898,6 @@ function MHBCalculator({ onBack }) {
                 </div>
               </div>
 
-              <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-gray-800 p-4 touch-manipulation">
-                <input
-                  type="checkbox"
-                  checked={useMidpoint}
-                  onChange={(e) => setUseMidpoint(e.target.checked)}
-                  className="h-5 w-5 shrink-0 rounded border-gray-600 bg-gray-700 accent-cyan-500 focus:ring-2 focus:ring-cyan-500/45 focus:ring-offset-0 focus:ring-offset-gray-800"
-                />
-                <span className="text-gray-300 text-sm leading-snug">
-                  Use Midpoint for EV & Breakeven
-                </span>
-              </label>
             </div>
           )}
         </div>
@@ -906,7 +908,7 @@ function MHBCalculator({ onBack }) {
             className="mb-6 text-center font-black text-[26px] tracking-[-1px] text-white"
             style={{
               textShadow:
-                '-1px -1px 0 #5b21b6, 1px -1px 0 #5b21b6, -1px 1px 0 #0e7490, 1px 1px 0 #0e7490, 0 0 12px rgba(6,182,212,0.25)',
+                '-1.5px -1.5px 0 #5b21b6, 1.5px -1.5px 0 #5b21b6, -1.5px 1.5px 0 #0e7490, 1.5px 1.5px 0 #0e7490, 0 0 18px rgba(6,182,212,0.45), 0 0 10px rgba(139,92,246,0.35)',
             }}
           >
             MHB Analysis
