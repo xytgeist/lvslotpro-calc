@@ -476,10 +476,8 @@ function MHBCalculator({ onBack }) {
                     onFocus={handleJpMeterFocus}
                     onChange={handleJpMeterChange}
                     onBlur={handleJpMeterBlur}
-                    className={`w-full rounded-2xl p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
-                      showMeterCue
-                        ? 'bg-gray-700/90 ring-2 ring-cyan-400/45 animate-pulse'
-                        : 'bg-gray-800'
+                    className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
+                      showMeterCue ? 'ring-2 ring-cyan-400/55 animate-pulse' : ''
                     }`}
                   />
                 </div>
@@ -502,10 +500,8 @@ function MHBCalculator({ onBack }) {
                   onFocus={handleJpMeterFocus}
                   onChange={handleJpMeterChange}
                   onBlur={handleJpMeterBlur}
-                  className={`w-full rounded-2xl p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
-                    showMeterCue
-                      ? 'bg-gray-700/90 ring-2 ring-cyan-400/45 animate-pulse'
-                      : 'bg-gray-800'
+                  className={`w-full rounded-2xl bg-gray-800 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35 ${
+                    showMeterCue ? 'ring-2 ring-cyan-400/55 animate-pulse' : ''
                   }`}
                 />
               </div>
