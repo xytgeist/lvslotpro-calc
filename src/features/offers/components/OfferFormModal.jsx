@@ -20,7 +20,7 @@ import {
 } from '../utils'
 
 function FieldGroup({ children }) {
-  return <div className="overflow-visible rounded-3xl border border-zinc-700/55 bg-[#2b2d34] shadow-none">{children}</div>
+  return <div className="overflow-visible rounded-3xl bg-[#2b2d34] shadow-[0_2px_8px_rgba(0,0,0,0.16)]">{children}</div>
 }
 
 function GroupRow({ children, divider = true }) {
@@ -454,7 +454,7 @@ export default function OfferFormModal({
     <div className="fixed inset-0 z-[70] flex bg-black/55 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[2px]">
       <div className="mx-auto flex w-full max-w-lg flex-1 items-end">
         <div
-          className="relative w-full overflow-hidden rounded-t-[36px] bg-[#2b2d34] shadow-[0_6px_16px_rgba(0,0,0,0.12)]"
+          className="relative w-full overflow-hidden rounded-t-[36px] bg-[#1b1e25] shadow-[0_6px_16px_rgba(0,0,0,0.12)]"
           style={{ height: 'calc(100dvh - (env(safe-area-inset-top) + 12px))' }}
         >
           {/* Scroll region (content scrolls under header) */}
@@ -470,7 +470,7 @@ export default function OfferFormModal({
           >
             {/* Sticky header overlay */}
             <div className="sticky top-0 z-30">
-              <div className="bg-[#2b2d34]/72 px-4 pb-5 pt-4 backdrop-blur-xl">
+              <div className="bg-[#1b1e25]/78 px-4 pb-5 pt-4 backdrop-blur-xl">
                 <div className="relative flex shrink-0 items-center justify-between">
                   <button
                     type="button"
@@ -504,7 +504,7 @@ export default function OfferFormModal({
             <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-1">
               <div className="flex flex-col gap-6">
           {!completingReviewItemId && !editingId && (
-            <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/35 via-slate-900/95 to-zinc-900/95 p-3 shadow-[0_14px_30px_rgba(0,0,0,0.45)]">
+            <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/35 via-slate-900/95 to-zinc-900/95 p-3 shadow-[0_2px_8px_rgba(0,0,0,0.16)]">
               <button
                 type="button"
                 disabled={uploading}
