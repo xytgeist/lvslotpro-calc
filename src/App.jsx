@@ -1369,6 +1369,9 @@ function AppShell({ onLogout, supabaseClient }) {
 
           <div className={`mt-3 rounded-xl border border-cyan-500/20 bg-black/25 p-3 ${!pushSubscribed || !allowPushControls ? 'opacity-60' : ''}`}>
             <div className="text-[11px] font-semibold text-cyan-100">Before each offer starts</div>
+            <p className="mt-1 text-[10px] leading-relaxed text-cyan-200/65">
+              Set timing on each offer with the Alert field in Add/Edit event (9:00 AM on the day for all-day, or 1 hour before when a start time is set).
+            </p>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="inline-flex rounded-xl border border-zinc-600 bg-zinc-900/90 p-0.5">
                 <button
@@ -1486,7 +1489,7 @@ function AppShell({ onLogout, supabaseClient }) {
                   </button>
                 </div>
                 <p className="text-[10px] leading-relaxed text-zinc-500">
-                  “Run reminder check” calls the server with the same logic as automation. Uses your saved reminder timing and only fires for offers whose start time falls in the next window (plus your lead minutes).
+                  “Run reminder check” uses the same server job as automation. It sends only for events that have an alert scheduled and whose alert time falls in the next window. Offer alerts are set on each event (Alert field on the form).
                 </p>
                 {pushStatusMessage && pushAdvancedOpen ? (
                   <div className="text-[11px] leading-relaxed text-cyan-100/85">{pushStatusMessage}</div>

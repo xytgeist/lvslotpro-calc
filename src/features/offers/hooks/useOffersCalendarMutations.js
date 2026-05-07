@@ -1,5 +1,11 @@
 import { useCallback } from 'react'
-import { dateFromDatetimeLocalValue, draftFromAiReviewPayload } from '../utils'
+import {
+  coerceAlertPresetForMode,
+  computeOfferAlertFireIso,
+  dateFromDatetimeLocalValue,
+  draftFromAiReviewPayload,
+  OFFER_ALERT_DAY_9AM
+} from '../utils'
 
 export default function useOffersCalendarMutations({
   supabaseClient,
@@ -106,6 +112,8 @@ export default function useOffersCalendarMutations({
             if (!normalizedEnd || normalizedEnd.getTime() >= normalizedStart.getTime()) {
               const up = row.offer_uploads
               const associatedStoragePath = Array.isArray(up) ? up[0]?.storage_path : up?.storage_path
+              const assocPreset = coerceAlertPresetForMode(draft.alertPreset || OFFER_ALERT_DAY_9AM, associatedAllDay)
+              const assocFire = computeOfferAlertFireIso(assocPreset, normalizedStart, associatedAllDay)
               const insertPayload = {
                 user_id: user.id,
                 casino_name: merged.casinoName.trim(),
@@ -116,7 +124,9 @@ export default function useOffersCalendarMutations({
                 value_amount: merged.valueAmount !== '' ? Number(merged.valueAmount) : null,
                 notes: merged.notes?.trim() || null,
                 source_type: 'image_ai',
-                source_image_path: associatedStoragePath || reviewSourceImagePath || null
+                source_image_path: associatedStoragePath || reviewSourceImagePath || null,
+                alert_preset: assocPreset,
+                alert_fire_at: assocFire
               }
               const { data: inserted, error: insertErr } = await supabaseClient
                 .from('offer_events')
@@ -199,6 +209,8 @@ export default function useOffersCalendarMutations({
         throw new Error('End date/time must be later than (or the same as) start.')
       }
 
+      const alertPreset = coerceAlertPresetForMode(draft.alertPreset || OFFER_ALERT_DAY_9AM, allDay)
+      const alertFireAt = computeOfferAlertFireIso(alertPreset, normalizedStart, allDay)
       const payload = {
         casino_name: draft.casinoName.trim(),
         offer_type: draft.offerType,
@@ -206,7 +218,9 @@ export default function useOffersCalendarMutations({
         start_at: normalizedStart.toISOString(),
         end_at: normalizedEnd ? normalizedEnd.toISOString() : null,
         value_amount: draft.valueAmount !== '' ? Number(draft.valueAmount) : null,
-        notes: draft.notes.trim() || null
+        notes: draft.notes.trim() || null,
+        alert_preset: alertPreset,
+        alert_fire_at: alertFireAt
       }
 
       if (editingId) {

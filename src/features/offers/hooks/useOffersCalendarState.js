@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { draftFromAiReviewPayload, emptyOfferDraft, localDateKeyFromDate, localDateKeyFromIso, shuffledCopy, toDatetimeLocalValue } from '../utils'
+import {
+  defaultAlertPresetForAllDay,
+  draftFromAiReviewPayload,
+  emptyOfferDraft,
+  localDateKeyFromDate,
+  localDateKeyFromIso,
+  OFFER_ALERT_DAY_9AM,
+  OFFER_ALERT_HOUR_BEFORE,
+  OFFER_ALERT_NONE,
+  shuffledCopy,
+  toDatetimeLocalValue
+} from '../utils'
 
 export default function useOffersCalendarState({ supabaseClient, normalizeLoadedEvent }) {
   const fileInputRef = useRef(null)
@@ -164,7 +175,9 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     try {
       const { data, error: e } = await supabaseClient
         .from('offer_events')
-        .select('id,casino_name,offer_type,title,start_at,end_at,value_amount,notes,created_at,source_type,source_image_path')
+        .select(
+          'id,casino_name,offer_type,title,start_at,end_at,value_amount,notes,created_at,source_type,source_image_path,alert_preset,alert_fire_at'
+        )
         .order('start_at', { ascending: true })
         .limit(500)
       if (e) throw e
@@ -328,12 +341,13 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     setEditingId(null)
     if (dayKey) {
       // Default to an all-day event when opening from a calendar day
-      setDraft((d) => ({ ...emptyOfferDraft(), startAt: `${dayKey}T00:00` }))
+      setDraft(() => ({ ...emptyOfferDraft(), startAt: `${dayKey}T00:00`, endAt: `${dayKey}T00:00` }))
       setAllDay(true)
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
     } else {
-      setDraft(emptyOfferDraft())
+      const todayKey = localDateKeyFromDate(new Date())
+      setDraft(() => ({ ...emptyOfferDraft(), startAt: `${todayKey}T00:00`, endAt: `${todayKey}T00:00` }))
       setAllDay(true)
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
@@ -356,6 +370,12 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     const en = ev.end_at ? new Date(ev.end_at) : null
     const enHasVisibleTime = en ? en.getHours() !== 0 || en.getMinutes() !== 0 : false
     setAllDay(!(stHasVisibleTime || enHasVisibleTime))
+    const allDayEdit = !(stHasVisibleTime || enHasVisibleTime)
+    const ap = ev.alert_preset
+    const alertPreset =
+      ap === OFFER_ALERT_NONE || ap === OFFER_ALERT_DAY_9AM || ap === OFFER_ALERT_HOUR_BEFORE
+        ? ap
+        : defaultAlertPresetForAllDay(allDayEdit)
     setDraft({
       casinoName: ev.casino_name || '',
       offerType: ev.offer_type || 'free_play',
@@ -363,7 +383,8 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
       startAt: toDatetimeLocalValue(ev.start_at),
       endAt: ev.end_at ? toDatetimeLocalValue(ev.end_at) : '',
       valueAmount: ev.value_amount !== null && ev.value_amount !== undefined ? String(ev.value_amount) : '',
-      notes: ev.notes || ''
+      notes: ev.notes || '',
+      alertPreset
     })
     setShowCasinoSuggestions(false)
     setShowTitleSuggestions(false)

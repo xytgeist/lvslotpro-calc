@@ -71,6 +71,52 @@ export function shuffledCopy(items) {
   return arr
 }
 
+export const OFFER_ALERT_NONE = 'none'
+export const OFFER_ALERT_DAY_9AM = 'day_9am'
+export const OFFER_ALERT_HOUR_BEFORE = 'hour_before'
+
+/** Default iOS-style alert when opening the form (All day is on by default). */
+export function defaultAlertPresetForAllDay(allDay) {
+  return allDay ? OFFER_ALERT_DAY_9AM : OFFER_ALERT_HOUR_BEFORE
+}
+
+/** Keep preset consistent with all-day vs timed mode. */
+export function coerceAlertPresetForMode(alertPreset, allDay) {
+  if (alertPreset === OFFER_ALERT_NONE) return OFFER_ALERT_NONE
+  if (allDay) {
+    return alertPreset === OFFER_ALERT_HOUR_BEFORE ? OFFER_ALERT_DAY_9AM : alertPreset
+  }
+  return alertPreset === OFFER_ALERT_DAY_9AM ? OFFER_ALERT_HOUR_BEFORE : alertPreset
+}
+
+/**
+ * When to send the reminder push (UTC ISO). null = no alert row / no push for this schedule.
+ * @param {string} alertPreset
+ * @param {Date} normalizedStart start instant (local all-day midnight or actual start)
+ * @param {boolean} allDay
+ */
+export function computeOfferAlertFireIso(alertPreset, normalizedStart, allDay) {
+  if (!normalizedStart || Number.isNaN(normalizedStart.getTime())) return null
+  const safe = coerceAlertPresetForMode(alertPreset, allDay)
+  if (safe === OFFER_ALERT_NONE) return null
+  if (safe === OFFER_ALERT_HOUR_BEFORE) {
+    return new Date(normalizedStart.getTime() - 60 * 60 * 1000).toISOString()
+  }
+  if (safe === OFFER_ALERT_DAY_9AM) {
+    const atNine = new Date(
+      normalizedStart.getFullYear(),
+      normalizedStart.getMonth(),
+      normalizedStart.getDate(),
+      9,
+      0,
+      0,
+      0
+    )
+    return atNine.toISOString()
+  }
+  return null
+}
+
 export function emptyOfferDraft() {
   return {
     casinoName: '',
@@ -79,7 +125,8 @@ export function emptyOfferDraft() {
     startAt: '',
     endAt: '',
     valueAmount: '',
-    notes: ''
+    notes: '',
+    alertPreset: OFFER_ALERT_DAY_9AM
   }
 }
 
@@ -102,6 +149,7 @@ export function draftFromAiReviewPayload(raw) {
     other: 'Other'
   }
   const normalizedType = allowedTypes.has(ot) ? ot : 'free_play'
+  const hasSpecificTime = o.hasSpecificTime === true || o.has_specific_time === true
   return {
     casinoName: String(o.casinoName ?? o.casino_name ?? ''),
     offerType: normalizedType,
@@ -110,6 +158,7 @@ export function draftFromAiReviewPayload(raw) {
     endAt: String(o.endAt ?? o.end_at ?? ''),
     valueAmount: va !== undefined && va !== null ? String(va) : '',
     notes: String(o.notes ?? ''),
-    hasSpecificTime: o.hasSpecificTime === true || o.has_specific_time === true
+    hasSpecificTime,
+    alertPreset: defaultAlertPresetForAllDay(!hasSpecificTime)
   }
 }

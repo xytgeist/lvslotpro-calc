@@ -125,6 +125,12 @@ input[list]::-webkit-list-button {
   box-shadow: 0 0 0 2px #7c3aed !important; /* violet-600 */
 }
 
+/* Inline calendar: today indicator is red text (no ring) */
+.offer-datepicker-inline .react-datepicker__day--today {
+  box-shadow: none !important;
+  color: #ef4444 !important; /* red-500 */
+}
+
 /* Selected indicator: white rounded ring */
 .react-datepicker__day--selected,
 .react-datepicker__day--keyboard-selected {
@@ -133,10 +139,67 @@ input[list]::-webkit-list-button {
   box-shadow: 0 0 0 2px #ffffff !important;
 }
 
+/* Inline calendar selected day: filled circle (iOS-style) */
+.offer-datepicker-inline .react-datepicker__day--selected,
+.offer-datepicker-inline .react-datepicker__day--keyboard-selected {
+  background: #ef4444 !important; /* red-500 */
+  color: #ffffff !important;
+  box-shadow: none !important;
+  border-radius: 9999px !important;
+}
+
 /* If react-datepicker uses range highlight classes, keep the same selected indicator */
 .react-datepicker__day--in-range,
 .react-datepicker__day--in-selecting-range {
   background: transparent !important;
   border: none !important;
   box-shadow: 0 0 0 2px #ffffff !important;
+}
+
+/* Inline calendar: make it feel embedded/full-width */
+.offer-datepicker-inline.react-datepicker {
+  width: 100%;
+  max-width: 100%;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.offer-datepicker-inline .react-datepicker__month-container {
+  width: 100%;
+  float: none;
+}
+
+.offer-datepicker-inline .react-datepicker__month {
+  margin: 0;
+}
+
+.offer-datepicker-inline .react-datepicker__day-names,
+.offer-datepicker-inline .react-datepicker__week {
+  display: flex;
+  justify-content: space-between;
+}
+
+.offer-datepicker-inline .react-datepicker__day-name {
+  color: rgba(161, 161, 170, 0.95) !important; /* zinc-400 */
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.offer-datepicker-inline .react-datepicker__day--outside-month {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.offer-datepicker-inline .react-datepicker__day-name,
+.offer-datepicker-inline .react-datepicker__day {
+  flex: 0 0 auto;
+  width: 2.1rem;
+  height: 2.1rem;
+  line-height: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }

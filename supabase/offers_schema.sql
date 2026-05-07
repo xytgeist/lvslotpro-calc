@@ -15,6 +15,8 @@ create table if not exists public.offer_events (
   source_type text not null default 'manual' check (source_type in ('manual', 'image_ai')),
   source_image_path text,
   ai_confidence numeric(5,2),
+  alert_preset text not null default 'none' check (alert_preset in ('none', 'day_9am', 'hour_before')),
+  alert_fire_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint offer_events_end_after_start check (end_at is null or end_at >= start_at)
