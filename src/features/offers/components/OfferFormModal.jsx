@@ -457,51 +457,58 @@ export default function OfferFormModal({
           className="relative w-full overflow-hidden rounded-t-[36px] bg-[#1b1e25] shadow-[0_6px_16px_rgba(0,0,0,0.12)]"
           style={{ height: 'calc(100dvh - (env(safe-area-inset-top) + 12px))' }}
         >
+          {/* Transparent control layer above scroll content */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-30 px-4 pb-5 pt-4">
+            <div className="relative flex shrink-0 items-center justify-between">
+              <button
+                type="button"
+                onClick={requestClose}
+                aria-label="Close event form"
+                className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full border border-zinc-600 bg-zinc-800/90 text-2xl leading-none text-zinc-300 touch-manipulation"
+              >
+                ×
+              </button>
+              <div className="pointer-events-none absolute left-0 right-0 text-center text-[16px] font-semibold text-white">
+                {editingId ? 'Edit Event' : 'New Event'}
+              </div>
+              <button
+                type="button"
+                onClick={saveEvent}
+                disabled={!canSave || saving}
+                aria-label={editingId ? 'Update event' : 'Save event'}
+                className={`pointer-events-auto grid h-12 w-12 place-items-center rounded-full border text-2xl leading-none touch-manipulation transition-colors ${
+                  canSave && !saving
+                    ? 'border-emerald-400/70 bg-emerald-500 text-white'
+                    : 'border-zinc-600 bg-zinc-800/90 text-zinc-500'
+                }`}
+              >
+                {saving ? '…' : '✓'}
+              </button>
+            </div>
+          </div>
+
+          {/* Top blur veil to recreate iOS-style scroll-under blur */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-20 h-28 bg-black/5 backdrop-blur-xl"
+            style={{
+              WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.88) 58%, rgba(0,0,0,0) 100%)',
+              maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.88) 58%, rgba(0,0,0,0) 100%)'
+            }}
+          />
+
           {/* Scroll region (content scrolls under header) */}
           <div
             className={`relative h-full overscroll-contain ${activeTime ? 'overflow-hidden' : 'overflow-y-auto touch-pan-y'}`}
             style={{
               WebkitOverflowScrolling: 'touch',
               WebkitMaskImage:
-                'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) calc(100% - 96px), rgba(0,0,0,0.9) calc(100% - 56px), rgba(0,0,0,0) 100%)',
+                'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 28px, rgba(0,0,0,1) 64px, rgba(0,0,0,1) calc(100% - 96px), rgba(0,0,0,0.9) calc(100% - 56px), rgba(0,0,0,0) 100%)',
               maskImage:
-                'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) calc(100% - 96px), rgba(0,0,0,0.9) calc(100% - 56px), rgba(0,0,0,0) 100%)'
+                'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 28px, rgba(0,0,0,1) 64px, rgba(0,0,0,1) calc(100% - 96px), rgba(0,0,0,0.9) calc(100% - 56px), rgba(0,0,0,0) 100%)'
             }}
           >
-            {/* Sticky header overlay */}
-            <div className="sticky top-0 z-30">
-              <div className="bg-[#1b1e25]/78 px-4 pb-5 pt-4 backdrop-blur-xl">
-                <div className="relative flex shrink-0 items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={requestClose}
-                    aria-label="Close event form"
-                    className="grid h-12 w-12 place-items-center rounded-full border border-zinc-600 bg-zinc-800/90 text-2xl leading-none text-zinc-300 touch-manipulation"
-                  >
-                    ×
-                  </button>
-                  <div className="pointer-events-none absolute left-0 right-0 text-center text-[16px] font-semibold text-white">
-                    {editingId ? 'Edit Event' : 'New Event'}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={saveEvent}
-                    disabled={!canSave || saving}
-                    aria-label={editingId ? 'Update event' : 'Save event'}
-                    className={`grid h-12 w-12 place-items-center rounded-full border text-2xl leading-none touch-manipulation transition-colors ${
-                      canSave && !saving
-                        ? 'border-emerald-400/70 bg-emerald-500 text-white'
-                        : 'border-zinc-600 bg-zinc-800/90 text-zinc-500'
-                    }`}
-                  >
-                    {saving ? '…' : '✓'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* Body */}
-            <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-1">
+            <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-[86px]">
               <div className="flex flex-col gap-6">
           {!completingReviewItemId && !editingId && (
             <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/35 via-slate-900/95 to-zinc-900/95 p-3 shadow-[0_2px_8px_rgba(0,0,0,0.16)]">
