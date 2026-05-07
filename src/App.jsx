@@ -171,6 +171,18 @@ function AppShell({ onLogout, supabaseClient }) {
     if (tab === 'home') void loadCommunityFeed()
   }, [tab, loadCommunityFeed])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator?.serviceWorker) return
+    const handleServiceWorkerMessage = (event) => {
+      const msgType = event?.data?.type
+      if (msgType !== 'offers-open-agenda') return
+      setTab('offers')
+      setPendingOfferCalendarView('agenda')
+    }
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
+  }, [])
+
   const openCalculator = (key) => {
     setActiveCalculator(key)
     setTab('calculators')

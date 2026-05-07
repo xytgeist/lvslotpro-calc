@@ -48,12 +48,16 @@ self.addEventListener('notificationclick', (event) => {
     url.searchParams.set('offersView', 'agenda')
   }
   const fullUrl = url.href
+  const pushAgendaMessage = { type: 'offers-open-agenda' }
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
       for (const client of clients) {
         if (!('focus' in client)) continue
         try {
           await client.focus()
+          if (typeof client.postMessage === 'function') {
+            client.postMessage(pushAgendaMessage)
+          }
           if ('navigate' in client && typeof client.navigate === 'function') {
             try {
               await client.navigate(fullUrl)
@@ -66,7 +70,13 @@ self.addEventListener('notificationclick', (event) => {
           continue
         }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(fullUrl)
+      if (self.clients.openWindow) {
+        const opened = await self.clients.openWindow(fullUrl)
+        if (opened && typeof opened.postMessage === 'function') {
+          opened.postMessage(pushAgendaMessage)
+        }
+        return opened
+      }
       return undefined
     })
   )
