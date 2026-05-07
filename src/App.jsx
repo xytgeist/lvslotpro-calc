@@ -1022,11 +1022,11 @@ function AppShell({ onLogout, supabaseClient }) {
 
     const handleAlertPresetSelection = useCallback(
       async (nextPreset) => {
-        if (editingId || nextPreset === OFFER_ALERT_NONE || pushSubscribed) return nextPreset
+        if (nextPreset === OFFER_ALERT_NONE || pushSubscribed) return nextPreset
         setAlertPromptHandledForCurrentForm(true)
         return maybeResolveAlertPresetWithPrompt(nextPreset)
       },
-      [editingId, maybeResolveAlertPresetWithPrompt, pushSubscribed]
+      [maybeResolveAlertPresetWithPrompt, pushSubscribed]
     )
 
     const resolveAlertPresetBeforeSave = useCallback(
