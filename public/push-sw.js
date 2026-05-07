@@ -44,12 +44,16 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const relative = typeof event.notification?.data?.url === 'string' ? event.notification.data.url : '/?tab=offers'
   const fullUrl = new URL(relative, self.location.origin).href
+  const openOffersMessage = { type: 'offers-open-tab' }
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
       for (const client of clients) {
         if (!('focus' in client)) continue
         try {
           await client.focus()
+          if (typeof client.postMessage === 'function') {
+            client.postMessage(openOffersMessage)
+          }
           if ('navigate' in client && typeof client.navigate === 'function') {
             try {
               await client.navigate(fullUrl)
@@ -58,6 +62,7 @@ self.addEventListener('notificationclick', (event) => {
               // If navigation fails on a focused client, keep trying other clients/openWindow.
             }
           }
+          return
         } catch {
           continue
         }

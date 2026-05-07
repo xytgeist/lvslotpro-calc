@@ -155,6 +155,16 @@ function AppShell({ onLogout, supabaseClient }) {
     if (tab === 'home') void loadCommunityFeed()
   }, [tab, loadCommunityFeed])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator?.serviceWorker) return
+    const handleServiceWorkerMessage = (event) => {
+      if (event?.data?.type !== 'offers-open-tab') return
+      setTab('offers')
+    }
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
+  }, [])
+
   const openCalculator = (key) => {
     setActiveCalculator(key)
     setTab('calculators')
