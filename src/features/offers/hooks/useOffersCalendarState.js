@@ -445,9 +445,11 @@ export default function useOffersCalendarState({
     const allDayEdit = !(stHasVisibleTime || enHasVisibleTime)
     const ap = ev.alert_preset
     const alertPreset =
-      ap === OFFER_ALERT_NONE || ap === OFFER_ALERT_DAY_9AM || ap === OFFER_ALERT_HOUR_BEFORE
-        ? ap
-        : defaultAlertPresetForAllDay(allDayEdit)
+      ap === undefined || ap === null || ap === ''
+        ? OFFER_ALERT_NONE
+        : ap === OFFER_ALERT_NONE || ap === OFFER_ALERT_DAY_9AM || ap === OFFER_ALERT_HOUR_BEFORE
+          ? ap
+          : defaultAlertPresetForAllDay(allDayEdit)
     setDraft({
       casinoName: ev.casino_name || '',
       offerType: ev.offer_type || 'free_play',
