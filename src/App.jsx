@@ -781,6 +781,15 @@ function AppShell({ onLogout, supabaseClient }) {
     const [pushAdvancedOpen, setPushAdvancedOpen] = useState(false)
     const [newEventAlertPresetDefault, setNewEventAlertPresetDefault] = useState(OFFER_ALERT_DAY_9AM)
     const [alertPromptHandledForCurrentForm, setAlertPromptHandledForCurrentForm] = useState(false)
+    const [alertDialogState, setAlertDialogState] = useState({
+      open: false,
+      mode: 'confirm',
+      title: '',
+      message: '',
+      confirmLabel: 'Continue',
+      cancelLabel: 'Cancel'
+    })
+    const alertDialogResolverRef = useRef(null)
 
     const {
       isSupported: pushSupported,
@@ -979,6 +988,52 @@ function AppShell({ onLogout, supabaseClient }) {
     const canSendTestPushUi = pushSubscribed && !sendingTestPush && allowPushControls
     const canRunRemindersUi = pushSubscribed && !runningReminderCheck && allowPushControls
 
+    const closeAlertDialog = useCallback((result) => {
+      const resolver = alertDialogResolverRef.current
+      alertDialogResolverRef.current = null
+      setAlertDialogState((cur) => ({ ...cur, open: false }))
+      if (resolver) resolver(result)
+    }, [])
+
+    const showAlertDialog = useCallback(
+      (config) =>
+        new Promise((resolve) => {
+          alertDialogResolverRef.current = resolve
+          setAlertDialogState({
+            open: true,
+            mode: config.mode || 'confirm',
+            title: config.title || '',
+            message: config.message || '',
+            confirmLabel: config.confirmLabel || 'Continue',
+            cancelLabel: config.cancelLabel || 'Cancel'
+          })
+        }),
+      []
+    )
+
+    const showAppConfirm = useCallback(
+      async ({ title, message, confirmLabel = 'Continue', cancelLabel = 'Cancel' }) =>
+        (await showAlertDialog({ mode: 'confirm', title, message, confirmLabel, cancelLabel })) === true,
+      [showAlertDialog]
+    )
+
+    const showAppInfo = useCallback(
+      async ({ title, message, confirmLabel = 'OK' }) => {
+        await showAlertDialog({ mode: 'info', title, message, confirmLabel, cancelLabel: '' })
+      },
+      [showAlertDialog]
+    )
+
+    useEffect(
+      () => () => {
+        if (alertDialogResolverRef.current) {
+          alertDialogResolverRef.current(false)
+          alertDialogResolverRef.current = null
+        }
+      },
+      []
+    )
+
     const maybeResolveAlertPresetWithPrompt = useCallback(
       async (alertPreset) => {
         if (alertPreset === OFFER_ALERT_NONE || pushSubscribed) return alertPreset
@@ -989,22 +1044,33 @@ function AppShell({ onLogout, supabaseClient }) {
         }
 
         if (iosInstallRequired) {
-          const proceed = window.confirm(
-            'Alerts are enabled for this event. On iPhone, notifications only work from the Home Screen app.\n\nPress OK to keep this event alert and follow setup now.\nPress Cancel to set Alert to None and make future new-event alerts default to None.'
-          )
+          const proceed = await showAppConfirm({
+            title: 'Enable Alerts on iPhone',
+            message:
+              'Alerts are enabled for this event. On iPhone, notifications only work from the Home Screen app.\n\nContinue to keep this event alert and view setup steps.\nCancel to set Alert to None and make future new-event alerts default to None.',
+            confirmLabel: 'Continue',
+            cancelLabel: 'Set to None'
+          })
           if (!proceed) {
             await setDefaultNone()
             return OFFER_ALERT_NONE
           }
-          window.alert(
-            'To enable alerts on iPhone:\n1) Open in Safari\n2) Share -> Add to Home Screen\n3) Open app from Home Screen icon\n4) Tap "Turn on alerts on this device"\n\nThen save your event.'
-          )
+          await showAppInfo({
+            title: 'iPhone Setup',
+            message:
+              'To enable alerts on iPhone:\n1) Open in Safari\n2) Share -> Add to Home Screen\n3) Open app from Home Screen icon\n4) Tap "Turn on alerts on this device"\n\nThen save your event.',
+            confirmLabel: 'Got it'
+          })
           return alertPreset
         }
 
-        const shouldEnable = window.confirm(
-          'This event has an alert. Enable notifications on this device now?\n\nPress OK to enable notifications.\nPress Cancel to set Alert to None and make future new-event alerts default to None.'
-        )
+        const shouldEnable = await showAppConfirm({
+          title: 'Enable Notifications',
+          message:
+            'This event has an alert. Enable notifications on this device now?\n\nContinue to request permission.\nCancel to set Alert to None and make future new-event alerts default to None.',
+          confirmLabel: 'Enable',
+          cancelLabel: 'Set to None'
+        })
         if (!shouldEnable) {
           await setDefaultNone()
           return OFFER_ALERT_NONE
@@ -1017,7 +1083,7 @@ function AppShell({ onLogout, supabaseClient }) {
         }
         return alertPreset
       },
-      [enablePush, iosInstallRequired, pushSubscribed, setStoredAlertDefaultForCurrentUser]
+      [enablePush, iosInstallRequired, pushSubscribed, setStoredAlertDefaultForCurrentUser, showAppConfirm, showAppInfo]
     )
 
     const handleAlertPresetSelection = useCallback(
@@ -2093,6 +2159,38 @@ function AppShell({ onLogout, supabaseClient }) {
           titleFieldRef={titleFieldRef}
           onRequestSetAlertPreset={handleAlertPresetSelection}
         />
+        {alertDialogState.open ? (
+          <div
+            className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60 p-4 sm:items-center"
+            onClick={() => closeAlertDialog(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-3xl border border-zinc-700 bg-zinc-900 p-4 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-[17px] font-semibold text-zinc-100">{alertDialogState.title}</div>
+              <div className="mt-2 whitespace-pre-line text-[14px] leading-relaxed text-zinc-300">{alertDialogState.message}</div>
+              <div className="mt-4 flex gap-2">
+                {alertDialogState.mode === 'confirm' ? (
+                  <button
+                    type="button"
+                    onClick={() => closeAlertDialog(false)}
+                    className="min-h-11 flex-1 rounded-xl border border-zinc-600 bg-zinc-800 px-3 text-sm font-semibold text-zinc-200 touch-manipulation"
+                  >
+                    {alertDialogState.cancelLabel}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => closeAlertDialog(true)}
+                  className="min-h-11 flex-1 rounded-xl border border-cyan-400/45 bg-cyan-600 px-3 text-sm font-semibold text-white touch-manipulation"
+                >
+                  {alertDialogState.confirmLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <UploadProgressOverlay show={uploading} message={uploadSpinnerMessage} />
       </div>
     )
