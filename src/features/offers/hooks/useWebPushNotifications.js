@@ -158,7 +158,7 @@ export default function useWebPushNotifications({ supabaseClient }) {
   }, [supabaseClient, fetchedPublicKey])
 
   const enable = useCallback(async () => {
-    if (!isSupported) return
+    if (!isSupported) return false
     setIsBusy(true)
     setStatusMessage('')
     let vapidKey
@@ -170,7 +170,7 @@ export default function useWebPushNotifications({ supabaseClient }) {
           'Missing push public key. Set VITE_WEB_PUSH_PUBLIC_KEY in Vercel or deploy Supabase function get-web-push-config with WEB_PUSH_PUBLIC_KEY.'
       )
       setIsBusy(false)
-      return
+      return false
     }
     try {
       const permissionResult = await Notification.requestPermission()
@@ -178,7 +178,7 @@ export default function useWebPushNotifications({ supabaseClient }) {
       if (permissionResult !== 'granted') {
         setStatusMessage('Notification permission was not granted.')
         setIsSubscribed(false)
-        return
+        return false
       }
       const registration = await navigator.serviceWorker.register('/push-sw.js')
       await registration.update().catch(() => {})
@@ -192,8 +192,10 @@ export default function useWebPushNotifications({ supabaseClient }) {
       await upsertSubscriptionRow(subscription)
       setIsSubscribed(true)
       setStatusMessage('Push notifications enabled on this device.')
+      return true
     } catch (error) {
       setStatusMessage(error?.message || 'Could not enable push notifications.')
+      return false
     } finally {
       setIsBusy(false)
     }

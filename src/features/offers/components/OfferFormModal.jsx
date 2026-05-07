@@ -105,7 +105,8 @@ export default function OfferFormModal({
   setPropagateValueOnSaveChecked,
   skipCurrentReviewFromForm,
   casinoFieldRef,
-  titleFieldRef
+  titleFieldRef,
+  onRequestSetAlertPreset
 }) {
   if (!showForm) return null
   const canSave = !!(draft.casinoName?.trim() && draft.title?.trim() && draft.startAt)
@@ -923,8 +924,11 @@ export default function OfferFormModal({
                             <button
                               key={opt.value}
                               type="button"
-                              onClick={() => {
-                                setDraft((d) => ({ ...d, alertPreset: opt.value }))
+                              onClick={async () => {
+                                const resolvedPreset = onRequestSetAlertPreset
+                                  ? await onRequestSetAlertPreset(opt.value)
+                                  : opt.value
+                                setDraft((d) => ({ ...d, alertPreset: resolvedPreset }))
                                 setShowAlertMenu(false)
                               }}
                               className="w-full text-left px-3 py-2 text-[16px] text-zinc-100 hover:bg-zinc-800/70 rounded-lg"

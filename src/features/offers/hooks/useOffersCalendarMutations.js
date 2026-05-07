@@ -49,7 +49,7 @@ export default function useOffersCalendarMutations({
     setUploading,
     setActiveImportBatchId
   } = setters
-  const { closeForm, loadEvents, loadReviewQueue, refreshImportResults } = actions
+  const { closeForm, loadEvents, loadReviewQueue, refreshImportResults, resolveAlertPresetBeforeSave } = actions
 
   const applyCurrentFieldsToAssociatedReviewItems = useCallback(async () => {
     if (!completingReviewUploadId || !completingReviewItemId) return
@@ -231,7 +231,13 @@ export default function useOffersCalendarMutations({
         throw new Error('End date/time must be later than (or the same as) start.')
       }
 
-      const alertPreset = coerceAlertPresetForMode(draft.alertPreset || OFFER_ALERT_DAY_9AM, allDay)
+      const initialAlertPreset = coerceAlertPresetForMode(draft.alertPreset || OFFER_ALERT_DAY_9AM, allDay)
+      const alertPreset = resolveAlertPresetBeforeSave
+        ? await resolveAlertPresetBeforeSave(initialAlertPreset, {
+            allDay,
+            editingId: Boolean(editingId)
+          })
+        : initialAlertPreset
       const alertFireAt = computeOfferAlertFireIso(alertPreset, normalizedStart, allDay)
       const payload = {
         casino_name: draft.casinoName.trim(),
@@ -337,7 +343,8 @@ export default function useOffersCalendarMutations({
     setCalendarMode,
     closeForm,
     loadEvents,
-    loadReviewQueue
+    loadReviewQueue,
+    resolveAlertPresetBeforeSave
   ])
 
   const handleImportPhotos = useCallback(

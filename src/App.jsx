@@ -6,6 +6,8 @@ import BuffaloLink from './calculators/BuffaloLink'
 import StackUpPays from './calculators/StackUpPays'
 import MHBCalculator from './calculators/MHBCalculator'
 import {
+  OFFER_ALERT_DAY_9AM,
+  OFFER_ALERT_NONE,
   localDateKeyFromIso,
   localDateKeyFromDate,
   dateFromDatetimeLocalValue,
@@ -32,6 +34,7 @@ const inputBase = 'w-full min-h-12 text-base text-white bg-gray-800 rounded-2xl 
 const btnPrimary = 'w-full min-h-12 text-base font-bold touch-manipulation active:scale-[0.99] transition-transform'
 const btnSecondary = 'w-full min-h-12 text-base font-bold touch-manipulation active:scale-[0.99] transition-transform'
 const linkBtn = 'w-full min-h-12 text-base text-gray-400 hover:text-white touch-manipulation py-3 text-center flex items-center justify-center active:scale-[0.99]'
+const OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX = 'offers_alert_default_preset_v1:'
 
 /**
  * When OAuth fails, Supabase redirects back with error / error_code in the query or hash (not the signInWithOAuth return value).
@@ -776,6 +779,8 @@ function AppShell({ onLogout, supabaseClient }) {
     const [reminderPrefsSaving, setReminderPrefsSaving] = useState(false)
     const [reminderPrefsError, setReminderPrefsError] = useState('')
     const [pushAdvancedOpen, setPushAdvancedOpen] = useState(false)
+    const [newEventAlertPresetDefault, setNewEventAlertPresetDefault] = useState(OFFER_ALERT_DAY_9AM)
+    const [alertPromptHandledForCurrentForm, setAlertPromptHandledForCurrentForm] = useState(false)
 
     const {
       isSupported: pushSupported,
@@ -788,6 +793,39 @@ function AppShell({ onLogout, supabaseClient }) {
       enable: enablePush,
       disable: disablePush,
     } = useWebPushNotifications({ supabaseClient })
+
+    const getAlertDefaultStorageKeyForUser = useCallback((userId) => `${OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX}${userId}`, [])
+
+    const setStoredAlertDefaultForCurrentUser = useCallback(
+      async (nextPreset) => {
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        const userId = session?.user?.id
+        if (!userId || typeof window === 'undefined') return
+        window.localStorage.setItem(getAlertDefaultStorageKeyForUser(userId), nextPreset)
+      },
+      [getAlertDefaultStorageKeyForUser, supabaseClient]
+    )
+
+    useEffect(() => {
+      let cancelled = false
+      ;(async () => {
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        if (!session?.user || typeof window === 'undefined') {
+          if (!cancelled) setNewEventAlertPresetDefault(OFFER_ALERT_DAY_9AM)
+          return
+        }
+        const stored = window.localStorage.getItem(getAlertDefaultStorageKeyForUser(session.user.id))
+        if (cancelled) return
+        setNewEventAlertPresetDefault(stored === OFFER_ALERT_NONE ? OFFER_ALERT_NONE : OFFER_ALERT_DAY_9AM)
+      })()
+      return () => {
+        cancelled = true
+      }
+    }, [getAlertDefaultStorageKeyForUser, supabaseClient])
 
     const persistReminderRule = useCallback(
       async (leadMinutes, enabled) => {
@@ -941,6 +979,65 @@ function AppShell({ onLogout, supabaseClient }) {
     const canSendTestPushUi = pushSubscribed && !sendingTestPush && allowPushControls
     const canRunRemindersUi = pushSubscribed && !runningReminderCheck && allowPushControls
 
+    const maybeResolveAlertPresetWithPrompt = useCallback(
+      async (alertPreset) => {
+        if (alertPreset === OFFER_ALERT_NONE || pushSubscribed) return alertPreset
+
+        const setDefaultNone = async () => {
+          setNewEventAlertPresetDefault(OFFER_ALERT_NONE)
+          await setStoredAlertDefaultForCurrentUser(OFFER_ALERT_NONE)
+        }
+
+        if (iosInstallRequired) {
+          const proceed = window.confirm(
+            'Alerts are enabled for this event. On iPhone, notifications only work from the Home Screen app.\n\nPress OK to keep this event alert and follow setup now.\nPress Cancel to set Alert to None and make future new-event alerts default to None.'
+          )
+          if (!proceed) {
+            await setDefaultNone()
+            return OFFER_ALERT_NONE
+          }
+          window.alert(
+            'To enable alerts on iPhone:\n1) Open in Safari\n2) Share -> Add to Home Screen\n3) Open app from Home Screen icon\n4) Tap "Turn on alerts on this device"\n\nThen save your event.'
+          )
+          return alertPreset
+        }
+
+        const shouldEnable = window.confirm(
+          'This event has an alert. Enable notifications on this device now?\n\nPress OK to enable notifications.\nPress Cancel to set Alert to None and make future new-event alerts default to None.'
+        )
+        if (!shouldEnable) {
+          await setDefaultNone()
+          return OFFER_ALERT_NONE
+        }
+
+        const enabled = await enablePush()
+        if (!enabled) {
+          await setDefaultNone()
+          return OFFER_ALERT_NONE
+        }
+        return alertPreset
+      },
+      [enablePush, iosInstallRequired, pushSubscribed, setStoredAlertDefaultForCurrentUser]
+    )
+
+    const handleAlertPresetSelection = useCallback(
+      async (nextPreset) => {
+        if (editingId || nextPreset === OFFER_ALERT_NONE || pushSubscribed) return nextPreset
+        setAlertPromptHandledForCurrentForm(true)
+        return maybeResolveAlertPresetWithPrompt(nextPreset)
+      },
+      [editingId, maybeResolveAlertPresetWithPrompt, pushSubscribed]
+    )
+
+    const resolveAlertPresetBeforeSave = useCallback(
+      async (alertPreset, { editingId }) => {
+        if (editingId || alertPreset === OFFER_ALERT_NONE || pushSubscribed) return alertPreset
+        if (alertPromptHandledForCurrentForm) return alertPreset
+        return maybeResolveAlertPresetWithPrompt(alertPreset)
+      },
+      [alertPromptHandledForCurrentForm, maybeResolveAlertPresetWithPrompt, pushSubscribed]
+    )
+
     const {
       fileInputRef,
       longPressTimerRef,
@@ -1029,7 +1126,15 @@ function AppShell({ onLogout, supabaseClient }) {
       closeForm,
       openForm,
       beginEdit
-    } = useOffersCalendarState({ supabaseClient, normalizeLoadedEvent })
+    } = useOffersCalendarState({
+      supabaseClient,
+      normalizeLoadedEvent,
+      newEventAlertPresetDefault
+    })
+
+    useEffect(() => {
+      setAlertPromptHandledForCurrentForm(false)
+    }, [showForm, editingId])
 
     useEffect(() => {
       const handlePointerDown = (event) => {
@@ -1115,7 +1220,8 @@ function AppShell({ onLogout, supabaseClient }) {
         closeForm,
         loadEvents,
         loadReviewQueue,
-        refreshImportResults
+        refreshImportResults,
+        resolveAlertPresetBeforeSave
       }
     })
 
@@ -1985,6 +2091,7 @@ function AppShell({ onLogout, supabaseClient }) {
           skipCurrentReviewFromForm={skipCurrentReviewFromForm}
           casinoFieldRef={casinoFieldRef}
           titleFieldRef={titleFieldRef}
+          onRequestSetAlertPreset={handleAlertPresetSelection}
         />
         <UploadProgressOverlay show={uploading} message={uploadSpinnerMessage} />
       </div>

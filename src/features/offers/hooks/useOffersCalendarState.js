@@ -48,8 +48,16 @@ function clearPersistedFormDraft() {
   window.localStorage.removeItem(OFFERS_FORM_DRAFT_STORAGE_KEY)
 }
 
-export default function useOffersCalendarState({ supabaseClient, normalizeLoadedEvent }) {
+export default function useOffersCalendarState({
+  supabaseClient,
+  normalizeLoadedEvent,
+  newEventAlertPresetDefault = OFFER_ALERT_DAY_9AM
+}) {
   const restoredFormDraft = readPersistedFormDraft()
+  const makeBaseDraft = useCallback(
+    () => ({ ...emptyOfferDraft(), alertPreset: newEventAlertPresetDefault || OFFER_ALERT_DAY_9AM }),
+    [newEventAlertPresetDefault]
+  )
   const fileInputRef = useRef(null)
   const longPressTimerRef = useRef(null)
   const casinoFieldRef = useRef(null)
@@ -85,7 +93,7 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     const n = new Date()
     return new Date(n.getFullYear(), n.getMonth(), 1)
   })
-  const [draft, setDraft] = useState(() => restoredFormDraft?.draft || emptyOfferDraft())
+  const [draft, setDraft] = useState(() => restoredFormDraft?.draft || makeBaseDraft())
   const [allDay, setAllDay] = useState(() => (restoredFormDraft ? restoredFormDraft.allDay : true))
   const [showCasinoSuggestions, setShowCasinoSuggestions] = useState(false)
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
@@ -325,7 +333,7 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
       const row = draftFromAiReviewPayload(item.draft || {})
       const hasSpecificTime = row.hasSpecificTime === true
       setAllDay(!hasSpecificTime)
-      setDraft({ ...emptyOfferDraft(), ...row })
+      setDraft({ ...makeBaseDraft(), ...row })
       setCompletingReviewItemId(item.id)
       const uploadId = item.upload_id || null
       setCompletingReviewUploadId(uploadId)
@@ -376,7 +384,7 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     clearPersistedFormDraft()
     setShowForm(false)
     setEditingId(null)
-    setDraft(emptyOfferDraft())
+    setDraft(makeBaseDraft())
     setAllDay(true)
     setShowCasinoSuggestions(false)
     setShowTitleSuggestions(false)
@@ -388,7 +396,7 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     setReviewSourceImagePath(null)
     setReviewSourceImageUrl('')
     setReviewSourceImageLoading(false)
-  }, [])
+  }, [makeBaseDraft])
 
   const openForm = useCallback((dayKey = null) => {
     setCompletingReviewItemId(null)
@@ -403,18 +411,18 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     setEditingId(null)
     if (dayKey) {
       // Default to an all-day event when opening from a calendar day
-      setDraft(() => ({ ...emptyOfferDraft(), startAt: `${dayKey}T00:00`, endAt: `${dayKey}T00:00` }))
+      setDraft(() => ({ ...makeBaseDraft(), startAt: `${dayKey}T00:00`, endAt: `${dayKey}T00:00` }))
       setAllDay(true)
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
     } else {
       const todayKey = localDateKeyFromDate(new Date())
-      setDraft(() => ({ ...emptyOfferDraft(), startAt: `${todayKey}T00:00`, endAt: `${todayKey}T00:00` }))
+      setDraft(() => ({ ...makeBaseDraft(), startAt: `${todayKey}T00:00`, endAt: `${todayKey}T00:00` }))
       setAllDay(true)
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
     }
-  }, [])
+  }, [makeBaseDraft])
 
   const beginEdit = useCallback((ev) => {
     setCompletingReviewItemId(null)
