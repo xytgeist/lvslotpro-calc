@@ -47,7 +47,6 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
   /** 'auto' = week in landscape, month in portrait; 'month' | 'week' | 'agenda' = forced */
   const [calendarMode, setCalendarMode] = useState('auto')
   const [weekDetailEvent, setWeekDetailEvent] = useState(null)
-  const [showWeekPortraitHint, setShowWeekPortraitHint] = useState(false)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   const viewMenuRef = useRef(null)
   const [isLandscape, setIsLandscape] = useState(() =>
@@ -462,8 +461,6 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     setCalendarMode,
     weekDetailEvent,
     setWeekDetailEvent,
-    showWeekPortraitHint,
-    setShowWeekPortraitHint,
     viewMenuOpen,
     setViewMenuOpen,
     viewMenuRef,

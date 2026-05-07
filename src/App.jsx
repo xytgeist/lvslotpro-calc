@@ -137,10 +137,180 @@ function AppShell({ onLogout, supabaseClient }) {
     { id: 'home', label: 'Home', icon: '🏠' },
     { id: 'calculators', label: 'Calcs', icon: '🧮' },
     { id: 'offers', label: 'Offers', icon: '📅' },
+    { id: 'bankroll', label: 'Bankroll', icon: '💰' },
     { id: 'guides', label: 'AP Guides', icon: '📗', menuHint: 'Search · +EV cards · ask' },
     { id: 'intel', label: 'Intel', icon: '📍' },
     { id: 'team', label: 'Team', icon: '🤝' }
   ]
+
+  const BankrollTracker = () => {
+    const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().slice(0, 10))
+    const [bankrollStart, setBankrollStart] = useState('2500')
+    const [buyIn, setBuyIn] = useState('500')
+    const [cashOut, setCashOut] = useState('0')
+    const [notes, setNotes] = useState('')
+
+    const parsedBuyIn = Number(buyIn) || 0
+    const parsedCashOut = Number(cashOut) || 0
+    const parsedBankrollStart = Number(bankrollStart) || 0
+    const sessionPnl = parsedCashOut - parsedBuyIn
+    const projectedBankroll = parsedBankrollStart + sessionPnl
+
+    return (
+      <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="mb-6">
+          <div className="text-white text-2xl font-black tracking-tight">Bankroll Tracker</div>
+          <div className="text-zinc-400 text-sm mt-0.5">Track sessions, win/loss trends, and bankroll growth</div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="rounded-2xl bg-zinc-900 p-4">
+            <div className="text-zinc-400 text-xs">Session P/L</div>
+            <div className={`mt-1 text-xl font-black ${sessionPnl >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+              {sessionPnl >= 0 ? '+' : '-'}${Math.abs(sessionPnl).toFixed(2)}
+            </div>
+          </div>
+          <div className="rounded-2xl bg-zinc-900 p-4">
+            <div className="text-zinc-400 text-xs">Projected Bankroll</div>
+            <div className="mt-1 text-xl font-black text-cyan-200">${projectedBankroll.toFixed(2)}</div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-zinc-900 p-5 mb-4">
+          <div className="text-white font-bold mb-3">Log session (UI scaffold)</div>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Session date</label>
+              <input
+                type="date"
+                value={sessionDate}
+                onChange={(e) => setSessionDate(e.target.value)}
+                className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+            </div>
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Starting bankroll</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={bankrollStart}
+                onChange={(e) => setBankrollStart(e.target.value)}
+                className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-zinc-400 text-xs mb-1">Buy-in</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={buyIn}
+                  onChange={(e) => setBuyIn(e.target.value)}
+                  className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+              <div>
+                <label className="block text-zinc-400 text-xs mb-1">Cash-out</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={cashOut}
+                  onChange={(e) => setCashOut(e.target.value)}
+                  className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-zinc-400 text-xs mb-1">Session notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full min-h-24 rounded-2xl bg-zinc-800 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                placeholder="Machine mix, promo used, notable hits..."
+              />
+            </div>
+            <button
+              type="button"
+              className="w-full min-h-12 rounded-2xl bg-cyan-600 text-white font-bold touch-manipulation active:scale-[0.99]"
+            >
+              Save session (coming next)
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-zinc-900 p-5">
+          <div className="text-white font-bold">Upcoming dashboard blocks</div>
+          <div className="text-zinc-400 text-sm mt-2 leading-relaxed">
+            Daily P/L graph, bankroll curve, game-level ROI, and promo-adjusted session analytics.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const SocialFeed = () => {
+    const [postText, setPostText] = useState('')
+    const samplePosts = [
+      { id: 'a', user: 'VegasGrinder', time: '2h', body: 'Hit a clean bonus train on Buffalo Link. Ended +$620 after 90 min.' },
+      { id: 'b', user: 'SlotMathNerd', time: '4h', body: 'Anyone tracking fresh Must Hit By resets at South Point tonight?' },
+    ]
+
+    return (
+      <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="mb-6">
+          <div className="text-white text-2xl font-black tracking-tight">Social Feed</div>
+          <div className="text-zinc-400 text-sm mt-0.5">Share plays, post media, and discuss live casino conditions</div>
+        </div>
+
+        <div className="rounded-3xl bg-zinc-900 p-5 mb-4">
+          <div className="text-white font-bold mb-3">Create post (UI scaffold)</div>
+          <textarea
+            value={postText}
+            onChange={(e) => setPostText(e.target.value)}
+            className="w-full min-h-24 rounded-2xl bg-zinc-800 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-fuchsia-500/40"
+            placeholder="Share your hit, strategy, or casino intel..."
+          />
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              className="min-h-10 rounded-xl bg-zinc-800 px-3 text-sm font-semibold text-zinc-100"
+            >
+              Add photo
+            </button>
+            <button
+              type="button"
+              className="min-h-10 rounded-xl bg-zinc-800 px-3 text-sm font-semibold text-zinc-100"
+            >
+              Add video
+            </button>
+            <button
+              type="button"
+              className="ml-auto min-h-10 rounded-xl bg-fuchsia-600 px-4 text-sm font-bold text-white"
+            >
+              Post
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {samplePosts.map((post) => (
+            <div key={post.id} className="rounded-3xl bg-zinc-900 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-zinc-100 font-semibold">{post.user}</div>
+                <div className="text-zinc-500 text-xs">{post.time}</div>
+              </div>
+              <div className="text-zinc-300 text-sm mt-2 leading-relaxed">{post.body}</div>
+              <div className="mt-3 flex items-center gap-4 text-xs text-zinc-400">
+                <button type="button" className="hover:text-zinc-200">Like</button>
+                <button type="button" className="hover:text-zinc-200">Comment</button>
+                <button type="button" className="hover:text-zinc-200">Share</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   const LocalIntel = () => {
     const [cities, setCities] = useState([])
@@ -599,6 +769,14 @@ function AppShell({ onLogout, supabaseClient }) {
     const [isStandaloneMode, setIsStandaloneMode] = useState(false)
     const [showIosInstallHelp, setShowIosInstallHelp] = useState(true)
 
+    const PUSH_LEAD_OPTIONS = [5, 10, 15, 30, 60]
+    const [reminderLeadMinutes, setReminderLeadMinutes] = useState(15)
+    const [remindersEnabled, setRemindersEnabled] = useState(true)
+    const [reminderPrefsLoaded, setReminderPrefsLoaded] = useState(false)
+    const [reminderPrefsSaving, setReminderPrefsSaving] = useState(false)
+    const [reminderPrefsError, setReminderPrefsError] = useState('')
+    const [pushAdvancedOpen, setPushAdvancedOpen] = useState(false)
+
     const {
       isSupported: pushSupported,
       permission: pushPermission,
@@ -610,6 +788,82 @@ function AppShell({ onLogout, supabaseClient }) {
       enable: enablePush,
       disable: disablePush,
     } = useWebPushNotifications({ supabaseClient })
+
+    const persistReminderRule = useCallback(
+      async (leadMinutes, enabled) => {
+        const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession()
+        if (sessionError) throw sessionError
+        const userId = sessionData?.session?.user?.id
+        if (!userId) throw new Error('Sign in required.')
+        const { error: disableError } = await supabaseClient
+          .from('offer_notification_rules')
+          .update({ enabled: false })
+          .eq('user_id', userId)
+        if (disableError) throw disableError
+        if (!enabled) return
+        const { error } = await supabaseClient.from('offer_notification_rules').upsert(
+          { user_id: userId, lead_minutes: leadMinutes, enabled: true },
+          { onConflict: 'user_id,lead_minutes' }
+        )
+        if (error) throw error
+      },
+      [supabaseClient]
+    )
+
+    useEffect(() => {
+      let cancelled = false
+      ;(async () => {
+        setReminderPrefsError('')
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        if (!session?.user || cancelled) {
+          setReminderPrefsLoaded(true)
+          return
+        }
+        const { data: rules, error } = await supabaseClient
+          .from('offer_notification_rules')
+          .select('lead_minutes, enabled')
+          .eq('user_id', session.user.id)
+        if (cancelled) return
+        if (error) {
+          setReminderPrefsError(error.message)
+          setReminderPrefsLoaded(true)
+          return
+        }
+        const list = rules || []
+        const active = list.find((r) => r.enabled)
+        if (active) {
+          setReminderLeadMinutes(active.lead_minutes)
+          setRemindersEnabled(true)
+        } else if (list.length > 0) {
+          setReminderLeadMinutes(list[0].lead_minutes)
+          setRemindersEnabled(false)
+        } else {
+          setReminderLeadMinutes(15)
+          setRemindersEnabled(true)
+        }
+        setReminderPrefsLoaded(true)
+      })()
+      return () => {
+        cancelled = true
+      }
+    }, [supabaseClient])
+
+    const pushSubscribedRef = useRef(false)
+    useEffect(() => {
+      if (!reminderPrefsLoaded) return
+      if (pushSubscribed && !pushSubscribedRef.current && remindersEnabled) {
+        void (async () => {
+          try {
+            await persistReminderRule(reminderLeadMinutes, true)
+          } catch {
+            /* user can fix via toggles */
+          }
+        })()
+      }
+      pushSubscribedRef.current = pushSubscribed
+    }, [pushSubscribed, remindersEnabled, reminderLeadMinutes, persistReminderRule, reminderPrefsLoaded])
 
     useEffect(() => {
       if (typeof window === 'undefined') return
@@ -644,44 +898,41 @@ function AppShell({ onLogout, supabaseClient }) {
       }
     }, [supabaseClient])
 
-    const ensureReminderRule = useCallback(async () => {
-      const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession()
-      if (sessionError) throw sessionError
-      const userId = sessionData?.session?.user?.id
-      if (!userId) throw new Error('Sign in required.')
-      const { error } = await supabaseClient
-        .from('offer_notification_rules')
-        .upsert(
-          {
-            user_id: userId,
-            lead_minutes: 15,
-            enabled: true,
-          },
-          { onConflict: 'user_id,lead_minutes' }
-        )
-      if (error) throw error
-    }, [supabaseClient])
+    const saveReminderTiming = useCallback(
+      async (nextLead, nextEnabled) => {
+        if (!pushSubscribed || !reminderPrefsLoaded) return
+        setReminderPrefsSaving(true)
+        setReminderPrefsError('')
+        try {
+          await persistReminderRule(nextLead, nextEnabled)
+        } catch (e) {
+          setReminderPrefsError(e?.message || 'Could not save reminder settings.')
+        } finally {
+          setReminderPrefsSaving(false)
+        }
+      },
+      [pushSubscribed, reminderPrefsLoaded, persistReminderRule]
+    )
 
     const runReminderCheckNow = useCallback(async () => {
       setRunningReminderCheck(true)
       setReminderMessage('')
       try {
-        await ensureReminderRule()
         const { data, error } = await supabaseClient.functions.invoke('send-due-offer-reminders', {
-          body: { lookaheadMinutes: 60 },
+          body: { lookaheadMinutes: 120 },
         })
         if (error) throw error
         setReminderMessage(
           `Reminder check complete: queued ${Number(data?.queued || 0)}, sent ${Number(data?.sent || 0)}, failed ${Number(
             data?.failed || 0
-          )}.`
+          )}. (Ensure a reminder rule is enabled and matches your offer times.)`
         )
       } catch (error) {
         setReminderMessage(error?.message || 'Could not run reminder check.')
       } finally {
         setRunningReminderCheck(false)
       }
-    }, [ensureReminderRule, supabaseClient])
+    }, [supabaseClient])
 
     const iosInstallRequired = isIosDevice && !isStandaloneMode
     const allowPushControls = !iosInstallRequired
@@ -755,8 +1006,6 @@ function AppShell({ onLogout, supabaseClient }) {
       setCalendarMode,
       weekDetailEvent,
       setWeekDetailEvent,
-      showWeekPortraitHint,
-      setShowWeekPortraitHint,
       viewMenuOpen,
       setViewMenuOpen,
       viewMenuRef,
@@ -886,14 +1135,6 @@ function AppShell({ onLogout, supabaseClient }) {
     useEffect(() => {
       if (activeCalendarView !== 'week') setWeekDetailEvent(null)
     }, [activeCalendarView])
-
-    useEffect(() => {
-      if (calendarMode !== 'week') setShowWeekPortraitHint(false)
-    }, [calendarMode])
-
-    useEffect(() => {
-      if (isLandscape) setShowWeekPortraitHint(false)
-    }, [isLandscape])
 
     const startOfWeekMonday = (d) => {
       const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -1090,63 +1331,171 @@ function AppShell({ onLogout, supabaseClient }) {
               <div>4) Launch the installed app icon, then tap Enable</div>
             </div>
           ) : null}
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-cyan-100">Push Notifications</div>
-              <div className="text-[11px] text-cyan-200/80">
-                Status: {pushSubscribed ? 'Enabled on this device' : 'Disabled'} {pushSupported ? '' : '(unsupported browser)'}
-              </div>
-              <div className="text-[11px] text-cyan-200/70">Permission: {pushPermission}</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!canEnablePushUi}
-                onClick={() => void enablePush()}
-                className="min-h-9 rounded-xl border border-cyan-300/35 bg-cyan-600 px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-cyan-900/35 disabled:text-cyan-100/90 disabled:opacity-100"
-              >
-                {pushBusy ? 'Working...' : 'Enable'}
-              </button>
-              <button
-                type="button"
-                disabled={!canDisablePushUi}
-                onClick={() => void disablePush()}
-                className="min-h-9 rounded-xl border border-zinc-600/60 bg-zinc-800 px-3 text-xs font-semibold text-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-800/70 disabled:text-zinc-300/85 disabled:opacity-100"
-              >
-                Disable
-              </button>
-              <button
-                type="button"
-                disabled={!canSendTestPushUi}
-                onClick={() => void sendTestPush()}
-                className="min-h-9 rounded-xl border border-violet-500/35 bg-violet-700/80 px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-violet-900/35 disabled:text-violet-100/80 disabled:opacity-100"
-              >
-                {sendingTestPush ? 'Sending...' : 'Send test'}
-              </button>
-              <button
-                type="button"
-                disabled={!canRunRemindersUi}
-                onClick={() => void runReminderCheckNow()}
-                className="min-h-9 rounded-xl border border-emerald-500/35 bg-emerald-700/80 px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-900/35 disabled:text-emerald-100/80 disabled:opacity-100"
-              >
-                {runningReminderCheck ? 'Checking...' : 'Run reminders'}
-              </button>
-            </div>
+
+          <div className="mb-3">
+            <div className="text-sm font-bold text-cyan-50">Offer reminders</div>
+            <p className="mt-1 text-[11px] leading-relaxed text-cyan-200/85">
+              Get alerted before timed offers start. Turn on notifications on this phone, choose how early to remind, then keep your Offers calendar filled in.
+              {!pushSupported ? ' This browser cannot use web push in this mode.' : null}
+            </p>
           </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+            <button
+              type="button"
+              disabled={!canEnablePushUi}
+              onClick={() => void enablePush()}
+              className="min-h-11 shrink-0 rounded-xl border border-cyan-300/35 bg-cyan-600 px-4 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-cyan-900/35 disabled:text-cyan-100/90 disabled:opacity-100 touch-manipulation"
+            >
+              {pushBusy ? 'Working…' : 'Turn on alerts on this device'}
+            </button>
+            <button
+              type="button"
+              disabled={!canDisablePushUi}
+              onClick={() => void disablePush()}
+              className="min-h-11 shrink-0 rounded-xl border border-zinc-600/60 bg-zinc-800 px-4 text-xs font-semibold text-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-800/70 disabled:text-zinc-300/85 disabled:opacity-100 touch-manipulation"
+            >
+              Stop alerts on this device
+            </button>
+          </div>
+          <div className="mt-1 text-[11px] text-cyan-200/80">
+            Device:{' '}
+            {!pushSupported
+              ? 'Not supported here'
+              : pushSubscribed
+                ? 'Subscribed • tap a notification to open Offers'
+                : 'Not subscribed yet'}
+          </div>
+
+          <div className={`mt-3 rounded-xl border border-cyan-500/20 bg-black/25 p-3 ${!pushSubscribed || !allowPushControls ? 'opacity-60' : ''}`}>
+            <div className="text-[11px] font-semibold text-cyan-100">Before each offer starts</div>
+            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="inline-flex rounded-xl border border-zinc-600 bg-zinc-900/90 p-0.5">
+                <button
+                  type="button"
+                  disabled={!pushSubscribed || !allowPushControls || reminderPrefsSaving || !reminderPrefsLoaded}
+                  aria-pressed={remindersEnabled}
+                  onClick={() => {
+                    setRemindersEnabled(true)
+                    void saveReminderTiming(reminderLeadMinutes, true)
+                  }}
+                  className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-bold touch-manipulation disabled:opacity-50 ${
+                    remindersEnabled ? 'bg-cyan-600 text-white' : 'text-zinc-400'
+                  }`}
+                >
+                  On
+                </button>
+                <button
+                  type="button"
+                  disabled={!pushSubscribed || !allowPushControls || reminderPrefsSaving || !reminderPrefsLoaded}
+                  aria-pressed={!remindersEnabled}
+                  onClick={() => {
+                    setRemindersEnabled(false)
+                    void saveReminderTiming(reminderLeadMinutes, false)
+                  }}
+                  className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-bold touch-manipulation disabled:opacity-50 ${
+                    !remindersEnabled ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400'
+                  }`}
+                >
+                  Off
+                </button>
+              </div>
+              <label className="flex flex-wrap items-center gap-2 text-[11px] text-cyan-100/90">
+                <span className="shrink-0 text-cyan-200/80">Remind me</span>
+                <select
+                  value={reminderLeadMinutes}
+                  disabled={!pushSubscribed || !allowPushControls || reminderPrefsSaving || !reminderPrefsLoaded || !remindersEnabled}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    setReminderLeadMinutes(v)
+                    void saveReminderTiming(v, remindersEnabled)
+                  }}
+                  className="min-h-10 min-w-[5.5rem] rounded-xl border border-zinc-600 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-100 outline-none focus:ring-2 focus:ring-cyan-500/35 disabled:opacity-50"
+                >
+                  {PUSH_LEAD_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m} min
+                    </option>
+                  ))}
+                </select>
+                <span className="shrink-0 text-cyan-200/80">early</span>
+              </label>
+            </div>
+            {!pushSubscribed || !allowPushControls ? (
+              <p className="mt-2 text-[10px] leading-relaxed text-cyan-200/70">
+                {iosInstallRequired
+                  ? 'After installing to Home Screen, turn on alerts above to manage reminder timing.'
+                  : 'Turn on alerts on this device to enable scheduled offer reminders.'}
+              </p>
+            ) : reminderPrefsSaving ? (
+              <p className="mt-2 text-[10px] text-cyan-200/70">Saving reminder settings…</p>
+            ) : null}
+            {reminderPrefsError ? <p className="mt-2 text-[10px] text-amber-200/95">{reminderPrefsError}</p> : null}
+          </div>
+
           {!canEnablePush && !pushSubscribed ? (
             <div className="mt-2 text-[11px] leading-relaxed text-cyan-100/80">
               {iosInstallRequired
-                ? 'Enable is unavailable on iPhone browser tabs. Install to Home Screen and open from the app icon first.'
+                ? 'Alerts are unavailable in a normal iPhone browser tab. Add this site to your Home Screen and open it from the icon first.'
                 : !pushSupported
-                ? 'Enable is unavailable because this browser does not support web push in the current context.'
-                : pushPermission === 'denied'
-                  ? 'Enable is unavailable because notification permission is blocked for this site.'
-                  : 'Enable is temporarily unavailable while setup is in progress.'}
+                  ? 'Alerts are unavailable because this browser does not support web push here (try Chrome on Android or your installed app on iPhone).'
+                  : pushPermission === 'denied'
+                    ? 'This site does not have notification permission. Open your browser’s site settings for this page (lock or info icon → Permissions) and set Notifications to Allow, then try again.'
+                    : 'Alerts are temporarily unavailable while setup finishes.'}
             </div>
           ) : null}
-          {pushStatusMessage ? <div className="mt-2 text-[11px] leading-relaxed text-cyan-100/90">{pushStatusMessage}</div> : null}
-          {testPushMessage ? <div className="mt-2 text-[11px] leading-relaxed text-violet-100/90">{testPushMessage}</div> : null}
-          {reminderMessage ? <div className="mt-2 text-[11px] leading-relaxed text-emerald-100/90">{reminderMessage}</div> : null}
+
+          {pushStatusMessage && !pushAdvancedOpen ? (
+            <div className="mt-2 text-[11px] leading-relaxed text-cyan-100/90">{pushStatusMessage}</div>
+          ) : null}
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setPushAdvancedOpen((o) => !o)}
+              className="text-[11px] font-semibold text-cyan-300/95 underline underline-offset-2 hover:text-cyan-200 touch-manipulation"
+              aria-expanded={pushAdvancedOpen}
+            >
+              {pushAdvancedOpen ? 'Hide troubleshooting' : 'Troubleshooting / test tools'}
+            </button>
+            {pushAdvancedOpen ? (
+              <div className="mt-3 space-y-3 rounded-xl border border-zinc-600/50 bg-zinc-950/50 p-3">
+                <div className="text-[11px] text-zinc-400">
+                  Technical: permission{' '}
+                  <span className="font-mono text-zinc-300">{pushPermission}</span>
+                  {' · '}
+                  {pushPermission === 'granted' ? 'Allowed' : pushPermission === 'denied' ? 'Blocked' : 'Not asked yet'}
+                  {reminderPrefsLoaded ? '' : ' · Loading reminder prefs…'}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <button
+                    type="button"
+                    disabled={!canSendTestPushUi}
+                    onClick={() => void sendTestPush()}
+                    className="min-h-10 rounded-xl border border-violet-500/35 bg-violet-700/80 px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-violet-900/35 disabled:text-violet-100/70 disabled:opacity-100 touch-manipulation"
+                  >
+                    {sendingTestPush ? 'Sending…' : 'Send test notification'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canRunRemindersUi}
+                    onClick={() => void runReminderCheckNow()}
+                    className="min-h-10 rounded-xl border border-emerald-500/35 bg-emerald-700/80 px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-900/35 disabled:text-emerald-100/70 disabled:opacity-100 touch-manipulation"
+                  >
+                    {runningReminderCheck ? 'Running…' : 'Run reminder check now'}
+                  </button>
+                </div>
+                <p className="text-[10px] leading-relaxed text-zinc-500">
+                  “Run reminder check” calls the server with the same logic as automation. Uses your saved reminder timing and only fires for offers whose start time falls in the next window (plus your lead minutes).
+                </p>
+                {pushStatusMessage && pushAdvancedOpen ? (
+                  <div className="text-[11px] leading-relaxed text-cyan-100/85">{pushStatusMessage}</div>
+                ) : null}
+                {testPushMessage ? <div className="text-[11px] leading-relaxed text-violet-100/85">{testPushMessage}</div> : null}
+                {reminderMessage ? <div className="text-[11px] leading-relaxed text-emerald-100/85">{reminderMessage}</div> : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <ReviewQueuePanel reviewQueue={reviewQueue} onComplete={beginReviewItem} onSkip={(itemId) => void skipReviewItem(itemId)} />
@@ -1199,9 +1548,6 @@ function AppShell({ onLogout, supabaseClient }) {
                       onClick={() => {
                         setCalendarMode('week')
                         setViewMenuOpen(false)
-                        if (typeof window !== 'undefined' && !window.matchMedia('(orientation: landscape)').matches) {
-                          setShowWeekPortraitHint(true)
-                        }
                       }}
                       className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
                     >
@@ -1436,35 +1782,6 @@ function AppShell({ onLogout, supabaseClient }) {
               </div>
             )}
           </div>
-
-        {showWeekPortraitHint && activeCalendarView === 'week' && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="week-portrait-hint-title"
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-6 backdrop-blur-sm"
-            onClick={() => setShowWeekPortraitHint(false)}
-          >
-            <div
-              className="w-full max-w-sm rounded-3xl border border-violet-500/35 bg-gradient-to-b from-zinc-900 to-zinc-950 p-6 text-center shadow-2xl shadow-black/50"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/20 text-2xl text-violet-200" aria-hidden>
-                ↻
-              </div>
-              <p id="week-portrait-hint-title" className="text-lg font-bold tracking-tight text-zinc-50">
-                Rotate phone for better Week view
-              </p>
-              <button
-                type="button"
-                className="mt-8 w-full min-h-12 rounded-2xl bg-violet-600 text-base font-bold text-white shadow-lg shadow-violet-900/30 hover:bg-violet-500 touch-manipulation"
-                onClick={() => setShowWeekPortraitHint(false)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
 
         {activeCalendarView === 'month' && selectedDays.length > 0 && (
           <div className="mb-3 flex items-center justify-between gap-3 px-1 py-1">
@@ -1762,7 +2079,7 @@ function AppShell({ onLogout, supabaseClient }) {
       return renderCalculatorsHome()
     }
 
-    if (tab === 'home') {
+    if (tab === 'dashboard') {
       return (
         <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
           <div className="flex items-center justify-between mb-6">
@@ -1848,6 +2165,8 @@ function AppShell({ onLogout, supabaseClient }) {
       )
     }
 
+    if (tab === 'home') return <SocialFeed />
+
     if (tab === 'guides') {
       return (
         <GuidesScreen
@@ -1860,6 +2179,7 @@ function AppShell({ onLogout, supabaseClient }) {
     }
 
     if (tab === 'offers') return <OffersCalendar />
+    if (tab === 'bankroll') return <BankrollTracker />
     if (tab === 'intel') return <LocalIntel />
 
     if (tab === 'team') {

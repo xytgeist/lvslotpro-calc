@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+/** Registration that owns our push-sw.js worker (avoid mixing with unrelated SW registrations). */
+async function getPushServiceWorkerRegistration() {
+  if (!('serviceWorker' in navigator)) return null
+  const registrations = await navigator.serviceWorker.getRegistrations()
+  return (
+    registrations.find((r) => r.active?.scriptURL?.includes('push-sw.js')) ||
+    registrations.find((r) => r.waiting?.scriptURL?.includes('push-sw.js')) ||
+    registrations.find((r) => r.installing?.scriptURL?.includes('push-sw.js')) ||
+    null
+  )
+}
+
 function base64UrlToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const normalized = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -45,7 +57,7 @@ export default function useWebPushNotifications({ supabaseClient }) {
 
   const syncLocalState = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-    const registration = await navigator.serviceWorker.getRegistration('/push-sw.js')
+    const registration = await getPushServiceWorkerRegistration()
     const subscription = registration ? await registration.pushManager.getSubscription() : null
     setIsSubscribed(Boolean(subscription))
     setPermission(Notification.permission)
@@ -59,6 +71,19 @@ export default function useWebPushNotifications({ supabaseClient }) {
       return
     }
     void syncLocalState()
+
+    const onFocusOrVisible = () => {
+      void syncLocalState()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') onFocusOrVisible()
+    }
+    window.addEventListener('focus', onFocusOrVisible)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('focus', onFocusOrVisible)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [syncLocalState])
 
   /** Production / PWA builds often omit VITE_WEB_PUSH_PUBLIC_KEY; load public key from Edge Function. */
@@ -155,8 +180,8 @@ export default function useWebPushNotifications({ supabaseClient }) {
         setIsSubscribed(false)
         return
       }
-      await navigator.serviceWorker.register('/push-sw.js')
-      const registration = await navigator.serviceWorker.ready
+      const registration = await navigator.serviceWorker.register('/push-sw.js')
+      await registration.update().catch(() => {})
       const existing = await registration.pushManager.getSubscription()
       const subscription =
         existing ||
@@ -179,7 +204,7 @@ export default function useWebPushNotifications({ supabaseClient }) {
     setIsBusy(true)
     setStatusMessage('')
     try {
-      const registration = await navigator.serviceWorker.getRegistration('/push-sw.js')
+      const registration = await getPushServiceWorkerRegistration()
       if (!registration) {
         setIsSubscribed(false)
         setStatusMessage('Push was already disabled.')
