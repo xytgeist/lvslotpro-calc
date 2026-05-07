@@ -131,6 +131,7 @@ export default function OfferFormModal({
     start: { hour: `${HOUR_MID}:1`, minute: `${MINUTE_MID}:00`, period: 'AM' },
     end: { hour: `${HOUR_MID}:1`, minute: `${MINUTE_MID}:00`, period: 'AM' }
   })
+  const timePickerRecenterTimersRef = useRef({ start: null, end: null })
 
   const valueRaw = String(draft.valueAmount ?? '')
   const valueFormatted = useMemo(() => {
@@ -276,6 +277,11 @@ export default function OfferFormModal({
     })
     const periods = ['AM', 'PM']
     const onChange = (nextValue) => {
+      const timers = timePickerRecenterTimersRef.current
+      if (timers?.[field]) {
+        window.clearTimeout(timers[field])
+        timers[field] = null
+      }
       const prevValue = timePickerValue[field]
       const [prevHourRepRaw, prevHourRaw] = String(prevValue.hour).split(':')
       const [, prevMinuteRaw] = String(prevValue.minute).split(':')
@@ -328,14 +334,18 @@ export default function OfferFormModal({
       const hourNearEdge = Number.isFinite(hourRep) && (hourRep < 2 || hourRep > HOUR_REPEAT - 3)
       const minuteNearEdge = Number.isFinite(minRep) && (minRep < 2 || minRep > MINUTE_REPEAT - 3)
       if (hourNearEdge || minuteNearEdge) {
-        setTimePickerValue((prev) => ({
-          ...prev,
-          [field]: {
-            hour: `${HOUR_MID}:${hourRaw}`,
-            minute: `${MINUTE_MID}:${minuteRaw}`,
-            period
-          }
-        }))
+        // Debounce recenter so swipe momentum doesn't feel "grabby".
+        timers[field] = window.setTimeout(() => {
+          setTimePickerValue((prev) => ({
+            ...prev,
+            [field]: {
+              hour: `${HOUR_MID}:${hourRaw}`,
+              minute: `${MINUTE_MID}:${minuteRaw}`,
+              period
+            }
+          }))
+          timers[field] = null
+        }, 140)
       }
     }
 
