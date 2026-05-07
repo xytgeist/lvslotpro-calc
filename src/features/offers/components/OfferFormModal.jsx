@@ -454,16 +454,17 @@ export default function OfferFormModal({
     <div className="fixed inset-0 z-[70] flex bg-black/55 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[2px]">
       <div className="mx-auto flex w-full max-w-lg flex-1 items-end">
         <div
-          className={`relative w-full overflow-hidden rounded-t-[36px] bg-[#2b2d34] shadow-[0_6px_16px_rgba(0,0,0,0.12)] ${
-            activeTime ? 'touch-none' : ''
-          }`}
+          className="relative w-full overflow-hidden rounded-t-[36px] bg-[#2b2d34] shadow-[0_6px_16px_rgba(0,0,0,0.12)]"
           style={{ height: 'calc(100dvh - (env(safe-area-inset-top) + 12px))' }}
         >
           {/* Scroll region (content scrolls under header) */}
-          <div className={`relative h-full ${activeTime ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          <div
+            className={`relative h-full overscroll-contain ${activeTime ? 'overflow-hidden' : 'overflow-y-auto touch-pan-y'}`}
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
             {/* Sticky header overlay */}
             <div className="sticky top-0 z-30">
-              <div className="px-4 pt-4 pb-3 bg-[#2b2d34]/65 backdrop-blur-xl">
+              <div className="px-4 pt-4 pb-6 bg-gradient-to-b from-[#2b2d34]/85 via-[#2b2d34]/70 to-transparent backdrop-blur-xl">
                 <div className="relative flex shrink-0 items-center justify-between">
                   <button
                     type="button"
@@ -491,8 +492,6 @@ export default function OfferFormModal({
                   </button>
                 </div>
               </div>
-              {/* Header fade so content can slide underneath nicely */}
-              <div className="h-6 bg-gradient-to-b from-[#2b2d34]/65 to-transparent backdrop-blur-xl" />
             </div>
 
             {/* Body */}
@@ -992,7 +991,7 @@ export default function OfferFormModal({
             </div>
 
             {/* Bottom fade (matches iOS feel when scrolling near bottom) */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-10 bg-gradient-to-t from-[#2b2d34] to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-16 bg-gradient-to-t from-[#2b2d34]/95 via-[#2b2d34]/55 to-transparent" />
           </div>
         </div>
       </div>
