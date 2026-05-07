@@ -1784,7 +1784,12 @@ function AppShell({ onLogout, supabaseClient }) {
         <ReviewQueuePanel reviewQueue={reviewQueue} onComplete={beginReviewItem} onSkip={(itemId) => void skipReviewItem(itemId)} />
 
         <div className={isWeekView ? 'flex flex-1 min-h-0 flex-col gap-2' : 'mb-2'}>
-            <div className={`flex shrink-0 items-center justify-between gap-2 ${isWeekView ? '' : 'mb-2'}`}>
+            <div className={`relative flex shrink-0 items-center gap-2 ${isWeekView ? '' : 'mb-2'}`}>
+              <div className="pointer-events-none absolute inset-x-0 text-center">
+                <div className="mx-auto max-w-[70%] truncate text-white text-xl font-black tracking-tight">
+                  {activeCalendarView === 'agenda' ? 'Agenda' : activeCalendarView === 'week' ? weekTitle : monthTitle}
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1802,9 +1807,7 @@ function AppShell({ onLogout, supabaseClient }) {
               >
                 ‹
               </button>
-              <div className="text-white text-xl font-black tracking-tight text-center flex-1 truncate">
-                {activeCalendarView === 'agenda' ? 'Agenda' : activeCalendarView === 'week' ? weekTitle : monthTitle}
-              </div>
+              <div className="flex-1" />
               <div ref={viewMenuRef} className="relative">
                 <button
                   type="button"
@@ -2111,7 +2114,7 @@ function AppShell({ onLogout, supabaseClient }) {
 
         {!isWeekView && (
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="text-white font-bold mb-2">{activeCalendarView === 'agenda' ? 'Agenda' : 'Events'}</div>
+          <div className="text-white font-bold mb-2">{activeCalendarView === 'agenda' ? '' : 'Events'}</div>
           <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-16">
             {loading ? (
               <div className="text-zinc-400 text-sm">Loading…</div>
