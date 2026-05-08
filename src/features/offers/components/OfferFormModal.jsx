@@ -125,6 +125,9 @@ export default function OfferFormModal({
   const alertAnchorRef = useRef(null)
   const offerTypeMenuRef = useRef(null)
   const alertMenuRef = useRef(null)
+  const scrollContainerRef = useRef(null)
+  const startPickerAnchorRef = useRef(null)
+  const endPickerAnchorRef = useRef(null)
   const HOUR_REPEAT = 9
   const HOUR_MID = Math.floor(HOUR_REPEAT / 2)
   const MINUTE_REPEAT = 7
@@ -217,6 +220,19 @@ export default function OfferFormModal({
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [showAlertMenu, showOfferTypeMenu])
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const pickerKey = activeTime || activeCalendar
+    if (!pickerKey) return
+    const target = pickerKey === 'start' ? startPickerAnchorRef.current : endPickerAnchorRef.current
+    if (!target) return
+    const containerRect = container.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
+    const nextTop = targetRect.top - containerRect.top + container.scrollTop - container.clientHeight * 0.22
+    container.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' })
+  }, [activeCalendar, activeTime])
 
   useEffect(() => {
     if (!showAlertMenu && !showOfferTypeMenu) return
@@ -502,7 +518,8 @@ export default function OfferFormModal({
 
           {/* Scroll region (content scrolls under header) */}
           <div
-            className={`relative h-full overscroll-contain ${activeTime ? 'overflow-hidden' : 'overflow-y-auto touch-pan-y'}`}
+            ref={scrollContainerRef}
+            className="relative h-full overscroll-contain overflow-y-auto touch-pan-y"
             style={{
               WebkitOverflowScrolling: 'touch',
               WebkitMaskImage:
@@ -682,7 +699,10 @@ export default function OfferFormModal({
                 <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 flex items-center text-[16px] text-zinc-100">
                   {offerTypeLabel}
                 </div>
-                <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 text-zinc-100 -translate-y-1/2 text-base leading-none">
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-zinc-100"
+                >
                   ▾
                 </span>
                 {showOfferTypeMenu ? (
@@ -799,6 +819,7 @@ export default function OfferFormModal({
               </div>
             </GroupRow>
             <GroupRow>
+            <div ref={startPickerAnchorRef} className="flex h-0 w-0" />
             <div className="flex h-12 items-center gap-4">
               <span className="w-[74px] shrink-0 pt-0.5 text-[16px] text-zinc-100">Starts</span>
               <button
@@ -842,6 +863,7 @@ export default function OfferFormModal({
             {activeCalendar === 'start' ? InlineCalendar : null}
             {renderTimePicker('start')}
             <GroupRow divider={false}>
+            <div ref={endPickerAnchorRef} className="flex h-0 w-0" />
             <div className="flex h-12 items-center gap-4">
               <span className="w-[74px] shrink-0 pt-0.5 text-[16px] text-zinc-100">Ends</span>
               <button
@@ -910,10 +932,13 @@ export default function OfferFormModal({
                   >
                     <span className="sr-only">Open alert options</span>
                   </button>
-                  <div aria-hidden className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-[16px] text-zinc-100">
+                  <div aria-hidden className="pointer-events-none absolute inset-y-0 right-9 flex items-center text-[16px] text-zinc-100">
                     {alertLabel}
                   </div>
-                  <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 text-zinc-100 -translate-y-1/2 text-base leading-none">
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-zinc-100"
+                  >
                     ▾
                   </span>
                   {showAlertMenu ? (
