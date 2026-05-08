@@ -36,6 +36,7 @@ const btnSecondary = 'w-full min-h-12 text-base font-bold touch-manipulation act
 const linkBtn = 'w-full min-h-12 text-base text-gray-400 hover:text-white touch-manipulation py-3 text-center flex items-center justify-center active:scale-[0.99]'
 const OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX = 'offers_alert_default_preset_v1:'
 const OFFERS_DEFAULT_VIEW_KEY_PREFIX = 'offers_default_view_v1:'
+const OFFERS_DELETE_CONFIRM_SKIP_KEY_PREFIX = 'offers_delete_confirm_skip_v1:'
 const OFFERS_IOS_ALERT_SETUP_SEEN_STORAGE_KEY_PREFIX = 'offers_ios_alert_setup_ack_v1:'
 const OFFERS_IOS_ALERT_REMINDER_SUPPRESS_STORAGE_KEY_PREFIX = 'offers_ios_alert_reminder_suppress_v1:'
 const OFFERS_IOS_PWA_NOTIF_PROMPT_KEY_PREFIX = 'offers_ios_pwa_notif_prompt_v1:'
@@ -851,6 +852,7 @@ function AppShell({ onLogout, supabaseClient }) {
 
     const getAlertDefaultStorageKeyForUser = useCallback((userId) => `${OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX}${userId}`, [])
     const getOffersDefaultViewStorageKeyForUser = useCallback((userId) => `${OFFERS_DEFAULT_VIEW_KEY_PREFIX}${userId}`, [])
+    const getDeleteConfirmSkipStorageKeyForUser = useCallback((userId) => `${OFFERS_DELETE_CONFIRM_SKIP_KEY_PREFIX}${userId}`, [])
     const getIosAlertSetupSeenStorageKeyForUser = useCallback((userId) => `${OFFERS_IOS_ALERT_SETUP_SEEN_STORAGE_KEY_PREFIX}${userId}`, [])
     const getIosAlertReminderSuppressStorageKeyForUser = useCallback(
       (userId) => `${OFFERS_IOS_ALERT_REMINDER_SUPPRESS_STORAGE_KEY_PREFIX}${userId}`,
@@ -1503,6 +1505,40 @@ function AppShell({ onLogout, supabaseClient }) {
     }
 
     const deleteEvent = async (id) => {
+      const {
+        data: { session },
+      } = await supabaseClient.auth.getSession()
+      const userId = session?.user?.id
+      let skipConfirm = false
+      if (userId && typeof window !== 'undefined') {
+        try {
+          skipConfirm = window.localStorage.getItem(getDeleteConfirmSkipStorageKeyForUser(userId)) === '1'
+        } catch {
+          skipConfirm = false
+        }
+      }
+
+      if (!skipConfirm) {
+        const deleteResult = await showAppInfo({
+          title: 'Delete Event?',
+          message: 'This will permanently delete the event.',
+          confirmLabel: 'Delete',
+          checkboxLabel: "Don't ask again",
+          checkboxDefaultChecked: false,
+          returnChecked: true
+        })
+        const confirmed = deleteResult?.confirmed === true
+        const dontAskAgain = deleteResult?.checked === true
+        if (!confirmed) return
+        if (dontAskAgain && userId && typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(getDeleteConfirmSkipStorageKeyForUser(userId), '1')
+          } catch {
+            // Ignore local storage failures.
+          }
+        }
+      }
+
       const { error: e } = await supabaseClient.from('offer_events').delete().eq('id', id)
       if (e) {
         setError(e?.message || 'Failed to delete event.')
