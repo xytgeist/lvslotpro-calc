@@ -1358,7 +1358,7 @@ function AppShell({ onLogout, supabaseClient }) {
               message: isSafariBrowser
                 ? "On iPhone, alert notifications only work from the Home Screen app. Don't blame me, blame Apple. 🤷‍♂️\n\nTo enable alerts:\n1) Tap Share -> Add to Home Screen\n2) Open app from Home Screen icon\n3) Allow Notifications"
                 : "On iPhone, alert notifications only work from the Home Screen app.\n\nTo enable alerts:\n1) Open Slot Pro in SAFARI (blame Apple 🤷‍♂️)\n2) Tap Share -> Add to Home Screen\n3) Open app from Home Screen icon\n4) Allow Notifications",
-              images: [{ src: '/onboarding/ios-setup.gif', alt: 'iPhone Home Screen setup steps', caption: '' }],
+              images: [{ src: '/onboarding/ios-setup.png', alt: 'iPhone Home Screen setup steps', caption: '' }],
               confirmLabel: 'Got it'
             })
             persistFlags(true, reminderSuppress)
@@ -1370,7 +1370,7 @@ function AppShell({ onLogout, supabaseClient }) {
           const infoResult = await showAppInfo({
             title: 'Remember...',
             message: "We'll save your event and alert, but you won't receive the alerts until you add the app to Home Screen!",
-            images: [{ src: '/onboarding/ios-setup.gif', alt: 'iPhone Home Screen setup steps', caption: '' }],
+            images: [{ src: '/onboarding/ios-setup.png', alt: 'iPhone Home Screen setup steps', caption: '' }],
             confirmLabel: 'Got it',
             checkboxLabel: 'No more reminders',
             checkboxDefaultChecked: false,
