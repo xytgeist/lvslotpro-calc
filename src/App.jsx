@@ -580,6 +580,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const pullTriggeredRef = useRef(false)
     const composerMediaInputRef = useRef(null)
     const composerTextareaRef = useRef(null)
+    const loungeShellRef = useRef(null)
     const loungeFeedScrollRef = useRef(null)
     const loungeTitleBarRef = useRef(null)
     const loungeScrollPrevTopRef = useRef(0)
@@ -647,7 +648,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     }, [])
 
     useLayoutEffect(() => {
-      const el = loungeFeedScrollRef.current
+      const el = loungeShellRef.current
       if (!el) return
       const sync = () => {
         setLoungeFeedViewportTopPx((prev) => {
@@ -883,7 +884,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       return () => {
         cancelled = true
       }
-    }, [supabaseClient, communityPosts.length])
+    }, [supabaseClient])
 
     useEffect(() => {
       if (typeof window === 'undefined') return
@@ -1159,11 +1160,10 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     )
 
     return (
-      <div className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <div
-          ref={loungeFeedScrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-        >
+      <div
+        ref={loungeShellRef}
+        className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      >
           <div
             aria-hidden
             className="shrink-0"
@@ -1184,19 +1184,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 <div className="text-zinc-500 text-[13px]">Latest</div>
               </div>
               <div className="text-zinc-600 text-[13px]">{communityFeedLoading ? 'Updating…' : ''}</div>
-            </div>
-          </div>
-
-          <div
-            className="overflow-hidden transition-[max-height,opacity] duration-200"
-            style={{ maxHeight: pullRefreshing || pullDistance > 0 ? '2.25rem' : '0rem', opacity: pullRefreshing || pullDistance > 0 ? 1 : 0 }}
-          >
-            <div className="px-3 py-1 text-center text-[13px] text-zinc-400">
-              {pullRefreshing
-                ? 'Refreshing lounge…'
-                : pullDistance >= pullRefreshThresholdPx
-                  ? 'Release to refresh'
-                  : 'Pull down to refresh'}
             </div>
           </div>
 
@@ -1421,6 +1408,23 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               </div>
             </div>
           ) : null}
+          </div>
+
+        <div
+          ref={loungeFeedScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+        >
+          <div
+            className="overflow-hidden transition-[max-height,opacity] duration-200"
+            style={{ maxHeight: pullRefreshing || pullDistance > 0 ? '2.25rem' : '0rem', opacity: pullRefreshing || pullDistance > 0 ? 1 : 0 }}
+          >
+            <div className="px-3 py-1 text-center text-[13px] text-zinc-400">
+              {pullRefreshing
+                ? 'Refreshing lounge…'
+                : pullDistance >= pullRefreshThresholdPx
+                  ? 'Release to refresh'
+                  : 'Pull down to refresh'}
+            </div>
           </div>
 
           <div className="border-b border-zinc-800 pb-4">
