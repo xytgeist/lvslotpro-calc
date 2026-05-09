@@ -1009,8 +1009,39 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         </div>
 
         <div
-          className={`shrink-0 border-b border-zinc-800 bg-zinc-900/40 px-3 ${composerExpanded ? 'pt-3 pb-1' : 'py-3'}`}
+          className={`relative shrink-0 border-b border-zinc-800 bg-zinc-900/40 px-3 ${composerExpanded ? 'pt-3 pb-2.5' : 'py-3'}`}
         >
+          {composerExpanded ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPostText('')
+                setComposerMediaFile(null)
+                setComposerMediaKind('')
+                setPostErr('')
+                setComposerExpanded(false)
+                clearLoungeComposerDraft()
+                try {
+                  const el = composerMediaInputRef.current
+                  if (el) el.value = ''
+                } catch {
+                  // ignore
+                }
+              }}
+              className="absolute right-2 top-2 z-10 flex h-6 w-6 touch-manipulation items-center justify-center rounded-full bg-zinc-800/95 text-zinc-500 shadow-sm hover:bg-zinc-700 hover:text-zinc-200 active:text-white [-webkit-tap-highlight-color:transparent]"
+              title="Discard draft"
+              aria-label="Discard draft"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" aria-hidden>
+                <path
+                  d="M6 6l8 8M14 6l-8 8"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          ) : null}
           <div className="flex items-start gap-4">
             <div className="mt-0.5 flex w-[3.3rem] shrink-0 justify-center">
               <button
@@ -1050,14 +1081,14 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 )}
               </button>
             </div>
-            <div className="min-w-0 flex-1">
+            <div className={`min-w-0 flex-1 ${composerExpanded ? 'pr-8' : ''}`}>
               {composerExpanded ? (
                 <>
                   <textarea
                     ref={composerTextareaRef}
                     value={postText}
                     onChange={(e) => setPostText(e.target.value)}
-                    className="w-full min-h-20 resize-none touch-manipulation bg-transparent px-0 pt-3 text-[17px] leading-tight text-white outline-none placeholder:text-[17px] placeholder:text-zinc-500"
+                    className="w-full min-h-[6.5rem] resize-none touch-manipulation bg-transparent px-0 py-0 pt-[18px] text-[17px] leading-[1.25] text-white outline-none placeholder:text-[17px] placeholder:leading-[1.25] placeholder:text-zinc-500"
                     placeholder="Are you winning, son?"
                     maxLength={280}
                   />
@@ -1071,7 +1102,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 <button
                   type="button"
                   onClick={() => setComposerExpanded(true)}
-                  className="min-h-12 w-full touch-manipulation text-left text-[17px] leading-tight text-zinc-500"
+                  className="flex min-h-12 w-full touch-manipulation items-start justify-start pt-[18px] text-left text-[17px] leading-[1.25] text-zinc-500"
                 >
                   Are you winning, son?
                 </button>
@@ -1107,7 +1138,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   setPostErr('Unsupported media type. Please choose an image or video file.')
                 }}
               />
-              <div className="mt-0.5 flex items-center gap-2">
+              <div className="mt-1 flex items-center gap-2 pt-1.5 pb-1">
                 <button
                   type="button"
                   onClick={() => composerMediaInputRef.current?.click()}
@@ -1143,7 +1174,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     </span>
                   ) : null}
                 </div>
-                <div className="inline-flex shrink-0 items-center gap-1">
+                <div className="inline-flex shrink-0 items-center gap-2 py-0.5 pl-2 pr-1">
                   {postText.length >= 280 ? (
                     <span className="text-[11px] tabular-nums font-semibold text-rose-400" aria-live="polite">
                       {postText.length}/280
@@ -1151,26 +1182,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   ) : null}
                   <button
                     type="button"
-                    onClick={() => setComposerExpanded(false)}
-                    className="flex min-h-7 min-w-7 shrink-0 touch-manipulation items-center justify-center rounded-md text-zinc-500 hover:text-zinc-200 active:text-white [-webkit-tap-highlight-color:transparent]"
-                    title="Close composer"
-                    aria-label="Close composer"
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden>
-                      <path
-                        d="M5.5 7.5 10 12l4.5-4.5"
-                        stroke="currentColor"
-                        strokeWidth="1.65"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => void submitLoungePost()}
                     disabled={postBusy}
-                    className="min-h-7 touch-manipulation rounded-md bg-cyan-600 px-2.5 text-[11px] font-bold text-white disabled:opacity-60"
+                    className="min-h-9 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-3.5 py-1.5 text-[14px] font-bold text-white disabled:opacity-60"
                   >
                     {postBusy ? 'Posting…' : 'Post'}
                   </button>
