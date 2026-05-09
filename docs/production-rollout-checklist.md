@@ -1,5 +1,7 @@
 # Production rollout checklist (mirror from **test**)
 
+**Workflow:** Ship the **full feature set on `test` first** (app + Supabase schema, RLS, Edge Functions, Vercel preview against test). Use this checklist only when you are ready to **replay** everything on **production** so prod never drifts behind what you validated on test.
+
 Use this when merging **`test` → production** so parity gaps aren’t missed.  
 Treat **`jtjgtucumuoswnbauxry`** as reference (**test**) unless documented elsewhere — **`wedrhwtsxifbnnbgxdkm`** is the (**production**) Supabase project ref inferred from `.env.supabase.production`.
 
