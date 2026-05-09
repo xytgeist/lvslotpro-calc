@@ -678,6 +678,8 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       const revealDeltaCapPx = 36
       const composerFoldPx = 140
       const composerUnfoldPx = 160
+      /** When feed-folded, allow smooth reopen while scrollTop is within this distance of the top. */
+      const composerUnfoldBandPx = 168
       const queueScrollVisualFlush = () => {
         if (loungeScrollVisualRafRef.current) return
         loungeScrollVisualRafRef.current = window.requestAnimationFrame(() => {
@@ -687,7 +689,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         })
       }
       const scrollDownPx = 14
-      const scrollTopPx = 6
       const onScroll = () => {
         const st = el.scrollTop
         const prev = loungeScrollPrevTopRef.current
@@ -712,8 +713,8 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           scrollVisualDirty = true
         }
 
-        if (composerExpandedRef.current && st > scrollDownPx) {
-          if (eff > 0.2) {
+        if (composerExpandedRef.current && eff > 0.2) {
+          if (st > scrollDownPx || composerFoldRevealRef.current < 0.998) {
             const next = Math.max(0, composerFoldRevealRef.current - eff / composerFoldPx)
             if (next !== composerFoldRevealRef.current) {
               composerFoldRevealRef.current = next
@@ -729,9 +730,20 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
             scrollVisualDirty = true
           }
         } else if (
+          composerExpandedRef.current &&
+          composerFoldRevealRef.current < 0.995 &&
+          st <= composerUnfoldBandPx &&
+          eff < -0.5
+        ) {
+          const next = Math.min(1, composerFoldRevealRef.current + (-eff) / composerUnfoldPx)
+          if (next !== composerFoldRevealRef.current) {
+            composerFoldRevealRef.current = next
+            scrollVisualDirty = true
+          }
+        } else if (
           !composerExpandedRef.current &&
           composerFoldedFromFeedScrollRef.current &&
-          st <= scrollTopPx
+          st <= composerUnfoldBandPx
         ) {
           if (eff < -0.5) {
             if (!composerExpandedRef.current) {
