@@ -32,6 +32,10 @@ import {
   saveProfileWithHandleFallback,
   uploadProfileAvatar,
 } from './features/profiles/profileGate'
+import {
+  communityFeedPostInsertPayload,
+  feedPostDisplayCaption,
+} from './utils/communityFeedPost'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -376,7 +380,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     communityFeedHeadReloadingRef.current = true
     try {
       const selectCols =
-        'id,caption,title,body,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count'
+        'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count'
       const [{ data: pinnedRows }, { data: rows, error }] = await Promise.all([
         supabaseClient
           .from('community_feed_posts')
@@ -431,7 +435,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       const cursorFilter = `created_at.lt.${communityFeedCursor.created_at},and(created_at.eq.${communityFeedCursor.created_at},id.lt.${communityFeedCursor.id})`
       const { data: rows, error } = await supabaseClient
         .from('community_feed_posts')
-        .select('id,caption,title,body,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count')
+        .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count')
         .eq('pinned', false)
         .or(cursorFilter)
         .order('created_at', { ascending: false })
@@ -1178,13 +1182,13 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           return
         }
 
-        const { error } = await supabaseClient.from('community_feed_posts').insert({
-          caption,
-          body: caption,
-          title: 'Lounge thread',
-          game_title: 'Lounge',
-          game_slug: null,
-        })
+        const { error } = await supabaseClient.from('community_feed_posts').insert(
+          communityFeedPostInsertPayload({
+            caption,
+            gameTitle: 'Lounge',
+            gameSlug: null,
+          })
+        )
 
         if (error) {
           const msg = String(error.message || '')
@@ -1288,7 +1292,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 .maybeSingle(),
               supabaseClient
                 .from('community_feed_posts')
-                .select('id,caption,title,body,created_at,game_title,pinned')
+                .select('id,caption,created_at,game_title,pinned')
                 .eq('user_id', userId)
                 .is('hidden_at', null)
                 .order('pinned', { ascending: false })
@@ -1699,11 +1703,8 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                           ) : null}
                         </div>
                       </div>
-                      {post.pinned && post.title ? (
-                        <div className="mt-1.5 text-white text-[17px] font-semibold leading-tight">{post.title}</div>
-                      ) : null}
                       <div className="mt-1.5 text-zinc-200 text-[17px] leading-tight whitespace-pre-wrap">
-                        {renderRichCaption(post.caption || post.body || post.title || '')}
+                        {renderRichCaption(feedPostDisplayCaption(post))}
                       </div>
                       <div className="mt-2 grid grid-cols-5 items-center text-[14px]">
                         <button
@@ -1854,7 +1855,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         ) : null}
                       </div>
                       <div className="mt-1.5 text-zinc-100 text-[15px] leading-relaxed whitespace-pre-wrap">
-                        {renderRichCaption(p.caption || p.body || p.title || '', {
+                        {renderRichCaption(feedPostDisplayCaption(p), {
                           hashtagClassName: 'font-semibold text-cyan-300',
                           linkClassName:
                             'font-medium text-sky-300 underline underline-offset-2 decoration-sky-300/70 break-words',
@@ -4423,7 +4424,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   <div key={p.id} className="rounded-2xl bg-zinc-800/70 p-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <div className="text-zinc-200 font-semibold">
-                        {renderRichCaption(p.caption || p.body || p.title || 'Post', {
+                        {renderRichCaption(feedPostDisplayCaption(p) || 'Post', {
                           hashtagClassName: 'font-semibold text-cyan-400',
                         })}
                       </div>

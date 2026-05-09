@@ -45,8 +45,6 @@ inserted as (
     user_id,
     game_slug,
     game_title,
-    title,
-    body,
     caption,
     created_at,
     like_count,
@@ -56,8 +54,6 @@ inserted as (
     sr.user_id,
     sr.game_slug,
     sr.game_title,
-    'Lounge test thread #' || sr.seq_no || ' · ' || coalesce(sr.game_title, 'Casino Floor'),
-    'Synthetic test post for Lounge pagination and pinned behavior.',
     left(
       case (sr.seq_no % 6)
         when 0 then 'Meter moved fast on this bank. Anyone seeing same trend tonight?'
@@ -92,7 +88,6 @@ with latest_visible as (
 update public.community_feed_posts p
 set
   pinned = true,
-  title = 'Lounge announcement',
   caption = 'Pinned test post: this should always stay at the top of Lounge.'
 from latest_visible lv
 where p.id = lv.id;

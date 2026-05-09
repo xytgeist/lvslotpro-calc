@@ -169,22 +169,38 @@ alter table public.community_feed_posts
 alter table public.community_feed_posts
   add column if not exists comment_count integer not null default 0;
 
--- Canonical v1 text field (280 chars). Keep `title`/`body` for compatibility
--- during transition; contract/remove later after app rollout and backfill checks.
+-- Canonical v1 text field (280 chars). Legacy `title`/`body` removed after backfill.
 alter table public.community_feed_posts
   add column if not exists caption text;
 
-update public.community_feed_posts
-set caption = left(
-  coalesce(
-    nullif(trim(caption), ''),
-    nullif(trim(body), ''),
-    nullif(trim(title), ''),
-    ''
-  ),
-  280
-)
-where caption is null;
+-- One-time backfill when upgrading from pre-A2 schema (columns dropped afterward).
+do $migration$
+begin
+  if exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'community_feed_posts'
+      and c.column_name = 'body'
+  ) then
+    update public.community_feed_posts
+    set caption = left(
+      coalesce(
+        nullif(trim(caption), ''),
+        nullif(trim(body), ''),
+        nullif(trim(title), ''),
+        ''
+      ),
+      280
+    )
+    where caption is null;
+  else
+    update public.community_feed_posts
+    set caption = coalesce(nullif(trim(caption), ''), '')
+    where caption is null;
+  end if;
+end;
+$migration$;
 
 alter table public.community_feed_posts
   alter column caption set not null;
@@ -199,9 +215,31 @@ alter table public.community_feed_posts
   add constraint community_feed_posts_caption_len_check
   check (char_length(caption) <= 280);
 
+alter table public.community_feed_posts drop column if exists body;
+alter table public.community_feed_posts drop column if exists title;
+
 comment on column public.community_feed_posts.hidden_at is 'When set, post is withheld from public feed (moderation).';
 comment on column public.community_feed_posts.pinned is 'At most one visible pinned row enforced by partial unique index below.';
 comment on column public.community_feed_posts.caption is 'Canonical feed caption (<= 280 chars).';
+
+-- Touch edited_at when caption changes.
+create or replace function public.community_feed_posts_touch_edited_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.caption is distinct from old.caption then
+    new.edited_at := now();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_community_feed_posts_touch_edited_at on public.community_feed_posts;
+create trigger trg_community_feed_posts_touch_edited_at
+  before update on public.community_feed_posts
+  for each row
+  execute function public.community_feed_posts_touch_edited_at();
 
 -- At most one globally pinned post among non-hidden rows.
 create unique index if not exists community_feed_single_pinned_idx

@@ -33,6 +33,7 @@ import {
   ainsworthMustHitByGuideMarkdown,
 } from './mustHitByGuideDemo'
 import { defaultCardEvThresholdForSlug } from '../../constants/slotCardEvThreshold'
+import { communityFeedPostInsertPayload } from '../../utils/communityFeedPost'
 import {
   fetchOwnProfile,
   handleSlugFromAtInput,
@@ -982,16 +983,13 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
         return
       }
 
-      const postTitle = `Question · ${gameTitle}`.slice(0, 200)
-      const postBody = cleanedCaption
-
-      const { error } = await supabaseClient.from('community_feed_posts').insert({
-        game_slug: gameSlug || null,
-        game_title: gameTitle,
-        caption: cleanedCaption,
-        title: postTitle,
-        body: postBody,
-      })
+      const { error } = await supabaseClient.from('community_feed_posts').insert(
+        communityFeedPostInsertPayload({
+          caption: cleanedCaption,
+          gameTitle,
+          gameSlug: gameSlug || null,
+        })
+      )
 
       if (error) {
         if (error.message?.includes('relation') || error.code === '42P01') {

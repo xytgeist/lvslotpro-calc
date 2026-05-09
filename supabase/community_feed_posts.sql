@@ -9,9 +9,9 @@ create table if not exists public.community_feed_posts (
   user_id uuid not null references auth.users(id) on delete cascade,
   game_slug text,
   game_title text not null default '',
-  title text not null,
-  body text not null,
-  created_at timestamptz not null default now()
+  caption text not null default '',
+  created_at timestamptz not null default now(),
+  constraint community_feed_posts_caption_len_check check (char_length(caption) <= 280)
 );
 
 create index if not exists community_feed_posts_created_idx
