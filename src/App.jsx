@@ -106,7 +106,8 @@ function GoogleIcon() {
   )
 }
 
-function AppShell({ onLogout, supabaseClient }) {
+function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
+  const COMMUNITY_FEED_PAGE_SIZE = 20
   const [tab, setTab] = useState('home')
   const [pendingOfferEventIds, setPendingOfferEventIds] = useState([])
   const [offerSpotlightEventIds, setOfferSpotlightEventIds] = useState([])
@@ -115,6 +116,9 @@ function AppShell({ onLogout, supabaseClient }) {
   const [intelView, setIntelView] = useState({ screen: 'home', cityId: null, casinoId: null })
   const [communityPosts, setCommunityPosts] = useState([])
   const [communityFeedLoading, setCommunityFeedLoading] = useState(false)
+  const [communityFeedLoadingMore, setCommunityFeedLoadingMore] = useState(false)
+  const [communityFeedHasMore, setCommunityFeedHasMore] = useState(false)
+  const [communityFeedCursor, setCommunityFeedCursor] = useState(null)
   const iosPwaGlobalPromptShownRef = useRef(false)
   const [globalConfirmState, setGlobalConfirmState] = useState({
     open: false,
@@ -203,25 +207,9 @@ function AppShell({ onLogout, supabaseClient }) {
     }
   }, [showGlobalConfirm, supabaseClient])
 
-  const loadCommunityFeed = useCallback(async () => {
-    setCommunityFeedLoading(true)
-    try {
-      const { data: rows, error } = await supabaseClient
-        .from('community_feed_posts')
-        .select(
-          'id,title,body,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count'
-        )
-        .order('pinned', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(40)
-      if (error) {
-        setCommunityPosts([])
-        return
-      }
-      if (!rows?.length) {
-        setCommunityPosts([])
-        return
-      }
+  const hydrateCommunityPosts = useCallback(
+    async (rows) => {
+      if (!rows?.length) return []
       const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
       let profileByUserId = {}
       if (ids.length > 0) {
@@ -231,16 +219,99 @@ function AppShell({ onLogout, supabaseClient }) {
           .in('user_id', ids)
         profileByUserId = Object.fromEntries((profiles || []).map((p) => [p.user_id, p]))
       }
-      setCommunityPosts(
-        rows.map((r) => ({
-          ...r,
-          author_profile: profileByUserId[r.user_id] || null,
-        }))
-      )
+      return rows.map((r) => ({
+        ...r,
+        author_profile: profileByUserId[r.user_id] || null,
+      }))
+    },
+    [supabaseClient]
+  )
+
+  const loadCommunityFeed = useCallback(async () => {
+    setCommunityFeedLoading(true)
+    setCommunityFeedLoadingMore(false)
+    try {
+      const selectCols =
+        'id,caption,title,body,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count'
+      const [{ data: pinnedRows }, { data: rows, error }] = await Promise.all([
+        supabaseClient
+          .from('community_feed_posts')
+          .select(selectCols)
+          .eq('pinned', true)
+          .order('created_at', { ascending: false })
+          .limit(1),
+        supabaseClient
+          .from('community_feed_posts')
+          .select(selectCols)
+          .eq('pinned', false)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(COMMUNITY_FEED_PAGE_SIZE + 1),
+      ])
+
+      if (error) {
+        setCommunityPosts([])
+        setCommunityFeedHasMore(false)
+        setCommunityFeedCursor(null)
+        return
+      }
+
+      const list = rows || []
+      const hasMore = list.length > COMMUNITY_FEED_PAGE_SIZE
+      const pageRows = hasMore ? list.slice(0, COMMUNITY_FEED_PAGE_SIZE) : list
+      const pageLast = pageRows.at(-1) || null
+      const merged = [...(pinnedRows || []), ...pageRows]
+      const deduped = merged.filter((row, idx, arr) => arr.findIndex((x) => x.id === row.id) === idx)
+      const hydrated = await hydrateCommunityPosts(deduped)
+
+      setCommunityPosts(hydrated)
+      setCommunityFeedHasMore(hasMore)
+      setCommunityFeedCursor(pageLast ? { created_at: pageLast.created_at, id: pageLast.id } : null)
     } finally {
       setCommunityFeedLoading(false)
     }
-  }, [supabaseClient])
+  }, [COMMUNITY_FEED_PAGE_SIZE, hydrateCommunityPosts, supabaseClient])
+
+  const loadMoreCommunityFeed = useCallback(async () => {
+    if (!communityFeedHasMore || !communityFeedCursor || communityFeedLoading || communityFeedLoadingMore) return
+    setCommunityFeedLoadingMore(true)
+    try {
+      const cursorFilter = `created_at.lt.${communityFeedCursor.created_at},and(created_at.eq.${communityFeedCursor.created_at},id.lt.${communityFeedCursor.id})`
+      const { data: rows, error } = await supabaseClient
+        .from('community_feed_posts')
+        .select('id,caption,title,body,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count')
+        .eq('pinned', false)
+        .or(cursorFilter)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(COMMUNITY_FEED_PAGE_SIZE + 1)
+
+      if (error) return
+
+      const list = rows || []
+      const hasMore = list.length > COMMUNITY_FEED_PAGE_SIZE
+      const pageRows = hasMore ? list.slice(0, COMMUNITY_FEED_PAGE_SIZE) : list
+      const pageLast = pageRows.at(-1) || null
+      const hydrated = await hydrateCommunityPosts(pageRows)
+
+      setCommunityPosts((prev) => [
+        ...prev,
+        ...hydrated.filter((row) => !prev.some((existing) => existing.id === row.id)),
+      ])
+      setCommunityFeedHasMore(hasMore)
+      setCommunityFeedCursor(pageLast ? { created_at: pageLast.created_at, id: pageLast.id } : null)
+    } finally {
+      setCommunityFeedLoadingMore(false)
+    }
+  }, [
+    COMMUNITY_FEED_PAGE_SIZE,
+    communityFeedCursor,
+    communityFeedHasMore,
+    communityFeedLoading,
+    communityFeedLoadingMore,
+    hydrateCommunityPosts,
+    supabaseClient,
+  ])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -285,7 +356,7 @@ function AppShell({ onLogout, supabaseClient }) {
   }
 
   const navItems = [
-    { id: 'home', label: 'Home', icon: '🏠' },
+    { id: 'home', label: 'Lounge', icon: '🍻' },
     { id: 'calculators', label: 'Calcs', icon: '🧮' },
     { id: 'offers', label: 'Offers', icon: '📅' },
     { id: 'bankroll', label: 'Bankroll', icon: '💰' },
@@ -401,6 +472,8 @@ function AppShell({ onLogout, supabaseClient }) {
 
   const SocialFeed = () => {
     const [postText, setPostText] = useState('')
+    const loadMoreSentinelRef = useRef(null)
+
     const displayLabel = useCallback((p) => {
       const pr = p?.author_profile
       if (pr?.handle) return `@${pr.handle}`
@@ -408,108 +481,160 @@ function AppShell({ onLogout, supabaseClient }) {
       return 'Member'
     }, [])
 
+    const avatarText = useCallback((p) => {
+      const pr = p?.author_profile
+      const base = (pr?.display_name || pr?.handle || 'Member').trim()
+      return base.slice(0, 1).toUpperCase() || 'M'
+    }, [])
+
+    useEffect(() => {
+      if (!communityFeedHasMore || communityFeedLoadingMore || communityFeedLoading) return
+      const node = loadMoreSentinelRef.current
+      if (!node || typeof window === 'undefined' || !('IntersectionObserver' in window)) return
+      const observer = new window.IntersectionObserver(
+        (entries) => {
+          const first = entries?.[0]
+          if (first?.isIntersecting) void loadMoreCommunityFeed()
+        },
+        { rootMargin: '300px 0px' }
+      )
+      observer.observe(node)
+      return () => observer.disconnect()
+    }, [communityFeedHasMore, communityFeedLoading, communityFeedLoadingMore, loadMoreCommunityFeed])
+
     return (
-      <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className="mb-6 flex items-start justify-between gap-3">
-          <div>
-            <div className="text-white text-2xl font-black tracking-tight">Social Feed</div>
-            <div className="text-zinc-400 text-sm mt-0.5">Share plays, post media, and discuss live casino conditions</div>
+      <div className="max-w-2xl mx-auto pb-4">
+        <div className="sticky top-[max(0px,env(safe-area-inset-top))] z-20 border-b border-zinc-800/95 bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80">
+          <div className="px-3 py-2.5 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-white text-xl font-black tracking-tight">Lounge</div>
+              <div className="text-zinc-500 text-[11px]">Latest</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => loadCommunityFeed()}
+              disabled={communityFeedLoading}
+              className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-200 touch-manipulation active:scale-[0.99] disabled:opacity-60"
+            >
+              {communityFeedLoading ? 'Refreshing…' : 'Refresh'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => loadCommunityFeed()}
-            className="shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200 touch-manipulation active:scale-[0.99]"
-          >
-            Refresh
-          </button>
         </div>
 
-        <div className="rounded-3xl bg-zinc-900 p-5 mb-4">
-          <div className="text-white font-bold mb-3">Create post (UI scaffold)</div>
+        <div className="border-b border-zinc-800 bg-zinc-950/65 px-3 py-3">
+          <div className="text-white font-bold text-sm mb-2">Start a thread</div>
           <textarea
             value={postText}
             onChange={(e) => setPostText(e.target.value)}
-            className="w-full min-h-24 rounded-2xl bg-zinc-800 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-fuchsia-500/40"
-            placeholder="Share your hit, strategy, or casino intel..."
+            className="w-full min-h-20 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2.5 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+            placeholder="Ask a question or drop quick floor intel..."
           />
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              className="min-h-10 rounded-xl bg-zinc-800 px-3 text-sm font-semibold text-zinc-100"
-            >
-              Add photo
+          <div className="mt-2.5 flex items-center gap-2">
+            <button type="button" className="min-h-8 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 text-[11px] font-semibold text-zinc-100">
+              Photo
             </button>
-            <button
-              type="button"
-              className="min-h-10 rounded-xl bg-zinc-800 px-3 text-sm font-semibold text-zinc-100"
-            >
-              Add video
+            <button type="button" className="min-h-8 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 text-[11px] font-semibold text-zinc-100">
+              Video
             </button>
-            <button
-              type="button"
-              className="ml-auto min-h-10 rounded-xl bg-fuchsia-600 px-4 text-sm font-bold text-white"
-            >
+            <button type="button" className="ml-auto min-h-8 rounded-lg bg-cyan-600 px-3.5 text-[11px] font-bold text-white">
               Post
             </button>
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="border-b border-zinc-800">
           {communityFeedLoading ? (
-            <div className="text-zinc-500 text-sm py-4">Loading feed…</div>
+            <div className="px-3 py-4 text-zinc-400 text-sm">Loading lounge…</div>
           ) : communityPosts.length === 0 ? (
-            <div className="rounded-3xl bg-zinc-900 p-5 text-zinc-400 text-sm leading-relaxed">
+            <div className="px-3 py-5 text-zinc-400 text-sm leading-relaxed">
               No posts yet. Run{' '}
               <code className="text-fuchsia-200/90">supabase/feed_phase_a_profiles_public_read.sql</code> in Supabase,
               then post from Guides → Ask community.
             </div>
           ) : (
-            communityPosts.map((post) => (
-              <article key={post.id} className="rounded-3xl bg-zinc-900 p-5">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div className="text-zinc-100 font-semibold">{displayLabel(post)}</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {post.pinned ? (
-                      <span className="rounded-lg bg-fuchsia-500/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-fuchsia-300">
-                        Pinned
-                      </span>
-                    ) : null}
-                    {post.game_title ? (
-                      <span className="text-[11px] font-bold uppercase tracking-wide text-amber-400/90">{post.game_title}</span>
-                    ) : null}
+            <>
+              {communityPosts.map((post) => (
+                <article key={post.id} className="border-t border-zinc-800 px-3 py-3 bg-zinc-950/35">
+                  <div className="flex gap-3">
+                    <div className="h-9 w-9 shrink-0 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 text-xs font-bold flex items-center justify-center">
+                      {avatarText(post)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-zinc-100 font-semibold">{displayLabel(post)}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {post.pinned ? (
+                            <span className="rounded-md bg-fuchsia-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-300">
+                              Pinned
+                            </span>
+                          ) : null}
+                          {post.game_title ? (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-400/90">{post.game_title}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      {post.pinned && post.title ? (
+                        <div className="mt-1.5 text-white font-semibold leading-snug">{post.title}</div>
+                      ) : null}
+                      <div className="text-zinc-200 text-sm mt-1.5 leading-relaxed whitespace-pre-wrap">
+                        {post.caption || post.body || post.title || ''}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-zinc-500">
+                        {post.created_at
+                          ? new Date(post.created_at).toLocaleString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })
+                          : ''}
+                        {typeof post.like_count === 'number' ? <span className="text-zinc-400">{post.like_count}</span> : null}
+                        {typeof post.comment_count === 'number' ? <span className="text-zinc-400">{post.comment_count}</span> : null}
+                      </div>
+                      <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
+                        <button type="button" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70 hover:text-zinc-200">
+                          <span aria-hidden>💬</span>
+                          <span>Reply</span>
+                        </button>
+                        <button type="button" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70 hover:text-zinc-200">
+                          <span aria-hidden>🔁</span>
+                          <span>Repost</span>
+                        </button>
+                        <button type="button" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70 hover:text-zinc-200">
+                          <span aria-hidden>❤️</span>
+                          <span>Like</span>
+                        </button>
+                        <button type="button" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70 hover:text-zinc-200">
+                          <span aria-hidden>↗️</span>
+                          <span>Share</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-2 text-white font-semibold leading-snug">{post.title}</div>
-                <div className="text-zinc-300 text-sm mt-2 leading-relaxed whitespace-pre-wrap">{post.body}</div>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-zinc-500">
-                  {post.created_at
-                    ? new Date(post.created_at).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })
-                    : ''}
-                  {typeof post.like_count === 'number' ? (
-                    <span className="text-zinc-400">{post.like_count} likes</span>
-                  ) : null}
-                  {typeof post.comment_count === 'number' ? (
-                    <span className="text-zinc-400">{post.comment_count} comments</span>
-                  ) : null}
-                </div>
-                <div className="mt-3 flex items-center gap-4 text-xs text-zinc-400">
-                  <button type="button" className="rounded-lg px-1 py-1 hover:text-zinc-200">
-                    Like
-                  </button>
-                  <button type="button" className="rounded-lg px-1 py-1 hover:text-zinc-200">
-                    Comment
-                  </button>
-                  <button type="button" className="rounded-lg px-1 py-1 hover:text-zinc-200">
-                    Share
-                  </button>
-                </div>
-              </article>
-            ))
+                </article>
+              ))}
+
+              {communityFeedHasMore ? <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden /> : null}
+
+              {communityFeedLoadingMore ? (
+                <div className="px-3 py-3 text-zinc-500 text-sm">Loading more…</div>
+              ) : null}
+
+              {communityFeedHasMore ? (
+                <button
+                  type="button"
+                  onClick={() => loadMoreCommunityFeed()}
+                  disabled={communityFeedLoadingMore}
+                  className="mx-3 my-2 w-[calc(100%-1.5rem)] min-h-9 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-100 text-xs font-semibold disabled:opacity-60 touch-manipulation"
+                >
+                  Load more
+                </button>
+              ) : null}
+
+              {!communityFeedHasMore && communityPosts.length > 0 ? (
+                <div className="text-center text-xs text-zinc-600 py-2">You are caught up.</div>
+              ) : null}
+            </>
           )}
         </div>
       </div>
@@ -2848,7 +2973,7 @@ function AppShell({ onLogout, supabaseClient }) {
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="text-white text-2xl font-black tracking-tight">Las Vegas Slot Pro</div>
-              <div className="text-zinc-400 text-sm mt-0.5">Home</div>
+              <div className="text-zinc-400 text-sm mt-0.5">Lounge</div>
             </div>
             <button
               onClick={onLogout}
@@ -2903,12 +3028,13 @@ function AppShell({ onLogout, supabaseClient }) {
                 {communityPosts.map((p) => (
                   <div key={p.id} className="rounded-2xl bg-zinc-800/70 p-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <div className="text-zinc-200 font-semibold">{p.title}</div>
+                      <div className="text-zinc-200 font-semibold">
+                        {p.caption || p.body || p.title || 'Post'}
+                      </div>
                       {p.game_title ? (
                         <span className="text-[11px] font-bold uppercase tracking-wide text-amber-400/90 shrink-0">{p.game_title}</span>
                       ) : null}
                     </div>
-                    <div className="text-zinc-400 text-sm mt-2 leading-relaxed whitespace-pre-wrap">{p.body}</div>
                     <div className="text-zinc-600 text-[11px] mt-2">
                       {p.created_at
                         ? new Date(p.created_at).toLocaleString(undefined, {
@@ -2937,6 +3063,7 @@ function AppShell({ onLogout, supabaseClient }) {
           onOpenCalculator={openCalculator}
           onNavigateHome={() => setTab('home')}
           onCommunityPosted={loadCommunityFeed}
+          onRequireAuth={onRequireAuth}
         />
       )
     }
@@ -3068,11 +3195,14 @@ function AppShell({ onLogout, supabaseClient }) {
 }
 
 function App() {
+  const AUTH_VIEW_STORAGE_KEY = 'lvslotpro-auth-view'
+  const ALLOW_GUEST_MODE = import.meta.env.DEV || String(import.meta.env.VITE_ALLOW_GUEST_MODE || '').toLowerCase() === 'true'
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isAllowed, setIsAllowed] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
+  const [guestMode, setGuestMode] = useState(false)
   const [currentView, setCurrentView] = useState('app')
 
   // Forgot password states
@@ -3103,6 +3233,23 @@ function App() {
 
   // Verification success message
   const [verificationSuccess, setVerificationSuccess] = useState(false)
+
+  useEffect(() => {
+    try {
+      const pref = window.localStorage.getItem(AUTH_VIEW_STORAGE_KEY)
+      if (pref === 'create') {
+        setShowCreateAccount(true)
+        setShowForgotPassword(false)
+      }
+      if (pref === 'login') {
+        setShowCreateAccount(false)
+        setShowForgotPassword(false)
+      }
+      if (pref) window.localStorage.removeItem(AUTH_VIEW_STORAGE_KEY)
+    } catch {
+      // Ignore storage read failures.
+    }
+  }, [])
 
   useEffect(() => {
     const { error: oauthError, errorCode, errorDescription } = readAuthCallbackParams()
@@ -3333,6 +3480,12 @@ function App() {
   }
 
   const handleLogout = async () => {
+    if (guestMode) {
+      setGuestMode(false)
+      setIsAllowed(false)
+      window.location.reload()
+      return
+    }
     await supabase.auth.signOut()
     window.location.reload()
   }
@@ -3387,7 +3540,7 @@ function App() {
   }
 
   // Login Screen
-  if (!user || !isAllowed) {
+  if (!guestMode && (!user || !isAllowed)) {
     return (
       <div className={mobileShell}>
         <div className="bg-gray-900 p-6 sm:p-8 rounded-3xl max-w-sm w-full">
@@ -3470,6 +3623,22 @@ function App() {
                   Forgot Password?
                 </button>
               </div>
+
+              {ALLOW_GUEST_MODE ? (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGuestMode(true)
+                      setIsAllowed(true)
+                      setCurrentView('app')
+                    }}
+                    className="w-full min-h-11 rounded-2xl border border-cyan-600/60 bg-cyan-950/35 text-cyan-200 text-sm font-semibold hover:bg-cyan-900/35 touch-manipulation"
+                  >
+                    Continue as guest (test)
+                  </button>
+                </div>
+              ) : null}
             </form>
           ) : showCreateAccount ? (
             <form onSubmit={handleSignUp} className="space-y-4">
@@ -3562,7 +3731,20 @@ function App() {
 
   // Logged-in app shell
   if (currentView === 'app') {
-    return <AppShell onLogout={handleLogout} supabaseClient={supabase} />
+    return (
+      <AppShell
+        onLogout={handleLogout}
+        supabaseClient={supabase}
+        onRequireAuth={(mode = 'login') => {
+          try {
+            window.localStorage.setItem(AUTH_VIEW_STORAGE_KEY, mode === 'create' ? 'create' : 'login')
+          } catch {
+            // Ignore storage write failures.
+          }
+          void handleLogout()
+        }}
+      />
+    )
   }
 
   return null

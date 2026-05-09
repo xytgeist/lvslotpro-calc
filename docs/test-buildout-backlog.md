@@ -23,6 +23,28 @@ Do not store secrets in this file.
 
 ---
 
+## Roadmap status snapshot
+
+### Phase A - Foundation (DB + auth shaping)
+
+- [x] A1 core `profiles` model in place on test (`handle`, `display_name`, `avatar_url`, `bio`, `role`, `banned_at`, timestamps, constraints/index).
+- [ ] A2 feed model finalization is in progress (current table still uses `title + body`; counters/pin columns exist; final caption model and migration sequence not finished).
+- [x] A3 baseline RLS/policy shape for public read + authed write + staff moderation is applied on test.
+- [ ] A4 rate limiting (`rate_limit_events` + policy/RPC/edge enforcement) not started.
+
+### Phase B - Public read feed
+
+- [x] Basic public read feed path works on test (anon-visible rows, signed-in posting path from Guides).
+- [x] Cursor pagination on `(created_at, id)` is implemented with load-more pagination (infinite auto-load polish still optional).
+- [ ] Pinned row handling exists at data level but UI/query behavior is not fully finalized to roadmap spec.
+- [ ] Logged-out gating for like/comment/search is not fully enforced end-to-end yet.
+
+### Phases C-L
+
+- [ ] Not started as complete feature slices yet (profiles page/gating, media pipeline, comments, likes, search, notifications, moderation, block/mute, permalinks, legal).
+
+---
+
 ## Supabase schema SQL (test first)
 
 - [x] Community feed base schema on test  
@@ -96,11 +118,17 @@ Do not store secrets in this file.
 
 ## Frontend feature buildout on test
 
-- [ ] Social/profile feature phases beyond current rollout
-  - Change: Continue full product build on test (profiles/onboarding, interactions, moderation UX, etc.).
-  - Source: app feature branches and merged work
-  - Test validation: Feature-level QA on test branch/deploy.
-  - Production replay: Add DB/function/env implications to checklist as they are introduced.
+- [ ] Active now: A2 feed model finalization (`community_feed_posts` -> v1 shape)
+  - Change: finalize content model (`caption/body` direction), migration order (`expand -> app migrate -> contract`), and pinned/count behavior to match roadmap.
+  - Source: `supabase/community_feed_posts.sql`, `supabase/feed_phase_a_profiles_public_read.sql`, home feed UI query/render.
+  - Test validation: existing feed reads/writes still work through migration sequence with no downtime.
+  - Production replay: add finalized SQL/migration steps to checklist §2 before promotion.
+
+- [ ] Next after A2: A4 rate limiting foundation
+  - Change: add `rate_limit_events` table + indexes and first enforcement path for posting actions.
+  - Source: new SQL + app/edge enforcement path.
+  - Test validation: window limits trigger correctly under repeated post attempts.
+  - Production replay: checklist §2 and/or §4 (depending on DB-only vs edge function).
 
 ---
 
@@ -119,3 +147,6 @@ Do not store secrets in this file.
 ## Update log
 
 - 2026-05-08: Initialized test-first backlog and seeded with current feed/policy/edge-function parity work.
+- 2026-05-08: Added explicit roadmap phase status snapshot; set active implementation target to A2 feed model finalization.
+- 2026-05-08: Started A2 implementation: added `caption` migration/backfill path and app read/write compatibility for `caption` with legacy `title/body` fallback.
+- 2026-05-08: Added pinned-first feed query + cursor-based pagination (`created_at`, `id`) with load-more behavior in Home feed UI.

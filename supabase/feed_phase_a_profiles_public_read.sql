@@ -25,6 +25,24 @@ create unique index if not exists profiles_handle_lower_key on public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- Helper used by policies/triggers to avoid self-referential policy recursion on
+-- `public.profiles` while checking current user role.
+create or replace function public.current_user_has_staff_role()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.user_id = auth.uid()
+      and p.role in ('moderator', 'admin')
+  );
+$$;
+
+grant execute on function public.current_user_has_staff_role() to anon, authenticated;
+
 drop policy if exists profiles_select_public on public.profiles;
 create policy profiles_select_public on public.profiles
   for select to anon, authenticated
@@ -38,14 +56,7 @@ create policy profiles_select_self on public.profiles
 drop policy if exists profiles_select_staff on public.profiles;
 create policy profiles_select_staff on public.profiles
   for select to authenticated
-  using (
-    exists (
-      select 1
-      from public.profiles mp
-      where mp.user_id = auth.uid()
-        and mp.role in ('moderator', 'admin')
-    )
-  );
+  using (public.current_user_has_staff_role());
 
 drop policy if exists profiles_insert_own on public.profiles;
 create policy profiles_insert_own on public.profiles
@@ -158,8 +169,39 @@ alter table public.community_feed_posts
 alter table public.community_feed_posts
   add column if not exists comment_count integer not null default 0;
 
+-- Canonical v1 text field (280 chars). Keep `title`/`body` for compatibility
+-- during transition; contract/remove later after app rollout and backfill checks.
+alter table public.community_feed_posts
+  add column if not exists caption text;
+
+update public.community_feed_posts
+set caption = left(
+  coalesce(
+    nullif(trim(caption), ''),
+    nullif(trim(body), ''),
+    nullif(trim(title), ''),
+    ''
+  ),
+  280
+)
+where caption is null;
+
+alter table public.community_feed_posts
+  alter column caption set not null;
+
+alter table public.community_feed_posts
+  alter column caption set default '';
+
+alter table public.community_feed_posts
+  drop constraint if exists community_feed_posts_caption_len_check;
+
+alter table public.community_feed_posts
+  add constraint community_feed_posts_caption_len_check
+  check (char_length(caption) <= 280);
+
 comment on column public.community_feed_posts.hidden_at is 'When set, post is withheld from public feed (moderation).';
 comment on column public.community_feed_posts.pinned is 'At most one visible pinned row enforced by partial unique index below.';
+comment on column public.community_feed_posts.caption is 'Canonical feed caption (<= 280 chars).';
 
 -- At most one globally pinned post among non-hidden rows.
 create unique index if not exists community_feed_single_pinned_idx

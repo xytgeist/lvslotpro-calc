@@ -36,6 +36,13 @@ import { defaultCardEvThresholdForSlug } from '../../constants/slotCardEvThresho
 
 /** Calculator / generic placeholder art for Buffalo Link — also used when a guide hero fails to load. */
 const BUFFALO_PLACEHOLDER_SRC = '/guides/buffalo-link/buffalo-link-calculator-icon.webp'
+const ACTIVE_SUPABASE_HOST = (() => {
+  try {
+    return new URL(import.meta.env.VITE_SUPABASE_URL || '').host || 'unknown-host'
+  } catch {
+    return 'unknown-host'
+  }
+})()
 
 /** Retired slugs → current slug (markdown `guide:` links, bookmarks). */
 const GUIDE_SLUG_CANONICAL = {
@@ -883,20 +890,20 @@ function cardAccent(machineSlug) {
   }
 }
 
-function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }) {
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, onRequireAuth }) {
+  const [caption, setCaption] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [authPromptOpen, setAuthPromptOpen] = useState(false)
 
   const gameTitle = guideRow?.machines?.name || guideRow?.title || 'Game'
   const gameSlug = guideRow?.machines?.slug || guideRow?.slug || ''
 
   useEffect(() => {
     if (open) {
-      setTitle('')
-      setBody('')
+      setCaption('')
       setErr('')
+      setAuthPromptOpen(false)
     }
   }, [open, guideRow?.id])
 
@@ -905,8 +912,13 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }
   const submit = async (e) => {
     e.preventDefault()
     setErr('')
-    if (!body.trim()) {
-      setErr('Write your question in the details box.')
+    const cleanedCaption = caption.trim()
+    if (!cleanedCaption) {
+      setErr('Write a caption before posting.')
+      return
+    }
+    if (cleanedCaption.length > 280) {
+      setErr('Caption must be 280 characters or fewer.')
       return
     }
     setBusy(true)
@@ -915,18 +927,18 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }
         data: { session },
       } = await supabaseClient.auth.getSession()
       if (!session?.user) {
-        setErr('You must be signed in to post to the feed.')
+        setAuthPromptOpen(true)
         setBusy(false)
         return
       }
 
-      const header = `Guide: **${gameTitle}** (${gameSlug || 'no slug'})\nManufacturer: ${guideRow.machines?.manufacturer || '—'}\n`
-      const postTitle = (title.trim() || `Question · ${gameTitle}`).slice(0, 200)
-      const postBody = `${header}\n---\n\n${body.trim()}`
+      const postTitle = `Question · ${gameTitle}`.slice(0, 200)
+      const postBody = cleanedCaption
 
       const { error } = await supabaseClient.from('community_feed_posts').insert({
         game_slug: gameSlug || null,
         game_title: gameTitle,
+        caption: cleanedCaption,
         title: postTitle,
         body: postBody,
       })
@@ -934,10 +946,12 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }
       if (error) {
         if (error.message?.includes('relation') || error.code === '42P01') {
           setErr(
-            'Home feed table is not set up yet. Run `supabase/community_feed_posts.sql` in the Supabase SQL editor, then try again.'
+            `A required relation is missing in the active project (${ACTIVE_SUPABASE_HOST}). Run both SQL files in this same project: \`supabase/community_feed_posts.sql\` then \`supabase/feed_phase_a_profiles_public_read.sql\`. Details: ${error.message}`
           )
+        } else if (error.code === '42501') {
+          setErr(`Posting blocked by RLS/policy in ${ACTIVE_SUPABASE_HOST}. Details: ${error.message}`)
         } else {
-          setErr(error.message || 'Could not post.')
+          setErr(`Could not post (${error.code || 'unknown'}): ${error.message || 'Unknown database error.'}`)
         }
         setBusy(false)
         return
@@ -953,61 +967,106 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted }
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4 bg-black/60" role="dialog" aria-modal>
-      <button type="button" className="absolute inset-0 z-0 cursor-default" aria-label="Close" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-3xl bg-zinc-900 border border-zinc-700 shadow-2xl max-h-[90dvh] overflow-hidden flex flex-col">
-        <div className="p-5 border-b border-zinc-800 shrink-0">
-          <div className="text-white font-bold text-lg">Ask the community</div>
-          <div className="text-zinc-400 text-sm mt-1">
-            Posts to the <span className="text-cyan-300 font-semibold">Home</span> feed with this game tagged.
+    <>
+      <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4 bg-black/60" role="dialog" aria-modal>
+        <button type="button" className="absolute inset-0 z-0 cursor-default" aria-label="Close" onClick={onClose} />
+        <div className="relative z-10 w-full max-w-lg rounded-3xl bg-zinc-900 border border-zinc-700 shadow-2xl max-h-[90dvh] overflow-hidden flex flex-col">
+          <div className="p-5 border-b border-zinc-800 shrink-0">
+            <div className="text-white font-bold text-lg">Ask the community</div>
+            <div className="text-zinc-400 text-sm mt-1">
+              Posts to the <span className="text-cyan-300 font-semibold">Lounge</span> feed with this game tagged.
+            </div>
+            <div className="mt-3 rounded-2xl bg-zinc-800/80 px-3 py-2 text-sm text-amber-100 font-semibold">{gameTitle}</div>
           </div>
-          <div className="mt-3 rounded-2xl bg-zinc-800/80 px-3 py-2 text-sm text-amber-100 font-semibold">{gameTitle}</div>
+          <form noValidate onSubmit={submit} className="p-5 flex flex-col gap-3 min-h-0 flex-1 overflow-y-auto">
+            <label className="block flex-1 min-h-[8rem]">
+              <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Caption</span>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                rows={6}
+                className="mt-1 w-full rounded-2xl bg-zinc-950 border border-zinc-700 px-4 py-3 text-white text-base focus:outline-none focus:ring-2 focus:ring-cyan-500/40 resize-y min-h-[10rem]"
+                maxLength={280}
+                placeholder="Ask your question or share a quick read..."
+              />
+              <div className="mt-1 text-right text-xs text-zinc-500">{caption.length}/280</div>
+            </label>
+            {err ? (
+              <div className="rounded-2xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-sm leading-relaxed">
+                {err}
+              </div>
+            ) : null}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 min-h-12 rounded-2xl bg-zinc-800 text-zinc-100 font-bold touch-manipulation"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busy}
+                className="flex-1 min-h-12 rounded-2xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold touch-manipulation"
+              >
+                {busy ? 'Posting…' : 'Post to Lounge'}
+              </button>
+            </div>
+          </form>
         </div>
-        <form onSubmit={submit} className="p-5 flex flex-col gap-3 min-h-0 flex-1 overflow-y-auto">
-          <label className="block">
-            <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Subject (optional)</span>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full min-h-12 rounded-2xl bg-zinc-950 border border-zinc-700 px-4 py-3 text-white text-base focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              placeholder={`e.g. Denom on ${gameTitle} majors`}
-            />
-          </label>
-          <label className="block flex-1 min-h-[8rem]">
-            <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Your question</span>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={6}
-              className="mt-1 w-full rounded-2xl bg-zinc-950 border border-zinc-700 px-4 py-3 text-white text-base focus:outline-none focus:ring-2 focus:ring-cyan-500/40 resize-y min-h-[10rem]"
-              required
-              placeholder="Context, casino, photos you saw on the glass, what you need verified…"
-            />
-          </label>
-          {err ? <div className="text-red-300 text-sm leading-relaxed">{err}</div> : null}
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 min-h-12 rounded-2xl bg-zinc-800 text-zinc-100 font-bold touch-manipulation"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={busy}
-              className="flex-1 min-h-12 rounded-2xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold touch-manipulation"
-            >
-              {busy ? 'Posting…' : 'Post to Home'}
-            </button>
-          </div>
-        </form>
       </div>
-    </div>
+
+      {authPromptOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70" role="dialog" aria-modal>
+          <button
+            type="button"
+            className="absolute inset-0 z-0 cursor-default"
+            aria-label="Close auth prompt"
+            onClick={() => setAuthPromptOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5">
+            <div className="text-rose-200 text-sm font-semibold uppercase tracking-wide">Sign in required</div>
+            <div className="text-white text-lg font-bold mt-1">You must be signed in to post in Lounge</div>
+            <div className="text-zinc-400 text-sm mt-2 leading-relaxed">
+              Choose an option below to continue. Your caption is still here if you cancel and come back after signing in.
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => onRequireAuth?.('login')}
+                className="min-h-11 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold"
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                onClick={() => onRequireAuth?.('create')}
+                className="min-h-11 rounded-xl border border-zinc-600 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold"
+              >
+                Create account
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthPromptOpen(false)}
+                className="min-h-10 rounded-xl text-zinc-400 hover:text-zinc-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   )
 }
 
-export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavigateHome, onCommunityPosted }) {
+export default function GuidesScreen({
+  supabaseClient,
+  onOpenCalculator,
+  onNavigateHome,
+  onCommunityPosted,
+  onRequireAuth,
+}) {
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1420,6 +1479,7 @@ export default function GuidesScreen({ supabaseClient, onOpenCalculator, onNavig
         guideRow={askFor}
         onClose={() => setAskFor(null)}
         supabaseClient={supabaseClient}
+        onRequireAuth={onRequireAuth}
         onPosted={() => {
           onCommunityPosted?.()
           onNavigateHome?.()
