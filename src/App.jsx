@@ -583,9 +583,12 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const loungeFeedScrollRef = useRef(null)
     const loungeTitleBarRef = useRef(null)
     const loungeScrollPrevTopRef = useRef(0)
-    const loungeTitleRevealRef = useRef(1)
-    const loungeScrollVisualRafRef = useRef(0)
-    const composerFoldRevealRef = useRef(loungeComposerInitial.fold)
+    const loungeTitleRevealTargetRef = useRef(1)
+    const loungeTitleRevealSmoothRef = useRef(1)
+    const loungeScrollSmoothRafRef = useRef(0)
+    const loungeScrollSmoothingCancelRef = useRef(() => {})
+    const composerFoldTargetRef = useRef(loungeComposerInitial.fold)
+    const composerFoldSmoothRef = useRef(loungeComposerInitial.fold)
     const composerExpandedRef = useRef(loungeComposerInitial.expanded)
     const [loungeTitleBarHeight, setLoungeTitleBarHeight] = useState(0)
     const [loungeTitleReveal, setLoungeTitleReveal] = useState(1)
@@ -673,21 +676,50 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       const el = loungeFeedScrollRef.current
       if (!el || typeof window === 'undefined') return
       loungeScrollPrevTopRef.current = el.scrollTop
-      const revealPx = 160
-      const hidePx = 130
-      const revealDeltaCapPx = 36
-      const composerFoldPx = 140
-      const composerUnfoldPx = 160
+      const revealPx = 210
+      const hidePx = 175
+      const revealDeltaCapPx = 22
+      const composerFoldPx = 185
+      const composerUnfoldPx = 200
       /** When feed-folded, allow smooth reopen while scrollTop is within this distance of the top. */
       const composerUnfoldBandPx = 168
-      const queueScrollVisualFlush = () => {
-        if (loungeScrollVisualRafRef.current) return
-        loungeScrollVisualRafRef.current = window.requestAnimationFrame(() => {
-          loungeScrollVisualRafRef.current = 0
-          setLoungeTitleReveal(loungeTitleRevealRef.current)
-          setComposerFoldReveal(composerFoldRevealRef.current)
-        })
+      const titleSmoothK = 0.16
+      const composerSmoothK = 0.18
+      const smoothEpsilon = 0.0022
+
+      const cancelScrollSmoothing = () => {
+        if (loungeScrollSmoothRafRef.current) {
+          window.cancelAnimationFrame(loungeScrollSmoothRafRef.current)
+          loungeScrollSmoothRafRef.current = 0
+        }
       }
+      loungeScrollSmoothingCancelRef.current = cancelScrollSmoothing
+
+      const scheduleScrollSmoothing = () => {
+        if (loungeScrollSmoothRafRef.current) return
+        const tick = () => {
+          const titleT = loungeTitleRevealTargetRef.current
+          let titleS = loungeTitleRevealSmoothRef.current
+          titleS += (titleT - titleS) * titleSmoothK
+          if (Math.abs(titleT - titleS) < smoothEpsilon) titleS = titleT
+          loungeTitleRevealSmoothRef.current = titleS
+
+          const compT = composerFoldTargetRef.current
+          let compS = composerFoldSmoothRef.current
+          compS += (compT - compS) * composerSmoothK
+          if (Math.abs(compT - compS) < smoothEpsilon) compS = compT
+          composerFoldSmoothRef.current = compS
+
+          setLoungeTitleReveal(titleS)
+          setComposerFoldReveal(compS)
+
+          const continueSmooth =
+            Math.abs(titleT - titleS) > smoothEpsilon || Math.abs(compT - compS) > smoothEpsilon
+          loungeScrollSmoothRafRef.current = continueSmooth ? window.requestAnimationFrame(tick) : 0
+        }
+        loungeScrollSmoothRafRef.current = window.requestAnimationFrame(tick)
+      }
+
       const scrollDownPx = 14
       const onScroll = () => {
         const st = el.scrollTop
@@ -699,45 +731,54 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
             ? 0
             : Math.sign(rawDelta) * Math.min(Math.abs(rawDelta), revealDeltaCapPx)
 
-        let r = loungeTitleRevealRef.current
-        if (st <= 2) {
-          r = 1
-        } else if (eff < -0.5) {
-          r = Math.min(1, r + (-eff) / revealPx)
-        } else if (eff > 1.25) {
-          r = Math.max(0, r - eff / hidePx)
-        }
         let scrollVisualDirty = false
-        if (r !== loungeTitleRevealRef.current) {
-          loungeTitleRevealRef.current = r
-          scrollVisualDirty = true
+        if (st <= 2) {
+          if (loungeTitleRevealTargetRef.current !== 1 || loungeTitleRevealSmoothRef.current !== 1) {
+            loungeTitleRevealTargetRef.current = 1
+            loungeTitleRevealSmoothRef.current = 1
+            scrollVisualDirty = true
+          }
+        } else {
+          let r = loungeTitleRevealTargetRef.current
+          if (eff < -0.5) {
+            r = Math.min(1, r + (-eff) / revealPx)
+          } else if (eff > 1.25) {
+            r = Math.max(0, r - eff / hidePx)
+          }
+          if (r !== loungeTitleRevealTargetRef.current) {
+            loungeTitleRevealTargetRef.current = r
+            scrollVisualDirty = true
+          }
         }
 
         if (composerExpandedRef.current && eff > 0.2) {
-          if (st > scrollDownPx || composerFoldRevealRef.current < 0.998) {
-            const next = Math.max(0, composerFoldRevealRef.current - eff / composerFoldPx)
-            if (next !== composerFoldRevealRef.current) {
-              composerFoldRevealRef.current = next
+          if (st > scrollDownPx || composerFoldTargetRef.current < 0.998) {
+            const next = Math.max(0, composerFoldTargetRef.current - eff / composerFoldPx)
+            if (next !== composerFoldTargetRef.current) {
+              composerFoldTargetRef.current = next
               scrollVisualDirty = true
             }
           }
-          if (composerFoldRevealRef.current < 0.04 && composerExpandedRef.current) {
+          if (composerFoldTargetRef.current < 0.04 && composerExpandedRef.current) {
             composerExpandedRef.current = false
             setComposerExpanded(false)
-            composerFoldRevealRef.current = 0
+            composerFoldTargetRef.current = 0
+            composerFoldSmoothRef.current = 0
             setComposerFoldReveal(0)
             composerFoldedFromFeedScrollRef.current = true
+            cancelScrollSmoothing()
+            setLoungeTitleReveal(loungeTitleRevealSmoothRef.current)
             scrollVisualDirty = true
           }
         } else if (
           composerExpandedRef.current &&
-          composerFoldRevealRef.current < 0.995 &&
+          composerFoldTargetRef.current < 0.995 &&
           st <= composerUnfoldBandPx &&
           eff < -0.5
         ) {
-          const next = Math.min(1, composerFoldRevealRef.current + (-eff) / composerUnfoldPx)
-          if (next !== composerFoldRevealRef.current) {
-            composerFoldRevealRef.current = next
+          const next = Math.min(1, composerFoldTargetRef.current + (-eff) / composerUnfoldPx)
+          if (next !== composerFoldTargetRef.current) {
+            composerFoldTargetRef.current = next
             scrollVisualDirty = true
           }
         } else if (
@@ -749,26 +790,27 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
             if (!composerExpandedRef.current) {
               setComposerExpanded(true)
               composerExpandedRef.current = true
-              composerFoldRevealRef.current = Math.max(composerFoldRevealRef.current, 0.06)
+              composerFoldTargetRef.current = Math.max(composerFoldTargetRef.current, 0.06)
               scrollVisualDirty = true
             }
-            const next = Math.min(1, composerFoldRevealRef.current + (-eff) / composerUnfoldPx)
-            if (next !== composerFoldRevealRef.current) {
-              composerFoldRevealRef.current = next
+            const next = Math.min(1, composerFoldTargetRef.current + (-eff) / composerUnfoldPx)
+            if (next !== composerFoldTargetRef.current) {
+              composerFoldTargetRef.current = next
               scrollVisualDirty = true
             }
-            if (composerFoldRevealRef.current > 0.96) {
+            if (composerFoldTargetRef.current > 0.96) {
               composerFoldedFromFeedScrollRef.current = false
             }
           }
         }
 
-        if (scrollVisualDirty) queueScrollVisualFlush()
+        if (scrollVisualDirty) scheduleScrollSmoothing()
       }
       el.addEventListener('scroll', onScroll, { passive: true })
       return () => {
         el.removeEventListener('scroll', onScroll)
-        if (loungeScrollVisualRafRef.current) window.cancelAnimationFrame(loungeScrollVisualRafRef.current)
+        cancelScrollSmoothing()
+        loungeScrollSmoothingCancelRef.current = () => {}
       }
     }, [])
 
@@ -1047,7 +1089,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         setComposerMediaFile(null)
         setComposerMediaKind('')
         composerFoldedFromFeedScrollRef.current = false
-        composerFoldRevealRef.current = 0
+        loungeScrollSmoothingCancelRef.current()
+        composerFoldTargetRef.current = 0
+        composerFoldSmoothRef.current = 0
         setComposerFoldReveal(0)
         composerExpandedRef.current = false
         setComposerExpanded(false)
@@ -1209,7 +1253,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 setComposerMediaKind('')
                 setPostErr('')
                 composerFoldedFromFeedScrollRef.current = false
-                composerFoldRevealRef.current = 0
+                loungeScrollSmoothingCancelRef.current()
+                composerFoldTargetRef.current = 0
+                composerFoldSmoothRef.current = 0
                 setComposerFoldReveal(0)
                 composerExpandedRef.current = false
                 setComposerExpanded(false)
@@ -1277,7 +1323,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
             <div className={`min-w-0 flex-1 ${composerExpanded ? 'pr-8' : ''}`}>
               {composerExpanded ? (
                 <div
-                  className="overflow-hidden will-change-[max-height,opacity]"
+                  className="overflow-hidden will-change-[max-height,opacity] transition-[max-height,opacity] duration-150 ease-out"
                   style={{
                     maxHeight: `${Math.max(40, Math.round(composerFoldReveal * 340))}px`,
                     opacity: Math.min(1, 0.2 + 0.8 * composerFoldReveal),
@@ -1382,7 +1428,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   type="button"
                   onClick={() => {
                     composerFoldedFromFeedScrollRef.current = false
-                    composerFoldRevealRef.current = 1
+                    loungeScrollSmoothingCancelRef.current()
+                    composerFoldTargetRef.current = 1
+                    composerFoldSmoothRef.current = 1
                     setComposerFoldReveal(1)
                     composerExpandedRef.current = true
                     setComposerExpanded(true)
