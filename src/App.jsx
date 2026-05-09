@@ -736,8 +736,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const [loungePostDetailMenuOpen, setLoungePostDetailMenuOpen] = useState(false)
     const [loungePostDeleteConfirmOpen, setLoungePostDeleteConfirmOpen] = useState(false)
     const loungePostDetailVisibleRef = useRef(true)
-    /** Only finalize slide-out after an explicit user close — avoids spurious `transitionend` from the open animation (`visible` false→true). */
-    const loungePostDetailClosingIntentionalRef = useRef(false)
     const loungePostDetailMenuWrapRef = useRef(null)
     const loadMoreSentinelRef = useRef(null)
     const pullStartYRef = useRef(null)
@@ -1060,7 +1058,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     }
 
     const finalizeLoungePostDetailClose = useCallback(() => {
-      loungePostDetailClosingIntentionalRef.current = false
       setLoungePostDetail(null)
       setLoungePostDetailVisible(true)
       setLoungePostDetailMenuOpen(false)
@@ -1087,19 +1084,11 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         finalizeLoungePostDetailClose()
         return
       }
-      loungePostDetailClosingIntentionalRef.current = true
       setLoungePostDetailVisible(false)
     }, [finalizeLoungePostDetailClose])
 
     const openLoungePostDetail = useCallback((post) => {
       if (!post?.id) return
-      loungePostDetailClosingIntentionalRef.current = false
-      /** Same post already showing — avoids replaying the slide-out/in (often triggered by a stray tap on the row after save / keyboard on mobile). */
-      if (loungePostDetail?.id === post.id && loungePostDetailVisible) {
-        setLoungePostDetailMenuOpen(false)
-        setLoungePostDeleteConfirmOpen(false)
-        return
-      }
       setLoungeManageErr('')
       setLoungeDetailEditing(false)
       setLoungeDetailDraftCaption('')
@@ -1120,15 +1109,13 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => setLoungePostDetailVisible(true))
       })
-    }, [loungePostDetail?.id, loungePostDetailVisible])
+    }, [])
 
     const onLoungePostDetailPanelTransitionEnd = useCallback(
       (e) => {
         if (e.propertyName !== 'transform') return
         if (e.target !== e.currentTarget) return
         if (loungePostDetailVisibleRef.current) return
-        if (!loungePostDetailClosingIntentionalRef.current) return
-        loungePostDetailClosingIntentionalRef.current = false
         finalizeLoungePostDetailClose()
       },
       [finalizeLoungePostDetailClose]
