@@ -1,5 +1,8 @@
 -- Home feed posts (e.g. "Ask community" from slot guide cards).
 -- Run in Supabase SQL editor after local_intel / auth is in place.
+--
+-- Public read + profiles + moderation: apply `feed_phase_a_profiles_public_read.sql`
+-- afterward (drops/replaces the RLS policies defined below).
 
 create table if not exists public.community_feed_posts (
   id uuid primary key default gen_random_uuid(),

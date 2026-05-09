@@ -206,16 +206,37 @@ function AppShell({ onLogout, supabaseClient }) {
   const loadCommunityFeed = useCallback(async () => {
     setCommunityFeedLoading(true)
     try {
-      const { data, error } = await supabaseClient
+      const { data: rows, error } = await supabaseClient
         .from('community_feed_posts')
-        .select('id,title,body,game_title,created_at')
+        .select(
+          'id,title,body,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count'
+        )
+        .order('pinned', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(40)
       if (error) {
         setCommunityPosts([])
         return
       }
-      setCommunityPosts(data || [])
+      if (!rows?.length) {
+        setCommunityPosts([])
+        return
+      }
+      const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
+      let profileByUserId = {}
+      if (ids.length > 0) {
+        const { data: profiles } = await supabaseClient
+          .from('profiles')
+          .select('user_id,handle,display_name,avatar_url')
+          .in('user_id', ids)
+        profileByUserId = Object.fromEntries((profiles || []).map((p) => [p.user_id, p]))
+      }
+      setCommunityPosts(
+        rows.map((r) => ({
+          ...r,
+          author_profile: profileByUserId[r.user_id] || null,
+        }))
+      )
     } finally {
       setCommunityFeedLoading(false)
     }
@@ -380,16 +401,27 @@ function AppShell({ onLogout, supabaseClient }) {
 
   const SocialFeed = () => {
     const [postText, setPostText] = useState('')
-    const samplePosts = [
-      { id: 'a', user: 'VegasGrinder', time: '2h', body: 'Hit a clean bonus train on Buffalo Link. Ended +$620 after 90 min.' },
-      { id: 'b', user: 'SlotMathNerd', time: '4h', body: 'Anyone tracking fresh Must Hit By resets at South Point tonight?' },
-    ]
+    const displayLabel = useCallback((p) => {
+      const pr = p?.author_profile
+      if (pr?.handle) return `@${pr.handle}`
+      if (pr?.display_name) return pr.display_name
+      return 'Member'
+    }, [])
 
     return (
       <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className="mb-6">
-          <div className="text-white text-2xl font-black tracking-tight">Social Feed</div>
-          <div className="text-zinc-400 text-sm mt-0.5">Share plays, post media, and discuss live casino conditions</div>
+        <div className="mb-6 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-white text-2xl font-black tracking-tight">Social Feed</div>
+            <div className="text-zinc-400 text-sm mt-0.5">Share plays, post media, and discuss live casino conditions</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadCommunityFeed()}
+            className="shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200 touch-manipulation active:scale-[0.99]"
+          >
+            Refresh
+          </button>
         </div>
 
         <div className="rounded-3xl bg-zinc-900 p-5 mb-4">
@@ -423,20 +455,62 @@ function AppShell({ onLogout, supabaseClient }) {
         </div>
 
         <div className="space-y-3">
-          {samplePosts.map((post) => (
-            <div key={post.id} className="rounded-3xl bg-zinc-900 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-zinc-100 font-semibold">{post.user}</div>
-                <div className="text-zinc-500 text-xs">{post.time}</div>
-              </div>
-              <div className="text-zinc-300 text-sm mt-2 leading-relaxed">{post.body}</div>
-              <div className="mt-3 flex items-center gap-4 text-xs text-zinc-400">
-                <button type="button" className="hover:text-zinc-200">Like</button>
-                <button type="button" className="hover:text-zinc-200">Comment</button>
-                <button type="button" className="hover:text-zinc-200">Share</button>
-              </div>
+          {communityFeedLoading ? (
+            <div className="text-zinc-500 text-sm py-4">Loading feed…</div>
+          ) : communityPosts.length === 0 ? (
+            <div className="rounded-3xl bg-zinc-900 p-5 text-zinc-400 text-sm leading-relaxed">
+              No posts yet. Run{' '}
+              <code className="text-fuchsia-200/90">supabase/feed_phase_a_profiles_public_read.sql</code> in Supabase,
+              then post from Guides → Ask community.
             </div>
-          ))}
+          ) : (
+            communityPosts.map((post) => (
+              <article key={post.id} className="rounded-3xl bg-zinc-900 p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="text-zinc-100 font-semibold">{displayLabel(post)}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {post.pinned ? (
+                      <span className="rounded-lg bg-fuchsia-500/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-fuchsia-300">
+                        Pinned
+                      </span>
+                    ) : null}
+                    {post.game_title ? (
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-amber-400/90">{post.game_title}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-2 text-white font-semibold leading-snug">{post.title}</div>
+                <div className="text-zinc-300 text-sm mt-2 leading-relaxed whitespace-pre-wrap">{post.body}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-zinc-500">
+                  {post.created_at
+                    ? new Date(post.created_at).toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : ''}
+                  {typeof post.like_count === 'number' ? (
+                    <span className="text-zinc-400">{post.like_count} likes</span>
+                  ) : null}
+                  {typeof post.comment_count === 'number' ? (
+                    <span className="text-zinc-400">{post.comment_count} comments</span>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex items-center gap-4 text-xs text-zinc-400">
+                  <button type="button" className="rounded-lg px-1 py-1 hover:text-zinc-200">
+                    Like
+                  </button>
+                  <button type="button" className="rounded-lg px-1 py-1 hover:text-zinc-200">
+                    Comment
+                  </button>
+                  <button type="button" className="rounded-lg px-1 py-1 hover:text-zinc-200">
+                    Share
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </div>
     )
