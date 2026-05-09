@@ -37,6 +37,55 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+/** Lounge composer: last loaded profile for this browser (validated against session user id). */
+const LOUNGE_PROFILE_CACHE_KEY = 'lounge_composer_profile_v1'
+
+function readLoungeProfileCache(uid) {
+  if (!uid || typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(LOUNGE_PROFILE_CACHE_KEY)
+    if (!raw) return null
+    const o = JSON.parse(raw)
+    if (!o || o.user_id !== uid) return null
+    return {
+      user_id: o.user_id,
+      handle: o.handle ?? null,
+      display_name: o.display_name ?? null,
+      avatar_url: o.avatar_url ?? null,
+      bio: o.bio ?? '',
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeLoungeProfileCache(profile) {
+  if (!profile?.user_id || typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(
+      LOUNGE_PROFILE_CACHE_KEY,
+      JSON.stringify({
+        user_id: profile.user_id,
+        handle: profile.handle,
+        display_name: profile.display_name,
+        avatar_url: profile.avatar_url,
+        bio: profile.bio ?? '',
+      })
+    )
+  } catch {
+    // ignore
+  }
+}
+
+/** Stable two-letter fallback while `profiles` row is still loading (avoids me→uuid tone/letter flicker on HMR). */
+function composerStableInitialsFromUid(uid) {
+  const h = String(uid || '')
+    .replace(/-/g, '')
+    .replace(/[^a-f0-9]/gi, '')
+  if (h.length >= 2) return h.slice(0, 2).toUpperCase()
+  return '··'
+}
+
 // Mobile-first: min 16px text (iOS won’t auto-zoom), ~48px min tap height, notched device padding
 const mobileShell = 'min-h-dvh bg-gray-950 flex items-center justify-center overflow-y-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]'
 const inputBase = 'w-full min-h-12 text-base text-white bg-gray-800 rounded-2xl border-0 px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-orange-500/50 touch-manipulation'
@@ -102,6 +151,86 @@ function OAuthDivider() {
       </div>
     </div>
   )
+}
+
+/** Strip trailing punctuation often pasted after URLs in prose. */
+function trimUrlTrail(url) {
+  let u = String(url)
+  while (u.length > 0 && /[),.;:!?\]'"]+$/u.test(u)) {
+    u = u.slice(0, -1)
+  }
+  return u
+}
+
+function hrefForUrlDisplay(display) {
+  const d = String(display).trim()
+  if (!d) return ''
+  if (/^https?:\/\//iu.test(d)) return d
+  if (/^www\./iu.test(d)) return `https://${d}`
+  return ''
+}
+
+/**
+ * Lounge caption: `http(s)://…` and `www.…` links (opens new tab), plus Unicode `#tags` with `_` / `-`.
+ * @param {{ hashtagClassName?: string, linkClassName?: string }} [opts]
+ */
+function renderRichCaption(
+  text,
+  {
+    hashtagClassName = 'font-semibold text-cyan-400',
+    linkClassName = 'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+  } = {}
+) {
+  const s = String(text ?? '')
+  if (!s) return null
+  const out = []
+  let rk = 0
+  const pushHashtagParsed = (fragment) => {
+    if (!fragment) return
+    let last = 0
+    const re = /#(?:[\p{L}\p{N}_-]+)/gu
+    let m
+    while ((m = re.exec(fragment)) !== null) {
+      if (m.index > last) out.push(fragment.slice(last, m.index))
+      out.push(
+        <span key={`rk-h-${rk++}`} className={hashtagClassName}>
+          {m[0]}
+        </span>
+      )
+      last = m.index + m[0].length
+    }
+    if (last < fragment.length) out.push(fragment.slice(last))
+  }
+
+  let last = 0
+  const urlRe = /https?:\/\/[^\s<>"']+|www\.[^\s<>"']+/gi
+  let um
+  while ((um = urlRe.exec(s)) !== null) {
+    const raw = um[0]
+    const display = trimUrlTrail(raw)
+    const href = hrefForUrlDisplay(display)
+    if (um.index > last) {
+      pushHashtagParsed(s.slice(last, um.index))
+    }
+    if (href) {
+      out.push(
+        <a
+          key={`rk-u-${rk++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClassName}
+        >
+          {display}
+        </a>
+      )
+    } else {
+      pushHashtagParsed(display || raw)
+    }
+    last = um.index + raw.length
+  }
+  if (last < s.length) pushHashtagParsed(s.slice(last))
+  return out.length ? out : null
 }
 
 function GoogleIcon() {
@@ -580,6 +709,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const pullTriggeredRef = useRef(false)
     const composerMediaInputRef = useRef(null)
     const composerTextareaRef = useRef(null)
+    const composerMirrorRef = useRef(null)
     const loungeFeedScrollRef = useRef(null)
     const loungeTitleBarRef = useRef(null)
     const loungeScrollPrevTopRef = useRef(0)
@@ -632,6 +762,13 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         el.focus()
       }
     }, [composerExpanded, composerFoldReveal])
+
+    useLayoutEffect(() => {
+      const ta = composerTextareaRef.current
+      const m = composerMirrorRef.current
+      if (!ta || !m) return
+      m.scrollTop = ta.scrollTop
+    }, [postText])
 
     useLayoutEffect(() => {
       const bar = loungeTitleBarRef.current
@@ -870,8 +1007,15 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         setComposerUserId(uid)
         if (!uid) {
           setComposerUserProfile(null)
+          try {
+            window.sessionStorage.removeItem(LOUNGE_PROFILE_CACHE_KEY)
+          } catch {
+            // ignore
+          }
           return
         }
+        const cached = readLoungeProfileCache(uid)
+        if (cached) setComposerUserProfile(cached)
         const { data } = await supabaseClient
           .from('profiles')
           .select('user_id,handle,display_name,avatar_url,bio')
@@ -879,11 +1023,19 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           .maybeSingle()
         if (cancelled) return
         setComposerUserProfile(data || null)
+        if (data) writeLoungeProfileCache(data)
+        else {
+          try {
+            window.sessionStorage.removeItem(LOUNGE_PROFILE_CACHE_KEY)
+          } catch {
+            // ignore
+          }
+        }
       })()
       return () => {
         cancelled = true
       }
-    }, [supabaseClient, communityPosts.length])
+    }, [supabaseClient])
 
     useEffect(() => {
       if (typeof window === 'undefined') return
@@ -1256,23 +1408,26 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               >
                 {composerUserProfile?.avatar_url ? (
                   <img
+                    key={composerUserProfile.avatar_url}
                     src={composerUserProfile.avatar_url}
                     alt=""
                     className="h-full w-full rounded-full object-cover"
-                    loading="lazy"
+                    loading="eager"
                     decoding="async"
                   />
                 ) : (
                   <span
                     className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarToneClass(
-                      composerUserProfile?.user_id || composerUserId || composerUserProfile?.display_name || 'me'
+                      composerUserProfile?.user_id || composerUserId || 'me'
                     )}`}
                   >
-                    {avatarText({
-                      author_profile: {
-                        display_name: composerUserProfile?.display_name || composerUserProfile?.handle || 'Me',
-                      },
-                    })}
+                    {composerUserProfile?.display_name?.trim() || composerUserProfile?.handle?.trim()
+                      ? avatarText({ author_profile: composerUserProfile })
+                      : composerUserId
+                        ? composerStableInitialsFromUid(composerUserId)
+                        : avatarText({
+                            author_profile: { display_name: 'Me', handle: '' },
+                          })}
                   </span>
                 )}
               </button>
@@ -1287,14 +1442,35 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   }}
                 >
                   <div className="pr-8">
-                    <textarea
-                      ref={composerTextareaRef}
-                      value={postText}
-                      onChange={(e) => setPostText(e.target.value)}
-                      className="w-full min-h-[6.5rem] resize-none touch-manipulation bg-transparent px-0 py-0 pt-[18px] text-[17px] leading-[1.25] text-white outline-none placeholder:text-[17px] placeholder:leading-[1.25] placeholder:text-zinc-500"
-                      placeholder="Are you winning, son?"
-                      maxLength={280}
-                    />
+                    <div className="grid min-h-[6.5rem] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
+                      <div
+                        ref={composerMirrorRef}
+                        aria-hidden
+                        className="pointer-events-none min-h-[6.5rem] w-full overflow-y-auto whitespace-pre-wrap break-words border border-transparent px-0 py-0 pt-[18px] text-left text-[17px] leading-[1.25] text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      >
+                        {postText ? (
+                          renderRichCaption(postText, {
+                            linkClassName:
+                              'pointer-events-none font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+                          })
+                        ) : (
+                          <span className="text-zinc-500">Are you winning, son?</span>
+                        )}
+                      </div>
+                      <textarea
+                        ref={composerTextareaRef}
+                        value={postText}
+                        onChange={(e) => setPostText(e.target.value)}
+                        onScroll={(e) => {
+                          const m = composerMirrorRef.current
+                          if (m) m.scrollTop = e.currentTarget.scrollTop
+                        }}
+                        className="z-10 min-h-[6.5rem] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[18px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25"
+                        placeholder=""
+                        aria-label="Lounge post caption"
+                        maxLength={280}
+                      />
+                    </div>
                     {postErr ? (
                       <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[17px] leading-tight text-rose-200">
                         {postErr}
@@ -1319,7 +1495,14 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                       .split('\n')[0]
                       .trim()
                     if (firstLine) {
-                      return <span className="block w-full min-w-0 truncate text-zinc-100">{firstLine}</span>
+                      return (
+                        <span className="block w-full min-w-0 truncate text-left text-zinc-100 [&_a]:pointer-events-none">
+                          {renderRichCaption(firstLine, {
+                            linkClassName:
+                              'pointer-events-none font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70',
+                          })}
+                        </span>
+                      )
                     }
                     if (composerMediaFile) {
                       return (
@@ -1509,7 +1692,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         <div className="mt-1.5 text-white text-[17px] font-semibold leading-tight">{post.title}</div>
                       ) : null}
                       <div className="mt-1.5 text-zinc-200 text-[17px] leading-tight whitespace-pre-wrap">
-                        {post.caption || post.body || post.title || ''}
+                        {renderRichCaption(post.caption || post.body || post.title || '')}
                       </div>
                       <div className="mt-2 grid grid-cols-5 items-center text-[14px]">
                         <button
@@ -1660,7 +1843,11 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         ) : null}
                       </div>
                       <div className="mt-1.5 text-zinc-100 text-[15px] leading-relaxed whitespace-pre-wrap">
-                        {p.caption || p.body || p.title || ''}
+                        {renderRichCaption(p.caption || p.body || p.title || '', {
+                          hashtagClassName: 'font-semibold text-cyan-300',
+                          linkClassName:
+                            'font-medium text-sky-300 underline underline-offset-2 decoration-sky-300/70 break-words',
+                        })}
                       </div>
                     </div>
                   ))
@@ -4225,7 +4412,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   <div key={p.id} className="rounded-2xl bg-zinc-800/70 p-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <div className="text-zinc-200 font-semibold">
-                        {p.caption || p.body || p.title || 'Post'}
+                        {renderRichCaption(p.caption || p.body || p.title || 'Post', {
+                          hashtagClassName: 'font-semibold text-cyan-400',
+                        })}
                       </div>
                       {p.game_title ? (
                         <span className="text-[11px] font-bold uppercase tracking-wide text-amber-400/90 shrink-0">{p.game_title}</span>
