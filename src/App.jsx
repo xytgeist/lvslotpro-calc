@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import 'react-datepicker/dist/react-datepicker.css'
 import PhoenixLink from './calculators/PhoenixLink'
@@ -510,6 +510,23 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const pullStartYRef = useRef(null)
     const pullTriggeredRef = useRef(false)
     const composerMediaInputRef = useRef(null)
+    const composerTextareaRef = useRef(null)
+    const loungeFeedPullZoneRef = useRef(null)
+    /** Pull-to-refresh: higher gain + cap = longer, looser travel before rubber-band limit. */
+    const pullRefreshThresholdPx = 88
+    const pullMaxVisualPx = 240
+    const pullFingerGain = 0.9
+
+    useLayoutEffect(() => {
+      if (!composerExpanded) return
+      const el = composerTextareaRef.current
+      if (!el) return
+      try {
+        el.focus({ preventScroll: true })
+      } catch {
+        el.focus()
+      }
+    }, [composerExpanded])
 
     const displayLabel = useCallback((p) => {
       const pr = p?.author_profile
@@ -644,7 +661,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
 
     useEffect(() => {
       if (typeof window === 'undefined') return
-      const thresholdPx = 84
+      const zone = loungeFeedPullZoneRef.current
+      if (!zone) return
+      const thresholdPx = pullRefreshThresholdPx
 
       const onTouchStart = (e) => {
         if (window.scrollY > 0) {
@@ -665,7 +684,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           setPullDistance(0)
           return
         }
-        const eased = Math.min(120, Math.floor(dy * 0.55))
+        const eased = Math.min(pullMaxVisualPx, Math.floor(dy * pullFingerGain))
         setPullDistance(eased)
       }
 
@@ -684,15 +703,15 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         }
       }
 
-      window.addEventListener('touchstart', onTouchStart, { passive: true })
-      window.addEventListener('touchmove', onTouchMove, { passive: true })
-      window.addEventListener('touchend', onTouchEnd, { passive: true })
-      window.addEventListener('touchcancel', onTouchEnd, { passive: true })
+      zone.addEventListener('touchstart', onTouchStart, { passive: true })
+      zone.addEventListener('touchmove', onTouchMove, { passive: true })
+      zone.addEventListener('touchend', onTouchEnd, { passive: true })
+      zone.addEventListener('touchcancel', onTouchEnd, { passive: true })
       return () => {
-        window.removeEventListener('touchstart', onTouchStart)
-        window.removeEventListener('touchmove', onTouchMove)
-        window.removeEventListener('touchend', onTouchEnd)
-        window.removeEventListener('touchcancel', onTouchEnd)
+        zone.removeEventListener('touchstart', onTouchStart)
+        zone.removeEventListener('touchmove', onTouchMove)
+        zone.removeEventListener('touchend', onTouchEnd)
+        zone.removeEventListener('touchcancel', onTouchEnd)
       }
     }, [loadCommunityFeed, pullDistance, pullRefreshing])
 
@@ -889,18 +908,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     return (
       <div className="max-w-2xl mx-auto pb-4">
         <div className="sticky top-[max(0px,env(safe-area-inset-top))] z-20 border-b border-zinc-800/95 bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80">
-          <div
-            className="overflow-hidden transition-[max-height,opacity] duration-200"
-            style={{ maxHeight: pullRefreshing || pullDistance > 0 ? '2rem' : '0rem', opacity: pullRefreshing || pullDistance > 0 ? 1 : 0 }}
-          >
-            <div className="px-3 py-1 text-center text-[11px] text-zinc-400">
-              {pullRefreshing
-                ? 'Refreshing lounge…'
-                : pullDistance >= 84
-                  ? 'Release to refresh'
-                  : 'Pull down to refresh'}
-            </div>
-          </div>
           <div className="px-3 py-2.5 flex items-center justify-between gap-3">
             <div>
               <div className="text-white text-xl font-black tracking-tight">Lounge</div>
@@ -911,147 +918,159 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         </div>
 
         <div className="border-b border-zinc-800 bg-zinc-950/65 px-3 py-3">
-          <div className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2.5">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 w-8 shrink-0 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() =>
-                    composerUserId
-                      ? void openProfileModal({
-                          user_id: composerUserId,
-                          author_profile: composerUserProfile,
-                        })
-                      : null
-                  }
-                  className="h-8 w-8 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 text-xs font-bold flex items-center justify-center overflow-hidden"
-                  title="Open your profile"
-                  aria-label="Open your profile"
-                >
-                  {composerUserProfile?.avatar_url ? (
-                    <img
-                      src={composerUserProfile.avatar_url}
-                      alt=""
-                      className="h-full w-full rounded-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <span
-                      className={`h-full w-full flex items-center justify-center text-white font-bold ${avatarToneClass(
-                        composerUserProfile?.user_id || composerUserId || composerUserProfile?.display_name || 'me'
-                      )}`}
-                    >
-                      {avatarText({
-                        author_profile: {
-                          display_name: composerUserProfile?.display_name || composerUserProfile?.handle || 'Me',
-                        },
-                      })}
-                    </span>
-                  )}
-                </button>
-              </div>
-              <div className="min-w-0 flex-1">
-            {composerExpanded ? (
-              <>
-                <textarea
-                  value={postText}
-                  onChange={(e) => setPostText(e.target.value)}
-                  className="w-full min-h-20 bg-transparent text-[16px] leading-snug text-white outline-none placeholder:text-zinc-500 placeholder:text-[16px] resize-none touch-manipulation"
-                  placeholder="Ask a question or drop quick floor intel..."
-                  maxLength={280}
-                />
-                {postErr ? (
-                  <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-[16px] leading-relaxed">
-                    {postErr}
-                  </div>
-                ) : null}
-              </>
-            ) : (
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex w-11 shrink-0 justify-center">
               <button
                 type="button"
-                onClick={() => setComposerExpanded(true)}
-                className="w-full min-h-11 text-left text-[16px] text-zinc-500 touch-manipulation"
+                onClick={() =>
+                  composerUserId
+                    ? void openProfileModal({
+                        user_id: composerUserId,
+                        author_profile: composerUserProfile,
+                      })
+                    : null
+                }
+                className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-sm font-bold text-zinc-200"
+                title="Open your profile"
+                aria-label="Open your profile"
               >
-                Are you winning, son?
+                {composerUserProfile?.avatar_url ? (
+                  <img
+                    src={composerUserProfile.avatar_url}
+                    alt=""
+                    className="h-full w-full rounded-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <span
+                    className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarToneClass(
+                      composerUserProfile?.user_id || composerUserId || composerUserProfile?.display_name || 'me'
+                    )}`}
+                  >
+                    {avatarText({
+                      author_profile: {
+                        display_name: composerUserProfile?.display_name || composerUserProfile?.handle || 'Me',
+                      },
+                    })}
+                  </span>
+                )}
               </button>
-            )}
-              </div>
             </div>
-            {composerExpanded ? (
-              <>
-                <input
-                  ref={composerMediaInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null
-                    if (!file) return
-                    const mime = String(file.type || '').toLowerCase()
-                    if (mime.startsWith('image/')) {
-                      setComposerMediaKind('image')
-                      setComposerMediaFile(file)
-                      return
-                    }
-                    if (mime.startsWith('video/')) {
-                      setComposerMediaKind('video')
-                      setComposerMediaFile(file)
-                      return
-                    }
-                    setPostErr('Unsupported media type. Please choose an image or video file.')
-                  }}
-                />
-                <div className="mt-2 flex items-center gap-3">
-                  <div className="mt-0.5 flex w-8 shrink-0 justify-center items-center">
-                    <button
-                      type="button"
-                      onClick={() => composerMediaInputRef.current?.click()}
-                      className="min-h-8 min-w-8 shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-zinc-300 hover:text-zinc-100"
-                      title="Add media"
-                      aria-label="Add media"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden>
-                        <path d="M4.75 4.75h10.5a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 01-1.5 1.5H4.75a1.5 1.5 0 01-1.5-1.5v-7.5a1.5 1.5 0 011.5-1.5z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M7 9.25l1.75 1.75 3.25-3.25 2.5 2.5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-                        <circle cx="7" cy="7.25" r=".9" fill="currentColor" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1 pr-2">
-                      {composerMediaFile ? (
-                        <span className="block truncate text-[16px] text-zinc-400">
-                          {composerMediaKind === 'video' ? 'Video' : 'Image'} selected
-                        </span>
-                      ) : null}
+            <div className="min-w-0 flex-1">
+              {composerExpanded ? (
+                <>
+                  <textarea
+                    ref={composerTextareaRef}
+                    value={postText}
+                    onChange={(e) => setPostText(e.target.value)}
+                    className="w-full min-h-20 resize-none touch-manipulation bg-transparent text-[16px] leading-snug text-white outline-none placeholder:text-[16px] placeholder:text-zinc-500"
+                    placeholder="Are you winning, son?"
+                    maxLength={280}
+                  />
+                  {postErr ? (
+                    <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[16px] leading-relaxed text-rose-200">
+                      {postErr}
                     </div>
-                    <div className="inline-flex shrink-0 items-center gap-2">
-                      <span className="text-[16px] tabular-nums text-zinc-500">{postText.length}/280</span>
-                      <button
-                        type="button"
-                        onClick={() => setComposerExpanded(false)}
-                        className="min-h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-[16px] font-semibold text-zinc-300 touch-manipulation"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void submitLoungePost()}
-                        disabled={postBusy}
-                        className="min-h-10 rounded-lg bg-cyan-600 px-4 text-[16px] font-bold text-white disabled:opacity-60 touch-manipulation"
-                      >
-                        {postBusy ? 'Posting…' : 'Post'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : null}
+                  ) : null}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setComposerExpanded(true)}
+                  className="min-h-11 w-full touch-manipulation text-left text-[16px] text-zinc-500"
+                >
+                  Are you winning, son?
+                </button>
+              )}
+            </div>
           </div>
+          {composerExpanded ? (
+            <>
+              <input
+                ref={composerMediaInputRef}
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null
+                  if (!file) return
+                  const mime = String(file.type || '').toLowerCase()
+                  if (mime.startsWith('image/')) {
+                    setComposerMediaKind('image')
+                    setComposerMediaFile(file)
+                    return
+                  }
+                  if (mime.startsWith('video/')) {
+                    setComposerMediaKind('video')
+                    setComposerMediaFile(file)
+                    return
+                  }
+                  setPostErr('Unsupported media type. Please choose an image or video file.')
+                }}
+              />
+              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-0.5 flex w-11 shrink-0 items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => composerMediaInputRef.current?.click()}
+                  className="min-h-9 min-w-9 shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-zinc-300 hover:text-zinc-100"
+                  title="Add media"
+                  aria-label="Add media"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden>
+                    <path d="M4.75 4.75h10.5a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 01-1.5 1.5H4.75a1.5 1.5 0 01-1.5-1.5v-7.5a1.5 1.5 0 011.5-1.5z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M7 9.25l1.75 1.75 3.25-3.25 2.5 2.5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="7" cy="7.25" r=".9" fill="currentColor" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <div className="min-w-0 flex-1 pr-2">
+                  {composerMediaFile ? (
+                    <span className="block truncate text-[16px] text-zinc-400">
+                      {composerMediaKind === 'video' ? 'Video' : 'Image'} selected
+                    </span>
+                  ) : null}
+                </div>
+                <div className="inline-flex shrink-0 items-center gap-2">
+                  <span className="text-[16px] tabular-nums text-zinc-500">{postText.length}/280</span>
+                  <button
+                    type="button"
+                    onClick={() => setComposerExpanded(false)}
+                    className="min-h-10 touch-manipulation rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-[16px] font-semibold text-zinc-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitLoungePost()}
+                    disabled={postBusy}
+                    className="min-h-10 touch-manipulation rounded-lg bg-cyan-600 px-4 text-[16px] font-bold text-white disabled:opacity-60"
+                  >
+                    {postBusy ? 'Posting…' : 'Post'}
+                  </button>
+                </div>
+              </div>
+              </div>
+            </>
+          ) : null}
         </div>
 
-        <div className="border-b border-zinc-800">
+        <div ref={loungeFeedPullZoneRef} className="min-h-0">
+          <div
+            className="overflow-hidden transition-[max-height,opacity] duration-200"
+            style={{ maxHeight: pullRefreshing || pullDistance > 0 ? '2rem' : '0rem', opacity: pullRefreshing || pullDistance > 0 ? 1 : 0 }}
+          >
+            <div className="px-3 py-1 text-center text-[11px] text-zinc-400">
+              {pullRefreshing
+                ? 'Refreshing lounge…'
+                : pullDistance >= pullRefreshThresholdPx
+                  ? 'Release to refresh'
+                  : 'Pull down to refresh'}
+            </div>
+          </div>
+          <div className="border-b border-zinc-800">
           {communityFeedLoading ? (
             <div className="px-3 py-4 text-zinc-400 text-sm">Loading lounge…</div>
           ) : communityPosts.length === 0 ? (
@@ -1214,6 +1233,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               ) : null}
             </>
           )}
+          </div>
         </div>
 
         {profileModalOpen ? (
