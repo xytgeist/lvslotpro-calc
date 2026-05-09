@@ -128,6 +128,8 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
   const [communityFeedLoadingMore, setCommunityFeedLoadingMore] = useState(false)
   const [communityFeedHasMore, setCommunityFeedHasMore] = useState(false)
   const [communityFeedCursor, setCommunityFeedCursor] = useState(null)
+  /** True while the first page of the Lounge feed is being reloaded (including silent pull-to-refresh). */
+  const communityFeedHeadReloadingRef = useRef(false)
   const iosPwaGlobalPromptShownRef = useRef(false)
   const [globalConfirmState, setGlobalConfirmState] = useState({
     open: false,
@@ -236,9 +238,13 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     [supabaseClient]
   )
 
-  const loadCommunityFeed = useCallback(async () => {
-    setCommunityFeedLoading(true)
-    setCommunityFeedLoadingMore(false)
+  const loadCommunityFeed = useCallback(async (opts) => {
+    const silent = opts?.silent === true
+    if (!silent) {
+      setCommunityFeedLoading(true)
+      setCommunityFeedLoadingMore(false)
+    }
+    communityFeedHeadReloadingRef.current = true
     try {
       const selectCols =
         'id,caption,title,body,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count'
@@ -277,12 +283,20 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       setCommunityFeedHasMore(hasMore)
       setCommunityFeedCursor(pageLast ? { created_at: pageLast.created_at, id: pageLast.id } : null)
     } finally {
-      setCommunityFeedLoading(false)
+      communityFeedHeadReloadingRef.current = false
+      if (!silent) setCommunityFeedLoading(false)
     }
   }, [COMMUNITY_FEED_PAGE_SIZE, hydrateCommunityPosts, supabaseClient])
 
   const loadMoreCommunityFeed = useCallback(async () => {
-    if (!communityFeedHasMore || !communityFeedCursor || communityFeedLoading || communityFeedLoadingMore) return
+    if (
+      !communityFeedHasMore ||
+      !communityFeedCursor ||
+      communityFeedLoading ||
+      communityFeedLoadingMore ||
+      communityFeedHeadReloadingRef.current
+    )
+      return
     setCommunityFeedLoadingMore(true)
     try {
       const cursorFilter = `created_at.lt.${communityFeedCursor.created_at},and(created_at.eq.${communityFeedCursor.created_at},id.lt.${communityFeedCursor.id})`
@@ -479,10 +493,61 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     )
   }
 
+  const LOUNGE_COMPOSER_DRAFT_KEY = 'lounge_composer_draft_v1'
+  const readLoungeComposerDraft = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = sessionStorage.getItem(LOUNGE_COMPOSER_DRAFT_KEY)
+      if (!raw) return null
+      const o = JSON.parse(raw)
+      if (!o || typeof o !== 'object') return null
+      const postText = typeof o.postText === 'string' ? o.postText.slice(0, 280) : ''
+      const composerExpanded = o.composerExpanded === true
+      return { postText, composerExpanded }
+    } catch {
+      return null
+    }
+  }
+  const persistLoungeComposerDraft = (text, expanded, mediaFile) => {
+    if (typeof window === 'undefined') return
+    try {
+      const hasText = String(text || '').trim().length > 0
+      const hasMedia = !!mediaFile
+      if (!hasText && !expanded && !hasMedia) {
+        sessionStorage.removeItem(LOUNGE_COMPOSER_DRAFT_KEY)
+        return
+      }
+      sessionStorage.setItem(
+        LOUNGE_COMPOSER_DRAFT_KEY,
+        JSON.stringify({
+          postText: String(text || '').slice(0, 280),
+          composerExpanded: expanded === true,
+        })
+      )
+    } catch {
+      // Quota or private mode — ignore.
+    }
+  }
+  const clearLoungeComposerDraft = () => {
+    if (typeof window === 'undefined') return
+    try {
+      sessionStorage.removeItem(LOUNGE_COMPOSER_DRAFT_KEY)
+    } catch {
+      // ignore
+    }
+  }
+
   const SocialFeed = () => {
     const BOOKMARKS_STORAGE_KEY = 'lounge_bookmarks_v1'
-    const [postText, setPostText] = useState('')
-    const [composerExpanded, setComposerExpanded] = useState(false)
+    const [postText, setPostText] = useState(() => {
+      const d = readLoungeComposerDraft()
+      return d?.postText ?? ''
+    })
+    const [composerExpanded, setComposerExpanded] = useState(() => {
+      const d = readLoungeComposerDraft()
+      if (!d) return false
+      return d.composerExpanded || d.postText.length > 0
+    })
     const [composerMediaFile, setComposerMediaFile] = useState(null)
     const [composerMediaKind, setComposerMediaKind] = useState('')
     const [postBusy, setPostBusy] = useState(false)
@@ -512,6 +577,30 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const composerMediaInputRef = useRef(null)
     const composerTextareaRef = useRef(null)
     const loungeFeedScrollRef = useRef(null)
+    const composerDraftFlushRef = useRef({ postText: '', composerExpanded: false, composerMediaFile: null })
+    composerDraftFlushRef.current = { postText, composerExpanded, composerMediaFile }
+
+    useEffect(() => {
+      persistLoungeComposerDraft(postText, composerExpanded, composerMediaFile)
+    }, [postText, composerExpanded, composerMediaFile])
+
+    useEffect(() => {
+      if (typeof window === 'undefined') return
+      const flush = () => {
+        const { postText: t, composerExpanded: ex, composerMediaFile: f } = composerDraftFlushRef.current
+        persistLoungeComposerDraft(t, ex, f)
+      }
+      window.addEventListener('pagehide', flush)
+      const onVis = () => {
+        if (document.visibilityState === 'hidden') flush()
+      }
+      document.addEventListener('visibilitychange', onVis)
+      return () => {
+        window.removeEventListener('pagehide', flush)
+        document.removeEventListener('visibilitychange', onVis)
+      }
+    }, [])
+
     /** Pull-to-refresh: 1:1-ish finger travel in the feed scroller; cap avoids runaway state. */
     const pullRefreshThresholdPx = 88
     const pullMaxVisualPx = 300
@@ -696,7 +785,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         pullTriggeredRef.current = true
         setPullRefreshing(true)
         try {
-          await loadCommunityFeed()
+          await loadCommunityFeed({ silent: true })
         } finally {
           setPullRefreshing(false)
           pullTriggeredRef.current = false
@@ -716,7 +805,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     }, [loadCommunityFeed, pullDistance, pullRefreshing])
 
     useEffect(() => {
-      if (!communityFeedHasMore || communityFeedLoadingMore || communityFeedLoading) return
+      if (!communityFeedHasMore || communityFeedLoadingMore || communityFeedLoading || pullRefreshing) return
       const root = loungeFeedScrollRef.current
       const node = loadMoreSentinelRef.current
       if (!root || !node || typeof window === 'undefined' || !('IntersectionObserver' in window)) return
@@ -729,7 +818,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       )
       observer.observe(node)
       return () => observer.disconnect()
-    }, [communityFeedHasMore, communityFeedLoading, communityFeedLoadingMore, loadMoreCommunityFeed])
+    }, [communityFeedHasMore, communityFeedLoading, communityFeedLoadingMore, loadMoreCommunityFeed, pullRefreshing])
 
     const submitLoungePost = useCallback(async () => {
       const caption = postText.trim()
@@ -803,6 +892,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         setComposerMediaFile(null)
         setComposerMediaKind('')
         setComposerExpanded(false)
+        clearLoungeComposerDraft()
         setAuthPromptOpen(false)
         await loadCommunityFeed()
       } finally {
@@ -988,6 +1078,11 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           </div>
           {composerExpanded ? (
             <>
+              <div
+                className="mt-3 h-px w-auto max-w-full bg-zinc-700/85 mx-5 sm:mx-8"
+                role="presentation"
+                aria-hidden
+              />
               <input
                 ref={composerMediaInputRef}
                 type="file"
@@ -1011,21 +1106,33 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 }}
               />
               <div className="mt-2 flex items-center gap-4">
-              <div className="mt-0.5 flex w-[3.3rem] shrink-0 items-center justify-center">
                 <button
                   type="button"
                   onClick={() => composerMediaInputRef.current?.click()}
-                  className="min-h-7 min-w-7 shrink-0 rounded-md border border-zinc-700 bg-zinc-900 px-1 text-zinc-300 hover:text-zinc-100"
+                  className="mt-0.5 flex shrink-0 touch-manipulation items-center justify-center rounded-md p-2.5 text-zinc-500 hover:text-zinc-200 active:text-white [-webkit-tap-highlight-color:transparent]"
                   title="Add media"
                   aria-label="Add media"
                 >
-                  <svg className="h-[11px] w-[11px]" viewBox="0 0 20 20" fill="none" aria-hidden>
-                    <path d="M4.75 4.75h10.5a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 01-1.5 1.5H4.75a1.5 1.5 0 01-1.5-1.5v-7.5a1.5 1.5 0 011.5-1.5z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M7 9.25l1.75 1.75 3.25-3.25 2.5 2.5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="7" cy="7.25" r=".9" fill="currentColor" />
+                  <svg className="h-7 w-7" viewBox="0 0 20 20" fill="none" aria-hidden>
+                    <rect
+                      x="3.75"
+                      y="3.75"
+                      width="12.5"
+                      height="12.5"
+                      rx="2"
+                      stroke="currentColor"
+                      strokeWidth="1.35"
+                    />
+                    <path
+                      d="M6.25 13.25 8.25 10.25l1.75 2 2.25-3 3.5 4"
+                      stroke="currentColor"
+                      strokeWidth="1.25"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="8" cy="8" r="0.9" fill="currentColor" />
                   </svg>
                 </button>
-              </div>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <div className="min-w-0 flex-1 pr-2">
                   {composerMediaFile ? (
@@ -1035,7 +1142,11 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   ) : null}
                 </div>
                 <div className="inline-flex shrink-0 items-center gap-1">
-                  <span className="text-[11px] tabular-nums text-zinc-500">{postText.length}/280</span>
+                  {postText.length >= 280 ? (
+                    <span className="text-[11px] tabular-nums font-semibold text-rose-400" aria-live="polite">
+                      {postText.length}/280
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => setComposerExpanded(false)}
