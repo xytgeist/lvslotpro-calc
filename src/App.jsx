@@ -702,6 +702,8 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const [bookmarkedByPost, setBookmarkedByPost] = useState({})
     const [composerUserId, setComposerUserId] = useState('')
     const [composerUserProfile, setComposerUserProfile] = useState(null)
+    /** False until first `getSession()` completes — avoids flashing guest "ME" while auth is unknown. */
+    const [composerAuthResolved, setComposerAuthResolved] = useState(false)
     const [pullDistance, setPullDistance] = useState(0)
     const [pullRefreshing, setPullRefreshing] = useState(false)
     const loadMoreSentinelRef = useRef(null)
@@ -999,37 +1001,41 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     useEffect(() => {
       let cancelled = false
       ;(async () => {
-        const {
-          data: { session },
-        } = await supabaseClient.auth.getSession()
-        const uid = session?.user?.id || ''
-        if (cancelled) return
-        setComposerUserId(uid)
-        if (!uid) {
-          setComposerUserProfile(null)
-          try {
-            window.sessionStorage.removeItem(LOUNGE_PROFILE_CACHE_KEY)
-          } catch {
-            // ignore
+        try {
+          const {
+            data: { session },
+          } = await supabaseClient.auth.getSession()
+          const uid = session?.user?.id || ''
+          if (cancelled) return
+          setComposerUserId(uid)
+          if (!uid) {
+            setComposerUserProfile(null)
+            try {
+              window.sessionStorage.removeItem(LOUNGE_PROFILE_CACHE_KEY)
+            } catch {
+              // ignore
+            }
+            return
           }
-          return
-        }
-        const cached = readLoungeProfileCache(uid)
-        if (cached) setComposerUserProfile(cached)
-        const { data } = await supabaseClient
-          .from('profiles')
-          .select('user_id,handle,display_name,avatar_url,bio')
-          .eq('user_id', uid)
-          .maybeSingle()
-        if (cancelled) return
-        setComposerUserProfile(data || null)
-        if (data) writeLoungeProfileCache(data)
-        else {
-          try {
-            window.sessionStorage.removeItem(LOUNGE_PROFILE_CACHE_KEY)
-          } catch {
-            // ignore
+          const cached = readLoungeProfileCache(uid)
+          if (cached) setComposerUserProfile(cached)
+          const { data } = await supabaseClient
+            .from('profiles')
+            .select('user_id,handle,display_name,avatar_url,bio')
+            .eq('user_id', uid)
+            .maybeSingle()
+          if (cancelled) return
+          setComposerUserProfile(data || null)
+          if (data) writeLoungeProfileCache(data)
+          else {
+            try {
+              window.sessionStorage.removeItem(LOUNGE_PROFILE_CACHE_KEY)
+            } catch {
+              // ignore
+            }
           }
+        } finally {
+          if (!cancelled) setComposerAuthResolved(true)
         }
       })()
       return () => {
@@ -1414,6 +1420,11 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     className="h-full w-full rounded-full object-cover"
                     loading="eager"
                     decoding="async"
+                  />
+                ) : !composerAuthResolved ? (
+                  <span
+                    className="block h-full w-full rounded-full bg-zinc-700/55 animate-pulse"
+                    aria-hidden
                   />
                 ) : (
                   <span
