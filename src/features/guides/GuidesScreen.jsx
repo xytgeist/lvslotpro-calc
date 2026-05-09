@@ -1203,15 +1203,6 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
                 </div>
               </label>
               <label className="block">
-                <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Handle</span>
-                <input
-                  value={profileGateHandle}
-                  onChange={(e) => setProfileGateHandle(e.target.value)}
-                  className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-[16px] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
-                  placeholder="your_handle"
-                />
-              </label>
-              <label className="block">
                 <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Display name</span>
                 <input
                   value={profileGateDisplayName}
@@ -1220,6 +1211,23 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
                   className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-[16px] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
                   placeholder="Bryan"
                 />
+              </label>
+              <label className="block">
+                <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Handle</span>
+                <div className="mt-1 flex min-h-11 items-stretch overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 focus-within:ring-2 focus-within:ring-cyan-500/40">
+                  <span className="flex shrink-0 items-center border-r border-zinc-700 bg-zinc-900/80 px-3 text-[16px] text-zinc-400 select-none">
+                    @
+                  </span>
+                  <input
+                    value={profileGateHandle}
+                    onChange={(e) => setProfileGateHandle(e.target.value.replace(/^@+/, ''))}
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2 text-white text-[16px] outline-none touch-manipulation"
+                    placeholder="your_handle"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                </div>
               </label>
               {profileGateErr ? (
                 <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-xs leading-relaxed">

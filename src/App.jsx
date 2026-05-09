@@ -515,13 +515,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       return 'Member'
     }, [])
 
-    const displayNameFor = useCallback((p) => {
-      const pr = p?.author_profile
-      if (pr?.display_name) return pr.display_name
-      if (pr?.handle) return `@${pr.handle}`
-      return 'Member'
-    }, [])
-
     const handleFor = useCallback((p) => {
       const pr = p?.author_profile
       if (pr?.handle) return `@${pr.handle}`
@@ -1113,11 +1106,12 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                           onClick={() => void openProfileModal(post)}
                           className="min-w-0 max-w-full text-left hover:text-cyan-300 text-xs leading-tight"
                         >
-                          <div className="text-zinc-100 font-semibold text-[14px] leading-tight">{displayNameFor(post)}</div>
-                          <div className="text-zinc-500 text-[12px] leading-tight">
-                            <span className="truncate max-w-[7rem] inline-block align-bottom">{handleFor(post)}</span>
-                            <span className="text-zinc-600 mx-1">·</span>
-                            <span>{postAgeLabel(post.created_at)}</span>
+                          <div className="flex flex-wrap items-center gap-x-1 text-zinc-100 font-semibold text-[14px] leading-tight">
+                            <span className="truncate max-w-[10rem] sm:max-w-[14rem]">{handleFor(post)}</span>
+                            <span className="text-zinc-600 shrink-0">·</span>
+                            <span className="text-zinc-500 text-[12px] font-normal shrink-0">
+                              {postAgeLabel(post.created_at)}
+                            </span>
                           </div>
                         </button>
                         <div className="flex flex-wrap items-center gap-2">
@@ -1401,15 +1395,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 </div>
               </label>
                 <label className="block">
-                  <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Handle</span>
-                  <input
-                    value={profileGateHandle}
-                    onChange={(e) => setProfileGateHandle(e.target.value)}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-[16px] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
-                    placeholder="your_handle"
-                  />
-                </label>
-                <label className="block">
                   <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Display name</span>
                   <input
                     value={profileGateDisplayName}
@@ -1418,6 +1403,23 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-[16px] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
                     placeholder="Bryan"
                   />
+                </label>
+                <label className="block">
+                  <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Handle</span>
+                  <div className="mt-1 flex min-h-11 items-stretch overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 focus-within:ring-2 focus-within:ring-cyan-500/40">
+                    <span className="flex shrink-0 items-center border-r border-zinc-700 bg-zinc-900/80 px-3 text-[16px] text-zinc-400 select-none">
+                      @
+                    </span>
+                    <input
+                      value={profileGateHandle}
+                      onChange={(e) => setProfileGateHandle(e.target.value.replace(/^@+/, ''))}
+                      className="min-w-0 flex-1 bg-transparent px-3 py-2 text-white text-[16px] outline-none touch-manipulation"
+                      placeholder="your_handle"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                  </div>
                 </label>
                 {profileGateErr ? (
                   <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-xs leading-relaxed">
