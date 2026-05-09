@@ -25,6 +25,9 @@ import useWebPushNotifications from './features/offers/hooks/useWebPushNotificat
 import GuidesScreen from './features/guides/GuidesScreen'
 import {
   fetchOwnProfile,
+  handleSlugFromAtInput,
+  profileAvatarInitials,
+  profileAvatarToneClass,
   profileSeedFromUser,
   saveProfileWithHandleFallback,
   uploadProfileAvatar,
@@ -517,8 +520,18 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
 
     const handleFor = useCallback((p) => {
       const pr = p?.author_profile
-      if (pr?.handle) return `@${pr.handle}`
+      const h = pr?.handle != null ? String(pr.handle).trim() : ''
+      if (h) return `@${h}`
       return '@member'
+    }, [])
+
+    const displayNameFor = useCallback((p) => {
+      const pr = p?.author_profile
+      const dn = pr?.display_name != null ? String(pr.display_name).trim() : ''
+      if (dn) return dn
+      const h = pr?.handle != null ? String(pr.handle).trim() : ''
+      if (h) return `@${h}`
+      return 'Member'
     }, [])
 
     const avatarText = useCallback((p) => {
@@ -533,21 +546,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       return letters.slice(0, 2) || 'ME'
     }, [])
 
-    const avatarToneClass = useCallback((seedValue) => {
-      const seed = String(seedValue || '')
-      const tones = [
-        'bg-rose-600/70',
-        'bg-amber-600/70',
-        'bg-emerald-600/70',
-        'bg-sky-600/70',
-        'bg-violet-600/70',
-        'bg-fuchsia-600/70',
-        'bg-cyan-600/70',
-      ]
-      let hash = 0
-      for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
-      return tones[hash % tones.length]
-    }, [])
+    const avatarToneClass = profileAvatarToneClass
 
     const rateLimitMessage = useCallback((rawMessage) => {
       const m = /retry_in_seconds=(\d+)/i.exec(String(rawMessage || ''))
@@ -745,7 +744,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           setProfileGateHandle(ownProfile?.handle || seed.baseHandle)
           setProfileGateDisplayName(ownProfile?.display_name || seed.displayName)
           setProfileGateAvatarFile(null)
-          setProfileGateAvatarPreview(ownProfile?.avatar_url || '')
+          setProfileGateAvatarPreview(
+            ownProfile?.avatar_url || composerUserProfile?.avatar_url || ''
+          )
           setProfileGateErr('')
           setProfileGateOpen(true)
           setPostErr('Complete your profile to post in Lounge.')
@@ -787,7 +788,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       } finally {
         setPostBusy(false)
       }
-    }, [loadCommunityFeed, onRequireAuth, postText, rateLimitMessage, supabaseClient])
+    }, [composerUserProfile?.avatar_url, loadCommunityFeed, onRequireAuth, postText, rateLimitMessage, supabaseClient])
 
     const saveProfileGate = useCallback(async () => {
       setProfileGateErr('')
@@ -1104,17 +1105,22 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         <button
                           type="button"
                           onClick={() => void openProfileModal(post)}
-                          className="min-w-0 max-w-full text-left hover:text-cyan-300 text-xs leading-tight"
+                          className="min-w-0 flex-1 overflow-hidden text-left hover:text-cyan-300 text-xs leading-tight"
                         >
-                          <div className="flex flex-wrap items-center gap-x-1 text-zinc-100 font-semibold text-[14px] leading-tight">
-                            <span className="truncate max-w-[10rem] sm:max-w-[14rem]">{handleFor(post)}</span>
-                            <span className="text-zinc-600 shrink-0">·</span>
-                            <span className="text-zinc-500 text-[12px] font-normal shrink-0">
+                          <div className="truncate text-left text-zinc-100 font-semibold text-[14px] leading-tight">
+                            {displayNameFor(post)}
+                          </div>
+                          <div className="mt-0.5 flex w-fit min-w-0 max-w-full items-center gap-x-1 text-left text-[12px] leading-tight">
+                            <span className="min-w-0 max-w-[11rem] shrink truncate text-zinc-500 sm:max-w-[14rem]">
+                              {handleFor(post)}
+                            </span>
+                            <span className="shrink-0 text-zinc-600">·</span>
+                            <span className="shrink-0 text-zinc-500 font-normal tabular-nums whitespace-nowrap">
                               {postAgeLabel(post.created_at)}
                             </span>
                           </div>
                         </button>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
                           {post.pinned ? (
                             <span className="rounded-full bg-fuchsia-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-fuchsia-200">
                               Pinned
@@ -1367,9 +1373,21 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 <div className="mt-1 flex items-center gap-3">
                   <label className="h-11 w-11 rounded-full border border-zinc-700 bg-zinc-950 overflow-hidden shrink-0 grid place-items-center cursor-pointer">
                     {profileGateAvatarPreview ? (
-                      <img src={profileGateAvatarPreview} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={profileGateAvatarPreview}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
-                      <div className="h-full w-full grid place-items-center text-zinc-500 text-xs">+</div>
+                      <span
+                        className={`flex h-full w-full items-center justify-center text-xs font-bold text-white ${profileAvatarToneClass(
+                          composerUserId || profileGateHandle || profileGateDisplayName
+                        )}`}
+                      >
+                        {profileAvatarInitials(profileGateDisplayName, profileGateHandle)}
+                      </span>
                     )}
                     <input
                       type="file"
@@ -1406,20 +1424,15 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 </label>
                 <label className="block">
                   <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Handle</span>
-                  <div className="mt-1 flex min-h-11 items-stretch overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 focus-within:ring-2 focus-within:ring-cyan-500/40">
-                    <span className="flex shrink-0 items-center border-r border-zinc-700 bg-zinc-900/80 px-3 text-[16px] text-zinc-400 select-none">
-                      @
-                    </span>
-                    <input
-                      value={profileGateHandle}
-                      onChange={(e) => setProfileGateHandle(e.target.value.replace(/^@+/, ''))}
-                      className="min-w-0 flex-1 bg-transparent px-3 py-2 text-white text-[16px] outline-none touch-manipulation"
-                      placeholder="your_handle"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                    />
-                  </div>
+                  <input
+                    value={profileGateHandle ? `@${profileGateHandle}` : '@'}
+                    onChange={(e) => setProfileGateHandle(handleSlugFromAtInput(e.target.value))}
+                    className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-white text-[16px] outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
+                    placeholder="@your_handle"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
                 </label>
                 {profileGateErr ? (
                   <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-xs leading-relaxed">

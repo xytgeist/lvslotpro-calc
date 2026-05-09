@@ -41,6 +41,43 @@ export function normalizeHandle(rawValue) {
   return clipped
 }
 
+/** Single-field @handle input → stored slug (no @). Max length matches handle column clipping. */
+export function handleSlugFromAtInput(raw) {
+  let v = String(raw ?? '')
+  if (v === '' || v === '@') return ''
+  if (!v.startsWith('@')) v = `@${v.replace(/@/g, '')}`
+  const tail = v.slice(1).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 30)
+  return tail
+}
+
+/** Two-letter initials for profile avatar placeholder (matches Lounge fallback style). */
+export function profileAvatarInitials(displayName, handle) {
+  const base = String(displayName || handle || 'Member')
+    .trim()
+    .replace(/\s+/g, ' ')
+  if (!base) return 'ME'
+  const words = base.split(' ').filter(Boolean)
+  if (words.length >= 2) return `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase()
+  const letters = base.replace(/[^a-z0-9]/gi, '').toUpperCase()
+  return letters.slice(0, 2) || 'ME'
+}
+
+export function profileAvatarToneClass(seedValue) {
+  const seed = String(seedValue || '')
+  const tones = [
+    'bg-rose-600/70',
+    'bg-amber-600/70',
+    'bg-emerald-600/70',
+    'bg-sky-600/70',
+    'bg-violet-600/70',
+    'bg-fuchsia-600/70',
+    'bg-cyan-600/70',
+  ]
+  let hash = 0
+  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+  return tones[hash % tones.length]
+}
+
 export function profileSeedFromUser(user) {
   const email = String(user?.email || '')
   const local = email.includes('@') ? email.split('@')[0] : ''

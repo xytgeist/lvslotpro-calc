@@ -35,6 +35,9 @@ import {
 import { defaultCardEvThresholdForSlug } from '../../constants/slotCardEvThreshold'
 import {
   fetchOwnProfile,
+  handleSlugFromAtInput,
+  profileAvatarInitials,
+  profileAvatarToneClass,
   profileSeedFromUser,
   saveProfileWithHandleFallback,
   uploadProfileAvatar,
@@ -1175,9 +1178,21 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
                 <div className="mt-1 flex items-center gap-3">
                   <label className="h-11 w-11 rounded-full border border-zinc-700 bg-zinc-950 overflow-hidden shrink-0 grid place-items-center cursor-pointer">
                     {profileGateAvatarPreview ? (
-                      <img src={profileGateAvatarPreview} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={profileGateAvatarPreview}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
-                      <div className="h-full w-full grid place-items-center text-zinc-500 text-xs">+</div>
+                      <span
+                        className={`flex h-full w-full items-center justify-center text-xs font-bold text-white ${profileAvatarToneClass(
+                          `${profileGateHandle}|${profileGateDisplayName}`
+                        )}`}
+                      >
+                        {profileAvatarInitials(profileGateDisplayName, profileGateHandle)}
+                      </span>
                     )}
                     <input
                       type="file"
@@ -1214,20 +1229,15 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
               </label>
               <label className="block">
                 <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Handle</span>
-                <div className="mt-1 flex min-h-11 items-stretch overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 focus-within:ring-2 focus-within:ring-cyan-500/40">
-                  <span className="flex shrink-0 items-center border-r border-zinc-700 bg-zinc-900/80 px-3 text-[16px] text-zinc-400 select-none">
-                    @
-                  </span>
-                  <input
-                    value={profileGateHandle}
-                    onChange={(e) => setProfileGateHandle(e.target.value.replace(/^@+/, ''))}
-                    className="min-w-0 flex-1 bg-transparent px-3 py-2 text-white text-[16px] outline-none touch-manipulation"
-                    placeholder="your_handle"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
-                </div>
+                <input
+                  value={profileGateHandle ? `@${profileGateHandle}` : '@'}
+                  onChange={(e) => setProfileGateHandle(handleSlugFromAtInput(e.target.value))}
+                  className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-white text-[16px] outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
+                  placeholder="@your_handle"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
               </label>
               {profileGateErr ? (
                 <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-xs leading-relaxed">
