@@ -965,12 +965,12 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     ref={composerTextareaRef}
                     value={postText}
                     onChange={(e) => setPostText(e.target.value)}
-                    className="w-full min-h-20 resize-none touch-manipulation bg-transparent text-[20px] leading-snug text-white outline-none placeholder:text-[20px] placeholder:text-zinc-500"
+                    className="w-full min-h-20 resize-none touch-manipulation bg-transparent text-[17px] leading-tight text-white outline-none placeholder:text-[17px] placeholder:text-zinc-500"
                     placeholder="Are you winning, son?"
                     maxLength={280}
                   />
                   {postErr ? (
-                    <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[20px] leading-relaxed text-rose-200">
+                    <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[17px] leading-tight text-rose-200">
                       {postErr}
                     </div>
                   ) : null}
@@ -979,7 +979,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 <button
                   type="button"
                   onClick={() => setComposerExpanded(true)}
-                  className="min-h-12 w-full touch-manipulation text-left text-[20px] text-zinc-500"
+                  className="min-h-12 w-full touch-manipulation text-left text-[17px] leading-tight text-zinc-500"
                 >
                   Are you winning, son?
                 </button>
@@ -1029,7 +1029,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <div className="min-w-0 flex-1 pr-2">
                   {composerMediaFile ? (
-                    <span className="block truncate text-[20px] text-zinc-400">
+                    <span className="block truncate text-[17px] leading-tight text-zinc-400">
                       {composerMediaKind === 'video' ? 'Video' : 'Image'} selected
                     </span>
                   ) : null}
@@ -1157,9 +1157,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         </div>
                       </div>
                       {post.pinned && post.title ? (
-                        <div className="mt-1.5 text-white text-[17px] font-semibold leading-snug">{post.title}</div>
+                        <div className="mt-1.5 text-white text-[17px] font-semibold leading-tight">{post.title}</div>
                       ) : null}
-                      <div className="mt-1.5 text-zinc-200 text-[17px] leading-relaxed whitespace-pre-wrap">
+                      <div className="mt-1.5 text-zinc-200 text-[17px] leading-tight whitespace-pre-wrap">
                         {post.caption || post.body || post.title || ''}
                       </div>
                       <div className="mt-2 grid grid-cols-5 items-center text-[14px]">
