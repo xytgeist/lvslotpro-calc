@@ -963,12 +963,12 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 <textarea
                   value={postText}
                   onChange={(e) => setPostText(e.target.value)}
-                  className="w-full min-h-20 bg-transparent text-white outline-none placeholder:text-zinc-500 text-sm resize-none"
+                  className="w-full min-h-20 bg-transparent text-[16px] leading-snug text-white outline-none placeholder:text-zinc-500 placeholder:text-[16px] resize-none touch-manipulation"
                   placeholder="Ask a question or drop quick floor intel..."
                   maxLength={280}
                 />
                 {postErr ? (
-                  <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-xs leading-relaxed">
+                  <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 text-[16px] leading-relaxed">
                     {postErr}
                   </div>
                 ) : null}
@@ -977,7 +977,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               <button
                 type="button"
                 onClick={() => setComposerExpanded(true)}
-                className="w-full min-h-9 text-left text-sm text-zinc-500"
+                className="w-full min-h-11 text-left text-[16px] text-zinc-500 touch-manipulation"
               >
                 Are you winning, son?
               </button>
@@ -1027,17 +1027,17 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 pr-2">
                       {composerMediaFile ? (
-                        <span className="block truncate text-[11px] text-zinc-400">
+                        <span className="block truncate text-[16px] text-zinc-400">
                           {composerMediaKind === 'video' ? 'Video' : 'Image'} selected
                         </span>
                       ) : null}
                     </div>
                     <div className="inline-flex shrink-0 items-center gap-2">
-                      <span className="text-[11px] text-zinc-500">{postText.length}/280</span>
+                      <span className="text-[16px] tabular-nums text-zinc-500">{postText.length}/280</span>
                       <button
                         type="button"
                         onClick={() => setComposerExpanded(false)}
-                        className="min-h-8 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 text-[11px] font-semibold text-zinc-300"
+                        className="min-h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-[16px] font-semibold text-zinc-300 touch-manipulation"
                       >
                         Cancel
                       </button>
@@ -1045,7 +1045,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         type="button"
                         onClick={() => void submitLoungePost()}
                         disabled={postBusy}
-                        className="min-h-8 rounded-lg bg-cyan-600 px-3.5 text-[11px] font-bold text-white disabled:opacity-60"
+                        className="min-h-10 rounded-lg bg-cyan-600 px-4 text-[16px] font-bold text-white disabled:opacity-60 touch-manipulation"
                       >
                         {postBusy ? 'Posting…' : 'Post'}
                       </button>
@@ -1405,7 +1405,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   <input
                     value={profileGateHandle}
                     onChange={(e) => setProfileGateHandle(e.target.value)}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-[16px] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
                     placeholder="your_handle"
                   />
                 </label>
@@ -1415,7 +1415,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     value={profileGateDisplayName}
                     onChange={(e) => setProfileGateDisplayName(e.target.value)}
                     maxLength={24}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="mt-1 w-full min-h-11 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-white text-[16px] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 touch-manipulation"
                     placeholder="Bryan"
                   />
                 </label>
