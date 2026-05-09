@@ -594,7 +594,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       return dt.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })
     }, [])
 
-    const actionIconClass = 'h-4 w-4 text-zinc-500'
+    const actionIconClass = 'h-[18px] w-[18px] text-zinc-500'
 
     const interactionStateFor = useCallback(
       (postId) => interactionByPost[postId] || { commented: false, reposted: false, liked: false },
@@ -911,16 +911,16 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         <div className="z-20 shrink-0 border-b border-zinc-800/95 bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80">
           <div className="px-3 py-2.5 flex items-center justify-between gap-3">
             <div>
-              <div className="text-white text-xl font-black tracking-tight">Lounge</div>
-              <div className="text-zinc-500 text-[11px]">Latest</div>
+              <div className="text-white text-[22px] font-black tracking-tight">Lounge</div>
+              <div className="text-zinc-500 text-[12px]">Latest</div>
             </div>
-            <div className="text-zinc-600 text-[11px]">{communityFeedLoading ? 'Updating…' : ''}</div>
+            <div className="text-zinc-600 text-[12px]">{communityFeedLoading ? 'Updating…' : ''}</div>
           </div>
         </div>
 
         <div className="shrink-0 border-b border-zinc-800 bg-zinc-950/65 px-3 py-3">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex w-11 shrink-0 justify-center">
+          <div className="flex items-start gap-3.5">
+            <div className="mt-0.5 flex w-12 shrink-0 justify-center">
               <button
                 type="button"
                 onClick={() =>
@@ -931,7 +931,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                       })
                     : null
                 }
-                className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-sm font-bold text-zinc-200"
+                className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[15px] font-bold text-zinc-200"
                 title="Open your profile"
                 aria-label="Open your profile"
               >
@@ -965,12 +965,12 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     ref={composerTextareaRef}
                     value={postText}
                     onChange={(e) => setPostText(e.target.value)}
-                    className="w-full min-h-20 resize-none touch-manipulation bg-transparent text-[16px] leading-snug text-white outline-none placeholder:text-[16px] placeholder:text-zinc-500"
+                    className="w-full min-h-20 resize-none touch-manipulation bg-transparent text-[18px] leading-snug text-white outline-none placeholder:text-[18px] placeholder:text-zinc-500"
                     placeholder="Are you winning, son?"
                     maxLength={280}
                   />
                   {postErr ? (
-                    <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[16px] leading-relaxed text-rose-200">
+                    <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[18px] leading-relaxed text-rose-200">
                       {postErr}
                     </div>
                   ) : null}
@@ -979,7 +979,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                 <button
                   type="button"
                   onClick={() => setComposerExpanded(true)}
-                  className="min-h-11 w-full touch-manipulation text-left text-[16px] text-zinc-500"
+                  className="min-h-11 w-full touch-manipulation text-left text-[18px] text-zinc-500"
                 >
                   Are you winning, son?
                 </button>
@@ -1010,16 +1010,16 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   setPostErr('Unsupported media type. Please choose an image or video file.')
                 }}
               />
-              <div className="mt-2 flex items-center gap-3">
-              <div className="mt-0.5 flex w-11 shrink-0 items-center justify-center">
+              <div className="mt-2 flex items-center gap-3.5">
+              <div className="mt-0.5 flex w-12 shrink-0 items-center justify-center">
                 <button
                   type="button"
                   onClick={() => composerMediaInputRef.current?.click()}
-                  className="min-h-9 min-w-9 shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-zinc-300 hover:text-zinc-100"
+                  className="min-h-10 min-w-10 shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-zinc-300 hover:text-zinc-100"
                   title="Add media"
                   aria-label="Add media"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden>
+                  <svg className="h-[18px] w-[18px]" viewBox="0 0 20 20" fill="none" aria-hidden>
                     <path d="M4.75 4.75h10.5a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 01-1.5 1.5H4.75a1.5 1.5 0 01-1.5-1.5v-7.5a1.5 1.5 0 011.5-1.5z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M7 9.25l1.75 1.75 3.25-3.25 2.5 2.5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
                     <circle cx="7" cy="7.25" r=".9" fill="currentColor" />
@@ -1029,17 +1029,17 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <div className="min-w-0 flex-1 pr-2">
                   {composerMediaFile ? (
-                    <span className="block truncate text-[16px] text-zinc-400">
+                    <span className="block truncate text-[18px] text-zinc-400">
                       {composerMediaKind === 'video' ? 'Video' : 'Image'} selected
                     </span>
                   ) : null}
                 </div>
                 <div className="inline-flex shrink-0 items-center gap-2">
-                  <span className="text-[16px] tabular-nums text-zinc-500">{postText.length}/280</span>
+                  <span className="text-[18px] tabular-nums text-zinc-500">{postText.length}/280</span>
                   <button
                     type="button"
                     onClick={() => setComposerExpanded(false)}
-                    className="min-h-10 touch-manipulation rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-[16px] font-semibold text-zinc-300"
+                    className="min-h-11 touch-manipulation rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-[18px] font-semibold text-zinc-300"
                   >
                     Cancel
                   </button>
@@ -1047,7 +1047,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     type="button"
                     onClick={() => void submitLoungePost()}
                     disabled={postBusy}
-                    className="min-h-10 touch-manipulation rounded-lg bg-cyan-600 px-4 text-[16px] font-bold text-white disabled:opacity-60"
+                    className="min-h-11 touch-manipulation rounded-lg bg-cyan-600 px-4 text-[18px] font-bold text-white disabled:opacity-60"
                   >
                     {postBusy ? 'Posting…' : 'Post'}
                   </button>
@@ -1066,7 +1066,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
             className="overflow-hidden transition-[max-height,opacity] duration-200"
             style={{ maxHeight: pullRefreshing || pullDistance > 0 ? '2rem' : '0rem', opacity: pullRefreshing || pullDistance > 0 ? 1 : 0 }}
           >
-            <div className="px-3 py-1 text-center text-[11px] text-zinc-400">
+            <div className="px-3 py-1 text-center text-[12px] text-zinc-400">
               {pullRefreshing
                 ? 'Refreshing lounge…'
                 : pullDistance >= pullRefreshThresholdPx
@@ -1076,9 +1076,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           </div>
           <div className="border-b border-zinc-800 pb-4">
           {communityFeedLoading ? (
-            <div className="px-3 py-4 text-zinc-400 text-sm">Loading lounge…</div>
+            <div className="px-3 py-4 text-zinc-400 text-[15px]">Loading lounge…</div>
           ) : communityPosts.length === 0 ? (
-            <div className="px-3 py-5 text-zinc-400 text-sm leading-relaxed">
+            <div className="px-3 py-5 text-zinc-400 text-[15px] leading-relaxed">
               No posts yet. Run{' '}
               <code className="text-fuchsia-200/90">supabase/feed_phase_a_profiles_public_read.sql</code> in Supabase,
               then post from Guides → Ask community.
@@ -1086,7 +1086,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           ) : (
             <>
               {communityPosts.map((post) => (
-                <article key={post.id} className="border-t border-zinc-800 px-3 py-3 bg-zinc-950/35">
+                <article key={post.id} className="border-t border-zinc-800 px-3 py-3.5 bg-zinc-950/35">
                   {(() => {
                     const ui = interactionStateFor(post.id)
                     const isBookmarked = !!bookmarkedByPost[post.id]
@@ -1099,11 +1099,11 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                     const likeClass = ui.liked ? 'text-rose-400' : 'text-zinc-500'
                     const bookmarkClass = isBookmarked ? 'text-amber-300' : 'text-zinc-500'
                     return (
-                  <div className="flex gap-3">
+                  <div className="flex gap-3.5">
                     <button
                       type="button"
                       onClick={() => void openProfileModal(post)}
-                      className="h-11 w-11 shrink-0 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 text-sm font-bold flex items-center justify-center overflow-hidden"
+                      className="h-12 w-12 shrink-0 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 text-[15px] font-bold flex items-center justify-center overflow-hidden"
                     >
                       {post?.author_profile?.avatar_url ? (
                         <img
@@ -1128,13 +1128,13 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         <button
                           type="button"
                           onClick={() => void openProfileModal(post)}
-                          className="min-w-0 flex-1 overflow-hidden text-left hover:text-cyan-300 text-xs leading-tight"
+                          className="min-w-0 flex-1 overflow-hidden text-left hover:text-cyan-300 text-[13px] leading-tight"
                         >
-                          <div className="truncate text-left text-zinc-100 font-semibold text-[14px] leading-tight">
+                          <div className="truncate text-left text-zinc-100 font-semibold text-[15px] leading-tight">
                             {displayNameFor(post)}
                           </div>
-                          <div className="mt-0.5 flex w-fit min-w-0 max-w-full items-center gap-x-1 text-left text-[12px] leading-tight">
-                            <span className="min-w-0 max-w-[11rem] shrink truncate text-zinc-500 sm:max-w-[14rem]">
+                          <div className="mt-0.5 flex w-fit min-w-0 max-w-full items-center gap-x-1 text-left text-[13px] leading-tight">
+                            <span className="min-w-0 max-w-[12rem] shrink truncate text-zinc-500 sm:max-w-[15rem]">
                               {handleFor(post)}
                             </span>
                             <span className="shrink-0 text-zinc-600">·</span>
@@ -1145,30 +1145,30 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         </button>
                         <div className="flex shrink-0 flex-wrap items-center gap-2">
                           {post.pinned ? (
-                            <span className="rounded-full bg-fuchsia-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-fuchsia-200">
+                            <span className="rounded-full bg-fuchsia-500/20 px-2.5 py-1 text-[12px] font-bold uppercase tracking-wide text-fuchsia-200">
                               Pinned
                             </span>
                           ) : null}
                           {post.game_slug ? (
-                            <span className="inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-300">
+                            <span className="inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[12px] font-bold uppercase tracking-wide text-amber-300">
                               {post.game_title}
                             </span>
                           ) : null}
                         </div>
                       </div>
                       {post.pinned && post.title ? (
-                        <div className="mt-1.5 text-white font-semibold leading-snug">{post.title}</div>
+                        <div className="mt-1.5 text-white text-[15px] font-semibold leading-snug">{post.title}</div>
                       ) : null}
-                      <div className="text-zinc-200 text-sm mt-1.5 leading-relaxed whitespace-pre-wrap">
+                      <div className="text-zinc-200 text-[15px] mt-1.5 leading-relaxed whitespace-pre-wrap">
                         {post.caption || post.body || post.title || ''}
                       </div>
-                      <div className="mt-2 grid grid-cols-5 items-center text-xs">
+                      <div className="mt-2 grid grid-cols-5 items-center text-[13px]">
                         <button
                           type="button"
                           onClick={() => toggleInteraction(post.id, 'commented')}
-                          className="inline-flex items-center justify-start gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70"
+                          className="inline-flex items-center justify-start gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70"
                         >
-                          <svg className={`h-4 w-4 ${commentClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <svg className={`h-[18px] w-[18px] ${commentClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
                             <path d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                           {Number.isFinite(commentCount) ? <span className={commentClass}>{commentCount}</span> : null}
@@ -1176,23 +1176,23 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         <button
                           type="button"
                           onClick={() => toggleInteraction(post.id, 'reposted')}
-                          className="inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70"
+                          className="inline-flex items-center justify-center gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70"
                         >
-                          <svg className={`h-4 w-4 ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <svg className={`h-[18px] w-[18px] ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
                             <path d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </button>
                         <button
                           type="button"
                           onClick={() => toggleInteraction(post.id, 'liked')}
-                          className="inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70"
+                          className="inline-flex items-center justify-center gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70"
                         >
-                          <svg className={`h-4 w-4 ${likeClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <svg className={`h-[18px] w-[18px] ${likeClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
                             <path d="M10 16.1l-.85-.78C5.65 12.1 3.5 10.16 3.5 7.78A3.28 3.28 0 016.78 4.5c1.07 0 2.1.5 2.72 1.29A3.55 3.55 0 0112.22 4.5a3.28 3.28 0 013.28 3.28c0 2.38-2.15 4.33-5.65 7.54l-.85.78z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                           {Number.isFinite(likeCount) ? <span className={likeClass}>{likeCount}</span> : null}
                         </button>
-                        <button type="button" className="inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70">
+                        <button type="button" className="inline-flex items-center justify-center gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70">
                           <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
                             <path d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
@@ -1200,10 +1200,10 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                         <button
                           type="button"
                           onClick={() => toggleBookmark(post.id)}
-                          className="inline-flex items-center justify-end gap-1 rounded px-1.5 py-0.5 hover:bg-zinc-900/70"
+                          className="inline-flex items-center justify-end gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70"
                           title={isBookmarked ? 'Remove bookmark' : 'Save post'}
                         >
-                          <svg className={`h-4 w-4 ${bookmarkClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <svg className={`h-[18px] w-[18px] ${bookmarkClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
                             <path d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </button>
@@ -1218,7 +1218,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               {communityFeedHasMore ? <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden /> : null}
 
               {communityFeedLoadingMore ? (
-                <div className="px-3 py-3 text-zinc-500 text-sm">Loading more…</div>
+                <div className="px-3 py-3 text-zinc-500 text-[15px]">Loading more…</div>
               ) : null}
 
               {communityFeedHasMore ? (
@@ -1226,14 +1226,14 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                   type="button"
                   onClick={() => loadMoreCommunityFeed()}
                   disabled={communityFeedLoadingMore}
-                  className="mx-3 my-2 w-[calc(100%-1.5rem)] min-h-9 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-100 text-xs font-semibold disabled:opacity-60 touch-manipulation"
+                  className="mx-3 my-2 w-[calc(100%-1.5rem)] min-h-10 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-100 text-[13px] font-semibold disabled:opacity-60 touch-manipulation"
                 >
                   Load more
                 </button>
               ) : null}
 
               {!communityFeedHasMore && communityPosts.length > 0 ? (
-                <div className="text-center text-xs text-zinc-600 py-2">You are caught up.</div>
+                <div className="text-center text-[13px] text-zinc-600 py-2">You are caught up.</div>
               ) : null}
             </>
           )}
