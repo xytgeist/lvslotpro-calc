@@ -577,11 +577,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const composerMediaInputRef = useRef(null)
     const composerTextareaRef = useRef(null)
     const loungeFeedScrollRef = useRef(null)
-    const loungeTitleBarRef = useRef(null)
-    const loungeScrollPrevTopRef = useRef(0)
-    const [loungeTitleBarHeight, setLoungeTitleBarHeight] = useState(0)
-    const [loungeTitleDocked, setLoungeTitleDocked] = useState(false)
-    const [loungeFeedViewportTopPx, setLoungeFeedViewportTopPx] = useState(0)
     /** True when feed scroll auto-collapsed the composer; cleared on explicit open / post / discard. */
     const composerFoldedFromFeedScrollRef = useRef(false)
     const composerDraftFlushRef = useRef({ postText: '', composerExpanded: false, composerMediaFile: null })
@@ -624,42 +619,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       }
     }, [composerExpanded])
 
-    useLayoutEffect(() => {
-      const bar = loungeTitleBarRef.current
-      if (!bar || typeof ResizeObserver === 'undefined') return
-      const apply = () => {
-        const h = Math.ceil(bar.getBoundingClientRect().height)
-        if (h > 0) setLoungeTitleBarHeight((prev) => (prev === h ? prev : h))
-      }
-      apply()
-      const ro = new ResizeObserver(() => apply())
-      ro.observe(bar)
-      return () => ro.disconnect()
-    }, [])
-
-    useLayoutEffect(() => {
-      const el = loungeFeedScrollRef.current
-      if (!el) return
-      const sync = () => {
-        setLoungeFeedViewportTopPx((prev) => {
-          const n = Math.round(el.getBoundingClientRect().top)
-          return prev === n ? prev : n
-        })
-      }
-      sync()
-      if (typeof ResizeObserver === 'undefined') {
-        window.addEventListener('resize', sync)
-        return () => window.removeEventListener('resize', sync)
-      }
-      const ro = new ResizeObserver(sync)
-      ro.observe(el)
-      window.addEventListener('resize', sync)
-      return () => {
-        ro.disconnect()
-        window.removeEventListener('resize', sync)
-      }
-    }, [])
-
     useEffect(() => {
       const el = loungeFeedScrollRef.current
       if (!el || typeof window === 'undefined') return
@@ -667,18 +626,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       const scrollTopPx = 6
       const onScroll = () => {
         const st = el.scrollTop
-        const prev = loungeScrollPrevTopRef.current
-        const delta = st - prev
-        loungeScrollPrevTopRef.current = st
-
-        if (st <= 1) {
-          setLoungeTitleDocked(false)
-        } else if (delta < -0.75) {
-          setLoungeTitleDocked(true)
-        } else if (delta > 2) {
-          setLoungeTitleDocked(false)
-        }
-
         const { composerExpanded: ex } = composerDraftFlushRef.current
         if (st > scrollDownPx && ex) {
           setComposerExpanded(false)
@@ -1078,26 +1025,13 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           ref={loungeFeedScrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
         >
-          <div
-            className="relative shrink-0 w-full"
-            style={loungeTitleBarHeight > 0 ? { height: loungeTitleBarHeight } : undefined}
-          >
-            <div
-              ref={loungeTitleBarRef}
-              className={
-                loungeTitleDocked
-                  ? 'fixed left-1/2 z-[45] w-full max-w-2xl -translate-x-1/2 border-b border-zinc-800/95 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 shadow-[0_1px_0_rgba(0,0,0,0.35)]'
-                  : 'relative z-10 w-full border-b border-zinc-800/95 bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80'
-              }
-              style={loungeTitleDocked ? { top: loungeFeedViewportTopPx } : undefined}
-            >
-              <div className="px-3 py-2.5 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-white text-[24px] font-black tracking-tight">Lounge</div>
-                  <div className="text-zinc-500 text-[13px]">Latest</div>
-                </div>
-                <div className="text-zinc-600 text-[13px]">{communityFeedLoading ? 'Updating…' : ''}</div>
+          <div className="relative z-10 shrink-0 w-full border-b border-zinc-800/95 bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80">
+            <div className="px-3 py-2.5 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-white text-[24px] font-black tracking-tight">Lounge</div>
+                <div className="text-zinc-500 text-[13px]">Latest</div>
               </div>
+              <div className="text-zinc-600 text-[13px]">{communityFeedLoading ? 'Updating…' : ''}</div>
             </div>
           </div>
 
