@@ -712,13 +712,13 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     const [pullDistance, setPullDistance] = useState(0)
     const [pullRefreshing, setPullRefreshing] = useState(false)
     const LOUNGE_POST_AUTHOR_EDIT_WINDOW_MS = 30 * 60 * 1000
-    const [loungeEditPostId, setLoungeEditPostId] = useState(null)
-    const [loungeEditCaption, setLoungeEditCaption] = useState('')
-    const [loungeEditBusy, setLoungeEditBusy] = useState(false)
-    const [loungeEditErr, setLoungeEditErr] = useState('')
-    const [loungeDeleteBusyId, setLoungeDeleteBusyId] = useState(null)
+    const [loungePostDetail, setLoungePostDetail] = useState(null)
+    const [loungeDetailEditing, setLoungeDetailEditing] = useState(false)
+    const [loungeDetailDraftCaption, setLoungeDetailDraftCaption] = useState('')
+    const [loungeDetailEditBusy, setLoungeDetailEditBusy] = useState(false)
+    const [loungeDetailEditErr, setLoungeDetailEditErr] = useState('')
+    const [loungeDetailDeleteBusy, setLoungeDetailDeleteBusy] = useState(false)
     const [loungeManageErr, setLoungeManageErr] = useState('')
-    const loungeEditPostIdRef = useRef(null)
     const loadMoreSentinelRef = useRef(null)
     const pullStartYRef = useRef(null)
     const pullTriggeredRef = useRef(false)
@@ -1018,118 +1018,132 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
       return Date.now() - t <= LOUNGE_POST_AUTHOR_EDIT_WINDOW_MS
     }
 
-    const cancelLoungeEdit = useCallback(() => {
-      setLoungeEditPostId(null)
-      setLoungeEditCaption('')
-      setLoungeEditErr('')
+    const closeLoungePostDetail = useCallback(() => {
+      setLoungePostDetail(null)
+      setLoungeDetailEditing(false)
+      setLoungeDetailDraftCaption('')
+      setLoungeDetailEditErr('')
+      setLoungeDetailDeleteBusy(false)
     }, [])
 
-    const beginLoungeEdit = useCallback(
-      (post) => {
-        if (!post?.id || post.user_id !== composerUserId) return
-        if (!loungePostWithinAuthorEditWindow(post.created_at)) return
-        setLoungeManageErr('')
-        setLoungeEditErr('')
-        setLoungeEditPostId(post.id)
-        setLoungeEditCaption(feedPostDisplayCaption(post))
-      },
-      [composerUserId]
-    )
+    const openLoungePostDetail = useCallback((post) => {
+      if (!post?.id) return
+      setLoungeManageErr('')
+      setLoungeDetailEditing(false)
+      setLoungeDetailDraftCaption('')
+      setLoungeDetailEditErr('')
+      setLoungePostDetail(post)
+    }, [])
 
-    const saveLoungeEdit = useCallback(async () => {
-      const cap = normalizeFeedCaption(loungeEditCaption)
-      setLoungeEditErr('')
+    const cancelLoungeDetailEdit = useCallback(() => {
+      setLoungeDetailEditing(false)
+      setLoungeDetailDraftCaption('')
+      setLoungeDetailEditErr('')
+    }, [])
+
+    const saveLoungeDetailCaption = useCallback(async () => {
+      if (!loungePostDetail?.id) return
+      const cap = normalizeFeedCaption(loungeDetailDraftCaption)
+      setLoungeDetailEditErr('')
       if (!cap) {
-        setLoungeEditErr('Write a caption before saving.')
+        setLoungeDetailEditErr('Write a caption before saving.')
         return
       }
-      if (!loungeEditPostId) return
-      setLoungeEditBusy(true)
+      setLoungeDetailEditBusy(true)
       try {
         const {
           data: { session },
         } = await supabaseClient.auth.getSession()
         if (!session?.user) {
           setAuthPromptOpen(true)
-          setLoungeEditErr('You must be signed in.')
+          setLoungeDetailEditErr('You must be signed in.')
           return
         }
         const { data, error } = await supabaseClient
           .from('community_feed_posts')
           .update({ caption: cap })
-          .eq('id', loungeEditPostId)
+          .eq('id', loungePostDetail.id)
           .select('id,caption,edited_at')
           .maybeSingle()
         if (error) {
           const msg = String(error.message || '')
           if (msg.toLowerCase().includes('rate limit exceeded')) {
-            setLoungeEditErr(rateLimitMessage(msg))
+            setLoungeDetailEditErr(rateLimitMessage(msg))
             return
           }
           if (error.code === '42501') {
-            setLoungeEditErr('You can no longer edit this post (time window or permissions).')
+            setLoungeDetailEditErr('You can no longer edit this post (time window or permissions).')
             return
           }
-          setLoungeEditErr(msg || 'Could not save.')
+          setLoungeDetailEditErr(msg || 'Could not save.')
           return
         }
         if (!data?.id) {
-          setLoungeEditErr('Could not save. Try refreshing the feed.')
+          setLoungeDetailEditErr('Could not save. Try refreshing the feed.')
           return
         }
         setCommunityPosts((prev) =>
           prev.map((p) => (p.id === data.id ? { ...p, caption: data.caption, edited_at: data.edited_at } : p))
         )
-        cancelLoungeEdit()
+        setLoungePostDetail((prev) =>
+          prev && prev.id === data.id ? { ...prev, caption: data.caption, edited_at: data.edited_at } : prev
+        )
+        cancelLoungeDetailEdit()
       } finally {
-        setLoungeEditBusy(false)
+        setLoungeDetailEditBusy(false)
       }
-    }, [cancelLoungeEdit, loungeEditCaption, loungeEditPostId, rateLimitMessage, supabaseClient])
+    }, [cancelLoungeDetailEdit, loungeDetailDraftCaption, loungePostDetail, rateLimitMessage, supabaseClient])
 
-    const confirmDeleteLoungePost = useCallback(
-      async (post) => {
-        if (!post?.id || post.user_id !== composerUserId) return
-        setLoungeManageErr('')
-        const ok = await showGlobalConfirm({
-          title: 'Delete this post?',
-          message: 'This removes the post from the Lounge. This cannot be undone.',
-          confirmLabel: 'Delete',
-          cancelLabel: 'Cancel',
-        })
-        if (!ok) return
-        setLoungeDeleteBusyId(post.id)
-        try {
-          const { error } = await supabaseClient.from('community_feed_posts').delete().eq('id', post.id)
-          if (error) {
-            const msg = String(error.message || '')
-            if (error.code === '42501') {
-              setLoungeManageErr('You do not have permission to delete this post.')
-              return
-            }
-            setLoungeManageErr(msg || 'Could not delete.')
+    const confirmDeleteLoungePostFromDetail = useCallback(async () => {
+      if (!loungePostDetail?.id || loungePostDetail.user_id !== composerUserId) return
+      setLoungeManageErr('')
+      const postId = loungePostDetail.id
+      const ok = await showGlobalConfirm({
+        title: 'Delete this post?',
+        message: 'This removes the post from the Lounge. This cannot be undone.',
+        confirmLabel: 'Delete',
+        cancelLabel: 'Cancel',
+      })
+      if (!ok) return
+      setLoungeDetailDeleteBusy(true)
+      try {
+        const { error } = await supabaseClient.from('community_feed_posts').delete().eq('id', postId)
+        if (error) {
+          const msg = String(error.message || '')
+          if (error.code === '42501') {
+            setLoungeManageErr('You do not have permission to delete this post.')
             return
           }
-          if (loungeEditPostIdRef.current === post.id) cancelLoungeEdit()
-          await loadCommunityFeed({ silent: true })
-        } finally {
-          setLoungeDeleteBusyId(null)
+          setLoungeManageErr(msg || 'Could not delete.')
+          return
         }
-      },
-      [cancelLoungeEdit, composerUserId, loadCommunityFeed, showGlobalConfirm, supabaseClient]
-    )
-
-    useEffect(() => {
-      loungeEditPostIdRef.current = loungeEditPostId
-    }, [loungeEditPostId])
+        closeLoungePostDetail()
+        await loadCommunityFeed({ silent: true })
+      } finally {
+        setLoungeDetailDeleteBusy(false)
+      }
+    }, [closeLoungePostDetail, composerUserId, loadCommunityFeed, loungePostDetail, showGlobalConfirm, supabaseClient])
 
     useEffect(() => {
       if (!composerUserId) {
-        setLoungeEditPostId(null)
-        setLoungeEditCaption('')
-        setLoungeEditErr('')
-        setLoungeDeleteBusyId(null)
+        closeLoungePostDetail()
       }
-    }, [composerUserId])
+    }, [composerUserId, closeLoungePostDetail])
+
+    useEffect(() => {
+      if (!loungePostDetail) return
+      const onKey = (e) => {
+        if (e.key !== 'Escape') return
+        if (loungeDetailEditing) {
+          e.preventDefault()
+          cancelLoungeDetailEdit()
+          return
+        }
+        closeLoungePostDetail()
+      }
+      window.addEventListener('keydown', onKey)
+      return () => window.removeEventListener('keydown', onKey)
+    }, [cancelLoungeDetailEdit, closeLoungePostDetail, loungeDetailEditing, loungePostDetail])
 
     useEffect(() => {
       let cancelled = false
@@ -1769,7 +1783,15 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           ) : (
             <>
               {communityPosts.map((post) => (
-                <article key={post.id} className="border-t border-zinc-800 px-3 py-4 bg-zinc-950/35">
+                <article
+                  key={post.id}
+                  className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                  onClick={(e) => {
+                    const t = e.target
+                    if (t instanceof Element && t.closest('button, a')) return
+                    openLoungePostDetail(post)
+                  }}
+                >
                   {(() => {
                     const ui = interactionStateFor(post.id)
                     const isBookmarked = !!bookmarkedByPost[post.id]
@@ -1839,68 +1861,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
                           ) : null}
                         </div>
                       </div>
-                      {composerUserId &&
-                      post.user_id === composerUserId &&
-                      loungePostWithinAuthorEditWindow(post.created_at) &&
-                      loungeEditPostId !== post.id ? (
-                        <div className="mt-1.5 flex flex-wrap items-center justify-end gap-3 text-[13px] font-semibold">
-                          <button
-                            type="button"
-                            onClick={() => beginLoungeEdit(post)}
-                            disabled={loungeDeleteBusyId === post.id || loungeEditBusy}
-                            className="touch-manipulation text-cyan-400 hover:text-cyan-300 disabled:opacity-40"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void confirmDeleteLoungePost(post)}
-                            disabled={loungeDeleteBusyId === post.id || loungeEditBusy}
-                            className="touch-manipulation text-rose-400 hover:text-rose-300 disabled:opacity-40"
-                          >
-                            {loungeDeleteBusyId === post.id ? 'Deleting…' : 'Delete'}
-                          </button>
-                        </div>
-                      ) : null}
-                      {loungeEditPostId === post.id ? (
-                        <div className="mt-1.5 space-y-2">
-                          <textarea
-                            value={loungeEditCaption}
-                            onChange={(e) => setLoungeEditCaption(e.target.value)}
-                            maxLength={280}
-                            rows={4}
-                            className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-[17px] leading-snug text-zinc-100 outline-none focus:border-cyan-600/60 focus:ring-2 focus:ring-cyan-500/25"
-                            aria-label="Edit caption"
-                          />
-                          {loungeEditErr ? (
-                            <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[13px] leading-tight text-rose-200">
-                              {loungeEditErr}
-                            </div>
-                          ) : null}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => void saveLoungeEdit()}
-                              disabled={loungeEditBusy}
-                              className="min-h-9 touch-manipulation rounded-lg bg-cyan-600 px-3 py-1.5 text-[14px] font-bold text-white disabled:opacity-60"
-                            >
-                              {loungeEditBusy ? 'Saving…' : 'Save'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelLoungeEdit}
-                              disabled={loungeEditBusy}
-                              className="min-h-9 touch-manipulation rounded-lg border border-zinc-600 px-3 py-1.5 text-[14px] font-semibold text-zinc-200 disabled:opacity-60"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="mt-1.5 text-zinc-200 text-[17px] leading-tight whitespace-pre-wrap">
-                          {renderRichCaption(feedPostDisplayCaption(post))}
-                        </div>
-                      )}
+                      <div className="mt-1.5 text-zinc-200 text-[17px] leading-tight whitespace-pre-wrap">
+                        {renderRichCaption(feedPostDisplayCaption(post))}
+                      </div>
                       <div className="mt-2 grid grid-cols-5 items-center text-[14px]">
                         <button
                           type="button"
@@ -1978,6 +1941,306 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
           )}
           </div>
         </div>
+
+        {loungePostDetail ? (
+          <div
+            className="fixed inset-0 z-[96] flex flex-col justify-end bg-black/80 sm:justify-center sm:p-3"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lounge-post-detail-title"
+          >
+            <button
+              type="button"
+              className="absolute inset-0 z-0 cursor-default"
+              aria-label="Close post"
+              onClick={() => {
+                if (loungeDetailEditing) cancelLoungeDetailEdit()
+                else closeLoungePostDetail()
+              }}
+            />
+            <div
+              className="relative z-10 flex max-h-[calc(100dvh-0.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-zinc-700 bg-zinc-950 shadow-2xl sm:mx-auto sm:max-h-[min(92dvh,880px)] sm:rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center gap-2 border-b border-zinc-800 px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-3 sm:py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (loungeDetailEditing) cancelLoungeDetailEdit()
+                    else closeLoungePostDetail()
+                  }}
+                  className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white [-webkit-tap-highlight-color:transparent]"
+                  aria-label="Back to Lounge"
+                >
+                  <span className="text-[22px] leading-none" aria-hidden>
+                    ←
+                  </span>
+                </button>
+                <h2 id="lounge-post-detail-title" className="min-w-0 flex-1 text-center text-[17px] font-bold text-white">
+                  Post
+                </h2>
+                <div className="h-10 w-10 shrink-0" aria-hidden />
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-4">
+                {loungeManageErr ? (
+                  <div className="mb-4 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] leading-tight text-rose-200">
+                    {loungeManageErr}
+                  </div>
+                ) : null}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = loungePostDetail
+                      closeLoungePostDetail()
+                      void openProfileModal(p)
+                    }}
+                    className="h-[3.3rem] w-[3.3rem] shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[17px] font-bold text-zinc-200"
+                  >
+                    {loungePostDetail?.author_profile?.avatar_url ? (
+                      <img
+                        src={loungePostDetail.author_profile.avatar_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="eager"
+                        decoding="async"
+                      />
+                    ) : (
+                      <span
+                        className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarToneClass(
+                          loungePostDetail?.author_profile?.user_id ||
+                            loungePostDetail?.user_id ||
+                            displayLabel(loungePostDetail)
+                        )}`}
+                      >
+                        {avatarText(loungePostDetail)}
+                      </span>
+                    )}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const p = loungePostDetail
+                        closeLoungePostDetail()
+                        void openProfileModal(p)
+                      }}
+                      className="text-left hover:text-cyan-300"
+                    >
+                      <div className="truncate text-[17px] font-bold leading-tight text-zinc-100">
+                        {displayNameFor(loungePostDetail)}
+                      </div>
+                      <div className="mt-0.5 truncate text-[15px] text-zinc-500">{handleFor(loungePostDetail)}</div>
+                    </button>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {loungePostDetail.pinned ? (
+                        <span className="rounded-full bg-fuchsia-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-fuchsia-200">
+                          Pinned
+                        </span>
+                      ) : null}
+                      {loungePostDetail.game_slug ? (
+                        <span className="inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-300">
+                          {loungePostDetail.game_title}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                {loungeDetailEditing ? (
+                  <div className="mt-4 space-y-2">
+                    <textarea
+                      value={loungeDetailDraftCaption}
+                      onChange={(e) => setLoungeDetailDraftCaption(e.target.value)}
+                      maxLength={280}
+                      rows={6}
+                      className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-[18px] leading-snug text-zinc-100 outline-none focus:border-cyan-600/60 focus:ring-2 focus:ring-cyan-500/25"
+                      aria-label="Edit caption"
+                    />
+                    {loungeDetailEditErr ? (
+                      <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[13px] leading-tight text-rose-200">
+                        {loungeDetailEditErr}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="mt-4 text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap">
+                    {renderRichCaption(feedPostDisplayCaption(loungePostDetail), {
+                      hashtagClassName: 'font-semibold text-cyan-300',
+                      linkClassName:
+                        'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+                    })}
+                  </div>
+                )}
+
+                <div className="mt-4 text-[14px] text-zinc-500">
+                  {loungePostDetail.created_at
+                    ? new Date(loungePostDetail.created_at).toLocaleString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : ''}
+                  {loungePostDetail.edited_at ? (
+                    <span className="text-zinc-600"> · Edited</span>
+                  ) : null}
+                </div>
+
+                {(() => {
+                  const d = loungePostDetail
+                  const ui = interactionStateFor(d.id)
+                  const isBookmarked = !!bookmarkedByPost[d.id]
+                  const commentCount =
+                    (typeof d.comment_count === 'number' ? d.comment_count : 0) + (ui.commented ? 1 : 0)
+                  const likeCount = (typeof d.like_count === 'number' ? d.like_count : 0) + (ui.liked ? 1 : 0)
+                  const commentClass = ui.commented ? 'text-zinc-100' : 'text-zinc-500'
+                  const repostClass = ui.reposted ? 'text-emerald-400' : 'text-zinc-500'
+                  const likeClass = ui.liked ? 'text-rose-400' : 'text-zinc-500'
+                  const bookmarkClass = isBookmarked ? 'text-amber-300' : 'text-zinc-500'
+                  return (
+                    <div className="mt-5 grid grid-cols-5 items-center gap-1 border-t border-zinc-800/90 pt-4 text-[15px]">
+                      <button
+                        type="button"
+                        onClick={() => toggleInteraction(d.id, 'commented')}
+                        className="inline-flex items-center justify-start gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
+                      >
+                        <svg className={`h-[22px] w-[22px] ${commentClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        {Number.isFinite(commentCount) ? <span className={commentClass}>{commentCount}</span> : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleInteraction(d.id, 'reposted')}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
+                      >
+                        <svg className={`h-[22px] w-[22px] ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleInteraction(d.id, 'liked')}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
+                      >
+                        <svg className={`h-[22px] w-[22px] ${likeClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M10 16.1l-.85-.78C5.65 12.1 3.5 10.16 3.5 7.78A3.28 3.28 0 016.78 4.5c1.07 0 2.1.5 2.72 1.29A3.55 3.55 0 0112.22 4.5a3.28 3.28 0 013.28 3.28c0 2.38-2.15 4.33-5.65 7.54l-.85.78z"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        {Number.isFinite(likeCount) ? <span className={likeClass}>{likeCount}</span> : null}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
+                      >
+                        <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleBookmark(d.id)}
+                        className="inline-flex items-center justify-end gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
+                        title={isBookmarked ? 'Remove bookmark' : 'Save post'}
+                      >
+                        <svg className={`h-[22px] w-[22px] ${bookmarkClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {composerUserId &&
+              loungePostDetail.user_id === composerUserId &&
+              loungePostWithinAuthorEditWindow(loungePostDetail.created_at) &&
+              !loungeDetailEditing ? (
+                <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-zinc-800 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoungeDetailEditErr('')
+                      setLoungeManageErr('')
+                      setLoungeDetailDraftCaption(feedPostDisplayCaption(loungePostDetail))
+                      setLoungeDetailEditing(true)
+                    }}
+                    disabled={loungeDetailDeleteBusy}
+                    className="min-h-12 touch-manipulation rounded-xl border border-zinc-600 bg-zinc-900 text-[15px] font-semibold text-zinc-100 hover:bg-zinc-800 disabled:opacity-50"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void confirmDeleteLoungePostFromDetail()}
+                    disabled={loungeDetailDeleteBusy}
+                    className="min-h-12 touch-manipulation rounded-xl bg-rose-600/90 text-[15px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
+                  >
+                    {loungeDetailDeleteBusy ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              ) : null}
+
+              {composerUserId &&
+              loungePostDetail.user_id === composerUserId &&
+              loungePostWithinAuthorEditWindow(loungePostDetail.created_at) &&
+              loungeDetailEditing ? (
+                <div className="flex shrink-0 flex-wrap gap-2 border-t border-zinc-800 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <button
+                    type="button"
+                    onClick={() => void saveLoungeDetailCaption()}
+                    disabled={loungeDetailEditBusy}
+                    className="min-h-12 flex-1 touch-manipulation rounded-xl bg-cyan-600 px-4 text-[15px] font-bold text-white hover:bg-cyan-500 disabled:opacity-60"
+                  >
+                    {loungeDetailEditBusy ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelLoungeDetailEdit}
+                    disabled={loungeDetailEditBusy}
+                    className="min-h-12 flex-1 touch-manipulation rounded-xl border border-zinc-600 bg-zinc-900 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {profileModalOpen ? (
           <div className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center p-4 bg-black/75" role="dialog" aria-modal>
@@ -4702,7 +4965,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
 
       {globalConfirmState.open ? (
         <div
-          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
           onClick={() => closeGlobalConfirm(false)}
         >
           <div
