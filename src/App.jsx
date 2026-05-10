@@ -220,11 +220,13 @@ function App() {
       return
     }
 
+    setIsLoggingIn(false)
     setUser(data.user)
     setAccessNotice('')
     setVerificationSuccess(false)
     setAuthPanelOpen(false)
-    setIsLoggingIn(false)
+    // Full reload so Lounge (and composer) mount with the new session; same-tab anon → member can leave feed UI stale otherwise.
+    window.location.reload()
   }
 
   const handleOAuthSignIn = async (provider, { setError = setLoginError } = {}) => {
