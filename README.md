@@ -6,6 +6,8 @@ React + Vite front end for slot guides, calculators, and related tooling. Supaba
 
 **Keeping docs current (humans + AI):** Follow **`AGENTS.md`** — which files are canonical, when to update them, and what to capture from decisions so future sessions do not rely on chat memory.
 
+**Access:** The app shell loads for **anonymous** visitors (Supabase anon key); use **Log in** from the sticky strip or from a feature when something needs an account. After login, the **`allowed_emails`** whitelist still applies. Details: **`docs/frontend-architecture.md`** (Access model).
+
 ## Prerequisites
 
 - Node.js (current LTS is fine)

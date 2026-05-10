@@ -10,6 +10,12 @@ How the React app is organized after the **feature-module split** (2026). Use th
 
 Keeping auth in **`App.jsx`** and product chrome in **`AppShell`** avoids a circular dependency story and keeps the entry file small (~hundreds of lines instead of thousands).
 
+## Access model (public browse + member)
+
+- **Anonymous:** No Supabase session → user lands in **`AppShell`** immediately (Supabase **anon** key; public-read RLS paths work). A sticky strip invites **Log in**; calculators and Lounge read behave like the old dev-only “guest” path without a fake session.
+- **Member:** Session exists **and** email is on **`allowed_emails`** → same shell with **`browseMode === 'member'`** (log out, posting, offers sync, etc. as implemented).
+- **Auth UI:** Log in / sign up / forgot password render as a **full-screen panel** when the user opens auth from the strip, **Continue without signing in**, or when a feature calls **`onRequireAuth`** (no full-app reload). Whitelist rejection sets a dismissible **`accessNotice`** in the shell after sign-out.
+
 ## Feature folders (`src/features/`)
 
 | Folder | Role |

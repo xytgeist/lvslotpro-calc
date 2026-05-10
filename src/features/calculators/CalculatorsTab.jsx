@@ -13,7 +13,7 @@ function CalculatorLoadingFallback() {
   )
 }
 
-function CalculatorsHome({ onSelectCalculator, onLogout }) {
+function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout }) {
   return (
     <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
     <div className="text-center mb-10 sm:mb-12">
@@ -87,20 +87,38 @@ function CalculatorsHome({ onSelectCalculator, onLogout }) {
     </button>
 
     <div className="mt-10 sm:mt-12 text-center">
-      <button
-        onClick={onLogout}
-        className="min-h-12 inline-flex items-center justify-center text-base text-gray-400 hover:text-red-400 underline touch-manipulation transition-colors px-4 py-2"
-      >
-        Logout
-      </button>
+      {browseMode === 'member' ? (
+        <button
+          type="button"
+          onClick={onLogout}
+          className="min-h-12 inline-flex items-center justify-center text-base text-gray-400 hover:text-red-400 underline touch-manipulation transition-colors px-4 py-2"
+        >
+          Log out
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onOpenAuth}
+          className="min-h-12 inline-flex items-center justify-center text-base text-cyan-400 hover:text-cyan-300 underline touch-manipulation transition-colors px-4 py-2"
+        >
+          Log in or create account
+        </button>
+      )}
     </div>
   </div>
   )
 }
 
-export default function CalculatorsTab({ activeCalculator, setActiveCalculator, onLogout }) {
+export default function CalculatorsTab({ activeCalculator, setActiveCalculator, browseMode, onOpenAuth, onLogout }) {
   if (!activeCalculator) {
-    return <CalculatorsHome onSelectCalculator={setActiveCalculator} onLogout={onLogout} />
+    return (
+      <CalculatorsHome
+        onSelectCalculator={setActiveCalculator}
+        browseMode={browseMode}
+        onOpenAuth={onOpenAuth}
+        onLogout={onLogout}
+      />
+    )
   }
   return (
     <Suspense fallback={<CalculatorLoadingFallback />}>

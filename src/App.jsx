@@ -11,14 +11,16 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 function App() {
   const AUTH_VIEW_STORAGE_KEY = 'lvslotpro-auth-view'
-  const ALLOW_GUEST_MODE = import.meta.env.DEV || String(import.meta.env.VITE_ALLOW_GUEST_MODE || '').toLowerCase() === 'true'
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isAllowed, setIsAllowed] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-  const [guestMode, setGuestMode] = useState(false)
   const [currentView, setCurrentView] = useState('app')
+  /** Full-screen login/signup when the user chooses it or a feature calls onRequireAuth. */
+  const [authPanelOpen, setAuthPanelOpen] = useState(false)
+  /** Shown in the shell after whitelist rejection (session is cleared). */
+  const [accessNotice, setAccessNotice] = useState('')
 
   // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -59,12 +61,16 @@ function App() {
     if (!data) {
       setIsAllowed(false)
       setIsChecking(false)
-      setLoginError("Your account is not yet approved. Contact Ryan to be whitelisted.")
+      const msg = 'Your account is not yet approved. Contact Ryan to be whitelisted.'
+      setLoginError(msg)
+      setAccessNotice(msg)
       await supabase.auth.signOut()
       return
     }
     setIsAllowed(true)
     setIsChecking(false)
+    setAuthPanelOpen(false)
+    setAccessNotice('')
   }, [])
 
   useEffect(() => {
@@ -74,10 +80,12 @@ function App() {
         if (pref === 'create') {
           setShowCreateAccount(true)
           setShowForgotPassword(false)
+          setAuthPanelOpen(true)
         }
         if (pref === 'login') {
           setShowCreateAccount(false)
           setShowForgotPassword(false)
+          setAuthPanelOpen(true)
         }
         if (pref) window.localStorage.removeItem(AUTH_VIEW_STORAGE_KEY)
       } catch {
@@ -186,9 +194,13 @@ function App() {
     if (whitelistData) {
       setUser(data.user)
       setIsAllowed(true)
+      setAccessNotice('')
+      setAuthPanelOpen(false)
     } else {
+      const msg = 'Your account is not yet approved. Contact Ryan to be whitelisted.'
+      setLoginError(msg)
+      setAccessNotice(msg)
       await supabase.auth.signOut()
-      setLoginError("Your account is not yet approved. Contact Ryan to be whitelisted.")
     }
     setIsLoggingIn(false)
   }
@@ -300,14 +312,20 @@ function App() {
   }
 
   const handleLogout = async () => {
-    if (guestMode) {
-      setGuestMode(false)
-      setIsAllowed(false)
-      window.location.reload()
-      return
-    }
     await supabase.auth.signOut()
     window.location.reload()
+  }
+
+  const openAuthPanel = (mode = 'login') => {
+    if (mode === 'create') {
+      setShowCreateAccount(true)
+      setShowForgotPassword(false)
+    } else {
+      setShowCreateAccount(false)
+      setShowForgotPassword(false)
+    }
+    setLoginError('')
+    setAuthPanelOpen(true)
   }
 
   if (isChecking) return <div className={`${mobileShell} text-white`}>Loading...</div>
@@ -359,11 +377,23 @@ function App() {
     )
   }
 
-  // Login Screen
-  if (!guestMode && (!user || !isAllowed)) {
+  // Login / signup (overlay path — app shell stays available when this is closed)
+  if (authPanelOpen) {
     return (
       <div className={mobileShell}>
         <div className="bg-gray-900 p-6 sm:p-8 rounded-3xl max-w-sm w-full">
+          <button
+            type="button"
+            onClick={() => {
+              setAuthPanelOpen(false)
+              setLoginError('')
+              setSignupError('')
+              setSignupMessage('')
+            }}
+            className={`${linkBtn} mb-5 block w-full text-left text-sm sm:text-base`}
+          >
+            ← Continue without signing in
+          </button>
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Las Vegas Slot Pro</h2>
 
           {verificationSuccess && (
@@ -443,22 +473,6 @@ function App() {
                   Forgot Password?
                 </button>
               </div>
-
-              {ALLOW_GUEST_MODE ? (
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGuestMode(true)
-                      setIsAllowed(true)
-                      setCurrentView('app')
-                    }}
-                    className="w-full min-h-11 rounded-2xl border border-cyan-600/60 bg-cyan-950/35 text-cyan-200 text-sm font-semibold hover:bg-cyan-900/35 touch-manipulation"
-                  >
-                    Continue as guest (test)
-                  </button>
-                </div>
-              ) : null}
             </form>
           ) : showCreateAccount ? (
             <form onSubmit={handleSignUp} className="space-y-4">
@@ -553,16 +567,13 @@ function App() {
   if (currentView === 'app') {
     return (
       <AppShell
+        browseMode={user && isAllowed ? 'member' : 'anonymous'}
+        onOpenAuth={openAuthPanel}
+        accessNotice={accessNotice}
+        onDismissAccessNotice={() => setAccessNotice('')}
         onLogout={handleLogout}
         supabaseClient={supabase}
-        onRequireAuth={(mode = 'login') => {
-          try {
-            window.localStorage.setItem(AUTH_VIEW_STORAGE_KEY, mode === 'create' ? 'create' : 'login')
-          } catch {
-            // Ignore storage write failures.
-          }
-          void handleLogout()
-        }}
+        onRequireAuth={(mode = 'login') => openAuthPanel(mode === 'create' ? 'create' : 'login')}
       />
     )
   }

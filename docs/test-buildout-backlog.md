@@ -164,6 +164,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-10: **Public browse access:** app shell loads without login (Supabase anon); full-screen auth panel + sticky shell CTA for sign-in; removed dev-only guest button / `VITE_ALLOW_GUEST_MODE`. See **`docs/frontend-architecture.md`** (Access model).
 - 2026-05-10: **`session-chat-export.md`** removed from Git tracking (`.gitignore`); local export path unchanged for scripts — see **`AGENTS.md`** for backup note on first pull after this change.
 - 2026-05-10: Added root **`AGENTS.md`** (canonical doc map, when-to-update table, chat-export vs repo rules); linked from `README.md`, `docs/frontend-architecture.md`, roadmap, backlog, production checklist.
 - 2026-05-10: Recorded operator **manual smoke pass on test** (items 1–5 as applicable) under **Test smoke and release readiness**.

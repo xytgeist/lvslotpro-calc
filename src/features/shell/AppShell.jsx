@@ -26,7 +26,15 @@ function TabLoadingFallback() {
   )
 }
 
-export default function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
+export default function AppShell({
+  onLogout,
+  supabaseClient,
+  onRequireAuth,
+  browseMode = 'member',
+  onOpenAuth,
+  accessNotice = '',
+  onDismissAccessNotice
+}) {
   const COMMUNITY_FEED_PAGE_SIZE = 20
   const [tab, setTab] = useState('home')
   const [pendingOfferEventIds, setPendingOfferEventIds] = useState([])
@@ -309,6 +317,8 @@ export default function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         <CalculatorsTab
           activeCalculator={activeCalculator}
           setActiveCalculator={setActiveCalculator}
+          browseMode={browseMode}
+          onOpenAuth={() => onOpenAuth?.('login')}
           onLogout={onLogout}
         />
       )
@@ -322,12 +332,22 @@ export default function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               <div className="text-white text-2xl font-black tracking-tight">Las Vegas Slot Pro</div>
               <div className="text-zinc-400 text-sm mt-0.5">Lounge</div>
             </div>
-            <button
-              onClick={onLogout}
-              className="min-h-10 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-semibold touch-manipulation"
-            >
-              Logout
-            </button>
+            {browseMode === 'member' ? (
+              <button
+                onClick={onLogout}
+                className="min-h-10 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-semibold touch-manipulation"
+              >
+                Log out
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenAuth?.('login')}
+                className="min-h-10 px-4 rounded-2xl bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-semibold touch-manipulation"
+              >
+                Log in
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-6">
@@ -478,6 +498,33 @@ export default function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
 
   return (
     <div className="min-h-dvh bg-gray-950">
+      {accessNotice ? (
+        <div className="sticky top-0 z-30 flex items-start justify-between gap-3 border-b border-amber-800/50 bg-amber-950/95 px-4 py-3 backdrop-blur">
+          <p className="min-w-0 flex-1 text-left text-[13px] leading-snug text-amber-100">{accessNotice}</p>
+          <button
+            type="button"
+            onClick={() => onDismissAccessNotice?.()}
+            className="shrink-0 rounded-lg border border-amber-700/60 px-2.5 py-1 text-[12px] font-semibold text-amber-200 touch-manipulation hover:bg-amber-900/50"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : browseMode === 'anonymous' ? (
+        <div className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-900/95 px-4 py-2.5 backdrop-blur">
+          <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+            <p className="min-w-0 text-[12px] leading-snug text-zinc-400">
+              Browsing without an account. Log in to post, save offers, and use member-only features.
+            </p>
+            <button
+              type="button"
+              onClick={() => onOpenAuth?.('login')}
+              className="shrink-0 rounded-xl bg-orange-600 px-3 py-2 text-[12px] font-bold text-white touch-manipulation hover:bg-orange-500"
+            >
+              Log in
+            </button>
+          </div>
+        </div>
+      ) : null}
       <Suspense fallback={<TabLoadingFallback />}>{renderTabContent()}</Suspense>
 
       {globalConfirmState.open ? (
