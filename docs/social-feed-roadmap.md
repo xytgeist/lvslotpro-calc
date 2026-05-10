@@ -12,7 +12,7 @@ For day-to-day implementation status, use `docs/test-buildout-backlog.md`. For w
 
 Product direction (not fully implemented yet; today’s **anonymous shell + whitelist** is the stepping stone):
 
-1. **Anonymous** — See **`docs/access-tiers.md`**: Lounge **read-only**, **first 50 posts per day**, no search/filter/post open; **create account** modal on cap and on any attempt to leave Lounge / use other UI.
+1. **Anonymous** — See **`docs/access-tiers.md`**: Lounge **read-only** (no artificial post cap; normal pagination/RLS), no search/filter/post open; **create account** modal on any attempt to leave Lounge / use other disallowed UI.
 2. **Free account** — **Verified user** badge; **full Lounge**; other tabs reachable; **subscribe** gates on bankroll, offer alerts + OCR, locked calculators/guides (see access tiers).
 3. **Subscriber** — Verified + **subscriber** badges on Lounge posts; **full app** access; **optional add-on paywalls** for brand-new game packs offered **only to subscribers**. Billing likely **Stripe** + webhooks → Supabase.
 

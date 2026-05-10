@@ -10,7 +10,7 @@
 
 | Tier | Internal label | One-line intent |
 | --- | --- | --- |
-| **No account** | `anonymous` | Lounge only: read-only, capped feed scroll (first **50 posts per day**), no search/filter/post detail/navigation; **create account** modal on limits and forbidden actions. |
+| **No account** | `anonymous` | Lounge only: **read-only** feed (no post cap — same feed depth as public RLS + app pagination allow). No search/filter/post detail/navigation; **create account** modal on forbidden actions. |
 | **Free (verified user)** | `free` | Full **Lounge** (post, lounge search, filter, comment, like, repost, bookmark, etc.). **Verified user** badge by display name. Rest of app reachable from menu; **subscribe** gates on bankroll, offer alerts/OCR, locked calcs/guides. |
 | **Paid subscriber** | `subscriber` | **Verified user** + **subscriber** badges on Lounge posts. Full access to current shipped features. **New** games/calcs/guides may ship with an **extra paywall** purchasable **only by subscribers** (optional add-on). |
 | **Moderator / admin** | `staff` (`role` on profile) | **Full access** to everything, including new calcs/guides before/during any add-on rollout. **Special badges** distinct from verified/subscriber. |
@@ -31,14 +31,10 @@
 
 **Allowed**
 
-- **Read-only** the **first 50 posts** in the Lounge feed **per day** (see §7 for “day” boundary TBD).
+- **Read-only** the Lounge feed for as many posts as the app loads under **public read** + **pagination** (no artificial daily or scroll cap).
 - **No** Lounge **search** (feature may not exist yet; still blocked for anon).
 - **No** feed **filtering** for anon.
 - **No** opening a **post** (tap / drill-in): treat as a forbidden action → **create account** popup (same as other gates below).
-
-**Hard stop in feed**
-
-- When the user **scrolls such that the 50th post is displayed** (i.e. they have “reached” the 50-post cap in the ordered feed), show the **create account** popup.
 
 **Forbidden actions → create account popup**
 
@@ -51,7 +47,7 @@ If the user attempts **any** of the following, show the **create account** popup
 
 **After dismiss**
 
-- User may **continue viewing** the same **50 posts** in the Lounge.
+- User may **continue viewing** the Lounge feed (read-only) as loaded.
 - On **any** subsequent forbidden action, show the **create account** popup again (re-entrant).
 
 ---
@@ -101,7 +97,6 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 
 | Topic | Status |
 | --- | --- |
-| **“Per day” for 50 posts** | Calendar day vs rolling 24h vs user timezone — **TBD**. Anon has no `user_id`; enforcing a strict daily cap may need **device/session token**, **Edge rate limit**, or **signed anonymous identity** — decide before shipping. |
 | **Which calcs/guides are free vs locked** | Curated list or metadata per slug — **TBD** (product + content). |
 | **Signup / whitelist** | Current **`allowed_emails`** behavior vs open signup — **TBD** if it changes for free tier. |
 | **Stripe products** | Base subscription vs add-on SKUs for new-game packs — **TBD**. |
@@ -112,7 +107,7 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 
 | Surface | No account | Free | Paid | Staff |
 | --- | --- | --- | --- | --- |
-| **Lounge** | First **50** posts/day read-only; no search/filter/post tap; cap hit → create account modal; other actions → create account modal | Full + verified badge | Full + verified + subscriber on posts | Full + staff badges |
+| **Lounge** | Read-only full feed (no search/filter/post tap); forbidden actions → create account modal | Full + verified badge | Full + verified + subscriber on posts | Full + staff badges |
 | **Hamburger / other tabs** | Create account modal | Allowed; gated features show subscribe modal | Full | Full |
 | **Bankroll** | Create account modal | Subscribe | Full | Full |
 | **Offers calendar** | Create account modal | Calendar yes; **alerts + OCR** subscribe | Full | Full |
@@ -125,7 +120,7 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 
 | Modal | When |
 | --- | --- |
-| **Create account** | Anonymous user hits cap, navigation, post tap, or any disallowed action. Dismiss → can still scroll the allowed 50 posts; modal returns on next violation. |
+| **Create account** | Anonymous user: navigation, post tap, search (when present), or any disallowed action. Dismiss → can still read the Lounge feed; modal returns on next violation. |
 | **Subscribe** | Free user hits a subscriber-only feature (bankroll, alerts, OCR, locked calc/guide, etc.). Include clear **Subscribe** action. |
 
 ---
@@ -134,4 +129,5 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 
 | Date | Change |
 | --- | --- |
-| 2026-05-10 | Initial template; then filled full spec: anon 50 posts/day + create-account gating; free verified + subscribe gates (bankroll, offers alerts/OCR, locked calcs/guides); paid badges + full access + subscriber-only add-on paywalls for new games; staff badges + full access; TBD + modal UX sections. |
+| 2026-05-10 | Initial template; filled anon/create-account gating; free verified + subscribe gates; paid + add-on paywalls; staff; TBD + modal UX. |
+| 2026-05-10 | Removed **50 posts per day** cap; anon Lounge read-only is uncapped aside from normal pagination/RLS. |
