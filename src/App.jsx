@@ -275,6 +275,8 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
   const [communityFeedCursor, setCommunityFeedCursor] = useState(null)
   /** True while the first page of the Lounge feed is being reloaded (including silent pull-to-refresh). */
   const communityFeedHeadReloadingRef = useRef(false)
+  /** Latest `communityPosts.length` for `loadCommunityFeed` (callback cannot read current state). */
+  const communityPostsHeadCountRef = useRef(0)
   const iosPwaGlobalPromptShownRef = useRef(false)
   const [globalConfirmState, setGlobalConfirmState] = useState({
     open: false,
@@ -363,6 +365,10 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     }
   }, [showGlobalConfirm, supabaseClient])
 
+  useEffect(() => {
+    communityPostsHeadCountRef.current = communityPosts.length
+  }, [communityPosts.length])
+
   const hydrateCommunityPosts = useCallback(
     async (rows) => {
       if (!rows?.length) return []
@@ -386,7 +392,10 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
   const loadCommunityFeed = useCallback(async (opts) => {
     const silent = opts?.silent === true
     if (!silent) {
-      setCommunityFeedLoading(true)
+      /** Avoid swapping the feed for the loading placeholder when posts already exist — that collapses scroll height and snaps `scrollTop` to the top. */
+      if (communityPostsHeadCountRef.current === 0) {
+        setCommunityFeedLoading(true)
+      }
       setCommunityFeedLoadingMore(false)
     }
     communityFeedHeadReloadingRef.current = true
@@ -1918,7 +1927,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               </div>
             </div>
           ) : null}
-          {communityFeedLoading && communityPosts.length === 0 ? (
+          {communityFeedLoading ? (
             <div className="px-3 py-4 text-zinc-400 text-[17px]">Loading lounge…</div>
           ) : communityPosts.length === 0 ? (
             <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
