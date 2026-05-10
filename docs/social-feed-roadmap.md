@@ -24,6 +24,8 @@ Product direction (not fully implemented yet; today’s **anonymous shell + whit
 
 Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity) and stable read paths, introduce schema + webhooks, then gate tab-by-tab. Track concrete tasks in `docs/test-buildout-backlog.md` when implementation starts.
 
+**Your tier definitions:** fill in **`docs/access-tiers.md`** (per-surface read/write matrix + global rules). That file becomes the spec implementation should follow.
+
 ---
 
 ## Phase A - Foundation (DB + auth shaping)

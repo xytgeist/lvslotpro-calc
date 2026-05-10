@@ -18,7 +18,7 @@ Keeping auth in **`App.jsx`** and product chrome in **`AppShell`** avoids a circ
 
 ### Planned: freemium + subscription tiers
 
-Roadmap detail: **`docs/social-feed-roadmap.md`** (section **Freemium & subscriptions**). In short: **anonymous** stays read-heavy (e.g. Lounge view-only); **free accounts** unlock more non-premium actions; **subscribers** get subscribe-gated areas. When built, add a small **entitlements** layer (DB + optional RPC) and extend **`browseMode`** or pass **`entitlements`** into **`AppShell`** — **RLS/webhooks** remain the source of truth, not UI alone.
+Roadmap detail: **`docs/social-feed-roadmap.md`** (section **Freemium & subscriptions**); **tier matrix:** **`docs/access-tiers.md`**. In short: **anonymous** stays read-heavy (e.g. Lounge view-only); **free accounts** unlock more non-premium actions; **subscribers** get subscribe-gated areas. When built, add a small **entitlements** layer (DB + optional RPC) and extend **`browseMode`** or pass **`entitlements`** into **`AppShell`** — **RLS/webhooks** remain the source of truth, not UI alone.
 
 ## Feature folders (`src/features/`)
 

@@ -13,7 +13,8 @@ Future sessions have **no memory** of this chat. Treat the repo as the **source 
 | 3 | `docs/social-feed-roadmap.md` | Phased plan for Lounge / feed / social (A, B, C, …) |
 | 4 | `docs/test-buildout-backlog.md` | Test-first work, phase checkboxes, **smoke list**, sign-offs, SQL/RLS notes tied to test |
 | 5 | `docs/production-rollout-checklist.md` | Promoting test work to production (SQL, functions, smoke) |
-| 6 | `supabase/*.sql` | Schema, RLS, triggers; read headers/comments when touching the DB |
+| 6 | `docs/access-tiers.md` | **Freemium spec:** no account vs free vs paid — per-surface read/write matrix; update when product rules change |
+| 7 | `supabase/*.sql` | Schema, RLS, triggers; read headers/comments when touching the DB |
 
 Feature-specific notes may also live next to code (e.g. `src/features/offers/README.md`).
 
@@ -30,7 +31,7 @@ Do this **in the same change or PR** as the code (or immediately after), not “
 | **DB capability** (e.g. moderator `UPDATE` including `pinned`) **without** matching UI | `docs/test-buildout-backlog.md`: open checkbox + how to test (seed SQL, SQL editor, future UI). Do not assume the next agent reads chat exports. |
 | Edge Function added/removed/renamed on test | `docs/test-buildout-backlog.md` Edge Functions section + prod checklist §4 if needed |
 | User / stakeholder **decision** that affects implementation | Distill into the single best canonical file above; **one sentence in Update log** if it closes or opens a tracked item |
-| **Freemium / subscriptions / entitlements** (tiers, paywalls, Stripe) | `docs/social-feed-roadmap.md` (Freemium section) + backlog tasks + `docs/frontend-architecture.md` access model when client shape changes |
+| **Freemium / subscriptions / entitlements** (tiers, paywalls, Stripe) | **`docs/access-tiers.md`** (matrix) + `docs/social-feed-roadmap.md` (Freemium section) + backlog + `docs/frontend-architecture.md` when client gating changes |
 | Only internal refactor, **zero** API/UX/contract change | Docs optional unless you moved paths (then `frontend-architecture.md`) |
 
 ## Information that belongs in repo docs (not only in chat)
