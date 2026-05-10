@@ -353,7 +353,7 @@ export default function AppShell({
     { id: 'calculators', label: 'Calcs', icon: '🧮', subscriberGated: true },
     { id: 'offers', label: 'Offers', icon: '📅', subscriberGated: false },
     { id: 'bankroll', label: 'Bankroll', icon: '💰', subscriberGated: true },
-    { id: 'guides', label: 'AP Guides', icon: '📗', menuHint: 'Search · +EV cards · ask', subscriberGated: true },
+    { id: 'guides', label: 'AP Guides', icon: '📗', subscriberGated: true },
     { id: 'intel', label: 'Intel', icon: '📍', subscriberGated: false },
     { id: 'team', label: 'Team', icon: '🤝', subscriberGated: false }
   ]
@@ -382,16 +382,13 @@ export default function AppShell({
           }}
           className={`w-full rounded-xl px-3 py-2.5 text-left text-sm touch-manipulation ${
             tab === item.id ? 'bg-zinc-800 text-white' : 'text-zinc-300 hover:bg-zinc-900'
-          } ${item.menuHint ? 'pb-2' : ''}`}
+          }`}
         >
           <span className="flex min-w-0 items-center gap-2">
             <span aria-hidden>{item.icon}</span>
             <span className="min-w-0 flex-1 font-semibold truncate">{item.label}</span>
             {showLock ? <NavLockGlyph className="h-3.5 w-3.5 shrink-0 text-amber-400/95" /> : null}
           </span>
-          {item.menuHint ? (
-            <span className="mt-0.5 block pl-8 text-[11px] leading-snug text-zinc-500">{item.menuHint}</span>
-          ) : null}
         </button>
       )
     })
@@ -400,7 +397,7 @@ export default function AppShell({
     <div className="relative z-[55] shrink-0">
       {menuOpen ? (
         <div
-          className="absolute right-0 top-full z-[55] mt-1 min-w-[11.5rem] max-w-[min(15rem,calc(100vw-1rem))] w-max max-h-[min(22rem,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-5rem))] overflow-y-auto overscroll-y-contain rounded-2xl border border-zinc-800/80 bg-zinc-950/98 px-2 py-2 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-zinc-950/90"
+          className="absolute right-0 top-full z-[55] mt-1 min-w-[8.05rem] max-w-[min(10.5rem,calc(100vw-1rem))] w-max max-h-[min(22rem,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-5rem))] overflow-y-auto overscroll-y-contain rounded-2xl border border-zinc-800/80 bg-zinc-950/98 px-2 py-2 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-zinc-950/90"
           role="menu"
         >
           {renderNavMenuItems()}
@@ -582,6 +579,7 @@ export default function AppShell({
           setPendingOfferEventIds={setPendingOfferEventIds}
           offerSpotlightEventIds={offerSpotlightEventIds}
           setOfferSpotlightEventIds={setOfferSpotlightEventIds}
+          titleBarNavSlot={renderTitleBarNavSlot()}
         />
       )
     if (tab === 'bankroll') return <BankrollTracker />
@@ -677,11 +675,11 @@ export default function AppShell({
         />
       )}
 
-      {tab !== 'home' && tab !== 'calculators' && tab !== 'guides' ? (
+      {tab !== 'home' && tab !== 'calculators' && tab !== 'guides' && tab !== 'offers' ? (
         <div className="fixed right-4 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-50 flex flex-col items-end gap-2">
           {menuOpen ? (
             <div
-              className="min-w-[11.5rem] max-w-[min(15rem,calc(100vw-2rem))] w-max max-h-[min(22rem,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-6rem))] overflow-y-auto overscroll-y-contain rounded-2xl bg-zinc-950/95 px-2 py-2 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85"
+              className="min-w-[8.05rem] max-w-[min(10.5rem,calc(100vw-2rem))] w-max max-h-[min(22rem,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-6rem))] overflow-y-auto overscroll-y-contain rounded-2xl bg-zinc-950/95 px-2 py-2 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85"
               role="menu"
             >
               {renderNavMenuItems()}

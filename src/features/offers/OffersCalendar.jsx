@@ -32,6 +32,7 @@ export default function OffersCalendar({
   setPendingOfferEventIds,
   offerSpotlightEventIds,
   setOfferSpotlightEventIds,
+  titleBarNavSlot = null,
 }) {
   /** Gate for the large legacy push / iOS help block below (was `false &&`). */
   const showLegacyOffersPushPanel = false
@@ -1235,121 +1236,136 @@ export default function OffersCalendar({
       <ReviewQueuePanel reviewQueue={reviewQueue} onComplete={beginReviewItem} onSkip={(itemId) => void skipReviewItem(itemId)} />
 
       <div className={isWeekView ? 'flex flex-1 min-h-0 flex-col gap-2' : 'mb-2'}>
-          <div className={`relative flex w-full min-h-9 shrink-0 items-center justify-between ${isWeekView ? '' : 'mb-2'}`}>
-            <img
-              src="/edge-lounge-logo.png"
-              alt="EDGE"
-              className="relative z-20 h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left"
-              draggable={false}
-            />
-            <div className="absolute left-1/2 top-1/2 z-10 flex max-w-[min(22rem,calc(100vw-5.5rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-1 px-1">
-              <button
-                type="button"
-                disabled={activeCalendarView === 'agenda'}
-                onClick={() => {
-                  if (activeCalendarView === 'agenda') return
-                  if (activeCalendarView === 'week') {
-                    setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))
-                    return
-                  }
-                  setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
-                }}
-                className={`min-h-9 min-w-9 shrink-0 rounded-xl bg-zinc-900 font-bold touch-manipulation ${
-                  activeCalendarView === 'agenda'
-                    ? 'cursor-not-allowed text-zinc-600 opacity-40'
-                    : 'text-zinc-200'
-                }`}
-                aria-label={
-                  activeCalendarView === 'agenda' ? 'Agenda view' : activeCalendarView === 'week' ? 'Previous week' : 'Previous month'
-                }
-              >
-                ‹
-              </button>
-              <div className="min-w-0 max-w-[min(12rem,calc(100vw-11rem))] shrink truncate text-center text-xl font-black tracking-tight text-white sm:max-w-[14rem]">
-                {activeCalendarView === 'agenda' ? 'Agenda' : activeCalendarView === 'week' ? weekTitle : monthTitle}
-              </div>
-              <button
-                type="button"
-                disabled={activeCalendarView === 'agenda'}
-                onClick={() => {
-                  if (activeCalendarView === 'agenda') return
-                  if (activeCalendarView === 'week') {
-                    setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7))
-                    return
-                  }
-                  setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
-                }}
-                className={`min-h-9 min-w-9 shrink-0 rounded-xl bg-zinc-900 font-bold touch-manipulation ${
-                  activeCalendarView === 'agenda'
-                    ? 'cursor-not-allowed text-zinc-600 opacity-40'
-                    : 'text-zinc-200'
-                }`}
-                aria-label={activeCalendarView === 'week' ? 'Next week' : 'Next month'}
-              >
-                ›
-              </button>
+          <div className={`flex shrink-0 flex-col gap-1.5 ${isWeekView ? '' : 'mb-2'}`}>
+            <div className="flex w-full min-h-9 shrink-0 items-center justify-between gap-3">
+              <img
+                src="/edge-lounge-logo.png"
+                alt="EDGE"
+                className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left"
+                draggable={false}
+              />
+              {titleBarNavSlot ? <div className="flex shrink-0 items-center justify-end pt-0.5">{titleBarNavSlot}</div> : null}
             </div>
-            <div ref={viewMenuRef} className="relative z-20 shrink-0">
-              <button
-                type="button"
-                onClick={() => setViewMenuOpen((v) => !v)}
-                className="min-h-9 min-w-9 rounded-xl bg-zinc-900 text-zinc-200 font-bold touch-manipulation"
-                aria-label="Calendar display options"
-              >
-                ⋯
-              </button>
-              {viewMenuOpen && (
-                <div className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setCalendarMode('month')
-                      setOffersDefaultView('month')
-                      await setStoredOffersDefaultViewForCurrentUser('month')
-                      setViewMenuOpen(false)
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                  >
-                    Calendar {offersDefaultView === 'month' ? '• default' : ''}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setCalendarMode('week')
-                      setOffersDefaultView('week')
-                      await setStoredOffersDefaultViewForCurrentUser('week')
-                      setViewMenuOpen(false)
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                  >
-                    Week {offersDefaultView === 'week' ? '• default' : ''}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setCalendarMode('agenda')
-                      setOffersDefaultView('agenda')
-                      await setStoredOffersDefaultViewForCurrentUser('agenda')
-                      setViewMenuOpen(false)
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                  >
-                    Agenda {offersDefaultView === 'agenda' ? '• default' : ''}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setCalendarMode('auto')
-                      setOffersDefaultView('auto')
-                      await setStoredOffersDefaultViewForCurrentUser('auto')
-                      setViewMenuOpen(false)
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                  >
-                    Auto {offersDefaultView === 'auto' ? '• default' : ''}
-                  </button>
+
+            <div className="flex w-full min-h-10 items-center px-1">
+              <div className="min-w-0 flex-1 shrink" aria-hidden />
+              <div className="flex min-h-10 min-w-0 max-w-full shrink items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={activeCalendarView === 'agenda'}
+                  onClick={() => {
+                    if (activeCalendarView === 'agenda') return
+                    if (activeCalendarView === 'week') {
+                      setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))
+                      return
+                    }
+                    setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
+                  }}
+                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center text-[27px] font-bold leading-none touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                    activeCalendarView === 'agenda'
+                      ? 'cursor-not-allowed text-zinc-600 opacity-40'
+                      : 'text-zinc-200'
+                  }`}
+                  aria-label={
+                    activeCalendarView === 'agenda' ? 'Agenda view' : activeCalendarView === 'week' ? 'Previous week' : 'Previous month'
+                  }
+                >
+                  <span className="block translate-y-[-0.08em]" aria-hidden>
+                    ‹
+                  </span>
+                </button>
+                <div className="flex min-h-10 min-w-0 max-w-[min(20rem,calc(100vw-10rem))] shrink items-center justify-center truncate text-center text-[15px] font-black leading-none tracking-tight text-white sm:text-[17px]">
+                  {activeCalendarView === 'agenda' ? 'Agenda' : activeCalendarView === 'week' ? weekTitle : monthTitle}
                 </div>
-              )}
+                <button
+                  type="button"
+                  disabled={activeCalendarView === 'agenda'}
+                  onClick={() => {
+                    if (activeCalendarView === 'agenda') return
+                    if (activeCalendarView === 'week') {
+                      setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7))
+                      return
+                    }
+                    setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
+                  }}
+                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center text-[27px] font-bold leading-none touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                    activeCalendarView === 'agenda'
+                      ? 'cursor-not-allowed text-zinc-600 opacity-40'
+                      : 'text-zinc-200'
+                  }`}
+                  aria-label={activeCalendarView === 'week' ? 'Next week' : 'Next month'}
+                >
+                  <span className="block translate-y-[-0.08em]" aria-hidden>
+                    ›
+                  </span>
+                </button>
+              </div>
+              <div className="flex min-h-0 min-w-0 flex-1 shrink items-center justify-end">
+                <div ref={viewMenuRef} className="relative z-20 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMenuOpen((v) => !v)}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center text-[18px] font-bold leading-none tracking-tight text-zinc-200 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                  aria-label="Calendar display options"
+                >
+                  <span className="block translate-y-[-0.08em]" aria-hidden>
+                    ⋯
+                  </span>
+                </button>
+                {viewMenuOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setCalendarMode('month')
+                        setOffersDefaultView('month')
+                        await setStoredOffersDefaultViewForCurrentUser('month')
+                        setViewMenuOpen(false)
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                    >
+                      Calendar {offersDefaultView === 'month' ? '• default' : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setCalendarMode('week')
+                        setOffersDefaultView('week')
+                        await setStoredOffersDefaultViewForCurrentUser('week')
+                        setViewMenuOpen(false)
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                    >
+                      Week {offersDefaultView === 'week' ? '• default' : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setCalendarMode('agenda')
+                        setOffersDefaultView('agenda')
+                        await setStoredOffersDefaultViewForCurrentUser('agenda')
+                        setViewMenuOpen(false)
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                    >
+                      Agenda {offersDefaultView === 'agenda' ? '• default' : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setCalendarMode('auto')
+                        setOffersDefaultView('auto')
+                        await setStoredOffersDefaultViewForCurrentUser('auto')
+                        setViewMenuOpen(false)
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                    >
+                      Auto {offersDefaultView === 'auto' ? '• default' : ''}
+                    </button>
+                  </div>
+                )}
+                </div>
+              </div>
             </div>
           </div>
 
