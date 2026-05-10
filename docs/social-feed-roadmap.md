@@ -12,9 +12,9 @@ For day-to-day implementation status, use `docs/test-buildout-backlog.md`. For w
 
 Product direction (not fully implemented yet; today’s **anonymous shell + whitelist** is the stepping stone):
 
-1. **Anonymous** — Browse with Supabase **anon**; **Lounge (and similar) read-only** (no composer, reactions, or other writes). Matches public-read RLS.
-2. **Free account** — After sign-up (and whatever **invite / whitelist / email verification** policy you keep), users get **more surfaces** but still **not** full “pro” access (exact split TBD per tab: e.g. deeper guides, intel, calculators tier, offers sync).
-3. **Subscriber** — **Paywalled / subscribe-gated** access to most premium value; billing likely **Stripe** (or similar) with **webhooks → Supabase** (`subscriptions`, `profiles` flags, or dedicated entitlements table).
+1. **Anonymous** — See **`docs/access-tiers.md`**: Lounge **read-only**, **first 50 posts per day**, no search/filter/post open; **create account** modal on cap and on any attempt to leave Lounge / use other UI.
+2. **Free account** — **Verified user** badge; **full Lounge**; other tabs reachable; **subscribe** gates on bankroll, offer alerts + OCR, locked calculators/guides (see access tiers).
+3. **Subscriber** — Verified + **subscriber** badges on Lounge posts; **full app** access; **optional add-on paywalls** for brand-new game packs offered **only to subscribers**. Billing likely **Stripe** + webhooks → Supabase.
 
 **Engineering rules when this ships:**
 

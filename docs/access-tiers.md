@@ -1,70 +1,137 @@
-# Access tiers — your definitions (source draft)
+# Access tiers — product spec (source of truth)
 
-**Purpose:** Lock in what **no account**, **free account**, and **paid subscriber** mean for *this* app before entitlements + RLS + UI gates are coded. Edit this file as the product truth; implementation should mirror it.
+**Purpose:** Define **no account**, **free (verified) account**, **paid subscriber**, and **staff** behavior before entitlements, RLS, and UI gates are implemented.
 
-**Related:** `docs/social-feed-roadmap.md` (Freemium & subscriptions), `docs/frontend-architecture.md` (Access model), `AGENTS.md` (when to update docs).
+**Related:** `docs/social-feed-roadmap.md` (Freemium & subscriptions), `docs/frontend-architecture.md` (Access model), `AGENTS.md`.
 
 ---
 
-## 1. Tier names & one-line intent
+## 1. Tier summary
 
-| Tier | Internal label (optional) | One sentence: who is this? |
+| Tier | Internal label | One-line intent |
 | --- | --- | --- |
-| **No account** | `anonymous` | |
-| **Free** | `free` | |
-| **Paid** | `subscriber` (or `pro`) | |
+| **No account** | `anonymous` | Lounge only: read-only, capped feed scroll (first **50 posts per day**), no search/filter/post detail/navigation; **create account** modal on limits and forbidden actions. |
+| **Free (verified user)** | `free` | Full **Lounge** (post, lounge search, filter, comment, like, repost, bookmark, etc.). **Verified user** badge by display name. Rest of app reachable from menu; **subscribe** gates on bankroll, offer alerts/OCR, locked calcs/guides. |
+| **Paid subscriber** | `subscriber` | **Verified user** + **subscriber** badges on Lounge posts. Full access to current shipped features. **New** games/calcs/guides may ship with an **extra paywall** purchasable **only by subscribers** (optional add-on). |
+| **Moderator / admin** | `staff` (`role` on profile) | **Full access** to everything, including new calcs/guides before/during any add-on rollout. **Special badges** distinct from verified/subscriber. |
 
 ---
 
-## 2. Global rules (cross-cutting)
+## 2. Badges (Lounge and elsewhere as noted)
 
-Fill anything that applies everywhere (not per tab).
-
-| Topic | Your rule |
+| Badge | Who |
 | --- | --- |
-| **Signup** | e.g. open signup / invite-only / `allowed_emails` whitelist forever / hybrid |
-| **Email verification** | required before “free” counts? |
-| **Free → paid** | one Stripe product or multiple? trial? |
-| **Downgrade / cancel** | what happens to saved data, offers, posts? |
-| **Moderators / admins** | separate from these three tiers? (recommended: yes, `role`-based) |
+| **Verified user** | Free and paid accounts (not anonymous). |
+| **Subscriber** | Paid tier (in addition to verified), shown on **posts** in Lounge. |
+| **Moderator / admin** | Staff roles; own badge treatment. |
 
 ---
 
-## 3. Per-surface matrix
+## 3. No account (anonymous) — Lounge teaser
 
-Use **R** = read/browse, **W** = write / personal actions (post, save, sync, react, etc.), **—** = not available, **Teaser** = limited read or capped feature.
+**Allowed**
 
-Copy the pattern in each cell: `R: …` / `W: …` / `—` as needed.
+- **Read-only** the **first 50 posts** in the Lounge feed **per day** (see §7 for “day” boundary TBD).
+- **No** Lounge **search** (feature may not exist yet; still blocked for anon).
+- **No** feed **filtering** for anon.
+- **No** opening a **post** (tap / drill-in): treat as a forbidden action → **create account** popup (same as other gates below).
 
-| Surface | No account | Free | Paid |
-| --- | --- | --- | --- |
-| **Lounge (Home feed)** | R: _e.g. feed + post detail read_ · W: _—_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **AP Guides** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Ask community → feed** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Offers calendar** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Push / reminders** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Local Intel** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Bankroll** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Calculators** (picker + each game) | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Team / deals** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
-| **Account / profile** | R: _…_ · W: _…_ | R: _…_ · W: _…_ | R: _…_ · W: _…_ |
+**Hard stop in feed**
 
-**Add rows** below for anything else (e.g. future `/u/:handle`, search, notifications):
+- When the user **scrolls such that the 50th post is displayed** (i.e. they have “reached” the 50-post cap in the ordered feed), show the **create account** popup.
 
-| Surface | No account | Free | Paid |
-| --- | --- | --- | --- |
-| _…_ | | | |
+**Forbidden actions → create account popup**
 
----
+If the user attempts **any** of the following, show the **create account** popup (not subscribe):
 
-## 4. UX expectations (optional)
+- Tap **search** (when it exists).
+- Open **any hamburger / nav menu item** (leave Lounge surface).
+- **Tap a post** (detail / thread / sheet — any post open).
+- Any other navigation or action outside the **allowed anon Lounge scroll** rules above.
 
-Short notes: what should **anonymous** see when they hit a **W** action (modal copy, blur, paywall screen, redirect to signup vs checkout)?
+**After dismiss**
+
+- User may **continue viewing** the same **50 posts** in the Lounge.
+- On **any** subsequent forbidden action, show the **create account** popup again (re-entrant).
 
 ---
 
-## 5. Revision log
+## 4. Free account — verified user, subscribe gates elsewhere
+
+**Lounge**
+
+- **Verified user** badge next to display name.
+- **Full access:** post, **Lounge search**, **filter**, comment, like, repost, bookmark, and other Lounge features as they ship.
+
+**Navigation**
+
+- May open **all** other app areas from the **hamburger menu** (no blanket “create account” wall).
+
+**Per-feature subscribe requirements**
+
+| Area | Free tier |
+| --- | --- |
+| **Bankroll manager** | **Subscribe** to use (gate + subscribe CTA). |
+| **Offers / calendar** | May use calendar **without** subscribe. **Subscribe** for **alerts** and for **image upload AI OCR** on offers. |
+| **Calculators** | **Subset unlocked**; **majority locked**. Locked rows: **lock icon** on calculator button; tap → **subscribe** popup with path to purchase. Unlocked calcs behave normally. |
+| **AP Guides** | **Some guides unlocked**, **many locked**; same pattern as calcs — lock affordance + tap → **subscribe** popup. |
+
+Copy for modals: distinguish **create account** (anon) vs **subscribe** (free user hitting paid feature).
+
+---
+
+## 5. Paid subscriber
+
+- **Verified** + **subscriber** badges on **posts in Lounge** (display rules as designed in UI).
+- **Full access** to all features that are generally available in the app at that time.
+- **New content paywall:** When **new games** launch with **new calculators and/or guides**, those assets may have an **additional paywall**. **Only subscribers** are offered the **option to purchase** that add-on (free users do not get that purchase path).
+- Staff (§6) bypass normal gates including add-ons.
+
+---
+
+## 6. Moderator and admin
+
+- **Full access** to the entire app, including **any new calculators and guides** (no lockout from general or add-on content).
+- **Special badges** (distinct from verified / subscriber).
+- Implemented via existing / planned **`profiles.role`** (`moderator`, `admin`) plus RLS that mirrors these rules.
+
+---
+
+## 7. Engineering / policy TBD (fill when decided)
+
+| Topic | Status |
+| --- | --- |
+| **“Per day” for 50 posts** | Calendar day vs rolling 24h vs user timezone — **TBD**. Anon has no `user_id`; enforcing a strict daily cap may need **device/session token**, **Edge rate limit**, or **signed anonymous identity** — decide before shipping. |
+| **Which calcs/guides are free vs locked** | Curated list or metadata per slug — **TBD** (product + content). |
+| **Signup / whitelist** | Current **`allowed_emails`** behavior vs open signup — **TBD** if it changes for free tier. |
+| **Stripe products** | Base subscription vs add-on SKUs for new-game packs — **TBD**. |
+
+---
+
+## 8. Per-surface matrix (condensed)
+
+| Surface | No account | Free | Paid | Staff |
+| --- | --- | --- | --- | --- |
+| **Lounge** | First **50** posts/day read-only; no search/filter/post tap; cap hit → create account modal; other actions → create account modal | Full + verified badge | Full + verified + subscriber on posts | Full + staff badges |
+| **Hamburger / other tabs** | Create account modal | Allowed; gated features show subscribe modal | Full | Full |
+| **Bankroll** | Create account modal | Subscribe | Full | Full |
+| **Offers calendar** | Create account modal | Calendar yes; **alerts + OCR** subscribe | Full | Full |
+| **Calculators** | Create account modal | Some unlocked; locks → subscribe | Full; add-on paywalls **offered to subscribers only** | Full |
+| **AP Guides** | Create account modal | Some unlocked; locks → subscribe | Full; new-game add-ons **offered to subscribers only** | Full |
+
+---
+
+## 9. UX — modal types
+
+| Modal | When |
+| --- | --- |
+| **Create account** | Anonymous user hits cap, navigation, post tap, or any disallowed action. Dismiss → can still scroll the allowed 50 posts; modal returns on next violation. |
+| **Subscribe** | Free user hits a subscriber-only feature (bankroll, alerts, OCR, locked calc/guide, etc.). Include clear **Subscribe** action. |
+
+---
+
+## 10. Revision log
 
 | Date | Change |
 | --- | --- |
-| _today_ | Template created; fill sections 1–3. |
+| 2026-05-10 | Initial template; then filled full spec: anon 50 posts/day + create-account gating; free verified + subscribe gates (bankroll, offers alerts/OCR, locked calcs/guides); paid badges + full access + subscriber-only add-on paywalls for new games; staff badges + full access; TBD + modal UX sections. |
