@@ -13,6 +13,7 @@ import UploadProgressOverlay from './components/UploadProgressOverlay'
 import OfferFormModal from './components/OfferFormModal'
 import WeekEventDetailModal from './components/WeekEventDetailModal'
 import AddEventFab from './components/AddEventFab'
+import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import useOffersCalendarState from './hooks/useOffersCalendarState'
 import useOffersCalendarMutations from './hooks/useOffersCalendarMutations'
 import useWebPushNotifications from './hooks/useWebPushNotifications'
@@ -1238,67 +1239,52 @@ export default function OffersCalendar({
       <div className={isWeekView ? 'flex flex-1 min-h-0 flex-col gap-2' : 'mb-2'}>
           <div className={`flex shrink-0 flex-col gap-1.5 ${isWeekView ? '' : 'mb-2'}`}>
             <div className="flex w-full min-h-9 shrink-0 items-center justify-between gap-3">
-              <img
-                src="/edge-lounge-logo.png"
-                alt="EDGE"
-                className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left"
-                draggable={false}
-              />
+              <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
               {titleBarNavSlot ? <div className="flex shrink-0 items-center justify-end pt-0.5">{titleBarNavSlot}</div> : null}
             </div>
 
             <div className="flex w-full min-h-10 items-center px-1">
               <div className="min-w-0 flex-1 shrink" aria-hidden />
               <div className="flex min-h-10 min-w-0 max-w-full shrink items-center justify-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={activeCalendarView === 'agenda'}
-                  onClick={() => {
-                    if (activeCalendarView === 'agenda') return
-                    if (activeCalendarView === 'week') {
-                      setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))
-                      return
-                    }
-                    setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
-                  }}
-                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center text-[27px] font-bold leading-none touch-manipulation [-webkit-tap-highlight-color:transparent] ${
-                    activeCalendarView === 'agenda'
-                      ? 'cursor-not-allowed text-zinc-600 opacity-40'
-                      : 'text-zinc-200'
-                  }`}
-                  aria-label={
-                    activeCalendarView === 'agenda' ? 'Agenda view' : activeCalendarView === 'week' ? 'Previous week' : 'Previous month'
-                  }
-                >
-                  <span className="block translate-y-[-0.08em]" aria-hidden>
-                    ‹
-                  </span>
-                </button>
+                {activeCalendarView !== 'agenda' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeCalendarView === 'week') {
+                        setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))
+                        return
+                      }
+                      setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
+                    }}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center text-[27px] font-bold leading-none text-zinc-200 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                    aria-label={activeCalendarView === 'week' ? 'Previous week' : 'Previous month'}
+                  >
+                    <span className="block translate-y-[-0.08em]" aria-hidden>
+                      ‹
+                    </span>
+                  </button>
+                ) : null}
                 <div className="flex min-h-10 min-w-0 max-w-[min(20rem,calc(100vw-10rem))] shrink items-center justify-center truncate text-center text-[15px] font-black leading-none tracking-tight text-white sm:text-[17px]">
                   {activeCalendarView === 'agenda' ? 'Agenda' : activeCalendarView === 'week' ? weekTitle : monthTitle}
                 </div>
-                <button
-                  type="button"
-                  disabled={activeCalendarView === 'agenda'}
-                  onClick={() => {
-                    if (activeCalendarView === 'agenda') return
-                    if (activeCalendarView === 'week') {
-                      setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7))
-                      return
-                    }
-                    setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
-                  }}
-                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center text-[27px] font-bold leading-none touch-manipulation [-webkit-tap-highlight-color:transparent] ${
-                    activeCalendarView === 'agenda'
-                      ? 'cursor-not-allowed text-zinc-600 opacity-40'
-                      : 'text-zinc-200'
-                  }`}
-                  aria-label={activeCalendarView === 'week' ? 'Next week' : 'Next month'}
-                >
-                  <span className="block translate-y-[-0.08em]" aria-hidden>
-                    ›
-                  </span>
-                </button>
+                {activeCalendarView !== 'agenda' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeCalendarView === 'week') {
+                        setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7))
+                        return
+                      }
+                      setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
+                    }}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center text-[27px] font-bold leading-none text-zinc-200 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                    aria-label={activeCalendarView === 'week' ? 'Next week' : 'Next month'}
+                  >
+                    <span className="block translate-y-[-0.08em]" aria-hidden>
+                      ›
+                    </span>
+                  </button>
+                ) : null}
               </div>
               <div className="flex min-h-0 min-w-0 flex-1 shrink items-center justify-end">
                 <div ref={viewMenuRef} className="relative z-20 shrink-0">

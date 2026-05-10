@@ -31,6 +31,7 @@ import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
+import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 
 /** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
 const LOUNGE_MAX_PINNED_ALERT =
@@ -1295,12 +1296,7 @@ export default function SocialFeed({
         }}
       >
         <div className="flex items-center justify-between gap-3 px-3 py-2">
-          <img
-            src="/edge-lounge-logo.png"
-            alt="EDGE"
-            className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left"
-            draggable={false}
-          />
+          <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
           <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
             <div className="pointer-events-none truncate text-right text-zinc-600 text-[13px]">
               {communityFeedLoading ? 'Updating…' : ''}

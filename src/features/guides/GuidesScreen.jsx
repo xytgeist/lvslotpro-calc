@@ -46,6 +46,7 @@ import {
   uploadProfileAvatar,
 } from '../profiles/profileGate'
 import { loungeProfileNeedsGate, writeProfileGateAck } from '../lounge/loungeStorage'
+import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 
 /** Calculator / generic placeholder art for Buffalo Link — also used when a guide hero fails to load. */
 const BUFFALO_PLACEHOLDER_SRC = '/guides/buffalo-link/buffalo-link-calculator-icon.webp'
@@ -1456,12 +1457,7 @@ export default function GuidesScreen({
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="sr-only">AP Guides</h1>
-          <img
-            src="/edge-lounge-logo.png"
-            alt="EDGE"
-            className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left"
-            draggable={false}
-          />
+          <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
           <div className="mt-2 text-sm text-zinc-400">+EV quick read · expand for full playbook</div>
         </div>
         {titleBarNavSlot ? <div className="shrink-0 pt-0.5">{titleBarNavSlot}</div> : null}

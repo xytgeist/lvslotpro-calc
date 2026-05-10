@@ -229,3 +229,27 @@ input[list]::-webkit-list-button {
 .offers-time-wheel > div:last-child {
   display: none !important;
 }
+
+/* EDGE logo tap easter egg (“Giggity”) — 1s total, fizzles out */
+@keyframes edgeGiggityFizzle {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+    letter-spacing: 0.02em;
+  }
+  35% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(-14px) scale(1.2);
+    letter-spacing: 0.4em;
+  }
+}
+
+.edge-giggity-fizzle {
+  animation: edgeGiggityFizzle 1s ease-out forwards;
+}

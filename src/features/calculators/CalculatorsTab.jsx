@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 
 const PhoenixLink = lazy(() => import('./games/PhoenixLink.jsx'))
 const BuffaloLink = lazy(() => import('./games/BuffaloLink.jsx'))
@@ -16,17 +17,14 @@ function CalculatorLoadingFallback() {
 function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout, onDeleteAccount, deleteAccountBusy, titleBarNavSlot }) {
   return (
     <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
-    <div className="mb-10 flex items-start justify-between gap-3 text-left sm:mb-12">
-      <div className="min-w-0 flex-1">
-        <img
-          src="/edge-lounge-logo.png"
-          alt="EDGE"
-          className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left"
-          draggable={false}
-        />
-        <p className="mt-4 text-base text-zinc-400">Select a calculator</p>
+    <div className="mb-10 text-left sm:mb-12">
+      <div className="flex items-center justify-between gap-3">
+        <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
+        {titleBarNavSlot ? (
+          <div className="flex min-w-0 shrink-0 items-center justify-end">{titleBarNavSlot}</div>
+        ) : null}
       </div>
-      {titleBarNavSlot ? <div className="shrink-0 pt-0.5">{titleBarNavSlot}</div> : null}
+      <p className="mt-4 text-base text-zinc-400">Select a calculator</p>
     </div>
 
     <button
