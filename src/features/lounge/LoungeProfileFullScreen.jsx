@@ -397,8 +397,14 @@ export default function LoungeProfileFullScreen({
           if (!panelVisible) onAfterTransitionOut?.()
         }}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          {/* Banner; ⋯ is a sibling strip with sticky top while editing so only that control pins (banner image scrolls). */}
+        <div
+          className={
+            showOwnEditControls
+              ? 'min-h-0 flex-1 overflow-hidden overscroll-y-none pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+              : 'min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+          }
+        >
+          {/* Banner; ⋯ in corner (edit mode: sheet does not scroll, so absolute only). */}
           <div className="relative z-10 w-full shrink-0">
             <div className="relative h-28 w-full shrink-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 sm:h-36">
               <button
@@ -436,11 +442,7 @@ export default function LoungeProfileFullScreen({
             {isOwnProfile ? (
               <div
                 ref={ownProfileBannerMenuRef}
-                className={
-                  showOwnEditControls
-                    ? 'pointer-events-none sticky top-0 z-20 -mt-28 flex h-28 w-full shrink-0 justify-end pr-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:-mt-36 sm:h-36 sm:pr-3'
-                    : 'absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 sm:right-3'
-                }
+                className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 sm:right-3"
               >
                 <button
                   ref={ownProfileMenuButtonRef}
@@ -449,9 +451,7 @@ export default function LoungeProfileFullScreen({
                   aria-expanded={ownProfileMenuOpen}
                   aria-haspopup="menu"
                   aria-label="Profile options"
-                  className={`grid h-9 w-9 place-items-center rounded-full bg-black/32 text-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm touch-manipulation outline-none ring-0 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [-webkit-tap-highlight-color:transparent] hover:bg-black/44 active:bg-black/50 ${
-                    showOwnEditControls ? 'pointer-events-auto' : ''
-                  }`}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-black/32 text-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm touch-manipulation outline-none ring-0 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [-webkit-tap-highlight-color:transparent] hover:bg-black/44 active:bg-black/50"
                 >
                   <span
                     aria-hidden
