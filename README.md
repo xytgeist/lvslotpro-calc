@@ -6,7 +6,7 @@ React + Vite front end for slot guides, calculators, and related tooling. Supaba
 
 **Keeping docs current (humans + AI):** Follow **`AGENTS.md`** — which files are canonical, when to update them, and what to capture from decisions so future sessions do not rely on chat memory.
 
-**Access:** The app shell loads for **anonymous** visitors (Supabase anon key); use **Log in** from the sticky strip or from a feature when something needs an account. After login, the **`allowed_emails`** whitelist still applies. Details: **`docs/frontend-architecture.md`** (Access model).
+**Access:** The app shell loads for **anonymous** visitors (Supabase anon key); use **Log in** from the sticky strip or from a feature when something needs an account. Any **successful sign-in** uses the full member shell (freemium / subscribe rules live in product docs + UI). Details: **`docs/frontend-architecture.md`** (Access model).
 
 **Subscriber UI (until billing is wired):** set **`VITE_HAS_ACTIVE_SUBSCRIPTION=true`** in `.env.local` to hide hamburger lock icons and simulate an active paid subscription locally. Omit or `false` in production until Stripe + profile flags drive this from the database.
 

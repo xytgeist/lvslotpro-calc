@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { mobileShell, inputBase, btnPrimary, btnSecondary, linkBtn } from './features/shell/shellClasses'
 import { readAuthCallbackParams, getOAuthCallbackMessage } from './features/auth/oauthCallback'
@@ -14,12 +14,11 @@ function App() {
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isAllowed, setIsAllowed] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [currentView, setCurrentView] = useState('app')
   /** Full-screen login/signup when the user chooses it or a feature calls onRequireAuth. */
   const [authPanelOpen, setAuthPanelOpen] = useState(false)
-  /** Shown in the shell after whitelist rejection (session is cleared). */
+  /** Optional shell banner (e.g. future account notices). */
   const [accessNotice, setAccessNotice] = useState('')
   /** Moderator/admin: full access; hamburger hides subscriber-only lock icons. */
   const [isStaffRole, setIsStaffRole] = useState(false)
@@ -52,28 +51,6 @@ function App() {
 
   // Verification success message
   const [verificationSuccess, setVerificationSuccess] = useState(false)
-
-  const checkWhitelist = useCallback(async (userEmail) => {
-    if (!userEmail) {
-      setIsAllowed(false)
-      setIsChecking(false)
-      return
-    }
-    const { data } = await supabase.from('allowed_emails').select('email').eq('email', userEmail).maybeSingle()
-    if (!data) {
-      setIsAllowed(false)
-      setIsChecking(false)
-      const msg = 'Your account is not yet approved. Contact Ryan to be whitelisted.'
-      setLoginError(msg)
-      setAccessNotice(msg)
-      await supabase.auth.signOut()
-      return
-    }
-    setIsAllowed(true)
-    setIsChecking(false)
-    setAuthPanelOpen(false)
-    setAccessNotice('')
-  }, [])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -138,24 +115,19 @@ function App() {
 
     void supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) checkWhitelist(session.user.email)
-      else setIsChecking(false)
+      setIsChecking(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) checkWhitelist(session.user.email)
-      else {
-        setIsAllowed(false)
-        setIsChecking(false)
-      }
+      if (!session?.user) setIsChecking(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [checkWhitelist])
+  }, [])
 
   useEffect(() => {
-    if (!user?.id || !isAllowed) {
+    if (!user?.id) {
       queueMicrotask(() => setIsStaffRole(false))
       return
     }
@@ -173,7 +145,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [user?.id, isAllowed])
+  }, [user?.id])
 
   const getFriendlyErrorMessage = (error, context = 'general') => {
     const message = error?.message || 'Unknown error'
@@ -212,19 +184,9 @@ function App() {
       return
     }
 
-    const { data: whitelistData } = await supabase.from('allowed_emails').select('email').eq('email', email).single()
-    
-    if (whitelistData) {
-      setUser(data.user)
-      setIsAllowed(true)
-      setAccessNotice('')
-      setAuthPanelOpen(false)
-    } else {
-      const msg = 'Your account is not yet approved. Contact Ryan to be whitelisted.'
-      setLoginError(msg)
-      setAccessNotice(msg)
-      await supabase.auth.signOut()
-    }
+    setUser(data.user)
+    setAccessNotice('')
+    setAuthPanelOpen(false)
     setIsLoggingIn(false)
   }
 
@@ -593,7 +555,7 @@ function App() {
   if (currentView === 'app') {
     return (
       <AppShell
-        browseMode={user && isAllowed ? 'member' : 'anonymous'}
+        browseMode={user ? 'member' : 'anonymous'}
         hasActiveSubscription={hasActiveSubscription}
         isStaff={isStaffRole}
         onOpenAuth={openAuthPanel}

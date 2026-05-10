@@ -99,7 +99,7 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | Topic | Status |
 | --- | --- |
 | **Which calcs/guides are free vs locked** | Curated list or metadata per slug — **TBD** (product + content). |
-| **Signup / whitelist** | Current **`allowed_emails`** behavior vs open signup — **TBD** if it changes for free tier. |
+| **Signup / verification** | Supabase auth + email verification policy for “free” tier — **TBD** (no `allowed_emails` gate in the client). |
 | **Stripe products** | Base subscription vs add-on SKUs for new-game packs — **TBD**. |
 
 ---
@@ -133,3 +133,4 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | 2026-05-10 | Initial template; filled anon/create-account gating; free verified + subscribe gates; paid + add-on paywalls; staff; TBD + modal UX. |
 | 2026-05-10 | Removed **50 posts per day** cap; anon Lounge read-only is uncapped aside from normal pagination/RLS. |
 | 2026-05-10 | Hamburger: lock icons on **Calcs**, **AP Guides**, **Bankroll** for free non-subscribers; staff/subscribers see no locks; Offers menu row unlocked (gates in-feature). |
+| 2026-05-10 | **Signup:** no client **`allowed_emails`** whitelist; free tier = signed-in user until billing flags ship. |

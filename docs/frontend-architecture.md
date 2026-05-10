@@ -5,7 +5,7 @@ How the React app is organized after the **feature-module split** (2026). Use th
 ## Entry and bootstrap
 
 - **`src/main.jsx`** — mounts the root component (unchanged pattern).
-- **`src/App.jsx`** — **auth and session only**: Supabase client, whitelist gate, login / signup / forgot password / reset password, OAuth callback handling, routing between auth panel vs the app shell, and **`browseMode`** (anonymous vs member). It imports **`AppShell`** when `currentView === 'app'`.
+- **`src/App.jsx`** — **auth and session only**: Supabase client, login / signup / forgot password / reset password, OAuth callback handling, routing between auth panel vs the app shell, and **`browseMode`** (anonymous vs member). It imports **`AppShell`** when `currentView === 'app'`. **No client-side email whitelist** — any successful Supabase session is treated as a member for shell access (freemium / subscribe gates are separate).
 - **`src/features/shell/AppShell.jsx`** — **logged-in application**: bottom navigation, tab state, Lounge feed wiring, Offers / Guides / Intel / Bankroll / Calculators / Team surfaces, global confirm modal, URL query handling for offers deep links, and iOS PWA notification prompt coordination.
 
 Keeping auth in **`App.jsx`** and product chrome in **`AppShell`** avoids a circular dependency story and keeps the entry file small (~hundreds of lines instead of thousands).
@@ -13,7 +13,7 @@ Keeping auth in **`App.jsx`** and product chrome in **`AppShell`** avoids a circ
 ## Access model (public browse + member)
 
 - **Anonymous:** No Supabase session → user lands in **`AppShell`** immediately (Supabase **anon** key; public-read RLS paths work). A sticky strip invites **Log in**; Lounge and other surfaces follow **anon** policies (today: read-only patterns in Lounge where writes require auth).
-- **Member:** Session exists **and** email is on **`allowed_emails`** → same shell with **`browseMode === 'member'`** (log out, posting, offers sync, etc. as implemented). **`hasActiveSubscription`** (today: env **`VITE_HAS_ACTIVE_SUBSCRIPTION`**, later: billing/profile) plus **`isStaff`** from **`profiles.role`** control **hamburger lock icons** for subscriber-gated tabs (`AppShell.jsx`).
+- **Member:** Any authenticated Supabase session → **`browseMode === 'member'`** (log out, posting, offers sync, etc. as implemented). **`hasActiveSubscription`** (today: env **`VITE_HAS_ACTIVE_SUBSCRIPTION`**, later: billing/profile) plus **`isStaff`** from **`profiles.role`** control **hamburger lock icons** for subscriber-gated tabs (`AppShell.jsx`).
 - **Auth UI:** Log in / sign up / forgot password render as a **full-screen panel** when the user opens auth from the strip, **Continue without signing in**, or when a feature calls **`onRequireAuth`** (no full-app reload). Whitelist rejection sets a dismissible **`accessNotice`** in the shell after sign-out.
 
 ### Planned: freemium + subscription tiers
