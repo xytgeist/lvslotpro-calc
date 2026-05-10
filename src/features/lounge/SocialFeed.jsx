@@ -30,6 +30,10 @@ import { renderRichCaption } from './loungeCaption'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 
+/** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
+const LOUNGE_MAX_PINNED_ALERT =
+  'The maximum number of pinned posts is two. Unpin a post to pin this one.'
+
 export default function SocialFeed({
   supabaseClient,
   onRequireAuth,
@@ -57,8 +61,11 @@ export default function SocialFeed({
   const [composerFoldReveal, setComposerFoldReveal] = useState(loungeComposerInitial.fold)
   const [composerMediaFile, setComposerMediaFile] = useState(null)
   const [composerMediaKind, setComposerMediaKind] = useState('')
+  /** Moderator/admin: create this lounge post already pinned (only one pinned post globally). */
+  const [composerPinOnPost, setComposerPinOnPost] = useState(false)
   const [postBusy, setPostBusy] = useState(false)
   const [postErr, setPostErr] = useState('')
+  const [loungePinBusy, setLoungePinBusy] = useState(false)
   const [profileGateOpen, setProfileGateOpen] = useState(false)
   const [profileGateBusy, setProfileGateBusy] = useState(false)
   const [profileGateErr, setProfileGateErr] = useState('')
@@ -125,6 +132,27 @@ export default function SocialFeed({
 
   /** No composer, server-only counts, gated taps until session is known and user is signed in. */
   const loungeReadOnly = !composerAuthResolved || !composerUserId
+
+  const loungeViewerIsStaff = useMemo(() => {
+    const r = composerUserProfile?.role
+    return r === 'moderator' || r === 'admin'
+  }, [composerUserProfile?.role])
+
+  const loungeDetailIsOwn = useMemo(
+    () => Boolean(composerUserId && loungePostDetail?.user_id && loungePostDetail.user_id === composerUserId),
+    [composerUserId, loungePostDetail?.user_id]
+  )
+
+  const loungeDetailShowPostMenu = useMemo(
+    () =>
+      Boolean(
+        composerUserId &&
+          loungePostDetail?.id &&
+          !loungeDetailEditing &&
+          (loungeDetailIsOwn || loungeViewerIsStaff)
+      ),
+    [composerUserId, loungePostDetail?.id, loungeDetailEditing, loungeDetailIsOwn, loungeViewerIsStaff]
+  )
 
   /** Starter row from `ensureDefaultProfileRow`: must confirm once (cannot dismiss until Save). */
   const profileGateProvisionalConfirmNeeded = useMemo(() => {
@@ -625,6 +653,37 @@ export default function SocialFeed({
     supabaseClient,
   ])
 
+  const setLoungePostPinned = useCallback(
+    async (postId, nextPinned) => {
+      if (!postId || !loungeViewerIsStaff) return
+      setLoungeManageErr('')
+      setLoungePinBusy(true)
+      try {
+        const { error } = await supabaseClient
+          .from('community_feed_posts')
+          .update({ pinned: nextPinned })
+          .eq('id', postId)
+        if (error) {
+          const raw = String(error.message || '')
+          if (raw.includes('MAX_PINNED_POSTS')) {
+            if (typeof window !== 'undefined') window.alert(LOUNGE_MAX_PINNED_ALERT)
+            setLoungeManageErr(LOUNGE_MAX_PINNED_ALERT)
+            return
+          }
+          setLoungeManageErr(raw || 'Could not update pin.')
+          return
+        }
+        setLoungePostDetail((prev) => (prev && prev.id === postId ? { ...prev, pinned: nextPinned } : prev))
+        setCommunityPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, pinned: nextPinned } : p)))
+        setLoungePostDetailMenuOpen(false)
+        await loadCommunityFeed({ silent: true })
+      } finally {
+        setLoungePinBusy(false)
+      }
+    },
+    [loungeViewerIsStaff, loadCommunityFeed, setCommunityPosts, supabaseClient]
+  )
+
   const performLoungePostDeleteFromDetail = useCallback(async () => {
     if (!loungePostDetail?.id || loungePostDetail.user_id !== composerUserId) return
     const postId = loungePostDetail.id
@@ -905,11 +964,17 @@ export default function SocialFeed({
         return
       }
 
+      const isStaffPoster =
+        ownProfile?.role === 'moderator' ||
+        ownProfile?.role === 'admin' ||
+        composerUserProfile?.role === 'moderator' ||
+        composerUserProfile?.role === 'admin'
       const { error } = await supabaseClient.from('community_feed_posts').insert(
         communityFeedPostInsertPayload({
           caption,
           gameTitle: 'Lounge',
           gameSlug: null,
+          pinned: isStaffPoster && composerPinOnPost ? true : undefined,
         })
       )
 
@@ -927,6 +992,11 @@ export default function SocialFeed({
           setPostErr('Lounge feed table is not set up in this project yet.')
           return
         }
+        if (msg.includes('MAX_PINNED_POSTS')) {
+          if (typeof window !== 'undefined') window.alert(LOUNGE_MAX_PINNED_ALERT)
+          setPostErr(LOUNGE_MAX_PINNED_ALERT)
+          return
+        }
         setPostErr(msg || 'Could not post right now.')
         return
       }
@@ -934,6 +1004,7 @@ export default function SocialFeed({
       setPostText('')
       setComposerMediaFile(null)
       setComposerMediaKind('')
+      setComposerPinOnPost(false)
       composerFoldedFromFeedScrollRef.current = false
       composerFoldRevealRef.current = 0
       setComposerFoldReveal(0)
@@ -944,7 +1015,16 @@ export default function SocialFeed({
     } finally {
       setPostBusy(false)
     }
-  }, [composerUserProfile?.avatar_url, loadCommunityFeed, onRequireAuth, postText, rateLimitMessage, supabaseClient])
+  }, [
+    composerPinOnPost,
+    composerUserProfile?.avatar_url,
+    composerUserProfile?.role,
+    loadCommunityFeed,
+    onRequireAuth,
+    postText,
+    rateLimitMessage,
+    supabaseClient,
+  ])
 
   const saveProfileGate = useCallback(async () => {
     setProfileGateErr('')
@@ -1107,6 +1187,7 @@ export default function SocialFeed({
               setPostText('')
               setComposerMediaFile(null)
               setComposerMediaKind('')
+              setComposerPinOnPost(false)
               setPostErr('')
               composerFoldedFromFeedScrollRef.current = false
               composerFoldRevealRef.current = 0
@@ -1338,8 +1419,25 @@ export default function SocialFeed({
                   ) : null}
                 </div>
                 <div className="inline-flex shrink-0 items-center gap-2 py-0.5">
-                  {postText.length >= 280 ? (
-                    <span className="text-[11px] tabular-nums font-semibold text-rose-400" aria-live="polite">
+                  {loungeViewerIsStaff ? (
+                    <label className="inline-flex cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-md border border-zinc-700/80 bg-zinc-900/50 px-2 py-1 text-[11px] font-semibold text-zinc-400 [-webkit-tap-highlight-color:transparent] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan-500/40">
+                      <input
+                        type="checkbox"
+                        checked={composerPinOnPost}
+                        onChange={(e) => setComposerPinOnPost(e.target.checked)}
+                        className="h-3.5 w-3.5 shrink-0 rounded border-zinc-600 bg-zinc-900 text-cyan-600 focus:ring-0"
+                        aria-label="Pin this post to the top of the lounge"
+                      />
+                      <span className="whitespace-nowrap">Pin</span>
+                    </label>
+                  ) : null}
+                  {postText.length >= 250 ? (
+                    <span
+                      className={`text-[11px] tabular-nums font-semibold ${
+                        postText.length >= 280 ? 'text-rose-400' : 'text-zinc-500'
+                      }`}
+                      aria-live="polite"
+                    >
                       {postText.length}/280
                     </span>
                   ) : null}
@@ -1447,6 +1545,19 @@ export default function SocialFeed({
                           <span className="shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
                             Pinned
                           </span>
+                        ) : null}
+                        {loungeViewerIsStaff && !loungeReadOnly ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void setLoungePostPinned(post.id, !post.pinned)
+                            }}
+                            disabled={loungePinBusy}
+                            className="shrink-0 rounded-full border border-zinc-600/90 bg-zinc-900/80 px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-zinc-300 hover:border-fuchsia-500/50 hover:text-fuchsia-100 disabled:opacity-50 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                          >
+                            {post.pinned ? 'Unpin' : 'Pin'}
+                          </button>
                         ) : null}
                       </div>
                     </div>
@@ -1614,9 +1725,7 @@ export default function SocialFeed({
               <h2 id="lounge-post-detail-title" className="min-w-0 flex-1 text-center text-[17px] font-bold text-white">
                 Post
               </h2>
-              {composerUserId &&
-              loungePostDetail.user_id === composerUserId &&
-              !loungeDetailEditing ? (
+              {loungeDetailShowPostMenu ? (
                 <div ref={loungePostDetailMenuWrapRef} className="relative flex h-10 w-10 shrink-0 justify-end">
                   <button
                     type="button"
@@ -1637,7 +1746,7 @@ export default function SocialFeed({
                       role="menu"
                       className="absolute right-0 top-full z-[20] mt-1 min-w-[11rem] rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
                     >
-                      {loungePostWithinAuthorEditWindow(loungePostDetail.created_at) ? (
+                      {loungeDetailIsOwn && loungePostWithinAuthorEditWindow(loungePostDetail.created_at) ? (
                         <button
                           type="button"
                           role="menuitem"
@@ -1661,18 +1770,31 @@ export default function SocialFeed({
                           Edit
                         </button>
                       ) : null}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="block w-full px-4 py-3 text-left text-[15px] font-medium text-rose-300 hover:bg-zinc-800 touch-manipulation disabled:opacity-50"
-                        disabled={loungeDetailDeleteBusy}
-                        onClick={() => {
-                          setLoungePostDetailMenuOpen(false)
-                          setLoungePostDeleteConfirmOpen(true)
-                        }}
-                      >
-                        Delete
-                      </button>
+                      {loungeDetailIsOwn ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="block w-full px-4 py-3 text-left text-[15px] font-medium text-rose-300 hover:bg-zinc-800 touch-manipulation disabled:opacity-50"
+                          disabled={loungeDetailDeleteBusy}
+                          onClick={() => {
+                            setLoungePostDetailMenuOpen(false)
+                            setLoungePostDeleteConfirmOpen(true)
+                          }}
+                        >
+                          Delete
+                        </button>
+                      ) : null}
+                      {loungeViewerIsStaff ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="block w-full px-4 py-3 text-left text-[15px] font-medium text-fuchsia-200 hover:bg-zinc-800 touch-manipulation disabled:opacity-50"
+                          disabled={loungePinBusy}
+                          onClick={() => void setLoungePostPinned(loungePostDetail.id, !loungePostDetail.pinned)}
+                        >
+                          {loungePostDetail.pinned ? 'Unpin from top' : 'Pin to top'}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

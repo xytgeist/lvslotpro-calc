@@ -191,7 +191,7 @@ export default function AppShell({
           .select(selectCols)
           .eq('pinned', true)
           .order('created_at', { ascending: false })
-          .limit(1),
+          .limit(2),
         supabaseClient
           .from('community_feed_posts')
           .select(selectCols)

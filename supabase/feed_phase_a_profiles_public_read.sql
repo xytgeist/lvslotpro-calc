@@ -219,7 +219,7 @@ alter table public.community_feed_posts drop column if exists body;
 alter table public.community_feed_posts drop column if exists title;
 
 comment on column public.community_feed_posts.hidden_at is 'When set, post is withheld from public feed (moderation).';
-comment on column public.community_feed_posts.pinned is 'At most one visible pinned row enforced by partial unique index below.';
+comment on column public.community_feed_posts.pinned is 'Staff: at most two visible pinned posts (trigger trg_community_feed_posts_max_two_pins).';
 comment on column public.community_feed_posts.caption is 'Canonical feed caption (<= 280 chars).';
 
 -- Touch edited_at when caption changes.
@@ -241,10 +241,52 @@ create trigger trg_community_feed_posts_touch_edited_at
   for each row
   execute function public.community_feed_posts_touch_edited_at();
 
--- At most one globally pinned post among non-hidden rows.
-create unique index if not exists community_feed_single_pinned_idx
-  on public.community_feed_posts ((1))
-  where pinned = true and hidden_at is null;
+-- At most two globally pinned posts among non-hidden rows (enforced by trigger).
+drop index if exists public.community_feed_single_pinned_idx;
+drop trigger if exists trg_community_feed_posts_single_pin on public.community_feed_posts;
+drop function if exists public.community_feed_posts_single_pin_enforcer();
+
+create or replace function public.community_feed_posts_enforce_max_two_pins()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  pinned_other int;
+  becoming_pinned boolean;
+begin
+  becoming_pinned := coalesce(new.pinned, false) is true
+    and new.hidden_at is null
+    and (
+      tg_op = 'INSERT'
+      or (tg_op = 'UPDATE' and coalesce(old.pinned, false) is not true)
+    );
+
+  if not becoming_pinned then
+    return new;
+  end if;
+
+  select count(*)::int
+  into pinned_other
+  from public.community_feed_posts c
+  where coalesce(c.pinned, false) is true
+    and c.hidden_at is null
+    and c.id is distinct from new.id;
+
+  if pinned_other >= 2 then
+    raise exception 'MAX_PINNED_POSTS';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_community_feed_posts_max_two_pins on public.community_feed_posts;
+create trigger trg_community_feed_posts_max_two_pins
+  before insert or update on public.community_feed_posts
+  for each row
+  execute function public.community_feed_posts_enforce_max_two_pins();
 
 -- ---------------------------------------------------------------------------
 -- 3) RLS — community_feed_posts (public read, authed write)

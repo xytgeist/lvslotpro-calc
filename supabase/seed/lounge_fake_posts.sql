@@ -73,7 +73,7 @@ inserted as (
 )
 select count(*) as inserted_posts from inserted;
 
--- Ensure exactly one visible pinned post exists for feed testing.
+-- Ensure one visible pinned post exists for feed testing (feed allows up to two).
 update public.community_feed_posts
 set pinned = false
 where pinned = true;
