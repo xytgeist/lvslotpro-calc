@@ -2220,7 +2220,7 @@ export default function SocialFeed({
                   >
                     <svg
                       viewBox="0 0 24 24"
-                      className="h-1/2 w-1/2 text-zinc-500"
+                      className="h-1/2 w-1/2 text-cyan-400"
                       fill="none"
                       aria-hidden
                     >
