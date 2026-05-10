@@ -30,6 +30,7 @@ Do this **in the same change or PR** as the code (or immediately after), not “
 | **DB capability** (e.g. moderator `UPDATE` including `pinned`) **without** matching UI | `docs/test-buildout-backlog.md`: open checkbox + how to test (seed SQL, SQL editor, future UI). Do not assume the next agent reads chat exports. |
 | Edge Function added/removed/renamed on test | `docs/test-buildout-backlog.md` Edge Functions section + prod checklist §4 if needed |
 | User / stakeholder **decision** that affects implementation | Distill into the single best canonical file above; **one sentence in Update log** if it closes or opens a tracked item |
+| **Freemium / subscriptions / entitlements** (tiers, paywalls, Stripe) | `docs/social-feed-roadmap.md` (Freemium section) + backlog tasks + `docs/frontend-architecture.md` access model when client shape changes |
 | Only internal refactor, **zero** API/UX/contract change | Docs optional unless you moved paths (then `frontend-architecture.md`) |
 
 ## Information that belongs in repo docs (not only in chat)

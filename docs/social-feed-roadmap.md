@@ -8,6 +8,24 @@ For day-to-day implementation status, use `docs/test-buildout-backlog.md`. For w
 
 ---
 
+## Freemium & subscriptions (cross-cutting — planned)
+
+Product direction (not fully implemented yet; today’s **anonymous shell + whitelist** is the stepping stone):
+
+1. **Anonymous** — Browse with Supabase **anon**; **Lounge (and similar) read-only** (no composer, reactions, or other writes). Matches public-read RLS.
+2. **Free account** — After sign-up (and whatever **invite / whitelist / email verification** policy you keep), users get **more surfaces** but still **not** full “pro” access (exact split TBD per tab: e.g. deeper guides, intel, calculators tier, offers sync).
+3. **Subscriber** — **Paywalled / subscribe-gated** access to most premium value; billing likely **Stripe** (or similar) with **webhooks → Supabase** (`subscriptions`, `profiles` flags, or dedicated entitlements table).
+
+**Engineering rules when this ships:**
+
+- **Server truth:** RLS + Edge checks must enforce tier limits; the client only hides/shows UX and must not be the only gate.
+- **Single entitlement read path:** e.g. `get_entitlements(user_id)` RPC or JWT claims refreshed post-webhook so `AppShell` / features can branch without duplicating business rules everywhere.
+- **Lounge:** view for everyone with `SELECT`; **writes** gated on `authenticated` + profile/tier policies (already directionally aligned with Phase A3).
+
+Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity) and stable read paths, introduce schema + webhooks, then gate tab-by-tab. Track concrete tasks in `docs/test-buildout-backlog.md` when implementation starts.
+
+---
+
 ## Phase A - Foundation (DB + auth shaping)
 
 ### A1. Profiles model (or extend existing table)
@@ -195,6 +213,7 @@ For day-to-day implementation status, use `docs/test-buildout-backlog.md`. For w
 9. H (notifications)
 10. I (moderation + bans)
 11. J polish (block/mute quality improvements)
+12. **Freemium / subscriptions** (see section above): entitlements in DB + Stripe webhooks, then progressive **subscribe gates** on tabs/features once account + feed foundations are stable.
 
 ---
 
