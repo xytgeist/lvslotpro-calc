@@ -368,6 +368,8 @@ function SocialFeed({
   const [loungePostDetailMenuOpen, setLoungePostDetailMenuOpen] = useState(false)
   const [loungePostDeleteConfirmOpen, setLoungePostDeleteConfirmOpen] = useState(false)
   const loungePostDetailVisibleRef = useRef(true)
+  /** If `transitionend` never runs, still tear down the full-screen detail shell (otherwise feed stays dead). */
+  const loungePostDetailCloseFallbackTimerRef = useRef(0)
   const loungePostDetailMenuWrapRef = useRef(null)
   const loadMoreSentinelRef = useRef(null)
   const pullStartYRef = useRef(null)
@@ -699,6 +701,11 @@ function SocialFeed({
   }
 
   const finalizeLoungePostDetailClose = useCallback(() => {
+    const tid = loungePostDetailCloseFallbackTimerRef.current
+    if (tid) {
+      window.clearTimeout(tid)
+      loungePostDetailCloseFallbackTimerRef.current = 0
+    }
     setLoungePostDetail(null)
     setLoungePostDetailVisible(true)
     setLoungePostDetailMenuOpen(false)
@@ -725,11 +732,24 @@ function SocialFeed({
       finalizeLoungePostDetailClose()
       return
     }
+    const prevTid = loungePostDetailCloseFallbackTimerRef.current
+    if (prevTid) window.clearTimeout(prevTid)
+    /** Match `onLoungePostDetailPanelTransitionEnd`: ref must be false before `transitionend` (same frame for 0ms transitions). */
+    loungePostDetailVisibleRef.current = false
     setLoungePostDetailVisible(false)
+    loungePostDetailCloseFallbackTimerRef.current = window.setTimeout(() => {
+      loungePostDetailCloseFallbackTimerRef.current = 0
+      if (!loungePostDetailVisibleRef.current) finalizeLoungePostDetailClose()
+    }, 400)
   }, [finalizeLoungePostDetailClose])
 
   const openLoungePostDetail = useCallback((post) => {
     if (!post?.id) return
+    const tid = loungePostDetailCloseFallbackTimerRef.current
+    if (tid) {
+      window.clearTimeout(tid)
+      loungePostDetailCloseFallbackTimerRef.current = 0
+    }
     setLoungeManageErr('')
     setLoungeDetailEditing(false)
     setLoungeDetailDraftCaption('')
@@ -1745,6 +1765,7 @@ function SocialFeed({
               loungePostDetailVisible ? 'translate-x-0' : 'translate-x-full'
             }`}
             onTransitionEnd={onLoungePostDetailPanelTransitionEnd}
+            onTransitionCancel={onLoungePostDetailPanelTransitionEnd}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex shrink-0 items-center gap-2 border-b border-zinc-800 px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))] sm:py-3">
