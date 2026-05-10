@@ -1494,17 +1494,6 @@ export default function SocialFeed({
               <div className="px-3 py-3 text-zinc-500 text-[17px]">Loading more…</div>
             ) : null}
 
-            {communityFeedHasMore ? (
-              <button
-                type="button"
-                onClick={() => void loadMoreCommunityFeed()}
-                disabled={communityFeedLoadingMore}
-                className="mx-3 my-2 w-[calc(100%-1.5rem)] min-h-11 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-100 text-[14px] font-semibold disabled:opacity-60 touch-manipulation"
-              >
-                Load more
-              </button>
-            ) : null}
-
             {!communityFeedHasMore && communityPosts.length > 0 ? (
               <div className="text-center text-[14px] text-zinc-600 py-2">You are caught up.</div>
             ) : null}
