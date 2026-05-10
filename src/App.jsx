@@ -275,8 +275,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
   const [communityFeedCursor, setCommunityFeedCursor] = useState(null)
   /** True while the first page of the Lounge feed is being reloaded (including silent pull-to-refresh). */
   const communityFeedHeadReloadingRef = useRef(false)
-  /** Latest `communityPosts.length` for `loadCommunityFeed` (callback cannot read current state). */
-  const communityPostsHeadCountRef = useRef(0)
   const iosPwaGlobalPromptShownRef = useRef(false)
   const [globalConfirmState, setGlobalConfirmState] = useState({
     open: false,
@@ -365,10 +363,6 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
     }
   }, [showGlobalConfirm, supabaseClient])
 
-  useEffect(() => {
-    communityPostsHeadCountRef.current = communityPosts.length
-  }, [communityPosts.length])
-
   const hydrateCommunityPosts = useCallback(
     async (rows) => {
       if (!rows?.length) return []
@@ -392,10 +386,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
   const loadCommunityFeed = useCallback(async (opts) => {
     const silent = opts?.silent === true
     if (!silent) {
-      /** Avoid swapping the feed for the loading placeholder when posts already exist — that collapses scroll height and snaps `scrollTop` to the top. */
-      if (communityPostsHeadCountRef.current === 0) {
-        setCommunityFeedLoading(true)
-      }
+      setCommunityFeedLoading(true)
       setCommunityFeedLoadingMore(false)
     }
     communityFeedHeadReloadingRef.current = true
@@ -865,17 +856,9 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
         })
       }
       sync()
-      if (typeof ResizeObserver === 'undefined') {
-        window.addEventListener('resize', sync)
-        return () => window.removeEventListener('resize', sync)
-      }
-      const ro = new ResizeObserver(sync)
-      ro.observe(el)
+      /** Avoid ResizeObserver on the scroll root: it can fire when scrollbar/layout shifts and re-run `sync`, which updates fixed header `top` and has been linked to scroll snapping on mobile WebKit. */
       window.addEventListener('resize', sync)
-      return () => {
-        ro.disconnect()
-        window.removeEventListener('resize', sync)
-      }
+      return () => window.removeEventListener('resize', sync)
     }, [])
 
     useEffect(() => {
