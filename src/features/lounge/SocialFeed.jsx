@@ -1135,57 +1135,55 @@ export default function SocialFeed({
             </svg>
           </button>
         ) : null}
-        <div className="flex items-start gap-4">
-          <div className="mt-0.5 flex w-[3.3rem] shrink-0 justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                if (!composerUserId) return
-                if (openProfileGateIfNeeded()) return
-                void openProfileModal({
-                  user_id: composerUserId,
-                  author_profile: composerUserProfile,
-                })
-              }}
-              className="flex h-[3.3rem] w-[3.3rem] shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[17px] font-bold text-zinc-200"
-              title="Open your profile"
-              aria-label="Open your profile"
-            >
-              {composerUserProfile?.avatar_url ? (
-                <img
-                  key={composerUserProfile.avatar_url}
-                  src={composerUserProfile.avatar_url}
-                  alt=""
-                  className="h-full w-full rounded-full object-cover"
-                  loading="eager"
-                  decoding="async"
-                />
-              ) : !composerAuthResolved ? (
-                <span
-                  className="block h-full w-full rounded-full bg-zinc-700/55 animate-pulse"
-                  aria-hidden
-                />
-              ) : (
-                <span
-                  className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarToneClass(
-                    composerUserProfile?.user_id || composerUserId || 'me'
-                  )}`}
-                >
-                  {(() => {
-                    if (composerUserProfile?.display_name?.trim() || composerUserProfile?.handle?.trim()) {
-                      return avatarText({ author_profile: composerUserProfile })
-                    }
-                    if (composerAuthUser) {
-                      const seed = profileSeedFromUser(composerAuthUser)
-                      return profileAvatarInitials(seed.displayName, seed.baseHandle)
-                    }
-                    if (composerUserId) return composerStableInitialsFromUid(composerUserId)
-                    return avatarText({ author_profile: { display_name: 'Me', handle: '' } })
-                  })()}
-                </span>
-              )}
-            </button>
-          </div>
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (!composerUserId) return
+              if (openProfileGateIfNeeded()) return
+              void openProfileModal({
+                user_id: composerUserId,
+                author_profile: composerUserProfile,
+              })
+            }}
+            className="mt-0.5 h-10 w-10 shrink-0 flex items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[15px] font-bold text-zinc-200 touch-manipulation hover:border-zinc-600 sm:h-[2.75rem] sm:w-[2.75rem] sm:text-[16px]"
+            title="Open your profile"
+            aria-label="Open your profile"
+          >
+            {composerUserProfile?.avatar_url ? (
+              <img
+                key={composerUserProfile.avatar_url}
+                src={composerUserProfile.avatar_url}
+                alt=""
+                className="h-full w-full rounded-full object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            ) : !composerAuthResolved ? (
+              <span
+                className="block h-full w-full rounded-full bg-zinc-700/55 animate-pulse"
+                aria-hidden
+              />
+            ) : (
+              <span
+                className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarToneClass(
+                  composerUserProfile?.user_id || composerUserId || 'me'
+                )}`}
+              >
+                {(() => {
+                  if (composerUserProfile?.display_name?.trim() || composerUserProfile?.handle?.trim()) {
+                    return avatarText({ author_profile: composerUserProfile })
+                  }
+                  if (composerAuthUser) {
+                    const seed = profileSeedFromUser(composerAuthUser)
+                    return profileAvatarInitials(seed.displayName, seed.baseHandle)
+                  }
+                  if (composerUserId) return composerStableInitialsFromUid(composerUserId)
+                  return avatarText({ author_profile: { display_name: 'Me', handle: '' } })
+                })()}
+              </span>
+            )}
+          </button>
           <div className="min-w-0 flex-1">
             {composerExpanded ? (
               <div
@@ -1195,12 +1193,12 @@ export default function SocialFeed({
                   opacity: Math.min(1, 0.2 + 0.8 * composerFoldReveal),
                 }}
               >
-                <div className="pr-8">
+                <div className="mt-0.5 pr-8">
                   <div className="grid min-h-[6.5rem] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
                     <div
                       ref={composerMirrorRef}
                       aria-hidden
-                      className="pointer-events-none min-h-[6.5rem] w-full overflow-y-auto whitespace-pre-wrap break-words border border-transparent px-0 py-0 pt-[18px] text-left text-[17px] leading-[1.25] text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="pointer-events-none min-h-[6.5rem] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-0 pt-[10px] text-left text-[17px] leading-[1.25] text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] sm:pt-[13px] [&::-webkit-scrollbar]:hidden"
                     >
                       {postText ? (
                         renderRichCaption(postText, {
@@ -1219,7 +1217,7 @@ export default function SocialFeed({
                         const m = composerMirrorRef.current
                         if (m) m.scrollTop = e.currentTarget.scrollTop
                       }}
-                      className="z-10 min-h-[6.5rem] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[18px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25"
+                      className="z-10 min-h-[6.5rem] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[10px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25 sm:pt-[13px]"
                       placeholder=""
                       aria-label="Lounge post caption"
                       maxLength={280}
@@ -1242,7 +1240,7 @@ export default function SocialFeed({
                   composerExpandedRef.current = true
                   setComposerExpanded(true)
                 }}
-                className="flex min-h-12 w-full min-w-0 touch-manipulation items-start justify-start pt-[18px] text-left text-[17px] leading-[1.25] text-zinc-500"
+                className="mt-0.5 flex min-h-10 w-full min-w-0 touch-manipulation items-center justify-start sm:min-h-[2.75rem] text-left text-[17px] leading-[1.25] text-zinc-500"
               >
                 {(() => {
                   const firstLine = String(postText || '')
