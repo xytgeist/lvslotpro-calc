@@ -32,3 +32,6 @@ supabase/.branches/
 
 # Per-machine offsets for transcript export (scripts/cursor-chat-export.mjs)
 .cursor/chat-export-state-*.json
+
+# Local-only chat handoff (scripts + Task Scheduler append here); not versioned — distill into docs per AGENTS.md
+session-chat-export.md
