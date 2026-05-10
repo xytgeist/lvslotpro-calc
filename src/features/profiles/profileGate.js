@@ -123,7 +123,7 @@ export function profileSeedFromUser(user) {
 export async function fetchOwnProfile(supabaseClient, userId) {
   const { data, error } = await supabaseClient
     .from('profiles')
-    .select('user_id,handle,display_name,avatar_url,bio,created_at')
+    .select('user_id,handle,display_name,avatar_url,bio,created_at,role')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) return { data: null, error }
@@ -186,7 +186,7 @@ export async function saveProfileWithHandleFallback({
     const { data, error } = await supabaseClient
       .from('profiles')
       .upsert(payload, { onConflict: 'user_id' })
-      .select('user_id,handle,display_name,avatar_url,bio,created_at')
+      .select('user_id,handle,display_name,avatar_url,bio,created_at,role')
       .single()
 
     if (!error) return { data, error: null }

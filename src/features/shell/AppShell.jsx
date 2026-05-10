@@ -163,7 +163,7 @@ export default function AppShell({
       if (ids.length > 0) {
         const { data: profiles } = await supabaseClient
           .from('profiles')
-          .select('user_id,handle,display_name,avatar_url')
+          .select('user_id,handle,display_name,avatar_url,role')
           .in('user_id', ids)
         profileByUserId = Object.fromEntries((profiles || []).map((p) => [p.user_id, p]))
       }

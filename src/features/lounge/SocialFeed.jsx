@@ -28,6 +28,7 @@ import {
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
 import { renderRichCaption } from './loungeCaption'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
+import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 
 export default function SocialFeed({
   supabaseClient,
@@ -731,7 +732,7 @@ export default function SocialFeed({
         if (cached) setComposerUserProfile(cached)
         const { data } = await supabaseClient
           .from('profiles')
-          .select('user_id,handle,display_name,avatar_url,bio,created_at')
+          .select('user_id,handle,display_name,avatar_url,bio,created_at,role')
           .eq('user_id', uid)
           .maybeSingle()
         if (cancelled) return
@@ -1018,7 +1019,7 @@ export default function SocialFeed({
           await Promise.all([
             supabaseClient
               .from('profiles')
-              .select('user_id,handle,display_name,avatar_url,bio,created_at')
+              .select('user_id,handle,display_name,avatar_url,bio,created_at,role')
               .eq('user_id', userId)
               .maybeSingle(),
             supabaseClient
@@ -1402,7 +1403,7 @@ export default function SocialFeed({
                   const bookmarkClass = loungeReadOnly ? 'text-zinc-600' : isBookmarked ? 'text-amber-300' : 'text-zinc-500'
                   const ro = loungeReadOnly
                   return (
-                <div className="flex gap-4">
+                <div className="flex items-start gap-3">
                   <button
                     type="button"
                     title="View profile"
@@ -1410,7 +1411,7 @@ export default function SocialFeed({
                       e.stopPropagation()
                       void openProfileModal(post)
                     }}
-                    className="h-[3.3rem] w-[3.3rem] shrink-0 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 text-[17px] font-bold flex items-center justify-center overflow-hidden touch-manipulation hover:border-zinc-600"
+                    className="mt-0.5 h-10 w-10 shrink-0 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 text-[15px] font-bold flex items-center justify-center overflow-hidden touch-manipulation hover:border-zinc-600 sm:h-[2.75rem] sm:w-[2.75rem] sm:text-[16px]"
                   >
                     {post?.author_profile?.avatar_url ? (
                       <img
@@ -1430,36 +1431,41 @@ export default function SocialFeed({
                       </span>
                     )}
                   </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1 overflow-hidden text-left text-[14px] leading-tight">
-                        <div className="truncate text-left text-zinc-100 font-semibold text-[17px] leading-tight">
-                          {displayNameFor(post)}
-                        </div>
-                        <div className="mt-0.5 flex w-fit min-w-0 max-w-full items-center gap-x-1 text-left text-[14px] leading-tight">
-                          <span className="min-w-0 max-w-[13rem] shrink truncate text-zinc-500 sm:max-w-[17rem]">
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1 overflow-hidden text-left">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-snug">
+                          <span className="min-w-0 max-w-[min(12rem,46vw)] truncate font-semibold text-[15px] text-zinc-100 sm:max-w-[14rem]">
+                            {displayNameFor(post)}
+                          </span>
+                          <span className="inline-flex shrink-0 translate-y-[0.5px]">
+                            <LoungeStaffRoleBadge role={post?.author_profile?.role} />
+                          </span>
+                          <span className="min-w-0 shrink truncate text-[15px] text-zinc-500 sm:max-w-[11rem]">
                             {handleFor(post)}
                           </span>
-                          <span className="shrink-0 text-zinc-600">·</span>
-                          <span className="shrink-0 text-zinc-500 font-normal tabular-nums whitespace-nowrap">
+                          <span className="shrink-0 text-[15px] text-zinc-600">·</span>
+                          <span className="shrink-0 text-[15px] font-normal tabular-nums text-zinc-500 whitespace-nowrap">
                             {postAgeLabel(post.created_at)}
                           </span>
                         </div>
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        {post.pinned ? (
-                          <span className="rounded-full bg-fuchsia-500/20 px-2.5 py-1 text-[12px] font-bold uppercase tracking-wide text-fuchsia-200">
-                            Pinned
-                          </span>
-                        ) : null}
-                        {post.game_slug ? (
-                          <span className="inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[12px] font-bold uppercase tracking-wide text-amber-300">
-                            {post.game_title}
-                          </span>
-                        ) : null}
-                      </div>
+                      {post.pinned ? (
+                        <span className="shrink-0 rounded-full bg-fuchsia-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-tight text-fuchsia-200">
+                          Pinned
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="mt-1.5 text-zinc-200 text-[17px] leading-tight whitespace-pre-wrap">
+                    {post.game_slug ? (
+                      <div className="mt-1.5 flex justify-start">
+                        <span className="inline-flex max-w-full items-center truncate rounded-full border border-amber-500/35 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-tight text-amber-300 sm:max-w-[14rem]">
+                          {post.game_title}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div
+                      className={`text-zinc-200 text-[17px] leading-tight whitespace-pre-wrap ${post.game_slug ? 'mt-1' : 'mt-1.5'}`}
+                    >
                       {renderRichCaption(feedPostDisplayCaption(post))}
                     </div>
                     {post.edited_at ? (
@@ -1688,7 +1694,7 @@ export default function SocialFeed({
                 </div>
               ) : null}
 
-              <div className="flex gap-3">
+              <div className="flex items-start gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -1696,7 +1702,7 @@ export default function SocialFeed({
                     closeLoungePostDetailImmediate()
                     void openProfileModal(p)
                   }}
-                  className="h-[3.3rem] w-[3.3rem] shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[17px] font-bold text-zinc-200"
+                  className="mt-0.5 h-10 w-10 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[15px] font-bold text-zinc-200 sm:h-[2.75rem] sm:w-[2.75rem] sm:text-[16px]"
                 >
                   {loungePostDetail?.author_profile?.avatar_url ? (
                     <img
@@ -1718,38 +1724,52 @@ export default function SocialFeed({
                     </span>
                   )}
                 </button>
-                <div className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const p = loungePostDetail
-                      closeLoungePostDetailImmediate()
-                      void openProfileModal(p)
-                    }}
-                    className="text-left hover:text-cyan-300"
-                  >
-                    <div className="truncate text-[17px] font-bold leading-tight text-zinc-100">
-                      {displayNameFor(loungePostDetail)}
-                    </div>
-                    <div className="mt-0.5 truncate text-[15px] text-zinc-500">{handleFor(loungePostDetail)}</div>
-                  </button>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const p = loungePostDetail
+                        closeLoungePostDetailImmediate()
+                        void openProfileModal(p)
+                      }}
+                      className="min-w-0 flex-1 overflow-hidden text-left hover:text-cyan-300"
+                    >
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-snug">
+                        <span className="min-w-0 max-w-[min(12rem,46vw)] truncate font-semibold text-[15px] text-zinc-100 sm:max-w-[14rem]">
+                          {displayNameFor(loungePostDetail)}
+                        </span>
+                        <span className="inline-flex shrink-0 translate-y-[0.5px]">
+                          <LoungeStaffRoleBadge role={loungePostDetail?.author_profile?.role} size="detail" />
+                        </span>
+                        <span className="min-w-0 shrink truncate text-[15px] text-zinc-500 sm:max-w-[11rem]">
+                          {handleFor(loungePostDetail)}
+                        </span>
+                        <span className="shrink-0 text-[15px] text-zinc-600">·</span>
+                        <span className="shrink-0 text-[15px] font-normal tabular-nums text-zinc-500 whitespace-nowrap">
+                          {postAgeLabel(loungePostDetail.created_at)}
+                        </span>
+                      </div>
+                    </button>
                     {loungePostDetail.pinned ? (
-                      <span className="rounded-full bg-fuchsia-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-fuchsia-200">
+                      <span className="shrink-0 rounded-full bg-fuchsia-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-tight text-fuchsia-200">
                         Pinned
-                      </span>
-                    ) : null}
-                    {loungePostDetail.game_slug ? (
-                      <span className="inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-300">
-                        {loungePostDetail.game_title}
                       </span>
                     ) : null}
                   </div>
                 </div>
               </div>
 
+              {loungePostDetail.game_slug ? (
+                <div className="mt-4 flex justify-start">
+                  <span className="inline-flex max-w-full items-center truncate rounded-full border border-amber-500/35 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-tight text-amber-300 sm:max-w-[14rem]">
+                    {loungePostDetail.game_title}
+                  </span>
+                </div>
+              ) : null}
+
               {loungeDetailEditing ? (
-                <div className="relative mt-4">
+                <div className={`relative ${loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'}`}>
                   <button
                     type="button"
                     disabled={loungeDetailEditBusy}
@@ -1809,7 +1829,11 @@ export default function SocialFeed({
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap">
+                <div
+                  className={`text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap ${
+                    loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
+                  }`}
+                >
                   {renderRichCaption(feedPostDisplayCaption(loungePostDetail), {
                     hashtagClassName: 'font-semibold text-cyan-300',
                     linkClassName:
@@ -2123,7 +2147,12 @@ export default function SocialFeed({
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-white text-[17px] font-bold truncate">{profileModalData?.display_name || 'Member'}</div>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="min-w-0 flex-1 truncate text-white text-[17px] font-bold">
+                      {profileModalData?.display_name || 'Member'}
+                    </div>
+                    <LoungeStaffRoleBadge role={profileModalData?.role} size="modal" />
+                  </div>
                   <div className="text-cyan-300 text-[15px] truncate">
                     {profileModalData?.handle ? `@${profileModalData.handle}` : '@member'}
                   </div>
@@ -2159,7 +2188,7 @@ export default function SocialFeed({
                           : ''}
                       </div>
                       {p.game_slug ? (
-                        <span className="inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+                        <span className="inline-flex max-w-[8.5rem] items-center truncate rounded-full border border-amber-500/35 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-tight text-amber-300">
                           {p.game_title}
                         </span>
                       ) : null}

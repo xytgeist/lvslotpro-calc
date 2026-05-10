@@ -13,6 +13,7 @@ export function readLoungeProfileCache(uid) {
       handle: o.handle ?? null,
       display_name: o.display_name ?? null,
       avatar_url: o.avatar_url ?? null,
+      role: o.role ?? 'user',
       bio: o.bio ?? '',
       created_at: o.created_at ?? null,
     }
@@ -31,6 +32,7 @@ export function writeLoungeProfileCache(profile) {
         handle: profile.handle,
         display_name: profile.display_name,
         avatar_url: profile.avatar_url,
+        role: profile.role ?? 'user',
         bio: profile.bio ?? '',
         created_at: profile.created_at ?? null,
       })
