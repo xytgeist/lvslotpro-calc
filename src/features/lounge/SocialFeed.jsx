@@ -864,10 +864,7 @@ export default function SocialFeed({
   const submitLoungePost = useCallback(async () => {
     const caption = postText.trim()
     setPostErr('')
-    if (!caption) {
-      setPostErr('Write a caption before posting.')
-      return
-    }
+    if (!caption) return
     if (caption.length > 280) {
       setPostErr('Caption must be 280 characters or fewer.')
       return
@@ -1348,8 +1345,8 @@ export default function SocialFeed({
                   <button
                     type="button"
                     onClick={() => void submitLoungePost()}
-                    disabled={postBusy}
-                    className="min-h-8 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-2 py-1 text-[14px] font-bold text-white disabled:opacity-60"
+                    disabled={postBusy || !postText.trim()}
+                    className="min-h-8 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-2 py-1 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {postBusy ? 'Posting…' : 'Post'}
                   </button>
@@ -2216,10 +2213,17 @@ export default function SocialFeed({
                     </span>
                   )}
                   <span
-                    className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full bg-black/45 text-[11px] font-extralight leading-none text-zinc-300/75 ring-1 ring-white/10"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center p-[8%]"
                     aria-hidden
                   >
-                    +
+                    <svg viewBox="0 0 24 24" className="h-full w-full text-white/32" fill="none" aria-hidden>
+                      <path
+                        d="M12 4v16M4 12h16"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
                   </span>
                   <input
                     type="file"

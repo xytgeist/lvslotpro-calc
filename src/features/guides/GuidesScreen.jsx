@@ -946,10 +946,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
     e?.preventDefault?.()
     setErr('')
     const cleanedCaption = String(forcedCaption ?? caption).trim()
-    if (!cleanedCaption) {
-      setErr('Write a caption before posting.')
-      return
-    }
+    if (!cleanedCaption) return
     if (cleanedCaption.length > 280) {
       setErr('Caption must be 280 characters or fewer.')
       return
@@ -1109,8 +1106,8 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
               </button>
               <button
                 type="submit"
-                disabled={busy}
-                className="flex-1 min-h-12 rounded-2xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold touch-manipulation"
+                disabled={busy || !caption.trim()}
+                className="flex-1 min-h-12 rounded-2xl bg-cyan-600 hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40 text-white font-bold touch-manipulation"
               >
                 {busy ? 'Posting…' : 'Post to Lounge'}
               </button>
@@ -1197,10 +1194,17 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
                       </span>
                     )}
                     <span
-                      className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/45 text-[10px] font-extralight leading-none text-zinc-300/75 ring-1 ring-white/10"
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center p-[8%]"
                       aria-hidden
                     >
-                      +
+                      <svg viewBox="0 0 24 24" className="h-full w-full text-white/32" fill="none" aria-hidden>
+                        <path
+                          d="M12 4v16M4 12h16"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
                     </span>
                     <input
                       type="file"
