@@ -99,6 +99,26 @@ export async function fetchOwnProfile(supabaseClient, userId) {
   return { data: data || null, error: null }
 }
 
+/**
+ * If the user has no `profiles` row yet, create one from email-based seed (handle + display name).
+ * Idempotent. Call after signup (when session exists) or first login so Lounge composer has real names, not UUID hex.
+ */
+export async function ensureDefaultProfileRow(supabaseClient, user) {
+  if (!user?.id) return { data: null, error: null, created: false }
+  const existing = await fetchOwnProfile(supabaseClient, user.id)
+  if (existing.error) return { data: null, error: existing.error, created: false }
+  if (existing.data) return { data: existing.data, error: null, created: false }
+  const seed = profileSeedFromUser(user)
+  const { data, error } = await saveProfileWithHandleFallback({
+    supabaseClient,
+    user,
+    displayName: seed.displayName,
+    requestedHandle: seed.baseHandle,
+    avatarUrl: undefined,
+  })
+  return { data, error, created: !error && !!data }
+}
+
 function candidateHandle(base, index) {
   if (index === 0) return base
   const suffix = `_${index}`
@@ -132,7 +152,7 @@ export async function saveProfileWithHandleFallback({
     const { data, error } = await supabaseClient
       .from('profiles')
       .upsert(payload, { onConflict: 'user_id' })
-      .select('user_id,handle,display_name')
+      .select('user_id,handle,display_name,avatar_url,bio')
       .single()
 
     if (!error) return { data, error: null }

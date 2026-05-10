@@ -69,6 +69,8 @@ export default function SocialFeed({
   const [interactionByPost, setInteractionByPost] = useState({})
   const [bookmarkedByPost, setBookmarkedByPost] = useState({})
   const [composerUserId, setComposerUserId] = useState('')
+  /** Session user for email-based initials before `profiles` exists. */
+  const [composerAuthUser, setComposerAuthUser] = useState(null)
   const [composerUserProfile, setComposerUserProfile] = useState(null)
   /** False until first `getSession()` completes — avoids flashing guest "ME" while auth is unknown. */
   const [composerAuthResolved, setComposerAuthResolved] = useState(false)
@@ -688,6 +690,7 @@ export default function SocialFeed({
         const uid = session?.user?.id || ''
         if (cancelled) return
         setComposerUserId(uid)
+        setComposerAuthUser(session?.user ?? null)
         if (!uid) {
           setComposerUserProfile(null)
           try {
@@ -947,6 +950,11 @@ export default function SocialFeed({
         setProfileGateErr(error.message || 'Could not save profile.')
         return
       }
+      const { data: freshProfile, error: freshErr } = await fetchOwnProfile(supabaseClient, session.user.id)
+      if (!freshErr && freshProfile) {
+        setComposerUserProfile(freshProfile)
+        writeLoungeProfileCache(freshProfile)
+      }
       setProfileGateOpen(false)
     await submitLoungePost()
     } finally {
@@ -1124,13 +1132,17 @@ export default function SocialFeed({
                     composerUserProfile?.user_id || composerUserId || 'me'
                   )}`}
                 >
-                  {composerUserProfile?.display_name?.trim() || composerUserProfile?.handle?.trim()
-                    ? avatarText({ author_profile: composerUserProfile })
-                    : composerUserId
-                      ? composerStableInitialsFromUid(composerUserId)
-                      : avatarText({
-                          author_profile: { display_name: 'Me', handle: '' },
-                        })}
+                  {(() => {
+                    if (composerUserProfile?.display_name?.trim() || composerUserProfile?.handle?.trim()) {
+                      return avatarText({ author_profile: composerUserProfile })
+                    }
+                    if (composerAuthUser) {
+                      const seed = profileSeedFromUser(composerAuthUser)
+                      return profileAvatarInitials(seed.displayName, seed.baseHandle)
+                    }
+                    if (composerUserId) return composerStableInitialsFromUid(composerUserId)
+                    return avatarText({ author_profile: { display_name: 'Me', handle: '' } })
+                  })()}
                 </span>
               )}
             </button>

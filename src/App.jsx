@@ -4,6 +4,7 @@ import { mobileShell, inputBase, btnPrimary, btnSecondary, linkBtn } from './fea
 import { readAuthCallbackParams, getOAuthCallbackMessage } from './features/auth/oauthCallback'
 import { OAuthDivider, GoogleIcon } from './features/auth/OAuthUi'
 import AppShell from './features/shell'
+import { ensureDefaultProfileRow } from './features/profiles/profileGate'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -225,6 +226,7 @@ function App() {
     setAccessNotice('')
     setVerificationSuccess(false)
     setAuthPanelOpen(false)
+    await ensureDefaultProfileRow(supabase, data.user)
     // Full reload so Lounge (and composer) mount with the new session; same-tab anon → member can leave feed UI stale otherwise.
     window.location.reload()
   }
@@ -284,6 +286,9 @@ function App() {
     setSignupPassword('')
     setSignupConfirmPassword('')
     setIsSigningUp(false)
+    if (data?.session?.user) {
+      void ensureDefaultProfileRow(supabase, data.session.user)
+    }
   }
 
   const handleForgotPassword = async (e) => {
