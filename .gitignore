@@ -32,6 +32,3 @@ supabase/.branches/
 
 # Per-machine offsets for transcript export (scripts/cursor-chat-export.mjs)
 .cursor/chat-export-state-*.json
-
-# Cursor chat transcripts often contain pasted secrets — do not commit
-session-chat-export.md
