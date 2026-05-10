@@ -1,0 +1,20 @@
+# Fresh session — paste this (or fill in the brackets)
+
+Use after a restart or any new chat when you want a cold start pointed the right way. The agent has no memory; repo docs are the source of truth.
+
+---
+
+**Branch:** `test` _(or `main`, etc.)_
+
+**Supabase:** **test** project _(or "local only" / "prod read-only" — say what you mean)_
+
+**Goal:** _[one line: what you want done this session]_
+
+**Start by reading:** `AGENTS.md` and _[pick one: `docs/social-feed-roadmap.md` | `docs/test-buildout-backlog.md` | `docs/frontend-architecture.md`]_ — if unsure, use **`AGENTS.md`** + **`docs/frontend-architecture.md`**, then propose a plan.
+
+---
+
+**Optional add-ons** (delete if not needed)
+
+- No prod writes / no commits / PR only: _[say which]_
+- Context: _[link, path, or "decision already in backlog §…"]_

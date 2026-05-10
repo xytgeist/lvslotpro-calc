@@ -2,6 +2,8 @@
 
 Future sessions have **no memory** of this chat. Treat the repo as the **source of truth**. Your job is to keep the right docs **as current as the code** whenever behavior, data contracts, or team workflow changes.
 
+**Humans:** copy the template in root **`WAKEUP`** into the first message of a new chat (after restart, etc.).
+
 ## Canonical docs (read these first in a new session)
 
 | Order | File | What it holds |
