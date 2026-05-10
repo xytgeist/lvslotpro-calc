@@ -1195,10 +1195,15 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
                       </span>
                     )}
                     <span
-                      className="pointer-events-none absolute inset-0 flex items-center justify-center p-[8%]"
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center"
                       aria-hidden
                     >
-                      <svg viewBox="0 0 24 24" className="h-full w-full text-white/32" fill="none" aria-hidden>
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-1/2 w-1/2 text-zinc-500"
+                        fill="none"
+                        aria-hidden
+                      >
                         <path
                           d="M12 4v16M4 12h16"
                           stroke="currentColor"
