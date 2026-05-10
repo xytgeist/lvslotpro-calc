@@ -1918,7 +1918,7 @@ function AppShell({ onLogout, supabaseClient, onRequireAuth }) {
               </div>
             </div>
           ) : null}
-          {communityFeedLoading ? (
+          {communityFeedLoading && communityPosts.length === 0 ? (
             <div className="px-3 py-4 text-zinc-400 text-[17px]">Loading lounge…</div>
           ) : communityPosts.length === 0 ? (
             <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
