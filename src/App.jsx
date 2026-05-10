@@ -137,6 +137,13 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  /** Seeds `profiles` when missing (avoids Lounge composer UUID hex initials like “65”) — OAuth and session restore, not only password login. */
+  useEffect(() => {
+    if (!user?.id) return
+    void ensureDefaultProfileRow(supabase, user)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when auth user id changes; not every new `user` reference from Supabase.
+  }, [user?.id])
+
   useEffect(() => {
     if (!user?.id) {
       queueMicrotask(() => {

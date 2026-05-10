@@ -43,6 +43,7 @@ import {
   saveProfileWithHandleFallback,
   uploadProfileAvatar,
 } from '../profiles/profileGate'
+import { readProfileGateAck, writeProfileGateAck } from '../lounge/loungeStorage'
 
 /** Calculator / generic placeholder art for Buffalo Link — also used when a guide hero fails to load. */
 const BUFFALO_PLACEHOLDER_SRC = '/guides/buffalo-link/buffalo-link-calculator-icon.webp'
@@ -970,10 +971,20 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
         setBusy(false)
         return
       }
-      if (!ownProfile?.handle || !ownProfile?.display_name) {
+      const h = String(ownProfile?.handle || '').trim()
+      const d = String(ownProfile?.display_name || '').trim()
+      const createdMs = ownProfile?.created_at ? new Date(ownProfile.created_at).getTime() : NaN
+      const maxAgeMs = 7 * 24 * 60 * 60 * 1000
+      const profileRecent =
+        Number.isFinite(createdMs) &&
+        createdMs <= Date.now() &&
+        Date.now() - createdMs < maxAgeMs
+      const needsProfileGate = !h || !d || (profileRecent && !readProfileGateAck(session.user.id))
+
+      if (needsProfileGate) {
         const seed = profileSeedFromUser(session.user)
-        setProfileGateHandle(ownProfile?.handle || seed.baseHandle)
-        setProfileGateDisplayName(ownProfile?.display_name || seed.displayName)
+        setProfileGateHandle(h || seed.baseHandle)
+        setProfileGateDisplayName(d || seed.displayName)
         setProfileGateAvatarFile(null)
         setProfileGateAvatarPreview(ownProfile?.avatar_url || '')
         setProfileGateErr('')
@@ -1058,6 +1069,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
         setProfileGateErr(error.message || 'Could not save profile.')
         return
       }
+      writeProfileGateAck(session.user.id)
       setProfileGateOpen(false)
       await submit(null, caption)
     } finally {

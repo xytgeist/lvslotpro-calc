@@ -14,6 +14,7 @@ export function readLoungeProfileCache(uid) {
       display_name: o.display_name ?? null,
       avatar_url: o.avatar_url ?? null,
       bio: o.bio ?? '',
+      created_at: o.created_at ?? null,
     }
   } catch {
     return null
@@ -31,8 +32,37 @@ export function writeLoungeProfileCache(profile) {
         display_name: profile.display_name,
         avatar_url: profile.avatar_url,
         bio: profile.bio ?? '',
+        created_at: profile.created_at ?? null,
       })
     )
+  } catch {
+    // ignore
+  }
+}
+
+/** After Save on the Lounge profile gate, suppress repeat “confirm starter profile” prompts. */
+const PROFILE_GATE_ACK_KEY = 'lvslotpro_profile_gate_ack_v1'
+
+export function readProfileGateAck(uid) {
+  if (!uid || typeof window === 'undefined') return false
+  try {
+    const raw = window.localStorage.getItem(PROFILE_GATE_ACK_KEY)
+    if (!raw) return false
+    const o = JSON.parse(raw)
+    return Boolean(o && typeof o === 'object' && o[uid])
+  } catch {
+    return false
+  }
+}
+
+export function writeProfileGateAck(uid) {
+  if (!uid || typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(PROFILE_GATE_ACK_KEY)
+    const o = raw ? JSON.parse(raw) : {}
+    const next = o && typeof o === 'object' ? { ...o } : {}
+    next[uid] = true
+    window.localStorage.setItem(PROFILE_GATE_ACK_KEY, JSON.stringify(next))
   } catch {
     // ignore
   }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import {
   fetchOwnProfile,
   handleSlugFromAtInput,
@@ -20,6 +20,8 @@ import {
   persistLoungeComposerDraft,
   clearLoungeComposerDraft,
   LOUNGE_PROFILE_CACHE_KEY,
+  readProfileGateAck,
+  writeProfileGateAck,
 } from './loungeStorage'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
 import { renderRichCaption } from './loungeCaption'
@@ -112,6 +114,8 @@ export default function SocialFeed({
   const [loungeTitleBarHeight, setLoungeTitleBarHeight] = useState(0)
   const [loungeTitleReveal, setLoungeTitleReveal] = useState(1)
   const [loungeFeedViewportTopPx, setLoungeFeedViewportTopPx] = useState(0)
+  /** One auto-open of the profile gate per signed-in user id (avoids repeat after dismiss). */
+  const profileGateAutoPromptedForUidRef = useRef('')
   /** True when feed scroll auto-collapsed the composer; cleared on explicit open / post / discard. */
   const composerFoldedFromFeedScrollRef = useRef(false)
   const composerDraftFlushRef = useRef({ postText: '', composerExpanded: false, composerMediaFile: null })
@@ -120,6 +124,24 @@ export default function SocialFeed({
 
   /** No composer, server-only counts, gated taps until session is known and user is signed in. */
   const loungeReadOnly = !composerAuthResolved || !composerUserId
+
+  /** Starter row from `ensureDefaultProfileRow`: must confirm once (cannot dismiss until Save). */
+  const profileGateProvisionalConfirmNeeded = useMemo(() => {
+    if (!composerUserId) return false
+    const h = String(composerUserProfile?.handle || '').trim()
+    const d = String(composerUserProfile?.display_name || '').trim()
+    if (!h || !d) return false
+    if (readProfileGateAck(composerUserId)) return false
+    const createdMs = composerUserProfile?.created_at
+      ? new Date(composerUserProfile.created_at).getTime()
+      : NaN
+    const maxAgeMs = 7 * 24 * 60 * 60 * 1000
+    return (
+      Number.isFinite(createdMs) &&
+      createdMs <= Date.now() &&
+      Date.now() - createdMs < maxAgeMs
+    )
+  }, [composerUserId, composerUserProfile])
 
   const requireLoungeAuth = useCallback(() => {
     onRequireAuth?.('login')
@@ -704,7 +726,7 @@ export default function SocialFeed({
         if (cached) setComposerUserProfile(cached)
         const { data } = await supabaseClient
           .from('profiles')
-          .select('user_id,handle,display_name,avatar_url,bio')
+          .select('user_id,handle,display_name,avatar_url,bio,created_at')
           .eq('user_id', uid)
           .maybeSingle()
         if (cancelled) return
@@ -725,6 +747,37 @@ export default function SocialFeed({
       cancelled = true
     }
   }, [supabaseClient])
+
+  useEffect(() => {
+    if (!composerAuthResolved || !composerUserId || !composerAuthUser) return
+    const h = String(composerUserProfile?.handle || '').trim()
+    const d = String(composerUserProfile?.display_name || '').trim()
+    const acked = readProfileGateAck(composerUserId)
+    const createdMs = composerUserProfile?.created_at
+      ? new Date(composerUserProfile.created_at).getTime()
+      : NaN
+    const maxAgeMs = 7 * 24 * 60 * 60 * 1000
+    const profileRecent =
+      Number.isFinite(createdMs) &&
+      createdMs <= Date.now() &&
+      Date.now() - createdMs < maxAgeMs
+    const needGate = !h || !d || (profileRecent && !acked)
+
+    if (!needGate) {
+      profileGateAutoPromptedForUidRef.current = ''
+      setProfileGateOpen(false)
+      return
+    }
+    if (profileGateAutoPromptedForUidRef.current === composerUserId) return
+    profileGateAutoPromptedForUidRef.current = composerUserId
+    const seed = profileSeedFromUser(composerAuthUser)
+    setProfileGateHandle(h || seed.baseHandle)
+    setProfileGateDisplayName(d || seed.displayName)
+    setProfileGateAvatarFile(null)
+    setProfileGateAvatarPreview(String(composerUserProfile?.avatar_url || '').trim())
+    setProfileGateErr('')
+    setProfileGateOpen(true)
+  }, [composerAuthResolved, composerUserId, composerAuthUser, composerUserProfile])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -853,10 +906,20 @@ export default function SocialFeed({
         setPostErr(`Could not verify profile: ${profileErr.message || 'Unknown error.'}`)
         return
       }
-      if (!ownProfile?.handle || !ownProfile?.display_name) {
+      const h = String(ownProfile?.handle || '').trim()
+      const d = String(ownProfile?.display_name || '').trim()
+      const createdMs = ownProfile?.created_at ? new Date(ownProfile.created_at).getTime() : NaN
+      const maxAgeMs = 7 * 24 * 60 * 60 * 1000
+      const profileRecent =
+        Number.isFinite(createdMs) &&
+        createdMs <= Date.now() &&
+        Date.now() - createdMs < maxAgeMs
+      const needsProfileGate = !h || !d || (profileRecent && !readProfileGateAck(session.user.id))
+
+      if (needsProfileGate) {
         const seed = profileSeedFromUser(session.user)
-        setProfileGateHandle(ownProfile?.handle || seed.baseHandle)
-        setProfileGateDisplayName(ownProfile?.display_name || seed.displayName)
+        setProfileGateHandle(h || seed.baseHandle)
+        setProfileGateDisplayName(d || seed.displayName)
         setProfileGateAvatarFile(null)
         setProfileGateAvatarPreview(
           ownProfile?.avatar_url || composerUserProfile?.avatar_url || ''
@@ -955,8 +1018,9 @@ export default function SocialFeed({
         setComposerUserProfile(freshProfile)
         writeLoungeProfileCache(freshProfile)
       }
+      writeProfileGateAck(session.user.id)
       setProfileGateOpen(false)
-    await submitLoungePost()
+      await submitLoungePost()
     } finally {
       setProfileGateBusy(false)
     }
@@ -980,7 +1044,7 @@ export default function SocialFeed({
           await Promise.all([
             supabaseClient
               .from('profiles')
-              .select('user_id,handle,display_name,avatar_url,bio')
+              .select('user_id,handle,display_name,avatar_url,bio,created_at')
               .eq('user_id', userId)
               .maybeSingle(),
             supabaseClient
@@ -2141,13 +2205,18 @@ export default function SocialFeed({
             type="button"
             className="absolute inset-0 z-0 cursor-default"
             aria-label="Close profile gate"
-            onClick={() => setProfileGateOpen(false)}
+            onClick={() => {
+              if (profileGateProvisionalConfirmNeeded) return
+              setProfileGateOpen(false)
+            }}
           />
           <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5">
             <div className="text-cyan-200 text-[15px] font-semibold uppercase tracking-wide">Complete your profile</div>
             <div className="text-white text-xl font-bold mt-1">One-time setup before posting</div>
             <div className="text-zinc-400 text-[15px] mt-2 leading-relaxed">
-              Pick a handle and display name for Lounge posts.
+              {profileGateProvisionalConfirmNeeded
+                ? 'We started your handle and display name from your email—confirm or edit them, then save.'
+                : 'Pick a handle and display name for Lounge posts.'}
             </div>
             <div className="mt-4 space-y-3">
             <label className="block">
@@ -2225,8 +2294,17 @@ export default function SocialFeed({
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => setProfileGateOpen(false)}
-                className="flex-1 min-h-11 rounded-xl bg-zinc-800 text-zinc-100 text-[15px] font-semibold"
+                disabled={profileGateProvisionalConfirmNeeded || profileGateBusy}
+                title={
+                  profileGateProvisionalConfirmNeeded
+                    ? 'Confirm your profile with Save to continue.'
+                    : undefined
+                }
+                onClick={() => {
+                  if (profileGateProvisionalConfirmNeeded) return
+                  setProfileGateOpen(false)
+                }}
+                className="flex-1 min-h-11 rounded-xl bg-zinc-800 text-zinc-100 text-[15px] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
               >
                 Cancel
               </button>

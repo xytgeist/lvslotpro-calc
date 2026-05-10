@@ -92,7 +92,7 @@ export function profileSeedFromUser(user) {
 export async function fetchOwnProfile(supabaseClient, userId) {
   const { data, error } = await supabaseClient
     .from('profiles')
-    .select('user_id,handle,display_name,avatar_url,bio')
+    .select('user_id,handle,display_name,avatar_url,bio,created_at')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) return { data: null, error }
@@ -101,7 +101,10 @@ export async function fetchOwnProfile(supabaseClient, userId) {
 
 /**
  * If the user has no `profiles` row yet, create one from email-based seed (handle + display name).
- * Idempotent. Call after signup (when session exists) or first login so Lounge composer has real names, not UUID hex.
+ * Idempotent. Call after login / when `user` is set (including OAuth) so the Lounge composer reads real
+ * initials from `profiles` instead of falling back to `composerStableInitialsFromUid` (first two hex
+ * digits of the user id, e.g. “65”). The app still shows the “Complete your profile” gate for new rows
+ * until the user saves once (see `readProfileGateAck` / `writeProfileGateAck` in Lounge).
  */
 export async function ensureDefaultProfileRow(supabaseClient, user) {
   if (!user?.id) return { data: null, error: null, created: false }
@@ -152,7 +155,7 @@ export async function saveProfileWithHandleFallback({
     const { data, error } = await supabaseClient
       .from('profiles')
       .upsert(payload, { onConflict: 'user_id' })
-      .select('user_id,handle,display_name,avatar_url,bio')
+      .select('user_id,handle,display_name,avatar_url,bio,created_at')
       .single()
 
     if (!error) return { data, error: null }
