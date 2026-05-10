@@ -68,6 +68,22 @@ export function writeProfileGateAck(uid) {
   }
 }
 
+const PROFILE_GATE_RECENT_PROFILE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Missing handle/name, or new starter profile not yet acknowledged (see `readProfileGateAck`). */
+export function loungeProfileNeedsGate(profile, userId) {
+  if (!userId) return false
+  const h = String(profile?.handle || '').trim()
+  const d = String(profile?.display_name || '').trim()
+  if (!h || !d) return true
+  if (readProfileGateAck(userId)) return false
+  const createdMs = profile?.created_at ? new Date(profile.created_at).getTime() : NaN
+  const now = Date.now()
+  const profileRecent =
+    Number.isFinite(createdMs) && createdMs <= now && now - createdMs < PROFILE_GATE_RECENT_PROFILE_MS
+  return profileRecent
+}
+
 export const LOUNGE_COMPOSER_DRAFT_KEY = 'lounge_composer_draft_v1'
 
 export function readLoungeComposerDraft() {

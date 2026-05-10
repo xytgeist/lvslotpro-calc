@@ -43,7 +43,7 @@ import {
   saveProfileWithHandleFallback,
   uploadProfileAvatar,
 } from '../profiles/profileGate'
-import { readProfileGateAck, writeProfileGateAck } from '../lounge/loungeStorage'
+import { loungeProfileNeedsGate, writeProfileGateAck } from '../lounge/loungeStorage'
 
 /** Calculator / generic placeholder art for Buffalo Link — also used when a guide hero fails to load. */
 const BUFFALO_PLACEHOLDER_SRC = '/guides/buffalo-link/buffalo-link-calculator-icon.webp'
@@ -971,17 +971,9 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
         setBusy(false)
         return
       }
-      const h = String(ownProfile?.handle || '').trim()
-      const d = String(ownProfile?.display_name || '').trim()
-      const createdMs = ownProfile?.created_at ? new Date(ownProfile.created_at).getTime() : NaN
-      const maxAgeMs = 7 * 24 * 60 * 60 * 1000
-      const profileRecent =
-        Number.isFinite(createdMs) &&
-        createdMs <= Date.now() &&
-        Date.now() - createdMs < maxAgeMs
-      const needsProfileGate = !h || !d || (profileRecent && !readProfileGateAck(session.user.id))
-
-      if (needsProfileGate) {
+      if (loungeProfileNeedsGate(ownProfile, session.user.id)) {
+        const h = String(ownProfile?.handle || '').trim()
+        const d = String(ownProfile?.display_name || '').trim()
         const seed = profileSeedFromUser(session.user)
         setProfileGateHandle(h || seed.baseHandle)
         setProfileGateDisplayName(d || seed.displayName)
@@ -1186,7 +1178,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
               <label className="block">
                 <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Profile photo</span>
                 <div className="mt-1 flex items-center gap-3">
-                  <label className="h-11 w-11 rounded-full border border-zinc-700 bg-zinc-950 overflow-hidden shrink-0 grid place-items-center cursor-pointer">
+                  <label className="relative h-11 w-11 shrink-0 cursor-pointer overflow-hidden rounded-full border border-zinc-700 bg-zinc-950 grid place-items-center">
                     {profileGateAvatarPreview ? (
                       <img
                         src={profileGateAvatarPreview}
@@ -1204,6 +1196,12 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
                         {profileAvatarInitials(profileGateDisplayName, profileGateHandle)}
                       </span>
                     )}
+                    <span
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[1.05rem] font-extralight leading-none text-white/40 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]"
+                      aria-hidden
+                    >
+                      +
+                    </span>
                     <input
                       type="file"
                       accept="image/*"

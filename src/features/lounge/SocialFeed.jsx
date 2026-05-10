@@ -20,7 +20,7 @@ import {
   persistLoungeComposerDraft,
   clearLoungeComposerDraft,
   LOUNGE_PROFILE_CACHE_KEY,
-  readProfileGateAck,
+  loungeProfileNeedsGate,
   writeProfileGateAck,
 } from './loungeStorage'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
@@ -114,8 +114,6 @@ export default function SocialFeed({
   const [loungeTitleBarHeight, setLoungeTitleBarHeight] = useState(0)
   const [loungeTitleReveal, setLoungeTitleReveal] = useState(1)
   const [loungeFeedViewportTopPx, setLoungeFeedViewportTopPx] = useState(0)
-  /** One auto-open of the profile gate per signed-in user id (avoids repeat after dismiss). */
-  const profileGateAutoPromptedForUidRef = useRef('')
   /** True when feed scroll auto-collapsed the composer; cleared on explicit open / post / discard. */
   const composerFoldedFromFeedScrollRef = useRef(false)
   const composerDraftFlushRef = useRef({ postText: '', composerExpanded: false, composerMediaFile: null })
@@ -130,18 +128,23 @@ export default function SocialFeed({
     if (!composerUserId) return false
     const h = String(composerUserProfile?.handle || '').trim()
     const d = String(composerUserProfile?.display_name || '').trim()
-    if (!h || !d) return false
-    if (readProfileGateAck(composerUserId)) return false
-    const createdMs = composerUserProfile?.created_at
-      ? new Date(composerUserProfile.created_at).getTime()
-      : NaN
-    const maxAgeMs = 7 * 24 * 60 * 60 * 1000
-    return (
-      Number.isFinite(createdMs) &&
-      createdMs <= Date.now() &&
-      Date.now() - createdMs < maxAgeMs
-    )
+    return Boolean(h && d && loungeProfileNeedsGate(composerUserProfile, composerUserId))
   }, [composerUserId, composerUserProfile])
+
+  const openProfileGateIfNeeded = useCallback(() => {
+    if (!composerUserId || !composerAuthUser || loungeReadOnly) return false
+    if (!loungeProfileNeedsGate(composerUserProfile, composerUserId)) return false
+    const h = String(composerUserProfile?.handle || '').trim()
+    const d = String(composerUserProfile?.display_name || '').trim()
+    const seed = profileSeedFromUser(composerAuthUser)
+    setProfileGateHandle(h || seed.baseHandle)
+    setProfileGateDisplayName(d || seed.displayName)
+    setProfileGateAvatarFile(null)
+    setProfileGateAvatarPreview(String(composerUserProfile?.avatar_url || '').trim())
+    setProfileGateErr('')
+    setProfileGateOpen(true)
+    return true
+  }, [composerUserId, composerAuthUser, loungeReadOnly, composerUserProfile])
 
   const requireLoungeAuth = useCallback(() => {
     onRequireAuth?.('login')
@@ -433,13 +436,17 @@ export default function SocialFeed({
     [interactionByPost]
   )
 
-  const toggleInteraction = useCallback((postId, key) => {
-    if (!composerUserId) return
-    setInteractionByPost((prev) => {
-      const cur = prev[postId] || { commented: false, reposted: false, liked: false }
-      return { ...prev, [postId]: { ...cur, [key]: !cur[key] } }
-    })
-  }, [composerUserId])
+  const toggleInteraction = useCallback(
+    (postId, key) => {
+      if (!composerUserId) return
+      if (key === 'commented' && openProfileGateIfNeeded()) return
+      setInteractionByPost((prev) => {
+        const cur = prev[postId] || { commented: false, reposted: false, liked: false }
+        return { ...prev, [postId]: { ...cur, [key]: !cur[key] } }
+      })
+    },
+    [composerUserId, openProfileGateIfNeeded]
+  )
 
   const toggleBookmark = useCallback((postId) => {
     if (!composerUserId) return
@@ -749,34 +756,14 @@ export default function SocialFeed({
   }, [supabaseClient])
 
   useEffect(() => {
-    if (!composerAuthResolved || !composerUserId || !composerAuthUser) return
-    const h = String(composerUserProfile?.handle || '').trim()
-    const d = String(composerUserProfile?.display_name || '').trim()
-    const acked = readProfileGateAck(composerUserId)
-    const createdMs = composerUserProfile?.created_at
-      ? new Date(composerUserProfile.created_at).getTime()
-      : NaN
-    const maxAgeMs = 7 * 24 * 60 * 60 * 1000
-    const profileRecent =
-      Number.isFinite(createdMs) &&
-      createdMs <= Date.now() &&
-      Date.now() - createdMs < maxAgeMs
-    const needGate = !h || !d || (profileRecent && !acked)
-
-    if (!needGate) {
-      profileGateAutoPromptedForUidRef.current = ''
+    if (!composerAuthResolved) return
+    if (!composerUserId || !composerAuthUser) {
       setProfileGateOpen(false)
       return
     }
-    if (profileGateAutoPromptedForUidRef.current === composerUserId) return
-    profileGateAutoPromptedForUidRef.current = composerUserId
-    const seed = profileSeedFromUser(composerAuthUser)
-    setProfileGateHandle(h || seed.baseHandle)
-    setProfileGateDisplayName(d || seed.displayName)
-    setProfileGateAvatarFile(null)
-    setProfileGateAvatarPreview(String(composerUserProfile?.avatar_url || '').trim())
-    setProfileGateErr('')
-    setProfileGateOpen(true)
+    if (!loungeProfileNeedsGate(composerUserProfile, composerUserId)) {
+      setProfileGateOpen(false)
+    }
   }, [composerAuthResolved, composerUserId, composerAuthUser, composerUserProfile])
 
   useEffect(() => {
@@ -906,17 +893,9 @@ export default function SocialFeed({
         setPostErr(`Could not verify profile: ${profileErr.message || 'Unknown error.'}`)
         return
       }
-      const h = String(ownProfile?.handle || '').trim()
-      const d = String(ownProfile?.display_name || '').trim()
-      const createdMs = ownProfile?.created_at ? new Date(ownProfile.created_at).getTime() : NaN
-      const maxAgeMs = 7 * 24 * 60 * 60 * 1000
-      const profileRecent =
-        Number.isFinite(createdMs) &&
-        createdMs <= Date.now() &&
-        Date.now() - createdMs < maxAgeMs
-      const needsProfileGate = !h || !d || (profileRecent && !readProfileGateAck(session.user.id))
-
-      if (needsProfileGate) {
+      if (loungeProfileNeedsGate(ownProfile, session.user.id)) {
+        const h = String(ownProfile?.handle || '').trim()
+        const d = String(ownProfile?.display_name || '').trim()
         const seed = profileSeedFromUser(session.user)
         setProfileGateHandle(h || seed.baseHandle)
         setProfileGateDisplayName(d || seed.displayName)
@@ -1239,6 +1218,9 @@ export default function SocialFeed({
                     <textarea
                       ref={composerTextareaRef}
                       value={postText}
+                      onFocus={() => {
+                        void openProfileGateIfNeeded()
+                      }}
                       onChange={(e) => setPostText(e.target.value)}
                       onScroll={(e) => {
                         const m = composerMirrorRef.current
@@ -1261,6 +1243,7 @@ export default function SocialFeed({
               <button
                 type="button"
                 onClick={() => {
+                  if (openProfileGateIfNeeded()) return
                   composerFoldedFromFeedScrollRef.current = false
                   composerFoldRevealRef.current = 1
                   setComposerFoldReveal(1)
@@ -1331,7 +1314,10 @@ export default function SocialFeed({
             <div className="mt-1 flex w-full items-center gap-2 pr-2 pt-1.5 pb-1">
               <button
                 type="button"
-                onClick={() => composerMediaInputRef.current?.click()}
+                onClick={() => {
+                  if (openProfileGateIfNeeded()) return
+                  composerMediaInputRef.current?.click()
+                }}
                 className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-zinc-500 hover:text-zinc-200 active:text-white [-webkit-tap-highlight-color:transparent]"
                 title="Add media"
                 aria-label="Add media"
@@ -2222,7 +2208,7 @@ export default function SocialFeed({
             <label className="block">
               <span className="text-zinc-400 text-[13px] font-semibold uppercase tracking-wide">Profile photo</span>
               <div className="mt-1 flex items-center gap-3">
-                <label className="h-[3.3rem] w-[3.3rem] rounded-full border border-zinc-700 bg-zinc-950 overflow-hidden shrink-0 grid place-items-center cursor-pointer">
+                <label className="relative h-[3.3rem] w-[3.3rem] shrink-0 cursor-pointer overflow-hidden rounded-full border border-zinc-700 bg-zinc-950 grid place-items-center">
                   {profileGateAvatarPreview ? (
                     <img
                       src={profileGateAvatarPreview}
@@ -2240,6 +2226,12 @@ export default function SocialFeed({
                       {profileAvatarInitials(profileGateDisplayName, profileGateHandle)}
                     </span>
                   )}
+                  <span
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center text-[1.2rem] font-extralight leading-none text-white/40 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]"
+                    aria-hidden
+                  >
+                    +
+                  </span>
                   <input
                     type="file"
                     accept="image/*"
