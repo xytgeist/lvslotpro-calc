@@ -51,6 +51,7 @@ function App() {
   const [isSendingReset, setIsSendingReset] = useState(false)
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
   const [isOAuthLoading, setIsOAuthLoading] = useState(false)
+  const [deleteAccountBusy, setDeleteAccountBusy] = useState(false)
 
   // Verification success message
   const [verificationSuccess, setVerificationSuccess] = useState(false)
@@ -345,6 +346,35 @@ function App() {
     window.location.reload()
   }
 
+  const handleDeleteAccount = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Permanently delete this account? All data tied to it in this project (profile, Lounge posts, offers subscriptions, Auth flags, etc.) will be removed. This cannot be undone.'
+      )
+    )
+      return
+    setDeleteAccountBusy(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-own-account', {
+        method: 'POST',
+        body: {},
+      })
+      if (error) throw error
+      if (data && typeof data === 'object' && data.error) {
+        throw new Error(String(data.error))
+      }
+      await supabase.auth.signOut()
+      window.location.href = `${window.location.origin}/`
+    } catch (e) {
+      const fallback =
+        'Could not delete account. Deploy the delete-own-account Edge Function (see supabase/functions/delete-own-account/README.md).'
+      const msg = typeof e?.message === 'string' && e.message.trim() ? e.message.trim() : fallback
+      window.alert(msg)
+    } finally {
+      setDeleteAccountBusy(false)
+    }
+  }, [])
+
   const openAuthPanel = (mode = 'login') => {
     if (mode === 'create') {
       setShowCreateAccount(true)
@@ -448,6 +478,8 @@ function App() {
           accessNotice={accessNotice}
           onDismissAccessNotice={() => setAccessNotice('')}
           onLogout={handleLogout}
+          onDeleteAccount={handleDeleteAccount}
+          deleteAccountBusy={deleteAccountBusy}
           supabaseClient={supabase}
           onRequireAuth={(mode = 'login') => openAuthPanel(mode === 'create' ? 'create' : 'login')}
         />

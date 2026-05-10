@@ -41,6 +41,8 @@ function NavLockGlyph({ className }) {
 
 export default function AppShell({
   onLogout,
+  onDeleteAccount,
+  deleteAccountBusy = false,
   supabaseClient,
   onRequireAuth,
   browseMode = 'member',
@@ -369,6 +371,8 @@ export default function AppShell({
           browseMode={browseMode}
           onOpenAuth={() => onOpenAuth?.('login')}
           onLogout={onLogout}
+          onDeleteAccount={onDeleteAccount}
+          deleteAccountBusy={deleteAccountBusy}
         />
       )
     }

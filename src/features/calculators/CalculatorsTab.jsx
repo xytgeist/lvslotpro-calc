@@ -13,7 +13,7 @@ function CalculatorLoadingFallback() {
   )
 }
 
-function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout }) {
+function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout, onDeleteAccount, deleteAccountBusy }) {
   return (
     <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
     <div className="text-center mb-10 sm:mb-12">
@@ -86,15 +86,27 @@ function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout 
       </div>
     </button>
 
-    <div className="mt-10 sm:mt-12 text-center">
+    <div className="mt-10 sm:mt-12 flex flex-col items-center gap-2 text-center">
       {browseMode === 'member' ? (
-        <button
-          type="button"
-          onClick={onLogout}
-          className="min-h-12 inline-flex items-center justify-center text-base text-gray-400 hover:text-red-400 underline touch-manipulation transition-colors px-4 py-2"
-        >
-          Log out
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="min-h-12 inline-flex items-center justify-center text-base text-gray-400 hover:text-red-400 underline touch-manipulation transition-colors px-4 py-2"
+          >
+            Log out
+          </button>
+          {typeof onDeleteAccount === 'function' ? (
+            <button
+              type="button"
+              disabled={deleteAccountBusy}
+              onClick={() => void onDeleteAccount()}
+              className="min-h-11 inline-flex max-w-sm items-center justify-center px-4 py-2 text-[15px] leading-snug text-rose-400/95 underline decoration-rose-400/60 underline-offset-2 hover:text-rose-300 touch-manipulation transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleteAccountBusy ? 'Deleting account…' : 'Delete account (removes Auth user + cascaded data)'}
+            </button>
+          ) : null}
+        </>
       ) : (
         <button
           type="button"
@@ -109,7 +121,15 @@ function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout 
   )
 }
 
-export default function CalculatorsTab({ activeCalculator, setActiveCalculator, browseMode, onOpenAuth, onLogout }) {
+export default function CalculatorsTab({
+  activeCalculator,
+  setActiveCalculator,
+  browseMode,
+  onOpenAuth,
+  onLogout,
+  onDeleteAccount,
+  deleteAccountBusy = false,
+}) {
   if (!activeCalculator) {
     return (
       <CalculatorsHome
@@ -117,6 +137,8 @@ export default function CalculatorsTab({ activeCalculator, setActiveCalculator, 
         browseMode={browseMode}
         onOpenAuth={onOpenAuth}
         onLogout={onLogout}
+        onDeleteAccount={onDeleteAccount}
+        deleteAccountBusy={deleteAccountBusy}
       />
     )
   }
