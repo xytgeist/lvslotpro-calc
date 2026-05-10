@@ -1284,6 +1284,33 @@ export default function SocialFeed({
 
   return (
     <div className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      {/* Fixed title bar outside the scroll container so the nav dropdown stays clickable (not under overflow hit-testing). */}
+      <div
+        ref={loungeTitleBarRef}
+        className="fixed left-1/2 z-[50] w-full max-w-2xl border-b border-zinc-800/95 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 shadow-[0_1px_0_rgba(0,0,0,0.22)] will-change-transform"
+        style={{
+          top: loungeFeedViewportTopPx,
+          transform: `translate3d(-50%, ${-(1 - loungeTitleReveal) * (loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56)}px, 0)`,
+          pointerEvents: loungeTitleReveal > 0.12 ? 'auto' : 'none',
+        }}
+      >
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-2">
+          <div className="min-w-0" aria-hidden />
+          <img
+            src="/edge-lounge-logo.png"
+            alt="EDGE"
+            className="h-6 w-auto max-w-[min(165px,calc(100vw-7rem))] justify-self-center object-contain object-center"
+            draggable={false}
+          />
+          <div className="flex min-w-0 items-center justify-end gap-2">
+            <div className="pointer-events-none truncate text-right text-zinc-600 text-[13px]">
+              {communityFeedLoading ? 'Updating…' : ''}
+            </div>
+            {titleBarNavSlot}
+          </div>
+        </div>
+      </div>
+
       <div
         ref={loungeFeedScrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
@@ -1293,31 +1320,6 @@ export default function SocialFeed({
           className="shrink-0"
           style={{ height: loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56 }}
         />
-        <div
-          ref={loungeTitleBarRef}
-          className="fixed left-1/2 z-[45] w-full max-w-2xl -translate-x-1/2 border-b border-zinc-800/95 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 shadow-[0_1px_0_rgba(0,0,0,0.22)] will-change-transform"
-          style={{
-            top: loungeFeedViewportTopPx,
-            transform: `translate3d(0, ${-(1 - loungeTitleReveal) * (loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56)}px, 0)`,
-            pointerEvents: loungeTitleReveal > 0.12 ? 'auto' : 'none',
-          }}
-        >
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-2">
-            <div className="min-w-0" aria-hidden />
-            <img
-              src="/edge-lounge-logo.png"
-              alt="EDGE"
-              className="h-6 w-auto max-w-[min(165px,calc(100vw-7rem))] justify-self-center object-contain object-center"
-              draggable={false}
-            />
-            <div className="flex min-w-0 items-center justify-end gap-2">
-              <div className="pointer-events-none truncate text-right text-zinc-600 text-[13px]">
-                {communityFeedLoading ? 'Updating…' : ''}
-              </div>
-              {titleBarNavSlot}
-            </div>
-          </div>
-        </div>
 
         <div
           className="overflow-hidden transition-[max-height,opacity] duration-200"
