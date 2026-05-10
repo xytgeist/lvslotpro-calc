@@ -398,90 +398,96 @@ export default function LoungeProfileFullScreen({
         }}
       >
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          {/* Banner: sticky only while editing own profile so back / ⋯ stay reachable over the form + keyboard. */}
-          <div
-            className={`relative z-10 h-28 w-full shrink-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 sm:h-36 ${
-              showOwnEditControls ? 'sticky top-0 shadow-[0_6px_16px_rgba(0,0,0,0.35)]' : ''
-            }`}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute left-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 grid h-9 w-9 place-items-center rounded-full bg-black/32 text-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm touch-manipulation outline-none ring-0 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [-webkit-tap-highlight-color:transparent] hover:bg-black/44 active:bg-black/50 sm:left-3"
-              aria-label="Back"
-            >
-              <span
-                aria-hidden
-                className="block leading-none text-2xl -translate-y-px [text-shadow:0_1px_2px_rgba(0,0,0,0.85),0_2px_8px_rgba(0,0,0,0.55)]"
+          {/* Banner; ⋯ is a sibling strip with sticky top while editing so only that control pins (banner image scrolls). */}
+          <div className="relative z-10 w-full shrink-0">
+            <div className="relative h-28 w-full shrink-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 sm:h-36">
+              <button
+                type="button"
+                onClick={onClose}
+                className="absolute left-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 grid h-9 w-9 place-items-center rounded-full bg-black/32 text-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm touch-manipulation outline-none ring-0 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [-webkit-tap-highlight-color:transparent] hover:bg-black/44 active:bg-black/50 sm:left-3"
+                aria-label="Back"
               >
-                ←
-              </span>
-            </button>
-            {profile?.banner_url ? (
-              <img src={profile.banner_url} alt="" className="relative z-0 h-full w-full object-cover" />
-            ) : null}
-            {isOwnProfile ? (
-              <>
-                <input ref={bannerInputRef} type="file" accept="image/*" className="hidden" onChange={onPickBanner} />
-                <div
-                  ref={ownProfileBannerMenuRef}
-                  className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 sm:right-3"
+                <span
+                  aria-hidden
+                  className="block leading-none text-2xl -translate-y-px [text-shadow:0_1px_2px_rgba(0,0,0,0.85),0_2px_8px_rgba(0,0,0,0.55)]"
                 >
-                  <button
-                    ref={ownProfileMenuButtonRef}
-                    type="button"
-                    onClick={() => setOwnProfileMenuOpen((v) => !v)}
-                    aria-expanded={ownProfileMenuOpen}
-                    aria-haspopup="menu"
-                    aria-label="Profile options"
-                    className="grid h-9 w-9 place-items-center rounded-full bg-black/32 text-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm touch-manipulation outline-none ring-0 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [-webkit-tap-highlight-color:transparent] hover:bg-black/44 active:bg-black/50"
-                  >
-                    <span
-                      aria-hidden
-                      className="block pb-0.5 text-2xl font-bold leading-none tracking-tight -translate-y-px [text-shadow:0_1px_2px_rgba(0,0,0,0.85),0_2px_8px_rgba(0,0,0,0.55)]"
+                  ←
+                </span>
+              </button>
+              {profile?.banner_url ? (
+                <img src={profile.banner_url} alt="" className="relative z-0 h-full w-full object-cover" />
+              ) : null}
+              {isOwnProfile ? (
+                <>
+                  <input ref={bannerInputRef} type="file" accept="image/*" className="hidden" onChange={onPickBanner} />
+                  {showOwnEditControls ? (
+                    <button
+                      type="button"
+                      disabled={bannerBusy}
+                      onClick={() => bannerInputRef.current?.click()}
+                      className="absolute bottom-2 right-2 z-10 rounded-full border border-zinc-600/90 bg-zinc-950/90 px-3 py-1.5 text-[12px] font-semibold text-zinc-200 shadow hover:bg-zinc-900 disabled:opacity-50 touch-manipulation"
                     >
-                      ···
-                    </span>
-                  </button>
-                  {ownProfileMenuOpen
-                    ? createPortal(
-                        <div
-                          ref={ownProfileMenuPanelRef}
-                          className="min-w-[11.5rem] rounded-xl border border-zinc-600/90 bg-zinc-900/98 py-1 shadow-xl backdrop-blur-sm"
-                          role="menu"
-                        >
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="w-full px-4 py-2.5 text-left text-[15px] font-semibold text-zinc-100 hover:bg-zinc-800/90 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                            onClick={() => {
-                              setOwnProfileMenuOpen(false)
-                              if (ownProfileEditing) {
-                                exitOwnProfileEditing()
-                              } else {
-                                setAboutErr('')
-                                setOwnProfileEditing(true)
-                              }
-                            }}
-                          >
-                            {ownProfileEditing ? 'Done editing' : 'Edit'}
-                          </button>
-                        </div>,
-                        document.body
-                      )
-                    : null}
-                </div>
-                {showOwnEditControls ? (
-                  <button
-                    type="button"
-                    disabled={bannerBusy}
-                    onClick={() => bannerInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 z-10 rounded-full border border-zinc-600/90 bg-zinc-950/90 px-3 py-1.5 text-[12px] font-semibold text-zinc-200 shadow hover:bg-zinc-900 disabled:opacity-50 touch-manipulation"
+                      {bannerBusy ? 'Uploading…' : 'Banner'}
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+            {isOwnProfile ? (
+              <div
+                ref={ownProfileBannerMenuRef}
+                className={
+                  showOwnEditControls
+                    ? 'pointer-events-none sticky top-0 z-20 -mt-28 flex h-28 w-full shrink-0 justify-end pr-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:-mt-36 sm:h-36 sm:pr-3'
+                    : 'absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 sm:right-3'
+                }
+              >
+                <button
+                  ref={ownProfileMenuButtonRef}
+                  type="button"
+                  onClick={() => setOwnProfileMenuOpen((v) => !v)}
+                  aria-expanded={ownProfileMenuOpen}
+                  aria-haspopup="menu"
+                  aria-label="Profile options"
+                  className={`grid h-9 w-9 place-items-center rounded-full bg-black/32 text-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm touch-manipulation outline-none ring-0 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [-webkit-tap-highlight-color:transparent] hover:bg-black/44 active:bg-black/50 ${
+                    showOwnEditControls ? 'pointer-events-auto' : ''
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className="block pb-0.5 text-2xl font-bold leading-none tracking-tight -translate-y-px [text-shadow:0_1px_2px_rgba(0,0,0,0.85),0_2px_8px_rgba(0,0,0,0.55)]"
                   >
-                    {bannerBusy ? 'Uploading…' : 'Banner'}
-                  </button>
-                ) : null}
-              </>
+                    ···
+                  </span>
+                </button>
+                {ownProfileMenuOpen
+                  ? createPortal(
+                      <div
+                        ref={ownProfileMenuPanelRef}
+                        className="min-w-[11.5rem] rounded-xl border border-zinc-600/90 bg-zinc-900/98 py-1 shadow-xl backdrop-blur-sm"
+                        role="menu"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="w-full px-4 py-2.5 text-left text-[15px] font-semibold text-zinc-100 hover:bg-zinc-800/90 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                          onClick={() => {
+                            setOwnProfileMenuOpen(false)
+                            if (ownProfileEditing) {
+                              exitOwnProfileEditing()
+                            } else {
+                              setAboutErr('')
+                              setOwnProfileEditing(true)
+                            }
+                          }}
+                        >
+                          {ownProfileEditing ? 'Done editing' : 'Edit'}
+                        </button>
+                      </div>,
+                      document.body
+                    )
+                  : null}
+              </div>
             ) : null}
           </div>
 
@@ -685,17 +691,6 @@ export default function LoungeProfileFullScreen({
             </div>
           </div>
         </div>
-        {showOwnEditControls ? (
-          <div className="shrink-0 border-t border-zinc-800/90 bg-zinc-950 px-4 pt-2 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
-            <button
-              type="button"
-              onClick={() => exitOwnProfileEditing()}
-              className="w-full min-h-11 rounded-xl border border-zinc-600 bg-zinc-800 py-2.5 text-[15px] font-semibold text-zinc-100 touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-700 active:bg-zinc-600"
-            >
-              Done editing
-            </button>
-          </div>
-        ) : null}
       </div>
     </div>
   )
