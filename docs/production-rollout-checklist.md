@@ -35,6 +35,7 @@ Track **everything else** already used on test that production must also have ap
 - [ ] `community_feed_posts.sql` — base home feed table + baseline trigger
 - [ ] `feed_phase_a_profiles_public_read.sql` — **`profiles`**, moderation columns, **public anon read** RLS, staff policies, guards
 - [ ] `profiles_tier_testing.sql` — **`has_active_subscription`** + guard trigger (subscriber UI + testing; run after phase A file)
+- [ ] **`lounge_feed_post_stream_video.sql`** — **`community_feed_posts.stream_video_uid`** for Lounge **Cloudflare Stream** video posts (required before current client inserts video)
 - [ ] Any earlier schema you rely on: **`offers`** / **`offer_events`**, **`push_subscriptions`**, notification SQL, etc. — mirror **test** `supabase/` files that are not yet on prod
 
 **After deploy — quick smoke SQL (production):**
@@ -77,7 +78,13 @@ supabase functions deploy process-offer-uploads
 supabase functions deploy get-web-push-config
 supabase functions deploy send-test-push
 supabase functions deploy send-due-offer-reminders
+supabase functions deploy lounge-cf-stream-direct-upload
 ```
+
+Set **production** Edge secrets for Stream (same **names** as test; rotate values independently):
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_STREAM_API_TOKEN`
 
 Cross-check dashboards: **Production** function list versus **test** (names active, versions reasonable).
 
@@ -92,7 +99,7 @@ Secrets (secrets / env vault in Supabase) for push + web-push must exist on prod
 - [ ] Signed-in: **Guides → Ask community** still inserts (`community_feed_posts`) when RLS permits.
 - [ ] Profiles: until onboarding ships, authors may appear as **`Member`** with no profiles row — expected until Account/gate UX exists.
 - [ ] **`get-web-push-config`**: authenticated `GET` → `200` with `publicKey` (mirror prior smoke checklist).
-- [ ] Regression: Offers save, calendars, calculators as before (calculator UI: `src/features/calculators/`).
+- [ ] **Lounge video (Cloudflare Stream):** post a short clip (composer, under **60 seconds**) from Lounge; it plays in feed/detail via HLS. Requires **`lounge_feed_post_stream_video.sql`** on the DB, **`lounge-cf-stream-direct-upload`** deployed, and Edge secrets **`CLOUDFLARE_ACCOUNT_ID`** / **`CLOUDFLARE_STREAM_API_TOKEN`** on that Supabase project.
 
 ---
 
@@ -118,4 +125,4 @@ Already planned for Slot Pro backlog; prod cutover reminders:
 
 ---
 
-_Last updated alongside social feed Phase A profiles + public read (`feed_phase_a_profiles_public_read`). Frontend layout map: `docs/frontend-architecture.md`._
+_Last updated: Lounge **Cloudflare Stream** video (`stream_video_uid`, Edge `lounge-cf-stream-direct-upload`). Frontend layout map: `docs/frontend-architecture.md`._

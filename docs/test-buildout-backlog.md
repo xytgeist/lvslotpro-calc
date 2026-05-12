@@ -111,6 +111,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Source: `supabase/functions/*`
   - Production replay: `production-rollout-checklist.md` §4
 
+- [ ] `lounge-cf-stream-direct-upload` (Lounge **Cloudflare Stream** direct-upload mint) deployed with secrets on **test** (and production when promoted)
+  - **SQL:** `supabase/lounge_feed_post_stream_video.sql` → column **`stream_video_uid`** on `community_feed_posts`.
+  - **Secrets (names only):** `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN` (Stream Write/Edit token).
+  - **Source:** `supabase/functions/lounge-cf-stream-direct-upload/`, `src/utils/loungeVideoUpload.js`, `LoungePostStreamVideo.jsx`, `SocialFeed.jsx`, feed selects in `AppShell.jsx`.
+  - Production replay: `production-rollout-checklist.md` §2 + §4 + smoke §5 (video line).
+
 - [ ] Function-by-function smoke notes captured  
   - Change: Record minimal expected input/output for each function.
   - Source: function `README.md` files
@@ -166,6 +172,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Test validation: scroll multi-image post off/on; repost menu position; quote sheet height + media below text; 7th image attempt shows cap modal.
   - Production replay: N/A (client-only).
 
+- [x] Lounge **video** via **Cloudflare Stream** (test / branch `test`)
+  - Change: **`stream_video_uid`** on posts; Edge **`lounge-cf-stream-direct-upload`**; client upload + HLS manifest poll (`loungeVideoUpload.js`); playback `LoungePostStreamVideo.jsx` (lazy `hls.js`); composer preview + post path in **`SocialFeed.jsx`**; selects include **`stream_video_uid`** in **`AppShell.jsx`**. Caps: **60s** duration, **200 MB** upload (Cloudflare basic POST).
+  - Source: files in bullet + `supabase/lounge_feed_post_stream_video.sql`.
+  - Test validation: apply SQL + deploy function + secrets on the Supabase project; post a short clip; plays in feed and post detail.
+  - Production replay: `production-rollout-checklist.md` §2, §4, §5.
+
 ---
 
 ## Test smoke and release readiness
@@ -183,6 +195,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
     8. **Repost:** menu opens **under** the Repost control on feed + post detail; already-reposted row shows manage actions in the same anchored popover (no bottom sheet).
     9. **Rate limit:** when posting is blocked, error strip is **above** the composer even with a tall draft.
     10. **Quote repost:** same vertical rhythm as main composer — **toolbar** (image / GIF / counter / Post) one line below the last caption line; optional media carousel under text with `mt-1.5`; cap modal if >6 images.
+    11. **Lounge video:** after SQL **`lounge_feed_post_stream_video.sql`** + Edge **`lounge-cf-stream-direct-upload`** + secrets on test — pick a clip **under 60 seconds** and **under 200 MB** in the composer → **Post** → video plays in feed and post detail (HLS).
   - **Sign-off:** Manual steps above passed on **test** (operator confirmation after latest `test` deploy).
   - Production replay: same ordered pass on production after deploy.
 
@@ -194,6 +207,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-09: **Lounge video (Cloudflare Stream):** `community_feed_posts.stream_video_uid` + Edge **`lounge-cf-stream-direct-upload`** + `loungeVideoUpload.js` / **`LoungePostStreamVideo.jsx`** / **`SocialFeed.jsx`** composer + post flow; **`hls.js`** lazy-loaded for HLS on non-Safari; feed **`stream_video_uid`** in **`AppShell.jsx`**. Continuity: **`AGENTS.md`**, **`WAKEUP`**, **`docs/social-feed-roadmap.md`** (D2), **`docs/frontend-architecture.md`**, **`docs/production-rollout-checklist.md`** (§2/§4/§5), **`docs/test-buildout-backlog.md`** (Edge list, FE row, smoke 11), **`supabase/functions/lounge-cf-stream-direct-upload/README.md`**. Branch **`test`** (commit `c8187dd`).
 - 2026-05-12: **Profile avatar crop modal** (`ProfileAvatarCropModal.jsx`): after picking a photo in **own profile edit**, circular preview with **drag pan**, **wheel / pinch zoom**, **±90° rotate**, **Reset**, **Apply** → WebP crop then existing `prepareAvatarImageForUpload` + upload path in `LoungeProfileFullScreen.jsx`.
 - 2026-05-12: **Lounge carousel + quote UI:** feed/detail carousels reset to slide 1 via **`visibilityResetRootRef`** + `IntersectionObserver`, plus **scroll/resize** geometry on the feed (and detail) root so **newly loaded posts** reliably detect leave/re-enter; quote repost compose mirrors **main composer** (`min-h-[6.5rem]` stack, textarea `min-h-[2.75rem]`, toolbar `mt-1` under caption); remove-quote bottom sheet **more bottom padding**. Files: `LoungePostFeedMedia.jsx`, `SocialFeed.jsx`. Prior `3578e6c` note + smoke steps 7/10 updated in this doc.
 - 2026-05-11: **Doc sync (Lounge continuity):** profile **`handle_changed_at`** + 7-day cooldown SQL and client modals; iOS profile-save mitigations; rate-limit banner above composer; feed carousel first-slide on re-entry; anchored repost menus; quote composer height — reflected in **`AGENTS.md`**, **`docs/social-feed-roadmap.md`** (Phases A4, C, D deliverable, F), **`docs/frontend-architecture.md`** (`lounge/` table), and this backlog (A1 bullet, A4 UX, FE rows, smoke 6–10). Code on branch **`test`** (commit `d7c3ffd` area).

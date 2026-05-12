@@ -26,7 +26,7 @@ Roadmap detail: **`docs/social-feed-roadmap.md`** (section **Freemium & subscrip
 | --- | --- |
 | **`shell/`** | `AppShell.jsx`, `shellClasses.js` (shared Tailwind class strings for layout/buttons where reused), `index.js` barrel. |
 | **`auth/`** | OAuth UI bits and URL callback helpers used by **`App.jsx`**. |
-| **`lounge/`** | Lounge social feed: **`SocialFeed.jsx`**, **`LoungePostArticle.jsx`**, **`LoungePostFeedMedia.jsx`**, **`LoungeProfileFullScreen.jsx`**, caption helpers, storage keys, `index.js`. Rate-limit errors render **above** the composer. **Repost** uses an **anchored popover** under the control (not a bottom sheet). Feed **media carousels** reset to the first slide when the post row re-enters the viewport. |
+| **`lounge/`** | Lounge social feed: **`SocialFeed.jsx`**, **`LoungePostArticle.jsx`**, **`LoungePostFeedMedia.jsx`**, **`LoungePostStreamVideo.jsx`** (Cloudflare Stream HLS via `hls.js` lazy chunk), **`LoungeProfileFullScreen.jsx`**, **`src/utils/loungeVideoUpload.js`**, caption helpers, storage keys, `index.js`. Rate-limit errors render **above** the composer. **Repost** uses an **anchored popover** under the control (not a bottom sheet). Feed **media carousels** reset to the first slide when the post row re-enters the viewport. **Video:** up to **60s**, direct upload to Stream (not Supabase Storage); DB column **`stream_video_uid`**. |
 | **`guides/`** | AP guides: `GuidesScreen.jsx`, demo data, `index.js`. |
 | **`offers/`** | Offers calendar: `OffersCalendar.jsx`, `offerStorageKeys.js`, `utils.js`, `hooks/`, `components/`, `index.js` (re-exports `OffersCalendar`). |
 | **`intel/`** | Local Intel (cities / casinos / posts): `LocalIntel.jsx`, `index.js`. |
