@@ -26,6 +26,64 @@ export function feedPostImageUrls(row) {
   return arr.map((x) => String(x ?? '').trim()).filter(Boolean)
 }
 
+function isProbablyLoungeStoredImageUrl(u) {
+  const s = String(u || '').toLowerCase()
+  if (!s) return false
+  return s.includes('/storage/v1/object/public/lounge-feed/') || s.includes('/lounge-feed/')
+}
+
+/**
+ * Split a feed row into editable image URLs + external GIF URL for the author edit UI.
+ * Handles `image_urls` + `gif_url`, legacy `media_url` + `gif_url`, single stored image in `media_url`, and GIF-only (`media_url` holds the GIF, `gif_url` null).
+ */
+export function feedPostAuthorEditMediaSeed(row) {
+  const imgs = feedPostImageUrls(row)
+  const gu = String(row?.gif_url ?? '').trim()
+  const mu = String(row?.media_url ?? '').trim()
+  if (imgs.length > 0) {
+    return { imageUrls: imgs.map((x) => String(x)), gifUrl: gu }
+  }
+  if (gu && mu) {
+    return { imageUrls: [mu], gifUrl: gu }
+  }
+  if (mu) {
+    if (isProbablyLoungeStoredImageUrl(mu)) {
+      return { imageUrls: [mu], gifUrl: '' }
+    }
+    return { imageUrls: [], gifUrl: mu }
+  }
+  return { imageUrls: [], gifUrl: '' }
+}
+
+/**
+ * Columns for `community_feed_posts.update` when saving attachment edits (remote URLs only).
+ */
+export function feedPostMediaUpdatePayload({ imageUrls, gifUrl }) {
+  const imgs = Array.isArray(imageUrls)
+    ? imageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
+    : []
+  const gu = gifUrl != null ? String(gifUrl).trim() : ''
+  if (imgs.length > 0) {
+    return {
+      image_urls: imgs,
+      media_url: imgs[0],
+      gif_url: gu || null,
+    }
+  }
+  if (gu) {
+    return {
+      image_urls: [],
+      media_url: gu,
+      gif_url: null,
+    }
+  }
+  return {
+    image_urls: [],
+    media_url: null,
+    gif_url: null,
+  }
+}
+
 /** Normalized caption for insert/update (trim, max 280). */
 export function normalizeFeedCaption(caption) {
   return String(caption ?? '')

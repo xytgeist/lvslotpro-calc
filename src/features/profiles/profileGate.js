@@ -188,8 +188,13 @@ export async function saveProfileWithHandleFallback({
       updated_at: nowIso,
     }
     if (avatarUrl !== undefined) payload.avatar_url = avatarUrl || null
-    /** Keep staff role on upsert — partial payloads must not demote moderator/admin to `user`. */
-    if (preserveStaffRole) payload.role = preserveStaffRole
+    if (!existing.data) {
+      /** INSERT: policy `profiles_insert_own` requires `role = 'user'`. Omitting `role` can yield NULL and fail RLS on upsert. */
+      payload.role = 'user'
+    } else if (preserveStaffRole) {
+      /** UPDATE: keep moderator/admin when re-upserting handle/display (never send staff `role` on insert — violates INSERT policy). */
+      payload.role = preserveStaffRole
+    }
 
     const { data, error } = await supabaseClient
       .from('profiles')

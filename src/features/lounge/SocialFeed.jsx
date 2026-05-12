@@ -13,7 +13,9 @@ import {
   communityFeedPostInsertPayload,
   communityFeedPlainRepostInsertPayload,
   communityFeedQuoteRepostInsertPayload,
+  feedPostAuthorEditMediaSeed,
   feedPostDisplayCaption,
+  feedPostMediaUpdatePayload,
   normalizeFeedCaption,
   uploadLoungeFeedPostImage,
 } from '../../utils/communityFeedPost'
@@ -132,6 +134,8 @@ export default function SocialFeed({
   const [composerPinOnPost, setComposerPinOnPost] = useState(false)
   const [postBusy, setPostBusy] = useState(false)
   const [postErr, setPostErr] = useState('')
+  /** Non-empty while showing the “too many images” alert (composer + quote repost uploads). */
+  const [loungeImageLimitDialog, setLoungeImageLimitDialog] = useState('')
   const [loungePinBusy, setLoungePinBusy] = useState(false)
   const [profileGateOpen, setProfileGateOpen] = useState(false)
   const [profileGateBusy, setProfileGateBusy] = useState(false)
@@ -204,6 +208,9 @@ export default function SocialFeed({
   const [loungeDetailEditErr, setLoungeDetailEditErr] = useState('')
   const [loungeDetailEditMediaFile, setLoungeDetailEditMediaFile] = useState(null)
   const [loungeDetailEditMediaKind, setLoungeDetailEditMediaKind] = useState('')
+  /** Remote URLs for the post being edited (remove-only in UI until upload-on-edit exists). */
+  const [loungeDetailEditImageUrls, setLoungeDetailEditImageUrls] = useState([])
+  const [loungeDetailEditGifUrl, setLoungeDetailEditGifUrl] = useState('')
   const [loungeDetailDeleteBusy, setLoungeDetailDeleteBusy] = useState(false)
   const loungePostDeleteInflightRef = useRef(false)
   const [loungeManageErr, setLoungeManageErr] = useState('')
@@ -955,16 +962,6 @@ export default function SocialFeed({
       const u = chk.value
       if (!u) return
       if (klipyPickerTarget === 'quote') {
-        setQuoteRepostImageItems((prev) => {
-          for (const it of prev) {
-            try {
-              URL.revokeObjectURL(it.preview)
-            } catch {
-              // ignore
-            }
-          }
-          return []
-        })
         setQuoteRepostMediaUrl(u)
       } else {
         setComposerVideoSlot((prev) => {
@@ -1409,6 +1406,8 @@ export default function SocialFeed({
     setLoungeDetailEditErr('')
     setLoungeDetailEditMediaFile(null)
     setLoungeDetailEditMediaKind('')
+    setLoungeDetailEditImageUrls([])
+    setLoungeDetailEditGifUrl('')
     setLoungeDetailDeleteBusy(false)
     loungePostDeleteInflightRef.current = false
     setLoungeManageErr('')
@@ -1467,6 +1466,8 @@ export default function SocialFeed({
       setLoungePostDetailMenuOpen(false)
       setLoungeDetailRepostMenuOpen(false)
       setLoungePostDetail(post)
+      setLoungeDetailEditImageUrls([])
+      setLoungeDetailEditGifUrl('')
       if (
         wantEdit &&
         composerUserId &&
@@ -1484,6 +1485,9 @@ export default function SocialFeed({
           // ignore
         }
         setLoungeDetailDraftCaption(feedPostDisplayCaption(post))
+        const seed = feedPostAuthorEditMediaSeed(post)
+        setLoungeDetailEditImageUrls(seed.imageUrls)
+        setLoungeDetailEditGifUrl(seed.gifUrl)
         setLoungeDetailEditing(true)
       }
       const reduce =
@@ -1517,6 +1521,8 @@ export default function SocialFeed({
     setLoungeDetailEditErr('')
     setLoungeDetailEditMediaFile(null)
     setLoungeDetailEditMediaKind('')
+    setLoungeDetailEditImageUrls([])
+    setLoungeDetailEditGifUrl('')
     try {
       const el = loungeDetailEditMediaInputRef.current
       if (el) el.value = ''
@@ -1547,11 +1553,15 @@ export default function SocialFeed({
         setLoungeDetailEditErr('You must be signed in.')
         return
       }
+      const mediaPatch = feedPostMediaUpdatePayload({
+        imageUrls: loungeDetailEditImageUrls,
+        gifUrl: loungeDetailEditGifUrl,
+      })
       const { data, error } = await supabaseClient
         .from('community_feed_posts')
-        .update({ caption: cap })
+        .update({ caption: cap, ...mediaPatch })
         .eq('id', loungePostDetail.id)
-        .select('id,caption,edited_at')
+        .select('id,caption,edited_at,image_urls,media_url,gif_url')
         .maybeSingle()
       if (error) {
         const msg = String(error.message || '')
@@ -1571,10 +1581,30 @@ export default function SocialFeed({
         return
       }
       setCommunityPosts((prev) =>
-        prev.map((p) => (p.id === data.id ? { ...p, caption: data.caption, edited_at: data.edited_at } : p))
+        prev.map((p) =>
+          p.id === data.id
+            ? {
+                ...p,
+                caption: data.caption,
+                edited_at: data.edited_at,
+                image_urls: data.image_urls,
+                media_url: data.media_url,
+                gif_url: data.gif_url,
+              }
+            : p
+        )
       )
       setLoungePostDetail((prev) =>
-        prev && prev.id === data.id ? { ...prev, caption: data.caption, edited_at: data.edited_at } : prev
+        prev && prev.id === data.id
+          ? {
+              ...prev,
+              caption: data.caption,
+              edited_at: data.edited_at,
+              image_urls: data.image_urls,
+              media_url: data.media_url,
+              gif_url: data.gif_url,
+            }
+          : prev
       )
       cancelLoungeDetailEdit()
     } finally {
@@ -1583,6 +1613,8 @@ export default function SocialFeed({
   }, [
     cancelLoungeDetailEdit,
     loungeDetailDraftCaption,
+    loungeDetailEditGifUrl,
+    loungeDetailEditImageUrls,
     loungeDetailEditMediaFile,
     loungePostDetail,
     onRequireAuth,
@@ -2768,7 +2800,7 @@ export default function SocialFeed({
                   const cap = LOUNGE_COMPOSER_MAX_IMAGES
                   let room = Math.max(0, cap - next.length)
                   if (room === 0) {
-                    setPostErr(`You can attach up to ${cap} images.`)
+                    setLoungeImageLimitDialog(`You can attach up to ${cap} images.`)
                     return next
                   }
                   let skipped = 0
@@ -2781,7 +2813,7 @@ export default function SocialFeed({
                     room -= 1
                   }
                   if (skipped > 0) {
-                    setPostErr(`You can attach up to ${cap} images. Extra files were not added.`)
+                    setLoungeImageLimitDialog(`You can attach up to ${cap} images. Extra files were not added.`)
                   }
                   return next
                 })
@@ -3219,6 +3251,9 @@ export default function SocialFeed({
                               // ignore
                             }
                             setLoungeDetailDraftCaption(feedPostDisplayCaption(loungePostDetail))
+                            const seed = feedPostAuthorEditMediaSeed(loungePostDetail)
+                            setLoungeDetailEditImageUrls(seed.imageUrls)
+                            setLoungeDetailEditGifUrl(seed.gifUrl)
                             setLoungeDetailEditing(true)
                           }}
                         >
@@ -3294,7 +3329,6 @@ export default function SocialFeed({
                   type="button"
                   onClick={() => {
                     const p = loungePostDetail
-                    closeLoungePostDetailImmediate()
                     void openProfileModal(p)
                   }}
                   className="mt-0.5 h-10 w-10 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[15px] font-bold text-zinc-200 sm:h-[2.75rem] sm:w-[2.75rem] sm:text-[16px]"
@@ -3325,7 +3359,6 @@ export default function SocialFeed({
                       type="button"
                       onClick={() => {
                         const p = loungePostDetail
-                        closeLoungePostDetailImmediate()
                         void openProfileModal(p)
                       }}
                       className="min-w-0 inline-flex max-w-full overflow-hidden text-left hover:text-cyan-300"
@@ -3420,6 +3453,29 @@ export default function SocialFeed({
                       </div>
                     ) : null}
                   </div>
+                  {(() => {
+                    const gifUrl = String(loungeDetailEditGifUrl || '').trim()
+                    const imageUrls = loungeDetailEditImageUrls
+                    const carouselUrls = gifUrl ? [...imageUrls, gifUrl] : imageUrls
+                    if (carouselUrls.length === 0) return null
+                    const nImg = loungeDetailEditImageUrls.length
+                    return (
+                      <LoungeImageCarousel
+                        urls={carouselUrls}
+                        variant="composer"
+                        firstMarginTopClass="mt-3"
+                        regionAriaLabel={gifUrl ? 'Post images and GIF' : 'Post images'}
+                        removeLabelForIndex={(i) => (i < nImg ? 'Remove image' : 'Remove GIF')}
+                        onRemoveIndex={(i) => {
+                          if (i < nImg) {
+                            setLoungeDetailEditImageUrls((prev) => prev.filter((_, j) => j !== i))
+                          } else {
+                            setLoungeDetailEditGifUrl('')
+                          }
+                        }}
+                      />
+                    )
+                  })()}
                 </div>
               ) : loungePostDetail.reposted_post ? (
                 <>
@@ -4131,11 +4187,11 @@ export default function SocialFeed({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="grid min-h-[2.25rem] max-h-[min(50vh,18rem)] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
+                          <div className="grid min-h-0 max-h-[min(50vh,18rem)] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
                             <div
                               ref={quoteRepostMirrorRef}
                               aria-hidden
-                              className="pointer-events-none min-h-[2.25rem] max-h-[min(50vh,18rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-1 text-left text-[18px] leading-snug text-zinc-100 [overflow-wrap:anywhere] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                              className="pointer-events-none min-h-0 max-h-[min(50vh,18rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-1 text-left text-[18px] leading-snug text-zinc-100 [overflow-wrap:anywhere] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                             >
                               {quoteRepostDraft ? (
                                 quoteRepostDraft
@@ -4145,6 +4201,7 @@ export default function SocialFeed({
                             </div>
                             <textarea
                               ref={quoteRepostTextareaRef}
+                              rows={1}
                               value={quoteRepostDraft}
                               onChange={(e) => setQuoteRepostDraft(e.target.value)}
                               onScroll={(e) => {
@@ -4152,7 +4209,7 @@ export default function SocialFeed({
                                 if (m) m.scrollTop = e.currentTarget.scrollTop
                               }}
                               maxLength={280}
-                              className="z-10 min-h-[2.25rem] max-h-[min(50vh,18rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-1 text-[18px] leading-snug text-transparent caret-white outline-none selection:bg-cyan-500/25 focus:outline-none focus:ring-0"
+                              className="z-10 min-h-0 max-h-[min(50vh,18rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-1 text-[18px] leading-snug text-transparent caret-white outline-none selection:bg-cyan-500/25 focus:outline-none focus:ring-0"
                               placeholder=""
                               aria-label="Quote for repost"
                             />
@@ -4183,7 +4240,7 @@ export default function SocialFeed({
                                 const cap = LOUNGE_COMPOSER_MAX_IMAGES
                                 let room = Math.max(0, cap - next.length)
                                 if (room === 0) {
-                                  setQuoteRepostErr(`You can attach up to ${cap} images.`)
+                                  setLoungeImageLimitDialog(`You can attach up to ${cap} images.`)
                                   return next
                                 }
                                 let skipped = 0
@@ -4196,7 +4253,7 @@ export default function SocialFeed({
                                   room -= 1
                                 }
                                 if (skipped > 0) {
-                                  setQuoteRepostErr(`You can attach up to ${cap} images. Extra files were not added.`)
+                                  setLoungeImageLimitDialog(`You can attach up to ${cap} images. Extra files were not added.`)
                                 }
                                 return next
                               })
@@ -4429,6 +4486,34 @@ export default function SocialFeed({
         onPick={handleKlipyGifPicked}
         supabaseClient={supabaseClient}
       />
+
+      {loungeImageLimitDialog ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="lounge-image-limit-msg"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 z-0 cursor-default touch-manipulation"
+            aria-label="Dismiss"
+            onClick={() => setLoungeImageLimitDialog('')}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-zinc-600 bg-zinc-900 p-5 shadow-2xl">
+            <p id="lounge-image-limit-msg" className="text-[15px] leading-relaxed text-zinc-100">
+              {loungeImageLimitDialog}
+            </p>
+            <button
+              type="button"
+              onClick={() => setLoungeImageLimitDialog('')}
+              className="mt-4 w-full min-h-11 rounded-xl bg-zinc-100 text-[15px] font-semibold text-zinc-900 touch-manipulation hover:bg-white active:bg-zinc-200 [-webkit-tap-highlight-color:transparent]"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {profileGateOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" role="dialog" aria-modal>
