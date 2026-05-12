@@ -63,33 +63,84 @@ export function LoungeImageCarousel({
     const scroller = carouselScrollRef.current
     if (!scroller) return
     const observeTarget = scroller.parentElement
-    if (!observeTarget || typeof IntersectionObserver === 'undefined') return
+    if (!observeTarget) return
     const scrollRoot = visibilityResetRootRef?.current ?? null
-    let wasVisibleEnough = false
-    const visibleEnough = (en) => en.isIntersecting && en.intersectionRatio >= 0.06
-    const io = new IntersectionObserver(
-      (entries) => {
-        const en = entries[0]
-        if (!en) return
-        const now = visibleEnough(en)
-        if (now && !wasVisibleEnough) {
-          scroller.scrollLeft = 0
-          try {
-            scroller.scrollTo({ left: 0, behavior: 'instant' })
-          } catch {
-            // ignore
-          }
-        }
-        wasVisibleEnough = now
-      },
-      {
-        root: scrollRoot,
-        rootMargin: '0px',
-        threshold: [0, 0.02, 0.06, 0.12, 0.25],
+
+    const resetToStart = () => {
+      scroller.scrollLeft = 0
+      try {
+        scroller.scrollTo({ left: 0, behavior: 'instant' })
+      } catch {
+        // ignore
       }
-    )
-    io.observe(observeTarget)
-    return () => io.disconnect()
+    }
+
+    /** Geometry check: more reliable than IO alone for nested scroll + freshly mounted rows (e.g. new posts). */
+    const stripIntersectsRoot = (rootEl, targetEl) => {
+      if (!rootEl || !targetEl) return false
+      const rr = rootEl.getBoundingClientRect()
+      const tr = targetEl.getBoundingClientRect()
+      if (tr.height < 6 || tr.width < 6) return false
+      return tr.bottom > rr.top + 2 && tr.top < rr.bottom - 2 && tr.right > rr.left + 2 && tr.left < rr.right - 2
+    }
+
+    let wasOut = false
+    let raf = 0
+    const runScrollGeometry = () => {
+      if (!scrollRoot) return
+      const inView = stripIntersectsRoot(scrollRoot, observeTarget)
+      if (!inView) {
+        wasOut = true
+        return
+      }
+      if (wasOut) {
+        wasOut = false
+        resetToStart()
+      }
+    }
+    const scheduleGeometry = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        runScrollGeometry()
+      })
+    }
+
+    if (scrollRoot) {
+      scrollRoot.addEventListener('scroll', scheduleGeometry, { passive: true })
+      window.addEventListener('resize', scheduleGeometry, { passive: true })
+      scheduleGeometry()
+    }
+
+    let io = null
+    if (typeof IntersectionObserver !== 'undefined') {
+      let wasVisibleEnough = false
+      const visibleEnough = (en) => en.isIntersecting && en.intersectionRatio >= 0.05
+      io = new IntersectionObserver(
+        (entries) => {
+          const en = entries[0]
+          if (!en) return
+          const now = visibleEnough(en)
+          if (now && !wasVisibleEnough) resetToStart()
+          wasVisibleEnough = now
+        },
+        {
+          root: scrollRoot,
+          rootMargin: '0px',
+          threshold: [0, 0.02, 0.05, 0.12, 0.25],
+        }
+      )
+      io.observe(observeTarget)
+    }
+
+    return () => {
+      if (scrollRoot) {
+        scrollRoot.removeEventListener('scroll', scheduleGeometry)
+        window.removeEventListener('resize', scheduleGeometry)
+      }
+      if (raf) window.cancelAnimationFrame(raf)
+      if (io) io.disconnect()
+    }
   }, [urlsKey, isComposer, list.length, visibilityResetRootRef])
   const imgClass = imgClassByVariant[variant] || imgClassByVariant.feed
   const canOpenLightbox = enableLightbox && !isComposer && typeof onRemoveIndex !== 'function'

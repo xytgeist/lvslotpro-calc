@@ -4114,8 +4114,8 @@ export default function SocialFeed({
               setQuoteRepostErr('')
             }}
           />
-          <div className="pointer-events-none relative z-10 mx-auto w-full max-w-md pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <div className="pointer-events-auto rounded-t-2xl border border-zinc-600/80 bg-[#181b22]/96 px-4 pt-4 shadow-2xl backdrop-blur-md">
+          <div className="pointer-events-none relative z-10 mx-auto w-full max-w-md pb-[max(1.25rem,env(safe-area-inset-bottom)+28px)]">
+            <div className="pointer-events-auto rounded-t-2xl border border-zinc-600/80 bg-[#181b22]/96 px-4 pb-6 pt-5 shadow-2xl backdrop-blur-md">
               <p id="quote-remove-confirm-title" className="text-[16px] font-semibold leading-snug text-white">
                 Are you sure you want to delete your quote of this post?
               </p>
@@ -4124,7 +4124,7 @@ export default function SocialFeed({
                   {quoteRepostErr}
                 </div>
               ) : null}
-              <div className="mt-5 flex gap-3 pb-1">
+              <div className="mt-6 flex gap-3">
                 <button
                   type="button"
                   disabled={quoteRepostBusy}
@@ -4257,104 +4257,104 @@ export default function SocialFeed({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="mt-0.5 flex min-h-[7.25rem] flex-col">
-                            <div className="grid min-h-[6.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 sm:min-h-[7.25rem] [&>*]:col-start-1 [&>*]:row-start-1">
-                            <div
-                              ref={quoteRepostMirrorRef}
-                              aria-hidden
-                              className="pointer-events-none min-h-[6.75rem] max-h-[min(50vh,22rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-0 pt-[10px] text-left text-[17px] leading-[1.25] text-zinc-100 [overflow-wrap:anywhere] [scrollbar-width:none] [-ms-overflow-style:none] sm:min-h-[7.25rem] sm:pt-[13px] [&::-webkit-scrollbar]:hidden"
-                            >
-                              {quoteRepostDraft ? (
-                                quoteRepostDraft
-                              ) : (
-                                <span className="text-zinc-500">Add a comment</span>
-                              )}
+                          <div className="mt-0.5 flex min-h-[6.5rem] flex-col">
+                            <div className="grid min-h-[2.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 sm:min-h-[3rem] [&>*]:col-start-1 [&>*]:row-start-1">
+                              <div
+                                ref={quoteRepostMirrorRef}
+                                aria-hidden
+                                className="pointer-events-none min-h-[2.75rem] max-h-[min(50vh,22rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-0 pt-[10px] text-left text-[17px] leading-[1.25] text-zinc-100 [overflow-wrap:anywhere] [scrollbar-width:none] [-ms-overflow-style:none] sm:min-h-[3rem] sm:pt-[13px] [&::-webkit-scrollbar]:hidden"
+                              >
+                                {quoteRepostDraft ? (
+                                  quoteRepostDraft
+                                ) : (
+                                  <span className="text-zinc-500">Add a comment</span>
+                                )}
+                              </div>
+                              <textarea
+                                ref={quoteRepostTextareaRef}
+                                value={quoteRepostDraft}
+                                onChange={(e) => setQuoteRepostDraft(e.target.value)}
+                                onScroll={(e) => {
+                                  const m = quoteRepostMirrorRef.current
+                                  if (m) m.scrollTop = e.currentTarget.scrollTop
+                                }}
+                                maxLength={280}
+                                className="z-10 min-h-[2.75rem] max-h-[min(50vh,22rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[10px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25 focus:outline-none focus:ring-0 sm:min-h-[3rem] sm:pt-[13px]"
+                                placeholder=""
+                                aria-label="Quote for repost"
+                              />
                             </div>
-                            <textarea
-                              ref={quoteRepostTextareaRef}
-                              rows={5}
-                              value={quoteRepostDraft}
-                              onChange={(e) => setQuoteRepostDraft(e.target.value)}
-                              onScroll={(e) => {
-                                const m = quoteRepostMirrorRef.current
-                                if (m) m.scrollTop = e.currentTarget.scrollTop
-                              }}
-                              maxLength={280}
-                              className="z-10 min-h-[6.75rem] max-h-[min(50vh,22rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[10px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25 focus:outline-none focus:ring-0 sm:min-h-[7.25rem] sm:pt-[13px]"
-                              placeholder=""
-                              aria-label="Quote for repost"
-                            />
-                          </div>
-                          </div>
-                          <input
-                            ref={quoteRepostMediaInputRef}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            onChange={(e) => {
-                              const input = e.target
-                              const files = Array.from(input.files || [])
-                              if (!files.length) return
-                              setQuoteRepostErr('')
-                              const bad = files.some((f) => !isProbablyImageFile(f))
-                              if (bad) {
-                                setQuoteRepostErr('Please choose image files.')
+                            <input
+                              ref={quoteRepostMediaInputRef}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                const input = e.target
+                                const files = Array.from(input.files || [])
+                                if (!files.length) return
+                                setQuoteRepostErr('')
+                                const bad = files.some((f) => !isProbablyImageFile(f))
+                                if (bad) {
+                                  setQuoteRepostErr('Please choose image files.')
+                                  try {
+                                    input.value = ''
+                                  } catch {
+                                    // ignore
+                                  }
+                                  return
+                                }
+                                const prevImgs = quoteRepostImageItemsRef.current
+                                const { next, limitDialog } = mergeLoungePickedImageItems(prevImgs, files, newComposerImageId)
+                                quoteRepostImageItemsRef.current = next
+                                setQuoteRepostImageItems(next)
+                                if (limitDialog) setLoungeImageLimitDialog(limitDialog)
                                 try {
                                   input.value = ''
                                 } catch {
                                   // ignore
                                 }
-                                return
-                              }
-                              const prevImgs = quoteRepostImageItemsRef.current
-                              const { next, limitDialog } = mergeLoungePickedImageItems(prevImgs, files, newComposerImageId)
-                              quoteRepostImageItemsRef.current = next
-                              setQuoteRepostImageItems(next)
-                              if (limitDialog) setLoungeImageLimitDialog(limitDialog)
-                              try {
-                                input.value = ''
-                              } catch {
-                                // ignore
-                              }
-                            }}
-                          />
-                          {(() => {
-                            const gifUrl = String(quoteRepostMediaUrl || '').trim()
-                            const imageUrls = quoteRepostImageItems.map((x) => x.preview)
-                            const carouselUrls = gifUrl ? [...imageUrls, gifUrl] : imageUrls
-                            if (carouselUrls.length === 0) return null
-                            const nImg = quoteRepostImageItems.length
-                            return (
-                              <LoungeImageCarousel
-                                urls={carouselUrls}
-                                variant="composer"
-                                firstMarginTopClass="mt-1.5"
-                                regionAriaLabel={gifUrl ? 'Quote images and GIF' : 'Quote images'}
-                                removeLabelForIndex={(i) => (i < nImg ? 'Remove image' : 'Remove GIF')}
-                                onRemoveIndex={(i) => {
-                                  if (i < nImg) {
-                                    setQuoteRepostImageItems((prev) => {
-                                      const row = prev[i]
-                                      if (row?.preview) {
-                                        try {
-                                          URL.revokeObjectURL(row.preview)
-                                        } catch {
-                                          // ignore
+                              }}
+                            />
+                            {(() => {
+                              const gifUrl = String(quoteRepostMediaUrl || '').trim()
+                              const imageUrls = quoteRepostImageItems.map((x) => x.preview)
+                              const carouselUrls = gifUrl ? [...imageUrls, gifUrl] : imageUrls
+                              if (carouselUrls.length === 0) return null
+                              const nImg = quoteRepostImageItems.length
+                              return (
+                                <LoungeImageCarousel
+                                  urls={carouselUrls}
+                                  variant="composer"
+                                  firstMarginTopClass="mt-1.5"
+                                  regionAriaLabel={gifUrl ? 'Quote images and GIF' : 'Quote images'}
+                                  removeLabelForIndex={(i) => (i < nImg ? 'Remove image' : 'Remove GIF')}
+                                  onRemoveIndex={(i) => {
+                                    if (i < nImg) {
+                                      setQuoteRepostImageItems((prev) => {
+                                        const row = prev[i]
+                                        if (row?.preview) {
+                                          try {
+                                            URL.revokeObjectURL(row.preview)
+                                          } catch {
+                                            // ignore
+                                          }
                                         }
-                                      }
-                                      return prev.filter((_, j) => j !== i)
-                                    })
-                                  } else {
-                                    setQuoteRepostMediaUrl('')
-                                  }
-                                }}
-                              />
-                            )
-                          })()}
+                                        return prev.filter((_, j) => j !== i)
+                                      })
+                                    } else {
+                                      setQuoteRepostMediaUrl('')
+                                    }
+                                  }}
+                                />
+                              )
+                            })()}
+                            <div className="min-h-0 flex-1" aria-hidden />
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-zinc-700/70 pt-3">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-zinc-700/70 pt-1.5 pb-1">
                         <div className="flex h-10 shrink-0 items-center justify-center gap-1.5">
                           <button
                             type="button"
