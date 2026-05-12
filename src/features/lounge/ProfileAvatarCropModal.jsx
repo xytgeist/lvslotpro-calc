@@ -26,12 +26,10 @@ export default function ProfileAvatarCropModal({ open, file, onCancel, onApply }
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [loadErr, setLoadErr] = useState('')
   const [applyBusy, setApplyBusy] = useState(false)
+  /** Last distance between two touches; incremental pinch zoom. */
   const pinchRef = useRef(null)
-  const zoomRef = useRef(1)
-  useEffect(() => {
-    zoomRef.current = zoom
-  }, [zoom])
-
+  /** True while two fingers on surface — blocks pointer-drag pan so pinch does not fight pan. */
+  const pinchLockRef = useRef(false)
   const paint = useCallback(() => {
     const canvas = canvasRef.current
     const bmp = bitmapRef.current
@@ -84,6 +82,8 @@ export default function ProfileAvatarCropModal({ open, file, onCancel, onApply }
       setRotationDeg(0)
       setZoom(1)
       setPan({ x: 0, y: 0 })
+      pinchRef.current = null
+      pinchLockRef.current = false
       return
     }
     let cancelled = false
@@ -120,11 +120,13 @@ export default function ProfileAvatarCropModal({ open, file, onCancel, onApply }
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return
+    if (pinchLockRef.current) return
     ;(e.currentTarget).setPointerCapture(e.pointerId)
     pointerDragRef.current = { active: true, lastX: e.clientX, lastY: e.clientY }
   }
 
   const onPointerMove = (e) => {
+    if (pinchLockRef.current) return
     if (!pointerDragRef.current.active) return
     const dx = e.clientX - pointerDragRef.current.lastX
     const dy = e.clientY - pointerDragRef.current.lastY
@@ -153,10 +155,12 @@ export default function ProfileAvatarCropModal({ open, file, onCancel, onApply }
   }
 
   const onTouchStart = (e) => {
-    if (e.touches.length === 2) {
+    if (e.touches.length >= 2) {
       const [a, b] = [e.touches[0], e.touches[1]]
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
-      pinchRef.current = { d0: dist, z0: zoomRef.current }
+      pinchRef.current = { lastDist: Math.max(dist, 8) }
+      pinchLockRef.current = true
+      pointerDragRef.current.active = false
     }
   }
 
@@ -165,13 +169,19 @@ export default function ProfileAvatarCropModal({ open, file, onCancel, onApply }
     e.preventDefault()
     const [a, b] = [e.touches[0], e.touches[1]]
     const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
-    const { d0, z0 } = pinchRef.current
-    const next = clamp(z0 * (dist / Math.max(d0, 1e-6)), 1, 4.5)
-    setZoom(next)
+    const last = pinchRef.current.lastDist
+    const rawRatio = dist / Math.max(last, 8)
+    // Dampen pinch so small finger jitter does not spike zoom (was: zoom = z0 * dist/d0 → jumpy).
+    const ratio = Math.pow(rawRatio, 0.52)
+    setZoom((z) => clamp(z * ratio, 1, 4.5))
+    pinchRef.current = { lastDist: Math.max(dist, 8) }
   }
 
   const onTouchEnd = (e) => {
-    if (e.touches.length < 2) pinchRef.current = null
+    if (e.touches.length < 2) {
+      pinchRef.current = null
+      pinchLockRef.current = false
+    }
   }
 
   const handleApply = async () => {
@@ -198,7 +208,7 @@ export default function ProfileAvatarCropModal({ open, file, onCancel, onApply }
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[220] flex flex-col bg-black/70 backdrop-blur-[2px] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
+      className="fixed inset-0 z-[220] flex flex-col bg-black/88 backdrop-blur-[2px] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="avatar-crop-title"
@@ -217,9 +227,6 @@ export default function ProfileAvatarCropModal({ open, file, onCancel, onApply }
         <h2 id="avatar-crop-title" className="text-center text-[17px] font-bold text-white">
           Adjust photo
         </h2>
-        <p className="mt-1 text-center text-[13px] leading-snug text-zinc-400">
-          Drag to position. Pinch or scroll to zoom. Rotate if needed, then Apply.
-        </p>
 
         <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-4">
           {loadErr ? (
