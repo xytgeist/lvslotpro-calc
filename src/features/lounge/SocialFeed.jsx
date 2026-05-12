@@ -565,7 +565,8 @@ export default function SocialFeed({
         rawDelta === 0 ? 0 : Math.sign(rawDelta) * Math.min(Math.abs(rawDelta), maxAbsScrollStepPx)
 
       let r = loungePostDetailTitleRevealRef.current
-      if (st <= 2) {
+      /** Treat a small band as “top” so the bar can return after layout/anchoring without needing pixel-perfect `0`. */
+      if (st <= 16) {
         r = 1
       } else if (eff < -minScrollStepPx) {
         r = Math.min(1, r + (-eff) / titleRevealPerScrollPx)
@@ -1287,14 +1288,19 @@ export default function SocialFeed({
       const cur = prev[loungePostDetail.id] || defaultInteraction
       return { ...prev, [loungePostDetail.id]: { ...cur, commented: true } }
     })
+    /** After a reply, user is usually scrolled in the comments band (`scrollTop` ≫ 2). Always show the detail title bar again and resync scroll math once layout has settled (new comment row + optional `patchPostAggregate`). */
     window.requestAnimationFrame(() => {
-      const sc = loungePostDetailScrollRef.current
-      if (!sc) return
-      loungePostDetailScrollPrevTopRef.current = sc.scrollTop
-      if (sc.scrollTop <= 2) {
+      window.requestAnimationFrame(() => {
+        const pending = loungePostDetailScrollVisualRafRef.current
+        if (pending) {
+          window.cancelAnimationFrame(pending)
+          loungePostDetailScrollVisualRafRef.current = 0
+        }
+        const sc = loungePostDetailScrollRef.current
+        if (sc) loungePostDetailScrollPrevTopRef.current = sc.scrollTop
         loungePostDetailTitleRevealRef.current = 1
         setLoungePostDetailTitleReveal(1)
-      }
+      })
     })
   }, [
     composerUserId,
