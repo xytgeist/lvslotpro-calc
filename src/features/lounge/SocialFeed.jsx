@@ -578,7 +578,7 @@ export default function SocialFeed({
       el.scrollTop = 0
       loungePostDetailScrollPrevTopRef.current = 0
     }
-  }, [loungePostDetail?.id])
+  }, [loungePostDetail])
 
   useEffect(() => {
     const el = loungePostDetailScrollRef.current
@@ -1458,10 +1458,6 @@ export default function SocialFeed({
     loungeTitleRevealRef.current = 1
     setLoungeTitleReveal(1)
   }, [])
-
-  const closeLoungePostDetailImmediate = useCallback(() => {
-    finalizeLoungePostDetailClose()
-  }, [finalizeLoungePostDetailClose])
 
   const closeLoungePostDetail = useCallback(() => {
     setLoungePostDetailMenuOpen(false)

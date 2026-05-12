@@ -87,10 +87,10 @@ export default function LoungeProfileFullScreen({
   }, [open, profileUserId])
 
   useEffect(() => {
-    if (!ownProfileEditing || !isOwnProfile || !profile) return
+    if (!ownProfileEditing || !isOwnProfile || profile?.user_id == null) return
     setDisplayNameDraft(String(profile.display_name ?? '').trim().slice(0, 24))
     setHandleSlugDraft(String(profile.handle ?? '').trim())
-  }, [ownProfileEditing, isOwnProfile, profile?.user_id, open])
+  }, [ownProfileEditing, isOwnProfile, open, profile?.user_id, profile?.display_name, profile?.handle])
 
   useEffect(() => {
     if (!open || !profileUserId) return
@@ -145,6 +145,7 @@ export default function LoungeProfileFullScreen({
 
   useLayoutEffect(() => {
     if (!ownProfileMenuOpen) return
+    const panel = ownProfileMenuPanelRef.current
     const run = () => {
       requestAnimationFrame(() => placeOwnProfileMenu())
     }
@@ -155,7 +156,6 @@ export default function LoungeProfileFullScreen({
     return () => {
       window.removeEventListener('resize', onRe)
       window.removeEventListener('scroll', onRe, true)
-      const panel = ownProfileMenuPanelRef.current
       if (panel) {
         panel.style.position = ''
         panel.style.zIndex = ''

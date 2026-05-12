@@ -19,8 +19,6 @@ export default function LoungePostArticle({
   toggleInteraction,
   /** Plain repost (no quote); requires caption empty + `is_plain_repost` in DB. */
   onPlainRepost,
-  /** When user already reposted: prefer inline menu via `onUndoPlainRepost` / `onRemoveQuoteRepost` (fallback: `onRepostManage`). */
-  onRepostManage,
   /** Undo plain repost for this original post (feed + profile use small menu). */
   onUndoPlainRepost,
   /** Open remove-quote flow for this original post. */
@@ -76,6 +74,11 @@ export default function LoungePostArticle({
   const bookmarkClass = loungeReadOnly ? 'text-zinc-600' : isBookmarked ? 'text-amber-300' : 'text-zinc-500'
   const ro = loungeReadOnly
   const menuIsOwn = Boolean(viewerUserId && post?.user_id === viewerUserId)
+  const menuShowEdit = Boolean(
+    menuIsOwn &&
+      typeof onPostMenuEdit === 'function' &&
+      (typeof captionEditableInMenu !== 'function' || captionEditableInMenu(post)),
+  )
   const showPostRowMenu = Boolean(
     !ro &&
       viewerUserId &&
@@ -85,7 +88,6 @@ export default function LoungePostArticle({
         onPostMenuReport ||
         (loungeViewerIsStaff && !menuIsOwn && typeof onStaffPostDelete === 'function'))
   )
-  const menuShowEdit = Boolean(menuIsOwn && typeof onPostMenuEdit === 'function')
 
   useEffect(() => {
     if (!repostMenuOpen) return

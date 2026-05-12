@@ -21,7 +21,7 @@ export default function KlipyGifPicker({ open, onClose, onPick, supabaseClient }
   const pageRef = useRef(1)
   const hasNextRef = useRef(false)
   const loadingRef = useRef(false)
-  const loadRef = useRef(async (_opts) => {})
+  const loadRef = useRef(async () => {})
   const appendInflightRef = useRef(false)
 
   useEffect(() => {

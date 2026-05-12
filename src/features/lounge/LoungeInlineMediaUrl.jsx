@@ -19,13 +19,14 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose }) {
   }, [url, urls])
 
   const [idx, setIdx] = useState(0)
-
-  useEffect(() => {
+  const [prevList, setPrevList] = useState(null)
+  const [prevInitialIndex, setPrevInitialIndex] = useState(null)
+  if (prevList !== list || prevInitialIndex !== initialIndex) {
+    setPrevList(list)
+    setPrevInitialIndex(initialIndex)
     const n = list.length
-    if (n === 0) return
-    const clamped = Math.max(0, Math.min(initialIndex, n - 1))
-    setIdx(clamped)
-  }, [list, initialIndex])
+    setIdx(n === 0 ? 0 : Math.max(0, Math.min(initialIndex, n - 1)))
+  }
 
   const current = list[idx] || ''
 
