@@ -10,9 +10,10 @@ import {
   uploadProfileAvatar,
   uploadProfileBanner,
 } from '../profiles/profileGate'
-import { prepareAvatarImageForUpload } from '../../utils/compressImageForUpload'
+import { prepareAvatarImageForUpload, isProbablyImageFile } from '../../utils/compressImageForUpload'
 import LoungePostArticle from './LoungePostArticle'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
+import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 
 const PROFILE_HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -53,6 +54,8 @@ export default function LoungeProfileFullScreen({
   const [aboutErr, setAboutErr] = useState('')
   const [bannerBusy, setBannerBusy] = useState(false)
   const [avatarBusy, setAvatarBusy] = useState(false)
+  /** Picked image file awaiting crop modal (own profile). */
+  const [avatarCropFile, setAvatarCropFile] = useState(null)
   /** Confirm handle change (7-day rule) or explain cooldown. */
   const [handleChangeDialog, setHandleChangeDialog] = useState(null)
   /** Own profile: overflow menu on banner (⋯). */
@@ -80,6 +83,7 @@ export default function LoungeProfileFullScreen({
     setDisplayNameDraft('')
     setHandleSlugDraft('')
     setHandleChangeDialog(null)
+    setAvatarCropFile(null)
   }, [open, profileUserId])
 
   useEffect(() => {
@@ -470,7 +474,42 @@ export default function LoungeProfileFullScreen({
     }
   }
 
-  const onPickAvatar = async (e) => {
+  const finalizeAvatarUpload = useCallback(
+    async (file) => {
+      if (!file || !isOwnProfile || !viewerUserId) return
+      setAvatarBusy(true)
+      try {
+        const { file: ready, error: compressErr } = await prepareAvatarImageForUpload(file)
+        if (compressErr) {
+          window.alert(compressErr.message || 'Could not process that image.')
+          return
+        }
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        if (!session?.user) return
+        const { data: url, error: up } = await uploadProfileAvatar({ supabaseClient, user: session.user, file: ready })
+        if (up) {
+          window.alert(formatProfileSaveDebugError(up, 'Avatar upload'))
+          return
+        }
+        const { error: dbErr } = await supabaseClient
+          .from('profiles')
+          .update({ avatar_url: url || null })
+          .eq('user_id', viewerUserId)
+        if (dbErr) {
+          window.alert(dbErr.message || 'Could not save profile photo.')
+          return
+        }
+        onProfileUpdated?.({ ...profile, avatar_url: url || null })
+      } finally {
+        setAvatarBusy(false)
+      }
+    },
+    [isOwnProfile, viewerUserId, supabaseClient, profile, onProfileUpdated]
+  )
+
+  const onPickAvatar = (e) => {
     const raw = e.target?.files?.[0]
     try {
       e.target.value = ''
@@ -478,35 +517,24 @@ export default function LoungeProfileFullScreen({
       // ignore
     }
     if (!raw || !isOwnProfile || !viewerUserId || avatarBusy) return
-    setAvatarBusy(true)
-    try {
-      const { file, error: compressErr } = await prepareAvatarImageForUpload(raw)
-      if (compressErr) {
-        window.alert(compressErr.message || 'Could not process that image.')
-        return
-      }
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession()
-      if (!session?.user) return
-      const { data: url, error: up } = await uploadProfileAvatar({ supabaseClient, user: session.user, file })
-      if (up) {
-        window.alert(formatProfileSaveDebugError(up, 'Avatar upload'))
-        return
-      }
-      const { error: dbErr } = await supabaseClient
-        .from('profiles')
-        .update({ avatar_url: url || null })
-        .eq('user_id', viewerUserId)
-      if (dbErr) {
-        window.alert(dbErr.message || 'Could not save profile photo.')
-        return
-      }
-      onProfileUpdated?.({ ...profile, avatar_url: url || null })
-    } finally {
-      setAvatarBusy(false)
+    if (!isProbablyImageFile(raw)) {
+      window.alert('Please choose an image file.')
+      return
     }
+    setAvatarCropFile(raw)
   }
+
+  const onAvatarCropCancel = useCallback(() => {
+    setAvatarCropFile(null)
+  }, [])
+
+  const onAvatarCropApply = useCallback(
+    async (croppedFile) => {
+      setAvatarCropFile(null)
+      await finalizeAvatarUpload(croppedFile)
+    },
+    [finalizeAvatarUpload]
+  )
 
   return (
     <div className="fixed inset-0 z-[97] sm:bg-black/85" role="dialog" aria-modal="true" aria-label="Profile">
@@ -652,7 +680,7 @@ export default function LoungeProfileFullScreen({
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(ev) => void onPickAvatar(ev)}
+                      onChange={(ev) => onPickAvatar(ev)}
                     />
                     <button
                       type="button"
@@ -873,6 +901,13 @@ export default function LoungeProfileFullScreen({
           </div>
         </div>
       </div>
+
+      <ProfileAvatarCropModal
+        open={Boolean(avatarCropFile)}
+        file={avatarCropFile}
+        onCancel={onAvatarCropCancel}
+        onApply={onAvatarCropApply}
+      />
 
       {handleChangeDialog && typeof document !== 'undefined'
         ? createPortal(
