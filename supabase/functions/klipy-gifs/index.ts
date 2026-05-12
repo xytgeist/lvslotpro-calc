@@ -28,12 +28,23 @@ function pickFromItem(item: Record<string, unknown>): KlipyItemOut | null {
       '',
   ).trim()
 
-  const previewUrl = String(
-    getNested(bag, ['xs', 'jpg', 'url']) ??
-      getNested(bag, ['sm', 'jpg', 'url']) ??
-      getNested(bag, ['md', 'jpg', 'url']) ??
-      gifUrl,
+  /** Prefer small animated GIFs for the picker grid (Klipy often exposes sm/md/xs gif URLs). */
+  const previewGif = String(
+    getNested(bag, ['xs', 'gif', 'url']) ??
+      getNested(bag, ['sm', 'gif', 'url']) ??
+      getNested(bag, ['md', 'gif', 'url']) ??
+      '',
   ).trim()
+
+  const previewJpg = String(
+    getNested(bag, ['md', 'jpg', 'url']) ??
+      getNested(bag, ['sm', 'jpg', 'url']) ??
+      getNested(bag, ['xs', 'jpg', 'url']) ??
+      '',
+  ).trim()
+
+  // Grid preview: small animated GIF when Klipy provides it; else full GIF (still animates); JPG only as last resort.
+  const previewUrl = (previewGif || gifUrl || previewJpg).trim()
 
   if (!gifUrl) return null
 

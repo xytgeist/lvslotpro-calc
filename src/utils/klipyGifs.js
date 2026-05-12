@@ -4,6 +4,7 @@
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {{ kind: 'search' | 'trending'; q?: string; page?: number; per_page?: number; locale?: string; rating?: string }} params
  * @returns {Promise<{ items: Array<{ id: string; title: string; gifUrl: string; previewUrl: string }>; hasNext: boolean; errorMessage: string }>}
+ *   `previewUrl`: animated grid preview when Klipy exposes xs/sm/md gif URLs; otherwise `gifUrl` or a JPG still.
  */
 export async function fetchKlipyGifs(supabaseClient, params) {
   const kind = params?.kind === 'trending' ? 'trending' : 'search'
