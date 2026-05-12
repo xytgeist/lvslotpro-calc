@@ -178,6 +178,7 @@ export default function SocialFeed({
   const [quoteRepostImageItems, setQuoteRepostImageItems] = useState([])
   const [quoteRepostMediaUrl, setQuoteRepostMediaUrl] = useState('')
   const quoteRepostTextareaRef = useRef(null)
+  const quoteRepostMirrorRef = useRef(null)
   const quoteRepostScrollRef = useRef(null)
   const quoteRepostMediaInputRef = useRef(null)
   const [loungeDetailComments, setLoungeDetailComments] = useState([])
@@ -543,6 +544,7 @@ export default function SocialFeed({
   useEffect(() => {
     const el = loungePostDetailScrollRef.current
     if (!el || typeof window === 'undefined' || !loungePostDetail) return
+    loungePostDetailScrollPrevTopRef.current = el.scrollTop
     const titleRevealPerScrollPx = 220
     const titleHidePerScrollPx = 190
     const maxAbsScrollStepPx = 180
@@ -1285,6 +1287,15 @@ export default function SocialFeed({
       const cur = prev[loungePostDetail.id] || defaultInteraction
       return { ...prev, [loungePostDetail.id]: { ...cur, commented: true } }
     })
+    window.requestAnimationFrame(() => {
+      const sc = loungePostDetailScrollRef.current
+      if (!sc) return
+      loungePostDetailScrollPrevTopRef.current = sc.scrollTop
+      if (sc.scrollTop <= 2) {
+        loungePostDetailTitleRevealRef.current = 1
+        setLoungePostDetailTitleReveal(1)
+      }
+    })
   }, [
     composerUserId,
     composerUserProfile,
@@ -1363,6 +1374,8 @@ export default function SocialFeed({
     setLoungeDetailCommentBusy(false)
     setLoungeDetailCommentDraft('')
     setLoungeDetailCommentErr('')
+    loungeTitleRevealRef.current = 1
+    setLoungeTitleReveal(1)
   }, [])
 
   const closeLoungePostDetailImmediate = useCallback(() => {
@@ -4075,16 +4088,32 @@ export default function SocialFeed({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <textarea
-                            ref={quoteRepostTextareaRef}
-                            value={quoteRepostDraft}
-                            onChange={(e) => setQuoteRepostDraft(e.target.value)}
-                            maxLength={280}
-                            rows={3}
-                            className="min-h-[5.5rem] w-full resize-none bg-transparent px-0 py-1 text-[18px] leading-snug text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-0 touch-manipulation"
-                            placeholder="Add a comment"
-                            aria-label="Quote for repost"
-                          />
+                          <div className="grid min-h-[2.25rem] max-h-[min(50vh,18rem)] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
+                            <div
+                              ref={quoteRepostMirrorRef}
+                              aria-hidden
+                              className="pointer-events-none min-h-[2.25rem] max-h-[min(50vh,18rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-1 text-left text-[18px] leading-snug text-zinc-100 [overflow-wrap:anywhere] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                            >
+                              {quoteRepostDraft ? (
+                                quoteRepostDraft
+                              ) : (
+                                <span className="text-zinc-500">Add a comment</span>
+                              )}
+                            </div>
+                            <textarea
+                              ref={quoteRepostTextareaRef}
+                              value={quoteRepostDraft}
+                              onChange={(e) => setQuoteRepostDraft(e.target.value)}
+                              onScroll={(e) => {
+                                const m = quoteRepostMirrorRef.current
+                                if (m) m.scrollTop = e.currentTarget.scrollTop
+                              }}
+                              maxLength={280}
+                              className="z-10 min-h-[2.25rem] max-h-[min(50vh,18rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-1 text-[18px] leading-snug text-transparent caret-white outline-none selection:bg-cyan-500/25 focus:outline-none focus:ring-0"
+                              placeholder=""
+                              aria-label="Quote for repost"
+                            />
+                          </div>
                           <input
                             ref={quoteRepostMediaInputRef}
                             type="file"
@@ -4145,7 +4174,7 @@ export default function SocialFeed({
                               <LoungeImageCarousel
                                 urls={carouselUrls}
                                 variant="composer"
-                                firstMarginTopClass="mt-1.5"
+                                firstMarginTopClass="mt-[1lh] text-[18px] leading-snug"
                                 regionAriaLabel={gifUrl ? 'Quote images and GIF' : 'Quote images'}
                                 removeLabelForIndex={(i) => (i < nImg ? 'Remove image' : 'Remove GIF')}
                                 onRemoveIndex={(i) => {
