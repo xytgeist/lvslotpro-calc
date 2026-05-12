@@ -179,10 +179,10 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
     4. **Guides → Ask community:** insert succeeds where RLS allows (profile gate if applicable).
     5. **Offers / calendars / push:** offers save; calendar surfaces; edge paths per §4 / §5 in production checklist (align with Edge Functions rows above).
     6. **Profile (Lounge):** own profile → edit → save display/avatar/about; change handle → **Confirm** → **Continue** completes save without a second Save; within 7 days of a handle change → **Cooldown** → **Continue** keeps handle, saves rest; **mod/admin** save retains `role`.
-    7. **Feed carousels:** multi-image post — scroll off-screen until row leaves view, scroll back — carousel shows **first** (left-most) slide.
+    7. **Feed carousels:** multi-image post — swipe to a **non-first** slide; scroll the **feed** until that post leaves the scroll area, then scroll back — carousel shows the **first** (left-most) slide (uses feed scroll root + media strip visibility).
     8. **Repost:** menu opens **under** the Repost control on feed + post detail; already-reposted row shows manage actions in the same anchored popover (no bottom sheet).
     9. **Rate limit:** when posting is blocked, error strip is **above** the composer even with a tall draft.
-    10. **Quote repost:** textarea expands like main composer; images/GIF one line below text; picking more than **6** images shows cap modal (composer + quote sheet).
+    10. **Quote repost:** sheet opens with a **tall** comment area (not a single-line box); images/GIF one line below text; picking more than **6** images shows cap modal (composer + quote sheet).
   - **Sign-off:** Manual steps above passed on **test** (operator confirmation after latest `test` deploy).
   - Production replay: same ordered pass on production after deploy.
 
@@ -194,6 +194,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-12: **Lounge regression pass (`test` `3578e6c`):** feed/detail/quote-sheet carousels reset slide 1 using **`visibilityResetRootRef`** + `IntersectionObserver` on the media strip (not viewport-only); quote repost compose **min height** + `rows={5}`; **remove quote** = short **bottom** confirm: *“Are you sure you want to delete your quote of this post?”* with Cancel / Delete. **Manual test list:** (1) Feed multi-image: swipe to slide 2+, scroll post off and on in the Lounge list — lands on slide 1. (2) Post detail: same if the post has multiple images and you scroll within the detail panel. (3) Quote repost: open composer — gray “Add a comment” visible with several lines of vertical space; toolbar still directly under text; media below. (4) Remove quote: Repost → Remove quote — bottom sheet copy matches above; Cancel closes; Delete removes and feed updates. (5) `npm run lint` + `npm run build` clean. Smoke steps 7 and 10 in this file updated to match.
 - 2026-05-11: **Doc sync (Lounge continuity):** profile **`handle_changed_at`** + 7-day cooldown SQL and client modals; iOS profile-save mitigations; rate-limit banner above composer; feed carousel first-slide on re-entry; anchored repost menus; quote composer height — reflected in **`AGENTS.md`**, **`docs/social-feed-roadmap.md`** (Phases A4, C, D deliverable, F), **`docs/frontend-architecture.md`** (`lounge/` table), and this backlog (A1 bullet, A4 UX, FE rows, smoke 6–10). Code on branch **`test`** (commit `d7c3ffd` area).
 - 2026-05-10: **`profiles.has_active_subscription`** + guard trigger (**`supabase/profiles_tier_testing.sql`**); app reads role + flag for hamburger locks; **`docs/test-user-roles.md`** for SQL recipes.
 - 2026-05-09: **Lounge interactions (Phase E/F slice):** added `supabase/feed_interactions_phase_ef.sql` (`post_likes`, `post_reposts`, `post_bookmarks`, `feed_comments`, `repost_count`, count triggers, RLS); client persistence + comments UI in **`SocialFeed.jsx`** / **`LoungePostArticle.jsx`**; feed selects include **`repost_count`** in **`AppShell.jsx`**. **Requires applying the new SQL on test.** Profile **follows** unchanged (`profile_follows` in `profile_lounge_fullscreen.sql`).
