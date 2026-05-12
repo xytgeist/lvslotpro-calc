@@ -19,8 +19,12 @@ export default function LoungePostArticle({
   toggleInteraction,
   /** Plain repost (no quote); requires caption empty + `is_plain_repost` in DB. */
   onPlainRepost,
-  /** When user already reposted: open sheet to undo plain / remove quote / add quote. */
+  /** When user already reposted: prefer inline menu via `onUndoPlainRepost` / `onRemoveQuoteRepost` (fallback: `onRepostManage`). */
   onRepostManage,
+  /** Undo plain repost for this original post (feed + profile use small menu). */
+  onUndoPlainRepost,
+  /** Open remove-quote flow for this original post. */
+  onRemoveQuoteRepost,
   /** Quote repost (opens composer with caption). */
   onQuoteRepost,
   toggleBookmark,
@@ -362,8 +366,7 @@ export default function LoungePostArticle({
               onClick={() => {
                 if (openProfileGateIfNeeded()) return
                 if (ui.reposted) {
-                  setRepostMenuOpen(false)
-                  onRepostManage?.(post)
+                  setRepostMenuOpen((o) => !o)
                   return
                 }
                 if (onPlainRepost && onQuoteRepost) {
@@ -389,6 +392,111 @@ export default function LoungePostArticle({
               </svg>
               {Number.isFinite(repostCount) ? <span className={repostClass}>{repostCount}</span> : null}
             </LoungeFeedStatSlot>
+            {typeof document !== 'undefined' &&
+            repostMenuOpen &&
+            !ro &&
+            ui.reposted &&
+            (onUndoPlainRepost || onRemoveQuoteRepost || onQuoteRepost)
+              ? createPortal(
+                  <div
+                    ref={repostMenuPortalRef}
+                    role="menu"
+                    className="fixed z-[48] min-w-[11.5rem] -translate-x-1/2 rounded-xl border border-zinc-700/90 bg-zinc-900/95 py-0.5 shadow-xl backdrop-blur-sm"
+                    style={{ top: repostMenuFixed.top, left: repostMenuFixed.left }}
+                  >
+                    {ui.plainRepostChildId ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setRepostMenuOpen(false)
+                          onUndoPlainRepost?.(post)
+                        }}
+                      >
+                        <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        Undo repost
+                      </button>
+                    ) : onPlainRepost ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setRepostMenuOpen(false)
+                          onPlainRepost(post)
+                        }}
+                      >
+                        <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        Repost
+                      </button>
+                    ) : null}
+                    {ui.quoteRepostChildId ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-rose-400 hover:bg-rose-950/35 touch-manipulation"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setRepostMenuOpen(false)
+                          onRemoveQuoteRepost?.(post)
+                        }}
+                      >
+                        <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M6.5 6.5h7v9.5a1 1 0 01-1 1h-5a1 1 0 01-1-1V6.5zM8 6.5V5a1.5 1.5 0 013 0v1.5M4 6.5h12"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        Remove quote
+                      </button>
+                    ) : null}
+                    {!ui.quoteRepostChildId && onQuoteRepost ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setRepostMenuOpen(false)
+                          onQuoteRepost(post)
+                        }}
+                      >
+                        <svg className="h-4 w-4 shrink-0 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                          <path
+                            d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        Quote
+                      </button>
+                    ) : null}
+                  </div>,
+                  document.body
+                )
+              : null}
             {typeof document !== 'undefined' &&
             repostMenuOpen &&
             !ro &&

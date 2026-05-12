@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { feedPostImageUrls } from '../../utils/communityFeedPost'
 import { LoungePostMediaPair, LoungeImageLightbox } from './LoungeInlineMediaUrl.jsx'
 
@@ -51,9 +51,36 @@ export function LoungeImageCarousel({
       cancelAnimationFrame(id1)
     }
   }, [urlsKey])
-  if (!list.length) return null
-  const imgClass = imgClassByVariant[variant] || imgClassByVariant.feed
   const isComposer = variant === 'composer'
+  /** When the post row re-enters the viewport after scroll-away, snap carousel back to the first slide. */
+  useEffect(() => {
+    if (isComposer || !list.length) return
+    const scroller = carouselScrollRef.current
+    if (!scroller) return
+    const rootEl = scroller.closest('article') || scroller.parentElement
+    if (!rootEl || typeof IntersectionObserver === 'undefined') return
+    let wasIntersecting = false
+    const io = new IntersectionObserver(
+      (entries) => {
+        const en = entries[0]
+        if (!en) return
+        const now = en.isIntersecting && en.intersectionRatio >= 0.12
+        if (now && !wasIntersecting) {
+          scroller.scrollLeft = 0
+          try {
+            scroller.scrollTo({ left: 0, behavior: 'instant' })
+          } catch {
+            // ignore
+          }
+        }
+        wasIntersecting = !!en.isIntersecting
+      },
+      { root: null, threshold: [0, 0.12, 0.2] }
+    )
+    io.observe(rootEl)
+    return () => io.disconnect()
+  }, [urlsKey, isComposer, list.length])
+  const imgClass = imgClassByVariant[variant] || imgClassByVariant.feed
   const canOpenLightbox = enableLightbox && !isComposer && typeof onRemoveIndex !== 'function'
   /** Cap slide width in the row; inner frame still shrinks to image (`inline-block` + `w-auto` img). */
   const slideMaxW = isComposer

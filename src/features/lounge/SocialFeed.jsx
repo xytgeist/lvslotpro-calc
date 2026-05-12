@@ -189,7 +189,6 @@ export default function SocialFeed({
   const plainRepostChildIdRef = useRef({})
   /** Maps original post id → this user's quote-repost row id (for remove). */
   const quoteRepostChildIdRef = useRef({})
-  const [repostManageModal, setRepostManageModal] = useState(null)
   const [composerDiscardPromptOpen, setComposerDiscardPromptOpen] = useState(false)
   const [loungeDetailRepostMenuOpen, setLoungeDetailRepostMenuOpen] = useState(false)
   const loungeDetailRepostMenuRef = useRef(null)
@@ -1024,20 +1023,9 @@ export default function SocialFeed({
       setQuoteRepostDraft('')
       setQuoteRepostErr('')
       setQuoteRepostModal({ mode: 'compose', original: post })
-      setRepostManageModal(null)
       setLoungeDetailRepostMenuOpen(false)
     },
     [clearQuoteRepostMedia, loungeReadOnly, openProfileGateIfNeeded]
-  )
-
-  const handleRepostManage = useCallback(
-    (post) => {
-      if (!post?.id || loungeReadOnly) return
-      if (openProfileGateIfNeeded()) return
-      setRepostManageModal({ original: post })
-      setLoungeDetailRepostMenuOpen(false)
-    },
-    [loungeReadOnly, openProfileGateIfNeeded]
   )
 
   const handlePlainRepost = useCallback(
@@ -1045,7 +1033,6 @@ export default function SocialFeed({
       if (!post?.id || loungeReadOnly || !composerUserId) return
       if (openProfileGateIfNeeded()) return
       setLoungeManageErr('')
-      setRepostManageModal(null)
       setLoungeDetailRepostMenuOpen(false)
       try {
         const {
@@ -1138,7 +1125,6 @@ export default function SocialFeed({
           setLoungeManageErr(error.message || 'Could not undo repost.')
           return
         }
-        setRepostManageModal(null)
         await loadCommunityFeed({ silent: true })
         await refreshLoungePostInteractions([originalPostId])
       } finally {
@@ -1146,6 +1132,23 @@ export default function SocialFeed({
       }
     },
     [composerUserId, loadCommunityFeed, refreshLoungePostInteractions, supabaseClient]
+  )
+
+  const openRemoveQuoteRepostForPost = useCallback(
+    (post) => {
+      if (!post?.id || loungeReadOnly) return
+      const quoteId =
+        quoteRepostChildIdRef.current[post.id] ||
+        interactionByPostRef.current[post.id]?.quoteRepostChildId
+      if (!quoteId) {
+        setLoungeManageErr('Could not find your quote repost. Try refreshing.')
+        return
+      }
+      setLoungeDetailRepostMenuOpen(false)
+      setQuoteRepostErr('')
+      setQuoteRepostModal({ mode: 'remove', original: post, childId: quoteId })
+    },
+    [loungeReadOnly]
   )
 
   /** Kept as alias for profile modal props dependency lists. */
@@ -1902,7 +1905,7 @@ export default function SocialFeed({
         if (cached) setComposerUserProfile(cached)
         const { data } = await supabaseClient
           .from('profiles')
-          .select('user_id,handle,display_name,avatar_url,bio,created_at,role')
+          .select('user_id,handle,display_name,avatar_url,bio,about_me,banner_url,created_at,role,handle_changed_at')
           .eq('user_id', uid)
           .maybeSingle()
         if (cancelled) return
@@ -2335,7 +2338,7 @@ export default function SocialFeed({
             .limit(30),
           supabaseClient
             .from('profiles')
-            .select('user_id,handle,display_name,avatar_url,bio,created_at,role')
+            .select('user_id,handle,display_name,avatar_url,bio,created_at,role,handle_changed_at')
             .eq('user_id', userId)
             .maybeSingle(),
         ])
@@ -2392,7 +2395,7 @@ export default function SocialFeed({
         return merged
       })
       const authorPatch = {}
-      for (const k of ['avatar_url', 'display_name', 'handle', 'banner_url', 'about_me', 'bio', 'role']) {
+      for (const k of ['avatar_url', 'display_name', 'handle', 'banner_url', 'about_me', 'bio', 'role', 'handle_changed_at']) {
         if (Object.prototype.hasOwnProperty.call(next, k)) authorPatch[k] = next[k]
       }
       if (Object.keys(authorPatch).length > 0) {
@@ -2413,7 +2416,10 @@ export default function SocialFeed({
       interactionStateFor,
       toggleInteraction,
       onPlainRepost: handlePlainRepost,
-      onRepostManage: handleRepostManage,
+      onUndoPlainRepost: (p) => {
+        void undoPlainRepostForOriginal(p.id)
+      },
+      onRemoveQuoteRepost: openRemoveQuoteRepostForPost,
       onQuoteRepost: openQuoteRepostComposer,
       toggleBookmark,
       bookmarkedByPost,
@@ -2448,7 +2454,8 @@ export default function SocialFeed({
       interactionStateFor,
       toggleInteraction,
       handlePlainRepost,
-      handleRepostManage,
+      undoPlainRepostForOriginal,
+      openRemoveQuoteRepostForPost,
       openQuoteRepostComposer,
       toggleBookmark,
       bookmarkedByPost,
@@ -2519,6 +2526,14 @@ export default function SocialFeed({
                 : 'Pull down to refresh'}
           </div>
         </div>
+
+        {loungeReadOnly ? null : postErr ? (
+          <div className="shrink-0 border-b border-rose-500/25 bg-zinc-950/90 px-3 py-2">
+            <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[15px] leading-snug text-rose-200">
+              {postErr}
+            </div>
+          </div>
+        ) : null}
 
         {loungeReadOnly ? null : (
         <div
@@ -2711,11 +2726,6 @@ export default function SocialFeed({
                       />
                     )
                   })()}
-                  {postErr ? (
-                    <div className="mt-2 shrink-0 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[17px] leading-tight text-rose-200">
-                      {postErr}
-                    </div>
-                  ) : null}
                   <div className="min-h-0 flex-1" aria-hidden />
                 </div>
               </div>
@@ -3129,7 +3139,10 @@ export default function SocialFeed({
                   toggleInteraction={toggleInteraction}
                   repostMenuScrollRootRef={loungeFeedScrollRef}
                   onPlainRepost={handlePlainRepost}
-                  onRepostManage={handleRepostManage}
+                  onUndoPlainRepost={(p) => {
+                    void undoPlainRepostForOriginal(p.id)
+                  }}
+                  onRemoveQuoteRepost={openRemoveQuoteRepostForPost}
                   onQuoteRepost={openQuoteRepostComposer}
                   toggleBookmark={toggleBookmark}
                   bookmarkedByPost={bookmarkedByPost}
@@ -3610,6 +3623,8 @@ export default function SocialFeed({
                 const likeClass = loungeReadOnly ? 'text-zinc-500' : ui.liked ? 'text-rose-400' : 'text-zinc-500'
                 const bookmarkClass = loungeReadOnly ? 'text-zinc-600' : isBookmarked ? 'text-amber-300' : 'text-zinc-500'
                 const ro = loungeReadOnly
+                const plainId = ui.plainRepostChildId
+                const quoteId = ui.quoteRepostChildId
                 return (
                   <div className="mt-5 border-t border-zinc-800/90 pt-4">
                     {loungeDetailEditing ? (
@@ -3748,11 +3763,6 @@ export default function SocialFeed({
                           onReadOnlyClick={requireLoungeAuth}
                           onClick={() => {
                             if (openProfileGateIfNeeded()) return
-                            if (ui.reposted) {
-                              setLoungeDetailRepostMenuOpen(false)
-                              handleRepostManage(d)
-                              return
-                            }
                             setLoungeDetailRepostMenuOpen((o) => !o)
                           }}
                           className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
@@ -3768,11 +3778,109 @@ export default function SocialFeed({
                           </svg>
                           {Number.isFinite(repostCount) ? <span className={repostClass}>{repostCount}</span> : null}
                         </LoungeFeedStatSlot>
-                        {loungeDetailRepostMenuOpen && !ro && !ui.reposted ? (
+                        {loungeDetailRepostMenuOpen && !ro ? (
                           <div
                             role="menu"
                             className="absolute left-1/2 top-full z-[130] mt-1 min-w-[11.5rem] -translate-x-1/2 rounded-xl border border-zinc-700/90 bg-zinc-900/95 py-0.5 shadow-xl backdrop-blur-sm"
                           >
+                            {ui.reposted ? (
+                              <>
+                                {plainId ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                                    disabled={repostManageBusy}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setLoungeDetailRepostMenuOpen(false)
+                                      void undoPlainRepostForOriginal(d.id)
+                                    }}
+                                  >
+                                    <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
+                                      <path
+                                        d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                                        stroke="currentColor"
+                                        strokeWidth="1.35"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                    Undo repost
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                                    disabled={repostManageBusy}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setLoungeDetailRepostMenuOpen(false)
+                                      void handlePlainRepost(d)
+                                    }}
+                                  >
+                                    <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
+                                      <path
+                                        d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                                        stroke="currentColor"
+                                        strokeWidth="1.35"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                    Repost
+                                  </button>
+                                )}
+                                {quoteId ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-rose-400 hover:bg-rose-950/35 touch-manipulation"
+                                    disabled={repostManageBusy}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setLoungeDetailRepostMenuOpen(false)
+                                      openRemoveQuoteRepostForPost(d)
+                                    }}
+                                  >
+                                    <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden>
+                                      <path
+                                        d="M6.5 6.5h7v9.5a1 1 0 01-1 1h-5a1 1 0 01-1-1V6.5zM8 6.5V5a1.5 1.5 0 013 0v1.5M4 6.5h12"
+                                        stroke="currentColor"
+                                        strokeWidth="1.35"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                    Remove quote
+                                  </button>
+                                ) : null}
+                                {!quoteId ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                                    disabled={repostManageBusy}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setLoungeDetailRepostMenuOpen(false)
+                                      openQuoteRepostComposer(d)
+                                    }}
+                                  >
+                                    <svg className="h-4 w-4 shrink-0 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                                      <path
+                                        d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                    Quote
+                                  </button>
+                                ) : null}
+                              </>
+                            ) : (
+                              <>
                             <button
                               type="button"
                               role="menuitem"
@@ -3813,6 +3921,8 @@ export default function SocialFeed({
                               </svg>
                               Quote
                             </button>
+                              </>
+                            )}
                           </div>
                         ) : null}
                       </div>
@@ -3983,116 +4093,6 @@ export default function SocialFeed({
         />
       ) : null}
 
-      {repostManageModal?.original ? (
-        <div
-          className="fixed inset-0 z-[94] flex items-end justify-center bg-black/45 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[3px]"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lounge-repost-manage-title"
-        >
-          <button
-            type="button"
-            className="absolute inset-0 z-0 cursor-default touch-manipulation bg-transparent"
-            aria-label="Close"
-            disabled={repostManageBusy}
-            onClick={() => {
-              if (repostManageBusy) return
-              setRepostManageModal(null)
-            }}
-          />
-          <div className="pointer-events-auto relative z-10 w-full max-w-lg rounded-t-[24px] border border-zinc-700/85 bg-zinc-950/90 px-4 pb-4 pt-3 shadow-xl backdrop-blur-md">
-            <h2 id="lounge-repost-manage-title" className="text-center text-[17px] font-bold text-white">
-              Repost
-            </h2>
-            <div className="mt-2 flex flex-col gap-0.5">
-              {(() => {
-                const orig = repostManageModal.original
-                const st = interactionStateFor(orig.id)
-                const plainId = st.plainRepostChildId
-                const quoteId = st.quoteRepostChildId
-                const repostArrowsIcon = (
-                  <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
-                    <path
-                      d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
-                      stroke="currentColor"
-                      strokeWidth="1.35"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )
-                return (
-                  <>
-                    {plainId ? (
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-zinc-100 hover:bg-zinc-800/90 touch-manipulation disabled:opacity-50"
-                        disabled={repostManageBusy}
-                        onClick={() => void undoPlainRepostForOriginal(orig.id)}
-                      >
-                        {repostArrowsIcon}
-                        Undo repost
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-zinc-100 hover:bg-zinc-800/90 touch-manipulation disabled:opacity-50"
-                        disabled={repostManageBusy}
-                        onClick={() => void handlePlainRepost(orig)}
-                      >
-                        {repostArrowsIcon}
-                        Repost
-                      </button>
-                    )}
-                    {quoteId ? (
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-rose-400 hover:bg-rose-950/35 touch-manipulation disabled:opacity-50"
-                        disabled={repostManageBusy}
-                        onClick={() => {
-                          setRepostManageModal(null)
-                          setQuoteRepostErr('')
-                          setQuoteRepostModal({ mode: 'remove', original: orig, childId: quoteId })
-                        }}
-                      >
-                        <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden>
-                          <path
-                            d="M6.5 6.5h7v9.5a1 1 0 01-1 1h-5a1 1 0 01-1-1V6.5zM8 6.5V5a1.5 1.5 0 013 0v1.5M4 6.5h12"
-                            stroke="currentColor"
-                            strokeWidth="1.35"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        Remove quote
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-zinc-100 hover:bg-zinc-800/90 touch-manipulation disabled:opacity-50"
-                      disabled={repostManageBusy}
-                      onClick={() => {
-                        setRepostManageModal(null)
-                        openQuoteRepostComposer(orig)
-                      }}
-                    >
-                      <svg className="h-4 w-4 shrink-0 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                        <path
-                          d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Quote
-                    </button>
-                  </>
-                )
-              })()}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {quoteRepostModal ? (
         <div
           className="fixed inset-0 z-[92] flex bg-black/45 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[3px]"
@@ -4206,11 +4206,11 @@ export default function SocialFeed({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="grid min-h-0 max-h-[min(50vh,18rem)] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
+                          <div className="grid min-h-0 max-h-[min(50vh,22rem)] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
                             <div
                               ref={quoteRepostMirrorRef}
                               aria-hidden
-                              className="pointer-events-none min-h-0 max-h-[min(50vh,18rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-1 text-left text-[18px] leading-snug text-zinc-100 [overflow-wrap:anywhere] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                              className="pointer-events-none min-h-0 max-h-[min(50vh,22rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-0 pt-[10px] text-left text-[17px] leading-[1.25] text-zinc-100 [overflow-wrap:anywhere] [scrollbar-width:none] [-ms-overflow-style:none] sm:pt-[13px] [&::-webkit-scrollbar]:hidden"
                             >
                               {quoteRepostDraft ? (
                                 quoteRepostDraft
@@ -4228,7 +4228,7 @@ export default function SocialFeed({
                                 if (m) m.scrollTop = e.currentTarget.scrollTop
                               }}
                               maxLength={280}
-                              className="z-10 min-h-0 max-h-[min(50vh,18rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-1 text-[18px] leading-snug text-transparent caret-white outline-none selection:bg-cyan-500/25 focus:outline-none focus:ring-0"
+                              className="z-10 min-h-[2.75rem] max-h-[min(50vh,22rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[10px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25 focus:outline-none focus:ring-0 sm:min-h-[3rem] sm:pt-[13px]"
                               placeholder=""
                               aria-label="Quote for repost"
                             />
@@ -4276,7 +4276,7 @@ export default function SocialFeed({
                               <LoungeImageCarousel
                                 urls={carouselUrls}
                                 variant="composer"
-                                firstMarginTopClass="mt-[1lh] text-[18px] leading-snug"
+                                firstMarginTopClass="mt-1.5"
                                 regionAriaLabel={gifUrl ? 'Quote images and GIF' : 'Quote images'}
                                 removeLabelForIndex={(i) => (i < nImg ? 'Remove image' : 'Remove GIF')}
                                 onRemoveIndex={(i) => {
