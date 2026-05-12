@@ -80,10 +80,29 @@ Deno.serve(async (req) => {
       }),
     })
 
-    const cfJson = (await cfRes.json()) as {
+    const ct = (cfRes.headers.get('Content-Type') || '').toLowerCase()
+    let cfJson: {
       success?: boolean
       errors?: Array<{ message?: string }>
       result?: { uploadURL?: string; uid?: string }
+    } = {}
+    try {
+      if (ct.includes('application/json')) {
+        cfJson = (await cfRes.json()) as typeof cfJson
+      } else {
+        const raw = await cfRes.text()
+        return new Response(
+          JSON.stringify({
+            error: `Cloudflare returned non-JSON (${cfRes.status}): ${raw.slice(0, 240)}`,
+          }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+    } catch {
+      return new Response(JSON.stringify({ error: 'Could not read Cloudflare response.' }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     if (!cfRes.ok || !cfJson?.success || !cfJson.result?.uploadURL || !cfJson.result?.uid) {

@@ -58,15 +58,68 @@ export function probeVideoFileDurationSeconds(file) {
 }
 
 /**
+ * When `functions.invoke` fails with HTTP 4xx/5xx, Supabase sets `error` to `FunctionsHttpError`
+ * with message "Edge Function returned a non-2xx status code" — the JSON body from our Edge
+ * Function (e.g. `{ "error": "..." }`) lives on `error.context` (a `Response`).
+ * @param {unknown} error
+ * @returns {Promise<string>}
+ */
+async function messageFromFunctionsInvokeError(error) {
+  const fallback = String(
+    (error && typeof error === 'object' && 'message' in error && error.message) || 'Could not start video upload.',
+  ).trim()
+  if (!error || typeof error !== 'object') return fallback || 'Could not start video upload.'
+  const ctx = /** @type {{ context?: unknown }} */ (error).context
+  if (!ctx || typeof ctx !== 'object' || typeof /** @type {Response} */ (ctx).json !== 'function') {
+    return fallback || 'Could not start video upload.'
+  }
+  const res = /** @type {Response} */ (ctx)
+  try {
+    const ct = (res.headers?.get?.('Content-Type') || '').toLowerCase()
+    if (ct.includes('application/json')) {
+      const body = await res.json()
+      if (body && typeof body === 'object' && body.error != null) {
+        const m = String(body.error).trim()
+        if (m) return m
+      }
+    } else {
+      const t = (await res.text().catch(() => '')).trim()
+      if (t) return t.slice(0, 400)
+    }
+  } catch {
+    // ignore parse failures
+  }
+  const status = typeof res.status === 'number' ? res.status : 0
+  if (status === 404) {
+    return 'Video upload service is not deployed. Deploy Edge Function `lounge-cf-stream-direct-upload` on this Supabase project.'
+  }
+  if (status === 401) {
+    return 'Sign in again, then retry the video post (session expired or not sent to upload service).'
+  }
+  if (status === 503) {
+    return 'Video uploads are not configured or unavailable (set Edge secrets `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_STREAM_API_TOKEN`, then redeploy `lounge-cf-stream-direct-upload`).'
+  }
+  return fallback || `Video upload service returned HTTP ${status || 'error'}.`
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @returns {Promise<{ uploadURL: string, uid: string, maxDurationSeconds: number }>}
  */
 export async function requestCfStreamDirectUpload(supabaseClient) {
+  const {
+    data: { session },
+  } = await supabaseClient.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('You must be signed in to post a video.')
+  }
+
   const { data, error } = await supabaseClient.functions.invoke('lounge-cf-stream-direct-upload', {
     body: {},
+    headers: { Authorization: `Bearer ${session.access_token}` },
   })
   if (error) {
-    const msg = String(error.message || 'Could not start video upload.')
+    const msg = await messageFromFunctionsInvokeError(error)
     throw new Error(msg)
   }
   if (!data || typeof data !== 'object') {
