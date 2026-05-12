@@ -136,6 +136,7 @@ Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity)
 
 ## Phase E - Comments (threaded)
 
+- **Shipped (test, first slice):** `supabase/feed_interactions_phase_ef.sql` defines `feed_comments` + RLS + top-level-only post `comment_count` triggers; Lounge post detail has a flat comment list + reply composer (`SocialFeed.jsx`). Threading, ranking, and anon teaser rules below are not all implemented yet.
 - Table: `feed_comments` with `parent_id`, `post_id`, `body`, `created_at`, `edited_at`, `hidden_at`.
 - RLS:
   - logged-out: no full comment body access (counts/teasers only as needed)
@@ -149,6 +150,7 @@ Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity)
 
 ## Phase F - Likes + counts
 
+- **Shipped (test, first slice):** `post_likes`, `post_reposts`, `post_bookmarks` + triggers on `like_count` / `repost_count` in `feed_interactions_phase_ef.sql`; Lounge wiring persists toggles. `comment_likes` and periodic reconcile are still out of scope.
 - `post_likes` and `comment_likes` with unique `(user_id, target)` constraints.
 - Count updates via triggers initially; periodic reconcile optional later.
 

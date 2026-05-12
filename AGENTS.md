@@ -59,7 +59,7 @@ Port these into the table above when they appear in conversation:
 
 - Auth/session: `src/App.jsx`. Logged-in shell: `src/features/shell/AppShell.jsx`.
 - Calculators: `src/features/calculators/` and `src/features/calculators/games/` (not `src/calculators/`).
-- Feed schema/RLS: `supabase/feed_phase_a_profiles_public_read.sql` and related files.
+- Feed schema/RLS: `supabase/feed_phase_a_profiles_public_read.sql`, `supabase/feed_interactions_phase_ef.sql` (likes/reposts/bookmarks/comments + count triggers), and related files.
 - Pinned row for UI testing: tail of `supabase/seed/lounge_fake_posts.sql`.
 
 ## Automation you can run anytime

@@ -785,7 +785,13 @@ export default function LoungeProfileFullScreen({
                       className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
                       onClick={(e) => {
                         const t = e.target
-                        if (t instanceof Element && t.closest('button, a, textarea, input, select')) return
+                        if (!(t instanceof Element)) return
+                        const origHost = t.closest('[data-lounge-original-embed]')
+                        if (origHost && post.reposted_post?.id) {
+                          postCardProps.onPostBodyClick?.(post.reposted_post)
+                          return
+                        }
+                        if (t.closest('button, a, textarea, input, select, [data-lounge-post-menu]')) return
                         postCardProps.onPostBodyClick?.(post)
                       }}
                     >

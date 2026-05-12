@@ -36,10 +36,10 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ### Phase A - Foundation (DB + auth shaping)
 
 - [x] A1 core `profiles` model in place on test (`handle`, `display_name`, `avatar_url`, `bio`, `role`, `banned_at`, timestamps, constraints/index).
-- [x] A2 feed model on test: `community_feed_posts` is **caption-only** (legacy `title` / `body` dropped after backfill); `edited_at`, pin/moderation columns, denormalized `like_count` / `comment_count` (counter **maintenance** still deferred until likes/comments ship).
+- [x] A2 feed model on test: `community_feed_posts` is **caption-only** (legacy `title` / `body` dropped after backfill); `edited_at`, pin/moderation columns, denormalized `like_count` / `comment_count` / `repost_count` (after `feed_interactions_phase_ef.sql`).
 - [x] A3 baseline RLS/policy shape for public read + authed write + staff moderation is applied on test (includes author **30-minute** `UPDATE` window in SQL).
 - [x] A4 **DB-first** posting rate limit on test: `rate_limit_events` + indexes + `BEFORE INSERT` guard on `community_feed_posts` in `feed_phase_a_profiles_public_read.sql` (optional later: Redis/edge limiter per roadmap).
-- [ ] A2 **counter maintenance:** when Phase E/F add `feed_comments` / `post_likes`, ship SQL triggers to keep `like_count` / `comment_count` in sync (cannot complete before those tables exist).
+- [x] A2 **counter maintenance:** `supabase/feed_interactions_phase_ef.sql` adds `post_likes`, `post_reposts`, `post_bookmarks`, `feed_comments`, `repost_count`, and triggers to keep `like_count` / `comment_count` / `repost_count` in sync (top-level comments only for post count). **Apply on test** before Lounge persistence works.
 
 ### Phase B - Public read feed
 
@@ -51,7 +51,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ### Phases C-L
 
-- [ ] Phases **D–L** not started as complete slices yet (media pipeline, comments, likes, search, notifications, moderation, block/mute, permalinks, legal).
+- [ ] Phases **D–L** not complete end-to-end; **first slice:** Lounge signed-in persistence for likes, reposts, bookmarks, and flat comments (post detail) + SQL `feed_interactions_phase_ef.sql` (Phase E/F subset). Threaded ranking, search, notifications, etc. still roadmap scope.
 - [ ] **Phase C (next):** `/u/:handle` profile surface, authored-posts list, handle collision + reserved-handle policy; profile completion gate for first post already in Lounge + Guides.
 - [ ] **Freemium / subscriptions:** anonymous read-only where required; free-account vs subscriber entitlements (DB + **RLS** + Stripe webhooks); extend shell gating beyond today’s **`browseMode`**. Product spec: fill **`docs/access-tiers.md`**; roadmap: **`docs/social-feed-roadmap.md`** → *Freemium & subscriptions*.
 
@@ -69,6 +69,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Change: Profiles and moderation-related policy/grant alignment for public read.
   - Source: `supabase/feed_phase_a_profiles_public_read.sql`
   - Test validation: Logged-out feed readability + signed-in posting flow.
+  - Production replay: `production-rollout-checklist.md` §2
+
+- [ ] Feed interactions Phase E/F (likes, reposts, bookmarks, comments) on test  
+  - Change: Tables + RLS + triggers for Lounge engagement; `repost_count` on posts; client wiring in `SocialFeed.jsx` / `LoungePostArticle.jsx` / `AppShell.jsx`.
+  - Source: `supabase/feed_interactions_phase_ef.sql`
+  - Test validation: Run SQL on test project; signed-in user can like/repost/bookmark and post top-level comments; counts update; anon still read-only on actions.
   - Production replay: `production-rollout-checklist.md` §2
 
 - [ ] Additional SQL parity audit against test history  
@@ -166,6 +172,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ## Update log
 
 - 2026-05-10: **`profiles.has_active_subscription`** + guard trigger (**`supabase/profiles_tier_testing.sql`**); app reads role + flag for hamburger locks; **`docs/test-user-roles.md`** for SQL recipes.
+- 2026-05-09: **Lounge interactions (Phase E/F slice):** added `supabase/feed_interactions_phase_ef.sql` (`post_likes`, `post_reposts`, `post_bookmarks`, `feed_comments`, `repost_count`, count triggers, RLS); client persistence + comments UI in **`SocialFeed.jsx`** / **`LoungePostArticle.jsx`**; feed selects include **`repost_count`** in **`AppShell.jsx`**. **Requires applying the new SQL on test.** Profile **follows** unchanged (`profile_follows` in `profile_lounge_fullscreen.sql`).
 - 2026-05-10: **Removed `allowed_emails` / whitelist** from **`App.jsx`**; authenticated users always get member shell (documented in README + **`docs/frontend-architecture.md`**). Optional: drop unused **`public.allowed_emails`** table/policies in Supabase when ops are ready.
 - 2026-05-10: Hamburger menu: **lock icons** on Calcs / AP Guides / Bankroll for free members without active subscription; **`VITE_HAS_ACTIVE_SUBSCRIPTION`** stub + **`profiles.role`** staff bypass; Offers row unlocked (per access spec).
 - 2026-05-10: **`docs/access-tiers.md`**: removed anon **50-post/day** cap; read-only Lounge = full loaded feed + same create-account gates elsewhere.

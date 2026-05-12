@@ -63,6 +63,8 @@ export default function AppShell({
   const [communityFeedLoadingMore, setCommunityFeedLoadingMore] = useState(false)
   const [communityFeedHasMore, setCommunityFeedHasMore] = useState(false)
   const [communityFeedCursor, setCommunityFeedCursor] = useState(null)
+  /** Set when the feed query fails (e.g. missing column); avoids showing “no posts” when posts exist but select failed. */
+  const [communityFeedQueryErr, setCommunityFeedQueryErr] = useState('')
   /** True while the first page of the Lounge feed is being reloaded (including silent pull-to-refresh). */
   const communityFeedHeadReloadingRef = useRef(false)
   const iosPwaGlobalPromptShownRef = useRef(false)
@@ -156,27 +158,60 @@ export default function AppShell({
   }, [showGlobalConfirm, supabaseClient])
 
   const hydrateCommunityPosts = useCallback(
-    async (rows) => {
+    async (rows, depth = 0) => {
       if (!rows?.length) return []
       /** Stable map key so post.user_id always matches hydrated profiles (UUID string vs object edge cases). */
       const uidKey = (id) => (id == null || id === '' ? '' : String(id))
-      const ids = [...new Set(rows.map((r) => uidKey(r.user_id)).filter(Boolean))]
+      const userIds = [...new Set(rows.map((r) => uidKey(r.user_id)).filter(Boolean))]
       let profileByUserId = {}
-      if (ids.length > 0) {
+      if (userIds.length > 0) {
         const coreFields = 'user_id,handle,display_name,avatar_url,bio,role'
         let res = await supabaseClient
           .from('profiles')
           .select(`${coreFields},about_me,banner_url`)
-          .in('user_id', ids)
+          .in('user_id', userIds)
         if (res.error) {
-          res = await supabaseClient.from('profiles').select(coreFields).in('user_id', ids)
+          res = await supabaseClient.from('profiles').select(coreFields).in('user_id', userIds)
         }
         const profiles = res.data
         profileByUserId = Object.fromEntries((profiles || []).map((p) => [uidKey(p.user_id), p]))
       }
+
+      const originalPostSelect =
+        'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,media_url,gif_url,image_urls'
+
+      let repostById = {}
+      if (depth === 0) {
+        const repostTargetIds = [
+          ...new Set(
+            rows
+              .map((r) => r.repost_of_post_id)
+              .filter((id) => id != null && id !== '')
+              .map((id) => uidKey(id))
+          ),
+        ]
+        if (repostTargetIds.length > 0) {
+          const { data: origRows, error: origErr } = await supabaseClient
+            .from('community_feed_posts')
+            .select(originalPostSelect)
+            .in('id', repostTargetIds)
+            .is('hidden_at', null)
+          if (origErr) {
+            console.warn('hydrateCommunityPosts originals:', origErr.message)
+          } else if (origRows?.length) {
+            const nested = await hydrateCommunityPosts(origRows, depth + 1)
+            repostById = Object.fromEntries(nested.map((p) => [uidKey(p.id), p]))
+          }
+        }
+      }
+
       return rows.map((r) => ({
         ...r,
         author_profile: profileByUserId[uidKey(r.user_id)] || null,
+        reposted_post:
+          depth === 0 && r.repost_of_post_id != null && r.repost_of_post_id !== ''
+            ? repostById[uidKey(r.repost_of_post_id)] || null
+            : null,
       }))
     },
     [supabaseClient]
@@ -191,7 +226,7 @@ export default function AppShell({
     communityFeedHeadReloadingRef.current = true
     try {
       const selectCols =
-        'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count'
+        'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,media_url,gif_url,image_urls'
       const [{ data: pinnedRows }, { data: rows, error }] = await Promise.all([
         supabaseClient
           .from('community_feed_posts')
@@ -209,12 +244,14 @@ export default function AppShell({
       ])
 
       if (error) {
+        setCommunityFeedQueryErr(String(error.message || error.details || 'Could not load feed.'))
         setCommunityPosts([])
         setCommunityFeedHasMore(false)
         setCommunityFeedCursor(null)
         return
       }
 
+      setCommunityFeedQueryErr('')
       const list = rows || []
       const hasMore = list.length > COMMUNITY_FEED_PAGE_SIZE
       const pageRows = hasMore ? list.slice(0, COMMUNITY_FEED_PAGE_SIZE) : list
@@ -249,7 +286,7 @@ export default function AppShell({
       const cursorFilter = `created_at.lt.${communityFeedCursor.created_at},and(created_at.eq.${communityFeedCursor.created_at},id.lt.${communityFeedCursor.id})`
       const { data: rows, error } = await supabaseClient
         .from('community_feed_posts')
-        .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count')
+        .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,media_url,gif_url,image_urls')
         .eq('pinned', false)
         .or(cursorFilter)
         .order('created_at', { ascending: false })
@@ -550,6 +587,7 @@ export default function AppShell({
           communityFeedLoading={communityFeedLoading}
           communityFeedLoadingMore={communityFeedLoadingMore}
           communityFeedHasMore={communityFeedHasMore}
+          communityFeedQueryErr={communityFeedQueryErr}
           loadCommunityFeed={loadCommunityFeed}
           loadMoreCommunityFeed={loadMoreCommunityFeed}
           hydrateCommunityPosts={hydrateCommunityPosts}

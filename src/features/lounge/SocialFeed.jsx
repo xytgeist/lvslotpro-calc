@@ -11,10 +11,17 @@ import {
 } from '../profiles/profileGate'
 import {
   communityFeedPostInsertPayload,
+  communityFeedQuoteRepostInsertPayload,
   feedPostDisplayCaption,
   normalizeFeedCaption,
+  uploadLoungeFeedPostImage,
 } from '../../utils/communityFeedPost'
-import { compressImageFileUnderMaxBytes } from '../../utils/compressImageForUpload'
+import {
+  compressImageFileUnderMaxBytes,
+  isProbablyImageFile,
+  isProbablyVideoFile,
+  prepareLoungeFeedImageForUpload,
+} from '../../utils/compressImageForUpload'
 import {
   readLoungeProfileCache,
   writeLoungeProfileCache,
@@ -27,15 +34,56 @@ import {
 } from './loungeStorage'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
 import { renderRichCaption } from './loungeCaption'
+import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
+import KlipyGifPicker from './KlipyGifPicker.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 
 /** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
 const LOUNGE_MAX_PINNED_ALERT =
   'The maximum number of pinned posts is two. Unpin a post to pin this one.'
+
+const LOUNGE_POST_AUTHOR_EDIT_WINDOW_MS = 30 * 60 * 1000
+
+function isLoungePostWithinAuthorEditWindow(createdAt) {
+  if (!createdAt) return false
+  const t = new Date(createdAt).getTime()
+  if (!Number.isFinite(t)) return false
+  return Date.now() - t <= LOUNGE_POST_AUTHOR_EDIT_WINDOW_MS
+}
+
+const LOUNGE_COMPOSER_MAX_IMAGES = 12
+
+function newComposerImageId() {
+  return `ci-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+/** Caption length → counter color (yellow 265+, orange 275+, red at 280). */
+function loungeCharCounterClass(len) {
+  const n = typeof len === 'number' ? len : 0
+  if (n >= 280) return 'font-semibold text-red-500'
+  if (n >= 275) return 'font-semibold text-orange-400'
+  if (n >= 265) return 'font-semibold text-yellow-400'
+  return 'text-zinc-500'
+}
+
+/** External GIF URL field: at most one URL (e.g. Klipy); reject pasted multi-URL strings. */
+function validateAtMostOneGifUrl(urlField) {
+  const t = String(urlField ?? '').trim()
+  if (!t) return { ok: true, value: '' }
+  const schemeHits = t.match(/https?:\/\//gi)
+  if (schemeHits && schemeHits.length > 1) {
+    return { ok: false, message: 'Only one GIF is allowed per post.' }
+  }
+  const parts = t.split(/\s+/).filter(Boolean)
+  if (parts.length > 1 && parts.every((p) => /^https?:\/\//i.test(p))) {
+    return { ok: false, message: 'Only one GIF is allowed per post.' }
+  }
+  return { ok: true, value: t }
+}
 
 export default function SocialFeed({
   supabaseClient,
@@ -45,6 +93,8 @@ export default function SocialFeed({
   communityFeedLoading,
   communityFeedLoadingMore,
   communityFeedHasMore,
+  /** Supabase/PostgREST error from the last feed load (empty when OK). */
+  communityFeedQueryErr = '',
   loadCommunityFeed,
   loadMoreCommunityFeed,
   hydrateCommunityPosts = async (rows) => rows ?? [],
@@ -55,7 +105,8 @@ export default function SocialFeed({
   const loungeComposerBoot = () => {
     const d = readLoungeComposerDraft()
     if (!d) return { expanded: false, fold: 0 }
-    const expanded = d.composerExpanded === true || (d.postText || '').length > 0
+    const expanded =
+      d.composerExpanded === true || (d.postText || '').length > 0 || String(d.composerMediaUrl || '').trim().length > 0
     return { expanded, fold: expanded ? 1 : 0 }
   }
   const loungeComposerInitial = loungeComposerBoot()
@@ -65,8 +116,17 @@ export default function SocialFeed({
   })
   const [composerExpanded, setComposerExpanded] = useState(loungeComposerInitial.expanded)
   const [composerFoldReveal, setComposerFoldReveal] = useState(loungeComposerInitial.fold)
-  const [composerMediaFile, setComposerMediaFile] = useState(null)
-  const [composerMediaKind, setComposerMediaKind] = useState('')
+  /** Pending uploaded images (local previews). */
+  const [composerImageItems, setComposerImageItems] = useState([])
+  /** Single unsupported video selection (clears images). */
+  const [composerVideoSlot, setComposerVideoSlot] = useState(null)
+  /** External GIF (Klipy CDN URL). */
+  const [composerMediaUrl, setComposerMediaUrl] = useState(() => {
+    const d = readLoungeComposerDraft()
+    return String(d?.composerMediaUrl || '').trim().slice(0, 2048)
+  })
+  const [klipyPickerOpen, setKlipyPickerOpen] = useState(false)
+  const [klipyPickerTarget, setKlipyPickerTarget] = useState('composer')
   /** Moderator/admin: create this lounge post already pinned (only one pinned post globally). */
   const [composerPinOnPost, setComposerPinOnPost] = useState(false)
   const [postBusy, setPostBusy] = useState(false)
@@ -89,6 +149,28 @@ export default function SocialFeed({
   const [profileModalPosts, setProfileModalPosts] = useState([])
   const [interactionByPost, setInteractionByPost] = useState({})
   const [bookmarkedByPost, setBookmarkedByPost] = useState({})
+  const interactionByPostRef = useRef(interactionByPost)
+  interactionByPostRef.current = interactionByPost
+  const bookmarkedByPostRef = useRef(bookmarkedByPost)
+  bookmarkedByPostRef.current = bookmarkedByPost
+  const bookmarksMigratedFromLocalRef = useRef(false)
+  /** Maps original post id → this user's quote-repost row id (for remove). */
+  const quoteRepostChildIdRef = useRef({})
+  const [quoteRepostModal, setQuoteRepostModal] = useState(null)
+  const [quoteRepostDraft, setQuoteRepostDraft] = useState('')
+  const [quoteRepostBusy, setQuoteRepostBusy] = useState(false)
+  const [quoteRepostErr, setQuoteRepostErr] = useState('')
+  const [quoteRepostMediaFile, setQuoteRepostMediaFile] = useState(null)
+  const [quoteRepostMediaPreview, setQuoteRepostMediaPreview] = useState('')
+  const [quoteRepostMediaUrl, setQuoteRepostMediaUrl] = useState('')
+  const quoteRepostTextareaRef = useRef(null)
+  const quoteRepostScrollRef = useRef(null)
+  const quoteRepostMediaInputRef = useRef(null)
+  const [loungeDetailComments, setLoungeDetailComments] = useState([])
+  const [loungeDetailCommentsLoading, setLoungeDetailCommentsLoading] = useState(false)
+  const [loungeDetailCommentBusy, setLoungeDetailCommentBusy] = useState(false)
+  const [loungeDetailCommentDraft, setLoungeDetailCommentDraft] = useState('')
+  const [loungeDetailCommentErr, setLoungeDetailCommentErr] = useState('')
   const [composerUserId, setComposerUserId] = useState('')
   /** Session user for email-based initials before `profiles` exists. */
   const [composerAuthUser, setComposerAuthUser] = useState(null)
@@ -97,7 +179,7 @@ export default function SocialFeed({
   const [composerAuthResolved, setComposerAuthResolved] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [pullRefreshing, setPullRefreshing] = useState(false)
-  const LOUNGE_POST_AUTHOR_EDIT_WINDOW_MS = 30 * 60 * 1000
+  const [loungeFeedDeleteBusyPostId, setLoungeFeedDeleteBusyPostId] = useState(null)
   const [loungePostDetail, setLoungePostDetail] = useState(null)
   const [loungeDetailEditing, setLoungeDetailEditing] = useState(false)
   const [loungeDetailDraftCaption, setLoungeDetailDraftCaption] = useState('')
@@ -106,10 +188,10 @@ export default function SocialFeed({
   const [loungeDetailEditMediaFile, setLoungeDetailEditMediaFile] = useState(null)
   const [loungeDetailEditMediaKind, setLoungeDetailEditMediaKind] = useState('')
   const [loungeDetailDeleteBusy, setLoungeDetailDeleteBusy] = useState(false)
+  const loungePostDeleteInflightRef = useRef(false)
   const [loungeManageErr, setLoungeManageErr] = useState('')
   const [loungePostDetailVisible, setLoungePostDetailVisible] = useState(true)
   const [loungePostDetailMenuOpen, setLoungePostDetailMenuOpen] = useState(false)
-  const [loungePostDeleteConfirmOpen, setLoungePostDeleteConfirmOpen] = useState(false)
   const loungePostDetailVisibleRef = useRef(true)
   /** If `transitionend` never runs, still tear down the full-screen detail shell (otherwise feed stays dead). */
   const loungePostDetailCloseFallbackTimerRef = useRef(0)
@@ -135,8 +217,18 @@ export default function SocialFeed({
   const [loungeFeedViewportTopPx, setLoungeFeedViewportTopPx] = useState(0)
   /** True when feed scroll auto-collapsed the composer; cleared on explicit open / post / discard. */
   const composerFoldedFromFeedScrollRef = useRef(false)
-  const composerDraftFlushRef = useRef({ postText: '', composerExpanded: false, composerMediaFile: null })
-  composerDraftFlushRef.current = { postText, composerExpanded, composerMediaFile }
+  const composerDraftFlushRef = useRef({
+    postText: '',
+    composerExpanded: false,
+    hasComposerLocalMedia: false,
+    composerMediaUrl: '',
+  })
+  composerDraftFlushRef.current = {
+    postText,
+    composerExpanded,
+    hasComposerLocalMedia: composerImageItems.length > 0 || composerVideoSlot != null,
+    composerMediaUrl,
+  }
   composerExpandedRef.current = composerExpanded
 
   /** No composer, server-only counts, gated taps until session is known and user is signed in. */
@@ -191,14 +283,20 @@ export default function SocialFeed({
   }, [onRequireAuth])
 
   useEffect(() => {
-    persistLoungeComposerDraft(postText, composerExpanded, composerMediaFile)
-  }, [postText, composerExpanded, composerMediaFile])
+    persistLoungeComposerDraft(
+      postText,
+      composerExpanded,
+      composerImageItems.length > 0 || composerVideoSlot != null,
+      composerMediaUrl
+    )
+  }, [postText, composerExpanded, composerImageItems, composerVideoSlot, composerMediaUrl])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const flush = () => {
-      const { postText: t, composerExpanded: ex, composerMediaFile: f } = composerDraftFlushRef.current
-      persistLoungeComposerDraft(t, ex, f)
+      const { postText: t, composerExpanded: ex, hasComposerLocalMedia: hm, composerMediaUrl: u } =
+        composerDraftFlushRef.current
+      persistLoungeComposerDraft(t, ex, hm, u)
     }
     window.addEventListener('pagehide', flush)
     const onVis = () => {
@@ -471,30 +569,565 @@ export default function SocialFeed({
 
   const actionIconClass = 'h-[20px] w-[20px] text-zinc-500'
 
-  const interactionStateFor = useCallback(
-    (postId) => interactionByPost[postId] || { commented: false, reposted: false, liked: false },
-    [interactionByPost]
+  const defaultInteraction = useMemo(() => ({ commented: false, reposted: false, liked: false }), [])
+
+  const patchPostAggregate = useCallback((postId, partial) => {
+    setCommunityPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...partial } : p)))
+    setLoungePostDetail((d) => (d && d.id === postId ? { ...d, ...partial } : d))
+    setProfileModalPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...partial } : p)))
+  }, [setCommunityPosts])
+
+  const refreshLoungePostInteractions = useCallback(
+    async (postIds) => {
+      const ids = [...new Set((postIds || []).filter(Boolean))]
+      if (!composerUserId || ids.length === 0) return
+      const uid = composerUserId
+      const [likesRes, quoteRepostRes, bookmarksRes, commentsRes] = await Promise.all([
+        supabaseClient.from('post_likes').select('post_id').eq('user_id', uid).in('post_id', ids),
+        supabaseClient
+          .from('community_feed_posts')
+          .select('id,repost_of_post_id')
+          .eq('user_id', uid)
+          .in('repost_of_post_id', ids)
+          .is('hidden_at', null),
+        supabaseClient.from('post_bookmarks').select('post_id').eq('user_id', uid).in('post_id', ids),
+        supabaseClient
+          .from('feed_comments')
+          .select('post_id')
+          .eq('user_id', uid)
+          .is('parent_id', null)
+          .is('hidden_at', null)
+          .in('post_id', ids),
+      ])
+      const errMsg =
+        likesRes.error?.message ||
+        quoteRepostRes.error?.message ||
+        bookmarksRes.error?.message ||
+        commentsRes.error?.message
+      if (errMsg) {
+        console.warn('refreshLoungePostInteractions:', errMsg)
+        return
+      }
+      const likedSet = new Set((likesRes.data || []).map((r) => r.post_id))
+      const repostedSet = new Set()
+      const nextChild = { ...quoteRepostChildIdRef.current }
+      for (const id of ids) delete nextChild[id]
+      for (const r of quoteRepostRes.data || []) {
+        if (r.repost_of_post_id) {
+          repostedSet.add(r.repost_of_post_id)
+          nextChild[r.repost_of_post_id] = r.id
+        }
+      }
+      quoteRepostChildIdRef.current = nextChild
+      const commentedSet = new Set((commentsRes.data || []).map((r) => r.post_id))
+      setInteractionByPost((prev) => {
+        const next = { ...prev }
+        for (const id of ids) {
+          const cur = next[id] || { ...defaultInteraction }
+          next[id] = {
+            ...cur,
+            liked: likedSet.has(id),
+            reposted: repostedSet.has(id),
+            commented: commentedSet.has(id),
+          }
+        }
+        return next
+      })
+      setBookmarkedByPost((prev) => {
+        const next = { ...prev }
+        for (const id of ids) {
+          if ((bookmarksRes.data || []).some((r) => r.post_id === id)) next[id] = true
+          else delete next[id]
+        }
+        return next
+      })
+    },
+    [composerUserId, defaultInteraction, supabaseClient]
   )
 
-  const toggleInteraction = useCallback((postId, key) => {
-    if (!composerUserId) return
-    setInteractionByPost((prev) => {
-      const cur = prev[postId] || { commented: false, reposted: false, liked: false }
-      return { ...prev, [postId]: { ...cur, [key]: !cur[key] } }
+  const feedPostIdsKey = useMemo(
+    () =>
+      communityPosts
+        .map((p) => p?.id)
+        .filter(Boolean)
+        .join(','),
+    [communityPosts]
+  )
+
+  useEffect(() => {
+    if (!composerUserId || loungeReadOnly) return
+    const ids = feedPostIdsKey ? feedPostIdsKey.split(',').filter(Boolean) : []
+    if (ids.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      if (!bookmarksMigratedFromLocalRef.current && typeof window !== 'undefined') {
+        try {
+          const raw = window.localStorage.getItem(BOOKMARKS_STORAGE_KEY)
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            if (parsed && typeof parsed === 'object') {
+              const toSave = Object.keys(parsed).filter((pid) => parsed[pid])
+              for (const postId of toSave) {
+                if (cancelled) return
+                await supabaseClient.from('post_bookmarks').upsert(
+                  { post_id: postId, user_id: composerUserId },
+                  { onConflict: 'post_id,user_id' }
+                )
+              }
+            }
+            window.localStorage.removeItem(BOOKMARKS_STORAGE_KEY)
+          }
+        } catch {
+          // ignore migration errors
+        }
+        bookmarksMigratedFromLocalRef.current = true
+      }
+      if (cancelled) return
+      await refreshLoungePostInteractions(ids)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [composerUserId, loungeReadOnly, feedPostIdsKey, refreshLoungePostInteractions, supabaseClient])
+
+  const interactionStateFor = useCallback(
+    (postId) => interactionByPost[postId] || defaultInteraction,
+    [interactionByPost, defaultInteraction]
+  )
+
+  const toggleInteraction = useCallback(
+    async (postId, key) => {
+      if (!composerUserId) return
+      if (key === 'commented') return
+      if (key === 'reposted') return
+      if (key !== 'liked') return
+      const prevSnap = interactionByPostRef.current[postId] || defaultInteraction
+      const was = !!prevSnap[key]
+      const delta = was ? -1 : 1
+      const countKey = 'like_count'
+      setInteractionByPost((prev) => {
+        const cur = prev[postId] || defaultInteraction
+        return { ...prev, [postId]: { ...cur, [key]: !was } }
+      })
+      setCommunityPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, [countKey]: Math.max(0, (Number(p[countKey]) || 0) + delta) } : p
+        )
+      )
+      setLoungePostDetail((d) =>
+        d && d.id === postId ? { ...d, [countKey]: Math.max(0, (Number(d[countKey]) || 0) + delta) } : d
+      )
+      setProfileModalPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, [countKey]: Math.max(0, (Number(p[countKey]) || 0) + delta) } : p
+        )
+      )
+      const res = was
+        ? await supabaseClient.from('post_likes').delete().eq('post_id', postId).eq('user_id', composerUserId)
+        : await supabaseClient.from('post_likes').insert({ post_id: postId, user_id: composerUserId })
+      if (res.error) {
+        setInteractionByPost((prev) => {
+          const cur = prev[postId] || defaultInteraction
+          return { ...prev, [postId]: { ...cur, [key]: was } }
+        })
+        setCommunityPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId ? { ...p, [countKey]: Math.max(0, (Number(p[countKey]) || 0) - delta) } : p
+          )
+        )
+        setLoungePostDetail((d) =>
+          d && d.id === postId ? { ...d, [countKey]: Math.max(0, (Number(d[countKey]) || 0) - delta) } : d
+        )
+        setProfileModalPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId ? { ...p, [countKey]: Math.max(0, (Number(p[countKey]) || 0) - delta) } : p
+          )
+        )
+        setLoungeManageErr(res.error.message || 'Could not update.')
+        return
+      }
+      const { data: row } = await supabaseClient
+        .from('community_feed_posts')
+        .select('like_count,comment_count,repost_count')
+        .eq('id', postId)
+        .maybeSingle()
+      if (row) patchPostAggregate(postId, row)
+    },
+    [composerUserId, defaultInteraction, patchPostAggregate, setCommunityPosts, supabaseClient]
+  )
+
+  const clearQuoteRepostFileAttachment = useCallback(() => {
+    setQuoteRepostMediaFile(null)
+    setQuoteRepostMediaPreview((prev) => {
+      if (prev) {
+        try {
+          URL.revokeObjectURL(prev)
+        } catch {
+          // ignore
+        }
+      }
+      return ''
     })
-  }, [composerUserId])
+    try {
+      const el = quoteRepostMediaInputRef.current
+      if (el) el.value = ''
+    } catch {
+      // ignore
+    }
+  }, [])
 
-  const toggleBookmark = useCallback((postId) => {
+  const clearQuoteRepostMedia = useCallback(() => {
+    clearQuoteRepostFileAttachment()
+    setQuoteRepostMediaUrl('')
+  }, [clearQuoteRepostFileAttachment])
+
+  const handleKlipyGifPicked = useCallback(
+    ({ gifUrl }) => {
+      const chk = validateAtMostOneGifUrl(gifUrl)
+      if (!chk.ok) {
+        if (klipyPickerTarget === 'quote') setQuoteRepostErr(chk.message)
+        else setPostErr(chk.message)
+        return
+      }
+      const u = chk.value
+      if (!u) return
+      if (klipyPickerTarget === 'quote') {
+        setQuoteRepostMediaUrl(u)
+      } else {
+        setComposerVideoSlot((prev) => {
+          if (prev?.preview) {
+            try {
+              URL.revokeObjectURL(prev.preview)
+            } catch {
+              // ignore
+            }
+          }
+          return null
+        })
+        try {
+          const el = composerMediaInputRef.current
+          if (el) el.value = ''
+        } catch {
+          // ignore
+        }
+        setComposerMediaUrl(u)
+      }
+    },
+    [klipyPickerTarget, setPostErr, setQuoteRepostErr],
+  )
+
+  const handleQuoteRepostPress = useCallback(
+    (post) => {
+      if (!post?.id || loungeReadOnly) return
+      if (openProfileGateIfNeeded()) return
+      const st = interactionStateFor(post.id)
+      if (st.reposted) {
+        const childId = quoteRepostChildIdRef.current[post.id]
+        if (childId) {
+          setQuoteRepostErr('')
+          setQuoteRepostModal({ mode: 'remove', original: post, childId })
+          return
+        }
+        void refreshLoungePostInteractions([post.id]).then(() => {
+          const cid = quoteRepostChildIdRef.current[post.id]
+          if (cid) {
+            setQuoteRepostErr('')
+            setQuoteRepostModal({ mode: 'remove', original: post, childId: cid })
+          } else {
+            setLoungeManageErr('Could not find your quote repost. Try refreshing the feed.')
+          }
+        })
+        return
+      }
+      clearQuoteRepostMedia()
+      setQuoteRepostDraft('')
+      setQuoteRepostErr('')
+      setQuoteRepostModal({ mode: 'compose', original: post })
+    },
+    [clearQuoteRepostMedia, loungeReadOnly, openProfileGateIfNeeded, interactionStateFor, refreshLoungePostInteractions]
+  )
+
+  const submitQuoteRepost = useCallback(async () => {
+    const modal = quoteRepostModal
+    if (!modal || modal.mode !== 'compose' || !modal.original?.id) return
+    const originalId = modal.original.id
+    const cap = normalizeFeedCaption(quoteRepostDraft)
+    setQuoteRepostErr('')
+    if (!cap) {
+      setQuoteRepostErr('Write a quote to repost.')
+      return
+    }
+    const quoteGifCheck = validateAtMostOneGifUrl(quoteRepostMediaUrl)
+    if (!quoteGifCheck.ok) {
+      setQuoteRepostErr(quoteGifCheck.message)
+      return
+    }
+    setQuoteRepostBusy(true)
+    try {
+      const {
+        data: { session },
+      } = await supabaseClient.auth.getSession()
+      if (!session?.user) {
+        onRequireAuth?.('login')
+        return
+      }
+      const { data: ownProfile, error: profileErr } = await fetchOwnProfile(supabaseClient, session.user.id)
+      if (profileErr) {
+        setQuoteRepostErr(`Could not verify profile: ${profileErr.message || 'Unknown error.'}`)
+        return
+      }
+      if (loungeProfileNeedsGate(ownProfile, session.user.id)) {
+        const h = String(ownProfile?.handle || '').trim()
+        const d = String(ownProfile?.display_name || '').trim()
+        const seed = profileSeedFromUser(session.user)
+        setProfileGateHandle(h || seed.baseHandle)
+        setProfileGateDisplayName(d || seed.displayName)
+        setProfileGateAvatarFile(null)
+        setProfileGateAvatarPreview(ownProfile?.avatar_url || composerUserProfile?.avatar_url || '')
+        setProfileGateErr('')
+        setQuoteRepostModal(null)
+        setQuoteRepostDraft('')
+        setQuoteRepostErr('')
+        clearQuoteRepostMedia()
+        setProfileGateOpen(true)
+        setLoungeManageErr('Complete your profile to repost.')
+        return
+      }
+      let imagePublicUrl = ''
+      if (quoteRepostMediaFile) {
+        const { file: ready, error: cErr } = await prepareLoungeFeedImageForUpload(quoteRepostMediaFile)
+        if (cErr) {
+          setQuoteRepostErr(cErr.message)
+          return
+        }
+        const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
+          supabaseClient,
+          user: session.user,
+          file: ready,
+        })
+        if (upErr) {
+          setQuoteRepostErr(upErr.message || 'Could not upload image.')
+          return
+        }
+        if (!upUrl) {
+          setQuoteRepostErr('Could not upload image.')
+          return
+        }
+        imagePublicUrl = upUrl
+      }
+      const gifOnlyUrl = quoteGifCheck.value
+      let insertMediaUrl = ''
+      let insertGifUrl = ''
+      if (imagePublicUrl && gifOnlyUrl) {
+        insertMediaUrl = imagePublicUrl
+        insertGifUrl = gifOnlyUrl
+      } else if (imagePublicUrl) {
+        insertMediaUrl = imagePublicUrl
+      } else if (gifOnlyUrl) {
+        insertMediaUrl = gifOnlyUrl
+      }
+      const { error } = await supabaseClient
+        .from('community_feed_posts')
+        .insert(
+          communityFeedQuoteRepostInsertPayload({
+            caption: cap,
+            originalPostId: originalId,
+            mediaUrl: insertMediaUrl || undefined,
+            gifUrl: insertGifUrl || undefined,
+          })
+        )
+      if (error) {
+        const msg = String(error.message || '')
+        if (error.code === '23505') {
+          setQuoteRepostErr('You already have a quote repost for this post.')
+          return
+        }
+        if (msg.toLowerCase().includes('rate limit exceeded')) {
+          setQuoteRepostErr(rateLimitMessage(msg))
+          return
+        }
+        if (error.code === '42501') {
+          setQuoteRepostErr('Reposting is blocked by current permissions.')
+          return
+        }
+        if (msg.toLowerCase().includes('quote repost requires') || msg.toLowerCase().includes('non-empty caption')) {
+          setQuoteRepostErr('Add a quote to repost.')
+          return
+        }
+        if (msg.toLowerCase().includes('hidden') || msg.toLowerCase().includes('not found')) {
+          setQuoteRepostErr('That post is no longer available to quote.')
+          return
+        }
+        if (/media_url|gif_url|image_urls|schema cache/i.test(msg)) {
+          setQuoteRepostErr(
+            'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, and supabase/lounge_feed_post_image_urls.sql in Supabase.'
+          )
+          return
+        }
+        setQuoteRepostErr(msg || 'Could not quote repost right now.')
+        return
+      }
+      setQuoteRepostModal(null)
+      setQuoteRepostDraft('')
+      clearQuoteRepostMedia()
+      await loadCommunityFeed({ silent: true })
+      await refreshLoungePostInteractions([originalId])
+    } finally {
+      setQuoteRepostBusy(false)
+    }
+  }, [
+    clearQuoteRepostMedia,
+    quoteRepostModal,
+    quoteRepostDraft,
+    quoteRepostMediaFile,
+    quoteRepostMediaUrl,
+    supabaseClient,
+    onRequireAuth,
+    composerUserProfile?.avatar_url,
+    loadCommunityFeed,
+    refreshLoungePostInteractions,
+    rateLimitMessage,
+  ])
+
+  const confirmRemoveQuoteRepost = useCallback(async () => {
+    const modal = quoteRepostModal
+    if (!modal || modal.mode !== 'remove' || !modal.childId || !composerUserId) return
+    setQuoteRepostBusy(true)
+    setQuoteRepostErr('')
+    try {
+      const { error } = await supabaseClient
+        .from('community_feed_posts')
+        .delete()
+        .eq('id', modal.childId)
+        .eq('user_id', composerUserId)
+      if (error) {
+        setQuoteRepostErr(error.message || 'Could not remove quote repost.')
+        return
+      }
+      const origId = modal.original?.id
+      setQuoteRepostModal(null)
+      clearQuoteRepostMedia()
+      await loadCommunityFeed({ silent: true })
+      if (origId) await refreshLoungePostInteractions([origId])
+    } finally {
+      setQuoteRepostBusy(false)
+    }
+  }, [clearQuoteRepostMedia, quoteRepostModal, composerUserId, supabaseClient, loadCommunityFeed, refreshLoungePostInteractions])
+
+  useLayoutEffect(() => {
+    if (!quoteRepostModal || quoteRepostModal.mode !== 'compose') return
+    const el = quoteRepostTextareaRef.current
+    if (!el) return
+    try {
+      el.focus({ preventScroll: true })
+    } catch {
+      el.focus()
+    }
+  }, [quoteRepostModal])
+
+  const toggleBookmark = useCallback(async (postId) => {
     if (!composerUserId) return
-    setBookmarkedByPost((prev) => ({ ...prev, [postId]: !prev[postId] }))
-  }, [composerUserId])
+    const was = !!bookmarkedByPostRef.current[postId]
+    setBookmarkedByPost((prev) => ({ ...prev, [postId]: !was }))
+    const res = was
+      ? await supabaseClient.from('post_bookmarks').delete().eq('post_id', postId).eq('user_id', composerUserId)
+      : await supabaseClient.from('post_bookmarks').insert({ post_id: postId, user_id: composerUserId })
+    if (res.error) {
+      setBookmarkedByPost((prev) => ({ ...prev, [postId]: was }))
+      setLoungeManageErr(res.error.message || 'Could not update bookmark.')
+    }
+  }, [composerUserId, supabaseClient])
 
-  function loungePostWithinAuthorEditWindow(createdAt) {
-    if (!createdAt) return false
-    const t = new Date(createdAt).getTime()
-    if (!Number.isFinite(t)) return false
-    return Date.now() - t <= LOUNGE_POST_AUTHOR_EDIT_WINDOW_MS
-  }
+  const submitLoungeDetailComment = useCallback(async () => {
+    if (!loungePostDetail?.id || !composerUserId || loungeReadOnly) return
+    const body = loungeDetailCommentDraft.trim()
+    if (body.length === 0) return
+    setLoungeDetailCommentBusy(true)
+    setLoungeDetailCommentErr('')
+    const { data, error } = await supabaseClient
+      .from('feed_comments')
+      .insert({ post_id: loungePostDetail.id, user_id: composerUserId, body })
+      .select('id,body,created_at,user_id,parent_id')
+      .single()
+    setLoungeDetailCommentBusy(false)
+    if (error) {
+      setLoungeDetailCommentErr(error.message)
+      return
+    }
+    const pr = await supabaseClient
+      .from('profiles')
+      .select('user_id,handle,display_name,avatar_url')
+      .eq('user_id', composerUserId)
+      .maybeSingle()
+    const row = { ...data, author_profile: pr.data || composerUserProfile || null }
+    setLoungeDetailComments((c) => [...c, row])
+    setLoungeDetailCommentDraft('')
+    const { data: countRow } = await supabaseClient
+      .from('community_feed_posts')
+      .select('comment_count')
+      .eq('id', loungePostDetail.id)
+      .maybeSingle()
+    if (countRow && typeof countRow.comment_count === 'number') {
+      patchPostAggregate(loungePostDetail.id, { comment_count: countRow.comment_count })
+    }
+    setInteractionByPost((prev) => {
+      const cur = prev[loungePostDetail.id] || defaultInteraction
+      return { ...prev, [loungePostDetail.id]: { ...cur, commented: true } }
+    })
+  }, [
+    composerUserId,
+    composerUserProfile,
+    defaultInteraction,
+    loungeDetailCommentDraft,
+    loungePostDetail?.id,
+    loungeReadOnly,
+    patchPostAggregate,
+    supabaseClient,
+  ])
+
+  useEffect(() => {
+    if (!loungePostDetail?.id || loungeReadOnly) {
+      setLoungeDetailComments([])
+      setLoungeDetailCommentsLoading(false)
+      setLoungeDetailCommentErr('')
+      return
+    }
+    let cancelled = false
+    setLoungeDetailCommentsLoading(true)
+    setLoungeDetailCommentErr('')
+    ;(async () => {
+      const postId = loungePostDetail.id
+      const { data, error } = await supabaseClient
+        .from('feed_comments')
+        .select('id,body,created_at,user_id,parent_id')
+        .eq('post_id', postId)
+        .is('parent_id', null)
+        .is('hidden_at', null)
+        .order('created_at', { ascending: true })
+      if (cancelled) return
+      setLoungeDetailCommentsLoading(false)
+      if (error) {
+        setLoungeDetailCommentErr(error.message)
+        setLoungeDetailComments([])
+        return
+      }
+      const rows = data || []
+      const authorIds = [...new Set(rows.map((r) => String(r.user_id)).filter(Boolean))]
+      let profileBy = {}
+      if (authorIds.length) {
+        const pr = await supabaseClient
+          .from('profiles')
+          .select('user_id,handle,display_name,avatar_url')
+          .in('user_id', authorIds)
+        if (!pr.error && pr.data) profileBy = Object.fromEntries(pr.data.map((p) => [p.user_id, p]))
+      }
+      if (cancelled) return
+      setLoungeDetailComments(rows.map((r) => ({ ...r, author_profile: profileBy[r.user_id] || null })))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [loungePostDetail?.id, loungeReadOnly, supabaseClient])
 
   const finalizeLoungePostDetailClose = useCallback(() => {
     const tid = loungePostDetailCloseFallbackTimerRef.current
@@ -505,14 +1138,19 @@ export default function SocialFeed({
     setLoungePostDetail(null)
     setLoungePostDetailVisible(true)
     setLoungePostDetailMenuOpen(false)
-    setLoungePostDeleteConfirmOpen(false)
     setLoungeDetailEditing(false)
     setLoungeDetailDraftCaption('')
     setLoungeDetailEditErr('')
     setLoungeDetailEditMediaFile(null)
     setLoungeDetailEditMediaKind('')
     setLoungeDetailDeleteBusy(false)
+    loungePostDeleteInflightRef.current = false
     setLoungeManageErr('')
+    setLoungeDetailComments([])
+    setLoungeDetailCommentsLoading(false)
+    setLoungeDetailCommentBusy(false)
+    setLoungeDetailCommentDraft('')
+    setLoungeDetailCommentErr('')
   }, [])
 
   const closeLoungePostDetailImmediate = useCallback(() => {
@@ -539,38 +1177,60 @@ export default function SocialFeed({
     }, 400)
   }, [finalizeLoungePostDetailClose])
 
-  const openLoungePostDetail = useCallback((post) => {
-    if (!post?.id) return
-    if (loungeReadOnly) {
-      onRequireAuth?.('login')
-      return
-    }
-    const tid = loungePostDetailCloseFallbackTimerRef.current
-    if (tid) {
-      window.clearTimeout(tid)
-      loungePostDetailCloseFallbackTimerRef.current = 0
-    }
-    setLoungeManageErr('')
-    setLoungeDetailEditing(false)
-    setLoungeDetailDraftCaption('')
-    setLoungeDetailEditErr('')
-    setLoungeDetailEditMediaFile(null)
-    setLoungeDetailEditMediaKind('')
-    setLoungePostDetailMenuOpen(false)
-    setLoungePostDeleteConfirmOpen(false)
-    setLoungePostDetail(post)
-    const reduce =
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
-    if (reduce) {
-      setLoungePostDetailVisible(true)
-      return
-    }
-    setLoungePostDetailVisible(false)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setLoungePostDetailVisible(true))
-    })
-  }, [loungeReadOnly, onRequireAuth])
+  const openLoungePostDetail = useCallback(
+    (post, opts) => {
+      if (!post?.id) return
+      if (loungeReadOnly) {
+        onRequireAuth?.('login')
+        return
+      }
+      const wantEdit = opts?.startEditing === true
+      const tid = loungePostDetailCloseFallbackTimerRef.current
+      if (tid) {
+        window.clearTimeout(tid)
+        loungePostDetailCloseFallbackTimerRef.current = 0
+      }
+      setLoungeManageErr('')
+      setLoungeDetailEditing(false)
+      setLoungeDetailDraftCaption('')
+      setLoungeDetailEditErr('')
+      setLoungeDetailEditMediaFile(null)
+      setLoungeDetailEditMediaKind('')
+      setLoungePostDetailMenuOpen(false)
+      setLoungePostDetail(post)
+      if (
+        wantEdit &&
+        composerUserId &&
+        post.user_id === composerUserId &&
+        isLoungePostWithinAuthorEditWindow(post.created_at)
+      ) {
+        setLoungeDetailEditErr('')
+        setLoungeManageErr('')
+        setLoungeDetailEditMediaFile(null)
+        setLoungeDetailEditMediaKind('')
+        try {
+          const el = loungeDetailEditMediaInputRef.current
+          if (el) el.value = ''
+        } catch {
+          // ignore
+        }
+        setLoungeDetailDraftCaption(feedPostDisplayCaption(post))
+        setLoungeDetailEditing(true)
+      }
+      const reduce =
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+      if (reduce) {
+        setLoungePostDetailVisible(true)
+        return
+      }
+      setLoungePostDetailVisible(false)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setLoungePostDetailVisible(true))
+      })
+    },
+    [composerUserId, loungeReadOnly, onRequireAuth]
+  )
 
   const onLoungePostDetailPanelTransitionEnd = useCallback(
     (e) => {
@@ -695,6 +1355,8 @@ export default function SocialFeed({
 
   const performLoungePostDeleteFromDetail = useCallback(async () => {
     if (!loungePostDetail?.id || loungePostDetail.user_id !== composerUserId) return
+    if (loungePostDeleteInflightRef.current) return
+    loungePostDeleteInflightRef.current = true
     const postId = loungePostDetail.id
     setLoungeManageErr('')
     setLoungeDetailDeleteBusy(true)
@@ -707,16 +1369,57 @@ export default function SocialFeed({
         } else {
           setLoungeManageErr(msg || 'Could not delete.')
         }
-        setLoungePostDeleteConfirmOpen(false)
         return
       }
-      setLoungePostDeleteConfirmOpen(false)
       closeLoungePostDetail()
       await loadCommunityFeed({ silent: true })
     } finally {
+      loungePostDeleteInflightRef.current = false
       setLoungeDetailDeleteBusy(false)
     }
   }, [closeLoungePostDetail, composerUserId, loadCommunityFeed, loungePostDetail, supabaseClient])
+
+  const deleteLoungePostFromFeed = useCallback(
+    async (post) => {
+      if (!post?.id || post.user_id !== composerUserId) return
+      if (loungePostDeleteInflightRef.current) return
+      if (typeof window !== 'undefined') {
+        const ok = window.confirm('Delete this post? This cannot be undone.')
+        if (!ok) return
+      }
+      loungePostDeleteInflightRef.current = true
+      setLoungeFeedDeleteBusyPostId(post.id)
+      setLoungeManageErr('')
+      try {
+        const { error } = await supabaseClient.from('community_feed_posts').delete().eq('id', post.id)
+        if (error) {
+          const msg = String(error.message || '')
+          if (error.code === '42501') {
+            setLoungeManageErr('You do not have permission to delete this post.')
+          } else {
+            setLoungeManageErr(msg || 'Could not delete.')
+          }
+          return
+        }
+        if (loungePostDetail?.id === post.id) closeLoungePostDetail()
+        await loadCommunityFeed({ silent: true })
+      } finally {
+        loungePostDeleteInflightRef.current = false
+        setLoungeFeedDeleteBusyPostId(null)
+      }
+    },
+    [closeLoungePostDetail, composerUserId, loadCommunityFeed, loungePostDetail, supabaseClient]
+  )
+
+  const onPostMenuBlockFromFeed = useCallback((p) => {
+    void p
+    if (typeof window !== 'undefined') window.alert('Blocking users is not available yet.')
+  }, [])
+
+  const onPostMenuReportFromFeed = useCallback((p) => {
+    void p
+    if (typeof window !== 'undefined') window.alert('Reporting posts is not available yet.')
+  }, [])
 
   useEffect(() => {
     loungePostDetailVisibleRef.current = loungePostDetailVisible
@@ -747,11 +1450,6 @@ export default function SocialFeed({
     if (!loungePostDetail) return
     const onKey = (e) => {
       if (e.key !== 'Escape') return
-      if (loungePostDeleteConfirmOpen) {
-        e.preventDefault()
-        if (!loungeDetailDeleteBusy) setLoungePostDeleteConfirmOpen(false)
-        return
-      }
       if (loungePostDetailMenuOpen) {
         e.preventDefault()
         setLoungePostDetailMenuOpen(false)
@@ -766,15 +1464,7 @@ export default function SocialFeed({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [
-    cancelLoungeDetailEdit,
-    closeLoungePostDetail,
-    loungeDetailDeleteBusy,
-    loungeDetailEditing,
-    loungePostDeleteConfirmOpen,
-    loungePostDetail,
-    loungePostDetailMenuOpen,
-  ])
+  }, [cancelLoungeDetailEdit, closeLoungePostDetail, loungeDetailEditing, loungePostDetail, loungePostDetailMenuOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -832,27 +1522,6 @@ export default function SocialFeed({
       setProfileGateOpen(false)
     }
   }, [composerAuthResolved, composerUserId, composerAuthUser, composerUserProfile])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const raw = window.localStorage.getItem(BOOKMARKS_STORAGE_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      if (parsed && typeof parsed === 'object') setBookmarkedByPost(parsed)
-    } catch {
-      // Ignore local storage parse errors.
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(bookmarkedByPost))
-    } catch {
-      // Ignore local storage write errors.
-    }
-  }, [bookmarkedByPost])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -935,7 +1604,15 @@ export default function SocialFeed({
   const submitLoungePost = useCallback(async () => {
     const caption = postText.trim()
     setPostErr('')
-    if (!caption) return
+    const gifCheck = validateAtMostOneGifUrl(composerMediaUrl)
+    if (!gifCheck.ok) {
+      setPostErr(gifCheck.message)
+      return
+    }
+    const hasGif = gifCheck.value.length > 0
+    const hasImages = composerImageItems.length > 0
+    const hasVideo = composerVideoSlot != null
+    if (!caption && !hasGif && !hasImages && !hasVideo) return
     if (caption.length > 280) {
       setPostErr('Caption must be 280 characters or fewer.')
       return
@@ -978,14 +1655,64 @@ export default function SocialFeed({
         ownProfile?.role === 'admin' ||
         composerUserProfile?.role === 'moderator' ||
         composerUserProfile?.role === 'admin'
-      const { error } = await supabaseClient.from('community_feed_posts').insert(
-        communityFeedPostInsertPayload({
+
+      if (hasVideo) {
+        setPostErr('Video attachments are not supported yet. Remove the video or add photos or a GIF.')
+        return
+      }
+
+      const gifOnlyUrl = gifCheck.value
+      const uploadedUrls = []
+      for (const item of composerImageItems) {
+        const { file: ready, error: cErr } = await prepareLoungeFeedImageForUpload(item.file)
+        if (cErr) {
+          setPostErr(cErr.message)
+          return
+        }
+        const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
+          supabaseClient,
+          user: session.user,
+          file: ready,
+        })
+        if (upErr) {
+          setPostErr(upErr.message || 'Could not upload image.')
+          return
+        }
+        if (!upUrl) {
+          setPostErr('Could not upload image.')
+          return
+        }
+        uploadedUrls.push(upUrl)
+      }
+
+      let insertPayload
+      if (uploadedUrls.length > 0) {
+        insertPayload = communityFeedPostInsertPayload({
+          caption,
+          gameTitle: 'Lounge',
+          gameSlug: null,
+          pinned: isStaffPoster && composerPinOnPost ? true : undefined,
+          imageUrls: uploadedUrls,
+          gifUrl: gifOnlyUrl || undefined,
+        })
+      } else if (gifOnlyUrl) {
+        insertPayload = communityFeedPostInsertPayload({
+          caption,
+          gameTitle: 'Lounge',
+          gameSlug: null,
+          pinned: isStaffPoster && composerPinOnPost ? true : undefined,
+          mediaUrl: gifOnlyUrl,
+        })
+      } else {
+        insertPayload = communityFeedPostInsertPayload({
           caption,
           gameTitle: 'Lounge',
           gameSlug: null,
           pinned: isStaffPoster && composerPinOnPost ? true : undefined,
         })
-      )
+      }
+
+      const { error } = await supabaseClient.from('community_feed_posts').insert(insertPayload)
 
       if (error) {
         const msg = String(error.message || '')
@@ -1006,13 +1733,38 @@ export default function SocialFeed({
           setPostErr(LOUNGE_MAX_PINNED_ALERT)
           return
         }
+        if (/media_url|gif_url|image_urls|schema cache/i.test(msg)) {
+          setPostErr(
+            'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, and supabase/lounge_feed_post_image_urls.sql in Supabase.'
+          )
+          return
+        }
         setPostErr(msg || 'Could not post right now.')
         return
       }
 
       setPostText('')
-      setComposerMediaFile(null)
-      setComposerMediaKind('')
+      setComposerImageItems((prev) => {
+        for (const it of prev) {
+          try {
+            URL.revokeObjectURL(it.preview)
+          } catch {
+            // ignore
+          }
+        }
+        return []
+      })
+      setComposerVideoSlot((prev) => {
+        if (prev?.preview) {
+          try {
+            URL.revokeObjectURL(prev.preview)
+          } catch {
+            // ignore
+          }
+        }
+        return null
+      })
+      setComposerMediaUrl('')
       setComposerPinOnPost(false)
       composerFoldedFromFeedScrollRef.current = false
       composerFoldRevealRef.current = 0
@@ -1025,6 +1777,9 @@ export default function SocialFeed({
       setPostBusy(false)
     }
   }, [
+    composerImageItems,
+    composerVideoSlot,
+    composerMediaUrl,
     composerPinOnPost,
     composerUserProfile?.avatar_url,
     composerUserProfile?.role,
@@ -1160,7 +1915,7 @@ export default function SocialFeed({
         const [{ data: postRows, error: postsErr }, coreProfile] = await Promise.all([
           supabaseClient
             .from('community_feed_posts')
-            .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count')
+            .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,media_url,gif_url,image_urls')
             .eq('user_id', userId)
             .is('hidden_at', null)
             .order('created_at', { ascending: false })
@@ -1245,10 +2000,12 @@ export default function SocialFeed({
       loungeReadOnly,
       interactionStateFor,
       toggleInteraction,
+      onQuoteRepost: handleQuoteRepostPress,
       toggleBookmark,
       bookmarkedByPost,
       requireLoungeAuth,
       openProfileGateIfNeeded,
+      onOpenComments: openLoungePostDetail,
       onAvatarClick: (p) => void openProfileModal(p),
       loungeViewerIsStaff,
       setLoungePostPinned,
@@ -1260,15 +2017,27 @@ export default function SocialFeed({
       avatarToneClass,
       avatarText,
       onPostBodyClick: openLoungePostDetail,
+      viewerUserId: composerUserId,
+      captionEditableInMenu: (p) =>
+        Boolean(
+          composerUserId && p?.user_id === composerUserId && isLoungePostWithinAuthorEditWindow(p?.created_at)
+        ),
+      onPostMenuEdit: (p) => openLoungePostDetail(p, { startEditing: true }),
+      onPostMenuDelete: deleteLoungePostFromFeed,
+      onPostMenuBlock: onPostMenuBlockFromFeed,
+      onPostMenuReport: onPostMenuReportFromFeed,
+      busyDeletingPostId: loungeFeedDeleteBusyPostId,
     }),
     [
       loungeReadOnly,
       interactionStateFor,
       toggleInteraction,
+      handleQuoteRepostPress,
       toggleBookmark,
       bookmarkedByPost,
       requireLoungeAuth,
       openProfileGateIfNeeded,
+      openLoungePostDetail,
       openProfileModal,
       loungeViewerIsStaff,
       setLoungePostPinned,
@@ -1279,7 +2048,11 @@ export default function SocialFeed({
       displayLabel,
       avatarToneClass,
       avatarText,
-      openLoungePostDetail,
+      composerUserId,
+      deleteLoungePostFromFeed,
+      onPostMenuBlockFromFeed,
+      onPostMenuReportFromFeed,
+      loungeFeedDeleteBusyPostId,
     ]
   )
 
@@ -1340,8 +2113,27 @@ export default function SocialFeed({
             type="button"
             onClick={() => {
               setPostText('')
-              setComposerMediaFile(null)
-              setComposerMediaKind('')
+              setComposerImageItems((prev) => {
+                for (const it of prev) {
+                  try {
+                    URL.revokeObjectURL(it.preview)
+                  } catch {
+                    // ignore
+                  }
+                }
+                return []
+              })
+              setComposerVideoSlot((prev) => {
+                if (prev?.preview) {
+                  try {
+                    URL.revokeObjectURL(prev.preview)
+                  } catch {
+                    // ignore
+                  }
+                }
+                return null
+              })
+              setComposerMediaUrl('')
               setComposerPinOnPost(false)
               setPostErr('')
               composerFoldedFromFeedScrollRef.current = false
@@ -1429,12 +2221,12 @@ export default function SocialFeed({
                   opacity: Math.min(1, 0.2 + 0.8 * composerFoldReveal),
                 }}
               >
-                <div className="mt-0.5 pr-8">
-                  <div className="grid min-h-[6.5rem] grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1">
+                <div className="mt-0.5 flex min-h-[6.5rem] flex-col pr-8">
+                  <div className="grid min-h-[2.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1 sm:min-h-[3rem]">
                     <div
                       ref={composerMirrorRef}
                       aria-hidden
-                      className="pointer-events-none min-h-[6.5rem] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-0 pt-[10px] text-left text-[17px] leading-[1.25] text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] sm:pt-[13px] [&::-webkit-scrollbar]:hidden"
+                      className="pointer-events-none min-h-[2.75rem] max-h-[min(50vh,22rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-0 pt-[10px] text-left text-[17px] leading-[1.25] text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] sm:min-h-[3rem] sm:pt-[13px] [&::-webkit-scrollbar]:hidden"
                     >
                       {postText ? (
                         renderRichCaption(postText, {
@@ -1453,17 +2245,51 @@ export default function SocialFeed({
                         const m = composerMirrorRef.current
                         if (m) m.scrollTop = e.currentTarget.scrollTop
                       }}
-                      className="z-10 min-h-[6.5rem] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[10px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25 sm:pt-[13px]"
+                      className="z-10 min-h-[2.75rem] max-h-[min(50vh,22rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[10px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25 sm:min-h-[3rem] sm:pt-[13px]"
                       placeholder=""
                       aria-label="Lounge post caption"
                       maxLength={280}
                     />
                   </div>
+                  {(() => {
+                    const gifUrl = String(composerMediaUrl || '').trim()
+                    const imageUrls = composerImageItems.map((x) => x.preview)
+                    const carouselUrls = gifUrl ? [...imageUrls, gifUrl] : imageUrls
+                    if (carouselUrls.length === 0) return null
+                    const nImg = composerImageItems.length
+                    return (
+                      <LoungeImageCarousel
+                        urls={carouselUrls}
+                        variant="composer"
+                        firstMarginTopClass="mt-1.5"
+                        regionAriaLabel={gifUrl ? 'Post images and GIF' : 'Post images'}
+                        removeLabelForIndex={(i) => (i < nImg ? 'Remove image' : 'Remove GIF')}
+                        onRemoveIndex={(i) => {
+                          if (i < nImg) {
+                            setComposerImageItems((prev) => {
+                              const row = prev[i]
+                              if (row?.preview) {
+                                try {
+                                  URL.revokeObjectURL(row.preview)
+                                } catch {
+                                  // ignore
+                                }
+                              }
+                              return prev.filter((_, j) => j !== i)
+                            })
+                          } else {
+                            setComposerMediaUrl('')
+                          }
+                        }}
+                      />
+                    )
+                  })()}
                   {postErr ? (
-                    <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[17px] leading-tight text-rose-200">
+                    <div className="mt-2 shrink-0 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[17px] leading-tight text-rose-200">
                       {postErr}
                     </div>
                   ) : null}
+                  <div className="min-h-0 flex-1" aria-hidden />
                 </div>
               </div>
             ) : (
@@ -1492,13 +2318,6 @@ export default function SocialFeed({
                       </span>
                     )
                   }
-                  if (composerMediaFile) {
-                    return (
-                      <span className="block w-full min-w-0 truncate text-zinc-400">
-                        {composerMediaKind === 'video' ? 'Video' : 'Image'} selected
-                      </span>
-                    )
-                  }
                   return 'Are you winning, son?'
                 })()}
               </button>
@@ -1519,22 +2338,85 @@ export default function SocialFeed({
               ref={composerMediaInputRef}
               type="file"
               accept="image/*,video/*"
+              multiple
               className="hidden"
               onChange={(e) => {
-                const file = e.target.files?.[0] || null
-                if (!file) return
-                const mime = String(file.type || '').toLowerCase()
-                if (mime.startsWith('image/')) {
-                  setComposerMediaKind('image')
-                  setComposerMediaFile(file)
+                const input = e.target
+                const files = Array.from(input.files || [])
+                if (!files.length) return
+                setPostErr('')
+                const hasVideo = files.some((f) => isProbablyVideoFile(f))
+                if (hasVideo) {
+                  const vf = files.find((f) => isProbablyVideoFile(f))
+                  if (!vf) {
+                    try {
+                      input.value = ''
+                    } catch {
+                      // ignore
+                    }
+                    return
+                  }
+                  setComposerImageItems((prev) => {
+                    for (const it of prev) {
+                      try {
+                        URL.revokeObjectURL(it.preview)
+                      } catch {
+                        // ignore
+                      }
+                    }
+                    return []
+                  })
+                  setComposerVideoSlot((prev) => {
+                    if (prev?.preview) {
+                      try {
+                        URL.revokeObjectURL(prev.preview)
+                      } catch {
+                        // ignore
+                      }
+                    }
+                    return { file: vf, preview: URL.createObjectURL(vf) }
+                  })
+                  setComposerMediaUrl('')
+                  try {
+                    input.value = ''
+                  } catch {
+                    // ignore
+                  }
                   return
                 }
-                if (mime.startsWith('video/')) {
-                  setComposerMediaKind('video')
-                  setComposerMediaFile(file)
+                const bad = files.some((f) => !isProbablyImageFile(f))
+                if (bad) {
+                  setPostErr('Unsupported media type. Please choose an image or video file.')
+                  try {
+                    input.value = ''
+                  } catch {
+                    // ignore
+                  }
                   return
                 }
-                setPostErr('Unsupported media type. Please choose an image or video file.')
+                setComposerVideoSlot((prev) => {
+                  if (prev?.preview) {
+                    try {
+                      URL.revokeObjectURL(prev.preview)
+                    } catch {
+                      // ignore
+                    }
+                  }
+                  return null
+                })
+                setComposerImageItems((prev) => {
+                  const next = [...prev]
+                  for (const file of files) {
+                    if (next.length >= LOUNGE_COMPOSER_MAX_IMAGES) break
+                    next.push({ id: newComposerImageId(), file, preview: URL.createObjectURL(file) })
+                  }
+                  return next
+                })
+                try {
+                  input.value = ''
+                } catch {
+                  // ignore
+                }
               }}
             />
             <div className="mt-1 flex w-full items-center gap-2 pr-2 pt-1.5 pb-1">
@@ -1565,14 +2447,21 @@ export default function SocialFeed({
                   <circle cx="8" cy="8" r="0.9" fill="currentColor" />
                 </svg>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (openProfileGateIfNeeded()) return
+                  setKlipyPickerTarget('composer')
+                  setKlipyPickerOpen(true)
+                }}
+                className="flex shrink-0 touch-manipulation items-center justify-center rounded-md px-1.5 py-1 text-[12px] font-bold tracking-wide text-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-200 active:text-white [-webkit-tap-highlight-color:transparent]"
+                title="Add GIF (Klipy)"
+                aria-label="Add GIF"
+              >
+                GIF
+              </button>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                <div className="min-w-0 flex-1 pr-2">
-                  {composerMediaFile ? (
-                    <span className="block truncate text-[17px] leading-tight text-zinc-400">
-                      {composerMediaKind === 'video' ? 'Video' : 'Image'} selected
-                    </span>
-                  ) : null}
-                </div>
+                <div className="min-w-0 flex-1 pr-2" />
                 <div className="inline-flex shrink-0 items-center gap-2 py-0.5">
                   {loungeViewerIsStaff ? (
                     <label className="inline-flex cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-md border border-zinc-700/80 bg-zinc-900/50 px-2 py-1 text-[11px] font-semibold text-zinc-400 [-webkit-tap-highlight-color:transparent] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan-500/40">
@@ -1586,20 +2475,22 @@ export default function SocialFeed({
                       <span className="whitespace-nowrap">Pin</span>
                     </label>
                   ) : null}
-                  {postText.length >= 250 ? (
-                    <span
-                      className={`text-[11px] tabular-nums font-semibold ${
-                        postText.length >= 280 ? 'text-rose-400' : 'text-zinc-500'
-                      }`}
-                      aria-live="polite"
-                    >
-                      {postText.length}/280
-                    </span>
-                  ) : null}
+                  <span
+                    className={`shrink-0 text-[12px] tabular-nums ${loungeCharCounterClass(postText.length)}`}
+                    aria-live="polite"
+                  >
+                    {postText.length}/280
+                  </span>
                   <button
                     type="button"
                     onClick={() => void submitLoungePost()}
-                    disabled={postBusy || !postText.trim()}
+                    disabled={
+                      postBusy ||
+                      !!composerVideoSlot ||
+                      (!postText.trim() &&
+                        !String(composerMediaUrl || '').trim() &&
+                        composerImageItems.length === 0)
+                    }
                     className="min-h-8 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-2 py-1 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {postBusy ? 'Posting…' : 'Post'}
@@ -1623,11 +2514,33 @@ export default function SocialFeed({
         {communityFeedLoading && communityPosts.length === 0 ? (
           <div className="px-3 py-4 text-zinc-400 text-[17px]">Loading lounge…</div>
         ) : communityPosts.length === 0 ? (
-          <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
-            No posts yet. Run{' '}
-            <code className="text-fuchsia-200/90">supabase/feed_phase_a_profiles_public_read.sql</code> in Supabase,
-            then post from Guides → Ask community.
-          </div>
+          communityFeedQueryErr ? (
+            <div className="px-3 py-5 text-[17px] leading-relaxed">
+              <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-rose-200 break-words whitespace-pre-wrap">
+                Could not load the lounge feed: {communityFeedQueryErr}
+              </div>
+              {/media_url|gif_url|schema cache|column/i.test(communityFeedQueryErr) ? (
+                <p className="mt-3 text-zinc-400">
+                  If you recently added GIFs or media on posts, apply{' '}
+                  <code className="text-fuchsia-200/90">supabase/lounge_feed_post_media.sql</code> and{' '}
+                  <code className="text-fuchsia-200/90">supabase/lounge_feed_post_gif_url.sql</code> in the Supabase SQL
+                  editor so the <code className="text-fuchsia-200/90">media_url</code> and{' '}
+                  <code className="text-fuchsia-200/90">gif_url</code> columns exist, then refresh.
+                </p>
+              ) : (
+                <p className="mt-3 text-zinc-400">
+                  Check the browser network tab for the <code className="text-fuchsia-200/90">community_feed_posts</code>{' '}
+                  request, fix the Supabase schema or RLS issue, then pull to refresh.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
+              No posts yet. Run{' '}
+              <code className="text-fuchsia-200/90">supabase/feed_phase_a_profiles_public_read.sql</code> in Supabase,
+              then post from Guides → Ask community.
+            </div>
+          )
         ) : (
           <>
             {communityPosts.map((post) => (
@@ -1637,7 +2550,13 @@ export default function SocialFeed({
                 className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
                 onClick={(e) => {
                   const t = e.target
-                  if (t instanceof Element && t.closest('button, a, textarea, input, select')) return
+                  if (!(t instanceof Element)) return
+                  const origHost = t.closest('[data-lounge-original-embed]')
+                  if (origHost && post.reposted_post?.id) {
+                    openLoungePostDetail(post.reposted_post)
+                    return
+                  }
+                  if (t.closest('button, a, textarea, input, select, [data-lounge-post-menu]')) return
                   openLoungePostDetail(post)
                 }}
               >
@@ -1646,8 +2565,10 @@ export default function SocialFeed({
                   loungeReadOnly={loungeReadOnly}
                   interactionStateFor={interactionStateFor}
                   toggleInteraction={toggleInteraction}
+                  onQuoteRepost={handleQuoteRepostPress}
                   toggleBookmark={toggleBookmark}
                   bookmarkedByPost={bookmarkedByPost}
+                  onOpenComments={openLoungePostDetail}
                   requireLoungeAuth={requireLoungeAuth}
                   openProfileGateIfNeeded={openProfileGateIfNeeded}
                   onAvatarClick={(p) => void openProfileModal(p)}
@@ -1660,6 +2581,19 @@ export default function SocialFeed({
                   displayLabel={displayLabel}
                   avatarToneClass={avatarToneClass}
                   avatarText={avatarText}
+                  viewerUserId={composerUserId}
+                  captionEditableInMenu={(p) =>
+                    Boolean(
+                      composerUserId &&
+                        p?.user_id === composerUserId &&
+                        isLoungePostWithinAuthorEditWindow(p?.created_at)
+                    )
+                  }
+                  onPostMenuEdit={(p) => openLoungePostDetail(p, { startEditing: true })}
+                  onPostMenuDelete={deleteLoungePostFromFeed}
+                  onPostMenuBlock={onPostMenuBlockFromFeed}
+                  onPostMenuReport={onPostMenuReportFromFeed}
+                  busyDeletingPostId={loungeFeedDeleteBusyPostId}
                 />
               </article>
             ))}
@@ -1690,10 +2624,6 @@ export default function SocialFeed({
             className="absolute inset-0 z-0 hidden cursor-default sm:block"
             aria-label="Close post"
             onClick={() => {
-              if (loungePostDeleteConfirmOpen) {
-                if (!loungeDetailDeleteBusy) setLoungePostDeleteConfirmOpen(false)
-                return
-              }
               if (loungeDetailEditing) cancelLoungeDetailEdit()
               else closeLoungePostDetail()
             }}
@@ -1710,10 +2640,6 @@ export default function SocialFeed({
               <button
                 type="button"
                 onClick={() => {
-                  if (loungePostDeleteConfirmOpen) {
-                    if (!loungeDetailDeleteBusy) setLoungePostDeleteConfirmOpen(false)
-                    return
-                  }
                   if (loungePostDetailMenuOpen) {
                     setLoungePostDetailMenuOpen(false)
                     return
@@ -1752,7 +2678,7 @@ export default function SocialFeed({
                       role="menu"
                       className="absolute right-0 top-full z-[20] mt-1 min-w-[11rem] rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
                     >
-                      {loungeDetailIsOwn && loungePostWithinAuthorEditWindow(loungePostDetail.created_at) ? (
+                      {loungeDetailIsOwn && isLoungePostWithinAuthorEditWindow(loungePostDetail.created_at) ? (
                         <button
                           type="button"
                           role="menuitem"
@@ -1784,7 +2710,7 @@ export default function SocialFeed({
                           disabled={loungeDetailDeleteBusy}
                           onClick={() => {
                             setLoungePostDetailMenuOpen(false)
-                            setLoungePostDeleteConfirmOpen(true)
+                            void performLoungePostDeleteFromDetail()
                           }}
                         >
                           Delete
@@ -1948,18 +2874,96 @@ export default function SocialFeed({
                     ) : null}
                   </div>
                 </div>
+              ) : loungePostDetail.reposted_post ? (
+                <>
+                  {feedPostDisplayCaption(loungePostDetail) ? (
+                    <div
+                      className={`text-left text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${
+                        loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
+                      }`}
+                    >
+                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail), {
+                        hashtagClassName: 'font-semibold text-cyan-300',
+                        linkClassName:
+                          'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+                      })}
+                    </div>
+                  ) : null}
+                  <LoungePostFeedImagesAndGif
+                    post={loungePostDetail}
+                    variant="detail"
+                    firstMarginTopClass={
+                      feedPostDisplayCaption(loungePostDetail)
+                        ? 'mt-2'
+                        : loungePostDetail.game_slug
+                          ? 'mt-1.5'
+                          : 'mt-4'
+                    }
+                  />
+                  <button
+                    type="button"
+                    data-lounge-original-embed
+                    aria-label="View original post"
+                    onClick={() => void openLoungePostDetail(loungePostDetail.reposted_post)}
+                    className="mt-3 w-full cursor-pointer rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/80 active:bg-zinc-800/50"
+                  >
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[14px] leading-snug">
+                      <span className="min-w-0 max-w-[min(11rem,42vw)] truncate font-semibold text-zinc-200 sm:max-w-[13rem]">
+                        {displayNameFor(loungePostDetail.reposted_post)}
+                      </span>
+                      <LoungeStaffRoleBadge role={loungePostDetail.reposted_post?.author_profile?.role} size="detail" />
+                      <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-[14px] text-zinc-500">
+                        <span className="min-w-0 max-w-[min(9rem,36vw)] truncate sm:max-w-[11rem]">
+                          {handleFor(loungePostDetail.reposted_post)}
+                        </span>
+                      </span>
+                      {loungePostDetail.reposted_post.pinned ? (
+                        <span className="shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
+                          Pinned
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
+                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail.reposted_post), {
+                        hashtagClassName: 'font-semibold text-cyan-300',
+                        linkClassName:
+                          'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+                      })}
+                    </div>
+                    <LoungePostFeedImagesAndGif
+                      post={loungePostDetail.reposted_post}
+                      variant="embed"
+                      firstMarginTopClass="mt-2"
+                    />
+                  </button>
+                </>
               ) : (
-                <div
-                  className={`text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap ${
-                    loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
-                  }`}
-                >
-                  {renderRichCaption(feedPostDisplayCaption(loungePostDetail), {
-                    hashtagClassName: 'font-semibold text-cyan-300',
-                    linkClassName:
-                      'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
-                  })}
-                </div>
+                <>
+                  {feedPostDisplayCaption(loungePostDetail) ? (
+                    <div
+                      className={`text-left text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${
+                        loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
+                      }`}
+                    >
+                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail), {
+                        hashtagClassName: 'font-semibold text-cyan-300',
+                        linkClassName:
+                          'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+                      })}
+                    </div>
+                  ) : null}
+                  <LoungePostFeedImagesAndGif
+                    post={loungePostDetail}
+                    variant="detail"
+                    firstMarginTopClass={
+                      feedPostDisplayCaption(loungePostDetail)
+                        ? 'mt-2'
+                        : loungePostDetail.game_slug
+                          ? 'mt-1.5'
+                          : 'mt-4'
+                    }
+                  />
+                </>
               )}
 
               <div className="mt-4 text-[14px] text-zinc-500">
@@ -1975,8 +2979,10 @@ export default function SocialFeed({
                 const isBookmarked = !!bookmarkedByPost[d.id]
                 const baseComments = typeof d.comment_count === 'number' ? d.comment_count : 0
                 const baseLikes = typeof d.like_count === 'number' ? d.like_count : 0
-                const commentCount = baseComments + (loungeReadOnly ? 0 : ui.commented ? 1 : 0)
-                const likeCount = baseLikes + (loungeReadOnly ? 0 : ui.liked ? 1 : 0)
+                const baseReposts = typeof d.repost_count === 'number' ? d.repost_count : 0
+                const commentCount = baseComments
+                const likeCount = baseLikes
+                const repostCount = baseReposts
                 const commentClass = loungeReadOnly ? 'text-zinc-500' : ui.commented ? 'text-zinc-100' : 'text-zinc-500'
                 const repostClass = loungeReadOnly ? 'text-zinc-500' : ui.reposted ? 'text-emerald-400' : 'text-zinc-500'
                 const likeClass = loungeReadOnly ? 'text-zinc-500' : ui.liked ? 'text-rose-400' : 'text-zinc-500'
@@ -2055,11 +3061,12 @@ export default function SocialFeed({
                               ) : null}
                             </div>
                             <div className="inline-flex shrink-0 items-center gap-2 py-0.5">
-                              {loungeDetailDraftCaption.length >= 280 ? (
-                                <span className="text-[11px] tabular-nums font-semibold text-rose-400" aria-live="polite">
-                                  {loungeDetailDraftCaption.length}/280
-                                </span>
-                              ) : null}
+                              <span
+                                className={`text-[12px] tabular-nums ${loungeCharCounterClass(loungeDetailDraftCaption.length)}`}
+                                aria-live="polite"
+                              >
+                                {loungeDetailDraftCaption.length}/280
+                              </span>
                               <button
                                 type="button"
                                 onClick={() => void saveLoungeDetailCaption()}
@@ -2084,7 +3091,10 @@ export default function SocialFeed({
                         onReadOnlyClick={requireLoungeAuth}
                         onClick={() => {
                           if (openProfileGateIfNeeded()) return
-                          toggleInteraction(d.id, 'commented')
+                          document.getElementById('lounge-detail-comments')?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start',
+                          })
                         }}
                         className="inline-flex items-center justify-start gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
                       >
@@ -2101,11 +3111,17 @@ export default function SocialFeed({
                       </LoungeFeedStatSlot>
                       <LoungeFeedStatSlot
                         readOnly={ro}
-                        title={ro ? 'Sign in to repost' : undefined}
+                        title={
+                          ro
+                            ? 'Sign in to repost'
+                            : ui.reposted
+                              ? 'Remove your quote repost'
+                              : 'Quote repost'
+                        }
                         onReadOnlyClick={requireLoungeAuth}
                         onClick={() => {
                           if (openProfileGateIfNeeded()) return
-                          toggleInteraction(d.id, 'reposted')
+                          handleQuoteRepostPress(d)
                         }}
                         className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
                       >
@@ -2118,12 +3134,13 @@ export default function SocialFeed({
                             strokeLinejoin="round"
                           />
                         </svg>
+                        {Number.isFinite(repostCount) ? <span className={repostClass}>{repostCount}</span> : null}
                       </LoungeFeedStatSlot>
                       <LoungeFeedStatSlot
                         readOnly={ro}
                         title={ro ? 'Sign in to like' : undefined}
                         onReadOnlyClick={requireLoungeAuth}
-                        onClick={() => toggleInteraction(d.id, 'liked')}
+                        onClick={() => void toggleInteraction(d.id, 'liked')}
                         className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
                       >
                         <svg className={`h-[22px] w-[22px] ${likeClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
@@ -2172,7 +3189,7 @@ export default function SocialFeed({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => toggleBookmark(d.id)}
+                          onClick={() => void toggleBookmark(d.id)}
                           className="inline-flex items-center justify-end gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
                           title={isBookmarked ? 'Remove bookmark' : 'Save post'}
                         >
@@ -2191,50 +3208,72 @@ export default function SocialFeed({
                   </div>
                 )
               })()}
+
+              <div id="lounge-detail-comments" className="mt-6 border-t border-zinc-800/90 pt-4">
+                <div className="text-[15px] font-bold text-zinc-200">Comments</div>
+                {loungeReadOnly ? (
+                  <p className="mt-2 text-[14px] text-zinc-500">
+                    {typeof loungePostDetail.comment_count === 'number' && loungePostDetail.comment_count > 0
+                      ? `${loungePostDetail.comment_count} comment${loungePostDetail.comment_count === 1 ? '' : 's'} · Sign in to read and reply`
+                      : 'Sign in to join the conversation.'}
+                  </p>
+                ) : (
+                  <>
+                    {loungeDetailCommentsLoading ? (
+                      <div className="mt-2 text-[14px] text-zinc-500">Loading comments…</div>
+                    ) : loungeDetailCommentErr ? (
+                      <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] text-rose-200">
+                        {loungeDetailCommentErr}
+                      </div>
+                    ) : loungeDetailComments.length === 0 ? (
+                      <p className="mt-2 text-[14px] text-zinc-500">No comments yet. Be the first.</p>
+                    ) : (
+                      <ul className="mt-3 space-y-3">
+                        {loungeDetailComments.map((c) => (
+                          <li key={c.id} className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
+                            <div className="flex items-baseline justify-between gap-2 text-[13px] text-zinc-500">
+                              <span className="min-w-0 truncate font-semibold text-zinc-300">
+                                {c.author_profile?.display_name || c.author_profile?.handle || 'Member'}
+                              </span>
+                              <span className="shrink-0 tabular-nums">{postAgeLabel(c.created_at)}</span>
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-snug text-zinc-100">
+                              {c.body}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="mt-4">
+                      <label htmlFor="lounge-detail-comment" className="sr-only">
+                        Write a comment
+                      </label>
+                      <textarea
+                        id="lounge-detail-comment"
+                        value={loungeDetailCommentDraft}
+                        onChange={(e) => setLoungeDetailCommentDraft(e.target.value)}
+                        placeholder="Write a comment…"
+                        maxLength={2000}
+                        rows={3}
+                        className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-[15px] text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          disabled={loungeDetailCommentBusy || !loungeDetailCommentDraft.trim()}
+                          onClick={() => void submitLoungeDetailComment()}
+                          className="min-h-10 rounded-xl bg-violet-600 px-4 text-[14px] font-bold text-white touch-manipulation hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
+                        >
+                          {loungeDetailCommentBusy ? 'Posting…' : 'Reply'}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
-          {loungePostDeleteConfirmOpen ? (
-            <div
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="lounge-delete-post-title"
-              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/65 p-4 sm:bg-black/70"
-              onClick={() => {
-                if (!loungeDetailDeleteBusy) setLoungePostDeleteConfirmOpen(false)
-              }}
-            >
-              <div
-                className="w-full max-w-sm rounded-3xl border border-zinc-700 bg-zinc-900 p-4 shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div id="lounge-delete-post-title" className="text-[17px] font-semibold text-zinc-100">
-                  Delete this post?
-                </div>
-                <div className="mt-2 text-[14px] leading-relaxed text-zinc-300">
-                  This removes the post from the Lounge. This cannot be undone.
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={loungeDetailDeleteBusy}
-                    onClick={() => setLoungePostDeleteConfirmOpen(false)}
-                    className="min-h-11 flex-1 rounded-xl border border-zinc-600 bg-zinc-800 px-3 text-sm font-semibold text-zinc-200 touch-manipulation disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={loungeDetailDeleteBusy}
-                    onClick={() => void performLoungePostDeleteFromDetail()}
-                    className="min-h-11 flex-1 rounded-xl border border-rose-500/50 bg-rose-600 px-3 text-sm font-semibold text-white touch-manipulation hover:bg-rose-500 disabled:opacity-50"
-                  >
-                    {loungeDetailDeleteBusy ? 'Deleting…' : 'Delete'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -2256,6 +3295,369 @@ export default function SocialFeed({
           onProfileUpdated={onProfileScreenUpdated}
         />
       ) : null}
+
+      {quoteRepostModal ? (
+        <div
+          className="fixed inset-0 z-[92] flex bg-black/55 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quote-repost-sheet-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 z-0 cursor-default touch-manipulation bg-transparent"
+            aria-label="Close"
+            disabled={quoteRepostBusy}
+            onClick={() => {
+              if (quoteRepostBusy) return
+              setQuoteRepostModal(null)
+              setQuoteRepostDraft('')
+              setQuoteRepostErr('')
+              clearQuoteRepostMedia()
+            }}
+          />
+          <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 items-end pointer-events-none">
+            <div
+              className="pointer-events-auto relative w-full overflow-hidden rounded-t-[36px] bg-[#181b22] shadow-[0_6px_16px_rgba(0,0,0,0.12)]"
+              style={{ height: 'calc(100dvh - (env(safe-area-inset-top) + 12px))' }}
+            >
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-30 px-4 pb-5 pt-4">
+                <div className="relative flex shrink-0 items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    disabled={quoteRepostBusy}
+                    aria-label="Cancel"
+                    onClick={() => {
+                      if (quoteRepostBusy) return
+                      setQuoteRepostModal(null)
+                      setQuoteRepostDraft('')
+                      setQuoteRepostErr('')
+                      clearQuoteRepostMedia()
+                    }}
+                    className="pointer-events-auto min-h-12 min-w-[4.75rem] shrink-0 touch-manipulation rounded-full px-3 py-2 text-left text-[12px] font-semibold leading-tight text-zinc-300 hover:bg-zinc-800/90 hover:text-white active:text-white disabled:opacity-45 [-webkit-tap-highlight-color:transparent]"
+                  >
+                    Cancel
+                  </button>
+                  <div
+                    id="quote-repost-sheet-title"
+                    className="pointer-events-none absolute left-0 right-0 text-center text-[16px] font-semibold text-white"
+                  >
+                    {quoteRepostModal.mode === 'compose' ? 'Repost' : 'Remove repost'}
+                  </div>
+                  {quoteRepostModal.mode === 'compose' ? (
+                    <div className="pointer-events-none min-h-12 min-w-[4.75rem] shrink-0" aria-hidden />
+                  ) : (
+                    <div className="min-h-8 min-w-[2.75rem] shrink-0" aria-hidden />
+                  )}
+                </div>
+              </div>
+
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 z-20 h-20 bg-black/4 backdrop-blur-xl"
+                style={{
+                  WebkitMaskImage:
+                    'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.95) 18%, rgba(0,0,0,0.82) 42%, rgba(0,0,0,0.5) 62%, rgba(0,0,0,0) 78%)',
+                  maskImage:
+                    'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.95) 18%, rgba(0,0,0,0.82) 42%, rgba(0,0,0,0.5) 62%, rgba(0,0,0,0) 78%)',
+                }}
+              />
+
+              <div
+                ref={quoteRepostScrollRef}
+                className="relative h-full overscroll-contain overflow-y-auto touch-pan-y"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  WebkitMaskImage:
+                    'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 28px, rgba(0,0,0,1) 64px, rgba(0,0,0,1) calc(100% - 96px), rgba(0,0,0,0.9) calc(100% - 56px), rgba(0,0,0,0) 100%)',
+                  maskImage:
+                    'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 28px, rgba(0,0,0,1) 64px, rgba(0,0,0,1) calc(100% - 96px), rgba(0,0,0,0.9) calc(100% - 56px), rgba(0,0,0,0) 100%)',
+                }}
+              >
+                <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-[86px]">
+                  {quoteRepostModal.mode === 'compose' ? (
+                    <>
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 h-10 w-10 shrink-0 overflow-hidden rounded-full border border-zinc-600 bg-zinc-900">
+                          {composerUserProfile?.avatar_url ? (
+                            <img
+                              src={composerUserProfile.avatar_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          ) : !composerAuthResolved ? (
+                            <span className="block h-full w-full rounded-full bg-zinc-700/55 animate-pulse" aria-hidden />
+                          ) : (
+                            <span
+                              className={`flex h-full w-full items-center justify-center text-[14px] font-bold text-white ${avatarToneClass(
+                                composerUserProfile?.user_id || composerUserId || 'me'
+                              )}`}
+                            >
+                              {(() => {
+                                if (composerUserProfile?.display_name?.trim() || composerUserProfile?.handle?.trim()) {
+                                  return avatarText({ author_profile: composerUserProfile })
+                                }
+                                if (composerAuthUser) {
+                                  const seed = profileSeedFromUser(composerAuthUser)
+                                  return profileAvatarInitials(seed.displayName, seed.baseHandle)
+                                }
+                                if (composerUserId) return composerStableInitialsFromUid(composerUserId)
+                                return avatarText({ author_profile: { display_name: 'Me', handle: '' } })
+                              })()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <textarea
+                            ref={quoteRepostTextareaRef}
+                            value={quoteRepostDraft}
+                            onChange={(e) => setQuoteRepostDraft(e.target.value)}
+                            maxLength={280}
+                            rows={3}
+                            className="min-h-[5.5rem] w-full resize-none bg-transparent px-0 py-1 text-[18px] leading-snug text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-0 touch-manipulation"
+                            placeholder="Add a comment"
+                            aria-label="Quote for repost"
+                          />
+                          <input
+                            ref={quoteRepostMediaInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null
+                              try {
+                                const input = e.target
+                                if (!file) return
+                                if (!isProbablyImageFile(file)) {
+                                  setQuoteRepostErr('Please choose an image file.')
+                                  input.value = ''
+                                  return
+                                }
+                                setQuoteRepostErr('')
+                                setQuoteRepostMediaFile(file)
+                                setQuoteRepostMediaPreview((prev) => {
+                                  if (prev) {
+                                    try {
+                                      URL.revokeObjectURL(prev)
+                                    } catch {
+                                      // ignore
+                                    }
+                                  }
+                                  return URL.createObjectURL(file)
+                                })
+                                input.value = ''
+                              } catch {
+                                // ignore
+                              }
+                            }}
+                          />
+                          {quoteRepostMediaPreview ? (
+                            <div className="relative mt-2 inline-block max-w-full self-start">
+                              <img
+                                src={quoteRepostMediaPreview}
+                                alt=""
+                                className="block max-h-52 max-w-full w-auto h-auto rounded-xl border border-zinc-600/60 object-contain"
+                              />
+                              <button
+                                type="button"
+                                disabled={quoteRepostBusy}
+                                aria-label="Remove image"
+                                onClick={() => {
+                                  if (quoteRepostBusy) return
+                                  clearQuoteRepostMedia()
+                                }}
+                                className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full border border-zinc-500/35 bg-black/25 text-base leading-none text-zinc-100 shadow-sm backdrop-blur-[2px] touch-manipulation hover:bg-black/45 active:bg-black/55 disabled:opacity-45"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : null}
+                          {quoteRepostMediaUrl ? (
+                            <div className="relative mt-2 inline-block max-w-full self-start">
+                              <img
+                                src={quoteRepostMediaUrl}
+                                alt=""
+                                className="block max-h-52 max-w-full w-auto h-auto rounded-xl border border-zinc-600/60 object-contain"
+                              />
+                              <button
+                                type="button"
+                                disabled={quoteRepostBusy}
+                                aria-label="Remove GIF"
+                                onClick={() => {
+                                  if (quoteRepostBusy) return
+                                  setQuoteRepostMediaUrl('')
+                                }}
+                                className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full border border-zinc-500/35 bg-black/25 text-base leading-none text-zinc-100 shadow-sm backdrop-blur-[2px] touch-manipulation hover:bg-black/45 active:bg-black/55 disabled:opacity-45"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-3 border-t border-zinc-700/70 pt-3">
+                        <div className="flex h-10 shrink-0 items-center justify-center gap-0.5">
+                          <button
+                            type="button"
+                            disabled={quoteRepostBusy}
+                            onClick={() => quoteRepostMediaInputRef.current?.click()}
+                            className="flex touch-manipulation items-center justify-center rounded-md p-0.5 text-zinc-500 hover:text-zinc-200 active:text-white disabled:opacity-45 [-webkit-tap-highlight-color:transparent]"
+                            title="Add image"
+                            aria-label="Add image"
+                          >
+                            <svg className="h-6 w-6" viewBox="0 0 20 20" fill="none" aria-hidden>
+                              <rect
+                                x="3.75"
+                                y="3.75"
+                                width="12.5"
+                                height="12.5"
+                                rx="2"
+                                stroke="currentColor"
+                                strokeWidth="1.35"
+                              />
+                              <path
+                                d="M6.25 13.25 8.25 10.25l1.75 2 2.25-3 3.5 4"
+                                stroke="currentColor"
+                                strokeWidth="1.25"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <circle cx="8" cy="8" r="0.9" fill="currentColor" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={quoteRepostBusy}
+                            onClick={() => {
+                              if (quoteRepostBusy) return
+                              if (openProfileGateIfNeeded()) return
+                              setKlipyPickerTarget('quote')
+                              setKlipyPickerOpen(true)
+                            }}
+                            className="flex touch-manipulation items-center justify-center rounded-md px-1 py-0.5 text-[11px] font-bold tracking-wide text-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-200 active:text-white disabled:opacity-45 [-webkit-tap-highlight-color:transparent]"
+                            title="Add GIF (Klipy)"
+                            aria-label="Add GIF"
+                          >
+                            GIF
+                          </button>
+                        </div>
+                        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                          <span
+                            className={`shrink-0 text-[12px] tabular-nums ${loungeCharCounterClass(quoteRepostDraft.length)}`}
+                          >
+                            {quoteRepostDraft.length}/280
+                          </span>
+                          <button
+                            type="button"
+                            disabled={quoteRepostBusy || !normalizeFeedCaption(quoteRepostDraft)}
+                            aria-label={quoteRepostBusy ? 'Posting' : 'Post quote repost'}
+                            aria-busy={quoteRepostBusy}
+                            title={quoteRepostBusy ? 'Posting…' : undefined}
+                            onClick={() => void submitQuoteRepost()}
+                            className={`min-h-8 shrink-0 touch-manipulation rounded-lg border px-2.5 py-1 text-center text-[12px] font-semibold leading-tight transition-colors disabled:opacity-45 [-webkit-tap-highlight-color:transparent] ${
+                              normalizeFeedCaption(quoteRepostDraft) && !quoteRepostBusy
+                                ? 'border-emerald-400/70 bg-emerald-500 text-white hover:bg-emerald-400'
+                                : 'border-zinc-600 bg-zinc-800/90 text-zinc-500'
+                            }`}
+                          >
+                            {quoteRepostBusy ? '…' : 'Post'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-start gap-3">
+                        <div className="mt-0.5 h-10 w-10 shrink-0" aria-hidden />
+                        <div className="min-w-0 flex-1">
+                          {(() => {
+                            const orig = quoteRepostModal.original
+                            if (!orig?.id) return null
+                            return (
+                              <div
+                                role="figure"
+                                aria-label="Quoted post preview"
+                                className="w-full rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit"
+                              >
+                                <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[14px] leading-snug">
+                                  <span className="min-w-0 max-w-[min(11rem,42vw)] truncate font-semibold text-zinc-200 sm:max-w-[13rem]">
+                                    {displayNameFor(orig)}
+                                  </span>
+                                  <LoungeStaffRoleBadge role={orig?.author_profile?.role} size="detail" />
+                                  <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-[14px] text-zinc-500">
+                                    <span className="min-w-0 max-w-[min(9rem,36vw)] truncate sm:max-w-[11rem]">{handleFor(orig)}</span>
+                                  </span>
+                                  {orig.pinned ? (
+                                    <span className="shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
+                                      Pinned
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
+                                  {renderRichCaption(feedPostDisplayCaption(orig))}
+                                </div>
+                                <LoungePostFeedImagesAndGif
+                                  post={orig}
+                                  variant="embed"
+                                  firstMarginTopClass="mt-2"
+                                />
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                      {quoteRepostErr ? (
+                        <div className="mt-2 rounded-2xl border border-rose-500/40 bg-rose-950/20 px-3 py-2 text-[14px] leading-relaxed text-rose-200 break-words whitespace-pre-wrap">
+                          {quoteRepostErr}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[15px] leading-relaxed text-zinc-300">
+                        This removes only your quote repost. The original post stays in the feed.
+                      </p>
+                      {quoteRepostErr ? (
+                        <div className="mt-3 rounded-2xl border border-rose-500/40 bg-rose-950/20 px-3 py-2 text-[14px] leading-relaxed text-rose-200 break-words whitespace-pre-wrap">
+                          {quoteRepostErr}
+                        </div>
+                      ) : null}
+                      <div className="mt-6 flex flex-col gap-3">
+                        <button
+                          type="button"
+                          disabled={quoteRepostBusy}
+                          onClick={() => {
+                            if (quoteRepostBusy) return
+                            setQuoteRepostModal(null)
+                            setQuoteRepostErr('')
+                            clearQuoteRepostMedia()
+                          }}
+                          className="min-h-12 w-full rounded-2xl border border-zinc-600 bg-zinc-800/90 text-[16px] font-semibold text-zinc-100 touch-manipulation disabled:opacity-45"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={quoteRepostBusy}
+                          onClick={() => void confirmRemoveQuoteRepost()}
+                          className="min-h-12 w-full rounded-2xl border border-rose-500/50 bg-rose-600 text-[16px] font-semibold text-white touch-manipulation hover:bg-rose-500 disabled:opacity-45"
+                        >
+                          {quoteRepostBusy ? 'Removing…' : 'Remove repost'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <KlipyGifPicker
+        open={klipyPickerOpen}
+        onClose={() => setKlipyPickerOpen(false)}
+        onPick={handleKlipyGifPicked}
+        supabaseClient={supabaseClient}
+      />
 
       {profileGateOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/75" role="dialog" aria-modal>

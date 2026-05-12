@@ -103,18 +103,22 @@ export function readLoungeComposerDraft() {
     if (!o || typeof o !== 'object') return null
     const postText = typeof o.postText === 'string' ? o.postText.slice(0, 280) : ''
     const composerExpanded = o.composerExpanded === true
-    return { postText, composerExpanded }
+    const composerMediaUrl =
+      typeof o.composerMediaUrl === 'string' ? o.composerMediaUrl.trim().slice(0, 2048) : ''
+    return { postText, composerExpanded, composerMediaUrl }
   } catch {
     return null
   }
 }
 
-export function persistLoungeComposerDraft(text, expanded, mediaFile) {
+export function persistLoungeComposerDraft(text, expanded, hasLocalMedia, mediaUrl = '') {
   if (typeof window === 'undefined') return
   try {
     const hasText = String(text || '').trim().length > 0
-    const hasMedia = !!mediaFile
-    if (!hasText && !expanded && !hasMedia) {
+    const hasMedia = !!hasLocalMedia
+    const url = String(mediaUrl || '').trim()
+    const hasUrl = url.length > 0
+    if (!hasText && !expanded && !hasMedia && !hasUrl) {
       sessionStorage.removeItem(LOUNGE_COMPOSER_DRAFT_KEY)
       return
     }
@@ -123,6 +127,7 @@ export function persistLoungeComposerDraft(text, expanded, mediaFile) {
       JSON.stringify({
         postText: String(text || '').slice(0, 280),
         composerExpanded: expanded === true,
+        ...(hasUrl ? { composerMediaUrl: url.slice(0, 2048) } : {}),
       })
     )
   } catch {
