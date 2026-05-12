@@ -170,6 +170,8 @@ export default function SocialFeed({
   const [loungePostDetailTitleBarHeight, setLoungePostDetailTitleBarHeight] = useState(0)
   const loungePostDetailScrollPrevTopRef = useRef(0)
   const loungePostDetailScrollVisualRafRef = useRef(0)
+  /** After a reply, iOS Safari often fires scroll/viewport jitter that would re-hide the title; ignore hide until this `performance.now()` deadline. */
+  const loungePostDetailTitleCoerceUntilRef = useRef(0)
   const [quoteRepostModal, setQuoteRepostModal] = useState(null)
   const [quoteRepostDraft, setQuoteRepostDraft] = useState('')
   const [quoteRepostBusy, setQuoteRepostBusy] = useState(false)
@@ -534,6 +536,7 @@ export default function SocialFeed({
     if (!loungePostDetail) return
     loungePostDetailTitleRevealRef.current = 1
     setLoungePostDetailTitleReveal(1)
+    loungePostDetailTitleCoerceUntilRef.current = 0
     const el = loungePostDetailScrollRef.current
     if (el) {
       el.scrollTop = 0
@@ -565,8 +568,15 @@ export default function SocialFeed({
         rawDelta === 0 ? 0 : Math.sign(rawDelta) * Math.min(Math.abs(rawDelta), maxAbsScrollStepPx)
 
       let r = loungePostDetailTitleRevealRef.current
-      /** Treat a small band as “top” so the bar can return after layout/anchoring without needing pixel-perfect `0`. */
-      if (st <= 16) {
+      const tMono =
+        typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now()
+      /** iOS: ignore scroll-driven hide briefly after a reply (keyboard / anchoring can fire bogus deltas). */
+      if (tMono < loungePostDetailTitleCoerceUntilRef.current) {
+        r = 1
+      } else if (st <= 16) {
+        /** Treat a small band as “top” so the bar can return after layout/anchoring without needing pixel-perfect `0`. */
         r = 1
       } else if (eff < -minScrollStepPx) {
         r = Math.min(1, r + (-eff) / titleRevealPerScrollPx)
@@ -681,6 +691,45 @@ export default function SocialFeed({
     setLoungePostDetail((d) => (d && d.id === postId ? { ...d, ...partial } : d))
     setProfileModalPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...partial } : p)))
   }, [setCommunityPosts])
+
+  const monoNow = useCallback(() => {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') return performance.now()
+    return Date.now()
+  }, [])
+
+  const forceLoungePostDetailTitleVisible = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const pending = loungePostDetailScrollVisualRafRef.current
+    if (pending) {
+      window.cancelAnimationFrame(pending)
+      loungePostDetailScrollVisualRafRef.current = 0
+    }
+    const sc = loungePostDetailScrollRef.current
+    if (sc) loungePostDetailScrollPrevTopRef.current = sc.scrollTop
+    loungePostDetailTitleRevealRef.current = 1
+    setLoungePostDetailTitleReveal(1)
+    loungePostDetailTitleCoerceUntilRef.current = monoNow() + 750
+  }, [monoNow])
+
+  /** iOS: layout, keyboard, and scroll anchoring settle after `rAF`; re-apply so a follow-up scroll event cannot leave the bar hidden. */
+  const scheduleLoungePostDetailTitleAfterReply = useCallback(() => {
+    const run = () => {
+      try {
+        const active = document.activeElement
+        if (active && active.id === 'lounge-detail-comment') active.blur()
+      } catch {
+        // ignore
+      }
+      forceLoungePostDetailTitleVisible()
+    }
+    run()
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(run)
+    })
+    window.setTimeout(run, 0)
+    window.setTimeout(run, 140)
+    window.setTimeout(run, 360)
+  }, [forceLoungePostDetailTitleVisible])
 
   const refreshLoungePostInteractions = useCallback(
     async (postIds) => {
@@ -1288,20 +1337,7 @@ export default function SocialFeed({
       const cur = prev[loungePostDetail.id] || defaultInteraction
       return { ...prev, [loungePostDetail.id]: { ...cur, commented: true } }
     })
-    /** After a reply, user is usually scrolled in the comments band (`scrollTop` ≫ 2). Always show the detail title bar again and resync scroll math once layout has settled (new comment row + optional `patchPostAggregate`). */
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        const pending = loungePostDetailScrollVisualRafRef.current
-        if (pending) {
-          window.cancelAnimationFrame(pending)
-          loungePostDetailScrollVisualRafRef.current = 0
-        }
-        const sc = loungePostDetailScrollRef.current
-        if (sc) loungePostDetailScrollPrevTopRef.current = sc.scrollTop
-        loungePostDetailTitleRevealRef.current = 1
-        setLoungePostDetailTitleReveal(1)
-      })
-    })
+    scheduleLoungePostDetailTitleAfterReply()
   }, [
     composerUserId,
     composerUserProfile,
@@ -1310,6 +1346,7 @@ export default function SocialFeed({
     loungePostDetail?.id,
     loungeReadOnly,
     patchPostAggregate,
+    scheduleLoungePostDetailTitleAfterReply,
     supabaseClient,
   ])
 
