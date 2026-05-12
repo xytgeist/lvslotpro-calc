@@ -17,6 +17,7 @@ import {
   feedPostAuthorEditMediaSeed,
   feedPostDisplayCaption,
   feedPostMediaUpdatePayload,
+  feedPostStreamVideoUid,
   normalizeFeedCaption,
   uploadLoungeFeedPostImage,
 } from '../../utils/communityFeedPost'
@@ -26,6 +27,14 @@ import {
   prepareAvatarImageForUpload,
   prepareLoungeFeedImageForUpload,
 } from '../../utils/compressImageForUpload'
+import {
+  LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES,
+  LOUNGE_VIDEO_MAX_SECONDS,
+  probeVideoFileDurationSeconds,
+  requestCfStreamDirectUpload,
+  uploadVideoToCfStreamDirectUrl,
+  waitForCfStreamManifestReady,
+} from '../../utils/loungeVideoUpload'
 import {
   readLoungeProfileCache,
   writeLoungeProfileCache,
@@ -1257,9 +1266,9 @@ export default function SocialFeed({
           setQuoteRepostErr('That post is no longer available to quote.')
           return
         }
-        if (/media_url|gif_url|image_urls|schema cache/i.test(msg)) {
+        if (/media_url|gif_url|image_urls|stream_video_uid|schema cache/i.test(msg)) {
           setQuoteRepostErr(
-            'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, and supabase/lounge_feed_post_image_urls.sql in Supabase.'
+            'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, supabase/lounge_feed_post_image_urls.sql, and supabase/lounge_feed_post_stream_video.sql in Supabase.'
           )
           return
         }
@@ -1592,11 +1601,16 @@ export default function SocialFeed({
         imageUrls: loungeDetailEditImageUrls,
         gifUrl: loungeDetailEditGifUrl,
       })
+      const keepStreamUid = feedPostStreamVideoUid(loungePostDetail)
+      const updateBody =
+        keepStreamUid && !loungeDetailEditMediaFile
+          ? { caption: cap, ...mediaPatch, stream_video_uid: keepStreamUid }
+          : { caption: cap, ...mediaPatch }
       const { data, error } = await supabaseClient
         .from('community_feed_posts')
-        .update({ caption: cap, ...mediaPatch })
+        .update(updateBody)
         .eq('id', loungePostDetail.id)
-        .select('id,caption,edited_at,image_urls,media_url,gif_url')
+        .select('id,caption,edited_at,image_urls,media_url,gif_url,stream_video_uid')
         .maybeSingle()
       if (error) {
         const msg = String(error.message || '')
@@ -1625,6 +1639,7 @@ export default function SocialFeed({
                 image_urls: data.image_urls,
                 media_url: data.media_url,
                 gif_url: data.gif_url,
+                stream_video_uid: data.stream_video_uid,
               }
             : p
         )
@@ -1638,6 +1653,7 @@ export default function SocialFeed({
               image_urls: data.image_urls,
               media_url: data.media_url,
               gif_url: data.gif_url,
+              stream_video_uid: data.stream_video_uid,
             }
           : prev
       )
@@ -2067,12 +2083,40 @@ export default function SocialFeed({
         composerUserProfile?.role === 'moderator' ||
         composerUserProfile?.role === 'admin'
 
-      if (hasVideo) {
-        setPostErr('Video attachments are not supported yet. Remove the video or add photos or a GIF.')
+      const gifOnlyUrl = gifCheck.value
+      if (hasVideo && gifOnlyUrl) {
+        setPostErr('Remove the GIF before posting a video.')
         return
       }
 
-      const gifOnlyUrl = gifCheck.value
+      let streamVideoUid = ''
+      if (hasVideo && composerVideoSlot?.file) {
+        const vf = composerVideoSlot.file
+        if (vf.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
+          setPostErr('Video must be 200 MB or smaller for upload.')
+          return
+        }
+        try {
+          const dur = await probeVideoFileDurationSeconds(vf)
+          if (!Number.isFinite(dur) || dur > LOUNGE_VIDEO_MAX_SECONDS + 0.35) {
+            setPostErr(`Video must be ${LOUNGE_VIDEO_MAX_SECONDS} seconds or shorter.`)
+            return
+          }
+        } catch (e) {
+          setPostErr(e instanceof Error ? e.message : 'Could not read this video file.')
+          return
+        }
+        try {
+          const { uploadURL, uid } = await requestCfStreamDirectUpload(supabaseClient)
+          await uploadVideoToCfStreamDirectUrl(uploadURL, vf)
+          await waitForCfStreamManifestReady(uid)
+          streamVideoUid = uid
+        } catch (e) {
+          setPostErr(e instanceof Error ? e.message : 'Video upload failed.')
+          return
+        }
+      }
+
       const uploadedUrls = []
       for (const item of composerImageItems) {
         const { file: ready, error: cErr } = await prepareLoungeFeedImageForUpload(item.file)
@@ -2097,7 +2141,15 @@ export default function SocialFeed({
       }
 
       let insertPayload
-      if (uploadedUrls.length > 0) {
+      if (streamVideoUid) {
+        insertPayload = communityFeedPostInsertPayload({
+          caption,
+          gameTitle: 'Lounge',
+          gameSlug: null,
+          pinned: isStaffPoster && composerPinOnPost ? true : undefined,
+          streamVideoUid,
+        })
+      } else if (uploadedUrls.length > 0) {
         insertPayload = communityFeedPostInsertPayload({
           caption,
           gameTitle: 'Lounge',
@@ -2144,9 +2196,9 @@ export default function SocialFeed({
           setPostErr(LOUNGE_MAX_PINNED_ALERT)
           return
         }
-        if (/media_url|gif_url|image_urls|schema cache/i.test(msg)) {
+        if (/media_url|gif_url|image_urls|stream_video_uid|schema cache/i.test(msg)) {
           setPostErr(
-            'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, and supabase/lounge_feed_post_image_urls.sql in Supabase.'
+            'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, supabase/lounge_feed_post_image_urls.sql, and supabase/lounge_feed_post_stream_video.sql in Supabase.'
           )
           return
         }
@@ -2326,7 +2378,7 @@ export default function SocialFeed({
         const [{ data: postRows, error: postsErr }, coreProfile] = await Promise.all([
           supabaseClient
             .from('community_feed_posts')
-            .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,media_url,gif_url,image_urls')
+            .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,media_url,gif_url,image_urls,stream_video_uid')
             .eq('user_id', userId)
             .is('hidden_at', null)
             .order('created_at', { ascending: false })
@@ -2722,6 +2774,37 @@ export default function SocialFeed({
                       />
                     )
                   })()}
+                  {composerVideoSlot ? (
+                    <div className="relative mt-1.5 max-h-52 w-full overflow-hidden rounded-xl border border-zinc-700/80 bg-black">
+                      <video
+                        src={composerVideoSlot.preview}
+                        className="max-h-52 w-full object-contain"
+                        controls
+                        playsInline
+                        aria-label="Video preview"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setComposerVideoSlot((prev) => {
+                            if (prev?.preview) {
+                              try {
+                                URL.revokeObjectURL(prev.preview)
+                              } catch {
+                                // ignore
+                              }
+                            }
+                            return null
+                          })
+                        }}
+                        className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full border border-zinc-500/35 bg-black/25 text-base leading-none text-zinc-100 shadow-sm backdrop-blur-[2px] touch-manipulation hover:bg-black/45 active:bg-black/55"
+                        aria-label="Remove video"
+                        title="Remove video"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : null}
                   <div className="min-h-0 flex-1" aria-hidden />
                 </div>
               </div>
@@ -2939,10 +3022,10 @@ export default function SocialFeed({
                     onClick={() => void submitLoungePost()}
                     disabled={
                       postBusy ||
-                      !!composerVideoSlot ||
                       (!postText.trim() &&
                         !String(composerMediaUrl || '').trim() &&
-                        composerImageItems.length === 0)
+                        composerImageItems.length === 0 &&
+                        !composerVideoSlot)
                     }
                     className="min-h-8 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-2 py-1 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
                   >

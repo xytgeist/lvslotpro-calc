@@ -26,6 +26,12 @@ export function feedPostImageUrls(row) {
   return arr.map((x) => String(x ?? '').trim()).filter(Boolean)
 }
 
+/** Cloudflare Stream uid when the post is video-only (see `supabase/lounge_feed_post_stream_video.sql`). */
+export function feedPostStreamVideoUid(row) {
+  const u = String(row?.stream_video_uid ?? '').trim()
+  return u || ''
+}
+
 function isProbablyLoungeStoredImageUrl(u) {
   const s = String(u || '').toLowerCase()
   if (!s) return false
@@ -92,7 +98,8 @@ export function normalizeFeedCaption(caption) {
 }
 
 /**
- * Insert payload for `community_feed_posts` (caption + optional game context + optional `media_url`).
+ * Insert payload for `community_feed_posts` (caption + optional game context + optional media).
+ * When `streamVideoUid` is set, stores Cloudflare Stream uid only (`supabase/lounge_feed_post_stream_video.sql`).
  */
 export function communityFeedPostInsertPayload({
   caption,
@@ -106,6 +113,8 @@ export function communityFeedPostInsertPayload({
   gifUrl,
   /** Ordered uploaded image URLs (1..N); sets `image_urls` jsonb (see `supabase/lounge_feed_post_image_urls.sql`). */
   imageUrls,
+  /** Cloudflare Stream asset uid (HLS); exclusive of images/GIF in app logic. */
+  streamVideoUid,
 }) {
   const cap = normalizeFeedCaption(caption)
   const gt = String(gameTitle ?? '').trim()
@@ -115,6 +124,14 @@ export function communityFeedPostInsertPayload({
     game_slug: gameSlug || null,
   }
   if (pinned === true) out.pinned = true
+  const sv = streamVideoUid != null ? String(streamVideoUid).trim() : ''
+  if (sv) {
+    out.stream_video_uid = sv
+    out.media_url = null
+    out.gif_url = null
+    out.image_urls = []
+    return out
+  }
   const imgs = Array.isArray(imageUrls)
     ? imageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
     : []

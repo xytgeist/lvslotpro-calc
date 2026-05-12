@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { feedPostImageUrls } from '../../utils/communityFeedPost'
+import { feedPostImageUrls, feedPostStreamVideoUid } from '../../utils/communityFeedPost'
 import { LoungePostMediaPair, LoungeImageLightbox } from './LoungeInlineMediaUrl.jsx'
+import LoungePostStreamVideo from './LoungePostStreamVideo.jsx'
 
 /** Match `LoungeInlineMediaUrl`: border wraps intrinsic image size (`w-auto`), not a fixed slide width. */
 const imgClassByVariant = {
@@ -256,6 +257,10 @@ export function LoungePostFeedImagesAndGif({
   enableLightbox = true,
   visibilityResetRootRef,
 }) {
+  const streamUid = feedPostStreamVideoUid(post)
+  if (streamUid) {
+    return <LoungePostStreamVideo uid={streamUid} variant={variant} firstMarginTopClass={firstMarginTopClass} />
+  }
   const imgs = feedPostImageUrls(post)
   const gif = String(post?.gif_url || '').trim()
   if (imgs.length > 0) {
