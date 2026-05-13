@@ -170,8 +170,12 @@ export default function SocialFeed({
   const [composerPinOnPost, setComposerPinOnPost] = useState(false)
   const [postBusy, setPostBusy] = useState(false)
   const [postErr, setPostErr] = useState('')
-  /** Bottom bar for **video** lounge posts only (`progress` 0–1). Text/image posts upload without this bar. */
+  /** Bottom bar during background lounge post submission (`progress` 0–1, plus diagnostic copy). */
   const [loungePostUploadBar, setLoungePostUploadBar] = useState(null)
+  /** Last step label when a background submission throws (paired with `loungePostUploadFailureDetails`). */
+  const loungePostUploadLastPhaseRef = useRef('')
+  /** Set on failed background submission for the retry modal. */
+  const [loungePostUploadFailureDetails, setLoungePostUploadFailureDetails] = useState(null)
   /** True while any background lounge post submission is running (keeps Post disabled without the video bar). */
   const [loungePostSubmitInFlight, setLoungePostSubmitInFlight] = useState(false)
   const [loungePostUploadFailedOpen, setLoungePostUploadFailedOpen] = useState(false)
@@ -2181,6 +2185,8 @@ export default function SocialFeed({
     }
     loungePostAbortRef.current = null
     loungePostJobRunningRef.current = false
+    loungePostUploadLastPhaseRef.current = ''
+    setLoungePostUploadFailureDetails(null)
     setLoungePostUploadBar(null)
     restoreComposerFromSnapshot(loungePostSnapshotRef.current)
     loungePostSnapshotRef.current = null
@@ -2190,24 +2196,36 @@ export default function SocialFeed({
     async (snapshot) => {
       loungePostJobRunningRef.current = true
       setLoungePostSubmitInFlight(true)
+      loungePostUploadLastPhaseRef.current = ''
+      setLoungePostUploadFailureDetails(null)
       const ac = new AbortController()
       loungePostAbortRef.current = ac
-      const showVideoUploadBar = Boolean(snapshot?.videoFile)
-      if (showVideoUploadBar) setLoungePostUploadBar({ progress: 0 })
+      setLoungePostUploadBar({ progress: 0, status: 'Starting…', detail: '' })
       try {
         await executeLoungeCommunityPostSubmission({
           supabaseClient,
           snapshot,
           signal: ac.signal,
-          onProgress: showVideoUploadBar ? (p) => setLoungePostUploadBar({ progress: p }) : undefined,
+          onProgress: (info) => {
+            loungePostUploadLastPhaseRef.current = String(info?.status || '')
+            setLoungePostUploadBar({
+              progress: typeof info?.progress === 'number' ? info.progress : 0,
+              status: String(info?.status || ''),
+              detail: String(info?.detail || ''),
+            })
+          },
           rateLimitMessage,
         })
         loungePostSnapshotRef.current = null
         await loadCommunityFeed()
       } catch (e) {
         if (e?.name === 'AbortError') return
-        const msg = e instanceof Error ? e.message : ''
+        const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Unknown error'
         if (msg === LOUNGE_MAX_PINNED_ALERT && typeof window !== 'undefined') window.alert(LOUNGE_MAX_PINNED_ALERT)
+        setLoungePostUploadFailureDetails({
+          phase: loungePostUploadLastPhaseRef.current || '(no step recorded)',
+          message: msg,
+        })
         setLoungePostUploadFailedOpen(true)
       } finally {
         setLoungePostUploadBar(null)
@@ -2235,6 +2253,7 @@ export default function SocialFeed({
     loungePostSnapshotRef.current = null
     loungePostJobRunningRef.current = false
     setLoungePostUploadFailedOpen(false)
+    setLoungePostUploadFailureDetails(null)
   }, [])
 
   const onLoungePostUploadFailureCancel = useCallback(() => {
@@ -2242,6 +2261,7 @@ export default function SocialFeed({
     loungePostSnapshotRef.current = null
     loungePostJobRunningRef.current = false
     setLoungePostUploadFailedOpen(false)
+    setLoungePostUploadFailureDetails(null)
   }, [restoreComposerFromSnapshot])
 
   const submitLoungePost = useCallback(async () => {
@@ -4897,7 +4917,14 @@ export default function SocialFeed({
         <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-[94] border-t border-zinc-700/90 bg-zinc-950/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md shadow-[0_-8px_30px_rgba(0,0,0,0.35)]">
           <div className="mx-auto flex max-w-lg items-center gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium text-zinc-200">Uploading post...</div>
+              <div className="text-[13px] font-medium text-zinc-200">Uploading post…</div>
+              <div className="mt-0.5 text-[12px] leading-snug text-cyan-200/90">
+                <span className="font-semibold text-cyan-300/95">Now:</span>{' '}
+                {loungePostUploadBar.status || '—'}
+              </div>
+              {loungePostUploadBar.detail ? (
+                <div className="mt-0.5 text-[11px] leading-snug text-zinc-400 break-words">{loungePostUploadBar.detail}</div>
+              ) : null}
               <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-zinc-800">
                 <div
                   className="h-full rounded-full bg-cyan-500 transition-[width] duration-300 ease-out"
@@ -4962,6 +4989,22 @@ export default function SocialFeed({
             <h2 id="lounge-upload-failed-title" className="text-[17px] font-bold text-white">
               Upload failed
             </h2>
+            {loungePostUploadFailureDetails ? (
+              <div className="mt-3 space-y-2 rounded-xl border border-zinc-700/70 bg-zinc-900/80 px-3 py-2.5 text-left">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Last step</div>
+                  <div className="mt-0.5 text-[13px] leading-snug text-zinc-200 break-words">
+                    {loungePostUploadFailureDetails.phase}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">What failed</div>
+                  <div className="mt-0.5 text-[12px] leading-snug text-rose-200/95 break-words whitespace-pre-wrap">
+                    {loungePostUploadFailureDetails.message}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
               <button
                 type="button"

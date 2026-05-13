@@ -786,7 +786,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-700/85 bg-zinc-950/96 p-4 shadow-2xl backdrop-blur-md">
         <h2 className="text-[17px] font-bold text-white">Trim &amp; crop (max {MAX_CLIP_SEC}s)</h2>
         <p className="mt-1 text-[13px] leading-snug text-zinc-400">
-          Trim with the timeline below. Optional crop: pick an aspect, then drag the highlighted region to frame your shot. Press play to preview; playback stays inside your selection and loops at the end. The clip never exceeds {MAX_CLIP_SEC}s.
+          Max length allowed is {MAX_CLIP_SEC} seconds. Press play to preview and trim with the timeline below. Playback stays inside your selection and loops at the end. Optional crop: pick an aspect, then drag the highlighted region to frame your shot.
         </p>
 
         <div ref={videoStageRef} className="relative mt-3 min-h-[min(40vh,220px)] overflow-hidden rounded-xl border border-zinc-700/80 bg-zinc-900">

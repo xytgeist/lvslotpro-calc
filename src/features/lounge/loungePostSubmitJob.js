@@ -31,7 +31,7 @@ const LOUNGE_MAX_PINNED_ALERT =
  * @param {import('@supabase/supabase-js').SupabaseClient} opts.supabaseClient
  * @param {LoungePostSubmissionSnapshot} opts.snapshot
  * @param {AbortSignal} opts.signal
- * @param {(ratio: number) => void} [opts.onProgress] 0–1
+ * @param {(info: { progress: number, status: string, detail?: string }) => void} [opts.onProgress]
  * @param {(msg: string) => string} opts.rateLimitMessage
  */
 export async function executeLoungeCommunityPostSubmission({
@@ -41,8 +41,13 @@ export async function executeLoungeCommunityPostSubmission({
   onProgress,
   rateLimitMessage,
 }) {
-  const tick = (n) => {
-    if (typeof onProgress === 'function') onProgress(Math.max(0, Math.min(1, n)))
+  const report = (progress, status, detail = '') => {
+    if (typeof onProgress !== 'function') return
+    onProgress({
+      progress: Math.max(0, Math.min(1, progress)),
+      status: String(status || ''),
+      detail: detail ? String(detail) : '',
+    })
   }
 
   const throwIfAborted = () => {
@@ -50,7 +55,7 @@ export async function executeLoungeCommunityPostSubmission({
   }
 
   throwIfAborted()
-  tick(0.02)
+  report(0.02, 'Checking session', '')
 
   const {
     data: { session },
@@ -68,7 +73,7 @@ export async function executeLoungeCommunityPostSubmission({
   }
 
   throwIfAborted()
-  tick(0.05)
+  report(0.05, 'Preparing post', '')
 
   let streamVideoUid = ''
   /** Set when direct upload URL is minted; cleared only after DB insert succeeds. Used to delete CF orphans on any failure. */
@@ -81,28 +86,34 @@ export async function executeLoungeCommunityPostSubmission({
       if (vf.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
         throw new Error('Video must be 200 MB or smaller for upload.')
       }
+      report(0.06, 'Reading video metadata', `${Math.round(vf.size / (1024 * 1024))} MB file`)
       const dur = await probeVideoFileDurationSeconds(vf)
       throwIfAborted()
       if (!Number.isFinite(dur) || dur > LOUNGE_VIDEO_MAX_SECONDS + 0.35) {
         throw new Error(`Video must be ${LOUNGE_VIDEO_MAX_SECONDS} seconds or shorter.`)
       }
-      tick(0.08)
+      report(0.08, 'Requesting upload URL', 'Cloudflare Stream direct upload')
       const { uploadURL, uid } = await requestCfStreamDirectUpload(supabaseClient)
       pendingCfUploadUid = uid
       throwIfAborted()
-      tick(0.1)
+      report(0.1, 'Uploading video to Cloudflare', '0% sent')
       await uploadVideoToCfStreamDirectUrlWithProgress(uploadURL, vf, {
         signal,
-        onProgress: (r) => tick(0.1 + r * 0.52),
+        onProgress: (r) =>
+          report(0.1 + r * 0.52, 'Uploading video to Cloudflare', `${Math.round(r * 100)}% sent`),
       })
       throwIfAborted()
-      tick(0.64)
+      report(0.64, 'Waiting for Cloudflare encoding', 'Polling HLS manifest…')
       await waitForCfStreamManifestReady(uid, {
         signal,
         onPoll: ({ elapsed }) => {
           const cap = 120_000
           const t = Math.min(1, elapsed / cap)
-          tick(0.64 + t * 0.24)
+          report(
+            0.64 + t * 0.24,
+            'Waiting for Cloudflare encoding',
+            `${Math.round(elapsed / 1000)}s elapsed (manifest must return 200)`,
+          )
         },
       })
       streamVideoUid = uid
@@ -115,7 +126,7 @@ export async function executeLoungeCommunityPostSubmission({
       const file = imageFiles[i]
       const base = hasVideo ? 0.1 : 0.08
       const span = hasVideo ? 0.2 : 0.82
-      tick(base + ((i + 1) / nImg) * span)
+      report(base + ((i + 1) / nImg) * span, 'Uploading images', `${i + 1} of ${nImg}`)
       const { file: ready, error: cErr } = await prepareLoungeFeedImageForUpload(file)
       if (cErr) throw new Error(cErr.message)
       const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
@@ -129,7 +140,7 @@ export async function executeLoungeCommunityPostSubmission({
     }
 
     throwIfAborted()
-    tick(0.9)
+    report(0.9, 'Publishing post', 'Inserting into community feed…')
 
     let insertPayload
     if (streamVideoUid) {
@@ -192,7 +203,7 @@ export async function executeLoungeCommunityPostSubmission({
 
     insertSucceeded = true
     pendingCfUploadUid = null
-    tick(1)
+    report(1, 'Finishing', '')
   } catch (e) {
     if (pendingCfUploadUid && !insertSucceeded) {
       await deleteCfStreamOrphanAsset(supabaseClient, pendingCfUploadUid)

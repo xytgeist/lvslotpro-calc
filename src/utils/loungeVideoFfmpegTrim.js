@@ -77,17 +77,20 @@ export async function trimVideoFileToMp4(file, startSec, endSec, opts = {}) {
     String(dur),
   ]
   if (vfParts.length) args.push('-vf', vfParts.join(','))
+  /** Direct uploads skip re-encode; trimmed clips are always re-encoded here. Avoid `ultrafast` + high CRF — that pairing smears fine text (slot UI). */
   args.push(
     '-c:v',
     'libx264',
     '-preset',
-    'ultrafast',
+    'veryfast',
     '-crf',
-    '26',
+    '22',
+    '-pix_fmt',
+    'yuv420p',
     '-c:a',
     'aac',
     '-b:a',
-    '128k',
+    '160k',
     '-movflags',
     '+faststart',
     '-y',
