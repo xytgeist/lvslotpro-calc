@@ -726,14 +726,13 @@ export default function LoungePostStreamVideo({
     : undefined
 
   return (
-    <div className={`${firstMarginTopClass} w-full min-w-0`}>
-      <div className={`block w-full min-w-0 ${slideMaxW}`}>
-        <div
-          ref={containerRef}
-          role="button"
-          tabIndex={0}
-          data-lounge-video-zoom
-          className={`relative block w-full cursor-pointer overflow-hidden ${rounding} border ${border} bg-black touch-manipulation [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50`}
+    <div className={`${firstMarginTopClass} w-fit max-w-full min-w-0 self-start ${slideMaxW}`}>
+      <div
+        ref={containerRef}
+        role="button"
+        tabIndex={0}
+        data-lounge-video-zoom
+        className={`relative inline-block max-w-full cursor-pointer overflow-hidden ${rounding} border ${border} bg-black touch-manipulation [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50`}
           aria-label={
             showOpen
               ? stripSoundUnmuted
@@ -761,7 +760,13 @@ export default function LoungePostStreamVideo({
             }
           }}
         >
-          <div className={usePosterFrame ? 'relative aspect-video w-full bg-black' : 'relative'}>
+          <div
+            className={
+              usePosterFrame
+                ? 'relative inline-block max-w-full min-w-[3rem] min-h-[2.5rem] bg-black'
+                : 'relative'
+            }
+          >
             {usePosterFrame ? (
               <>
                 <img
@@ -769,7 +774,7 @@ export default function LoungePostStreamVideo({
                   alt=""
                   decoding="async"
                   draggable={false}
-                  className={`pointer-events-none absolute inset-0 z-0 h-full w-full select-none object-contain transition-opacity ease-out ${
+                  className={`pointer-events-none relative z-0 select-none transition-opacity ease-out ${videoClass} ${
                     attachStream && streamFadeShowVideo ? 'opacity-0' : 'opacity-100'
                   }`}
                   style={streamFadeTransitionStyle}
@@ -848,7 +853,6 @@ export default function LoungePostStreamVideo({
             </button>
           ) : null}
         </div>
-      </div>
       {lightboxOpen ? (
         <LoungeStreamVideoLightbox
           uid={id}
