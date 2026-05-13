@@ -891,7 +891,9 @@ export default function SocialFeed({
               prepError: '',
             }
           })
-          setLoungePostUploadBar((bar) => (bar?.mode === 'mediaPrep' && bar.prepJobId === jobId ? null : bar))
+          setLoungePostUploadBar((bar) =>
+            bar?.mode === 'mediaPrep' && bar.prepJobId === jobId && !bar.postSubmission ? null : bar,
+          )
         } catch (e) {
           if (!handoff.settled) {
             handoff.reject(e instanceof Error ? e : new Error(String(e)))
@@ -2511,13 +2513,35 @@ export default function SocialFeed({
 
   const runBackgroundLoungePostSubmission = useCallback(
     async (snapshot) => {
+      const uidBar = String(snapshot.streamVideoUid || '').trim()
+      const mediaUploadBarSkin =
+        !uidBar && (snapshot.awaitingComposerVideoPrepJobId != null || Boolean(snapshot.videoPrepSpec))
+      const prepHudId = snapshot.awaitingComposerVideoPrepJobId ?? 0
+
       loungePostJobRunningRef.current = true
       setLoungePostSubmitInFlight(true)
       loungePostUploadLastPhaseRef.current = ''
       setLoungePostUploadFailureDetails(null)
       const ac = new AbortController()
       loungePostAbortRef.current = ac
-      setLoungePostUploadBar({ mode: 'post', progress: 0, status: 'Starting…', detail: '' })
+
+      setLoungePostUploadBar((prev) => {
+        if (mediaUploadBarSkin) {
+          const p = typeof prev?.progress === 'number' ? prev.progress : 0
+          const st = prev?.mode === 'mediaPrep' && prev.status ? prev.status : 'Starting…'
+          const det = prev?.mode === 'mediaPrep' && prev.detail ? prev.detail : ''
+          return {
+            mode: 'mediaPrep',
+            postSubmission: true,
+            prepJobId: prepHudId,
+            progress: p,
+            status: st,
+            detail: det,
+          }
+        }
+        return { mode: 'post', progress: 0, status: 'Starting…', detail: '' }
+      })
+
       let snap = { ...snapshot }
       try {
         const uid0 = String(snap.streamVideoUid || '').trim()
@@ -2526,12 +2550,15 @@ export default function SocialFeed({
           (snap.awaitingComposerVideoPrepJobId != null || snap.videoPrepSpec)
         ) {
           loungePostUploadLastPhaseRef.current = 'Waiting for video'
-          setLoungePostUploadBar({
-            mode: 'post',
-            progress: 0.06,
+          setLoungePostUploadBar((prev) => ({
+            ...(mediaUploadBarSkin
+              ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+              : { mode: 'post' }),
+            progress:
+              mediaUploadBarSkin && typeof prev?.progress === 'number' ? Math.max(0.06, prev.progress) : 0.06,
             status: 'Waiting for video',
-            detail: '',
-          })
+            detail: mediaUploadBarSkin && prev?.detail ? prev.detail : '',
+          }))
 
           /** @type {{ encodedFile: File, streamVideoUid: string }} */
           let out
@@ -2550,7 +2577,9 @@ export default function SocialFeed({
                 onProgress: (info) => {
                   if (ac.signal.aborted) return
                   setLoungePostUploadBar({
-                    mode: 'post',
+                    ...(mediaUploadBarSkin
+                      ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                      : { mode: 'post' }),
                     progress: 0.06 + (typeof info.progress === 'number' ? info.progress : 0) * 0.38,
                     status: String(info.status || ''),
                     detail: String(info.detail || ''),
@@ -2566,7 +2595,9 @@ export default function SocialFeed({
               onProgress: (info) => {
                 if (ac.signal.aborted) return
                 setLoungePostUploadBar({
-                  mode: 'post',
+                  ...(mediaUploadBarSkin
+                    ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                    : { mode: 'post' }),
                   progress: 0.06 + (typeof info.progress === 'number' ? info.progress : 0) * 0.38,
                   status: String(info.status || ''),
                   detail: String(info.detail || ''),
@@ -2598,7 +2629,9 @@ export default function SocialFeed({
           onProgress: (info) => {
             loungePostUploadLastPhaseRef.current = String(info?.status || '')
             setLoungePostUploadBar({
-              mode: 'post',
+              ...(mediaUploadBarSkin
+                ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                : { mode: 'post' }),
               progress: typeof info?.progress === 'number' ? info.progress : 0,
               status: String(info?.status || ''),
               detail: String(info?.detail || ''),
@@ -5353,8 +5386,11 @@ export default function SocialFeed({
             <button
               type="button"
               onClick={() => {
-                if (loungePostUploadBar.mode === 'mediaPrep') cancelComposerMediaPrep()
-                else cancelLoungePostUpload()
+                if (loungePostUploadBar.mode === 'mediaPrep' && !loungePostUploadBar.postSubmission) {
+                  cancelComposerMediaPrep()
+                } else {
+                  cancelLoungePostUpload()
+                }
               }}
               aria-label="Cancel upload"
               className="shrink-0 touch-manipulation bg-transparent px-1 py-1 text-[14px] font-semibold text-cyan-400 hover:text-cyan-300 [-webkit-tap-highlight-color:transparent]"
