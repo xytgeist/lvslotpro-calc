@@ -92,6 +92,8 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   const [phase, setPhase] = useState('idle')
   const [trimErr, setTrimErr] = useState('')
   const [posterUrl, setPosterUrl] = useState('')
+  /** Separate blob URL for the hidden probe so WebKit decodes it independently of the main preview. */
+  const [probeBlobUrl, setProbeBlobUrl] = useState('')
   const trimAbortRef = useRef(null)
   const trimBusyRef = useRef(false)
   const posterCapturedRef = useRef(false)
@@ -141,7 +143,9 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   useEffect(() => {
     if (!file) return undefined
     const u = URL.createObjectURL(file)
+    const uProbe = URL.createObjectURL(file)
     urlRef.current = u
+    setProbeBlobUrl(uProbe)
     setTrimErr('')
     posterCapturedRef.current = false
     posterSeekScheduledRef.current = false
@@ -180,7 +184,13 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       } catch {
         // ignore
       }
+      try {
+        URL.revokeObjectURL(uProbe)
+      } catch {
+        // ignore
+      }
       urlRef.current = ''
+      setProbeBlobUrl('')
       if (posterObjectUrlRef.current) {
         try {
           URL.revokeObjectURL(posterObjectUrlRef.current)
@@ -231,7 +241,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
 
   const capturePosterFromVideo = useCallback((v) => {
     if (posterCapturedRef.current) return
-    if (!v || v.readyState < 2 || v.videoWidth < 2 || v.videoHeight < 2) return
+    if (!v || v.videoWidth < 2 || v.videoHeight < 2) return
     try {
       const w0 = v.videoWidth
       const h0 = v.videoHeight
@@ -265,39 +275,52 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     }
   }, [])
 
-  const onPosterProbeLoadedData = useCallback(() => {
+  const beginPosterProbeCapture = useCallback(() => {
     if (posterCapturedRef.current || posterSeekScheduledRef.current) return
     const v = posterVideoRef.current
-    if (!v) return
+    if (!v || v.readyState < 1 || v.videoWidth < 2) return
+
     posterSeekScheduledRef.current = true
     const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
     const seekTo = dur > 0 ? Math.min(0.12, dur * 0.004) : 0.08
-    const onSeeked = () => {
+
+    let finished = false
+    let fallbackTimer = 0
+    function runCapture() {
+      if (finished) return
+      finished = true
+      window.clearTimeout(fallbackTimer)
       v.removeEventListener('seeked', onSeeked)
-      posterSeekScheduledRef.current = false
       void (async () => {
         try {
-          await primePosterFrameForCanvas(v)
-          capturePosterFromVideo(posterVideoRef.current)
+          const probe = posterVideoRef.current
+          if (!probe) {
+            return
+          }
+          await primePosterFrameForCanvas(probe)
+          capturePosterFromVideo(posterVideoRef.current ?? probe)
         } catch {
-          capturePosterFromVideo(posterVideoRef.current)
+          capturePosterFromVideo(posterVideoRef.current ?? v)
+        } finally {
+          posterSeekScheduledRef.current = false
         }
       })()
     }
+    function onSeeked() {
+      runCapture()
+    }
+
+    fallbackTimer = window.setTimeout(runCapture, 520)
+
     v.addEventListener('seeked', onSeeked)
     try {
+      if (Math.abs(v.currentTime - seekTo) < 0.03) {
+        runCapture()
+        return
+      }
       v.currentTime = seekTo
     } catch {
-      v.removeEventListener('seeked', onSeeked)
-      posterSeekScheduledRef.current = false
-      void (async () => {
-        try {
-          await primePosterFrameForCanvas(v)
-          capturePosterFromVideo(posterVideoRef.current)
-        } catch {
-          capturePosterFromVideo(posterVideoRef.current)
-        }
-      })()
+      runCapture()
     }
   }, [capturePosterFromVideo])
 
@@ -519,14 +542,19 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
           />
           <video
             ref={posterVideoRef}
-            src={urlRef.current || undefined}
+            key={probeBlobUrl || 'probe'}
+            src={probeBlobUrl || undefined}
             muted
             playsInline
             preload="auto"
             aria-hidden
             tabIndex={-1}
             className="pointer-events-none fixed left-[-9999px] top-0 z-0 h-16 w-16 overflow-hidden opacity-0"
-            onLoadedData={onPosterProbeLoadedData}
+            onLoadedData={beginPosterProbeCapture}
+            onLoadedMetadata={() => {
+              requestAnimationFrame(() => beginPosterProbeCapture())
+            }}
+            onCanPlay={beginPosterProbeCapture}
           />
         </div>
 
