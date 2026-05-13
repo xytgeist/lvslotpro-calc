@@ -31,7 +31,7 @@ function seekPreviewMaybeResume(video, timeSec, resumePlay) {
 }
 
 /**
- * iOS Safari often keeps the first decoded frame black until a muted `play()` runs and a frame is presented.
+ * iOS Safari often keeps decoded frames black until a muted `play()` presents a frame.
  * Restores `video.muted` afterward so preview can stay unmuted by default.
  */
 async function primeVideoFrameForCanvas(video) {
@@ -94,14 +94,13 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   const [phase, setPhase] = useState('idle')
   const [trimErr, setTrimErr] = useState('')
   const [posterUrl, setPosterUrl] = useState('')
-  /** When false, show `<img>` over the video so a decoded black frame at clip start does not hide the poster. */
-  const [previewThumbDismissed, setPreviewThumbDismissed] = useState(false)
   const trimAbortRef = useRef(null)
   const trimBusyRef = useRef(false)
   const posterCapturedRef = useRef(false)
   const posterObjectUrlRef = useRef('')
   const posterSeekScheduledRef = useRef(false)
-  const capturePosterOnceRef = useRef(() => {})
+  /** Bumped on new file or trim drag so in-flight poster work cannot snap `currentTime` after user interaction. */
+  const posterCaptureGenRef = useRef(0)
 
   useEffect(() => {
     clipRef.current = { start: clipStart, end: clipEnd }
@@ -145,13 +144,13 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
 
   useEffect(() => {
     if (!file) return undefined
+    posterCaptureGenRef.current += 1
     const u = URL.createObjectURL(file)
     urlRef.current = u
     setTrimErr('')
     posterCapturedRef.current = false
     posterSeekScheduledRef.current = false
     setPosterUrl('')
-    setPreviewThumbDismissed(false)
     if (posterObjectUrlRef.current) {
       try {
         URL.revokeObjectURL(posterObjectUrlRef.current)
@@ -238,7 +237,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   const capturePosterOnce = useCallback(() => {
     if (posterCapturedRef.current) return
     const v = videoRef.current
-    if (!v || v.videoWidth < 2 || v.videoHeight < 2) return
+    if (!v || v.readyState < 2 || v.videoWidth < 2 || v.videoHeight < 2) return
     try {
       const w0 = v.videoWidth
       const h0 = v.videoHeight
@@ -272,81 +271,57 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     }
   }, [])
 
-  useEffect(() => {
-    capturePosterOnceRef.current = capturePosterOnce
-  }, [capturePosterOnce])
-
-  const finishPosterSeek = useCallback(async () => {
-    try {
-      try {
-        const v = videoRef.current
-        if (v && v.videoWidth >= 2) {
-          await primeVideoFrameForCanvas(v)
-        }
+  const onVideoLoadedDataForPoster = useCallback(() => {
+    if (posterCapturedRef.current || posterSeekScheduledRef.current) return
+    const v = videoRef.current
+    if (!v) return
+    posterSeekScheduledRef.current = true
+    const genAtSchedule = posterCaptureGenRef.current
+    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
+    const seekTo = dur > 0 ? Math.min(0.12, dur * 0.004) : 0.08
+    const onSeeked = () => {
+      v.removeEventListener('seeked', onSeeked)
+      posterSeekScheduledRef.current = false
+      if (genAtSchedule !== posterCaptureGenRef.current) return
+      void (async () => {
+        if (genAtSchedule !== posterCaptureGenRef.current) return
+        const vNow = videoRef.current
+        if (!vNow || vNow !== v) return
+        await primeVideoFrameForCanvas(vNow)
+        if (genAtSchedule !== posterCaptureGenRef.current) return
+        const vMid = videoRef.current
+        if (!vMid || vMid !== v || Math.abs(vMid.currentTime - seekTo) > 0.25) return
         capturePosterOnce()
+        if (genAtSchedule !== posterCaptureGenRef.current) return
         try {
           const v2 = videoRef.current
-          if (v2) v2.currentTime = clipRef.current.start
+          if (
+            v2 &&
+            v2.paused &&
+            Math.abs(v2.currentTime - seekTo) < 0.25
+          ) {
+            v2.currentTime = clipRef.current.start
+          }
         } catch {
           // ignore
         }
-      } catch {
-        // ignore
-      }
-    } finally {
-      posterSeekScheduledRef.current = false
+      })()
     }
-  }, [capturePosterOnce])
-
-  const requestPosterFrame = useCallback(() => {
-    if (posterCapturedRef.current || posterSeekScheduledRef.current) return
-    const v = videoRef.current
-    if (!v || v.readyState < 1 || v.videoWidth < 2) return
-    posterSeekScheduledRef.current = true
-    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
-    const cs = clipRef.current.start
-    const seekTo = dur > 0 ? Math.min(Math.max(cs + 0.06, 0.05), dur - 0.02) : 0.12
-
-    let finished = false
-    const done = () => {
-      if (finished) return
-      finished = true
-      void finishPosterSeek()
-    }
-
-    let fallbackTimer = 0
-    const onSeeked = () => {
-      v.removeEventListener('seeked', onSeeked)
-      window.clearTimeout(fallbackTimer)
-      done()
-    }
-    fallbackTimer = window.setTimeout(() => {
-      v.removeEventListener('seeked', onSeeked)
-      done()
-    }, 400)
-
     v.addEventListener('seeked', onSeeked)
     try {
-      const before = v.currentTime
-      if (Math.abs(before - seekTo) < 0.03) {
-        v.removeEventListener('seeked', onSeeked)
-        window.clearTimeout(fallbackTimer)
-        done()
-        return
-      }
       v.currentTime = seekTo
     } catch {
       v.removeEventListener('seeked', onSeeked)
-      window.clearTimeout(fallbackTimer)
-      done()
+      posterSeekScheduledRef.current = false
+      capturePosterOnce()
     }
-  }, [finishPosterSeek])
+  }, [capturePosterOnce])
 
   const startLeftDrag = useCallback(
     (e) => {
       e.preventDefault()
       e.stopPropagation()
-      setPreviewThumbDismissed(true)
+      posterCaptureGenRef.current += 1
       const end0 = clipRef.current.end
       dragRef.current = { kind: 'left', end0 }
       let lastStartSec = clipRef.current.start
@@ -393,7 +368,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     (e) => {
       e.preventDefault()
       e.stopPropagation()
-      setPreviewThumbDismissed(true)
+      posterCaptureGenRef.current += 1
       const start0 = clipRef.current.start
       dragRef.current = { kind: 'right', start0 }
       let lastEndSec = clipRef.current.end
@@ -439,7 +414,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   const startMoveDrag = useCallback(
     (e) => {
       e.preventDefault()
-      setPreviewThumbDismissed(true)
+      posterCaptureGenRef.current += 1
       const { start: s0, end: e0 } = clipRef.current
       const t0 = timeFromClientX(e.clientX)
       dragRef.current = { kind: 'move', start0: s0, end0: e0, grabT: t0 - s0 }
@@ -546,43 +521,20 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
           Press play on the video once to preview. Drag the handles or the highlighted range to scrub; playback stays inside your selection and loops at the end. The clip is never wider than {MAX_CLIP_SEC}s.
         </p>
 
-        <div className="relative mt-3 overflow-hidden rounded-xl border border-zinc-700/80 bg-black">
-          {posterUrl && !previewThumbDismissed ? (
-            <img
-              src={posterUrl}
-              alt=""
-              draggable={false}
-              className="pointer-events-none absolute inset-0 z-[2] mx-auto max-h-[40vh] w-full object-contain"
-            />
-          ) : null}
+        <div className="mt-3 overflow-hidden rounded-xl border border-zinc-700/80 bg-black">
           <video
-            key={`${file.name}-${file.size}-${file.lastModified}`}
             ref={videoRef}
             src={urlRef.current || undefined}
             poster={posterUrl || undefined}
-            className="relative z-[1] max-h-[40vh] w-full object-contain"
+            className="max-h-[40vh] w-full object-contain"
             controls={!busy}
             playsInline
-            preload="auto"
-            onPlay={() => {
-              requestAnimationFrame(() => {
-                if (!posterCapturedRef.current) {
-                  capturePosterOnceRef.current()
-                }
-                setPreviewThumbDismissed(true)
-              })
-            }}
-            onLoadedMetadata={() => {
-              onMetaLoaded()
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => requestPosterFrame())
-              })
-            }}
+            preload="metadata"
+            onLoadedMetadata={onMetaLoaded}
             onLoadedData={() => {
               onMetaLoaded()
-              requestPosterFrame()
+              onVideoLoadedDataForPoster()
             }}
-            onCanPlay={() => requestPosterFrame()}
             onDurationChange={onMetaLoaded}
           />
         </div>
