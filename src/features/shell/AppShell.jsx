@@ -463,8 +463,36 @@ export default function AppShell({
   }, [browseMode, tab])
 
   const renderTabContent = () => {
+    /** Stay mounted across tabs so lounge composer / uploads are not torn down when browsing elsewhere in-app. */
+    const keepAliveSocialFeed = (
+      <Suspense fallback={tab === 'home' ? <TabLoadingFallback /> : null}>
+        <div
+          key="lounge-keepalive"
+          className={tab === 'home' ? 'contents min-h-0' : 'hidden'}
+          aria-hidden={tab !== 'home'}
+        >
+          <SocialFeed
+            supabaseClient={supabaseClient}
+            onRequireAuth={onRequireAuth}
+            communityPosts={communityPosts}
+            setCommunityPosts={setCommunityPosts}
+            communityFeedLoading={communityFeedLoading}
+            communityFeedLoadingMore={communityFeedLoadingMore}
+            communityFeedHasMore={communityFeedHasMore}
+            communityFeedQueryErr={communityFeedQueryErr}
+            loadCommunityFeed={loadCommunityFeed}
+            loadMoreCommunityFeed={loadMoreCommunityFeed}
+            hydrateCommunityPosts={hydrateCommunityPosts}
+            titleBarNavSlot={renderTitleBarNavSlot()}
+          />
+        </div>
+      </Suspense>
+    )
+
+    /** Lazy tab content: own Suspense so a loading lounge chunk does not block Offers / Guides / etc. */
+    let visibleTab = null
     if (tab === 'calculators') {
-      return (
+      visibleTab = (
         <CalculatorsTab
           activeCalculator={activeCalculator}
           setActiveCalculator={setActiveCalculator}
@@ -476,10 +504,8 @@ export default function AppShell({
           titleBarNavSlot={renderTitleBarNavSlot()}
         />
       )
-    }
-
-    if (tab === 'dashboard') {
-      return (
+    } else if (tab === 'dashboard') {
+      visibleTab = (
         <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -575,29 +601,8 @@ export default function AppShell({
           </div>
         </div>
       )
-    }
-
-    if (tab === 'home') {
-      return (
-        <SocialFeed
-          supabaseClient={supabaseClient}
-          onRequireAuth={onRequireAuth}
-          communityPosts={communityPosts}
-          setCommunityPosts={setCommunityPosts}
-          communityFeedLoading={communityFeedLoading}
-          communityFeedLoadingMore={communityFeedLoadingMore}
-          communityFeedHasMore={communityFeedHasMore}
-          communityFeedQueryErr={communityFeedQueryErr}
-          loadCommunityFeed={loadCommunityFeed}
-          loadMoreCommunityFeed={loadMoreCommunityFeed}
-          hydrateCommunityPosts={hydrateCommunityPosts}
-          titleBarNavSlot={renderTitleBarNavSlot()}
-        />
-      )
-    }
-
-    if (tab === 'guides') {
-      return (
+    } else if (tab === 'guides') {
+      visibleTab = (
         <GuidesScreen
           supabaseClient={supabaseClient}
           onOpenCalculator={openCalculator}
@@ -607,10 +612,8 @@ export default function AppShell({
           titleBarNavSlot={renderTitleBarNavSlot()}
         />
       )
-    }
-
-    if (tab === 'offers')
-      return (
+    } else if (tab === 'offers') {
+      visibleTab = (
         <OffersCalendar
           supabaseClient={supabaseClient}
           pendingOfferEventIds={pendingOfferEventIds}
@@ -620,11 +623,12 @@ export default function AppShell({
           titleBarNavSlot={renderTitleBarNavSlot()}
         />
       )
-    if (tab === 'bankroll') return <BankrollTracker />
-    if (tab === 'intel') return <LocalIntel supabaseClient={supabaseClient} />
-
-    if (tab === 'team') {
-      return (
+    } else if (tab === 'bankroll') {
+      visibleTab = <BankrollTracker />
+    } else if (tab === 'intel') {
+      visibleTab = <LocalIntel supabaseClient={supabaseClient} />
+    } else if (tab === 'team') {
+      visibleTab = (
         <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
           <div className="mb-6">
             <div className="text-white text-2xl font-black tracking-tight">Team / Deals</div>
@@ -652,7 +656,14 @@ export default function AppShell({
       )
     }
 
-    return null
+    return (
+      <>
+        {keepAliveSocialFeed}
+        {visibleTab != null ? (
+          <Suspense fallback={<TabLoadingFallback />}>{visibleTab}</Suspense>
+        ) : null}
+      </>
+    )
   }
 
   return (
@@ -669,7 +680,7 @@ export default function AppShell({
           </button>
         </div>
       ) : null}
-      <Suspense fallback={<TabLoadingFallback />}>{renderTabContent()}</Suspense>
+      {renderTabContent()}
 
       {globalConfirmState.open ? (
         <div

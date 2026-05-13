@@ -2511,6 +2511,36 @@ export default function SocialFeed({
     loungePostSnapshotRef.current = null
   }, [restoreComposerFromSnapshot])
 
+  useEffect(() => {
+    return () => {
+      try {
+        loungePostAbortRef.current?.abort()
+      } catch {
+        // ignore
+      }
+      loungePostAbortRef.current = null
+      loungePostJobRunningRef.current = false
+
+      const h = composerVideoPrepHandoffRef.current
+      if (h && !h.settled) {
+        try {
+          h.reject(new DOMException('Aborted', 'AbortError'))
+        } catch {
+          // ignore
+        }
+      }
+      composerVideoPrepHandoffRef.current = null
+      composerVideoPrepJobIdRef.current += 1
+      try {
+        composerVideoPrepAbortRef.current?.abort()
+      } catch {
+        // ignore
+      }
+      composerVideoPrepAbortRef.current = null
+      disposeComposerVideoMedia(composerVideoSlotRef.current)
+    }
+  }, [disposeComposerVideoMedia])
+
   const runBackgroundLoungePostSubmission = useCallback(
     async (snapshot) => {
       const uidBar = String(snapshot.streamVideoUid || '').trim()
