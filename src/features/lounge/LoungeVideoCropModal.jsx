@@ -6,6 +6,9 @@ import { maxCropRectForAspect, sanitizeVideoCropPx } from '../../utils/loungeVid
 const MIN_CLIP_SEC = 0.5
 const MAX_CLIP_SEC = LOUNGE_VIDEO_MAX_SECONDS
 
+/** `pointermove` must be non-passive so drag handlers can `preventDefault` and stop scroll / pull-to-refresh underneath. */
+const POINTER_MOVE_DRAG = { passive: false }
+
 function formatClock(sec) {
   const s = Math.max(0, sec)
   const mm = Math.floor(s / 60)
@@ -305,6 +308,20 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
       .catch(() => {})
   }, [])
 
+  /** Prevent the lounge feed (scroll + pull-to-refresh) from moving while this modal is open. */
+  useEffect(() => {
+    if (!file) return undefined
+    const html = document.documentElement
+    const prevHtml = html.style.overflow
+    const prevBody = document.body.style.overflow
+    html.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = prevHtml
+      document.body.style.overflow = prevBody
+    }
+  }, [file])
+
   useEffect(() => {
     if (!file) return undefined
     posterScanGenRef.current += 1
@@ -432,6 +449,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
       const startCy = cur.y
       const { vw, vh, scale } = layout
       const move = (ev) => {
+        if (ev.cancelable) ev.preventDefault()
         const c = cropRef.current
         if (!c) return
         const dx = (ev.clientX - startUx) / scale
@@ -444,7 +462,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
         cleanupCropDrag()
       }
       cropListenersRef.current = { move, up }
-      window.addEventListener('pointermove', move)
+      window.addEventListener('pointermove', move, POINTER_MOVE_DRAG)
       window.addEventListener('pointerup', up)
       window.addEventListener('pointercancel', up)
       try {
@@ -583,6 +601,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
       const resumePlay = Boolean(v0 && !v0.paused)
       seekPreviewMaybeResume(v0, lastStartSec, resumePlay)
       const move = (ev) => {
+        if (ev.cancelable) ev.preventDefault()
         const drag = dragRef.current
         const dur = durationRef.current
         if (!drag || dur <= 0) return
@@ -606,7 +625,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
         seekPreviewMaybeResume(videoRef.current, lastStartSec, resumePlay)
       }
       listenersRef.current = { move, up }
-      window.addEventListener('pointermove', move)
+      window.addEventListener('pointermove', move, POINTER_MOVE_DRAG)
       window.addEventListener('pointerup', up)
       window.addEventListener('pointercancel', up)
       try {
@@ -629,6 +648,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
       const resumePlay = Boolean(v0 && !v0.paused)
       seekPreviewMaybeResume(v0, lastEndSec, resumePlay)
       const move = (ev) => {
+        if (ev.cancelable) ev.preventDefault()
         const drag = dragRef.current
         const dur = durationRef.current
         if (!drag || dur <= 0) return
@@ -652,7 +672,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
         seekPreviewMaybeResume(videoRef.current, lastEndSec, resumePlay)
       }
       listenersRef.current = { move, up }
-      window.addEventListener('pointermove', move)
+      window.addEventListener('pointermove', move, POINTER_MOVE_DRAG)
       window.addEventListener('pointerup', up)
       window.addEventListener('pointercancel', up)
       try {
@@ -675,6 +695,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
       const resumePlay = Boolean(v0 && !v0.paused)
       seekPreviewMaybeResume(v0, lastStartSec, resumePlay)
       const move = (ev) => {
+        if (ev.cancelable) ev.preventDefault()
         const drag = dragRef.current
         const dur = durationRef.current
         if (!drag || dur <= 0) return
@@ -702,7 +723,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
         seekPreviewMaybeResume(videoRef.current, lastStartSec, resumePlay)
       }
       listenersRef.current = { move, up }
-      window.addEventListener('pointermove', move)
+      window.addEventListener('pointermove', move, POINTER_MOVE_DRAG)
       window.addEventListener('pointerup', up)
       window.addEventListener('pointercancel', up)
     },
@@ -845,7 +866,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[96] flex items-end justify-center bg-black/55 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-10 backdrop-blur-[2px] sm:items-center sm:p-6"
+      className="fixed inset-0 z-[96] flex items-end justify-center overscroll-none bg-black/55 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-10 backdrop-blur-[2px] sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Trim and crop video"
@@ -897,7 +918,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
             onCanPlay={scheduleProbePosterScan}
           />
           {cropPc ? (
-            <div key={layoutRev} className="absolute inset-0 z-[5] select-none">
+            <div key={layoutRev} className="absolute inset-0 z-[5] select-none touch-none">
               <div
                 className="pointer-events-none absolute inset-x-0 top-0 bg-black/60"
                 style={{ height: `${cropPc.ct}%` }}
@@ -921,7 +942,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
               <button
                 type="button"
                 aria-label="Drag to move crop region"
-                className="pointer-events-auto absolute cursor-move border-2 border-cyan-400 bg-transparent"
+                className="pointer-events-auto absolute cursor-move touch-none border-2 border-cyan-400 bg-transparent"
                 style={{
                   left: `${cropPc.cl}%`,
                   top: `${cropPc.ct}%`,
