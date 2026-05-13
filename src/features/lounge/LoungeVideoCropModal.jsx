@@ -13,6 +13,9 @@ function formatClock(sec) {
   return `${mm}:${String(ss).padStart(2, '0')}.${frac}`
 }
 
+/** Downscale wide frames so poster data URLs stay small. */
+const POSTER_MAX_WIDTH = 960
+
 /** Seek preview; if `resumePlay`, continue playback (e.g. user had pressed play on native controls). */
 function seekPreviewMaybeResume(video, timeSec, resumePlay) {
   if (!video) return
@@ -47,9 +50,12 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   const [clipEnd, setClipEnd] = useState(MAX_CLIP_SEC)
   const [phase, setPhase] = useState('idle')
   const [trimErr, setTrimErr] = useState('')
-  const [trimProgress, setTrimProgress] = useState(0)
+  const [posterUrl, setPosterUrl] = useState('')
   const trimAbortRef = useRef(null)
   const trimBusyRef = useRef(false)
+  const posterCapturedRef = useRef(false)
+  const posterObjectUrlRef = useRef('')
+  const posterSeekScheduledRef = useRef(false)
 
   useEffect(() => {
     clipRef.current = { start: clipStart, end: clipEnd }
@@ -96,7 +102,17 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     const u = URL.createObjectURL(file)
     urlRef.current = u
     setTrimErr('')
-    setTrimProgress(0)
+    posterCapturedRef.current = false
+    posterSeekScheduledRef.current = false
+    setPosterUrl('')
+    if (posterObjectUrlRef.current) {
+      try {
+        URL.revokeObjectURL(posterObjectUrlRef.current)
+      } catch {
+        // ignore
+      }
+      posterObjectUrlRef.current = ''
+    }
     setPhase('idle')
     const probed =
       typeof knownDurationSec === 'number' &&
@@ -124,6 +140,14 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
         // ignore
       }
       urlRef.current = ''
+      if (posterObjectUrlRef.current) {
+        try {
+          URL.revokeObjectURL(posterObjectUrlRef.current)
+        } catch {
+          // ignore
+        }
+        posterObjectUrlRef.current = ''
+      }
     }
   }, [file, knownDurationSec])
 
@@ -163,6 +187,71 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     setClipStart(ns)
     setClipEnd(ne)
   }, [])
+
+  const capturePosterOnce = useCallback(() => {
+    if (posterCapturedRef.current) return
+    const v = videoRef.current
+    if (!v || v.readyState < 2 || v.videoWidth < 2 || v.videoHeight < 2) return
+    try {
+      const w0 = v.videoWidth
+      const h0 = v.videoHeight
+      const scale = w0 > POSTER_MAX_WIDTH ? POSTER_MAX_WIDTH / w0 : 1
+      const c = document.createElement('canvas')
+      c.width = Math.round(w0 * scale)
+      c.height = Math.round(h0 * scale)
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      ctx.drawImage(v, 0, 0, c.width, c.height)
+      c.toBlob(
+        (blob) => {
+          if (!blob) return
+          posterCapturedRef.current = true
+          if (posterObjectUrlRef.current) {
+            try {
+              URL.revokeObjectURL(posterObjectUrlRef.current)
+            } catch {
+              // ignore
+            }
+          }
+          const u = URL.createObjectURL(blob)
+          posterObjectUrlRef.current = u
+          setPosterUrl(u)
+        },
+        'image/jpeg',
+        0.78,
+      )
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const onVideoLoadedDataForPoster = useCallback(() => {
+    if (posterCapturedRef.current || posterSeekScheduledRef.current) return
+    const v = videoRef.current
+    if (!v) return
+    posterSeekScheduledRef.current = true
+    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
+    const seekTo = dur > 0 ? Math.min(0.12, dur * 0.004) : 0.08
+    const onSeeked = () => {
+      v.removeEventListener('seeked', onSeeked)
+      posterSeekScheduledRef.current = false
+      capturePosterOnce()
+      try {
+        const v2 = videoRef.current
+        if (v2) v2.currentTime = clipRef.current.start
+      } catch {
+        // ignore
+      }
+    }
+    v.addEventListener('seeked', onSeeked)
+    try {
+      v.currentTime = seekTo
+    } catch {
+      v.removeEventListener('seeked', onSeeked)
+      posterSeekScheduledRef.current = false
+      capturePosterOnce()
+    }
+  }, [capturePosterOnce])
 
   const startLeftDrag = useCallback(
     (e) => {
@@ -309,13 +398,11 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     }
     trimAbortRef.current = null
     setPhase('idle')
-    setTrimProgress(0)
   }, [])
 
   const confirmTrim = useCallback(async () => {
     setTrimErr('')
     setPhase('trimming')
-    setTrimProgress(0)
     const ac = new AbortController()
     trimAbortRef.current = ac
     const { start, end } = clipRef.current
@@ -323,7 +410,6 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       const { trimVideoFileToMp4 } = await import('../../utils/loungeVideoFfmpegTrim')
       const out = await trimVideoFileToMp4(file, start, end, {
         signal: ac.signal,
-        onProgress: (p) => setTrimProgress(p),
       })
       onConfirm(out)
     } catch (err) {
@@ -353,7 +439,15 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       aria-modal="true"
       aria-label="Trim video"
     >
-      <button type="button" className="absolute inset-0 cursor-default bg-transparent" aria-label="Close" onClick={busy ? undefined : onCancel} disabled={busy} />
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default bg-transparent"
+        aria-label="Close"
+        onClick={() => {
+          if (busy) cancelTrim()
+          else onCancel()
+        }}
+      />
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-700/85 bg-zinc-950/96 p-4 shadow-2xl backdrop-blur-md">
         <h2 className="text-[17px] font-bold text-white">Trim video (max {MAX_CLIP_SEC}s)</h2>
         <p className="mt-1 text-[13px] leading-snug text-zinc-400">
@@ -364,12 +458,16 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
           <video
             ref={videoRef}
             src={urlRef.current || undefined}
+            poster={posterUrl || undefined}
             className="max-h-[40vh] w-full object-contain"
             controls={!busy}
             playsInline
             preload="metadata"
             onLoadedMetadata={onMetaLoaded}
-            onLoadedData={onMetaLoaded}
+            onLoadedData={() => {
+              onMetaLoaded()
+              onVideoLoadedDataForPoster()
+            }}
             onDurationChange={onMetaLoaded}
           />
         </div>
@@ -423,26 +521,17 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
           <div className="mt-3 rounded-lg border border-rose-500/40 bg-rose-950/30 px-2 py-1.5 text-[13px] text-rose-200">{trimErr}</div>
         ) : null}
 
-        {busy ? (
-          <div className="mt-3">
-            <div className="text-[13px] text-zinc-300">Encoding clip… first run may download the encoder.</div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-              <div
-                className="h-full rounded-full bg-cyan-500 transition-[width] duration-200"
-                style={{ width: `${Math.round(trimProgress * 100)}%` }}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={cancelTrim}
-              className="mt-2 text-[13px] font-semibold text-zinc-400 underline hover:text-zinc-200"
-            >
-              Cancel encoding
-            </button>
-          </div>
-        ) : null}
-
         <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (busy) cancelTrim()
+              else onCancel()
+            }}
+            className="min-h-11 flex-1 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation"
+          >
+            Cancel
+          </button>
           <button
             type="button"
             disabled={busy || duration <= 0}
@@ -450,14 +539,6 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
             className="min-h-11 flex-1 rounded-xl bg-cyan-600 px-4 text-[15px] font-semibold text-white hover:bg-cyan-500 disabled:opacity-40 touch-manipulation"
           >
             Use this clip
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onCancel}
-            className="min-h-11 flex-1 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40 touch-manipulation"
-          >
-            Cancel
           </button>
         </div>
       </div>
