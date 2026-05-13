@@ -9,7 +9,7 @@ import {
   waitForCfStreamManifestReady,
 } from '../../utils/loungeVideoUpload'
 
-/** Auto-retries before surfacing a hard failure to the user. */
+/** Auto-retries before surfacing a hard failure to the user (Cloudflare mint / upload / manifest only). */
 export const COMPOSER_VIDEO_PREP_MAX_ATTEMPTS = 5
 
 function sleep(ms) {
@@ -20,6 +20,7 @@ function sleep(ms) {
 
 /**
  * Encode (when trim), upload to Cloudflare Stream, wait for manifest — with retries on failure.
+ * On-device encode and duration checks run once; retries repeat only mint → upload → manifest.
  *
  * @param {object} opts
  * @param {import('@supabase/supabase-js').SupabaseClient} opts.supabaseClient
@@ -39,6 +40,39 @@ export async function runComposerStreamVideoPrepWithRetries({ supabaseClient, si
     })
   }
 
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+
+  /** @type {File} */
+  let uploadFile
+  if (spec.kind === 'direct') {
+    uploadFile = spec.file
+    report(0.08, 'Validating video', '', 1)
+  } else {
+    report(0.05, 'Encoding clip', 'On-device…', 1)
+    const { trimVideoFileToMp4 } = await import('../../utils/loungeVideoFfmpegTrim')
+    const c =
+      spec.cropPx && spec.intrinsicWidth > 0 && spec.intrinsicHeight > 0
+        ? sanitizeVideoCropPx(spec.intrinsicWidth, spec.intrinsicHeight, spec.cropPx)
+        : null
+    uploadFile = await trimVideoFileToMp4(spec.sourceFile, spec.startSec, spec.endSec, {
+      signal,
+      crop: c,
+      intrinsicWidth: spec.intrinsicWidth,
+      intrinsicHeight: spec.intrinsicHeight,
+      onProgress: (r) => report(0.05 + r * 0.34, 'Encoding clip', `${Math.round(r * 100)}%`, 1),
+    })
+  }
+
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+  if (uploadFile.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
+    throw new Error('Video must be 200 MB or smaller for upload.')
+  }
+  report(0.4, 'Reading video metadata', '', 1)
+  const dur = await probeVideoFileDurationSeconds(uploadFile)
+  if (!Number.isFinite(dur) || dur > LOUNGE_VIDEO_MAX_SECONDS + 0.35) {
+    throw new Error(`Video must be ${LOUNGE_VIDEO_MAX_SECONDS} seconds or shorter.`)
+  }
+
   /** @type {Error | null} */
   let lastErr = null
 
@@ -46,38 +80,12 @@ export async function runComposerStreamVideoPrepWithRetries({ supabaseClient, si
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
     let pendingUid = null
     try {
-      report(0.02, 'Preparing video', `Attempt ${attempt} of ${COMPOSER_VIDEO_PREP_MAX_ATTEMPTS}`, attempt)
-
-      /** @type {File} */
-      let uploadFile
-      if (spec.kind === 'direct') {
-        uploadFile = spec.file
-        report(0.08, 'Validating video', '', attempt)
-      } else {
-        report(0.05, 'Encoding clip', 'On-device…', attempt)
-        const { trimVideoFileToMp4 } = await import('../../utils/loungeVideoFfmpegTrim')
-        const c =
-          spec.cropPx && spec.intrinsicWidth > 0 && spec.intrinsicHeight > 0
-            ? sanitizeVideoCropPx(spec.intrinsicWidth, spec.intrinsicHeight, spec.cropPx)
-            : null
-        uploadFile = await trimVideoFileToMp4(spec.sourceFile, spec.startSec, spec.endSec, {
-          signal,
-          crop: c,
-          intrinsicWidth: spec.intrinsicWidth,
-          intrinsicHeight: spec.intrinsicHeight,
-          onProgress: (r) => report(0.05 + r * 0.34, 'Encoding clip', `${Math.round(r * 100)}%`, attempt),
-        })
-      }
-
-      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-      if (uploadFile.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
-        throw new Error('Video must be 200 MB or smaller for upload.')
-      }
-      report(0.4, 'Reading video metadata', '', attempt)
-      const dur = await probeVideoFileDurationSeconds(uploadFile)
-      if (!Number.isFinite(dur) || dur > LOUNGE_VIDEO_MAX_SECONDS + 0.35) {
-        throw new Error(`Video must be ${LOUNGE_VIDEO_MAX_SECONDS} seconds or shorter.`)
-      }
+      report(
+        0.42,
+        'Preparing upload',
+        `Cloudflare attempt ${attempt} of ${COMPOSER_VIDEO_PREP_MAX_ATTEMPTS}`,
+        attempt,
+      )
 
       report(0.44, 'Requesting upload URL', '', attempt)
       const { uploadURL, uid } = await requestCfStreamDirectUpload(supabaseClient)
@@ -117,7 +125,7 @@ export async function runComposerStreamVideoPrepWithRetries({ supabaseClient, si
       lastErr = e instanceof Error ? e : new Error(String(e))
       const tail = lastErr.message ? `${lastErr.message} — ` : ''
       report(
-        0,
+        0.42,
         'Retrying',
         `${tail}will retry (${attempt}/${COMPOSER_VIDEO_PREP_MAX_ATTEMPTS})`,
         attempt,
