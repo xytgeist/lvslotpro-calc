@@ -129,6 +129,16 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       e.stopPropagation()
       const end0 = clipRef.current.end
       dragRef.current = { kind: 'left', end0 }
+      let lastStartSec = clipRef.current.start
+      try {
+        const v0 = videoRef.current
+        if (v0) {
+          v0.pause()
+          v0.currentTime = lastStartSec
+        }
+      } catch {
+        // ignore
+      }
       const move = (ev) => {
         const drag = dragRef.current
         const dur = durationRef.current
@@ -142,10 +152,32 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
           ne = dur
           ns = Math.max(0, ne - MAX_CLIP_SEC)
         }
+        lastStartSec = ns
+        clipRef.current = { start: ns, end: ne }
         setClipStart(ns)
         setClipEnd(ne)
+        try {
+          const v = videoRef.current
+          if (v) {
+            v.pause()
+            v.currentTime = ns
+          }
+        } catch {
+          // ignore
+        }
       }
-      const up = () => cleanupDrag()
+      const up = () => {
+        cleanupDrag()
+        try {
+          const v = videoRef.current
+          if (v) {
+            v.pause()
+            v.currentTime = lastStartSec
+          }
+        } catch {
+          // ignore
+        }
+      }
       listenersRef.current = { move, up }
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
