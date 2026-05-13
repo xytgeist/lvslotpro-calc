@@ -13,6 +13,20 @@ function formatClock(sec) {
   return `${mm}:${String(ss).padStart(2, '0')}.${frac}`
 }
 
+/** Seek preview; if `resumePlay`, continue playback (e.g. user had pressed play on native controls). */
+function seekPreviewMaybeResume(video, timeSec, resumePlay) {
+  if (!video) return
+  try {
+    video.currentTime = timeSec
+    if (resumePlay) {
+      const p = video.play()
+      if (p && typeof p.catch === 'function') p.catch(() => {})
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Trim a video to at most 60s: draggable window on the full timeline (cannot widen past 60s).
  *
@@ -35,6 +49,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   const [trimErr, setTrimErr] = useState('')
   const [trimProgress, setTrimProgress] = useState(0)
   const trimAbortRef = useRef(null)
+  const trimBusyRef = useRef(false)
 
   useEffect(() => {
     clipRef.current = { start: clipStart, end: clipEnd }
@@ -43,6 +58,32 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   useEffect(() => {
     durationRef.current = duration
   }, [duration])
+
+  useEffect(() => {
+    trimBusyRef.current = phase === 'trimming'
+  }, [phase])
+
+  /** While preview is playing, keep playback inside the trim range (loop at end). */
+  useEffect(() => {
+    if (!file || duration <= 0) return undefined
+    const v = videoRef.current
+    if (!v) return undefined
+    const onTime = () => {
+      if (trimBusyRef.current) return
+      const { start, end } = clipRef.current
+      if (!Number.isFinite(end) || end <= start) return
+      if (v.paused) return
+      if (v.currentTime < start - 0.02) {
+        seekPreviewMaybeResume(v, start, true)
+        return
+      }
+      if (v.currentTime >= end - 0.05) {
+        seekPreviewMaybeResume(v, start, true)
+      }
+    }
+    v.addEventListener('timeupdate', onTime)
+    return () => v.removeEventListener('timeupdate', onTime)
+  }, [file, duration])
 
   useEffect(() => {
     void import('../../utils/loungeVideoFfmpegTrim')
@@ -130,15 +171,9 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       const end0 = clipRef.current.end
       dragRef.current = { kind: 'left', end0 }
       let lastStartSec = clipRef.current.start
-      try {
-        const v0 = videoRef.current
-        if (v0) {
-          v0.pause()
-          v0.currentTime = lastStartSec
-        }
-      } catch {
-        // ignore
-      }
+      const v0 = videoRef.current
+      const resumePlay = Boolean(v0 && !v0.paused)
+      seekPreviewMaybeResume(v0, lastStartSec, resumePlay)
       const move = (ev) => {
         const drag = dragRef.current
         const dur = durationRef.current
@@ -156,27 +191,11 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
         clipRef.current = { start: ns, end: ne }
         setClipStart(ns)
         setClipEnd(ne)
-        try {
-          const v = videoRef.current
-          if (v) {
-            v.pause()
-            v.currentTime = ns
-          }
-        } catch {
-          // ignore
-        }
+        seekPreviewMaybeResume(videoRef.current, ns, resumePlay)
       }
       const up = () => {
         cleanupDrag()
-        try {
-          const v = videoRef.current
-          if (v) {
-            v.pause()
-            v.currentTime = lastStartSec
-          }
-        } catch {
-          // ignore
-        }
+        seekPreviewMaybeResume(videoRef.current, lastStartSec, resumePlay)
       }
       listenersRef.current = { move, up }
       window.addEventListener('pointermove', move)
@@ -197,6 +216,10 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       e.stopPropagation()
       const start0 = clipRef.current.start
       dragRef.current = { kind: 'right', start0 }
+      let lastEndSec = clipRef.current.end
+      const v0 = videoRef.current
+      const resumePlay = Boolean(v0 && !v0.paused)
+      seekPreviewMaybeResume(v0, lastEndSec, resumePlay)
       const move = (ev) => {
         const drag = dragRef.current
         const dur = durationRef.current
@@ -210,10 +233,16 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
           ns = 0
           ne = Math.min(dur, ns + MAX_CLIP_SEC)
         }
+        lastEndSec = ne
+        clipRef.current = { start: ns, end: ne }
         setClipStart(ns)
         setClipEnd(ne)
+        seekPreviewMaybeResume(videoRef.current, ne, resumePlay)
       }
-      const up = () => cleanupDrag()
+      const up = () => {
+        cleanupDrag()
+        seekPreviewMaybeResume(videoRef.current, lastEndSec, resumePlay)
+      }
       listenersRef.current = { move, up }
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
@@ -234,15 +263,9 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       const t0 = timeFromClientX(e.clientX)
       dragRef.current = { kind: 'move', start0: s0, end0: e0, grabT: t0 - s0 }
       let lastStartSec = s0
-      try {
-        const v0 = videoRef.current
-        if (v0) {
-          v0.pause()
-          v0.currentTime = lastStartSec
-        }
-      } catch {
-        // ignore
-      }
+      const v0 = videoRef.current
+      const resumePlay = Boolean(v0 && !v0.paused)
+      seekPreviewMaybeResume(v0, lastStartSec, resumePlay)
       const move = (ev) => {
         const drag = dragRef.current
         const dur = durationRef.current
@@ -264,27 +287,11 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
         clipRef.current = { start: ns, end: ne }
         setClipStart(ns)
         setClipEnd(ne)
-        try {
-          const v = videoRef.current
-          if (v) {
-            v.pause()
-            v.currentTime = ns
-          }
-        } catch {
-          // ignore
-        }
+        seekPreviewMaybeResume(videoRef.current, ns, resumePlay)
       }
       const up = () => {
         cleanupDrag()
-        try {
-          const v = videoRef.current
-          if (v) {
-            v.pause()
-            v.currentTime = lastStartSec
-          }
-        } catch {
-          // ignore
-        }
+        seekPreviewMaybeResume(videoRef.current, lastStartSec, resumePlay)
       }
       listenersRef.current = { move, up }
       window.addEventListener('pointermove', move)
@@ -293,26 +300,6 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     },
     [cleanupDrag, timeFromClientX],
   )
-
-  const playSelection = useCallback(() => {
-    const v = videoRef.current
-    const { start, end } = clipRef.current
-    if (!v) return
-    try {
-      v.pause()
-      v.currentTime = start
-      void v.play()
-      const onTime = () => {
-        if (v.currentTime >= end - 0.04) {
-          v.pause()
-          v.removeEventListener('timeupdate', onTime)
-        }
-      }
-      v.addEventListener('timeupdate', onTime)
-    } catch {
-      // ignore
-    }
-  }, [])
 
   const cancelTrim = useCallback(() => {
     try {
@@ -370,7 +357,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-700/85 bg-zinc-950/96 p-4 shadow-2xl backdrop-blur-md">
         <h2 className="text-[17px] font-bold text-white">Trim video (max {MAX_CLIP_SEC}s)</h2>
         <p className="mt-1 text-[13px] leading-snug text-zinc-400">
-          Drag the handles to shorten the clip (never wider than {MAX_CLIP_SEC}s). Drag the highlighted range to move it along your video.
+          Press play on the video once to preview. Drag the handles or the highlighted range to scrub; playback stays inside your selection and loops at the end. The clip is never wider than {MAX_CLIP_SEC}s.
         </p>
 
         <div className="mt-3 overflow-hidden rounded-xl border border-zinc-700/80 bg-black">
@@ -424,14 +411,6 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
                 onPointerDown={startRightDrag}
               />
             </div>
-            <button
-              type="button"
-              onClick={playSelection}
-              disabled={busy}
-              className="mt-2 text-[13px] font-semibold text-cyan-400 hover:text-cyan-300 disabled:opacity-40"
-            >
-              Play selection
-            </button>
           </div>
         ) : (
           <p className="mt-3 text-[13px] text-zinc-500">
