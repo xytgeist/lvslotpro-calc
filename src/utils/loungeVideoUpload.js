@@ -19,8 +19,12 @@ export function cfStreamPosterUrl(uid, height = 720) {
   return `https://videodelivery.net/${id}/thumbnails/thumbnail.jpg?height=${encodeURIComponent(String(height))}&fit=crop`
 }
 
+/** Max wait for local file duration (iOS can delay `loadedmetadata` on long clips). */
+const PROBE_DURATION_TIMEOUT_MS = 45000
+
 /**
  * Read duration from a local video file (metadata only).
+ * Safari/iOS often fires `durationchange` after (or instead of) `loadedmetadata` for camera MOV/HEVC.
  * @returns {Promise<number>} seconds (>0) or NaN if unknown
  */
 export function probeVideoFileDurationSeconds(file) {
@@ -34,7 +38,9 @@ export function probeVideoFileDurationSeconds(file) {
     v.preload = 'metadata'
     v.muted = true
     v.playsInline = true
+    v.setAttribute('playsinline', '')
     v.src = url
+    let settled = false
     const cleanup = () => {
       try {
         URL.revokeObjectURL(url)
@@ -48,14 +54,35 @@ export function probeVideoFileDurationSeconds(file) {
         // ignore
       }
     }
-    v.onloadedmetadata = () => {
+    const finishOk = () => {
+      if (settled) return
       const d = v.duration
+      if (!Number.isFinite(d) || d <= 0) return
+      settled = true
+      window.clearTimeout(tid)
       cleanup()
-      resolve(Number.isFinite(d) && d > 0 ? d : NaN)
+      resolve(d)
     }
-    v.onerror = () => {
+    const finishErr = (msg) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(tid)
       cleanup()
-      reject(new Error('Could not read this video file.'))
+      reject(new Error(msg || 'Could not read this video file.'))
+    }
+    const tid = window.setTimeout(() => {
+      finishErr(
+        'This video is taking too long to read on device. Try a shorter clip, Wi‑Fi, or export as MP4 (H.264) in Photos before posting.',
+      )
+    }, PROBE_DURATION_TIMEOUT_MS)
+    v.onloadedmetadata = () => finishOk()
+    v.onloadeddata = () => finishOk()
+    v.ondurationchange = () => finishOk()
+    v.onerror = () => finishErr('Could not read this video file.')
+    try {
+      v.load()
+    } catch {
+      // ignore
     }
   })
 }

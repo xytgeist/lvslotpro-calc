@@ -741,7 +741,7 @@ export default function SocialFeed({
         }
         return
       }
-      setLoungeVideoCrop({ file: vf, mode })
+      setLoungeVideoCrop({ file: vf, mode, knownDurationSec: dur })
     } catch (e) {
       if (mode === 'composer') setPostErr(msgRead(e))
       else setLoungeDetailEditErr(msgRead(e))
@@ -4294,7 +4294,7 @@ export default function SocialFeed({
 
       {quoteRepostModal?.mode === 'remove' ? (
         <div
-          className="fixed inset-0 z-[92] flex items-end justify-center bg-black/45 px-3 pb-0 backdrop-blur-[3px]"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 px-3 pb-0 backdrop-blur-[3px]"
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="quote-remove-confirm-title"
@@ -4347,7 +4347,7 @@ export default function SocialFeed({
         </div>
       ) : quoteRepostModal ? (
         <div
-          className="fixed inset-0 z-[92] flex bg-black/45 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[3px]"
+          className="fixed inset-0 z-[100] flex bg-black/45 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[3px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="quote-repost-sheet-title"
@@ -4915,7 +4915,7 @@ export default function SocialFeed({
               aria-label="Cancel upload"
               className="shrink-0 touch-manipulation bg-transparent px-1 py-1 text-[14px] font-semibold text-cyan-400 hover:text-cyan-300 [-webkit-tap-highlight-color:transparent]"
             >
-              cancel
+              Cancel
             </button>
           </div>
         </div>
@@ -4924,6 +4924,7 @@ export default function SocialFeed({
       {loungeVideoCrop ? (
         <LoungeVideoCropModal
           file={loungeVideoCrop.file}
+          knownDurationSec={loungeVideoCrop.knownDurationSec}
           onCancel={() => {
             if (loungeVideoCrop.mode === 'detail') {
               setLoungeDetailEditMediaFile(null)

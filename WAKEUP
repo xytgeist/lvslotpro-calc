@@ -21,6 +21,6 @@ Use after a restart or any new chat when you want a cold start pointed the right
   `supabase functions deploy lounge-cf-stream-delete-video --project-ref jtjgtucumuoswnbauxry`,  
   `supabase functions deploy lounge-cf-stream-delete-orphan --project-ref jtjgtucumuoswnbauxry`, and  
   `supabase functions deploy lounge-cf-stream-purge-pending-uploads --project-ref jtjgtucumuoswnbauxry`  
-  (details: **`supabase/functions/lounge-cf-stream-direct-upload/README.md`**, **`lounge-cf-stream-delete-video/README.md`**, **`lounge-cf-stream-delete-orphan/README.md`**, **`lounge-cf-stream-purge-pending-uploads/README.md`** for deploy + **pg_cron / Vault** schedule, **`AGENTS.md`**). If moderators staff-delete others’ posts, run **`supabase/lounge_feed_posts_delete_moderator_align.sql`** when the DB still has admin-only moderator delete.
+- **Lounge Stream (feed):** autoplay coordinator + shared **Tap for sound** live in **`LoungePostStreamVideo.jsx`** + **`LoungeFeedVideoAutoplayContext.jsx`**; quote repost **`z-[100]`** vs post detail **`z-[96]`** — see **`AGENTS.md`** quick anchors and **`docs/test-buildout-backlog.md`** smoke 11.
 - No prod writes / no commits / PR only: _[say which]_
 - Context: _[link, path, or "decision already in backlog §…"]_

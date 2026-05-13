@@ -321,6 +321,16 @@ function MutedGlyph({ className = 'h-4 w-4' }) {
   )
 }
 
+/** Same speaker cone as `MutedGlyph`, with waves (pairs with “Tap to mute”). */
+function SoundOnGlyph({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.5 9.5c3 2 3 3 0 5M16.5 7c4.5 3.2 4.5 6.8 0 10" />
+    </svg>
+  )
+}
+
 /**
  * Cloudflare Stream playback (adaptive HLS). `uid` is the Stream asset id from `stream_video_uid`.
  *
@@ -826,7 +836,11 @@ export default function LoungePostStreamVideo({
               }}
             >
               <span className="pointer-events-none flex max-w-full items-center gap-1.5 rounded-md bg-black/55 px-2 py-1.5 text-[11px] font-medium text-zinc-200 sm:px-2.5 sm:py-2 sm:text-[12px]">
-                <MutedGlyph className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" />
+                {stripSoundUnmuted ? (
+                  <SoundOnGlyph className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" />
+                ) : (
+                  <MutedGlyph className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" />
+                )}
                 <span className="max-w-[min(12rem,72vw)] truncate">
                   {stripSoundUnmuted ? 'Tap to mute' : 'Tap for sound'}
                 </span>

@@ -16,9 +16,10 @@ function formatClock(sec) {
 /**
  * Trim a video to at most 60s: draggable window on the full timeline (cannot widen past 60s).
  *
- * @param {{ file: File, onCancel: () => void, onConfirm: (file: File) => void }} props
+ * @param {{ file: File, knownDurationSec?: number, onCancel: () => void, onConfirm: (file: File) => void }} props
+ * `knownDurationSec` — duration already probed before opening (avoids iOS waiting twice on `loadedmetadata`).
  */
-export default function LoungeVideoCropModal({ file, onCancel, onConfirm }) {
+export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel, onConfirm }) {
   const videoRef = useRef(null)
   const trackRef = useRef(null)
   const urlRef = useRef('')
@@ -53,13 +54,28 @@ export default function LoungeVideoCropModal({ file, onCancel, onConfirm }) {
     if (!file) return undefined
     const u = URL.createObjectURL(file)
     urlRef.current = u
-    setDuration(0)
-    setClipStart(0)
-    setClipEnd(MAX_CLIP_SEC)
-    setPhase('idle')
     setTrimErr('')
     setTrimProgress(0)
-    clipRef.current = { start: 0, end: MAX_CLIP_SEC }
+    setPhase('idle')
+    const probed =
+      typeof knownDurationSec === 'number' &&
+      Number.isFinite(knownDurationSec) &&
+      knownDurationSec > 0
+    if (probed) {
+      const d0 = knownDurationSec
+      durationRef.current = d0
+      setDuration(d0)
+      const span = Math.min(MAX_CLIP_SEC, d0)
+      setClipStart(0)
+      setClipEnd(span)
+      clipRef.current = { start: 0, end: span }
+    } else {
+      durationRef.current = 0
+      setDuration(0)
+      setClipStart(0)
+      setClipEnd(MAX_CLIP_SEC)
+      clipRef.current = { start: 0, end: MAX_CLIP_SEC }
+    }
     return () => {
       try {
         URL.revokeObjectURL(u)
@@ -68,7 +84,7 @@ export default function LoungeVideoCropModal({ file, onCancel, onConfirm }) {
       }
       urlRef.current = ''
     }
-  }, [file])
+  }, [file, knownDurationSec])
 
   const cleanupDrag = useCallback(() => {
     const { move, up } = listenersRef.current
@@ -96,10 +112,15 @@ export default function LoungeVideoCropModal({ file, onCancel, onConfirm }) {
     if (!Number.isFinite(d) || d <= 0) return
     durationRef.current = d
     setDuration(d)
-    const span = Math.min(MAX_CLIP_SEC, d)
-    setClipStart(0)
-    setClipEnd(span)
-    clipRef.current = { start: 0, end: span }
+    let ns = clipRef.current.start
+    let ne = clipRef.current.end
+    if (ne > d) ne = d
+    if (ne - ns > MAX_CLIP_SEC) ns = Math.max(0, ne - MAX_CLIP_SEC)
+    if (ns < 0) ns = 0
+    if (ne - ns < MIN_CLIP_SEC) ne = Math.min(d, ns + MIN_CLIP_SEC)
+    clipRef.current = { start: ns, end: ne }
+    setClipStart(ns)
+    setClipEnd(ne)
   }, [])
 
   const startLeftDrag = useCallback(
@@ -297,6 +318,8 @@ export default function LoungeVideoCropModal({ file, onCancel, onConfirm }) {
             playsInline
             preload="metadata"
             onLoadedMetadata={onMetaLoaded}
+            onLoadedData={onMetaLoaded}
+            onDurationChange={onMetaLoaded}
           />
         </div>
 
@@ -347,7 +370,10 @@ export default function LoungeVideoCropModal({ file, onCancel, onConfirm }) {
             </button>
           </div>
         ) : (
-          <p className="mt-3 text-[13px] text-zinc-500">Reading video…</p>
+          <p className="mt-3 text-[13px] text-zinc-500">
+            Reading video…{' '}
+            <span className="text-zinc-600">If this hangs, try exporting as MP4 in Photos or a shorter clip.</span>
+          </p>
         )}
 
         {trimErr ? (
