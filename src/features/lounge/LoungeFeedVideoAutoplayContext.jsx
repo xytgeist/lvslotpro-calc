@@ -3,12 +3,17 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useSyncExternalStore,
 } from 'react'
 
 const LoungeFeedVideoAutoplayContext = createContext(null)
+
+/** Match `LAZY_ATTACH_ROOT_MARGIN` in `LoungePostStreamVideo.jsx` (expanded intersection for prefetch). */
+const SCROLL_ROOT_PAD_TOP = 180
+const SCROLL_ROOT_PAD_BOTTOM = 240
 
 /**
  * @param {React.RefObject<HTMLElement | null>} scrollRootRef
@@ -49,9 +54,12 @@ function createAutoplayStore(scrollRootRef) {
       const el = getEl()
       if (!el) continue
       const rect = el.getBoundingClientRect()
-      const intersectsRoot = rect.bottom > rootTop && rect.top < rootBottom
+      if (rect.width < 2 || rect.height < 2) continue
+      const intersectsRootLoose =
+        rect.bottom > rootTop - SCROLL_ROOT_PAD_TOP && rect.top < rootBottom + SCROLL_ROOT_PAD_BOTTOM
+      const intersectsRootStrict = rect.bottom > rootTop && rect.top < rootBottom
       const intersectsViewport = rect.bottom > 0 && rect.top < vh
-      if (!intersectsRoot || !intersectsViewport) continue
+      if (!intersectsViewport || (!intersectsRootLoose && !intersectsRootStrict)) continue
       const centerY = (rect.top + rect.bottom) / 2
       candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom })
     }
@@ -59,7 +67,22 @@ function createAutoplayStore(scrollRootRef) {
     /** @type {string | null} */
     let next = null
     if (candidates.length === 0) {
+      /** Last resort: registered tiles with layout but strict root missed (e.g. first paint timing). */
+      for (const [id, getEl] of entries) {
+        const el = getEl()
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.width < 2 || rect.height < 2) continue
+        if (rect.bottom <= 0 || rect.top >= vh) continue
+        const centerY = (rect.top + rect.bottom) / 2
+        candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom })
+      }
+    }
+
+    if (candidates.length === 0) {
       next = null
+    } else if (candidates.length === 1) {
+      next = candidates[0].id
     } else {
       const containing = candidates.filter((c) => c.top <= midY && c.bottom >= midY)
       if (containing.length === 1) {
@@ -96,10 +119,14 @@ function createAutoplayStore(scrollRootRef) {
     /** @returns {() => void} */
     register(id, getEl) {
       entries.set(id, getEl)
-      schedule()
+      queueMicrotask(() => {
+        schedule()
+      })
       return () => {
         entries.delete(id)
-        schedule()
+        queueMicrotask(() => {
+          schedule()
+        })
       }
     },
     subscribe(listener) {
@@ -145,8 +172,12 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
     if (ro && el) ro.observe(el)
 
     store.schedule()
+    const kick = requestAnimationFrame(() => {
+      store.schedule()
+    })
 
     return () => {
+      cancelAnimationFrame(kick)
       if (el) el.removeEventListener('scroll', onScrollOrResize)
       window.removeEventListener('resize', onScrollOrResize)
       if (ro && el) ro.disconnect()
@@ -167,7 +198,7 @@ export function useLoungeFeedVideoAutoplay(clientId, getContainerEl) {
   const ctx = useContext(LoungeFeedVideoAutoplayContext)
   const getEl = useCallback(() => getContainerEl(), [getContainerEl])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!ctx?.store || !clientId) return undefined
     return ctx.store.register(clientId, getEl)
   }, [ctx, clientId, getEl])
