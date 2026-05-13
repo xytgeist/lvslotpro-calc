@@ -1,0 +1,139 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import EdgeLogoWithEasterEgg from './EdgeLogoWithEasterEgg.jsx'
+
+/**
+ * Fixed EDGE title bar + scroll-linked hide/show — same chrome and tuning as
+ * `SocialFeed.jsx` / Guides (no composer coupling).
+ *
+ * @param {React.ReactNode} titleBarNavSlot — hamburger / shell menu (right).
+ * @param {React.ReactNode} children — scrollable body (placed inside padded column).
+ * @param {string} [contentClassName='px-3 pb-24'] — inner wrapper classes (horizontal padding + bottom inset).
+ */
+export default function ScrollLinkedEdgeTitleBarShell({
+  titleBarNavSlot = null,
+  children,
+  contentClassName = 'px-3 pb-24',
+}) {
+  const feedScrollRef = useRef(null)
+  const titleBarRef = useRef(null)
+  const scrollPrevTopRef = useRef(0)
+  const titleRevealRef = useRef(1)
+  const scrollVisualRafRef = useRef(0)
+  const [titleBarHeight, setTitleBarHeight] = useState(0)
+  const [titleReveal, setTitleReveal] = useState(1)
+  const [feedViewportTopPx, setFeedViewportTopPx] = useState(0)
+
+  useLayoutEffect(() => {
+    const bar = titleBarRef.current
+    if (!bar || typeof ResizeObserver === 'undefined') return
+    const apply = () => {
+      const h = Math.ceil(bar.getBoundingClientRect().height)
+      if (h > 0) setTitleBarHeight((prev) => (prev === h ? prev : h))
+    }
+    apply()
+    const ro = new ResizeObserver(() => apply())
+    ro.observe(bar)
+    return () => ro.disconnect()
+  }, [])
+
+  useLayoutEffect(() => {
+    const el = feedScrollRef.current
+    if (!el) return
+    const sync = () => {
+      setFeedViewportTopPx((prev) => {
+        const n = Math.round(el.getBoundingClientRect().top)
+        return prev === n ? prev : n
+      })
+    }
+    sync()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', sync)
+      return () => window.removeEventListener('resize', sync)
+    }
+    const ro = new ResizeObserver(sync)
+    ro.observe(el)
+    window.addEventListener('resize', sync)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', sync)
+    }
+  }, [])
+
+  useEffect(() => {
+    const el = feedScrollRef.current
+    if (!el || typeof window === 'undefined') return
+    scrollPrevTopRef.current = el.scrollTop
+    const titleRevealPerScrollPx = 220
+    const titleHidePerScrollPx = 190
+    const maxAbsScrollStepPx = 180
+    const minScrollStepPx = 0.35
+    const queueScrollVisualFlush = () => {
+      if (scrollVisualRafRef.current) return
+      scrollVisualRafRef.current = window.requestAnimationFrame(() => {
+        scrollVisualRafRef.current = 0
+        setTitleReveal(titleRevealRef.current)
+      })
+    }
+    const onScroll = () => {
+      const st = el.scrollTop
+      const prev = scrollPrevTopRef.current
+      const rawDelta = st - prev
+      scrollPrevTopRef.current = st
+      const eff =
+        rawDelta === 0 ? 0 : Math.sign(rawDelta) * Math.min(Math.abs(rawDelta), maxAbsScrollStepPx)
+
+      let r = titleRevealRef.current
+      if (st <= 2) {
+        r = 1
+      } else if (eff < -minScrollStepPx) {
+        r = Math.min(1, r + (-eff) / titleRevealPerScrollPx)
+      } else if (eff > minScrollStepPx) {
+        r = Math.max(0, r - eff / titleHidePerScrollPx)
+      }
+      if (r !== titleRevealRef.current) {
+        titleRevealRef.current = r
+        queueScrollVisualFlush()
+      }
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (scrollVisualRafRef.current) window.cancelAnimationFrame(scrollVisualRafRef.current)
+    }
+  }, [])
+
+  return (
+    <div className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <div
+        ref={titleBarRef}
+        className="fixed left-1/2 z-[50] w-full max-w-2xl border-b border-zinc-800/95 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 shadow-[0_1px_0_rgba(0,0,0,0.22)] will-change-transform"
+        style={{
+          top: feedViewportTopPx,
+          transform: `translate3d(-50%, ${-(1 - titleReveal) * (titleBarHeight > 0 ? titleBarHeight : 56)}px, 0)`,
+          pointerEvents: titleReveal > 0.12 ? 'auto' : 'none',
+        }}
+      >
+        <div className="flex items-center justify-between gap-3 px-3 py-2">
+          <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
+            <div className="pointer-events-none truncate text-right text-zinc-600 text-[13px]" />
+            {titleBarNavSlot}
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={feedScrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+      >
+        <div
+          aria-hidden
+          className="shrink-0"
+          style={{ height: titleBarHeight > 0 ? titleBarHeight : 56 }}
+        />
+
+        <div className={contentClassName}>{children}</div>
+      </div>
+    </div>
+  )
+}

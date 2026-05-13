@@ -17,7 +17,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const MUST_HIT = 1800
 const RTP_FLOOR_COUNTER = 850
 
-function BuffaloLink({ onBack, titleBarNavSlot = null }) {
+function BuffaloLink({ onBack }) {
   const [currentX, setCurrentX] = useState(1234)   // Changed default to 1234
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -217,8 +217,8 @@ function BuffaloLink({ onBack, titleBarNavSlot = null }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-4">
+    <div className="min-h-full bg-gray-950 pb-12">
+      <div className="max-w-lg mx-auto px-4 pt-1">
 
         {/* Large back chevron + Title with reduced padding */}
         <div className="flex items-center mb-4">
@@ -245,7 +245,7 @@ function BuffaloLink({ onBack, titleBarNavSlot = null }) {
             </h1>
           </div>
 
-          {titleBarNavSlot ? <div className="flex shrink-0 justify-end">{titleBarNavSlot}</div> : <div className="w-12 shrink-0" aria-hidden />}
+          <div className="w-12 shrink-0" aria-hidden />
         </div>
 
         {/* Counter + Bet + Denom */}

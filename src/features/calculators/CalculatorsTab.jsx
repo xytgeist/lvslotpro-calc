@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
+import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 
 const PhoenixLink = lazy(() => import('./games/PhoenixLink.jsx'))
 const BuffaloLink = lazy(() => import('./games/BuffaloLink.jsx'))
@@ -14,17 +14,11 @@ function CalculatorLoadingFallback() {
   )
 }
 
-function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout, onDeleteAccount, deleteAccountBusy, titleBarNavSlot }) {
+function CalculatorsHome({ onSelectCalculator, browseMode, onOpenAuth, onLogout, onDeleteAccount, deleteAccountBusy }) {
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
+    <div className="max-w-lg mx-auto px-1 pt-2 sm:pt-3">
     <div className="mb-10 text-left sm:mb-12">
-      <div className="flex items-center justify-between gap-3">
-        <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
-        {titleBarNavSlot ? (
-          <div className="flex min-w-0 shrink-0 items-center justify-end">{titleBarNavSlot}</div>
-        ) : null}
-      </div>
-      <p className="mt-4 text-base text-zinc-400">Select a calculator</p>
+      <p className="text-base text-zinc-400">Select a calculator</p>
     </div>
 
     <button
@@ -139,30 +133,45 @@ export default function CalculatorsTab({
 }) {
   if (!activeCalculator) {
     return (
-      <CalculatorsHome
-        onSelectCalculator={setActiveCalculator}
-        browseMode={browseMode}
-        onOpenAuth={onOpenAuth}
-        onLogout={onLogout}
-        onDeleteAccount={onDeleteAccount}
-        deleteAccountBusy={deleteAccountBusy}
-        titleBarNavSlot={titleBarNavSlot}
-      />
+      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pb-24">
+        <CalculatorsHome
+          onSelectCalculator={setActiveCalculator}
+          browseMode={browseMode}
+          onOpenAuth={onOpenAuth}
+          onLogout={onLogout}
+          onDeleteAccount={onDeleteAccount}
+          deleteAccountBusy={deleteAccountBusy}
+        />
+      </ScrollLinkedEdgeTitleBarShell>
     )
   }
   return (
-    <Suspense fallback={<CalculatorLoadingFallback />}>
+    <Suspense
+      fallback={
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pb-24">
+          <CalculatorLoadingFallback />
+        </ScrollLinkedEdgeTitleBarShell>
+      }
+    >
       {activeCalculator === 'phoenix' ? (
-        <PhoenixLink onBack={() => setActiveCalculator(null)} titleBarNavSlot={titleBarNavSlot} />
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pb-12">
+          <PhoenixLink onBack={() => setActiveCalculator(null)} />
+        </ScrollLinkedEdgeTitleBarShell>
       ) : null}
       {activeCalculator === 'buffalo' ? (
-        <BuffaloLink onBack={() => setActiveCalculator(null)} titleBarNavSlot={titleBarNavSlot} />
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pb-12">
+          <BuffaloLink onBack={() => setActiveCalculator(null)} />
+        </ScrollLinkedEdgeTitleBarShell>
       ) : null}
       {activeCalculator === 'stackup' ? (
-        <StackUpPays onBack={() => setActiveCalculator(null)} titleBarNavSlot={titleBarNavSlot} />
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pb-12">
+          <StackUpPays onBack={() => setActiveCalculator(null)} />
+        </ScrollLinkedEdgeTitleBarShell>
       ) : null}
       {activeCalculator === 'mhb' ? (
-        <MHBCalculator onBack={() => setActiveCalculator(null)} titleBarNavSlot={titleBarNavSlot} />
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pb-12">
+          <MHBCalculator onBack={() => setActiveCalculator(null)} />
+        </ScrollLinkedEdgeTitleBarShell>
       ) : null}
     </Suspense>
   )

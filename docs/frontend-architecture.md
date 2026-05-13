@@ -27,11 +27,11 @@ Roadmap detail: **`docs/social-feed-roadmap.md`** (section **Freemium & subscrip
 | **`shell/`** | `AppShell.jsx`, `shellClasses.js` (shared Tailwind class strings for layout/buttons where reused), `index.js` barrel. |
 | **`auth/`** | OAuth UI bits and URL callback helpers used by **`App.jsx`**. |
 | **`lounge/`** | Lounge social feed: **`SocialFeed.jsx`**, **`LoungePostArticle.jsx`**, **`LoungePostFeedMedia.jsx`**, **`LoungePostStreamVideo.jsx`** (Cloudflare Stream HLS via `hls.js` lazy chunk), **`LoungeProfileFullScreen.jsx`**, **`src/utils/loungeVideoUpload.js`**, caption helpers, storage keys, `index.js`. Rate-limit errors render **above** the composer. **Repost** uses an **anchored popover** under the control (not a bottom sheet). Feed **media carousels** reset to the first slide when the post row re-enters the viewport. **Video:** up to **60s**, Cloudflare Stream; **`LoungePostStreamVideo`** — muted **autoplay** when the clip is sufficiently in view (IntersectionObserver, optional scroll `root` from **`visibilityResetRootRef`**), **no inline controls** so a **single tap** opens a full-screen portal with sound when the browser allows it; small “Tap for sound” hint on the inset frame. Frame **`data-lounge-video-zoom`** excludes row-open on tap. Deleting the post invokes Edge **`lounge-cf-stream-delete-video`** before removing the row. |
-| **`guides/`** | AP guides: `GuidesScreen.jsx`, demo data, `index.js`. |
+| **`guides/`** | AP guides: `GuidesScreen.jsx` (uses **`ScrollLinkedEdgeTitleBarShell`** — same fixed EDGE title bar + scroll-hide as Lounge), demo data, `index.js`. |
 | **`offers/`** | Offers calendar: `OffersCalendar.jsx`, `offerStorageKeys.js`, `utils.js`, `hooks/`, `components/`, `index.js` (re-exports `OffersCalendar`). |
 | **`intel/`** | Local Intel (cities / casinos / posts): `LocalIntel.jsx`, `index.js`. |
 | **`bankroll/`** | Bankroll tracker UI scaffold: `BankrollTracker.jsx`, `index.js`. |
-| **`calculators/`** | **`CalculatorsTab.jsx`** (calculator picker + active game routing). Game implementations live under **`calculators/games/`** (`PhoenixLink`, `BuffaloLink`, `StackUpPays`, `MHBCalculator`). |
+| **`calculators/`** | **`CalculatorsTab.jsx`** (picker + lazy games); **`ScrollLinkedEdgeTitleBarShell`** for the same fixed EDGE bar + scroll-hide as Lounge/Guides. Game UIs in **`calculators/games/`**. |
 | **`profiles/`** | Shared profile gate helpers for Lounge + Guides (`profileGate.js`, etc.). Profile saves and **`handle_changed_at`** / cooldown-aware selects for the Lounge profile editor. |
 
 Shared non-feature code stays in **`src/utils/`**, **`src/components/`** (e.g. `CalculatorDisclaimer`), and **`src/constants/`** as before.

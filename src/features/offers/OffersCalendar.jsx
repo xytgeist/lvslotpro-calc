@@ -1237,10 +1237,13 @@ export default function OffersCalendar({
       <ReviewQueuePanel reviewQueue={reviewQueue} onComplete={beginReviewItem} onSkip={(itemId) => void skipReviewItem(itemId)} />
 
       <div className={isWeekView ? 'flex flex-1 min-h-0 flex-col gap-2' : 'mb-2'}>
-          <div className={`flex shrink-0 flex-col gap-1.5 ${isWeekView ? '' : 'mb-2'}`}>
-            <div className="flex w-full min-h-9 shrink-0 items-center justify-between gap-3">
+          <div className={`flex shrink-0 flex-col gap-1 ${isWeekView ? '' : 'mb-2'}`}>
+            <div className="-mx-4 -mt-1.5 flex w-[calc(100%+2rem)] shrink-0 items-center justify-between gap-3 px-3 py-1.5">
               <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
-              {titleBarNavSlot ? <div className="flex shrink-0 items-center justify-end pt-0.5">{titleBarNavSlot}</div> : null}
+              <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
+                <div className="pointer-events-none truncate text-right text-zinc-600 text-[13px]" />
+                {titleBarNavSlot}
+              </div>
             </div>
 
             <div className="flex w-full min-h-10 items-center px-1">

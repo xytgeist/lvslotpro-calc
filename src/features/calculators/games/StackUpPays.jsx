@@ -111,7 +111,7 @@ function getCalibratedStateRTP(overallRTP, meters) {
   return baseRTP + stateBonusRTP
 }
 
-function StackUpPays({ onBack, titleBarNavSlot = null }) {
+function StackUpPays({ onBack }) {
   const [mega, setMega] = useState(300)
   const [grand, setGrand] = useState(225)
   const [major, setMajor] = useState(175)
@@ -247,8 +247,8 @@ function StackUpPays({ onBack, titleBarNavSlot = null }) {
   }, [calculate])
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-6">
+    <div className="min-h-full bg-slate-950 pb-12">
+      <div className="max-w-lg mx-auto px-4 pt-1">
 
         {/* Title block */}
         <div className="flex items-center mb-6">
@@ -275,7 +275,7 @@ function StackUpPays({ onBack, titleBarNavSlot = null }) {
             </div>
           </div>
 
-          {titleBarNavSlot ? <div className="flex shrink-0 justify-end">{titleBarNavSlot}</div> : <div className="w-12 shrink-0" aria-hidden />}
+          <div className="w-12 shrink-0" aria-hidden />
         </div>
 
         {/* Bet Size + Denomination + RTP Override */}

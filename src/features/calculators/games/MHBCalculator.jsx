@@ -257,7 +257,7 @@ function formatUsd(amount) {
   }).format(n)
 }
 
-function MHBCalculator({ onBack, titleBarNavSlot = null }) {
+function MHBCalculator({ onBack }) {
   const [manufacturer, setManufacturer] = useState('ainsworth')
   const [igtTier, setIgtTier] = useState('mini')
   const [igtLineBet, setIgtLineBet] = useState(1)
@@ -707,8 +707,8 @@ function MHBCalculator({ onBack, titleBarNavSlot = null }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-6">
+    <div className="min-h-full bg-gray-950 pb-12">
+      <div className="max-w-lg mx-auto px-4 pt-1">
 
         {/* Title */}
         <div className="flex items-center mb-6">
@@ -743,7 +743,6 @@ function MHBCalculator({ onBack, titleBarNavSlot = null }) {
             >
               i
             </button>
-            {titleBarNavSlot}
           </div>
         </div>
 

@@ -46,7 +46,7 @@ import {
   uploadProfileAvatar,
 } from '../profiles/profileGate'
 import { loungeProfileNeedsGate, writeProfileGateAck } from '../lounge/loungeStorage'
-import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
+import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 
 /** Calculator / generic placeholder art for Buffalo Link — also used when a guide hero fails to load. */
 const BUFFALO_PLACEHOLDER_SRC = '/guides/buffalo-link/buffalo-link-calculator-icon.webp'
@@ -1453,15 +1453,10 @@ export default function GuidesScreen({
   }, [rows, query])
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))] pb-24">
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="sr-only">AP Guides</h1>
-          <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
-          <div className="mt-2 text-sm text-zinc-400">+EV quick read · expand for full playbook</div>
-        </div>
-        {titleBarNavSlot ? <div className="shrink-0 pt-0.5">{titleBarNavSlot}</div> : null}
-      </div>
+    <>
+      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pb-24">
+        <h1 className="sr-only">AP Guides</h1>
+        <div className="mb-5 mt-1 text-sm text-zinc-400">+EV quick read · expand for full playbook</div>
 
       <label className="block mb-5">
         <span className="sr-only">Search guides</span>
@@ -1524,7 +1519,7 @@ export default function GuidesScreen({
                     if (el) guideCardRefs.current[slug] = el
                     else delete guideCardRefs.current[slug]
                   }}
-                  className={`rounded-3xl border overflow-hidden bg-zinc-900 scroll-mt-[max(0.5rem,env(safe-area-inset-top))] transition-[box-shadow,border-color,ring-color] duration-200 ${
+                  className={`rounded-3xl border overflow-hidden bg-zinc-900 scroll-mt-14 transition-[box-shadow,border-color,ring-color] duration-200 ${
                     expanded
                       ? `${accent.expandedBorder} ring-1 ring-white/[0.07] shadow-2xl`
                       : 'border-zinc-700/85 ring-1 ring-zinc-500/15 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.65)]'
@@ -1711,6 +1706,8 @@ export default function GuidesScreen({
         </ul>
       )}
 
+      </ScrollLinkedEdgeTitleBarShell>
+
       <AskCommunityModal
         open={!!askFor}
         guideRow={askFor}
@@ -1722,6 +1719,6 @@ export default function GuidesScreen({
           onNavigateHome?.()
         }}
       />
-    </div>
+    </>
   )
 }
