@@ -44,7 +44,10 @@ import {
   writeProfileGateAck,
 } from './loungeStorage'
 import { executeLoungeCommunityPostSubmission } from './loungePostSubmitJob'
-import { runComposerStreamVideoPrepWithRetries } from './loungeComposerVideoPrep.js'
+import {
+  runComposerStreamVideoPrepWithRetries,
+  uploadEncodedVideoToCfStreamWithRetries,
+} from './loungeComposerVideoPrep.js'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
 import { renderRichCaption } from './loungeCaption'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
@@ -192,6 +195,8 @@ export default function SocialFeed({
   const composerVideoPrepAbortRef = useRef(null)
   /** Last spec passed to `runComposerStreamVideoPrepWithRetries` (for Retry after prep failure). */
   const composerVideoPrepSpecRef = useRef(null)
+  /** After encode completes (same prep job), reused so a failed handoff / post retry does not re-run FFmpeg. */
+  const composerVideoLastEncodedFileRef = useRef(/** @type {File | null} */ (null))
   /**
    * In-flight composer prep handoff for posts submitted before prep finishes.
    * @type {{ jobId: number, promise: Promise<{ encodedFile: File, streamVideoUid: string }>, resolve: (v: { encodedFile: File, streamVideoUid: string }) => void, reject: (e: unknown) => void, settled: boolean } | null}
@@ -791,6 +796,7 @@ export default function SocialFeed({
         // ignore
       }
       const jobId = (composerVideoPrepJobIdRef.current += 1)
+      composerVideoLastEncodedFileRef.current = null
       const ac = new AbortController()
       composerVideoPrepAbortRef.current = ac
       composerVideoPrepSpecRef.current = spec
@@ -839,6 +845,9 @@ export default function SocialFeed({
             supabaseClient,
             signal: ac.signal,
             spec,
+            onEncodedFileReady: (f) => {
+              composerVideoLastEncodedFileRef.current = f
+            },
             onProgress: (info) => {
               if (composerVideoPrepJobIdRef.current !== jobId) return
               setLoungePostUploadBar((bar) =>
@@ -861,6 +870,7 @@ export default function SocialFeed({
             return
           }
           handoff.resolve(result)
+          composerVideoLastEncodedFileRef.current = null
           const { encodedFile, streamVideoUid } = result
           setComposerVideoSlot((prev) => {
             if (!prev || prev.prepJobId !== jobId) return prev
@@ -941,6 +951,7 @@ export default function SocialFeed({
       // ignore
     }
     composerVideoPrepAbortRef.current = null
+    composerVideoLastEncodedFileRef.current = null
     disposeComposerVideoMedia(composerVideoSlotRef.current)
     setComposerVideoSlot(null)
     setLoungePostUploadBar(null)
@@ -2538,6 +2549,7 @@ export default function SocialFeed({
       }
       composerVideoPrepAbortRef.current = null
       disposeComposerVideoMedia(composerVideoSlotRef.current)
+      composerVideoLastEncodedFileRef.current = null
     }
   }, [disposeComposerVideoMedia])
 
@@ -2592,6 +2604,44 @@ export default function SocialFeed({
 
           /** @type {{ encodedFile: File, streamVideoUid: string }} */
           let out
+          const onPrepProgressWhilePosting = (info) => {
+            if (ac.signal.aborted) return
+            setLoungePostUploadBar({
+              ...(mediaUploadBarSkin
+                ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                : { mode: 'post' }),
+              progress: 0.06 + (typeof info.progress === 'number' ? info.progress : 0) * 0.38,
+              status: String(info.status || ''),
+              detail: String(info.detail || ''),
+            })
+          }
+
+          const runPrepForPosting = async () => {
+            if (!snap.videoPrepSpec) throw new Error('Video preparation was interrupted.')
+            const reuse = composerVideoLastEncodedFileRef.current
+            if (reuse) {
+              const { streamVideoUid } = await uploadEncodedVideoToCfStreamWithRetries({
+                supabaseClient,
+                signal: ac.signal,
+                uploadFile: reuse,
+                onProgress: onPrepProgressWhilePosting,
+              })
+              composerVideoLastEncodedFileRef.current = null
+              return { encodedFile: reuse, streamVideoUid }
+            }
+            const prepOut = await runComposerStreamVideoPrepWithRetries({
+              supabaseClient,
+              signal: ac.signal,
+              spec: snap.videoPrepSpec,
+              onEncodedFileReady: (f) => {
+                composerVideoLastEncodedFileRef.current = f
+              },
+              onProgress: onPrepProgressWhilePosting,
+            })
+            composerVideoLastEncodedFileRef.current = null
+            return prepOut
+          }
+
           const awaitingId = snap.awaitingComposerVideoPrepJobId
           const h = composerVideoPrepHandoffRef.current
           if (awaitingId != null && h && h.jobId === awaitingId) {
@@ -2600,40 +2650,10 @@ export default function SocialFeed({
             } catch (e) {
               if (e?.name === 'AbortError') throw e
               if (!snap.videoPrepSpec) throw e
-              out = await runComposerStreamVideoPrepWithRetries({
-                supabaseClient,
-                signal: ac.signal,
-                spec: snap.videoPrepSpec,
-                onProgress: (info) => {
-                  if (ac.signal.aborted) return
-                  setLoungePostUploadBar({
-                    ...(mediaUploadBarSkin
-                      ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
-                      : { mode: 'post' }),
-                    progress: 0.06 + (typeof info.progress === 'number' ? info.progress : 0) * 0.38,
-                    status: String(info.status || ''),
-                    detail: String(info.detail || ''),
-                  })
-                },
-              })
+              out = await runPrepForPosting()
             }
           } else if (snap.videoPrepSpec) {
-            out = await runComposerStreamVideoPrepWithRetries({
-              supabaseClient,
-              signal: ac.signal,
-              spec: snap.videoPrepSpec,
-              onProgress: (info) => {
-                if (ac.signal.aborted) return
-                setLoungePostUploadBar({
-                  ...(mediaUploadBarSkin
-                    ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
-                    : { mode: 'post' }),
-                  progress: 0.06 + (typeof info.progress === 'number' ? info.progress : 0) * 0.38,
-                  status: String(info.status || ''),
-                  detail: String(info.detail || ''),
-                })
-              },
-            })
+            out = await runPrepForPosting()
           } else {
             throw new Error('Video preparation was interrupted.')
           }

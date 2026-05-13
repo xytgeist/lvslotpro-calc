@@ -19,17 +19,15 @@ function sleep(ms) {
 }
 
 /**
- * Encode (when trim), upload to Cloudflare Stream, wait for manifest — with retries on failure.
- * On-device encode and duration checks run once; retries repeat only mint → upload → manifest.
+ * On-device encode (trim) or pass-through file — once per logical clip.
  *
  * @param {object} opts
- * @param {import('@supabase/supabase-js').SupabaseClient} opts.supabaseClient
  * @param {AbortSignal} opts.signal
  * @param {{ kind: 'direct', file: File } | { kind: 'trim', sourceFile: File, startSec: number, endSec: number, cropPx: { x: number, y: number, w: number, h: number } | null, intrinsicWidth: number, intrinsicHeight: number }} opts.spec
  * @param {(info: { progress: number, status: string, detail?: string, attempt: number }) => void} [opts.onProgress]
- * @returns {Promise<{ encodedFile: File, streamVideoUid: string }>}
+ * @returns {Promise<File>}
  */
-export async function runComposerStreamVideoPrepWithRetries({ supabaseClient, signal, spec, onProgress }) {
+export async function encodeComposerVideoFileFromSpec({ signal, spec, onProgress }) {
   const report = (progress, status, detail, attempt) => {
     if (typeof onProgress !== 'function') return
     onProgress({
@@ -73,6 +71,32 @@ export async function runComposerStreamVideoPrepWithRetries({ supabaseClient, si
     throw new Error(`Video must be ${LOUNGE_VIDEO_MAX_SECONDS} seconds or shorter.`)
   }
 
+  return uploadFile
+}
+
+/**
+ * Mint → upload → manifest retries only (caller supplies the encoded `File`).
+ *
+ * @param {object} opts
+ * @param {import('@supabase/supabase-js').SupabaseClient} opts.supabaseClient
+ * @param {AbortSignal} opts.signal
+ * @param {File} opts.uploadFile
+ * @param {(info: { progress: number, status: string, detail?: string, attempt: number }) => void} [opts.onProgress]
+ * @returns {Promise<{ streamVideoUid: string }>}
+ */
+export async function uploadEncodedVideoToCfStreamWithRetries({ supabaseClient, signal, uploadFile, onProgress }) {
+  const report = (progress, status, detail, attempt) => {
+    if (typeof onProgress !== 'function') return
+    onProgress({
+      progress: Math.max(0, Math.min(1, progress)),
+      status: String(status || ''),
+      detail: detail ? String(detail) : '',
+      attempt,
+    })
+  }
+
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+
   /** @type {Error | null} */
   let lastErr = null
 
@@ -111,7 +135,7 @@ export async function runComposerStreamVideoPrepWithRetries({ supabaseClient, si
       })
 
       report(1, 'Ready', '', attempt)
-      return { encodedFile: uploadFile, streamVideoUid: uid }
+      return { streamVideoUid: uid }
     } catch (e) {
       if (e && typeof e === 'object' && 'name' in e && /** @type {{ name?: string }} */ (e).name === 'AbortError') {
         if (pendingUid) {
@@ -137,4 +161,35 @@ export async function runComposerStreamVideoPrepWithRetries({ supabaseClient, si
   }
 
   throw lastErr || new Error('Video upload failed after multiple attempts.')
+}
+
+/**
+ * Encode (when trim), upload to Cloudflare Stream, wait for manifest — with retries on failure.
+ * On-device encode and duration checks run once; retries repeat only mint → upload → manifest.
+ *
+ * @param {object} opts
+ * @param {import('@supabase/supabase-js').SupabaseClient} opts.supabaseClient
+ * @param {AbortSignal} opts.signal
+ * @param {{ kind: 'direct', file: File } | { kind: 'trim', sourceFile: File, startSec: number, endSec: number, cropPx: { x: number, y: number, w: number, h: number } | null, intrinsicWidth: number, intrinsicHeight: number }} opts.spec
+ * @param {(info: { progress: number, status: string, detail?: string, attempt: number }) => void} [opts.onProgress]
+ * @param {(file: File) => void} [opts.onEncodedFileReady] Called once after encode + validation, before Cloudflare attempts (for post-job reuse without re-encoding).
+ * @returns {Promise<{ encodedFile: File, streamVideoUid: string }>}
+ */
+export async function runComposerStreamVideoPrepWithRetries({
+  supabaseClient,
+  signal,
+  spec,
+  onProgress,
+  onEncodedFileReady,
+}) {
+  const uploadFile = await encodeComposerVideoFileFromSpec({ signal, spec, onProgress })
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+  onEncodedFileReady?.(uploadFile)
+  const { streamVideoUid } = await uploadEncodedVideoToCfStreamWithRetries({
+    supabaseClient,
+    signal,
+    uploadFile,
+    onProgress,
+  })
+  return { encodedFile: uploadFile, streamVideoUid }
 }
