@@ -16,6 +16,12 @@ function formatClock(sec) {
 /** Downscale wide frames so poster data URLs stay small. */
 const POSTER_MAX_WIDTH = 960
 
+/** Hidden probe: scan from t=0 for first frame that is not decoder black. */
+const POSTER_SCAN_STEP_SEC = 0.13
+const POSTER_SCAN_MAX_T = 2.1
+const POSTER_SCAN_MAX_STEPS = 18
+const POSTER_SEEK_WAIT_MS = 240
+
 /** Seek preview; if `resumePlay`, continue playback (e.g. user had pressed play on native controls). */
 function seekPreviewMaybeResume(video, timeSec, resumePlay) {
   if (!video) return
@@ -69,6 +75,103 @@ async function primePosterFrameForCanvas(video) {
   }
 }
 
+function waitSeeked(video, targetT, timeoutMs) {
+  return new Promise((resolve) => {
+    if (!video) {
+      resolve()
+      return
+    }
+    const cap =
+      Number.isFinite(video.duration) && video.duration > 0 ? Math.max(0, video.duration - 0.02) : 1e9
+    const target = Math.min(Math.max(0, targetT), cap)
+    let settled = false
+    const done = () => {
+      if (settled) return
+      settled = true
+      video.removeEventListener('seeked', onSeeked)
+      window.clearTimeout(tm)
+      resolve()
+    }
+    const onSeeked = () => done()
+    const tm = window.setTimeout(done, timeoutMs)
+    if (Math.abs(video.currentTime - target) < 0.028) {
+      done()
+      return
+    }
+    video.addEventListener('seeked', onSeeked)
+    try {
+      video.currentTime = target
+    } catch {
+      done()
+    }
+  })
+}
+
+function waitPaintTick(video) {
+  if (!video) return Promise.resolve()
+  if (typeof video.requestVideoFrameCallback === 'function') {
+    return new Promise((resolve) => {
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        resolve()
+      }
+      try {
+        video.requestVideoFrameCallback(() => finish())
+      } catch {
+        finish()
+      }
+      window.setTimeout(finish, 140)
+    })
+  }
+  return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+}
+
+/** Sample a downscaled frame: mean luma + fraction of near-black pixels. */
+function analyzeFrameBlackness(video) {
+  const vw = video.videoWidth
+  const vh = video.videoHeight
+  if (!(vw > 1) || !(vh > 1)) return { mean: 0, darkRatio: 1 }
+  const tw = 64
+  const th = Math.max(2, Math.round((vh / vw) * tw))
+  const c = document.createElement('canvas')
+  c.width = tw
+  c.height = th
+  const ctx = c.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return { mean: 0, darkRatio: 1 }
+  try {
+    ctx.drawImage(video, 0, 0, tw, th)
+  } catch {
+    return { mean: 0, darkRatio: 1 }
+  }
+  let id
+  try {
+    id = ctx.getImageData(0, 0, tw, th)
+  } catch {
+    return { mean: 0, darkRatio: 1 }
+  }
+  const d = id.data
+  const pixels = tw * th
+  let sum = 0
+  let dark = 0
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i]
+    const g = d[i + 1]
+    const b = d[i + 2]
+    const y = 0.299 * r + 0.587 * g + 0.114 * b
+    sum += y
+    if (y < 16) dark += 1
+  }
+  return { mean: sum / pixels, darkRatio: dark / pixels }
+}
+
+function isNearlyBlack(a) {
+  if (a.mean >= 18) return false
+  if (a.mean <= 6) return true
+  return a.darkRatio > 0.88 && a.mean < 15
+}
+
 /**
  * Trim a video to at most 60s: draggable window on the full timeline (cannot widen past 60s).
  *
@@ -99,6 +202,8 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
   const posterCapturedRef = useRef(false)
   const posterObjectUrlRef = useRef('')
   const posterSeekScheduledRef = useRef(false)
+  /** Incremented when `file` changes so an in-flight poster scan cannot commit after swap. */
+  const posterScanGenRef = useRef(0)
 
   useEffect(() => {
     clipRef.current = { start: clipStart, end: clipEnd }
@@ -142,6 +247,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
 
   useEffect(() => {
     if (!file) return undefined
+    posterScanGenRef.current += 1
     const u = URL.createObjectURL(file)
     const uProbe = URL.createObjectURL(file)
     urlRef.current = u
@@ -275,53 +381,53 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
     }
   }, [])
 
-  const beginPosterProbeCapture = useCallback(() => {
+  const scheduleProbePosterScan = useCallback(() => {
     if (posterCapturedRef.current || posterSeekScheduledRef.current) return
-    const v = posterVideoRef.current
-    if (!v || v.readyState < 1 || v.videoWidth < 2) return
+    const probe = posterVideoRef.current
+    if (!probe || probe.readyState < 1 || probe.videoWidth < 2) return
+    const dur = probe.duration
+    if (!Number.isFinite(dur) || dur <= 0) return
 
     posterSeekScheduledRef.current = true
-    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
-    const seekTo = dur > 0 ? Math.min(0.12, dur * 0.004) : 0.08
+    const gen = posterScanGenRef.current
 
-    let finished = false
-    let fallbackTimer = 0
-    function runCapture() {
-      if (finished) return
-      finished = true
-      window.clearTimeout(fallbackTimer)
-      v.removeEventListener('seeked', onSeeked)
-      void (async () => {
-        try {
-          const probe = posterVideoRef.current
-          if (!probe) {
-            return
+    void (async () => {
+      try {
+        let v = posterVideoRef.current
+        if (!v || gen !== posterScanGenRef.current) return
+        await primePosterFrameForCanvas(v)
+        v = posterVideoRef.current
+        if (!v || gen !== posterScanGenRef.current) return
+
+        const maxT = Math.min(Math.max(0, dur - 0.02), POSTER_SCAN_MAX_T)
+        let chosenT = Math.min(0.04, maxT)
+
+        for (let i = 0; i < POSTER_SCAN_MAX_STEPS; i += 1) {
+          if (gen !== posterScanGenRef.current) return
+          const at = Math.min(i * POSTER_SCAN_STEP_SEC, maxT)
+          await waitSeeked(v, at, POSTER_SEEK_WAIT_MS)
+          v = posterVideoRef.current
+          if (!v || gen !== posterScanGenRef.current) return
+          await waitPaintTick(v)
+          if (gen !== posterScanGenRef.current) return
+          const sample = analyzeFrameBlackness(v)
+          chosenT = Math.min(v.currentTime, maxT)
+          if (!isNearlyBlack(sample)) {
+            break
           }
-          await primePosterFrameForCanvas(probe)
-          capturePosterFromVideo(posterVideoRef.current ?? probe)
-        } catch {
-          capturePosterFromVideo(posterVideoRef.current ?? v)
-        } finally {
-          posterSeekScheduledRef.current = false
         }
-      })()
-    }
-    function onSeeked() {
-      runCapture()
-    }
 
-    fallbackTimer = window.setTimeout(runCapture, 520)
-
-    v.addEventListener('seeked', onSeeked)
-    try {
-      if (Math.abs(v.currentTime - seekTo) < 0.03) {
-        runCapture()
-        return
+        if (gen !== posterScanGenRef.current) return
+        v = posterVideoRef.current
+        if (!v) return
+        await waitSeeked(v, chosenT, POSTER_SEEK_WAIT_MS)
+        await waitPaintTick(v)
+        if (gen !== posterScanGenRef.current) return
+        capturePosterFromVideo(posterVideoRef.current ?? v)
+      } finally {
+        posterSeekScheduledRef.current = false
       }
-      v.currentTime = seekTo
-    } catch {
-      runCapture()
-    }
+    })()
   }, [capturePosterFromVideo])
 
   const startLeftDrag = useCallback(
@@ -550,11 +656,11 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, onCancel,
             aria-hidden
             tabIndex={-1}
             className="pointer-events-none fixed left-[-9999px] top-0 z-0 h-16 w-16 overflow-hidden opacity-0"
-            onLoadedData={beginPosterProbeCapture}
+            onLoadedData={scheduleProbePosterScan}
             onLoadedMetadata={() => {
-              requestAnimationFrame(() => beginPosterProbeCapture())
+              requestAnimationFrame(() => scheduleProbePosterScan())
             }}
-            onCanPlay={beginPosterProbeCapture}
+            onCanPlay={scheduleProbePosterScan}
           />
         </div>
 
