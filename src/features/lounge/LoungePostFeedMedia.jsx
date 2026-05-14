@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { feedPostImageUrls, feedPostStreamVideoUid } from '../../utils/communityFeedPost'
 import { LoungePostMediaPair, LoungeImageLightbox } from './LoungeInlineMediaUrl.jsx'
 import LoungePostStreamVideo from './LoungePostStreamVideo.jsx'
+import { peekLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 
 /** Match `LoungeInlineMediaUrl`: border wraps intrinsic image size (`w-auto`), not a fixed slide width. */
 const imgClassByVariant = {
@@ -258,6 +259,7 @@ export function LoungePostFeedImagesAndGif({
   visibilityResetRootRef,
 }) {
   const streamUid = feedPostStreamVideoUid(post)
+  const sessionStreamPosterUrl = streamUid ? peekLoungeStreamSessionPoster(streamUid) : ''
   const feedAutoplayClientId =
     (variant === 'feed' || variant === 'embed') && post?.id && streamUid && enableLightbox
       ? `${post.id}:${streamUid}`
@@ -272,6 +274,7 @@ export function LoungePostFeedImagesAndGif({
         enableLightbox={enableLightbox}
         visibilityResetRootRef={visibilityResetRootRef}
         feedAutoplayClientId={feedAutoplayClientId}
+        sessionPosterUrl={sessionStreamPosterUrl || undefined}
       />
     )
   }

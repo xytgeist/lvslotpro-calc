@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoUpload'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
+import { releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 
 /** Keep in sync with `imgClassByVariant` in `LoungePostFeedMedia.jsx` (same caps; media sets frame width via w-auto). */
 const videoClassByVariant = {
@@ -364,6 +365,7 @@ function SoundOnGlyph({ className = 'h-4 w-4' }) {
  * @param {import('react').RefObject<HTMLElement | null>} [visibilityResetRootRef] — Optional scroll root for in-view
  *   checks; when omitted, intersection uses the viewport (still correct when the feed scrolls inside the window).
  * @param {string} [feedAutoplayClientId] — When inside `LoungeFeedVideoAutoplayProvider`, only the mid-scroll winner attaches/plays.
+ * @param {string} [sessionPosterUrl] — Optional `blob:` JPEG from composer; shown until CF `thumbnail.jpg` loads (same-tab session pin).
  */
 export default function LoungePostStreamVideo({
   uid,
@@ -372,7 +374,9 @@ export default function LoungePostStreamVideo({
   enableLightbox = true,
   visibilityResetRootRef,
   feedAutoplayClientId,
+  sessionPosterUrl: sessionPosterUrlProp = '',
 }) {
+  const sessionPosterUrl = String(sessionPosterUrlProp || '').trim()
   const containerRef = useRef(null)
   const videoRef = useRef(null)
   const inViewRef = useRef(false)
@@ -391,6 +395,8 @@ export default function LoungePostStreamVideo({
   const [posterDecodeOk, setPosterDecodeOk] = useState(false)
   /** Bumped to bust CDN cache while CF thumbnail is still generating. */
   const [posterBust, setPosterBust] = useState(0)
+  /** When false, in-flow `<img>` uses `sessionPosterUrl` (stable layout); CF loads off-DOM until true. */
+  const [cfPosterActive, setCfPosterActive] = useState(() => !sessionPosterUrl)
   const posterRetryTimerRef = useRef(0)
   const posterAttemptRef = useRef(0)
   const id = String(uid || '').trim()
@@ -401,6 +407,12 @@ export default function LoungePostStreamVideo({
     const sep = poster.includes('?') ? '&' : '?'
     return `${poster}${sep}_pv=${posterBust}`
   }, [poster, posterBust])
+
+  const visiblePosterSrc = useMemo(() => {
+    if (cfPosterActive || !sessionPosterUrl) return posterDisplayUrl
+    return sessionPosterUrl
+  }, [cfPosterActive, sessionPosterUrl, posterDisplayUrl])
+
   const showOpen = enableLightbox && variant !== 'composer'
   const lazyStream = showOpen && (variant === 'feed' || variant === 'embed')
 
@@ -411,8 +423,57 @@ export default function LoungePostStreamVideo({
     posterAttemptRef.current = 0
     window.clearTimeout(posterRetryTimerRef.current)
     posterRetryTimerRef.current = 0
-  }, [id])
+    setCfPosterActive(!sessionPosterUrl)
+  }, [id, sessionPosterUrl])
+
+  /** Off-DOM CF thumbnail fetch while the visible `<img>` still shows the session `blob:` poster. */
+  useEffect(() => {
+    if (!sessionPosterUrl || !id || !poster) return undefined
+    let cancelled = false
+    let attempt = 0
+    let bust = 0
+    let timer = 0
+
+    const bustUrl = () => {
+      const base = cfStreamPosterUrl(id, 720)
+      const sep = base.includes('?') ? '&' : '?'
+      return `${base}${sep}_pv=${bust}`
+    }
+
+    const arm = () => {
+      if (cancelled) return
+      const im = new Image()
+      im.onload = () => {
+        if (cancelled) return
+        setPosterBust(bust)
+        setPosterDecodeOk(false)
+        setPosterLayoutFailed(false)
+        posterAttemptRef.current = 0
+        setCfPosterActive(true)
+        queueMicrotask(() => releaseLoungeStreamSessionPoster(id))
+      }
+      im.onerror = () => {
+        if (cancelled) return
+        attempt += 1
+        if (attempt > CF_POSTER_RETRY_MAX) return
+        bust += 1
+        const delay = Math.min(2200, 140 + attempt * 95)
+        timer = window.setTimeout(arm, delay)
+      }
+      im.src = bustUrl()
+    }
+
+    arm()
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [id, poster, sessionPosterUrl])
   const onPosterImgError = useCallback(() => {
+    if (!cfPosterActive) {
+      setCfPosterActive(true)
+      return
+    }
     posterAttemptRef.current += 1
     if (posterAttemptRef.current > CF_POSTER_RETRY_MAX) {
       setPosterLayoutFailed(true)
@@ -424,7 +485,7 @@ export default function LoungePostStreamVideo({
       posterRetryTimerRef.current = 0
       setPosterBust((b) => b + 1)
     }, delay)
-  }, [])
+  }, [cfPosterActive])
 
   useEffect(
     () => () => {
@@ -894,15 +955,15 @@ export default function LoungePostStreamVideo({
                   loop
                   playsInline
                   preload={variant === 'composer' ? 'auto' : 'metadata'}
-                  poster={posterDisplayUrl || poster}
+                  poster={visiblePosterSrc}
                   aria-hidden
                   onError={onInlineStreamError}
                 />
               ) : (
                 <>
                   <img
-                    key={posterDisplayUrl}
-                    src={posterDisplayUrl}
+                    key={visiblePosterSrc}
+                    src={visiblePosterSrc}
                     alt=""
                     decoding="async"
                     draggable={false}
@@ -925,7 +986,7 @@ export default function LoungePostStreamVideo({
                     loop
                     playsInline
                     preload={variant === 'composer' ? 'auto' : 'metadata'}
-                    poster={posterDisplayUrl || poster}
+                    poster={visiblePosterSrc}
                     aria-hidden
                     onError={onInlineStreamError}
                   />

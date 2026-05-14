@@ -59,6 +59,7 @@ import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeVideoCropModal from './LoungeVideoCropModal.jsx'
+import { pinLoungeStreamSessionPoster, releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 import KlipyGifPicker from './KlipyGifPicker.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 
@@ -2386,6 +2387,17 @@ export default function SocialFeed({
 
   const clearComposerForPostAttempt = useCallback((opts = {}) => {
     const preserve = Boolean(opts.preserveComposerVideoPrep)
+    const snap = loungePostSnapshotRef.current
+    const pendingPoster =
+      snap && typeof snap.sessionStreamPosterBlobUrl === 'string'
+        ? snap.sessionStreamPosterBlobUrl.trim()
+        : ''
+    const skipRevoke = new Set()
+    if (pendingPoster.startsWith('blob:')) {
+      skipRevoke.add(pendingPoster)
+      const sl = composerVideoSlotRef.current
+      if (sl?.preview && sl.preview === pendingPoster) skipRevoke.add(sl.preview)
+    }
     if (!preserve) {
       const h = composerVideoPrepHandoffRef.current
       if (h && !h.settled) {
@@ -2416,15 +2428,15 @@ export default function SocialFeed({
       return []
     })
     setComposerVideoSlot((prev) => {
-      if (!preserve) {
-        if (prev?.preview) {
+      if (!preserve && prev) {
+        if (prev.preview && !skipRevoke.has(prev.preview)) {
           try {
             URL.revokeObjectURL(prev.preview)
           } catch {
             // ignore
           }
         }
-        if (prev?.posterUrl && prev.posterUrl !== prev.preview) {
+        if (prev.posterUrl && !skipRevoke.has(prev.posterUrl)) {
           try {
             URL.revokeObjectURL(prev.posterUrl)
           } catch {
@@ -2447,6 +2459,11 @@ export default function SocialFeed({
       if (el) el.value = ''
     } catch {
       // ignore
+    }
+
+    const postUid = snap && String(snap.streamVideoUid || '').trim()
+    if (postUid && pendingPoster.startsWith('blob:')) {
+      pinLoungeStreamSessionPoster(postUid, pendingPoster)
     }
   }, [])
 
@@ -2541,7 +2558,18 @@ export default function SocialFeed({
       composerVideoPrepJobIdRef.current += 1
       composerVideoPrepHandoffRef.current = null
     }
-    restoreComposerFromSnapshot(loungePostSnapshotRef.current)
+    const cancelSnap = loungePostSnapshotRef.current
+    restoreComposerFromSnapshot(cancelSnap)
+    if (cancelSnap) {
+      const cUid = String(cancelSnap.streamVideoUid || '').trim()
+      if (
+        cUid &&
+        typeof cancelSnap.sessionStreamPosterBlobUrl === 'string' &&
+        cancelSnap.sessionStreamPosterBlobUrl.startsWith('blob:')
+      ) {
+        releaseLoungeStreamSessionPoster(cUid)
+      }
+    }
     loungePostSnapshotRef.current = null
   }, [restoreComposerFromSnapshot])
 
@@ -2699,6 +2727,12 @@ export default function SocialFeed({
             awaitingComposerVideoPrepJobId: null,
           }
           loungePostSnapshotRef.current = snap
+          const pend =
+            typeof snap.sessionStreamPosterBlobUrl === 'string' ? snap.sessionStreamPosterBlobUrl.trim() : ''
+          const nu = String(snap.streamVideoUid || '').trim()
+          if (nu && pend.startsWith('blob:')) {
+            pinLoungeStreamSessionPoster(nu, pend)
+          }
           if (
             snapshot.awaitingComposerVideoPrepJobId != null &&
             composerVideoPrepHandoffRef.current?.jobId === snapshot.awaitingComposerVideoPrepJobId
@@ -2737,6 +2771,13 @@ export default function SocialFeed({
         await loadCommunityFeed()
       } catch (e) {
         if (e?.name === 'AbortError') return
+        const failUid = String(snap.streamVideoUid || '').trim()
+        const hadSessionPoster =
+          typeof snap.sessionStreamPosterBlobUrl === 'string' &&
+          snap.sessionStreamPosterBlobUrl.startsWith('blob:')
+        if (failUid && hadSessionPoster) {
+          releaseLoungeStreamSessionPoster(failUid)
+        }
         const curSnap = loungePostSnapshotRef.current
         if (curSnap?.awaitingComposerVideoPrepJobId != null) {
           loungePostSnapshotRef.current = { ...curSnap, awaitingComposerVideoPrepJobId: null }
@@ -2802,6 +2843,14 @@ export default function SocialFeed({
     if (snap) {
       persistLoungeComposerDraft(snap.caption, false, false, snap.gifOnlyUrl)
       setPostErr('Draft saved. Re-add photos or video if you had any.')
+      const cUid = String(snap.streamVideoUid || '').trim()
+      if (
+        cUid &&
+        typeof snap.sessionStreamPosterBlobUrl === 'string' &&
+        snap.sessionStreamPosterBlobUrl.startsWith('blob:')
+      ) {
+        releaseLoungeStreamSessionPoster(cUid)
+      }
     }
     loungePostSnapshotRef.current = null
     loungePostJobRunningRef.current = false
@@ -2818,7 +2867,18 @@ export default function SocialFeed({
       setLoungePostUploadFailureDetails(null)
       return
     }
-    restoreComposerFromSnapshot(loungePostSnapshotRef.current)
+    const failSnap = loungePostSnapshotRef.current
+    restoreComposerFromSnapshot(failSnap)
+    if (failSnap) {
+      const cUid = String(failSnap.streamVideoUid || '').trim()
+      if (
+        cUid &&
+        typeof failSnap.sessionStreamPosterBlobUrl === 'string' &&
+        failSnap.sessionStreamPosterBlobUrl.startsWith('blob:')
+      ) {
+        releaseLoungeStreamSessionPoster(cUid)
+      }
+    }
     loungePostSnapshotRef.current = null
     loungePostJobRunningRef.current = false
     setLoungePostUploadFailedOpen(false)
@@ -2913,6 +2973,11 @@ export default function SocialFeed({
           ? { posterUrl: slot.posterUrl, preview: slot.preview }
           : null
 
+      const sessionPosterBlob =
+        hasVideo && slot?.posterUrl && String(slot.posterUrl).startsWith('blob:')
+          ? String(slot.posterUrl)
+          : null
+
       snapshot = {
         caption,
         gifOnlyUrl,
@@ -2922,6 +2987,7 @@ export default function SocialFeed({
         awaitingComposerVideoPrepJobId: awaiting,
         videoPrepSpec: specForSnap,
         videoPrepSlotRestore: trimRestore,
+        sessionStreamPosterBlobUrl: sessionPosterBlob,
         wantsPin: composerPinOnPost,
         isStaffPoster,
       }
