@@ -254,41 +254,51 @@ input[list]::-webkit-list-button {
   animation: edgeGiggityFizzle 1s ease-out forwards;
 }
 
-/* Lounge badge hover tips — micro “Giggity” drift + blur (smaller / shorter than EDGE egg) */
+/* Lounge badge tips — short rise-in / gentle fade-up out (no blur / letter-spacing jitter) */
 @keyframes loungeBadgeTipIn {
-  0% {
+  from {
     opacity: 0;
-    filter: blur(2px);
-    transform: translateY(4px) scale(0.9);
-    letter-spacing: 0.16em;
+    transform: translateY(6px);
   }
-  100% {
+  to {
     opacity: 1;
-    filter: blur(0);
-    transform: translateY(0) scale(1);
-    letter-spacing: 0.05em;
+    transform: translateY(0);
   }
 }
 
 @keyframes loungeBadgeTipOut {
-  0% {
+  from {
     opacity: 1;
-    filter: blur(0);
-    transform: translateY(0) scale(1);
-    letter-spacing: 0.05em;
+    transform: translateY(0);
   }
-  100% {
+  to {
     opacity: 0;
-    filter: blur(5px);
-    transform: translateY(-6px) scale(1.08);
-    letter-spacing: 0.26em;
+    transform: translateY(-5px);
   }
 }
 
 .lounge-badge-tip-in {
-  animation: loungeBadgeTipIn 0.22s ease-out forwards;
+  animation: loungeBadgeTipIn 0.18s ease-out forwards;
 }
 
 .lounge-badge-tip-out {
-  animation: loungeBadgeTipOut 0.4s ease-out forwards;
+  animation: loungeBadgeTipOut 0.2s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lounge-badge-tip-in,
+  .lounge-badge-tip-out {
+    animation: none;
+  }
+
+  .lounge-badge-tip-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  .lounge-badge-tip-out {
+    opacity: 0;
+    transform: none;
+    transition: opacity 0.15s ease-out;
+  }
 }

@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-const OUT_MS = 400
+const OUT_MS = 220
+/** Brief delay so pointer can move from anchor to portaled tip without dismissing. */
+const LEAVE_DELAY_MS = 140
 /** Coarse-pointer tap: show tip briefly (hover is unreliable on touch). */
 const TAP_TIP_MS = 2800
 
@@ -16,16 +19,31 @@ const TONE = {
 }
 
 /**
- * Very small hover tooltip with a micro “Giggity”-style drift + blur (see `index.css` / EDGE egg).
+ * Small hover / tap tooltip for Lounge role + OG badges.
+ * Portaled above the anchor so feed scroll / overflow / paint containment cannot clip it,
+ * with a short leave delay so the pointer can reach the tip (tip uses pointer-events).
  *
  * @param {{ tip: string, tone?: 'amber' | 'violet' | 'sky', children: import('react').ReactNode, className?: string }} props
  */
 export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, className = '' }) {
+  const anchorRef = useRef(null)
+  const tipShellRef = useRef(null)
   const [mounted, setMounted] = useState(false)
   const [exiting, setExiting] = useState(false)
   const [animKey, setAnimKey] = useState(0)
+  const [tipBox, setTipBox] = useState({ left: 0, top: 0, visible: false })
+
   const hideTRef = useRef(null)
   const tapDismissTRef = useRef(null)
+  const leaveDelayTRef = useRef(null)
+  const canRepositionRef = useRef(false)
+
+  const clearLeaveDelay = useCallback(() => {
+    if (leaveDelayTRef.current != null) {
+      clearTimeout(leaveDelayTRef.current)
+      leaveDelayTRef.current = null
+    }
+  }, [])
 
   const clearHide = useCallback(() => {
     if (hideTRef.current != null) {
@@ -38,68 +56,165 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
     }
   }, [])
 
-  useEffect(() => () => clearHide(), [clearHide])
-
-  const onEnter = useCallback(() => {
+  const clearAllTimers = useCallback(() => {
     clearHide()
+    clearLeaveDelay()
+  }, [clearHide, clearLeaveDelay])
+
+  useEffect(() => () => clearAllTimers(), [clearAllTimers])
+
+  const beginExit = useCallback(() => {
+    clearLeaveDelay()
+    if (hideTRef.current != null) {
+      clearTimeout(hideTRef.current)
+      hideTRef.current = null
+    }
+    setExiting(true)
+    hideTRef.current = window.setTimeout(() => {
+      canRepositionRef.current = false
+      setMounted(false)
+      setExiting(false)
+      setTipBox((b) => ({ ...b, visible: false }))
+      hideTRef.current = null
+    }, OUT_MS)
+  }, [clearLeaveDelay])
+
+  const updateTipPosition = useCallback(() => {
+    if (!canRepositionRef.current) return
+    const anchor = anchorRef.current
+    const shell = tipShellRef.current
+    if (!anchor) return
+    const ar = anchor.getBoundingClientRect()
+    const h = shell?.offsetHeight ?? 18
+    const gap = 6
+    setTipBox({
+      left: ar.left + ar.width / 2,
+      top: ar.top - h - gap,
+      visible: true,
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!mounted) {
+      canRepositionRef.current = false
+      return undefined
+    }
+    canRepositionRef.current = true
+    let cancelled = false
+    const run = () => {
+      if (!cancelled) updateTipPosition()
+    }
+    run()
+    requestAnimationFrame(() => {
+      run()
+      requestAnimationFrame(run)
+    })
+    const onScrollOrResize = () => run()
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
+    let ro
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(run)
+      const anchor = anchorRef.current
+      const shell = tipShellRef.current
+      if (anchor) ro.observe(anchor)
+      if (shell) ro.observe(shell)
+    }
+    return () => {
+      cancelled = true
+      canRepositionRef.current = false
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
+      ro?.disconnect()
+    }
+  }, [mounted, tip, updateTipPosition])
+
+  const onEnterAnchor = useCallback(() => {
+    clearAllTimers()
     setExiting(false)
     setMounted(true)
     setAnimKey((k) => k + 1)
-  }, [clearHide])
+  }, [clearAllTimers])
 
-  const onLeave = useCallback(() => {
-    clearHide()
-    setExiting(true)
-    hideTRef.current = window.setTimeout(() => {
-      setMounted(false)
-      setExiting(false)
-      hideTRef.current = null
-    }, OUT_MS)
-  }, [clearHide])
+  const onLeaveAnchor = useCallback(() => {
+    clearLeaveDelay()
+    leaveDelayTRef.current = window.setTimeout(() => {
+      leaveDelayTRef.current = null
+      beginExit()
+    }, LEAVE_DELAY_MS)
+  }, [beginExit, clearLeaveDelay])
+
+  const onEnterTip = useCallback(() => {
+    clearAllTimers()
+    setExiting(false)
+  }, [clearAllTimers])
+
+  const onLeaveTip = useCallback(() => {
+    beginExit()
+  }, [beginExit])
 
   const onWrapperClick = useCallback(
     (e) => {
       e.stopPropagation()
       if (prefersFinePointerHover()) return
-      clearHide()
+      clearAllTimers()
       setExiting(false)
       setMounted(true)
       setAnimKey((k) => k + 1)
       tapDismissTRef.current = window.setTimeout(() => {
         tapDismissTRef.current = null
-        setExiting(true)
-        hideTRef.current = window.setTimeout(() => {
-          setMounted(false)
-          setExiting(false)
-          hideTRef.current = null
-        }, OUT_MS)
+        beginExit()
       }, TAP_TIP_MS)
     },
-    [clearHide],
+    [beginExit, clearAllTimers],
   )
 
   const toneCls = TONE[tone] ?? TONE.amber
 
-  return (
-    <span
-      data-lounge-badge-tip
-      className={`relative inline-flex shrink-0 cursor-help touch-manipulation ${className}`}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      onClick={onWrapperClick}
-    >
-      {children}
-      {mounted ? (
-        <span className="pointer-events-none absolute left-1/2 top-full z-[80] mt-0.5 -translate-x-1/2 text-center">
-          <span
-            key={exiting ? `out-${animKey}` : `in-${animKey}`}
+  const tipPortal =
+    mounted && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            ref={tipShellRef}
+            data-lounge-badge-tip
             role="tooltip"
-            className={`inline-block max-w-[13rem] whitespace-normal text-[9px] font-semibold italic leading-snug tracking-wide antialiased ${exiting ? 'lounge-badge-tip-out' : 'lounge-badge-tip-in'} ${toneCls}`}
+            className="pointer-events-auto fixed z-[10050] max-w-[13rem] text-center"
+            style={{
+              left: tipBox.left,
+              top: tipBox.top,
+              transform: 'translateX(-50%)',
+              opacity: tipBox.visible ? 1 : 0,
+              visibility: tipBox.visible ? 'visible' : 'hidden',
+            }}
+            onMouseEnter={onEnterTip}
+            onMouseLeave={onLeaveTip}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
-            {tip}
-          </span>
-        </span>
-      ) : null}
-    </span>
+            <span
+              key={exiting ? `out-${animKey}` : `in-${animKey}`}
+              className={`inline-block whitespace-normal text-[9px] font-semibold leading-snug tracking-wide antialiased ${exiting ? 'lounge-badge-tip-out' : 'lounge-badge-tip-in'} ${toneCls}`}
+            >
+              {tip}
+            </span>
+          </div>,
+          document.body,
+        )
+      : null
+
+  return (
+    <>
+      <span
+        ref={anchorRef}
+        data-lounge-badge-tip
+        className={`relative inline-flex shrink-0 cursor-help touch-manipulation ${className}`}
+        onMouseEnter={onEnterAnchor}
+        onMouseLeave={onLeaveAnchor}
+        onClick={onWrapperClick}
+      >
+        {children}
+      </span>
+      {tipPortal}
+    </>
   )
 }
