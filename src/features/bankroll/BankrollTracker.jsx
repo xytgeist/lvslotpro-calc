@@ -15,7 +15,7 @@ export default function BankrollTracker({ titleBarNavSlot = null }) {
   const projectedBankroll = parsedBankrollStart + sessionPnl
 
   return (
-    <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-24">
+    <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
       <div className="mb-6">
         <div className="text-white text-2xl font-black tracking-tight">Bankroll Tracker</div>
         <div className="text-zinc-400 text-sm mt-0.5">Track sessions, win/loss trends, and bankroll growth</div>

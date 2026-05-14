@@ -179,7 +179,7 @@ export default function LocalIntel({ supabaseClient, titleBarNavSlot = null }) {
 
   if (intelView.screen === 'home') {
     return (
-      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-24">
+      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
         <Header title="Local Intel" subtitle="City + casino updates (skeleton)" />
 
         <SetupHint />
@@ -223,7 +223,7 @@ export default function LocalIntel({ supabaseClient, titleBarNavSlot = null }) {
     const city = cities.find((c) => c.id === intelView.cityId)
     const isFollowing = intelView.cityId ? follows.city.has(intelView.cityId) : false
     return (
-      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-24">
+      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
         <Header
           title={city?.name || 'City'}
           subtitle="City feed + casinos"
@@ -348,7 +348,7 @@ export default function LocalIntel({ supabaseClient, titleBarNavSlot = null }) {
     const casino = casinos.find((c) => c.id === intelView.casinoId)
     const isFollowing = intelView.casinoId ? follows.casino.has(intelView.casinoId) : false
     return (
-      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-24">
+      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
         <Header
           title={casino?.name || 'Casino'}
           subtitle="Casino-specific updates"

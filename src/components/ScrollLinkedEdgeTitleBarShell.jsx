@@ -7,13 +7,15 @@ import EdgeLogoWithEasterEgg from './EdgeLogoWithEasterEgg.jsx'
  *
  * @param {React.ReactNode} titleBarNavSlot — hamburger / shell menu (right).
  * @param {React.ReactNode} children — scrollable body (placed inside padded column).
- * @param {string} [contentClassName='px-3 pb-24'] — inner wrapper classes (horizontal padding + bottom inset).
+ * @param {string} [contentClassName] — inner wrapper classes. Default adds horizontal padding + bottom inset for FAB / thumb clearance **including** `env(safe-area-inset-bottom)` inside the scroller (no dead strip under the scroll viewport).
  * @param {boolean} [fullWidth=false] — use full viewport width for column + fixed bar (e.g. Offers week landscape).
  */
+const defaultShellContentClassName = 'px-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]'
+
 export default function ScrollLinkedEdgeTitleBarShell({
   titleBarNavSlot = null,
   children,
-  contentClassName = 'px-3 pb-24',
+  contentClassName = defaultShellContentClassName,
   fullWidth = false,
 }) {
   const colMax = fullWidth ? 'max-w-none' : 'max-w-2xl'
@@ -107,7 +109,7 @@ export default function ScrollLinkedEdgeTitleBarShell({
 
   return (
     <div
-      className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full ${colMax} flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]`}
+      className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full ${colMax} flex-col overflow-hidden bg-zinc-950 pt-[max(0px,env(safe-area-inset-top))]`}
     >
       <div
         ref={titleBarRef}
@@ -129,7 +131,7 @@ export default function ScrollLinkedEdgeTitleBarShell({
 
       <div
         ref={feedScrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-zinc-950 [-webkit-overflow-scrolling:touch]"
       >
         <div
           aria-hidden

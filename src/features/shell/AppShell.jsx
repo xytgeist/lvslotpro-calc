@@ -513,7 +513,7 @@ export default function AppShell({
       )
     } else if (tab === 'dashboard') {
       visibleTab = (
-        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-24">
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="text-white text-2xl font-black tracking-tight">Edge</div>
@@ -636,7 +636,7 @@ export default function AppShell({
       visibleTab = <LocalIntel supabaseClient={supabaseClient} titleBarNavSlot={renderTitleBarNavSlot()} />
     } else if (tab === 'team') {
       visibleTab = (
-        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-24">
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
           <div className="mb-6">
             <div className="text-white text-2xl font-black tracking-tight">Team / Deals</div>
             <div className="text-zinc-400 text-sm mt-0.5">Bring our team in (skeleton)</div>

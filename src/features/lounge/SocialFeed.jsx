@@ -4062,7 +4062,7 @@ export default function SocialFeed({
 
   const showLoungeViewportDock = !loungePostDetail && !profileModalOpen
   const loungeTitleBarChromePx = loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56
-  /** Scroll inset for the opaque dock icon row only — not home-indicator space; feed scrolls edge-to-edge (cf. Twitter/X). */
+  /** Scroll inset for the opaque dock icon row only. Outer column uses `pb-0`; home-indicator inset lives in feed bottom padding + scroll content. */
   const loungeDockFeedContentInsetPx = showLoungeViewportDock
     ? dockChromeHeightFromTitleBarPx(loungeTitleBarChromePx) + 6
     : 0
@@ -4070,9 +4070,7 @@ export default function SocialFeed({
 
   return (
     <div
-      className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] ${
-        showLoungeViewportDock ? 'pb-0' : 'pb-[max(0.5rem,env(safe-area-inset-bottom))]'
-      }`}
+      className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden bg-zinc-950 pt-[max(0px,env(safe-area-inset-top))] pb-0`}
     >
       {quoteRepostQueuedToast ? (
         <div
@@ -4134,7 +4132,7 @@ export default function SocialFeed({
 
       <div
         ref={loungeFeedScrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-zinc-950 [-webkit-overflow-scrolling:touch]"
         style={loungeFeedDockPaddingBottom > 0 ? { paddingBottom: loungeFeedDockPaddingBottom } : undefined}
       >
         <LoungeFeedVideoAutoplayProvider scrollRootRef={loungeFeedScrollRef}>
@@ -4697,7 +4695,7 @@ export default function SocialFeed({
           </div>
         ) : null}
 
-        <div className="border-b border-zinc-800 pb-4">
+        <div className="border-b border-zinc-800 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
         {loungeManageErr ? (
           <div className="px-3 pt-3">
             <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] leading-tight text-rose-200">

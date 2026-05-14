@@ -1022,8 +1022,8 @@ export default function OffersCalendar({
         fullWidth={weekLayoutFullBleed}
         contentClassName={
           weekLayoutFullBleed
-            ? 'px-3 pb-[max(5rem,env(safe-area-inset-bottom))]'
-            : 'px-3 pb-24'
+            ? 'px-3 pb-[calc(5rem+env(safe-area-inset-bottom,0px))]'
+            : 'px-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]'
         }
       >
 
