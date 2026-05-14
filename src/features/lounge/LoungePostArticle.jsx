@@ -5,6 +5,7 @@ import { renderRichCaption } from './loungeCaption'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
+import LoungeOgBadge from './LoungeOgBadge'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 
 const actionIconClass = 'h-[20px] w-[20px] text-zinc-500'
@@ -166,6 +167,7 @@ export default function LoungePostArticle({
                 {displayNameFor(post)}
               </span>
               <LoungeStaffRoleBadge role={post?.author_profile?.role} />
+              <LoungeOgBadge isOg={post?.author_profile?.is_og} />
               <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-zinc-500">
                 <span className="min-w-0 truncate sm:max-w-[11rem]">{handleFor(post)}</span>
                 <span className="shrink-0 text-zinc-600">·</span>
@@ -244,6 +246,7 @@ export default function LoungePostArticle({
                     {displayNameFor(post.reposted_post)}
                   </span>
                   <LoungeStaffRoleBadge role={post.reposted_post?.author_profile?.role} size="detail" />
+                  <LoungeOgBadge isOg={post.reposted_post?.author_profile?.is_og} size="detail" />
                   <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-[14px] text-zinc-500">
                     <span className="min-w-0 max-w-[min(9rem,36vw)] truncate sm:max-w-[11rem]">{handleFor(post.reposted_post)}</span>
                   </span>
@@ -288,6 +291,7 @@ export default function LoungePostArticle({
                     {displayNameFor(post.reposted_post)}
                   </span>
                   <LoungeStaffRoleBadge role={post.reposted_post?.author_profile?.role} size="detail" />
+                  <LoungeOgBadge isOg={post.reposted_post?.author_profile?.is_og} size="detail" />
                   <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-[14px] text-zinc-500">
                     <span className="min-w-0 max-w-[min(9rem,36vw)] truncate sm:max-w-[11rem]">{handleFor(post.reposted_post)}</span>
                   </span>

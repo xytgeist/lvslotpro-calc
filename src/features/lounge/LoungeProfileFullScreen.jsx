@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   formatProfileSaveDebugError,
@@ -13,7 +13,13 @@ import {
 import { prepareAvatarImageForUpload, isProbablyImageFile } from '../../utils/compressImageForUpload'
 import LoungePostArticle from './LoungePostArticle'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
+import LoungeOgBadge from './LoungeOgBadge'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
+
+const PROFILE_TAB_IDS = ['posts', 'replies', 'likes', 'bookmarks']
+
+const PROFILE_LIKED_POST_SELECT =
+  'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height'
 
 const PROFILE_HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -22,6 +28,14 @@ function formatCount(n) {
   if (n < 1000) return String(n)
   if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
   return `${Math.round(n / 1000)}K`
+}
+
+function profileTabLabel(id) {
+  if (id === 'posts') return 'Posts'
+  if (id === 'replies') return 'Replies'
+  if (id === 'likes') return 'Likes'
+  if (id === 'bookmarks') return 'Bookmarks'
+  return id
 }
 
 export default function LoungeProfileFullScreen({
@@ -39,8 +53,13 @@ export default function LoungeProfileFullScreen({
   onAfterTransitionOut,
   postCardProps,
   onProfileUpdated,
+  /** Hydrate `community_feed_posts` rows (repost targets, author profiles); required for Likes/Bookmarks tabs. */
+  hydratePosts,
 }) {
   const [tab, setTab] = useState('posts')
+  const [interactionPosts, setInteractionPosts] = useState([])
+  const [interactionLoading, setInteractionLoading] = useState(false)
+  const [interactionErr, setInteractionErr] = useState('')
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [isFollowing, setIsFollowing] = useState(false)
@@ -74,6 +93,36 @@ export default function LoungeProfileFullScreen({
   const displayName = String(profile?.display_name || profile?.handle || 'Member').trim() || 'Member'
   const handle = profile?.handle ? `@${String(profile.handle).trim()}` : '@member'
   const aboutDisplay = String(profile?.about_me || profile?.bio || '').trim()
+  const profileTabsVisible = isOwnProfile ? PROFILE_TAB_IDS : PROFILE_TAB_IDS.slice(0, 2)
+  const profileTabBtnClass =
+    profileTabsVisible.length > 2 ? 'min-h-11 px-1 text-[13px]' : 'min-h-11 px-2 text-[15px]'
+
+  /** Drop rows from Likes/Bookmarks lists after successful unlike / un-bookmark on that tab. */
+  const postCardPropsForLists = useMemo(() => {
+    const base = postCardProps
+    if (!base) return base
+    const wrapBm =
+      typeof base.toggleBookmark === 'function'
+        ? async (postId) => {
+            const r = await base.toggleBookmark(postId)
+            if (r?.ok && tab === 'bookmarks' && r.bookmarked === false) {
+              setInteractionPosts((prev) => prev.filter((p) => p.id !== postId))
+            }
+            return r
+          }
+        : base.toggleBookmark
+    const wrapLike =
+      typeof base.toggleInteraction === 'function'
+        ? async (postId, key) => {
+            const r = await base.toggleInteraction(postId, key)
+            if (r?.ok && tab === 'likes' && key === 'liked' && r.liked === false) {
+              setInteractionPosts((prev) => prev.filter((p) => p.id !== postId))
+            }
+            return r
+          }
+        : base.toggleInteraction
+    return { ...base, toggleBookmark: wrapBm, toggleInteraction: wrapLike }
+  }, [postCardProps, tab])
 
   useEffect(() => {
     if (!open || !profileUserId) return
@@ -84,6 +133,9 @@ export default function LoungeProfileFullScreen({
     setHandleSlugDraft('')
     setHandleChangeDialog(null)
     setAvatarCropFile(null)
+    setInteractionPosts([])
+    setInteractionErr('')
+    setInteractionLoading(false)
   }, [open, profileUserId])
 
   useEffect(() => {
@@ -96,6 +148,72 @@ export default function LoungeProfileFullScreen({
     if (!open || !profileUserId) return
     setAboutDraft(String(profile?.about_me ?? profile?.bio ?? '').slice(0, 140))
   }, [open, profileUserId, profile?.about_me, profile?.bio])
+
+  useEffect(() => {
+    if (!open || !isOwnProfile || !profileUserId || (tab !== 'likes' && tab !== 'bookmarks')) {
+      setInteractionLoading(false)
+      return
+    }
+    if (typeof hydratePosts !== 'function') {
+      setInteractionErr('Could not load saved posts.')
+      setInteractionPosts([])
+      setInteractionLoading(false)
+      return
+    }
+    let cancelled = false
+    setInteractionLoading(true)
+    setInteractionErr('')
+    ;(async () => {
+      try {
+        const linkTable = tab === 'likes' ? 'post_likes' : 'post_bookmarks'
+        const { data: links, error: le } = await supabaseClient
+          .from(linkTable)
+          .select('post_id, created_at')
+          .eq('user_id', profileUserId)
+          .order('created_at', { ascending: false })
+          .limit(80)
+        if (le) throw le
+        const orderedIds = []
+        const seen = new Set()
+        for (const row of links || []) {
+          const pid = row.post_id
+          if (pid == null || pid === '') continue
+          const key = String(pid)
+          if (seen.has(key)) continue
+          seen.add(key)
+          orderedIds.push(pid)
+        }
+        if (orderedIds.length === 0) {
+          if (!cancelled) setInteractionPosts([])
+          return
+        }
+        const { data: postRows, error: pe } = await supabaseClient
+          .from('community_feed_posts')
+          .select(PROFILE_LIKED_POST_SELECT)
+          .in('id', orderedIds)
+          .is('hidden_at', null)
+        if (pe) throw pe
+        const rank = new Map(orderedIds.map((id, i) => [String(id), i]))
+        const sorted = (postRows || []).slice().sort((a, b) => {
+          const ia = rank.get(String(a.id)) ?? 9999
+          const ib = rank.get(String(b.id)) ?? 9999
+          return ia - ib
+        })
+        const hydrated = await hydratePosts(sorted)
+        if (!cancelled) setInteractionPosts(hydrated || [])
+      } catch (e) {
+        if (!cancelled) {
+          setInteractionErr(e?.message || 'Could not load.')
+          setInteractionPosts([])
+        }
+      } finally {
+        if (!cancelled) setInteractionLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, tab, isOwnProfile, profileUserId, supabaseClient, hydratePosts])
 
   useEffect(() => {
     if (!ownProfileMenuOpen) return
@@ -752,6 +870,7 @@ export default function LoungeProfileFullScreen({
                     </label>
                     <div className="flex shrink-0 items-center gap-1.5 pt-6 sm:pt-7">
                       <LoungeStaffRoleBadge role={profile?.role} />
+                      <LoungeOgBadge isOg={profile?.is_og} size="modal" />
                     </div>
                   </div>
                   <label className="block">
@@ -777,6 +896,7 @@ export default function LoungeProfileFullScreen({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xl font-bold text-white sm:text-2xl">{displayName}</span>
                     <LoungeStaffRoleBadge role={profile?.role} />
+                    <LoungeOgBadge isOg={profile?.is_og} size="modal" />
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-[15px] text-cyan-300">
                     <span>{handle}</span>
@@ -834,18 +954,18 @@ export default function LoungeProfileFullScreen({
 
             <div className="mt-6 border-b border-zinc-800">
               <div className="flex gap-0">
-                {['posts', 'replies'].map((id) => (
+                {profileTabsVisible.map((id) => (
                   <button
                     key={id}
                     type="button"
                     onClick={() => setTab(id)}
-                    className={`relative min-h-11 flex-1 touch-manipulation px-2 text-[15px] font-semibold capitalize [-webkit-tap-highlight-color:transparent] ${
+                    className={`relative flex-1 touch-manipulation font-semibold capitalize [-webkit-tap-highlight-color:transparent] ${profileTabBtnClass} ${
                       tab === id ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    {id}
+                    {profileTabLabel(id)}
                     {tab === id ? (
-                      <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-cyan-500" />
+                      <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-cyan-500 sm:left-3 sm:right-3" />
                     ) : null}
                   </button>
                 ))}
@@ -853,12 +973,12 @@ export default function LoungeProfileFullScreen({
             </div>
 
             <div className="min-h-[12rem]">
-              {loading ? (
-                <div className="px-3 py-6 text-center text-zinc-500 text-[15px]">Loading…</div>
-              ) : error ? (
+              {error ? (
                 <div className="m-3 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] text-rose-200">{error}</div>
               ) : tab === 'posts' ? (
-                posts.length === 0 ? (
+                loading ? (
+                  <div className="px-3 py-6 text-center text-zinc-500 text-[15px]">Loading…</div>
+                ) : posts.length === 0 ? (
                   <div className="px-3 py-8 text-center text-zinc-500 text-[15px]">No Lounge posts yet.</div>
                 ) : (
                   posts.map((post) => (
@@ -871,24 +991,24 @@ export default function LoungeProfileFullScreen({
                         if (!(t instanceof Element)) return
                         const origHost = t.closest('[data-lounge-original-embed]')
                         if (origHost && post.reposted_post?.id) {
-                          postCardProps.onPostBodyClick?.(post.reposted_post)
+                          postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
                           return
                         }
                         if (t.closest('button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom]')) return
-                        postCardProps.onPostBodyClick?.(post)
+                        postCardPropsForLists.onPostBodyClick?.(post)
                       }}
                     >
                       <LoungePostArticle
                         post={post}
                         suppressAvatarProfileNavigation
                         profileOwnerUserId={profileUserId}
-                        {...postCardProps}
+                        {...postCardPropsForLists}
                         repostMenuScrollRootRef={profileBodyScrollRef}
                       />
                     </article>
                   ))
                 )
-              ) : (
+              ) : tab === 'replies' ? (
                 <div className="px-4 py-8 text-center text-[15px] leading-relaxed text-zinc-500">
                   <p className="font-semibold text-zinc-400">Replies</p>
                   <p className="mt-2">
@@ -896,7 +1016,48 @@ export default function LoungeProfileFullScreen({
                     reply together.
                   </p>
                 </div>
-              )}
+              ) : tab === 'likes' || tab === 'bookmarks' ? (
+                interactionLoading ? (
+                  <div className="px-3 py-6 text-center text-zinc-500 text-[15px]">Loading…</div>
+                ) : interactionErr ? (
+                  <div className="m-3 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] text-rose-200">
+                    {interactionErr}
+                  </div>
+                ) : interactionPosts.length === 0 ? (
+                  <div className="px-3 py-8 text-center text-zinc-500 text-[15px]">
+                    {tab === 'likes'
+                      ? 'Posts you like will show up here.'
+                      : 'Posts you bookmark will show up here.'}
+                  </div>
+                ) : (
+                  interactionPosts.map((post) => (
+                    <article
+                      key={post.id}
+                      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
+                      className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                      onClick={(e) => {
+                        const t = e.target
+                        if (!(t instanceof Element)) return
+                        const origHost = t.closest('[data-lounge-original-embed]')
+                        if (origHost && post.reposted_post?.id) {
+                          postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          return
+                        }
+                        if (t.closest('button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom]')) return
+                        postCardPropsForLists.onPostBodyClick?.(post)
+                      }}
+                    >
+                      <LoungePostArticle
+                        post={post}
+                        suppressAvatarProfileNavigation
+                        profileOwnerUserId={profileUserId}
+                        {...postCardPropsForLists}
+                        repostMenuScrollRootRef={profileBodyScrollRef}
+                      />
+                    </article>
+                  ))
+                )
+              ) : null}
             </div>
           </div>
         </div>

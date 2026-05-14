@@ -60,6 +60,7 @@ import { LoungeFeedVideoAutoplayProvider } from './LoungeFeedVideoAutoplayContex
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
+import LoungeOgBadge from './LoungeOgBadge'
 import LoungeVideoCropModal from './LoungeVideoCropModal.jsx'
 import { pinLoungeStreamSessionPoster, releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 import KlipyGifPicker from './KlipyGifPicker.jsx'
@@ -621,8 +622,9 @@ export default function SocialFeed({
     return () => ro.disconnect()
   }, [loungePostDetail])
 
+  /** Only reset scroll when opening a different post — same-post updates (e.g. like) replace `loungePostDetail` by id and must not jump to top. */
   useEffect(() => {
-    if (!loungePostDetail) return
+    if (!loungePostDetail?.id) return
     loungePostDetailTitleRevealRef.current = 1
     setLoungePostDetailTitleReveal(1)
     loungePostDetailTitleCoerceUntilRef.current = 0
@@ -631,7 +633,7 @@ export default function SocialFeed({
       el.scrollTop = 0
       loungePostDetailScrollPrevTopRef.current = 0
     }
-  }, [loungePostDetail])
+  }, [loungePostDetail?.id])
 
   useEffect(() => {
     const el = loungePostDetailScrollRef.current
@@ -1228,7 +1230,7 @@ export default function SocialFeed({
       if (!composerUserId) return
       if (key === 'commented') return
       if (key === 'reposted') return
-      if (key !== 'liked') return
+      if (key !== 'liked') return undefined
       const prevSnap = interactionByPostRef.current[postId] || defaultInteraction
       const was = !!prevSnap[key]
       const delta = was ? -1 : 1
@@ -1272,7 +1274,7 @@ export default function SocialFeed({
           )
         )
         setLoungeManageErr(res.error.message || 'Could not update.')
-        return
+        return { ok: false }
       }
       const { data: row } = await supabaseClient
         .from('community_feed_posts')
@@ -1280,6 +1282,7 @@ export default function SocialFeed({
         .eq('id', postId)
         .maybeSingle()
       if (row) patchPostAggregate(postId, row)
+      return { ok: true, liked: !was }
     },
     [composerUserId, defaultInteraction, patchPostAggregate, setCommunityPosts, supabaseClient]
   )
@@ -1655,7 +1658,7 @@ export default function SocialFeed({
   }, [quoteRepostModal])
 
   const toggleBookmark = useCallback(async (postId) => {
-    if (!composerUserId) return
+    if (!composerUserId) return { ok: false }
     const was = !!bookmarkedByPostRef.current[postId]
     setBookmarkedByPost((prev) => ({ ...prev, [postId]: !was }))
     const res = was
@@ -1664,7 +1667,9 @@ export default function SocialFeed({
     if (res.error) {
       setBookmarkedByPost((prev) => ({ ...prev, [postId]: was }))
       setLoungeManageErr(res.error.message || 'Could not update bookmark.')
+      return { ok: false }
     }
+    return { ok: true, bookmarked: !was }
   }, [composerUserId, supabaseClient])
 
   const submitLoungeDetailComment = useCallback(async () => {
@@ -1685,7 +1690,7 @@ export default function SocialFeed({
     }
     const pr = await supabaseClient
       .from('profiles')
-      .select('user_id,handle,display_name,avatar_url')
+      .select('user_id,handle,display_name,avatar_url,role,is_og')
       .eq('user_id', composerUserId)
       .maybeSingle()
     const row = { ...data, author_profile: pr.data || composerUserProfile || null }
@@ -1748,7 +1753,7 @@ export default function SocialFeed({
       if (authorIds.length) {
         const pr = await supabaseClient
           .from('profiles')
-          .select('user_id,handle,display_name,avatar_url')
+          .select('user_id,handle,display_name,avatar_url,role,is_og')
           .in('user_id', authorIds)
         if (!pr.error && pr.data) profileBy = Object.fromEntries(pr.data.map((p) => [p.user_id, p]))
       }
@@ -2284,7 +2289,7 @@ export default function SocialFeed({
         if (cached) setComposerUserProfile(cached)
         const { data } = await supabaseClient
           .from('profiles')
-          .select('user_id,handle,display_name,avatar_url,bio,about_me,banner_url,created_at,role,handle_changed_at')
+          .select('user_id,handle,display_name,avatar_url,bio,about_me,banner_url,created_at,role,handle_changed_at,is_og')
           .eq('user_id', uid)
           .maybeSingle()
         if (cancelled) return
@@ -3179,7 +3184,7 @@ export default function SocialFeed({
             .limit(30),
           supabaseClient
             .from('profiles')
-            .select('user_id,handle,display_name,avatar_url,bio,created_at,role,handle_changed_at')
+            .select('user_id,handle,display_name,avatar_url,bio,created_at,role,handle_changed_at,is_og')
             .eq('user_id', userId)
             .maybeSingle(),
         ])
@@ -3236,7 +3241,17 @@ export default function SocialFeed({
         return merged
       })
       const authorPatch = {}
-      for (const k of ['avatar_url', 'display_name', 'handle', 'banner_url', 'about_me', 'bio', 'role', 'handle_changed_at']) {
+      for (const k of [
+        'avatar_url',
+        'display_name',
+        'handle',
+        'banner_url',
+        'about_me',
+        'bio',
+        'role',
+        'handle_changed_at',
+        'is_og',
+      ]) {
         if (Object.prototype.hasOwnProperty.call(next, k)) authorPatch[k] = next[k]
       }
       if (Object.keys(authorPatch).length > 0) {
@@ -4226,6 +4241,7 @@ export default function SocialFeed({
                           {displayNameFor(loungePostDetail)}
                         </span>
                         <LoungeStaffRoleBadge role={loungePostDetail?.author_profile?.role} size="detail" />
+                        <LoungeOgBadge isOg={loungePostDetail?.author_profile?.is_og} size="detail" />
                         <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-[15px] text-zinc-500">
                           <span className="min-w-0 truncate sm:max-w-[11rem]">{handleFor(loungePostDetail)}</span>
                           <span className="shrink-0 text-zinc-600">·</span>
@@ -4856,8 +4872,12 @@ export default function SocialFeed({
                         {loungeDetailComments.map((c) => (
                           <li key={c.id} className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
                             <div className="flex items-baseline justify-between gap-2 text-[13px] text-zinc-500">
-                              <span className="min-w-0 truncate font-semibold text-zinc-300">
-                                {c.author_profile?.display_name || c.author_profile?.handle || 'Member'}
+                              <span className="flex min-w-0 items-baseline gap-1.5 truncate font-semibold text-zinc-300">
+                                <span className="min-w-0 truncate">
+                                  {c.author_profile?.display_name || c.author_profile?.handle || 'Member'}
+                                </span>
+                                <LoungeStaffRoleBadge role={c.author_profile?.role} size="detail" />
+                                <LoungeOgBadge isOg={c.author_profile?.is_og} size="detail" />
                               </span>
                               <span className="shrink-0 tabular-nums">{postAgeLabel(c.created_at)}</span>
                             </div>
@@ -4918,6 +4938,7 @@ export default function SocialFeed({
           onAfterTransitionOut={finalizeProfileModalClose}
           postCardProps={profilePostCardProps}
           onProfileUpdated={onProfileScreenUpdated}
+          hydratePosts={hydrateCommunityPosts}
         />
       ) : null}
 
@@ -5298,6 +5319,7 @@ export default function SocialFeed({
                                     {displayNameFor(orig)}
                                   </span>
                                   <LoungeStaffRoleBadge role={orig?.author_profile?.role} size="detail" />
+                                  <LoungeOgBadge isOg={orig?.author_profile?.is_og} size="detail" />
                                   <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-[14px] text-zinc-500">
                                     <span className="min-w-0 max-w-[min(9rem,36vw)] truncate sm:max-w-[11rem]">{handleFor(orig)}</span>
                                   </span>

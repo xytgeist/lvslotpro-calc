@@ -253,3 +253,42 @@ input[list]::-webkit-list-button {
 .edge-giggity-fizzle {
   animation: edgeGiggityFizzle 1s ease-out forwards;
 }
+
+/* Lounge badge hover tips — micro “Giggity” drift + blur (smaller / shorter than EDGE egg) */
+@keyframes loungeBadgeTipIn {
+  0% {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(4px) scale(0.9);
+    letter-spacing: 0.16em;
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+    letter-spacing: 0.05em;
+  }
+}
+
+@keyframes loungeBadgeTipOut {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+    letter-spacing: 0.05em;
+  }
+  100% {
+    opacity: 0;
+    filter: blur(5px);
+    transform: translateY(-6px) scale(1.08);
+    letter-spacing: 0.26em;
+  }
+}
+
+.lounge-badge-tip-in {
+  animation: loungeBadgeTipIn 0.22s ease-out forwards;
+}
+
+.lounge-badge-tip-out {
+  animation: loungeBadgeTipOut 0.4s ease-out forwards;
+}
