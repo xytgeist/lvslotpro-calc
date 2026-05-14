@@ -71,9 +71,8 @@ const FALLBACK_SAFE_BOTTOM_PX = 40
  * `reveal` 1 = fully visible, 0 = slid off downward (paired with scroll-linked title hide).
  * Icon-only controls (no chrome around glyphs); active slot uses cyan icon color.
  *
- * @param {number} [matchTitleBarHeightPx=0] — When >0 (viewport dock), the icon band height matches the measured
- *   lounge title bar; bottom safe-area inset is padding inside the same frosted bar so it runs flush to the screen
- *   edge (no separate gap below the dock).
+ * @param {number} [matchTitleBarHeightPx=0] — When >0 (viewport dock), the icon band uses ~⅔ of the measured
+ *   title bar height (min 36px); safe-area padding stays inside the same full-bleed frosted bar.
  * @param {'viewport' | 'sheet'} [layout='viewport'] — `sheet` pins to a full-screen sheet bottom (e.g. profile).
  */
 export default function LoungeDockFooterBar({
@@ -96,7 +95,7 @@ export default function LoungeDockFooterBar({
     barHeightPx > 0
       ? barHeightPx
       : useMatchedChrome
-        ? matchTitleBarHeightPx + FALLBACK_SAFE_BOTTOM_PX
+        ? dockChromePx + FALLBACK_SAFE_BOTTOM_PX
         : 44
   const translateY = (1 - Math.min(1, Math.max(0, reveal))) * h
 
