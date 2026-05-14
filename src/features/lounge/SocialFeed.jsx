@@ -34,6 +34,13 @@ import {
   probeVideoFileDurationSeconds,
 } from '../../utils/loungeVideoUpload'
 import {
+  buildLoungePostShareUrl,
+  isLoungePostShareId,
+  LOUNGE_SINGLE_POST_SELECT,
+  shareLoungePostHybrid,
+  stripLoungePostQueryParam,
+} from '../../utils/loungeSharePost'
+import {
   readLoungeProfileCache,
   writeLoungeProfileCache,
   readLoungeComposerDraft,
@@ -265,6 +272,8 @@ export default function SocialFeed({
   const [quoteRepostErr, setQuoteRepostErr] = useState('')
   const [quoteRepostQueuedToast, setQuoteRepostQueuedToast] = useState(false)
   const quoteRepostQueuedToastTimerRef = useRef(0)
+  /** Transient copy/share feedback (permalink flow). */
+  const [loungeShareFlash, setLoungeShareFlash] = useState('')
   const [quoteRepostImageItems, setQuoteRepostImageItems] = useState([])
   const composerImageItemsRef = useRef(composerImageItems)
   composerImageItemsRef.current = composerImageItems
@@ -741,6 +750,23 @@ export default function SocialFeed({
     return 'Member'
   }, [])
 
+  const handleShareLoungePost = useCallback((post) => {
+    if (!post?.id) return
+    const url = buildLoungePostShareUrl(post.id)
+    const cap = feedPostDisplayCaption(post)
+    const name = displayNameFor(post)
+    const trimmed = cap != null ? String(cap).trim() : ''
+    const text =
+      trimmed.length > 0 ? `${name}: ${trimmed.slice(0, 200)}` : `${name} on Edge Lounge`
+    void shareLoungePostHybrid({
+      url,
+      title: 'Edge Lounge',
+      text,
+      onCopied: () => setLoungeShareFlash('Link copied to clipboard.'),
+      onCopyFailed: () => setLoungeShareFlash('Could not copy link. Try copying from the address bar.'),
+    })
+  }, [displayNameFor])
+
   const avatarText = useCallback((p) => {
     const pr = p?.author_profile
     const base = String(pr?.display_name || pr?.handle || 'Member')
@@ -778,6 +804,12 @@ export default function SocialFeed({
   useEffect(() => {
     loungePostUploadFailureDetailsRef.current = loungePostUploadFailureDetails
   }, [loungePostUploadFailureDetails])
+
+  useEffect(() => {
+    if (!loungeShareFlash) return
+    const tid = window.setTimeout(() => setLoungeShareFlash(''), 2500)
+    return () => window.clearTimeout(tid)
+  }, [loungeShareFlash])
 
   const disposeComposerVideoMedia = useCallback(
     (slot) => {
@@ -2092,7 +2124,7 @@ export default function SocialFeed({
   const openLoungePostDetail = useCallback(
     (post, opts) => {
       if (!post?.id) return
-      if (loungeReadOnly) {
+      if (loungeReadOnly && !opts?.fromPublicLink) {
         onRequireAuth?.('login')
         return
       }
@@ -2150,6 +2182,54 @@ export default function SocialFeed({
     [composerUserId, loungeReadOnly, onRequireAuth]
   )
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let cancelled = false
+    const run = async () => {
+      const params = new URLSearchParams(window.location.search || '')
+      const raw = (params.get('post') || '').trim()
+      if (!isLoungePostShareId(raw)) return
+      await new Promise((resolve) => {
+        window.requestAnimationFrame(() => resolve(undefined))
+      })
+      if (cancelled) return
+      let postRow = communityPosts.find((p) => p.id === raw)
+      if (!postRow) {
+        const { data, error } = await supabaseClient
+          .from('community_feed_posts')
+          .select(LOUNGE_SINGLE_POST_SELECT)
+          .eq('id', raw)
+          .is('hidden_at', null)
+          .maybeSingle()
+        if (cancelled) return
+        if (error || !data) {
+          setLoungeShareFlash('This post is unavailable.')
+          stripLoungePostQueryParam()
+          return
+        }
+        const hydrated = await hydrateCommunityPosts([data])
+        if (cancelled) return
+        postRow = hydrated?.[0] || null
+      }
+      if (!postRow) {
+        setLoungeShareFlash('This post is unavailable.')
+        stripLoungePostQueryParam()
+        return
+      }
+      if (cancelled) return
+      setCommunityPosts((prev) => (prev.some((p) => p.id === postRow.id) ? prev : [postRow, ...prev]))
+      openLoungePostDetail(postRow, { fromPublicLink: true })
+      stripLoungePostQueryParam()
+    }
+    void run()
+    const onPop = () => void run()
+    window.addEventListener('popstate', onPop)
+    return () => {
+      cancelled = true
+      window.removeEventListener('popstate', onPop)
+    }
+  }, [communityPosts, hydrateCommunityPosts, openLoungePostDetail, setCommunityPosts, supabaseClient])
+
   const renderDetailMediaLightboxFooter = useCallback(
     (mediaPost) => (
       <LoungePostInteractionBar
@@ -2174,6 +2254,7 @@ export default function SocialFeed({
           document.getElementById('lounge-detail-comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }}
         repostActionBusy={repostManageBusy}
+        onSharePost={handleShareLoungePost}
       />
     ),
     [
@@ -2191,6 +2272,7 @@ export default function SocialFeed({
       openProfileGateIfNeeded,
       loungePostDetailScrollRef,
       repostManageBusy,
+      handleShareLoungePost,
     ],
   )
 
@@ -2214,6 +2296,7 @@ export default function SocialFeed({
         requireLoungeAuth={requireLoungeAuth}
         openProfileGateIfNeeded={openProfileGateIfNeeded}
         repostMenuScrollRootRef={quoteRepostScrollRef}
+        onSharePost={handleShareLoungePost}
       />
     ),
     [
@@ -2230,6 +2313,7 @@ export default function SocialFeed({
       requireLoungeAuth,
       openProfileGateIfNeeded,
       quoteRepostScrollRef,
+      handleShareLoungePost,
     ],
   )
 
@@ -3878,6 +3962,7 @@ export default function SocialFeed({
       requireLoungeAuth,
       openProfileGateIfNeeded,
       onOpenComments: openLoungePostDetail,
+      onSharePost: handleShareLoungePost,
       onAvatarClick: (p) => void openProfileModal(p),
       loungeViewerIsStaff,
       setLoungePostPinned,
@@ -3917,6 +4002,7 @@ export default function SocialFeed({
       openProfileGateIfNeeded,
       openLoungePostDetail,
       openProfileModal,
+      handleShareLoungePost,
       loungeViewerIsStaff,
       setLoungePostPinned,
       loungePinBusy,
@@ -3945,6 +4031,16 @@ export default function SocialFeed({
           style={{ top: 'max(0.5rem, env(safe-area-inset-top))' }}
         >
           Sending your quote... You&apos;ll have 30 minutes to edit after it posts.
+        </div>
+      ) : null}
+      {loungeShareFlash ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed left-1/2 z-[102] w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-emerald-500/45 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-emerald-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md"
+          style={{ top: quoteRepostQueuedToast ? 'max(4.25rem, calc(0.5rem + 3.25rem + env(safe-area-inset-top)))' : 'max(0.5rem, env(safe-area-inset-top))' }}
+        >
+          {loungeShareFlash}
         </div>
       ) : null}
       {/* Fixed title bar outside the scroll container so the nav dropdown stays clickable (not under overflow hit-testing). */}
@@ -4609,6 +4705,7 @@ export default function SocialFeed({
                   toggleBookmark={toggleBookmark}
                   bookmarkedByPost={bookmarkedByPost}
                   onOpenComments={openLoungePostDetail}
+                  onSharePost={handleShareLoungePost}
                   requireLoungeAuth={requireLoungeAuth}
                   openProfileGateIfNeeded={openProfileGateIfNeeded}
                   onAvatarClick={(p) => void openProfileModal(p)}
@@ -5415,10 +5512,15 @@ export default function SocialFeed({
                         </svg>
                         {Number.isFinite(likeCount) ? <span className={likeClass}>{likeCount}</span> : null}
                       </LoungeFeedStatSlot>
-                      <span
-                        className="inline-flex items-center justify-center rounded-lg px-2 py-2 text-zinc-600"
-                        title="Share"
-                        aria-hidden
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleShareLoungePost(d)
+                        }}
+                        className="inline-flex items-center justify-center rounded-lg px-2 py-2 text-zinc-500 hover:bg-zinc-900/80 hover:text-zinc-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                        title="Share post"
+                        aria-label="Share post"
                       >
                         <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
                           <path
@@ -5429,7 +5531,7 @@ export default function SocialFeed({
                             strokeLinejoin="round"
                           />
                         </svg>
-                      </span>
+                      </button>
                       {ro ? (
                         <button
                           type="button"

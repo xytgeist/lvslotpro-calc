@@ -27,6 +27,8 @@ export default function LoungePostArticle({
   bookmarkedByPost,
   /** Opens post detail / comments (e.g. feed row comment control). */
   onOpenComments,
+  /** Share / copy permalink (allowed when read-only). */
+  onSharePost,
   requireLoungeAuth,
   openProfileGateIfNeeded,
   onAvatarClick,
@@ -88,6 +90,7 @@ export default function LoungePostArticle({
         toggleBookmark={toggleBookmark}
         bookmarkedByPost={bookmarkedByPost}
         onOpenComments={onOpenComments}
+        onSharePost={onSharePost}
         requireLoungeAuth={requireLoungeAuth}
         openProfileGateIfNeeded={openProfileGateIfNeeded}
         repostMenuScrollRootRef={repostMenuScrollRootRef}
@@ -104,6 +107,7 @@ export default function LoungePostArticle({
       toggleBookmark,
       bookmarkedByPost,
       onOpenComments,
+      onSharePost,
       requireLoungeAuth,
       openProfileGateIfNeeded,
       repostMenuScrollRootRef,
@@ -333,6 +337,7 @@ export default function LoungePostArticle({
           toggleBookmark={toggleBookmark}
           bookmarkedByPost={bookmarkedByPost}
           onOpenComments={onOpenComments}
+          onSharePost={onSharePost}
           requireLoungeAuth={requireLoungeAuth}
           openProfileGateIfNeeded={openProfileGateIfNeeded}
           repostMenuScrollRootRef={repostMenuScrollRootRef}

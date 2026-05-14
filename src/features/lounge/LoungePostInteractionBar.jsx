@@ -11,6 +11,7 @@ const actionIconClassSheet = 'h-[20px] w-[20px] text-zinc-500'
  * @param {'feed' | 'sheet'} [props.variant='feed'] — `feed`: fixed portaled repost menus (feed card). `sheet`: absolute repost dropdown (post detail sheet styling).
  * @param {string} [props.repostMenuPortalClass='z-[48]'] — Tailwind z class for portaled repost menus (`feed` only). Use `z-[101]` above media lightboxes (`z-[100]`).
  * @param {() => void} [props.onCommentClick] — When set, runs instead of `onOpenComments` / `toggleInteraction('commented')` for the comment control.
+ * @param {(post: object) => void} [props.onSharePost] — Share / copy permalink (works when `loungeReadOnly`; does not use `requireLoungeAuth`).
  * @param {boolean} [props.repostActionBusy=false] — Disables repost menu actions (`sheet` only).
  */
 export default function LoungePostInteractionBar({
@@ -31,6 +32,7 @@ export default function LoungePostInteractionBar({
   variant = 'feed',
   repostMenuPortalClass = 'z-[48]',
   onCommentClick,
+  onSharePost,
   repostActionBusy = false,
   /** Extra classes on the outer grid wrapper (e.g. `w-full` in lightbox). */
   rootClassName = '',
@@ -518,25 +520,52 @@ export default function LoungePostInteractionBar({
           </svg>
           {Number.isFinite(likeCount) ? <span className={likeClass}>{likeCount}</span> : null}
         </LoungeFeedStatSlot>
-        <span
-          className={
-            isFeed
-              ? 'inline-flex items-center justify-center gap-1.5 rounded px-1.5 py-1 text-zinc-600'
-              : 'inline-flex items-center justify-center rounded-lg px-2 py-2 text-zinc-600'
-          }
-          title="Share"
-          aria-hidden
-        >
-          <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
-            <path
-              d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4"
-              stroke="currentColor"
-              strokeWidth="1.35"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
+        {typeof onSharePost === 'function' ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onSharePost(post)
+            }}
+            className={
+              isFeed
+                ? `${statFeedCenter} touch-manipulation [-webkit-tap-highlight-color:transparent] text-zinc-500 hover:bg-zinc-900/70`
+                : `${statSheetCenter} touch-manipulation [-webkit-tap-highlight-color:transparent] text-zinc-500 hover:bg-zinc-900/80`
+            }
+            title="Share post"
+            aria-label="Share post"
+          >
+            <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
+              <path
+                d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4"
+                stroke="currentColor"
+                strokeWidth="1.35"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : (
+          <span
+            className={
+              isFeed
+                ? 'inline-flex items-center justify-center gap-1.5 rounded px-1.5 py-1 text-zinc-600'
+                : 'inline-flex items-center justify-center rounded-lg px-2 py-2 text-zinc-600'
+            }
+            title="Share"
+            aria-hidden
+          >
+            <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
+              <path
+                d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4"
+                stroke="currentColor"
+                strokeWidth="1.35"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        )}
         {ro ? (
           <button
             type="button"

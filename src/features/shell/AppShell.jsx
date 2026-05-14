@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
+import { isLoungePostShareId } from '../../utils/loungeSharePost'
 import { renderRichCaption } from '../lounge/loungeCaption'
 import {
   OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX,
@@ -325,6 +326,11 @@ export default function AppShell({
     const applyFromUrl = () => {
       const params = new URLSearchParams(window.location.search || '')
       const targetTab = params.get('tab')
+      const postShareId = (params.get('post') || '').trim()
+      if (isLoungePostShareId(postShareId)) {
+        setTab('home')
+        setMenuOpen(false)
+      }
       const targetEventId = params.get('eventId')
       const targetEventIdsRaw = params.get('eventIds')
       const targetEventIds = targetEventIdsRaw
