@@ -1,25 +1,27 @@
 import LoungeBadgeHoverTip from './LoungeBadgeHoverTip.jsx'
 
+const BADGE_SRC = '/og-cohort-badge.svg'
+
 /**
  * Earliest-adopter marker from `profiles.is_og` (first 1k profiles by created_at).
- * Compact, theme-adjacent to staff badges — not a pill.
+ * Flat gold OG + laurel (`public/og-cohort-badge.svg`); swap for PNG at same path if preferred.
+ * Hover tip in `LoungeBadgeHoverTip`.
  *
  * @param {{ isOg?: boolean | null, size?: 'feed' | 'detail' | 'modal' }} props
  */
-export default function LoungeOgBadge({ isOg, size = 'feed' }) {
+export default function LoungeOgBadge({ isOg, size: _size = 'feed' }) {
   if (isOg !== true) return null
-  const text =
-    size === 'detail' || size === 'modal'
-      ? 'text-[11px] leading-[22px] tracking-[0.14em]'
-      : 'text-[10px] leading-[20px] tracking-[0.14em]'
+  const iconClass = 'h-6 w-6 shrink-0 object-contain'
+
   return (
     <LoungeBadgeHoverTip tip="One of the first 1,000 members" tone="amber" className="translate-y-[0.5px]">
-      <abbr
-        aria-label="OG, one of the first 1,000 members"
-        className={`inline-flex items-baseline border-b border-amber-600/60 ${text} font-extrabold uppercase text-amber-400/95 no-underline decoration-transparent`}
+      <span
+        className="inline-flex h-6 w-6 items-center justify-center"
+        role="img"
+        aria-label="OG cohort: one of the first 1,000 members"
       >
-        OG
-      </abbr>
+        <img src={BADGE_SRC} alt="" className={iconClass} draggable={false} width={24} height={24} aria-hidden />
+      </span>
     </LoungeBadgeHoverTip>
   )
 }

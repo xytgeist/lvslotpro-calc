@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="presentation">
+  <!-- Flat gold OG + laurel (reference ~#EBB71D); transparent canvas for dark/light rows -->
+  <g fill="#EBB71D">
+    <!-- Left wreath leaves (almond ellipses, five) -->
+    <ellipse cx="6.35" cy="16.65" rx="1.85" ry="2.7" transform="rotate(-38 6.35 16.65)"/>
+    <ellipse cx="5.35" cy="13.45" rx="1.65" ry="2.5" transform="rotate(-48 5.35 13.45)"/>
+    <ellipse cx="4.85" cy="10.05" rx="1.52" ry="2.32" transform="rotate(-56 4.85 10.05)"/>
+    <ellipse cx="5.15" cy="6.75" rx="1.42" ry="2.1" transform="rotate(-64 5.15 6.75)"/>
+    <ellipse cx="6.65" cy="4.05" rx="1.28" ry="1.88" transform="rotate(-72 6.65 4.05)"/>
+    <!-- Right wreath (mirror) -->
+    <ellipse cx="17.65" cy="16.65" rx="1.85" ry="2.7" transform="rotate(38 17.65 16.65)"/>
+    <ellipse cx="18.65" cy="13.45" rx="1.65" ry="2.5" transform="rotate(48 18.65 13.45)"/>
+    <ellipse cx="19.15" cy="10.05" rx="1.52" ry="2.32" transform="rotate(56 19.15 10.05)"/>
+    <ellipse cx="18.85" cy="6.75" rx="1.42" ry="2.1" transform="rotate(64 18.85 6.75)"/>
+    <ellipse cx="17.35" cy="4.05" rx="1.28" ry="1.88" transform="rotate(72 17.35 4.05)"/>
+    <!-- Bottom tie -->
+    <rect x="10" y="18.25" width="4" height="2.35" rx="0.45"/>
+    <!-- OG  serif stack for legibility at 24px -->
+    <text
+      x="12"
+      y="9.25"
+      text-anchor="middle"
+      dominant-baseline="middle"
+      font-family="Georgia, 'Times New Roman', Times, serif"
+      font-size="7.75"
+      font-weight="700"
+      letter-spacing="-0.02em"
+    >OG</text>
+  </g>
+</svg>
