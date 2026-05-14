@@ -43,6 +43,30 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ---
 
+## Planned (partner / server API — medium priority)
+
+- [ ] **Lounge — trusted partner auto-post (HTTP API):** Let an external system (cron, Zapier, another product’s backend) publish **text-first** Lounge posts **without** a browser session. **Do not** share Supabase **service role** with the partner; they call **your** URL only (e.g. **Vercel serverless** or **Supabase Edge Function**). **Auth:** `Authorization: Bearer <integration secret>` (rotate in env); optional **IP allowlist**; **`Idempotency-Key`** header to dedupe retries; tight **rate limit** (e.g. a few posts per day per key). **Implementation sketch:** server validates secret, then uses **service-role** Supabase on **your** side to `insert` into **`community_feed_posts`** with fixed **`user_id`** = a **dedicated** `auth.users` row + **`profiles`** (clear handle for attribution). Align insert columns with **`communityFeedPostInsertPayload`** in `src/utils/communityFeedPost.js` (caption ≤280; optional `game_title` / `game_slug`; extend later for image URL if product allows). **Watch:** existing **`rate_limit_events`** / `BEFORE INSERT` guard on posts (`feed_phase_a_profiles_public_read.sql` §A4) may apply to that user — decide exempt vs. partner account tuned for low volume. **Test validation:** `curl` happy path + wrong secret + duplicate idempotency key; confirm feed row + author profile in app. **Production replay:** env var names in `production-rollout-checklist.md` §1; add Edge row + §4 if shipped as a function.
+
+---
+
+## Planned (messaging — phased: TLS / at rest → ciphertext)
+
+**Product intent:** subscriber-capable **chat** (DMs + groups — scope TBD) with honest security language: **TLS in transit** + **provider encryption at rest** first; a **later phase** adds **app-level ciphertext storage** (message bodies as ciphertext in Postgres; keys **not** colocated with data in a naive dump — **not** E2EE unless clients alone hold keys).
+
+- [ ] **Phase 1 — Transport + at rest (ship first):** Enforce **HTTPS-only** app/API surfaces (no mixed content; HTTP→HTTPS; consider **HSTS** on the app domain). Rely on **Supabase / host managed encryption at rest** for persisted data; document in privacy/architecture notes (names of controls only in repo). **Rough timeline:** aligns with initial messaging MVP build (order of **weeks** for barebones chat — see prior estimates — not a separate “TLS project”).
+
+- [ ] **Phase 2 — App-level ciphertext storage (follow-on):** Encrypt message bodies (e.g. AES-GCM) before persist; decrypt on authorized read via a **trusted server path**; optional **per-room DEK** wrapped by a **KEK** in Vault/KMS. **Rough incremental time:** ~**1–2 weeks** (single master key + wiring) to **~2–4+ weeks** (per-room keys, rotation runbooks, re-encrypt jobs). Marketing: **“stored as ciphertext”** only if keys are handled separately; do **not** imply **end-to-end** unless clients hold keys.
+
+**Smart prep from day one (so Phase 2 is not a rewrite):**
+
+- **Single read/write seam** for messages (e.g. one **Edge Function** or **Vercel API** module), even if v1 passes **plaintext** through — avoids scattered `supabase.from('messages').insert` that is painful to retrofit.
+- **Schema placeholders:** e.g. **`content_encoding`** (`plain` | future `aes_gcm_v1`), optional **`key_id` / wrapped DEK** columns (nullable in v1), body column type that can hold **binary ciphertext** later (**`bytea`** or a single chosen base64-in-text convention).
+- **Avoid early coupling** to **plaintext-only** DB features on the message body (e.g. **full-text search indexes**, triggers that assume readable text) until the ciphertext strategy is decided — or plan **parallel** searchable metadata.
+
+**Cross-link:** high-level sequencing note in **`docs/social-feed-roadmap.md`** (*Messaging / chat (future)*). Roadmap phases **A–L** unchanged; messaging is **out of band** until picked up.
+
+---
+
 ## Roadmap status snapshot
 
 ### Phase A - Foundation (DB + auth shaping)
@@ -232,6 +256,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-13: **Planned (messaging):** Phased timeline — **Phase 1:** TLS + **provider at rest** (document; HTTPS-only discipline). **Phase 2:** **app-level ciphertext storage** (keys separate from naive DB dump; not E2EE). **Smart prep:** single message read/write API seam + nullable `content_encoding` / key metadata + avoid plaintext-only FTS on body until strategy set — see *Planned (messaging)* in this file; roadmap *Messaging / chat (future)*.
+- 2026-05-13: **Backlog (medium priority):** *Planned (partner / server API)* — trusted partner **Lounge auto-post** via HTTPS + integration secret; server-side insert as a **dedicated** feed user; idempotency + rate limits (see section for sketch).
 - 2026-05-13: **Lounge OG preview text:** **`compoundOgTitle`** = **`byline · caption · stats`** in **`og:title`**. **WhatsApp** showed duplicate blocks when **`og:description`** repeated the title — description is now a short CTA (**`Open this post in Edge.`**). iMessage still reads mainly **`og:title`**.
 - 2026-05-18: **Planned:** **Up to two Stream clips per post** (ordered uids; migration from single `stream_video_uid`; composer/quote/feed/delete/autoplay) — `[ ]` under *Planned (Lounge media)*; **Phase D** note in **`docs/social-feed-roadmap.md`**.
 - 2026-05-18: **Deferred:** **Stream inside image carousel** (upload-order mixed strip + lightbox + composer/quote + lifecycle) — `[-]` row under *Deferred / someday* in this file; short **Phase D** note in **`docs/social-feed-roadmap.md`** (not scheduled).

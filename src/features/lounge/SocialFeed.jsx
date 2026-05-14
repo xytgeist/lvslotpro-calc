@@ -70,6 +70,8 @@ import LoungeVideoCropModal from './LoungeVideoCropModal.jsx'
 import { pinLoungeStreamSessionPoster, releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 import KlipyGifPicker from './KlipyGifPicker.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
+import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
+import LoungeDockSlidePanels from '../../components/LoungeDockSlidePanels.jsx'
 
 /** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
 const LOUNGE_MAX_PINNED_ALERT =
@@ -238,6 +240,8 @@ export default function SocialFeed({
   const [profileModalVisible, setProfileModalVisible] = useState(true)
   const profileModalVisibleRef = useRef(true)
   const profileModalCloseFallbackTimerRef = useRef(0)
+  /** `closeProfileModal` is defined later; dock Home uses this ref. */
+  const closeProfileModalRef = useRef(() => {})
   const [profileModalLoading, setProfileModalLoading] = useState(false)
   const [profileModalErr, setProfileModalErr] = useState('')
   const [profileModalData, setProfileModalData] = useState(null)
@@ -306,6 +310,9 @@ export default function SocialFeed({
   const [pullDistance, setPullDistance] = useState(0)
   const [pullRefreshing, setPullRefreshing] = useState(false)
   const [loungeFeedDeleteBusyPostId, setLoungeFeedDeleteBusyPostId] = useState(null)
+  /** Left dock: search / notifications / chat (Lounge shell). */
+  const [loungeDockPanel, setLoungeDockPanel] = useState(null)
+  const [loungeDockFooterHeight, setLoungeDockFooterHeight] = useState(52)
   const [loungePostDetail, setLoungePostDetail] = useState(null)
   const [loungeDetailEditing, setLoungeDetailEditing] = useState(false)
   const [loungeDetailDraftCaption, setLoungeDetailDraftCaption] = useState('')
@@ -2177,6 +2184,51 @@ export default function SocialFeed({
     [composerUserId, loungeReadOnly, onRequireAuth]
   )
 
+  const scrollLoungeFeedToTop = useCallback(() => {
+    const el = loungeFeedScrollRef.current
+    if (!el) return
+    el.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
+  const onLoungeDockFooterHeight = useCallback((px) => {
+    if (typeof px !== 'number' || !Number.isFinite(px) || px <= 0) return
+    setLoungeDockFooterHeight((cur) => (cur === px ? cur : px))
+  }, [])
+
+  const onLoungeDockHome = useCallback(() => {
+    setLoungeDockPanel(null)
+    if (profileModalOpen) closeProfileModalRef.current()
+    if (loungePostDetail) closeLoungePostDetail()
+    scrollLoungeFeedToTop()
+    loungeTitleRevealRef.current = 1
+    setLoungeTitleReveal(1)
+  }, [profileModalOpen, loungePostDetail, closeLoungePostDetail, scrollLoungeFeedToTop])
+
+  const onLoungeDockSearch = useCallback(() => {
+    setLoungeDockPanel((p) => (p === 'search' ? null : 'search'))
+  }, [])
+  const onLoungeDockNotifications = useCallback(() => {
+    setLoungeDockPanel((p) => (p === 'notifications' ? null : 'notifications'))
+  }, [])
+  const onLoungeDockChat = useCallback(() => {
+    setLoungeDockPanel((p) => (p === 'chat' ? null : 'chat'))
+  }, [])
+
+  const onLoungeDockPickPostFromSearch = useCallback(
+    (postId) => {
+      const id = String(postId || '').trim()
+      if (!id) return
+      setLoungeDockPanel(null)
+      const post = communityPosts.find((p) => p && String(p.id) === id)
+      if (post) openLoungePostDetail(post, {})
+    },
+    [communityPosts, openLoungePostDetail]
+  )
+
+  useEffect(() => {
+    if (loungePostDetail && loungeDockPanel) setLoungeDockPanel(null)
+  }, [loungePostDetail, loungeDockPanel])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     let cancelled = false
@@ -3816,6 +3868,10 @@ export default function SocialFeed({
     }, 400)
   }, [finalizeProfileModalClose])
 
+  useEffect(() => {
+    closeProfileModalRef.current = closeProfileModal
+  }, [closeProfileModal])
+
   const openProfileModal = useCallback(
     async (post) => {
       if (loungeReadOnly) {
@@ -4016,6 +4072,9 @@ export default function SocialFeed({
     ]
   )
 
+  const showLoungeViewportDock = !loungePostDetail && !profileModalOpen
+  const loungeFeedDockPaddingBottom = showLoungeViewportDock ? loungeDockFooterHeight + 10 : 0
+
   return (
     <div className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       {quoteRepostQueuedToast ? (
@@ -4059,9 +4118,24 @@ export default function SocialFeed({
         </div>
       </div>
 
+      {showLoungeViewportDock ? (
+        <LoungeDockFooterBar
+          reveal={loungeTitleReveal}
+          barHeightPx={loungeDockFooterHeight}
+          onHeightChange={onLoungeDockFooterHeight}
+          onHome={onLoungeDockHome}
+          onSearch={onLoungeDockSearch}
+          onNotifications={onLoungeDockNotifications}
+          onChat={onLoungeDockChat}
+          activePanel={loungeDockPanel}
+          layout="viewport"
+        />
+      ) : null}
+
       <div
         ref={loungeFeedScrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+        style={loungeFeedDockPaddingBottom > 0 ? { paddingBottom: loungeFeedDockPaddingBottom } : undefined}
       >
         <LoungeFeedVideoAutoplayProvider scrollRootRef={loungeFeedScrollRef}>
         <div
@@ -5644,6 +5718,17 @@ export default function SocialFeed({
         </div>
       ) : null}
 
+      {loungeDockPanel ? (
+        <LoungeDockSlidePanels
+          key={loungeDockPanel}
+          openPanel={loungeDockPanel}
+          onClose={() => setLoungeDockPanel(null)}
+          communityPosts={communityPosts}
+          bottomReservePx={loungeDockFooterHeight + 10}
+          onPickPost={onLoungeDockPickPostFromSearch}
+        />
+      ) : null}
+
       {profileModalOpen && profileModalData?.user_id ? (
         <LoungeProfileFullScreen
           open={profileModalOpen}
@@ -5661,6 +5746,13 @@ export default function SocialFeed({
           postCardProps={profilePostCardProps}
           onProfileUpdated={onProfileScreenUpdated}
           hydratePosts={hydrateCommunityPosts}
+          shellDock={{
+            activePanel: loungeDockPanel,
+            onHome: onLoungeDockHome,
+            onSearch: onLoungeDockSearch,
+            onNotifications: onLoungeDockNotifications,
+            onChat: onLoungeDockChat,
+          }}
         />
       ) : null}
 

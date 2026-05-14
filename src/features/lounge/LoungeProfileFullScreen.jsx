@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
 import {
   formatProfileSaveDebugError,
   handleSlugFromAtInput,
@@ -55,6 +56,8 @@ export default function LoungeProfileFullScreen({
   onProfileUpdated,
   /** Hydrate `community_feed_posts` rows (repost targets, author profiles); required for Likes/Bookmarks tabs. */
   hydratePosts,
+  /** Optional Lounge shell dock (Home / Search / Alerts / Chat) — same actions as main feed dock. */
+  shellDock = null,
 }) {
   const [tab, setTab] = useState('posts')
   const [interactionPosts, setInteractionPosts] = useState([])
@@ -88,6 +91,11 @@ export default function LoungeProfileFullScreen({
   const ownProfileMenuButtonRef = useRef(null)
   const ownProfileMenuPanelRef = useRef(null)
   const profileBodyScrollRef = useRef(null)
+  const profileDockScrollPrevTopRef = useRef(0)
+  const profileDockRevealRef = useRef(1)
+  const profileDockScrollRafRef = useRef(0)
+  const [profileDockReveal, setProfileDockReveal] = useState(1)
+  const [profileDockFooterMeasured, setProfileDockFooterMeasured] = useState(52)
   const wasOwnProfileEditingRef = useRef(false)
 
   const displayName = String(profile?.display_name || profile?.handle || 'Member').trim() || 'Member'
@@ -391,6 +399,57 @@ export default function LoungeProfileFullScreen({
     void refreshSocial()
   }, [open, panelVisible, refreshSocial])
 
+  useEffect(() => {
+    if (!open || !panelVisible) return
+    profileDockRevealRef.current = 1
+    setProfileDockReveal(1)
+    const el = profileBodyScrollRef.current
+    if (el) profileDockScrollPrevTopRef.current = el.scrollTop
+  }, [open, panelVisible])
+
+  useEffect(() => {
+    const el = profileBodyScrollRef.current
+    if (!el || typeof window === 'undefined') return
+    if (!shellDock || showOwnEditControls || !open || !panelVisible) return
+    profileDockScrollPrevTopRef.current = el.scrollTop
+    const titleRevealPerScrollPx = 220
+    const titleHidePerScrollPx = 190
+    const maxAbsScrollStepPx = 180
+    const minScrollStepPx = 0.35
+    const queueFlush = () => {
+      if (profileDockScrollRafRef.current) return
+      profileDockScrollRafRef.current = window.requestAnimationFrame(() => {
+        profileDockScrollRafRef.current = 0
+        setProfileDockReveal(profileDockRevealRef.current)
+      })
+    }
+    const onScroll = () => {
+      const st = el.scrollTop
+      const prev = profileDockScrollPrevTopRef.current
+      const rawDelta = st - prev
+      profileDockScrollPrevTopRef.current = st
+      const eff =
+        rawDelta === 0 ? 0 : Math.sign(rawDelta) * Math.min(Math.abs(rawDelta), maxAbsScrollStepPx)
+      let r = profileDockRevealRef.current
+      if (st <= 2) {
+        r = 1
+      } else if (eff < -minScrollStepPx) {
+        r = Math.min(1, r + (-eff) / titleRevealPerScrollPx)
+      } else if (eff > minScrollStepPx) {
+        r = Math.max(0, r - eff / titleHidePerScrollPx)
+      }
+      if (r !== profileDockRevealRef.current) {
+        profileDockRevealRef.current = r
+        queueFlush()
+      }
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (profileDockScrollRafRef.current) window.cancelAnimationFrame(profileDockScrollRafRef.current)
+    }
+  }, [shellDock, showOwnEditControls, open, panelVisible])
+
   const toggleFollow = async () => {
     if (!viewerUserId || !profileUserId || isOwnProfile || socialBusy) return
     setSocialBusy(true)
@@ -675,12 +734,18 @@ export default function LoungeProfileFullScreen({
           if (!panelVisible) onAfterTransitionOut?.()
         }}
       >
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
           ref={profileBodyScrollRef}
           className={
             showOwnEditControls
               ? 'min-h-0 flex-1 overflow-hidden overscroll-y-none pb-[max(0.5rem,env(safe-area-inset-bottom))]'
               : 'min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+          }
+          style={
+            shellDock && !showOwnEditControls
+              ? { paddingBottom: Math.max(56, profileDockFooterMeasured) + 8 }
+              : undefined
           }
         >
           {/* Banner; ⋯ in corner (edit mode: sheet does not scroll, so absolute only). */}
@@ -1070,6 +1135,23 @@ export default function LoungeProfileFullScreen({
               ) : null}
             </div>
           </div>
+        </div>
+        {shellDock && !showOwnEditControls ? (
+          <LoungeDockFooterBar
+            layout="sheet"
+            reveal={profileDockReveal}
+            barHeightPx={profileDockFooterMeasured}
+            onHeightChange={(h) => {
+              if (typeof h !== 'number' || !Number.isFinite(h) || h <= 0) return
+              setProfileDockFooterMeasured((cur) => (cur === h ? cur : h))
+            }}
+            onHome={shellDock.onHome}
+            onSearch={shellDock.onSearch}
+            onNotifications={shellDock.onNotifications}
+            onChat={shellDock.onChat}
+            activePanel={shellDock.activePanel}
+          />
+        ) : null}
         </div>
       </div>
 
