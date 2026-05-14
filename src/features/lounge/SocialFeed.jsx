@@ -1335,7 +1335,7 @@ export default function SocialFeed({
       const ids = [...new Set((postIds || []).filter(Boolean))]
       if (!composerUserId || ids.length === 0) return
       const uid = composerUserId
-      const [likesRes, quoteRepostRes, bookmarksRes, commentsRes] = await Promise.all([
+      const [likesRes, quoteRepostRes, bookmarksRes, commentsRes, countsRes] = await Promise.all([
         supabaseClient.from('post_likes').select('post_id').eq('user_id', uid).in('post_id', ids),
         supabaseClient
           .from('community_feed_posts')
@@ -1351,12 +1351,17 @@ export default function SocialFeed({
           .is('parent_id', null)
           .is('hidden_at', null)
           .in('post_id', ids),
+        supabaseClient
+          .from('community_feed_posts')
+          .select('id,like_count,comment_count,repost_count')
+          .in('id', ids),
       ])
       const errMsg =
         likesRes.error?.message ||
         quoteRepostRes.error?.message ||
         bookmarksRes.error?.message ||
-        commentsRes.error?.message
+        commentsRes.error?.message ||
+        countsRes.error?.message
       if (errMsg) {
         console.warn('refreshLoungePostInteractions:', errMsg)
         return
@@ -1404,8 +1409,16 @@ export default function SocialFeed({
         }
         return next
       })
+      for (const row of countsRes.data || []) {
+        if (!row?.id) continue
+        patchPostAggregate(row.id, {
+          like_count: row.like_count,
+          comment_count: row.comment_count,
+          repost_count: row.repost_count,
+        })
+      }
     },
-    [composerUserId, defaultInteraction, supabaseClient]
+    [composerUserId, defaultInteraction, patchPostAggregate, supabaseClient]
   )
 
   const feedPostIdsKey = useMemo(
