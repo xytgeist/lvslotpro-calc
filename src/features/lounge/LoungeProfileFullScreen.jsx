@@ -95,7 +95,7 @@ export default function LoungeProfileFullScreen({
   const profileDockRevealRef = useRef(1)
   const profileDockScrollRafRef = useRef(0)
   const [profileDockReveal, setProfileDockReveal] = useState(1)
-  const [profileDockFooterMeasured, setProfileDockFooterMeasured] = useState(52)
+  const [profileDockFooterMeasured, setProfileDockFooterMeasured] = useState(44)
   const wasOwnProfileEditingRef = useRef(false)
 
   const displayName = String(profile?.display_name || profile?.handle || 'Member').trim() || 'Member'

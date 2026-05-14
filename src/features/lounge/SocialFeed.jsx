@@ -312,7 +312,7 @@ export default function SocialFeed({
   const [loungeFeedDeleteBusyPostId, setLoungeFeedDeleteBusyPostId] = useState(null)
   /** Left dock: search / notifications / chat (Lounge shell). */
   const [loungeDockPanel, setLoungeDockPanel] = useState(null)
-  const [loungeDockFooterHeight, setLoungeDockFooterHeight] = useState(52)
+  const [loungeDockFooterHeight, setLoungeDockFooterHeight] = useState(0)
   const [loungePostDetail, setLoungePostDetail] = useState(null)
   const [loungeDetailEditing, setLoungeDetailEditing] = useState(false)
   const [loungeDetailDraftCaption, setLoungeDetailDraftCaption] = useState('')
@@ -4073,7 +4073,14 @@ export default function SocialFeed({
   )
 
   const showLoungeViewportDock = !loungePostDetail && !profileModalOpen
-  const loungeFeedDockPaddingBottom = showLoungeViewportDock ? loungeDockFooterHeight + 10 : 0
+  const loungeTitleBarChromePx = loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56
+  const effectiveLoungeDockFooterHeight =
+    loungeDockFooterHeight > 0
+      ? loungeDockFooterHeight
+      : showLoungeViewportDock
+        ? loungeTitleBarChromePx + 40
+        : 0
+  const loungeFeedDockPaddingBottom = showLoungeViewportDock ? effectiveLoungeDockFooterHeight + 10 : 0
 
   return (
     <div className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -4122,6 +4129,7 @@ export default function SocialFeed({
         <LoungeDockFooterBar
           reveal={loungeTitleReveal}
           barHeightPx={loungeDockFooterHeight}
+          matchTitleBarHeightPx={loungeTitleBarChromePx}
           onHeightChange={onLoungeDockFooterHeight}
           onHome={onLoungeDockHome}
           onSearch={onLoungeDockSearch}
@@ -5724,7 +5732,7 @@ export default function SocialFeed({
           openPanel={loungeDockPanel}
           onClose={() => setLoungeDockPanel(null)}
           communityPosts={communityPosts}
-          bottomReservePx={loungeDockFooterHeight + 10}
+          bottomReservePx={effectiveLoungeDockFooterHeight + 10}
           onPickPost={onLoungeDockPickPostFromSearch}
         />
       ) : null}
