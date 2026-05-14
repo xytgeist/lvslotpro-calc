@@ -941,15 +941,15 @@ export default function LoungePostStreamVideo({
           aria-label={
             showOpen
               ? stripSoundUnmuted
-                ? 'Post video, sound on in feed. Tap the video for full screen. Use the bottom control to mute in the feed.'
-                : 'Post video, playing muted in feed. Tap the video for full screen. Use the bottom control for sound in the feed.'
+                ? 'Post video, sound on in feed. Tap the video for full screen. Use the bottom-left mute control in the feed.'
+                : 'Post video, playing muted in feed. Tap the video for full screen. Use the bottom-left control for sound in the feed.'
               : 'Post video'
           }
           title={
             showOpen
               ? stripSoundUnmuted
-                ? 'Tap video for full screen; bottom area to mute'
-                : 'Tap video for full screen; bottom area for sound'
+                ? 'Tap video for full screen; bottom-left chip to mute'
+                : 'Tap video for full screen; bottom-left chip for sound'
               : undefined
           }
           onClick={(e) => {
@@ -1063,21 +1063,19 @@ export default function LoungePostStreamVideo({
             <button
               type="button"
               aria-label={stripSoundUnmuted ? 'Mute video in the feed' : 'Play video with sound in the feed'}
-              className="absolute bottom-0 left-0 right-0 z-[3] flex min-h-[5.25rem] items-end justify-start bg-gradient-to-t from-black/75 via-black/30 to-transparent px-2 pb-2.5 pt-10 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50"
+              className="absolute bottom-2 left-2 z-[3] inline-flex min-h-[44px] max-w-[min(calc(100%-1rem),15rem)] items-center gap-1.5 rounded-xl border border-zinc-500/35 bg-black/65 px-3 py-2.5 text-left text-[11px] font-medium text-zinc-200 shadow-md backdrop-blur-[2px] touch-manipulation [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50 sm:bottom-2.5 sm:left-2.5 sm:gap-2 sm:px-3.5 sm:py-3 sm:text-[12px]"
               onClick={(e) => {
                 e.stopPropagation()
                 onSoundStripPress()
               }}
             >
-              <span className="pointer-events-none flex max-w-full items-center gap-1.5 rounded-md bg-black/55 px-2 py-1.5 text-[11px] font-medium text-zinc-200 sm:px-2.5 sm:py-2 sm:text-[12px]">
-                {stripSoundUnmuted ? (
-                  <SoundOnGlyph className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" />
-                ) : (
-                  <MutedGlyph className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" />
-                )}
-                <span className="max-w-[min(12rem,72vw)] truncate">
-                  {stripSoundUnmuted ? 'Tap to mute' : 'Tap for sound'}
-                </span>
+              {stripSoundUnmuted ? (
+                <SoundOnGlyph className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" />
+              ) : (
+                <MutedGlyph className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" />
+              )}
+              <span className="min-w-0 max-w-[min(11rem,70vw)] truncate">
+                {stripSoundUnmuted ? 'Tap to mute' : 'Tap for sound'}
               </span>
             </button>
           ) : null}
