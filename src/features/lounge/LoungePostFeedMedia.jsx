@@ -27,6 +27,8 @@ export function LoungeImageCarousel({
   removeLabelForIndex,
   /** Tap image to open fullscreen (disabled in composer). */
   enableLightbox = true,
+  /** Shown under fullscreen image(s) (e.g. post interactions). */
+  lightboxFooter,
   /**
    * When set (feed/detail scroll container), carousel snaps back to slide 1 when this block
    * re-enters that scrollport after leaving — fixes nested scroll + `content-visibility` with `root: null`.
@@ -242,7 +244,12 @@ export function LoungeImageCarousel({
         ))}
       </div>
       {lightbox ? (
-        <LoungeImageLightbox urls={lightbox.urls} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />
+        <LoungeImageLightbox
+          urls={lightbox.urls}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+          footer={lightboxFooter}
+        />
       ) : null}
     </div>
   )
@@ -257,7 +264,11 @@ export function LoungePostFeedImagesAndGif({
   firstMarginTopClass = 'mt-2',
   enableLightbox = true,
   visibilityResetRootRef,
+  /** `(post) => ReactNode` — e.g. interaction bar for the same post as this media strip. */
+  renderMediaLightboxFooter,
 }) {
+  const mediaLightboxFooter =
+    typeof renderMediaLightboxFooter === 'function' ? renderMediaLightboxFooter(post) : null
   const streamUid = feedPostStreamVideoUid(post)
   const persistedStreamPoster = streamUid ? feedPostStreamPosterUrl(post) : ''
   const streamDims = streamUid ? feedPostStreamVideoDisplayDimensions(post) : null
@@ -280,6 +291,7 @@ export function LoungePostFeedImagesAndGif({
         persistedStreamPosterUrl={persistedStreamPoster || undefined}
         streamVideoDisplayWidth={streamDims?.width}
         streamVideoDisplayHeight={streamDims?.height}
+        mediaLightboxFooter={mediaLightboxFooter}
       />
     )
   }
@@ -295,6 +307,7 @@ export function LoungePostFeedImagesAndGif({
         regionAriaLabel={gif ? 'Post images and GIF' : 'Post images'}
         enableLightbox={enableLightbox}
         visibilityResetRootRef={visibilityResetRootRef}
+        lightboxFooter={mediaLightboxFooter}
       />
     )
   }
@@ -305,6 +318,7 @@ export function LoungePostFeedImagesAndGif({
       variant={variant}
       firstMarginTopClass={firstMarginTopClass}
       enableLightbox={enableLightbox}
+      lightboxFooter={mediaLightboxFooter}
     />
   )
 }

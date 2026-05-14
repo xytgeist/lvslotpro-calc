@@ -207,7 +207,7 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
   }, [src, attachKey, enabled, feedStyleAbr, onAutoReattach, recoveryBurstRef])
 }
 
-function LoungeStreamVideoLightbox({ uid, onClose }) {
+function LoungeStreamVideoLightbox({ uid, onClose, footer }) {
   const videoRef = useRef(null)
   const recoveryBurstRef = useRef(0)
   const [attachKey, setAttachKey] = useState(0)
@@ -329,6 +329,14 @@ function LoungeStreamVideoLightbox({ uid, onClose }) {
           </button>
         </div>
       ) : null}
+      {footer ? (
+        <div
+          className="shrink-0 border-t border-zinc-700/50 bg-black/40 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {footer}
+        </div>
+      ) : null}
     </div>,
     document.body,
   )
@@ -369,6 +377,7 @@ function SoundOnGlyph({ className = 'h-4 w-4' }) {
  * @param {string} [persistedStreamPosterUrl] — Public `lounge-feed` poster URL from DB (cross-device stable tile).
  * @param {number} [streamVideoDisplayWidth] — Display width from DB for CSS `aspect-ratio` when set with height.
  * @param {number} [streamVideoDisplayHeight] — Display height from DB for CSS `aspect-ratio` when set with width.
+ * @param {import('react').ReactNode} [mediaLightboxFooter] — Interaction bar etc. below full-screen video.
  */
 export default function LoungePostStreamVideo({
   uid,
@@ -381,6 +390,7 @@ export default function LoungePostStreamVideo({
   persistedStreamPosterUrl: persistedStreamPosterUrlProp = '',
   streamVideoDisplayWidth: streamDisplayWProp,
   streamVideoDisplayHeight: streamDisplayHProp,
+  mediaLightboxFooter,
 }) {
   const sessionPosterUrl = String(sessionPosterUrlProp || '').trim()
   const persistedPosterTrim = useMemo(
@@ -438,13 +448,20 @@ export default function LoungePostStreamVideo({
   const lazyStream = showOpen && (variant === 'feed' || variant === 'embed')
 
   useEffect(() => {
-    setPosterLayoutFailed(false)
-    setPosterDecodeOk(false)
-    setPosterBust(0)
-    posterAttemptRef.current = 0
-    window.clearTimeout(posterRetryTimerRef.current)
-    posterRetryTimerRef.current = 0
-    setCfPosterActive(hasPersistedPoster || !sessionPosterUrl)
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setPosterLayoutFailed(false)
+      setPosterDecodeOk(false)
+      setPosterBust(0)
+      posterAttemptRef.current = 0
+      window.clearTimeout(posterRetryTimerRef.current)
+      posterRetryTimerRef.current = 0
+      setCfPosterActive(hasPersistedPoster || !sessionPosterUrl)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [id, sessionPosterUrl, hasPersistedPoster])
 
   /** Off-DOM CF thumbnail fetch while the visible `<img>` still shows the session `blob:` poster. */
@@ -577,102 +594,106 @@ export default function LoungePostStreamVideo({
   /** Fade HLS over CF thumbnail once playing (all variants with poster frame; when not `attachStream`, keep video hidden). */
   useEffect(() => {
     if (!poster) return undefined
-    if (!attachStream) {
-      setStreamFadeShowVideo(false)
-      return undefined
-    }
-    setStreamFadeShowVideo(false)
-
     let cleaned = false
     let disarm = () => {}
+    let rafId = 0
 
-    const arm = () => {
-      const v = videoRef.current
-      if (!v) {
-        const tid = window.setTimeout(() => {
-          if (!cleaned) setStreamFadeShowVideo(true)
-        }, 800)
-        disarm = () => window.clearTimeout(tid)
+    queueMicrotask(() => {
+      if (cleaned) return
+      if (!attachStream) {
+        setStreamFadeShowVideo(false)
         return
       }
-      const reveal = () => {
-        if (cleaned) return
-        const el = videoRef.current
-        if (!el) {
-          queueMicrotask(() => setStreamFadeShowVideo(true))
+      setStreamFadeShowVideo(false)
+
+      const arm = () => {
+        const v = videoRef.current
+        if (!v) {
+          const tid = window.setTimeout(() => {
+            if (!cleaned) setStreamFadeShowVideo(true)
+          }, 800)
+          disarm = () => window.clearTimeout(tid)
           return
         }
-        const run = () => {
+        const reveal = () => {
           if (cleaned) return
-          requestAnimationFrame(() => {
+          const el = videoRef.current
+          if (!el) {
+            queueMicrotask(() => setStreamFadeShowVideo(true))
+            return
+          }
+          const run = () => {
             if (cleaned) return
             requestAnimationFrame(() => {
               if (cleaned) return
-              setStreamFadeShowVideo(true)
+              requestAnimationFrame(() => {
+                if (cleaned) return
+                setStreamFadeShowVideo(true)
+              })
             })
-          })
-        }
-        if (typeof el.requestVideoFrameCallback === 'function') {
-          try {
-            el.requestVideoFrameCallback(() => {
-              if (cleaned) return
+          }
+          if (typeof el.requestVideoFrameCallback === 'function') {
+            try {
+              el.requestVideoFrameCallback(() => {
+                if (cleaned) return
+                run()
+              })
+            } catch {
               run()
-            })
-          } catch {
+            }
+          } else {
             run()
           }
-        } else {
-          run()
         }
-      }
-      const onPlaying = () => reveal()
-      const onTime = () => {
-        if (cleaned || !videoRef.current || videoRef.current.currentTime <= 0) return
-        videoRef.current.removeEventListener('timeupdate', onTime)
-        reveal()
-      }
-      /** Only fade poster away once the stream can paint pixels; bare timeout was hiding poster over a black HLS layer. */
-      const revealIfDecoded = () => {
-        if (cleaned) return
-        const el = videoRef.current
-        if (
-          el &&
-          (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ||
-            (el.readyState >= HTMLMediaElement.HAVE_METADATA && el.currentTime > 0))
-        ) {
+        const onPlaying = () => reveal()
+        const onTime = () => {
+          if (cleaned || !videoRef.current || videoRef.current.currentTime <= 0) return
+          videoRef.current.removeEventListener('timeupdate', onTime)
           reveal()
         }
+        /** Only fade poster away once the stream can paint pixels; bare timeout was hiding poster over a black HLS layer. */
+        const revealIfDecoded = () => {
+          if (cleaned) return
+          const el = videoRef.current
+          if (
+            el &&
+            (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ||
+              (el.readyState >= HTMLMediaElement.HAVE_METADATA && el.currentTime > 0))
+          ) {
+            reveal()
+          }
+        }
+        if (!v.paused && v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          reveal()
+        } else {
+          v.addEventListener('playing', onPlaying, { once: true })
+          v.addEventListener('timeupdate', onTime)
+        }
+        const tid = window.setTimeout(revealIfDecoded, 900)
+        const tid2 = window.setTimeout(revealIfDecoded, 2400)
+        /** Original ~800ms timer also prevented a stuck fade (poster forever, video opacity-0) when events never ran. */
+        const tidLastResort = window.setTimeout(() => {
+          if (cleaned) return
+          reveal()
+        }, STREAM_FADE_LAST_RESORT_MS)
+        disarm = () => {
+          v.removeEventListener('playing', onPlaying)
+          v.removeEventListener('timeupdate', onTime)
+          window.clearTimeout(tid)
+          window.clearTimeout(tid2)
+          window.clearTimeout(tidLastResort)
+        }
       }
-      if (!v.paused && v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
-        reveal()
-      } else {
-        v.addEventListener('playing', onPlaying, { once: true })
-        v.addEventListener('timeupdate', onTime)
-      }
-      const tid = window.setTimeout(revealIfDecoded, 900)
-      const tid2 = window.setTimeout(revealIfDecoded, 2400)
-      /** Original ~800ms timer also prevented a stuck fade (poster forever, video opacity-0) when events never ran. */
-      const tidLastResort = window.setTimeout(() => {
-        if (cleaned) return
-        reveal()
-      }, STREAM_FADE_LAST_RESORT_MS)
-      disarm = () => {
-        v.removeEventListener('playing', onPlaying)
-        v.removeEventListener('timeupdate', onTime)
-        window.clearTimeout(tid)
-        window.clearTimeout(tid2)
-        window.clearTimeout(tidLastResort)
-      }
-    }
 
-    const raf = requestAnimationFrame(() => {
-      if (cleaned) return
-      arm()
+      rafId = requestAnimationFrame(() => {
+        if (cleaned) return
+        arm()
+      })
     })
 
     return () => {
       cleaned = true
-      cancelAnimationFrame(raf)
+      cancelAnimationFrame(rafId)
       disarm()
     }
   }, [attachStream, poster, id, streamAttachKey])
@@ -818,7 +839,16 @@ export default function LoungePostStreamVideo({
     }
     io.observe(wrap)
     return () => io.disconnect()
-  }, [id, showOpen, lazyStream, visibilityResetRootRef, streamAttachKey, scheduleRecompute, localStripSoundUnmuted])
+  }, [
+    id,
+    showOpen,
+    lazyStream,
+    visibilityResetRootRef,
+    streamAttachKey,
+    scheduleRecompute,
+    localStripSoundUnmuted,
+    coordinatorActive,
+  ])
 
   /** After lazy HLS attach (feed/embed), start muted autoplay once media is ready. */
   useEffect(() => {
@@ -1085,6 +1115,7 @@ export default function LoungePostStreamVideo({
       {lightboxOpen ? (
         <LoungeStreamVideoLightbox
           uid={id}
+          footer={mediaLightboxFooter}
           onClose={() => {
             setLightboxOpen(false)
           }}

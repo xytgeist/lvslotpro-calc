@@ -9,8 +9,9 @@ function normalizeUrlList(urls) {
 /**
  * Full-screen image viewer (feed / detail). Portals to `document.body` above sheets and feed rows.
  * Pass `urls` + `initialIndex` for multi-image navigation; or legacy single `url`.
+ * @param {import('react').ReactNode} [footer] — e.g. post interaction bar; clicks do not close the lightbox.
  */
-export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose }) {
+export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose, footer }) {
   const list = useMemo(() => {
     const fromArr = normalizeUrlList(urls)
     if (fromArr.length) return fromArr
@@ -132,6 +133,14 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose }) {
           decoding="async"
         />
       </div>
+      {footer ? (
+        <div
+          className="shrink-0 border-t border-zinc-700/50 bg-black/40 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {footer}
+        </div>
+      ) : null}
     </div>,
     document.body
   )
@@ -141,8 +150,15 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose }) {
  * GIF/photo URL shown below the post caption (always under the final line of text).
  * @param {string} [marginTopClass] — Tailwind margin-top on the wrapper (default `mt-2` after caption).
  * @param {boolean} [enableLightbox] — Tap to open fullscreen (feed/detail); set false for non-interactive embeds if needed.
+ * @param {import('react').ReactNode} [lightboxFooter] — Shown below the image in fullscreen (e.g. interactions).
  */
-export function LoungeInlineMediaUrl({ url, variant = 'feed', marginTopClass = 'mt-2', enableLightbox = true }) {
+export function LoungeInlineMediaUrl({
+  url,
+  variant = 'feed',
+  marginTopClass = 'mt-2',
+  enableLightbox = true,
+  lightboxFooter,
+}) {
   const [lightbox, setLightbox] = useState(null)
   if (!url) return null
   const isEmbed = variant === 'embed'
@@ -189,7 +205,12 @@ export function LoungeInlineMediaUrl({ url, variant = 'feed', marginTopClass = '
         framed
       )}
       {lightbox ? (
-        <LoungeImageLightbox urls={lightbox.urls} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />
+        <LoungeImageLightbox
+          urls={lightbox.urls}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+          footer={lightboxFooter}
+        />
       ) : null}
     </div>
   )
@@ -199,18 +220,25 @@ export function LoungeInlineMediaUrl({ url, variant = 'feed', marginTopClass = '
  * Renders `media_url` then optional `gif_url` (image + external GIF), or a single legacy URL in `media_url`.
  * @param {string} [firstMarginTopClass]
  */
-export function LoungePostMediaPair({ mediaUrl, gifUrl, variant = 'feed', firstMarginTopClass = 'mt-2', enableLightbox = true }) {
+export function LoungePostMediaPair({
+  mediaUrl,
+  gifUrl,
+  variant = 'feed',
+  firstMarginTopClass = 'mt-2',
+  enableLightbox = true,
+  lightboxFooter,
+}) {
   const m = mediaUrl != null ? String(mediaUrl).trim() : ''
   const g = gifUrl != null ? String(gifUrl).trim() : ''
   if (!m && !g) return null
   if (m && g) {
     return (
       <>
-        <LoungeInlineMediaUrl url={m} variant={variant} marginTopClass={firstMarginTopClass} enableLightbox={enableLightbox} />
-        <LoungeInlineMediaUrl url={g} variant={variant} marginTopClass="mt-2" enableLightbox={enableLightbox} />
+        <LoungeInlineMediaUrl url={m} variant={variant} marginTopClass={firstMarginTopClass} enableLightbox={enableLightbox} lightboxFooter={lightboxFooter} />
+        <LoungeInlineMediaUrl url={g} variant={variant} marginTopClass="mt-2" enableLightbox={enableLightbox} lightboxFooter={lightboxFooter} />
       </>
     )
   }
   const single = m || g
-  return <LoungeInlineMediaUrl url={single} variant={variant} marginTopClass={firstMarginTopClass} enableLightbox={enableLightbox} />
+  return <LoungeInlineMediaUrl url={single} variant={variant} marginTopClass={firstMarginTopClass} enableLightbox={enableLightbox} lightboxFooter={lightboxFooter} />
 }
