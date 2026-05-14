@@ -3974,7 +3974,12 @@ export default function SocialFeed({
                     openLoungePostDetail(post.reposted_post)
                     return
                   }
-                  if (t.closest('button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom]')) return
+                  if (
+                    t.closest(
+                      'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
+                    )
+                  )
+                    return
                   openLoungePostDetail(post)
                 }}
               >

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 const OUT_MS = 400
+/** Coarse-pointer tap: show tip briefly (hover is unreliable on touch). */
+const TAP_TIP_MS = 2800
+
+function prefersFinePointerHover() {
+  if (typeof window === 'undefined') return true
+  return window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
 
 const TONE = {
   amber: 'text-amber-200/95 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]',
@@ -18,11 +25,16 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
   const [exiting, setExiting] = useState(false)
   const [animKey, setAnimKey] = useState(0)
   const hideTRef = useRef(null)
+  const tapDismissTRef = useRef(null)
 
   const clearHide = useCallback(() => {
     if (hideTRef.current != null) {
       clearTimeout(hideTRef.current)
       hideTRef.current = null
+    }
+    if (tapDismissTRef.current != null) {
+      clearTimeout(tapDismissTRef.current)
+      tapDismissTRef.current = null
     }
   }, [])
 
@@ -36,21 +48,45 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
   }, [clearHide])
 
   const onLeave = useCallback(() => {
+    clearHide()
     setExiting(true)
     hideTRef.current = window.setTimeout(() => {
       setMounted(false)
       setExiting(false)
       hideTRef.current = null
     }, OUT_MS)
-  }, [])
+  }, [clearHide])
+
+  const onWrapperClick = useCallback(
+    (e) => {
+      e.stopPropagation()
+      if (prefersFinePointerHover()) return
+      clearHide()
+      setExiting(false)
+      setMounted(true)
+      setAnimKey((k) => k + 1)
+      tapDismissTRef.current = window.setTimeout(() => {
+        tapDismissTRef.current = null
+        setExiting(true)
+        hideTRef.current = window.setTimeout(() => {
+          setMounted(false)
+          setExiting(false)
+          hideTRef.current = null
+        }, OUT_MS)
+      }, TAP_TIP_MS)
+    },
+    [clearHide],
+  )
 
   const toneCls = TONE[tone] ?? TONE.amber
 
   return (
     <span
-      className={`relative inline-flex shrink-0 cursor-help ${className}`}
+      data-lounge-badge-tip
+      className={`relative inline-flex shrink-0 cursor-help touch-manipulation ${className}`}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
+      onClick={onWrapperClick}
     >
       {children}
       {mounted ? (

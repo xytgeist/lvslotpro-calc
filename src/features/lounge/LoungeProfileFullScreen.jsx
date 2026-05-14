@@ -994,7 +994,12 @@ export default function LoungeProfileFullScreen({
                           postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
                           return
                         }
-                        if (t.closest('button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom]')) return
+                        if (
+                          t.closest(
+                            'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
+                          )
+                        )
+                          return
                         postCardPropsForLists.onPostBodyClick?.(post)
                       }}
                     >
@@ -1043,7 +1048,12 @@ export default function LoungeProfileFullScreen({
                           postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
                           return
                         }
-                        if (t.closest('button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom]')) return
+                        if (
+                          t.closest(
+                            'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
+                          )
+                        )
+                          return
                         postCardPropsForLists.onPostBodyClick?.(post)
                       }}
                     >
