@@ -753,19 +753,14 @@ export default function SocialFeed({
   const handleShareLoungePost = useCallback((post) => {
     if (!post?.id) return
     const url = buildLoungePostShareUrl(post.id)
-    const cap = feedPostDisplayCaption(post)
-    const name = displayNameFor(post)
-    const trimmed = cap != null ? String(cap).trim() : ''
-    const text =
-      trimmed.length > 0 ? `${name}: ${trimmed.slice(0, 200)}` : `${name} on Edge Lounge`
+    /** Omit `text` so iMessage does not show a second bubble; caption lives in OG `description` from `/lounge/p/…`. */
     void shareLoungePostHybrid({
       url,
       title: 'Edge Lounge',
-      text,
       onCopied: () => setLoungeShareFlash('Link copied to clipboard.'),
       onCopyFailed: () => setLoungeShareFlash('Could not copy link. Try copying from the address bar.'),
     })
-  }, [displayNameFor])
+  }, [])
 
   const avatarText = useCallback((p) => {
     const pr = p?.author_profile

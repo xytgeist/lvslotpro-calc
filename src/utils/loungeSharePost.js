@@ -41,7 +41,9 @@ export async function shareLoungePostHybrid({ url, title, text, onCopied, onCopy
     onCopyFailed?.()
     return { mode: 'failed' }
   }
-  const shareData = { url, title: title || 'Lounge post', text: text || '' }
+  const shareData = { url, title: title || 'Lounge post' }
+  const t = typeof text === 'string' ? text.trim() : ''
+  if (t) shareData.text = t
   const nav = typeof navigator !== 'undefined' ? navigator : null
   if (nav?.share) {
     const allowed = typeof nav.canShare !== 'function' ? true : nav.canShare(shareData)

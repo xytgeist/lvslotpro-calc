@@ -57,9 +57,20 @@ function formatCount(n) {
 function buildDescription(post, captionSnippet) {
   const likes = formatCount(Number(post.like_count))
   const comments = formatCount(Number(post.comment_count))
-  const bits = [`${likes} likes`, `${comments} comments`]
-  if (captionSnippet) bits.push(`"${captionSnippet}"`)
-  return bits.join(' · ')
+  const stats = `${likes} likes · ${comments} comments`
+  if (captionSnippet) return `${captionSnippet} · ${stats}`
+  return stats
+}
+
+/** Same icon hints as `index.html` — crawlers use these for the small mark next to the domain. */
+function appBrandLinkTags(origin) {
+  const o = escapeAttr(origin.replace(/\/$/, ''))
+  return `  <link rel="icon" type="image/png" sizes="32x32" href="${o}/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="${o}/favicon-16x16.png" />
+  <link rel="icon" type="image/png" sizes="96x96" href="${o}/favicon-96x96.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="${o}/apple-touch-icon.png?v=7" />
+  <meta name="apple-mobile-web-app-title" content="Edge" />
+`
 }
 
 async function fetchJson(url, headers) {
@@ -77,13 +88,16 @@ async function fetchJson(url, headers) {
 function genericHtml(origin, canonicalPath, title, description) {
   const canonical = `${origin}${canonicalPath}`
   const ogImage = `${origin}/apple-touch-icon.png`
+  const brand = appBrandLinkTags(origin)
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+${brand}
   <title>${escapeAttr(title)}</title>
   <link rel="canonical" href="${escapeAttr(canonical)}" />
+  <meta property="og:site_name" content="Edge" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="${escapeAttr(title)}" />
   <meta property="og:description" content="${escapeAttr(description)}" />
@@ -204,14 +218,17 @@ export default async function handler(req, res) {
   const ogImage = pickOgImage(post, origin)
   const canonical = `${origin}/lounge/p/${postId}`
   const appTarget = `${origin}/?tab=home&post=${encodeURIComponent(postId)}`
+  const brand = appBrandLinkTags(origin)
 
   const html = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+${brand}
   <title>${escapeAttr(title)}</title>
   <link rel="canonical" href="${escapeAttr(canonical)}" />
+  <meta property="og:site_name" content="Edge" />
   <meta property="og:type" content="article" />
   <meta property="og:title" content="${escapeAttr(title)}" />
   <meta property="og:description" content="${escapeAttr(description)}" />
