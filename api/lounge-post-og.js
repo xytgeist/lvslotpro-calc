@@ -1,8 +1,9 @@
 /**
  * Vercel Serverless: HTML + Open Graph / Twitter Card meta for Lounge post permalinks.
  * Shared URL path: `/lounge/p/:postId` (rewritten here from `vercel.json`).
- * Typical link preview order (iMessage / Slack, not guaranteed): `og:image` → bold `og:title`
- * (caption when present) → `og:description` (author on Edge + stats, or stats only if no caption) → domain + icon.
+ * Typical preview: `og:image` → `og:title` → domain. **Apple Messages often drops `og:description`**
+ * on large-image cards, so caption + byline + stats are folded into **`og:title`** (`compoundOgTitle`).
+ * `og:description` remains for Slack / Facebook / etc. **`/favicon.ico`** first for domain-row icons.
  *
  * Env (set on Vercel; same as the Vite client): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
  */
@@ -72,10 +73,37 @@ function buildAuthorByline(displayName, handle, isOg) {
   return `${core}${mark}`
 }
 
-/** Same icon hints as `index.html` — crawlers use these for the small mark next to the domain. */
+/** iMessage large-image previews often hide `og:description` — keep one visible title string. */
+const OG_TITLE_MAX = 380
+
+function compoundOgTitle(captionSnippet, byline, stats) {
+  const sep = ' · '
+  const tail = `${sep}${byline}${sep}${stats}`
+  if (!captionSnippet) {
+    return `${byline}${sep}${stats}`
+  }
+  if (captionSnippet.length + tail.length <= OG_TITLE_MAX) {
+    return `${captionSnippet}${tail}`
+  }
+  const headRoom = OG_TITLE_MAX - tail.length - 1
+  if (headRoom < 16) {
+    return `${captionSnippet.slice(0, 12)}${sep}${byline}${sep}${stats}`
+  }
+  return `${captionSnippet.slice(0, headRoom - 1)}\u2026${tail}`
+}
+
+function jsonLdScript(obj) {
+  const raw = JSON.stringify(obj)
+  const safe = raw.replace(/</g, '\\u003c')
+  return `  <script type="application/ld+json">${safe}</script>
+`
+}
+
+/** Same icon hints as `index.html` — include `/favicon.ico` first (many crawlers only request that). */
 function appBrandLinkTags(origin) {
   const o = escapeAttr(origin.replace(/\/$/, ''))
-  return `  <link rel="icon" type="image/png" sizes="32x32" href="${o}/favicon-32x32.png" />
+  return `  <link rel="shortcut icon" href="${o}/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="${o}/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="${o}/favicon-16x16.png" />
   <link rel="icon" type="image/png" sizes="96x96" href="${o}/favicon-96x96.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="${o}/apple-touch-icon.png?v=7" />
@@ -225,17 +253,33 @@ export default async function handler(req, res) {
   const stats = statsLine(post)
   const hasCaption = captionSnippet.length > 0
 
-  /** Most clients: image, then bold `og:title`, then `og:description`, then domain + icon. */
-  const ogTitle = hasCaption ? captionSnippet : byline
+  /** iMessage often ignores `og:description` on large-image cards — pack into `og:title`. */
+  const ogTitle = compoundOgTitle(hasCaption ? captionSnippet : '', byline, stats)
   const ogDescription = hasCaption ? `${byline} · ${stats}` : stats
-  const docTitle = hasCaption
-    ? `${captionSnippet.length > 72 ? `${captionSnippet.slice(0, 69)}\u2026` : captionSnippet} · Edge`
-    : `${byline} · Edge`
+  const docTitle =
+    ogTitle.length > 72 ? `${ogTitle.slice(0, 69)}\u2026 · Edge` : `${ogTitle} · Edge`
 
   const ogImage = pickOgImage(post, origin)
   const canonical = `${origin}/lounge/p/${postId}`
   const appTarget = `${origin}/?tab=home&post=${encodeURIComponent(postId)}`
   const brand = appBrandLinkTags(origin)
+
+  const ldJson = {
+    '@context': 'https://schema.org',
+    '@type': 'SocialMediaPosting',
+    headline: captionSnippet || byline,
+    alternativeHeadline: byline,
+    ...(captionSnippet ? { articleBody: captionSnippet } : {}),
+    author: {
+      '@type': 'Person',
+      name: displayName,
+      ...(handle ? { alternateName: handle } : {}),
+    },
+    image: ogImage,
+    url: canonical,
+    description: ogDescription,
+  }
+  const ldHtml = jsonLdScript(ldJson)
 
   const html = `<!doctype html>
 <html lang="en">
@@ -255,6 +299,7 @@ ${brand}
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}" />
   <meta name="twitter:description" content="${escapeAttr(ogDescription)}" />
   <meta name="twitter:image" content="${escapeAttr(ogImage)}" />
+${ldHtml}
   <meta http-equiv="refresh" content="0;url=${escapeAttr(appTarget)}">
   <script>window.location.replace(${JSON.stringify(appTarget)})</script>
 </head>
@@ -265,6 +310,6 @@ ${brand}
 
   res.statusCode = 200
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=86400')
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600')
   res.end(html)
 }
