@@ -1,9 +1,15 @@
-import { useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { feedPostDisplayCaption } from '../utils/communityFeedPost'
 import { renderRichCaption } from '../features/lounge/loungeCaption'
 
+const OPEN_MS = 300
+const DISMISS_FRACTION = 0.22
+const DISMISS_MIN_PX = 72
+const COMMIT_PX = 10
+
 /**
  * Left-sliding dock panels for Lounge (search / notifications / chat).
+ * Swipe horizontally (finger left) to dismiss; vertical scroll still works after a short direction lock.
  * `bottomReservePx` clears the fixed dock footer height + a little gap.
  */
 export default function LoungeDockSlidePanels({
@@ -14,15 +20,20 @@ export default function LoungeDockSlidePanels({
   /** Optional: focus a post in the parent feed (e.g. open detail). */
   onPickPost,
 }) {
-  const [entered, setEntered] = useState(false)
+  const panelRef = useRef(null)
+  const [panelW, setPanelW] = useState(300)
+  const [tx, setTx] = useState(0)
+  const [txTransition, setTxTransition] = useState(false)
+  const dragTxRef = useRef(0)
+  const closeTimerRef = useRef(0)
 
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') return
-    const id = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setEntered(true))
-    })
-    return () => window.cancelAnimationFrame(id)
-  }, [openPanel])
+  const pointerIdRef = useRef(null)
+  const startClientXRef = useRef(0)
+  const startClientYRef = useRef(0)
+  const startTxRef = useRef(0)
+  const draggingRef = useRef(false)
+  const decidedRef = useRef(false)
+  const horizontalRef = useRef(false)
 
   const [q, setQ] = useState('')
 
@@ -35,6 +46,152 @@ export default function LoungeDockSlidePanels({
       return cap.includes(s) || game.includes(s)
     })
   }, [communityPosts, q])
+
+  useLayoutEffect(() => {
+    return () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    if (!el || typeof window === 'undefined') return
+    let cancelled = false
+    let innerRaf = 0
+    const outerRaf = window.requestAnimationFrame(() => {
+      if (cancelled) return
+      const w = Math.round(el.getBoundingClientRect().width)
+      const wClamped = Math.max(w || 300, 200)
+      setPanelW(wClamped)
+      setTxTransition(false)
+      setTx(-wClamped)
+      dragTxRef.current = -wClamped
+      innerRaf = window.requestAnimationFrame(() => {
+        if (cancelled) return
+        const w2 = Math.round(el.getBoundingClientRect().width)
+        const wc = Math.max(w2 || wClamped, 200)
+        setPanelW(wc)
+        setTxTransition(true)
+        setTx(0)
+        dragTxRef.current = 0
+      })
+    })
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(outerRaf)
+      if (innerRaf) window.cancelAnimationFrame(innerRaf)
+    }
+  }, [openPanel])
+
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      const w = Math.round(el.getBoundingClientRect().width)
+      if (w > 0) setPanelW(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const dismissWithAnimation = useCallback(() => {
+    const w = Math.round(panelRef.current?.getBoundingClientRect().width || panelW)
+    const wc = Math.max(w, 200)
+    setPanelW(wc)
+    setTxTransition(true)
+    setTx(-wc)
+    dragTxRef.current = -wc
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = 0
+      onClose()
+    }, OPEN_MS + 40)
+  }, [onClose, panelW])
+
+  const onPointerDown = useCallback(
+    (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      const t = e.target
+      if (t instanceof Element && t.closest('button, a, input, textarea, select, label')) return
+      const cur = e.currentTarget
+      if (!(cur instanceof Element)) return
+      pointerIdRef.current = e.pointerId
+      startClientXRef.current = e.clientX
+      startClientYRef.current = e.clientY
+      startTxRef.current = dragTxRef.current
+      draggingRef.current = true
+      decidedRef.current = false
+      horizontalRef.current = false
+      setTxTransition(false)
+      try {
+        cur.setPointerCapture(e.pointerId)
+      } catch {
+        draggingRef.current = false
+        pointerIdRef.current = null
+      }
+    },
+    []
+  )
+
+  const onPointerMove = useCallback(
+    (e) => {
+      if (!draggingRef.current || pointerIdRef.current !== e.pointerId) return
+      const dx = e.clientX - startClientXRef.current
+      const dy = e.clientY - startClientYRef.current
+      if (!decidedRef.current) {
+        if (Math.abs(dx) < COMMIT_PX && Math.abs(dy) < COMMIT_PX) return
+        decidedRef.current = true
+        if (Math.abs(dy) > Math.abs(dx)) {
+          draggingRef.current = false
+          horizontalRef.current = false
+          try {
+            if (e.currentTarget instanceof Element) e.currentTarget.releasePointerCapture(e.pointerId)
+          } catch {
+            // ignore
+          }
+          pointerIdRef.current = null
+          setTxTransition(true)
+          return
+        }
+        horizontalRef.current = true
+      }
+      if (!horizontalRef.current) return
+      e.preventDefault()
+      const w = Math.max(panelW, 200)
+      const next = Math.min(0, Math.max(-w, startTxRef.current + dx))
+      dragTxRef.current = next
+      setTx(next)
+    },
+    [panelW]
+  )
+
+  const endPointerGesture = useCallback(
+    (e) => {
+      if (pointerIdRef.current !== e.pointerId) return
+      try {
+        if (e.currentTarget instanceof Element) e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        // ignore
+      }
+      pointerIdRef.current = null
+      const wasHorizontal = horizontalRef.current
+      draggingRef.current = false
+      horizontalRef.current = false
+      decidedRef.current = false
+      setTxTransition(true)
+      if (!wasHorizontal) return
+      const cur = dragTxRef.current
+      const w = Math.max(panelW, 200)
+      const threshold = -Math.max(w * DISMISS_FRACTION, DISMISS_MIN_PX)
+      if (cur <= threshold) {
+        dismissWithAnimation()
+      } else {
+        setTx(0)
+        dragTxRef.current = 0
+      }
+    },
+    [dismissWithAnimation, panelW]
+  )
 
   if (!openPanel) return null
 
@@ -49,13 +206,21 @@ export default function LoungeDockSlidePanels({
         onClick={onClose}
       />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={openPanel === 'search' ? 'Search lounge' : openPanel === 'notifications' ? 'Notifications' : 'Chat'}
-        className={`fixed left-0 top-0 z-[99] flex h-dvh max-h-dvh w-[min(22rem,calc(100vw-2.5rem))] max-w-[85vw] flex-col border-r border-zinc-800/90 bg-zinc-950 shadow-[8px_0_40px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-out motion-reduce:transition-none ${
-          entered ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        style={{ paddingBottom: bottomPad, paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+        className="fixed left-0 top-0 z-[99] flex h-dvh max-h-dvh w-[min(22rem,calc(100vw-2.5rem))] max-w-[85vw] flex-col border-r border-zinc-800/90 bg-zinc-950 shadow-[8px_0_40px_rgba(0,0,0,0.45)] will-change-transform motion-reduce:transition-none"
+        style={{
+          transform: `translate3d(${tx}px, 0, 0)`,
+          transition: txTransition ? `transform ${OPEN_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : 'none',
+          paddingBottom: bottomPad,
+          paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endPointerGesture}
+        onPointerCancel={endPointerGesture}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800/90 px-3 py-2">
           <h2 className="truncate text-[17px] font-semibold text-zinc-100">
@@ -63,7 +228,7 @@ export default function LoungeDockSlidePanels({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={dismissWithAnimation}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-zinc-700/60 bg-zinc-900 text-zinc-200 touch-manipulation hover:bg-zinc-800"
             aria-label="Close"
           >
@@ -81,7 +246,7 @@ export default function LoungeDockSlidePanels({
               autoComplete="off"
               className="mb-3 w-full rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-2.5 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-cyan-500/45 focus:ring-1 focus:ring-cyan-500/25"
             />
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] pb-2">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] pb-2 touch-pan-y">
               {filtered.length === 0 ? (
                 <p className="text-[14px] leading-relaxed text-zinc-500">No posts match.</p>
               ) : (
@@ -109,7 +274,7 @@ export default function LoungeDockSlidePanels({
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 [-webkit-overflow-scrolling:touch]">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 [-webkit-overflow-scrolling:touch] touch-pan-y">
             <p className="text-[15px] leading-relaxed text-zinc-400">
               {openPanel === 'notifications'
                 ? 'Notification center is coming soon. Push and offer alerts continue to work from their tabs.'
