@@ -8,12 +8,15 @@ import EdgeLogoWithEasterEgg from './EdgeLogoWithEasterEgg.jsx'
  * @param {React.ReactNode} titleBarNavSlot — hamburger / shell menu (right).
  * @param {React.ReactNode} children — scrollable body (placed inside padded column).
  * @param {string} [contentClassName='px-3 pb-24'] — inner wrapper classes (horizontal padding + bottom inset).
+ * @param {boolean} [fullWidth=false] — use full viewport width for column + fixed bar (e.g. Offers week landscape).
  */
 export default function ScrollLinkedEdgeTitleBarShell({
   titleBarNavSlot = null,
   children,
   contentClassName = 'px-3 pb-24',
+  fullWidth = false,
 }) {
+  const colMax = fullWidth ? 'max-w-none' : 'max-w-2xl'
   const feedScrollRef = useRef(null)
   const titleBarRef = useRef(null)
   const scrollPrevTopRef = useRef(0)
@@ -103,10 +106,12 @@ export default function ScrollLinkedEdgeTitleBarShell({
   }, [])
 
   return (
-    <div className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div
+      className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full ${colMax} flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]`}
+    >
       <div
         ref={titleBarRef}
-        className="fixed left-1/2 z-[50] w-full max-w-2xl border-b border-zinc-800/95 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 shadow-[0_1px_0_rgba(0,0,0,0.22)] will-change-transform"
+        className={`fixed left-1/2 z-[50] w-full ${colMax} border-b border-zinc-800/95 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 shadow-[0_1px_0_rgba(0,0,0,0.22)] will-change-transform`}
         style={{
           top: feedViewportTopPx,
           transform: `translate3d(-50%, ${-(1 - titleReveal) * (titleBarHeight > 0 ? titleBarHeight : 56)}px, 0)`,

@@ -13,7 +13,7 @@ import UploadProgressOverlay from './components/UploadProgressOverlay'
 import OfferFormModal from './components/OfferFormModal'
 import WeekEventDetailModal from './components/WeekEventDetailModal'
 import AddEventFab from './components/AddEventFab'
-import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
+import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 import useOffersCalendarState from './hooks/useOffersCalendarState'
 import useOffersCalendarMutations from './hooks/useOffersCalendarMutations'
 import useWebPushNotifications from './hooks/useWebPushNotifications'
@@ -1016,14 +1016,16 @@ export default function OffersCalendar({
   const weekLayoutFullBleed = isWeekView && isLandscape
 
   return (
-    <div
-      className={`flex flex-col overflow-hidden px-3 pt-[max(0px,env(safe-area-inset-top))] ${
-        weekLayoutFullBleed
-          ? 'w-full max-w-none h-[100dvh] pb-[max(4rem,env(safe-area-inset-bottom))] box-border'
-          : 'mx-auto w-full max-w-2xl pb-2'
-      }`}
-      style={weekLayoutFullBleed ? undefined : { height: 'calc(100dvh - env(safe-area-inset-bottom) - 0.5rem)' }}
-    >
+    <>
+      <ScrollLinkedEdgeTitleBarShell
+        titleBarNavSlot={titleBarNavSlot}
+        fullWidth={weekLayoutFullBleed}
+        contentClassName={
+          weekLayoutFullBleed
+            ? 'px-3 pb-[max(5rem,env(safe-area-inset-bottom))]'
+            : 'px-3 pb-24'
+        }
+      >
 
       {error && (
         <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
@@ -1236,16 +1238,8 @@ export default function OffersCalendar({
 
       <ReviewQueuePanel reviewQueue={reviewQueue} onComplete={beginReviewItem} onSkip={(itemId) => void skipReviewItem(itemId)} />
 
-      <div className={isWeekView ? 'flex flex-1 min-h-0 flex-col gap-2' : 'mb-2'}>
+      <div className={isWeekView ? 'flex flex-col gap-2' : 'mb-2'}>
           <div className={`flex shrink-0 flex-col gap-1 ${isWeekView ? '' : 'mb-2'}`}>
-            <div className="-mx-4 -mt-1.5 flex w-[calc(100%+2rem)] shrink-0 items-center justify-between gap-3 px-3 py-1.5">
-              <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
-              <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
-                <div className="pointer-events-none truncate text-right text-zinc-600 text-[13px]" />
-                {titleBarNavSlot}
-              </div>
-            </div>
-
             <div className="flex w-full min-h-10 items-center px-1">
               <div className="min-w-0 flex-1 shrink" aria-hidden />
               <div className="flex min-h-10 min-w-0 max-w-full shrink items-center justify-center gap-1.5">
@@ -1427,7 +1421,7 @@ export default function OffersCalendar({
                   )
                 })}
               </div>
-              <div className="mt-0.5 flex min-h-0 flex-1 flex-col space-y-0.5 overflow-y-auto">
+              <div className="mt-0.5 flex flex-col space-y-0.5">
                 {weekEvents.length === 0 ? (
                   <div className="relative min-h-[12rem] flex-1">
                     <div
@@ -1584,9 +1578,9 @@ export default function OffersCalendar({
       )}
 
       {!isWeekView && (
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex flex-col">
         <div className="text-white font-bold mb-2">{activeCalendarView === 'agenda' ? '' : 'Events'}</div>
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-16">
+        <div className="pr-1 pb-4">
           {loading ? (
             <div className="text-zinc-400 text-sm">Loading…</div>
           ) : listEvents.length === 0 ? (
@@ -1721,6 +1715,8 @@ export default function OffersCalendar({
       </div>
       )}
 
+      </ScrollLinkedEdgeTitleBarShell>
+
       <WeekEventDetailModal
         event={weekDetailEvent}
         offerTypeMeta={offerTypeMeta}
@@ -1836,6 +1832,6 @@ export default function OffersCalendar({
         </div>
       ) : null}
       <UploadProgressOverlay show={uploading} message={uploadSpinnerMessage} />
-    </div>
+    </>
   )
 }

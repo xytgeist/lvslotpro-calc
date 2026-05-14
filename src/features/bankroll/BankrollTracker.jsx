@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 
-export default function BankrollTracker() {
+export default function BankrollTracker({ titleBarNavSlot = null }) {
   const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [bankrollStart, setBankrollStart] = useState('2500')
   const [buyIn, setBuyIn] = useState('500')
@@ -14,7 +15,7 @@ export default function BankrollTracker() {
   const projectedBankroll = parsedBankrollStart + sessionPnl
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-3 py-6 pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-24">
       <div className="mb-6">
         <div className="text-white text-2xl font-black tracking-tight">Bankroll Tracker</div>
         <div className="text-zinc-400 text-sm mt-0.5">Track sessions, win/loss trends, and bankroll growth</div>
@@ -101,6 +102,6 @@ export default function BankrollTracker() {
           Daily P/L graph, bankroll curve, game-level ROI, and promo-adjusted session analytics.
         </div>
       </div>
-    </div>
+    </ScrollLinkedEdgeTitleBarShell>
   )
 }

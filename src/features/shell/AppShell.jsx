@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
 import { isLoungePostShareId } from '../../utils/loungeSharePost'
 import { renderRichCaption } from '../lounge/loungeCaption'
@@ -512,7 +513,7 @@ export default function AppShell({
       )
     } else if (tab === 'dashboard') {
       visibleTab = (
-        <div className="mx-auto w-full max-w-2xl px-3 py-6 pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-24">
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="text-white text-2xl font-black tracking-tight">Edge</div>
@@ -605,7 +606,7 @@ export default function AppShell({
               </div>
             )}
           </div>
-        </div>
+        </ScrollLinkedEdgeTitleBarShell>
       )
     } else if (tab === 'guides') {
       visibleTab = (
@@ -630,12 +631,12 @@ export default function AppShell({
         />
       )
     } else if (tab === 'bankroll') {
-      visibleTab = <BankrollTracker />
+      visibleTab = <BankrollTracker titleBarNavSlot={renderTitleBarNavSlot()} />
     } else if (tab === 'intel') {
-      visibleTab = <LocalIntel supabaseClient={supabaseClient} />
+      visibleTab = <LocalIntel supabaseClient={supabaseClient} titleBarNavSlot={renderTitleBarNavSlot()} />
     } else if (tab === 'team') {
       visibleTab = (
-        <div className="mx-auto w-full max-w-2xl px-3 py-6 pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-24">
           <div className="mb-6">
             <div className="text-white text-2xl font-black tracking-tight">Team / Deals</div>
             <div className="text-zinc-400 text-sm mt-0.5">Bring our team in (skeleton)</div>
@@ -658,7 +659,7 @@ export default function AppShell({
             <div className="text-white font-bold">Submission status</div>
             <div className="text-zinc-500 text-sm mt-1">Submitted → Reviewing → Accepted → Coordinating</div>
           </div>
-        </div>
+        </ScrollLinkedEdgeTitleBarShell>
       )
     }
 
