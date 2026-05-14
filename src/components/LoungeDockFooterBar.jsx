@@ -29,17 +29,25 @@ function IconHome({ className }) {
 
 function IconSearch({ className }) {
   const lensInnerClipId = `dock-search-lens-${useId().replace(/:/g, '')}`
-  // Cyan glint: short rounded stroke along inner lens curve (~10–11 o'clock), like a glass highlight.
+  // Cyan glint: short rounded stroke along inner lens curve (~10–11 o'clock). Radius inset so the
+  // stroke’s outer edge sits slightly inside the lens ring (not flush on the grey inner edge).
   const cx = 10.25
   const cy = 10.25
-  const r = 5.44
-  const t0 = -2.62
-  const t1 = -1.88
+  const lensRingR = 6.25
+  const lensStroke = 1.65
+  const glintStroke = 1.48
+  const ringInner = lensRingR - lensStroke / 2
+  const glintInset = 0.82
+  const r = ringInner - glintStroke / 2 - glintInset
+  /** CCW shift (more negative) nudges the glint toward the left side of the lens. */
+  const angleShift = -0.65
+  const t0 = -2.78 + angleShift
+  const t1 = -1.72 + angleShift
   const x0 = cx + r * Math.cos(t0)
   const y0 = cy + r * Math.sin(t0)
   const x1 = cx + r * Math.cos(t1)
   const y1 = cy + r * Math.sin(t1)
-  const glintArc = `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`
+  const glintArc = `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`
 
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className} aria-hidden>
@@ -55,7 +63,7 @@ function IconSearch({ className }) {
           d={glintArc}
           fill="none"
           stroke="#22d3ee"
-          strokeWidth="1.25"
+          strokeWidth={glintStroke}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
