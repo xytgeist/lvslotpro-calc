@@ -29,6 +29,7 @@ import {
 import {
   LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES,
   LOUNGE_VIDEO_MAX_SECONDS,
+  captureVideoFilePosterObjectUrl,
   deleteCfStreamForCommunityFeedPost,
   deleteCfStreamOrphanAsset,
   probeVideoFileDurationSeconds,
@@ -988,9 +989,15 @@ export default function SocialFeed({
             disposeComposerVideoMedia(composerVideoSlotRef.current)
             const spec = { kind: 'direct', file: vf }
             const previewUrl = URL.createObjectURL(vf)
+            let posterUrl = null
+            try {
+              posterUrl = await captureVideoFilePosterObjectUrl(vf)
+            } catch {
+              posterUrl = null
+            }
             startComposerVideoPrepFromSpec(spec, {
               file: vf,
-              posterUrl: null,
+              posterUrl: posterUrl || null,
               preview: previewUrl,
               streamVideoUid: null,
             })

@@ -200,6 +200,331 @@ export function probeVideoFileDurationSeconds(file) {
   })
 }
 
+/** First-frame JPEG poster for composer preview (aligns with `LoungeVideoCropModal` probe behavior). */
+const LOUNGE_VIDEO_POSTER_CAPTURE_TIMEOUT_MS = 28000
+const LOUNGE_VIDEO_POSTER_MAX_WIDTH = 960
+const LOUNGE_VIDEO_POSTER_SCAN_STEP_SEC = 0.13
+const LOUNGE_VIDEO_POSTER_SCAN_MAX_T = 2.1
+const LOUNGE_VIDEO_POSTER_SCAN_MAX_STEPS = 18
+const LOUNGE_VIDEO_POSTER_SEEK_WAIT_MS = 240
+
+/** iOS Safari: decoded frames can stay black until a muted `play()` presents a frame. */
+async function primePosterFrameForFileProbeVideo(video) {
+  if (!video) return
+  video.muted = true
+  try {
+    try {
+      const p = video.play()
+      if (p && typeof p.then === 'function') await p
+    } catch {
+      // ignore — still try canvas
+    }
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      await new Promise((resolve) => {
+        let settled = false
+        const finish = () => {
+          if (settled) return
+          settled = true
+          resolve(undefined)
+        }
+        try {
+          video.requestVideoFrameCallback(() => finish())
+        } catch {
+          finish()
+        }
+        window.setTimeout(finish, 320)
+      })
+    } else {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    }
+    try {
+      video.pause()
+    } catch {
+      // ignore
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function loungeVideoPosterWaitSeeked(video, targetT, timeoutMs) {
+  return new Promise((resolve) => {
+    if (!video) {
+      resolve()
+      return
+    }
+    const cap =
+      Number.isFinite(video.duration) && video.duration > 0 ? Math.max(0, video.duration - 0.02) : 1e9
+    const target = Math.min(Math.max(0, targetT), cap)
+    let settled = false
+    const done = () => {
+      if (settled) return
+      settled = true
+      video.removeEventListener('seeked', onSeeked)
+      window.clearTimeout(tm)
+      resolve()
+    }
+    const onSeeked = () => done()
+    const tm = window.setTimeout(done, timeoutMs)
+    if (Math.abs(video.currentTime - target) < 0.028) {
+      done()
+      return
+    }
+    video.addEventListener('seeked', onSeeked)
+    try {
+      video.currentTime = target
+    } catch {
+      done()
+    }
+  })
+}
+
+function loungeVideoPosterWaitPaintTick(video) {
+  if (!video) return Promise.resolve()
+  if (typeof video.requestVideoFrameCallback === 'function') {
+    return new Promise((resolve) => {
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        resolve(undefined)
+      }
+      try {
+        video.requestVideoFrameCallback(() => finish())
+      } catch {
+        finish()
+      }
+      window.setTimeout(finish, 140)
+    })
+  }
+  return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+}
+
+function loungeVideoPosterAnalyzeBlackness(video) {
+  const vw = video.videoWidth
+  const vh = video.videoHeight
+  if (!(vw > 1) || !(vh > 1)) return { mean: 0, darkRatio: 1 }
+  const tw = 64
+  const th = Math.max(2, Math.round((vh / vw) * tw))
+  const c = document.createElement('canvas')
+  c.width = tw
+  c.height = th
+  const ctx = c.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return { mean: 0, darkRatio: 1 }
+  try {
+    ctx.drawImage(video, 0, 0, tw, th)
+  } catch {
+    return { mean: 0, darkRatio: 1 }
+  }
+  let id
+  try {
+    id = ctx.getImageData(0, 0, tw, th)
+  } catch {
+    return { mean: 0, darkRatio: 1 }
+  }
+  const d = id.data
+  const pixels = tw * th
+  let sum = 0
+  let dark = 0
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i]
+    const g = d[i + 1]
+    const b = d[i + 2]
+    const y = 0.299 * r + 0.587 * g + 0.114 * b
+    sum += y
+    if (y < 16) dark += 1
+  }
+  return { mean: sum / pixels, darkRatio: dark / pixels }
+}
+
+function loungeVideoPosterIsNearlyBlack(a) {
+  if (a.mean >= 18) return false
+  if (a.mean <= 6) return true
+  return a.darkRatio > 0.88 && a.mean < 15
+}
+
+function loungeVideoPosterCanvasToJpegObjectUrl(canvas, quality) {
+  return new Promise((resolve) => {
+    try {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(null)
+            return
+          }
+          try {
+            resolve(URL.createObjectURL(blob))
+          } catch {
+            resolve(null)
+          }
+        },
+        'image/jpeg',
+        quality,
+      )
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+/**
+ * Capture a representative first frame as a JPEG object URL for `<video poster>`.
+ * Caller must `URL.revokeObjectURL` when the poster is discarded (see `disposeComposerVideoMedia`).
+ * @param {File} file
+ * @param {{ signal?: AbortSignal }} [opts]
+ * @returns {Promise<string | null>}
+ */
+export async function captureVideoFilePosterObjectUrl(file, opts = {}) {
+  const signal = opts && opts.signal
+  if (!file || typeof document === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    return null
+  }
+
+  const url = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.preload = 'auto'
+  video.muted = true
+  video.playsInline = true
+  video.setAttribute('playsinline', '')
+  video.src = url
+
+  const cleanupSrc = () => {
+    try {
+      URL.revokeObjectURL(url)
+    } catch {
+      // ignore
+    }
+    try {
+      video.removeAttribute('src')
+      video.load()
+    } catch {
+      // ignore
+    }
+  }
+
+  const metaReady = new Promise((resolve, reject) => {
+    const onDone = () => {
+      video.removeEventListener('loadedmetadata', onDone)
+      video.removeEventListener('loadeddata', onDone)
+      video.removeEventListener('error', onErr)
+      resolve(undefined)
+    }
+    const onErr = () => {
+      video.removeEventListener('loadedmetadata', onDone)
+      video.removeEventListener('loadeddata', onDone)
+      video.removeEventListener('error', onErr)
+      reject(new Error('Could not read this video file.'))
+    }
+    video.addEventListener('loadedmetadata', onDone)
+    video.addEventListener('loadeddata', onDone)
+    video.addEventListener('error', onErr)
+    try {
+      video.load()
+    } catch {
+      onErr()
+    }
+  })
+
+  const timeoutMs = LOUNGE_VIDEO_POSTER_CAPTURE_TIMEOUT_MS
+  const timeoutPromise = new Promise((_, reject) => {
+    window.setTimeout(() => reject(new Error('timeout')), timeoutMs)
+  })
+
+  const abortPromise =
+    signal &&
+    new Promise((_, reject) => {
+      const fail = () => reject(new DOMException('Aborted', 'AbortError'))
+      if (signal.aborted) fail()
+      else signal.addEventListener('abort', fail, { once: true })
+    })
+
+  try {
+    const racers = [metaReady, timeoutPromise]
+    if (abortPromise) racers.push(abortPromise)
+    await Promise.race(racers)
+
+    if (signal && signal.aborted) {
+      cleanupSrc()
+      return null
+    }
+
+    if (video.videoWidth < 2 || video.videoHeight < 2) {
+      cleanupSrc()
+      return null
+    }
+
+    const dur = video.duration
+    if (!Number.isFinite(dur) || dur <= 0) {
+      cleanupSrc()
+      return null
+    }
+
+    await primePosterFrameForFileProbeVideo(video)
+
+    if (signal && signal.aborted) {
+      cleanupSrc()
+      return null
+    }
+
+    const maxT = Math.min(Math.max(0, dur - 0.02), LOUNGE_VIDEO_POSTER_SCAN_MAX_T)
+    let chosenT = Math.min(0.04, maxT)
+
+    for (let i = 0; i < LOUNGE_VIDEO_POSTER_SCAN_MAX_STEPS; i += 1) {
+      if (signal && signal.aborted) {
+        cleanupSrc()
+        return null
+      }
+      const at = Math.min(i * LOUNGE_VIDEO_POSTER_SCAN_STEP_SEC, maxT)
+      await loungeVideoPosterWaitSeeked(video, at, LOUNGE_VIDEO_POSTER_SEEK_WAIT_MS)
+      await loungeVideoPosterWaitPaintTick(video)
+      const sample = loungeVideoPosterAnalyzeBlackness(video)
+      chosenT = Math.min(video.currentTime, maxT)
+      if (!loungeVideoPosterIsNearlyBlack(sample)) {
+        break
+      }
+    }
+
+    if (signal && signal.aborted) {
+      cleanupSrc()
+      return null
+    }
+
+    await loungeVideoPosterWaitSeeked(video, chosenT, LOUNGE_VIDEO_POSTER_SEEK_WAIT_MS)
+    await loungeVideoPosterWaitPaintTick(video)
+
+    const w0 = video.videoWidth
+    const h0 = video.videoHeight
+    if (!(w0 > 1) || !(h0 > 1)) {
+      cleanupSrc()
+      return null
+    }
+
+    const scale = w0 > LOUNGE_VIDEO_POSTER_MAX_WIDTH ? LOUNGE_VIDEO_POSTER_MAX_WIDTH / w0 : 1
+    const c = document.createElement('canvas')
+    c.width = Math.round(w0 * scale)
+    c.height = Math.round(h0 * scale)
+    const ctx = c.getContext('2d')
+    if (!ctx) {
+      cleanupSrc()
+      return null
+    }
+    try {
+      ctx.drawImage(video, 0, 0, c.width, c.height)
+    } catch {
+      cleanupSrc()
+      return null
+    }
+
+    const posterUrl = await loungeVideoPosterCanvasToJpegObjectUrl(c, 0.78)
+    cleanupSrc()
+    return posterUrl
+  } catch (e) {
+    cleanupSrc()
+    if (e && typeof e === 'object' && 'name' in e && e.name === 'AbortError') throw e
+    return null
+  }
+}
+
 /**
  * @param {Response} res
  * @returns {Promise<string>}
