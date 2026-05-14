@@ -71,9 +71,9 @@ const FALLBACK_SAFE_BOTTOM_PX = 40
  * `reveal` 1 = fully visible, 0 = slid off downward (paired with scroll-linked title hide).
  * Icon-only controls (no chrome around glyphs); active slot uses cyan icon color.
  *
- * @param {number} [matchTitleBarHeightPx=0] — When >0 (viewport dock), chrome row height is derived from the
- *   measured lounge title bar (~⅔ height, min 36px). The strip under the icons uses transparent background so
- *   feed content can show through the home-indicator zone (Twitter/X–style edge-to-edge scroll).
+ * @param {number} [matchTitleBarHeightPx=0] — When >0 (viewport dock), the icon band height matches the measured
+ *   lounge title bar; bottom safe-area inset is padding inside the same frosted bar so it runs flush to the screen
+ *   edge (no separate gap below the dock).
  * @param {'viewport' | 'sheet'} [layout='viewport'] — `sheet` pins to a full-screen sheet bottom (e.g. profile).
  */
 export default function LoungeDockFooterBar({
@@ -96,7 +96,7 @@ export default function LoungeDockFooterBar({
     barHeightPx > 0
       ? barHeightPx
       : useMatchedChrome
-        ? dockChromePx + FALLBACK_SAFE_BOTTOM_PX
+        ? matchTitleBarHeightPx + FALLBACK_SAFE_BOTTOM_PX
         : 44
   const translateY = (1 - Math.min(1, Math.max(0, reveal))) * h
 
@@ -143,14 +143,16 @@ export default function LoungeDockFooterBar({
 
   const chromeBarClass =
     'border-t border-zinc-800/95 bg-zinc-950/95 shadow-[0_-1px_0_rgba(0,0,0,0.22)] backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85'
-  const safeStripClass = 'shrink-0 bg-transparent'
 
   /** Sheet / legacy: single shell with bottom safe-area padding inside the bar. */
   const outerClassSingle = isSheet
     ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-[40] w-full border-t border-zinc-800/95 bg-zinc-950/95 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_-1px_0_rgba(0,0,0,0.22)] backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 will-change-transform'
     : 'pointer-events-none fixed bottom-0 left-1/2 z-[56] w-full max-w-2xl border-t border-zinc-800/95 bg-zinc-950/95 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_-1px_0_rgba(0,0,0,0.22)] backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 will-change-transform'
 
-  const transform = isSheet ? `translate3d(0, ${translateY}px, 0)` : `translate3d(-50%, ${translateY}px, 0)`
+  const transform =
+    isSheet || useMatchedChrome
+      ? `translate3d(0, ${translateY}px, 0)`
+      : `translate3d(-50%, ${translateY}px, 0)`
   const outerStyle = {
     transform,
     pointerEvents: reveal > 0.12 ? 'auto' : 'none',
@@ -160,16 +162,12 @@ export default function LoungeDockFooterBar({
     return (
       <div
         ref={measureRef}
-        className="pointer-events-none fixed bottom-0 left-1/2 z-[56] flex w-full max-w-2xl flex-col will-change-transform"
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-[56] will-change-transform ${chromeBarClass} pb-[max(0.25rem,env(safe-area-inset-bottom))]`}
         style={outerStyle}
       >
-        <div
-          className={`flex items-center justify-center gap-2 px-3 ${chromeBarClass}`}
-          style={{ height: dockChromePx, boxSizing: 'border-box' }}
-        >
+        <div className="mx-auto flex w-full max-w-2xl shrink-0 items-center justify-center gap-2 px-3" style={{ height: dockChromePx, boxSizing: 'border-box' }}>
           {dockIcons}
         </div>
-        <div className={`${safeStripClass} pb-[max(0.25rem,env(safe-area-inset-bottom))]`} aria-hidden />
       </div>
     )
   }
