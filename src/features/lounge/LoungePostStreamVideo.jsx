@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoUpload'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
@@ -41,13 +41,19 @@ const posterFrameMinHByVariant = {
   composer: 'min-h-[8rem]',
 }
 
-/** When CF thumbnail `<img>` errors: fixed aspect box so `w-fit` ancestors never collapse (matches slide caps per variant). */
-const posterFallbackAspectClassByVariant = {
-  feed: 'relative aspect-video w-[min(88vw,20rem)] max-w-full bg-black sm:w-[min(72vw,17rem)]',
-  embed: 'relative aspect-video w-[min(88vw,20rem)] max-w-full bg-black sm:w-[min(72vw,17rem)]',
-  detail: 'relative aspect-video w-full max-w-full bg-black',
-  composer: 'relative aspect-video w-[min(78vw,18rem)] max-w-full bg-black',
+/**
+ * When CF thumbnail never loads: flex box caps height/width so the inline `<video>` can size to intrinsic
+ * aspect (avoids a forced 16:9 “letterbox” that looks like a broken poster for portrait clips).
+ */
+const posterFallbackFrameClassByVariant = {
+  feed: 'relative flex max-h-52 w-fit max-w-[min(88vw,20rem)] items-center justify-center bg-black sm:max-h-52 sm:max-w-[min(72vw,17rem)]',
+  embed: 'relative flex max-h-44 w-fit max-w-[min(88vw,20rem)] items-center justify-center bg-black sm:max-h-44 sm:max-w-[min(72vw,17rem)]',
+  detail: 'relative flex max-h-[min(70vh,520px)] w-fit max-w-full items-center justify-center bg-black',
+  composer: 'relative flex max-h-40 w-fit max-w-[min(78vw,18rem)] items-center justify-center bg-black',
 }
+
+/** CF `thumbnail.jpg` is often 404 until processing finishes — retry with cache-bust before giving up. */
+const CF_POSTER_RETRY_MAX = 32
 
 /** Feed/embed: attach HLS when a small fraction is visible (was 0.32 — felt slow). */
 const LAZY_ATTACH_IO_THRESHOLD = 0.04
@@ -381,15 +387,53 @@ export default function LoungePostStreamVideo({
   const [streamFadeShowVideo, setStreamFadeShowVideo] = useState(false)
   /** In-flow poster can collapse to a broken-icon size when CF thumbnail 404s or is not ready yet. */
   const [posterLayoutFailed, setPosterLayoutFailed] = useState(false)
+  /** True after CF poster `<img>` fires `onLoad` — drop min-height floor so the frame hugs decoded pixels. */
+  const [posterDecodeOk, setPosterDecodeOk] = useState(false)
+  /** Bumped to bust CDN cache while CF thumbnail is still generating. */
+  const [posterBust, setPosterBust] = useState(0)
+  const posterRetryTimerRef = useRef(0)
+  const posterAttemptRef = useRef(0)
   const id = String(uid || '').trim()
   const src = cfStreamManifestUrl(id)
   const poster = cfStreamPosterUrl(id, 720)
+  const posterDisplayUrl = useMemo(() => {
+    if (!poster) return ''
+    const sep = poster.includes('?') ? '&' : '?'
+    return `${poster}${sep}_pv=${posterBust}`
+  }, [poster, posterBust])
   const showOpen = enableLightbox && variant !== 'composer'
   const lazyStream = showOpen && (variant === 'feed' || variant === 'embed')
 
   useEffect(() => {
     setPosterLayoutFailed(false)
+    setPosterDecodeOk(false)
+    setPosterBust(0)
+    posterAttemptRef.current = 0
+    window.clearTimeout(posterRetryTimerRef.current)
+    posterRetryTimerRef.current = 0
   }, [id])
+  const onPosterImgError = useCallback(() => {
+    posterAttemptRef.current += 1
+    if (posterAttemptRef.current > CF_POSTER_RETRY_MAX) {
+      setPosterLayoutFailed(true)
+      return
+    }
+    window.clearTimeout(posterRetryTimerRef.current)
+    const delay = Math.min(2200, 140 + posterAttemptRef.current * 95)
+    posterRetryTimerRef.current = window.setTimeout(() => {
+      posterRetryTimerRef.current = 0
+      setPosterBust((b) => b + 1)
+    }, delay)
+  }, [])
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(posterRetryTimerRef.current)
+      posterRetryTimerRef.current = 0
+    },
+    [],
+  )
+
   const getVideoContainer = useCallback(() => containerRef.current, [])
   const {
     coordinatorActive,
@@ -783,8 +827,9 @@ export default function LoungePostStreamVideo({
   /** iOS: in-flow poster `<img>` sizes the frame; `<video>` stays absolute until fade. Use whenever we have a CF thumbnail URL (feed, embed, and detail — not only lazy feed). */
   const usePosterFrame = Boolean(id && poster)
   const posterFrameMinH = posterFrameMinHByVariant[variant] || posterFrameMinHByVariant.feed
-  const posterFallbackAspectClass =
-    posterFallbackAspectClassByVariant[variant] || posterFallbackAspectClassByVariant.feed
+  const posterFallbackFrameClass =
+    posterFallbackFrameClassByVariant[variant] || posterFallbackFrameClassByVariant.feed
+  const posterShellMinHClass = posterDecodeOk ? 'min-h-0' : posterFrameMinH
   /** Same delay on poster + video keeps poster visible through transparent video until fade starts (reduces black flash). */
   const streamFadeTransitionStyle = attachStream
     ? {
@@ -832,33 +877,32 @@ export default function LoungePostStreamVideo({
             className={
               usePosterFrame
                 ? posterLayoutFailed
-                  ? 'relative w-full bg-black'
-                  : `relative inline-block w-fit max-w-full bg-black leading-none ${posterFrameMinH}`
+                  ? posterFallbackFrameClass
+                  : `relative inline-block w-fit max-w-full bg-black leading-none ${posterShellMinHClass}`
                 : 'relative'
             }
           >
             {usePosterFrame ? (
               posterLayoutFailed ? (
-                <div className={posterFallbackAspectClass}>
-                  <video
-                    ref={videoRef}
-                    className={`pointer-events-none absolute inset-0 z-[1] h-full w-full object-contain transition-opacity ease-out ${
-                      attachStream && streamFadeShowVideo ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    style={streamFadeTransitionStyle}
-                    muted={!stripSoundUnmuted}
-                    loop
-                    playsInline
-                    preload={variant === 'composer' ? 'auto' : 'metadata'}
-                    poster={poster}
-                    aria-hidden
-                    onError={onInlineStreamError}
-                  />
-                </div>
+                <video
+                  ref={videoRef}
+                  className={`pointer-events-none z-[1] max-h-full w-auto max-w-full object-contain transition-opacity ease-out ${
+                    attachStream && streamFadeShowVideo ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={streamFadeTransitionStyle}
+                  muted={!stripSoundUnmuted}
+                  loop
+                  playsInline
+                  preload={variant === 'composer' ? 'auto' : 'metadata'}
+                  poster={posterDisplayUrl || poster}
+                  aria-hidden
+                  onError={onInlineStreamError}
+                />
               ) : (
                 <>
                   <img
-                    src={poster}
+                    key={posterDisplayUrl}
+                    src={posterDisplayUrl}
                     alt=""
                     decoding="async"
                     draggable={false}
@@ -868,7 +912,8 @@ export default function LoungePostStreamVideo({
                     }`}
                     style={streamFadeTransitionStyle}
                     aria-hidden
-                    onError={() => setPosterLayoutFailed(true)}
+                    onLoad={() => setPosterDecodeOk(true)}
+                    onError={onPosterImgError}
                   />
                   <video
                     ref={videoRef}
@@ -880,7 +925,7 @@ export default function LoungePostStreamVideo({
                     loop
                     playsInline
                     preload={variant === 'composer' ? 'auto' : 'metadata'}
-                    poster={poster}
+                    poster={posterDisplayUrl || poster}
                     aria-hidden
                     onError={onInlineStreamError}
                   />
