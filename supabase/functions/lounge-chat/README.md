@@ -35,3 +35,15 @@ If you deployed chat before the **members RLS recursion** fix, also run **`supab
 ## Secrets
 
 Uses default `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` only (no extra Vault keys for v1).
+
+## Troubleshooting (`Failed to send a request to the Edge function`)
+
+That message usually means the browser never got a normal HTTP response from **`/functions/v1/lounge-chat`** (undeployed function, wrong project URL, or blocked request).
+
+1. **Deploy** from repo root (CLI linked to the same project as the app’s `VITE_SUPABASE_URL`):  
+   `supabase functions deploy lounge-chat`
+2. In **Supabase Dashboard → Edge Functions**, confirm **`lounge-chat`** is listed.
+3. Confirm the app’s **`VITE_SUPABASE_URL`** (and anon key) target the **same** Supabase project where you deployed.
+4. Retry in a private window or with extensions disabled (some ad blockers block `functions/v1`).
+
+The client sends an explicit **`Authorization: Bearer <session>`** header (same pattern as Stream upload) so the gateway can verify JWT when `verify_jwt` is enabled.
