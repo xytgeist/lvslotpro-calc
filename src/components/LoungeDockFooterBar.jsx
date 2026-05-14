@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import { dockChromeHeightFromTitleBarPx } from '../utils/loungeDockChrome.js'
 
 const stroke = {
@@ -17,7 +17,7 @@ const cyanStroke = {
   fill: 'none',
 }
 
-/** Outline icons; cyan accents on roof, bell clapper, chat dots. */
+/** Outline icons; cyan accents on roof, search lens glint, bell clapper, chat dots. */
 function IconHome({ className }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className} aria-hidden>
@@ -28,10 +28,38 @@ function IconHome({ className }) {
 }
 
 function IconSearch({ className }) {
+  const lensInnerClipId = `dock-search-lens-${useId().replace(/:/g, '')}`
+  // Cyan glint: short rounded stroke along inner lens curve (~10–11 o'clock), like a glass highlight.
+  const cx = 10.25
+  const cy = 10.25
+  const r = 5.44
+  const t0 = -2.62
+  const t1 = -1.88
+  const x0 = cx + r * Math.cos(t0)
+  const y0 = cy + r * Math.sin(t0)
+  const x1 = cx + r * Math.cos(t1)
+  const y1 = cy + r * Math.sin(t1)
+  const glintArc = `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`
+
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className} aria-hidden>
+      <defs>
+        <clipPath id={lensInnerClipId}>
+          <circle cx="10.25" cy="10.25" r="5.95" />
+        </clipPath>
+      </defs>
       <circle {...stroke} cx="10.25" cy="10.25" r="6.25" />
       <path {...stroke} d="M15.5 15.5 21 21" />
+      <g clipPath={`url(#${lensInnerClipId})`}>
+        <path
+          d={glintArc}
+          fill="none"
+          stroke="#22d3ee"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
     </svg>
   )
 }
@@ -128,15 +156,15 @@ export default function LoungeDockFooterBar({
 
   const dockIcons = (
     <>
-      {dockBtn(false, onHome, 'Home', <IconHome className="h-6 w-6 shrink-0 opacity-95" />)}
-      {dockBtn(activePanel === 'search', onSearch, 'Search', <IconSearch className="h-6 w-6 shrink-0 opacity-95" />)}
+      {dockBtn(false, onHome, 'Home', <IconHome className="h-7 w-7 shrink-0 opacity-95" />)}
+      {dockBtn(activePanel === 'search', onSearch, 'Search', <IconSearch className="h-7 w-7 shrink-0 opacity-95" />)}
       {dockBtn(
         activePanel === 'notifications',
         onNotifications,
         'Notifications',
-        <IconBell className="h-6 w-6 shrink-0 opacity-95" />
+        <IconBell className="h-7 w-7 shrink-0 opacity-95" />
       )}
-      {dockBtn(activePanel === 'chat', onChat, 'Chat', <IconChat className="h-6 w-6 shrink-0 opacity-95" />)}
+      {dockBtn(activePanel === 'chat', onChat, 'Chat', <IconChat className="h-7 w-7 shrink-0 opacity-95" />)}
     </>
   )
 
@@ -164,7 +192,7 @@ export default function LoungeDockFooterBar({
         className={`pointer-events-none fixed inset-x-0 bottom-0 z-[56] will-change-transform ${chromeBarClass} pb-[max(0.25rem,env(safe-area-inset-bottom))]`}
         style={outerStyle}
       >
-        <div className="mx-auto flex w-full max-w-2xl shrink-0 items-center justify-center gap-2 px-3" style={{ height: dockChromePx, boxSizing: 'border-box' }}>
+        <div className="mx-auto flex w-full max-w-2xl shrink-0 items-center justify-center gap-2 px-3 pb-0.5 pt-2" style={{ height: dockChromePx, boxSizing: 'border-box' }}>
           {dockIcons}
         </div>
       </div>
@@ -173,7 +201,7 @@ export default function LoungeDockFooterBar({
 
   return (
     <div ref={measureRef} className={outerClassSingle} style={outerStyle}>
-      <div className="flex items-center justify-center gap-2 px-3 py-0.5">{dockIcons}</div>
+      <div className="flex items-center justify-center gap-2 px-3 pb-0.5 pt-1.5">{dockIcons}</div>
     </div>
   )
 }
