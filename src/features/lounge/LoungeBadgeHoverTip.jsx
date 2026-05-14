@@ -24,6 +24,7 @@ const TONE = {
  * Small hover / tap tooltip for Lounge role + OG badges.
  * Portaled above the anchor so feed scroll / overflow / paint containment cannot clip it,
  * with a short leave delay so the pointer can reach the tip (tip uses pointer-events).
+ * Outside **pointerdown** (capture) and **Escape** dismiss the tip so it does not stick when `mouseleave` does not fire.
  *
  * @param {{ tip: string, tone?: 'amber' | 'crown' | 'violet' | 'sky', children: import('react').ReactNode, className?: string }} props
  */
@@ -80,6 +81,27 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
       hideTRef.current = null
     }, OUT_MS)
   }, [clearLeaveDelay])
+
+  /** Dismiss when the user taps/clicks outside the anchor and portaled tip (mouseleave is flaky on touch and when focus moves). */
+  useEffect(() => {
+    if (!mounted) return undefined
+    const onDocPointerDown = (e) => {
+      const t = e.target
+      if (!(t instanceof Node)) return
+      if (anchorRef.current?.contains(t)) return
+      if (tipShellRef.current?.contains(t)) return
+      beginExit()
+    }
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') beginExit()
+    }
+    document.addEventListener('pointerdown', onDocPointerDown, true)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      document.removeEventListener('pointerdown', onDocPointerDown, true)
+      window.removeEventListener('keydown', onKeyDown, true)
+    }
+  }, [mounted, beginExit])
 
   const updateTipPosition = useCallback(() => {
     if (!canRepositionRef.current) return
