@@ -37,6 +37,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ---
 
+## Planned (Lounge media — not started)
+
+- [ ] **Multiple Stream clips per post (v1 cap: 2):** Move from a single **`stream_video_uid`** to an **ordered list** of Stream asset ids (max **two** for the first ship; can raise toward **4** later). Work: Supabase migration + backfill; `AppShell` / feed selects; **`loungeVideoUpload.js`** + composer + quote submit/cancel/draft; **`LoungePostFeedMedia.jsx`** / **`LoungePostStreamVideo.jsx`** (two tiles or horizontal strip); post delete / staff delete — call **`lounge-cf-stream-delete-video`** (or batch) **per** uid; orphan/purge alignment; **`LoungeFeedVideoAutoplayContext.jsx`** — **explicit rule** when one post row has two clips (e.g. only first clip eligible as inline winner, or neither). **Rough target:** ~1–2 weeks to test-ready slice once picked up.
+
+---
+
 ## Roadmap status snapshot
 
 ### Phase A - Foundation (DB + auth shaping)
@@ -226,6 +232,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-18: **Planned:** **Up to two Stream clips per post** (ordered uids; migration from single `stream_video_uid`; composer/quote/feed/delete/autoplay) — `[ ]` under *Planned (Lounge media)*; **Phase D** note in **`docs/social-feed-roadmap.md`**.
 - 2026-05-18: **Deferred:** **Stream inside image carousel** (upload-order mixed strip + lightbox + composer/quote + lifecycle) — `[-]` row under *Deferred / someday* in this file; short **Phase D** note in **`docs/social-feed-roadmap.md`** (not scheduled).
 - 2026-05-18: **Lounge badge tips:** `LoungeBadgeHoverTip.jsx` — dismiss open tip on **document `pointerdown` (capture)** outside anchor/tip and on **Escape** (avoids stuck tooltips when `mouseleave` does not run). **Smoke §12:** Ryan **PASSED** main composer, quote video/media matrix, Cancel-while-prep on **test**; backlog §12 checkboxes + sign-off; note on **why Stream video is exclusive of GIF/images** (schema + feed tile + upload/delete paths).
 - 2026-05-13: **Post detail vs profile z-index:** `SocialFeed.jsx` post detail overlay **`z-[98]`** (was **`z-[96]`**) so opening post detail from a post inside **`LoungeProfileFullScreen`** (`z-[97]`) or after dismissing media fullscreen shows the detail **above** the profile; quote/media layers remain **`z-[100]`+**.

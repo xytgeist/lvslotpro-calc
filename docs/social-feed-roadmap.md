@@ -120,12 +120,13 @@ Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity)
 - Persist media rows (`post_id`, `sort`, `type=image`, `path`, optional dimensions).
 - Consider resumable upload flow for larger images.
 
-### D2. Video (1 per post, max **60s** on Lounge)
+### D2. Video (1 per post today, max **60s** on Lounge)
 
 - **Shipped (test):** **Cloudflare Stream** — Edge **`lounge-cf-stream-direct-upload`** mints one-time upload URLs (`maxDurationSeconds: 60`); Edge **`lounge-cf-stream-delete-video`** deletes the Stream asset when the feed post is removed (client calls it before row delete); client **`src/utils/loungeVideoUpload.js`** uploads and polls HLS manifest until ready; DB **`community_feed_posts.stream_video_uid`** (`supabase/lounge_feed_post_stream_video.sql`). Playback **`LoungePostStreamVideo.jsx`** (native HLS where supported, else lazy **`hls.js`**). Video bytes **not** in Supabase Storage. **Basic POST** path: files **≤ 200 MB** (Cloudflare limit for that method).
 - **Shipped (test, feed UX):** **`LoungeFeedVideoAutoplayContext.jsx`** + feed scroll root — only the **mid-scroll “winner”** tile attaches/plays inline HLS (prefetch margin + `IntersectionObserver`). First-on-screen and coordinator/IO race: attach/play when winner even if in-view ref lags; poster→video **crossfade** with **`requestVideoFrameCallback`** (and fallbacks) + short **transition delay** to reduce black flash. **Shared inline sound:** provider flag so **Tap for sound** / **Tap to mute** + speaker glyph apply to whichever clip is autoplaying; strip label toggles. **Quote repost** modal **`z-[100]`** above opened post detail **`z-[98]`** (above profile **`z-[97]`**) so compose/remove is not behind the post page or an open profile. Upload progress bar: **Cancel** capitalization.
 - **Edge secrets (names only):** `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN` (Stream **Write** or **Edit**). See **`supabase/functions/lounge-cf-stream-direct-upload/README.md`** and **`supabase/functions/lounge-cf-stream-delete-video/README.md`**.
 - **Alternatives** (not implemented): Mux, Bunny Stream.
+- **Planned (not shipped):** **Up to two** Stream clips per post (ordered uids; still exclusive of still-image carousel). First ship caps at **2**; may raise toward **4** later. Needs migration from scalar `stream_video_uid`, multi-tile feed/detail, composer + quote paths, delete-each-uid, and an **inline autoplay** rule when two clips share one row — tracked **`[ ]`** in **`docs/test-buildout-backlog.md`** *Planned (Lounge media)*.
 
 ### Deliverable
 
