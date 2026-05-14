@@ -6,6 +6,16 @@ import { sanitizeVideoCropPx } from './loungeVideoCropMath.js'
 const CORE_VERSION = '0.12.6'
 const CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${CORE_VERSION}/dist/esm`
 
+/** Mount point for WORKERFS-backed trim input (see `installTrimInput`). */
+const WORKERFS_INPUT_MOUNT = '/lwfs_in'
+
+/**
+ * Above ~**4 MiB**, loading the whole file with `writeFile` + `fetchFile` duplicates it in WASM
+ * heap and commonly **crashes the tab** on long clips (e.g. 4+ minute sources). WORKERFS mounts
+ * the browser `File` so ffmpeg reads from the backing store without a full in-memory copy.
+ */
+const MEMFS_INPUT_MAX_BYTES = 4 * 1024 * 1024
+
 let ffmpegSingleton = null
 let loadPromise = null
 
@@ -22,6 +32,73 @@ async function getFfmpeg() {
     return ffmpeg
   })()
   return loadPromise
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof getFfmpeg>>} ffmpeg
+ * @param {File} file
+ * @param {string} inName virtual filename (e.g. `in.mp4`)
+ * @returns {Promise<{ inputPath: string, mode: 'memfs' | 'workerfs' }>}
+ */
+async function installTrimInput(ffmpeg, file, inName) {
+  const n = typeof file.size === 'number' && Number.isFinite(file.size) ? file.size : 0
+  if (n >= MEMFS_INPUT_MAX_BYTES) {
+    try {
+      await ffmpeg.unmount(WORKERFS_INPUT_MOUNT)
+    } catch {
+      // ignore
+    }
+    try {
+      await ffmpeg.deleteDir(WORKERFS_INPUT_MOUNT)
+    } catch {
+      // ignore
+    }
+    try {
+      await ffmpeg.createDir(WORKERFS_INPUT_MOUNT)
+      await ffmpeg.mount('WORKERFS', { blobs: [{ name: inName, data: file }] }, WORKERFS_INPUT_MOUNT)
+      return { inputPath: `${WORKERFS_INPUT_MOUNT}/${inName}`, mode: 'workerfs' }
+    } catch (e) {
+      try {
+        await ffmpeg.unmount(WORKERFS_INPUT_MOUNT)
+      } catch {
+        // ignore
+      }
+      try {
+        await ffmpeg.deleteDir(WORKERFS_INPUT_MOUNT)
+      } catch {
+        // ignore
+      }
+      throw e instanceof Error ? e : new Error(String(e))
+    }
+  }
+  await ffmpeg.writeFile(inName, await fetchFile(file))
+  return { inputPath: inName, mode: 'memfs' }
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof getFfmpeg>>} ffmpeg
+ * @param {'memfs' | 'workerfs'} mode
+ * @param {string} inName
+ */
+async function uninstallTrimInput(ffmpeg, mode, inName) {
+  if (mode === 'workerfs') {
+    try {
+      await ffmpeg.unmount(WORKERFS_INPUT_MOUNT)
+    } catch {
+      // ignore
+    }
+    try {
+      await ffmpeg.deleteDir(WORKERFS_INPUT_MOUNT)
+    } catch {
+      // ignore
+    }
+  } else {
+    try {
+      await ffmpeg.deleteFile(inName)
+    } catch {
+      // ignore
+    }
+  }
 }
 
 /** Warm ffmpeg core in the background (first open of trim modal). */
@@ -59,7 +136,7 @@ export async function trimVideoFileToMp4(file, startSec, endSec, opts = {}) {
   }
   ffmpeg.on('progress', onProg)
 
-  await ffmpeg.writeFile(inName, await fetchFile(file))
+  const { inputPath, mode } = await installTrimInput(ffmpeg, file, inName)
 
   /**
    * Optional crop (source pixels), then scale width to 1280 (height -2, bicubic).
@@ -90,7 +167,7 @@ export async function trimVideoFileToMp4(file, startSec, endSec, opts = {}) {
     '-probesize',
     '5242880',
   ]
-  const trim = ['-ss', String(start), '-i', inName, '-t', String(dur)]
+  const trim = ['-ss', String(start), '-i', inputPath, '-t', String(dur)]
   const video = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '27', '-pix_fmt', 'yuv420p']
   const videoFilters = ['-vf', vf]
   const audio = ['-c:a', 'aac', '-b:a', '128k']
@@ -103,11 +180,7 @@ export async function trimVideoFileToMp4(file, startSec, endSec, opts = {}) {
     if (code !== 0) throw new Error('Video encoding failed.')
   } finally {
     ffmpeg.off('progress', onProg)
-    try {
-      await ffmpeg.deleteFile(inName)
-    } catch {
-      // ignore
-    }
+    await uninstallTrimInput(ffmpeg, mode, inName)
   }
 
   const data = await ffmpeg.readFile(outName)
