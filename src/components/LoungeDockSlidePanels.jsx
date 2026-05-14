@@ -6,12 +6,15 @@ const OPEN_MS = 300
 const DISMISS_FRACTION = 0.22
 const DISMISS_MIN_PX = 72
 const COMMIT_PX = 10
+/** Vertical must clearly beat horizontal to steal the gesture (left-thumb arcs skew slightly vertical). */
+const VERTICAL_BEATS_HORIZONTAL = 1.34
 
 /**
  * Left-sliding dock panels for Lounge (search / notifications / chat).
  * Swipe horizontally (finger left) to dismiss from anywhere on the panel, including search result rows;
- * vertical scroll still wins when movement is clearly vertical after a short direction lock. Taps on rows
- * still work because pointer capture starts only after horizontal intent is detected.
+ * vertical scroll still wins when movement is clearly vertical after a short direction lock (vertical must
+ * exceed horizontal by a small factor so left-thumb dismiss arcs are not misread as scroll).
+ * Taps on rows still work because pointer capture starts only after horizontal intent is detected.
  * `bottomReservePx` clears the fixed dock footer height + a little gap.
  */
 export default function LoungeDockSlidePanels({
@@ -139,7 +142,7 @@ export default function LoungeDockSlidePanels({
       if (!decidedRef.current) {
         if (Math.abs(dx) < COMMIT_PX && Math.abs(dy) < COMMIT_PX) return
         decidedRef.current = true
-        if (Math.abs(dy) > Math.abs(dx)) {
+        if (Math.abs(dy) > Math.abs(dx) * VERTICAL_BEATS_HORIZONTAL) {
           draggingRef.current = false
           horizontalRef.current = false
           pointerIdRef.current = null
