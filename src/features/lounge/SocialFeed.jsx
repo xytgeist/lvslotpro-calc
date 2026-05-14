@@ -190,6 +190,9 @@ export default function SocialFeed({
   const loungePostAbortRef = useRef(null)
   /** True while a background lounge post job may be in flight (guards double submit). */
   const loungePostJobRunningRef = useRef(false)
+  /** Patched after definitions so early `submitQuoteRepost` can call `clearQuoteRepostForPostAttempt` / `runBackgroundLoungePostSubmission` without reordering hooks. */
+  const clearQuoteRepostForPostAttemptRef = useRef(/** @type {(opts?: { preserveQuoteVideoPrep?: boolean }) => void} */ (() => {}))
+  const runBackgroundLoungePostSubmissionRef = useRef(/** @type {(snapshot: unknown) => void} */ (() => {}))
   /** Mirrors `composerVideoSlot` for async prep / dispose (avoid stale closures). */
   const composerVideoSlotRef = useRef(null)
   /** Monotonic id so an older prep run cannot clear UI after a newer one starts. */
@@ -1715,7 +1718,7 @@ export default function SocialFeed({
     [loungeReadOnly]
   )
 
-  /** Kept as alias for profile modal props dependency lists. */
+  /** Quote repost uses the same background submission + upload bar as the main composer. */
   const submitQuoteRepost = useCallback(async () => {
     const modal = quoteRepostModal
     if (!modal || modal.mode !== 'compose' || !modal.original?.id) return
@@ -1744,37 +1747,15 @@ export default function SocialFeed({
       setQuoteRepostErr('Add a comment, image, GIF, or video to repost.')
       return
     }
+    if (loungePostJobRunningRef.current) return
+    if (loungeQuoteRepostVideoPostBlocked) return
     if (hasVideo && slotNow?.prepStatus === 'failed') {
       setQuoteRepostErr(slotNow.prepError || 'Video processing failed. Remove the video or try again.')
       return
     }
-    if (hasVideo && slotNow?.prepStatus === 'preparing') {
-      const awaitingJob = slotNow.prepJobId
-      const h = quoteRepostVideoPrepHandoffRef.current
-      if (awaitingJob != null && h && h.jobId === awaitingJob) {
-        try {
-          await h.promise
-        } catch (e) {
-          if (e?.name !== 'AbortError') {
-            setQuoteRepostErr(e instanceof Error ? e.message : 'Video processing failed.')
-            return
-          }
-        }
-      }
-    }
-    let streamVideoUid = String(quoteRepostVideoSlotRef.current?.streamVideoUid || '').trim() || null
-    if (hasVideo && !streamVideoUid) {
-      if (quoteRepostVideoSlotRef.current?.prepStatus === 'preparing') {
-        setQuoteRepostErr('Wait for the video to finish processing, then try again.')
-        return
-      }
-      setQuoteRepostErr('Video is not ready to post yet.')
-      return
-    }
 
     setQuoteRepostBusy(true)
-    const ac = new AbortController()
-    let posterBlobForPin = /** @type {string | null} */ (null)
+    let snapshot = null
     try {
       const {
         data: { session },
@@ -1808,107 +1789,58 @@ export default function SocialFeed({
       }
 
       const slot = quoteRepostVideoSlotRef.current
-      posterBlobForPin =
-        slot?.posterUrl && String(slot.posterUrl).startsWith('blob:') ? String(slot.posterUrl) : null
+      const uid = hasVideo ? String(slot?.streamVideoUid || '').trim() || null : null
+      const awaiting =
+        hasVideo &&
+        !uid &&
+        slot?.prepStatus === 'preparing' &&
+        typeof slot?.prepJobId === 'number'
+          ? slot.prepJobId
+          : null
+      const specForSnap = awaiting != null ? quoteRepostVideoPrepSpecRef.current : null
+      const trimRestore =
+        awaiting != null && specForSnap && specForSnap.kind === 'trim' && slot
+          ? { posterUrl: slot.posterUrl, preview: slot.preview }
+          : null
+      const sessionPosterBlob =
+        hasVideo && slot?.posterUrl && String(slot.posterUrl).startsWith('blob:')
+          ? String(slot.posterUrl)
+          : null
 
-      await executeLoungeCommunityPostSubmission({
-        supabaseClient,
-        signal: ac.signal,
-        snapshot: {
-          caption: cap,
-          gifOnlyUrl,
-          imageFiles: quoteRepostImageItems.map((it) => it.file),
-          videoFile: hasVideo && slot?.file ? slot.file : null,
-          streamVideoUid,
-          wantsPin: false,
-          isStaffPoster: false,
-          quoteRepostOfPostId: originalId,
-          sessionStreamPosterBlobUrl: posterBlobForPin,
-        },
-        onProgress: (info) => {
-          setLoungePostUploadBar((prev) => {
-            const d = String(info.detail || '').trim()
-            return {
-              mode: 'post',
-              progress: typeof info.progress === 'number' ? info.progress : 0,
-              status: String(info.status || ''),
-              detail: d !== '' ? d : prev && typeof prev.detail === 'string' ? prev.detail : '',
-            }
-          })
-        },
-        rateLimitMessage,
-        onUploadDiagnostic: (detail) => {
-          setLoungePostUploadBar((prev) =>
-            prev ? { ...prev, detail: String(detail).slice(0, 280) } : prev,
-          )
-        },
-      })
-
-      const nu = String(streamVideoUid || '').trim()
-      if (nu && posterBlobForPin && posterBlobForPin.startsWith('blob:')) {
-        pinLoungeStreamSessionPoster(nu, posterBlobForPin)
+      snapshot = {
+        caption: cap,
+        gifOnlyUrl,
+        imageFiles: quoteRepostImageItems.map((it) => it.file),
+        videoFile: hasVideo && slot?.file ? slot.file : null,
+        streamVideoUid: uid,
+        awaitingComposerVideoPrepJobId: awaiting,
+        videoPrepSpec: specForSnap,
+        videoPrepSlotRestore: trimRestore,
+        sessionStreamPosterBlobUrl: sessionPosterBlob,
+        wantsPin: false,
+        isStaffPoster: false,
+        quoteRepostOfPostId: originalId,
       }
-
-      setQuoteRepostModal(null)
-      setQuoteRepostDraft('')
-      clearQuoteRepostMedia()
-      await loadCommunityFeed({ silent: true })
-      await refreshLoungePostInteractions([originalId])
-    } catch (e) {
-      if (e?.name === 'AbortError') return
-      const uidFail = String(streamVideoUid || '').trim()
-      if (uidFail && posterBlobForPin && posterBlobForPin.startsWith('blob:')) {
-        releaseLoungeStreamSessionPoster(uidFail)
-      }
-      const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Could not quote repost right now.'
-      const low = msg.toLowerCase()
-      if (low.includes('rate limit exceeded')) {
-        setQuoteRepostErr(rateLimitMessage(msg))
-        return
-      }
-      if (low.includes('duplicate key') || low.includes('unique constraint') || low.includes('23505')) {
-        setQuoteRepostErr('You already have a quote repost for this post.')
-        return
-      }
-      if (low.includes('42501') || low.includes('permissions')) {
-        setQuoteRepostErr('Reposting is blocked by current permissions.')
-        return
-      }
-      if (
-        low.includes('quote repost requires') ||
-        low.includes('comment or media') ||
-        low.includes('non-empty caption')
-      ) {
-        setQuoteRepostErr('Add a comment, image, GIF, or video to repost.')
-        return
-      }
-      if (low.includes('hidden') || low.includes('not found')) {
-        setQuoteRepostErr('That post is no longer available to quote.')
-        return
-      }
-      if (/media_url|gif_url|image_urls|stream_video_uid|stream_poster_url|stream_video_width|stream_video_height|schema cache/i.test(msg)) {
-        setQuoteRepostErr(
-          'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, supabase/lounge_feed_post_image_urls.sql, and supabase/lounge_feed_post_stream_video.sql in Supabase.',
-        )
-        return
-      }
-      setQuoteRepostErr(msg)
     } finally {
-      setLoungePostUploadBar(null)
       setQuoteRepostBusy(false)
     }
+
+    if (!snapshot) return
+
+    const preserveVideoPrep = snapshot.awaitingComposerVideoPrepJobId != null
+    loungePostSnapshotRef.current = snapshot
+    clearQuoteRepostForPostAttemptRef.current?.({ preserveQuoteVideoPrep: preserveVideoPrep })
+    void runBackgroundLoungePostSubmissionRef.current?.(snapshot)
   }, [
     clearQuoteRepostMedia,
-    quoteRepostModal,
-    quoteRepostDraft,
+    composerUserProfile?.avatar_url,
+    loungeQuoteRepostVideoPostBlocked,
+    onRequireAuth,
     quoteRepostImageItems,
     quoteRepostMediaUrl,
+    quoteRepostModal,
+    quoteRepostDraft,
     supabaseClient,
-    onRequireAuth,
-    composerUserProfile?.avatar_url,
-    loadCommunityFeed,
-    refreshLoungePostInteractions,
-    rateLimitMessage,
   ])
 
   const confirmRemoveQuoteRepost = useCallback(async () => {
@@ -2844,6 +2776,177 @@ export default function SocialFeed({
     composerFoldedFromFeedScrollRef.current = false
   }, [startComposerVideoPrepFromSpec])
 
+  const restoreQuoteFromSnapshot = useCallback(
+    (snap, opts = {}) => {
+      const skipVideo = Boolean(opts.skipVideo)
+      if (!snap?.quoteRepostOfPostId) return
+      const pid = String(snap.quoteRepostOfPostId).trim()
+      if (!pid) return
+      const orig =
+        communityPosts.find((p) => p.id === pid) ||
+        (loungePostDetail?.id === pid ? loungePostDetail : null) ||
+        profileModalPosts.find((p) => p.id === pid) ||
+        null
+      if (!orig?.id) {
+        setLoungeManageErr(
+          'Could not restore quote repost — the original post is not loaded. Return to the feed and try again.',
+        )
+        return
+      }
+      setQuoteRepostModal({ mode: 'compose', original: orig })
+      setQuoteRepostDraft(String(snap.caption || ''))
+      setQuoteRepostMediaUrl(String(snap.gifOnlyUrl || '').trim())
+      const files = Array.isArray(snap.imageFiles) ? snap.imageFiles : []
+      setQuoteRepostImageItems(
+        files.map((file) => ({
+          id: newComposerImageId(),
+          file,
+          preview: URL.createObjectURL(file),
+        })),
+      )
+      if (skipVideo) {
+        cancelQuoteRepostMediaPrep()
+        return
+      }
+      if (String(snap.streamVideoUid || '').trim()) {
+        const vf = snap.videoFile
+        const uid = String(snap.streamVideoUid || '').trim() || null
+        if (vf) {
+          setQuoteRepostVideoSlot({
+            prepJobId: 0,
+            file: vf,
+            posterUrl: null,
+            preview: URL.createObjectURL(vf),
+            streamVideoUid: uid,
+            prepStatus: 'ready',
+            prepError: '',
+          })
+        } else {
+          setQuoteRepostVideoSlot(null)
+        }
+      } else if (snap.videoPrepSpec) {
+        if (snap.videoPrepSpec.kind === 'direct') {
+          const f = snap.videoPrepSpec.file
+          const previewUrl = URL.createObjectURL(f)
+          void startQuoteRepostVideoPrepFromSpec(snap.videoPrepSpec, {
+            file: f,
+            posterUrl: null,
+            preview: previewUrl,
+            streamVideoUid: null,
+          })
+        } else if (snap.videoPrepSlotRestore) {
+          void startQuoteRepostVideoPrepFromSpec(snap.videoPrepSpec, {
+            file: null,
+            posterUrl: snap.videoPrepSlotRestore.posterUrl,
+            preview: snap.videoPrepSlotRestore.preview,
+            streamVideoUid: null,
+          })
+        } else {
+          setQuoteRepostVideoSlot(null)
+        }
+      } else if (snap.videoFile) {
+        const vf = snap.videoFile
+        setQuoteRepostVideoSlot({
+          prepJobId: 0,
+          file: vf,
+          posterUrl: null,
+          preview: URL.createObjectURL(vf),
+          streamVideoUid: null,
+          prepStatus: 'ready',
+          prepError: '',
+        })
+      } else {
+        setQuoteRepostVideoSlot(null)
+      }
+    },
+    [
+      cancelQuoteRepostMediaPrep,
+      communityPosts,
+      loungePostDetail,
+      profileModalPosts,
+      startQuoteRepostVideoPrepFromSpec,
+    ],
+  )
+
+  const clearQuoteRepostForPostAttempt = useCallback((opts = {}) => {
+    const preserve = Boolean(opts.preserveQuoteVideoPrep)
+    const snap = loungePostSnapshotRef.current
+    const pendingPoster =
+      snap && typeof snap.sessionStreamPosterBlobUrl === 'string'
+        ? snap.sessionStreamPosterBlobUrl.trim()
+        : ''
+    const skipRevoke = new Set()
+    if (pendingPoster.startsWith('blob:')) {
+      skipRevoke.add(pendingPoster)
+      const sl = quoteRepostVideoSlotRef.current
+      if (sl?.preview && sl.preview === pendingPoster) skipRevoke.add(sl.preview)
+      if (sl?.posterUrl && sl.posterUrl === pendingPoster) skipRevoke.add(sl.posterUrl)
+    }
+    if (!preserve) {
+      const h = quoteRepostVideoPrepHandoffRef.current
+      if (h && !h.settled) {
+        try {
+          h.reject(new DOMException('Aborted', 'AbortError'))
+        } catch {
+          // ignore
+        }
+      }
+      quoteRepostVideoPrepHandoffRef.current = null
+      quoteRepostVideoPrepJobIdRef.current += 1
+      try {
+        quoteRepostVideoPrepAbortRef.current?.abort()
+      } catch {
+        // ignore
+      }
+      quoteRepostVideoPrepAbortRef.current = null
+    }
+    setQuoteRepostModal(null)
+    setQuoteRepostDraft('')
+    setQuoteRepostErr('')
+    setQuoteRepostImageItems((prev) => {
+      for (const it of prev) {
+        try {
+          URL.revokeObjectURL(it.preview)
+        } catch {
+          // ignore
+        }
+      }
+      return []
+    })
+    setQuoteRepostMediaUrl('')
+    setQuoteRepostVideoSlot((prev) => {
+      if (!preserve && prev) {
+        if (prev.preview && !skipRevoke.has(prev.preview)) {
+          try {
+            URL.revokeObjectURL(prev.preview)
+          } catch {
+            // ignore
+          }
+        }
+        if (prev.posterUrl && !skipRevoke.has(prev.posterUrl)) {
+          try {
+            URL.revokeObjectURL(prev.posterUrl)
+          } catch {
+            // ignore
+          }
+        }
+      }
+      return null
+    })
+    try {
+      const el = quoteRepostMediaInputRef.current
+      if (el) el.value = ''
+    } catch {
+      // ignore
+    }
+
+    const postUid = snap && String(snap.streamVideoUid || '').trim()
+    if (postUid && pendingPoster.startsWith('blob:')) {
+      pinLoungeStreamSessionPoster(postUid, pendingPoster)
+    }
+  }, [])
+  clearQuoteRepostForPostAttemptRef.current = clearQuoteRepostForPostAttempt
+
   const cancelLoungePostUpload = useCallback(() => {
     try {
       loungePostAbortRef.current?.abort()
@@ -2857,16 +2960,30 @@ export default function SocialFeed({
     setLoungePostUploadBar(null)
     const snap = loungePostSnapshotRef.current
     if (snap?.awaitingComposerVideoPrepJobId != null) {
-      try {
-        composerVideoPrepAbortRef.current?.abort()
-      } catch {
-        // ignore
+      if (String(snap.quoteRepostOfPostId || '').trim()) {
+        try {
+          quoteRepostVideoPrepAbortRef.current?.abort()
+        } catch {
+          // ignore
+        }
+        quoteRepostVideoPrepJobIdRef.current += 1
+        quoteRepostVideoPrepHandoffRef.current = null
+      } else {
+        try {
+          composerVideoPrepAbortRef.current?.abort()
+        } catch {
+          // ignore
+        }
+        composerVideoPrepJobIdRef.current += 1
+        composerVideoPrepHandoffRef.current = null
       }
-      composerVideoPrepJobIdRef.current += 1
-      composerVideoPrepHandoffRef.current = null
     }
     const cancelSnap = loungePostSnapshotRef.current
-    restoreComposerFromSnapshot(cancelSnap)
+    if (cancelSnap?.quoteRepostOfPostId) {
+      restoreQuoteFromSnapshot(cancelSnap)
+    } else {
+      restoreComposerFromSnapshot(cancelSnap)
+    }
     if (cancelSnap) {
       const cUid = String(cancelSnap.streamVideoUid || '').trim()
       if (
@@ -2878,7 +2995,7 @@ export default function SocialFeed({
       }
     }
     loungePostSnapshotRef.current = null
-  }, [restoreComposerFromSnapshot])
+  }, [restoreComposerFromSnapshot, restoreQuoteFromSnapshot])
 
   useEffect(() => {
     return () => {
@@ -2913,6 +3030,9 @@ export default function SocialFeed({
 
   const runBackgroundLoungePostSubmission = useCallback(
     async (snapshot) => {
+      const prepSource = String(snapshot.quoteRepostOfPostId || '').trim() ? 'quote' : 'composer'
+      const lastEncRef =
+        prepSource === 'quote' ? quoteRepostVideoLastEncodedFileRef : composerVideoLastEncodedFileRef
       const uidBar = String(snapshot.streamVideoUid || '').trim()
       const mediaUploadBarSkin =
         !uidBar && (snapshot.awaitingComposerVideoPrepJobId != null || Boolean(snapshot.videoPrepSpec))
@@ -2986,7 +3106,7 @@ export default function SocialFeed({
 
           const runPrepForPosting = async () => {
             if (!snap.videoPrepSpec) throw new Error('Video preparation was interrupted.')
-            const reuse = composerVideoLastEncodedFileRef.current
+            const reuse = lastEncRef.current
             if (reuse) {
               const { streamVideoUid } = await uploadEncodedVideoToCfStreamWithRetries({
                 supabaseClient,
@@ -2995,7 +3115,7 @@ export default function SocialFeed({
                 onProgress: onPrepProgressWhilePosting,
                 onUploadDiagnostic: onPrepUploadDiagnostic,
               })
-              composerVideoLastEncodedFileRef.current = null
+              lastEncRef.current = null
               return { encodedFile: reuse, streamVideoUid }
             }
             const prepOut = await runComposerStreamVideoPrepWithRetries({
@@ -3003,17 +3123,20 @@ export default function SocialFeed({
               signal: ac.signal,
               spec: snap.videoPrepSpec,
               onEncodedFileReady: (f) => {
-                composerVideoLastEncodedFileRef.current = f
+                lastEncRef.current = f
               },
               onProgress: onPrepProgressWhilePosting,
               onUploadDiagnostic: onPrepUploadDiagnostic,
             })
-            composerVideoLastEncodedFileRef.current = null
+            lastEncRef.current = null
             return prepOut
           }
 
           const awaitingId = snap.awaitingComposerVideoPrepJobId
-          const h = composerVideoPrepHandoffRef.current
+          const h =
+            prepSource === 'quote'
+              ? quoteRepostVideoPrepHandoffRef.current
+              : composerVideoPrepHandoffRef.current
           if (awaitingId != null && h && h.jobId === awaitingId) {
             try {
               out = await h.promise
@@ -3040,11 +3163,12 @@ export default function SocialFeed({
           if (nu && pend.startsWith('blob:')) {
             pinLoungeStreamSessionPoster(nu, pend)
           }
-          if (
-            snapshot.awaitingComposerVideoPrepJobId != null &&
-            composerVideoPrepHandoffRef.current?.jobId === snapshot.awaitingComposerVideoPrepJobId
-          ) {
-            composerVideoPrepHandoffRef.current = null
+          if (snapshot.awaitingComposerVideoPrepJobId != null) {
+            const href =
+              prepSource === 'quote' ? quoteRepostVideoPrepHandoffRef : composerVideoPrepHandoffRef
+            if (href.current?.jobId === snapshot.awaitingComposerVideoPrepJobId) {
+              href.current = null
+            }
           }
         }
 
@@ -3076,6 +3200,10 @@ export default function SocialFeed({
         })
         loungePostSnapshotRef.current = null
         await loadCommunityFeed()
+        const quoteOrigId = String(snapshot.quoteRepostOfPostId || '').trim()
+        if (quoteOrigId) {
+          await refreshLoungePostInteractions([quoteOrigId])
+        }
       } catch (e) {
         if (e?.name === 'AbortError') return
         const failUid = String(snap.streamVideoUid || '').trim()
@@ -3107,8 +3235,9 @@ export default function SocialFeed({
         setLoungePostSubmitInFlight(false)
       }
     },
-    [loadCommunityFeed, rateLimitMessage, supabaseClient],
+    [loadCommunityFeed, rateLimitMessage, refreshLoungePostInteractions, supabaseClient],
   )
+  runBackgroundLoungePostSubmissionRef.current = runBackgroundLoungePostSubmission
 
   const retryLoungePostUpload = useCallback(() => {
     const fail = loungePostUploadFailureDetailsRef.current
@@ -3171,8 +3300,13 @@ export default function SocialFeed({
     }
     const snap = loungePostSnapshotRef.current
     if (snap) {
-      persistLoungeComposerDraft(snap.caption, false, false, snap.gifOnlyUrl)
-      setPostErr('Draft saved. Re-add photos or video if you had any.')
+      if (String(snap.quoteRepostOfPostId || '').trim()) {
+        restoreQuoteFromSnapshot(snap, { skipVideo: true })
+        setQuoteRepostErr('Draft saved. Re-add photos or video if you had any.')
+      } else {
+        persistLoungeComposerDraft(snap.caption, false, false, snap.gifOnlyUrl)
+        setPostErr('Draft saved. Re-add photos or video if you had any.')
+      }
       const cUid = String(snap.streamVideoUid || '').trim()
       if (
         cUid &&
@@ -3186,7 +3320,7 @@ export default function SocialFeed({
     loungePostJobRunningRef.current = false
     setLoungePostUploadFailedOpen(false)
     setLoungePostUploadFailureDetails(null)
-  }, [cancelQuoteRepostMediaPrep, composerMediaUrl, disposeComposerVideoMedia, postText])
+  }, [cancelQuoteRepostMediaPrep, composerMediaUrl, disposeComposerVideoMedia, postText, restoreQuoteFromSnapshot])
 
   const onLoungePostUploadFailureCancel = useCallback(() => {
     const fail = loungePostUploadFailureDetailsRef.current
@@ -3203,7 +3337,11 @@ export default function SocialFeed({
       return
     }
     const failSnap = loungePostSnapshotRef.current
-    restoreComposerFromSnapshot(failSnap)
+    if (String(failSnap?.quoteRepostOfPostId || '').trim()) {
+      restoreQuoteFromSnapshot(failSnap)
+    } else {
+      restoreComposerFromSnapshot(failSnap)
+    }
     if (failSnap) {
       const cUid = String(failSnap.streamVideoUid || '').trim()
       if (
@@ -3218,7 +3356,7 @@ export default function SocialFeed({
     loungePostJobRunningRef.current = false
     setLoungePostUploadFailedOpen(false)
     setLoungePostUploadFailureDetails(null)
-  }, [disposeComposerVideoMedia, restoreComposerFromSnapshot])
+  }, [disposeComposerVideoMedia, restoreComposerFromSnapshot, restoreQuoteFromSnapshot])
 
   const submitLoungePost = useCallback(async () => {
     const caption = postText.trim()
@@ -5668,6 +5806,7 @@ export default function SocialFeed({
                             type="button"
                             disabled={
                               quoteRepostBusy ||
+                              loungePostSubmitInFlight ||
                               loungeQuoteRepostVideoPostBlocked ||
                               loungePostUploadFailedOpen ||
                               loungeVideoCrop != null ||
@@ -5688,6 +5827,7 @@ export default function SocialFeed({
                                 !!String(quoteRepostMediaUrl || '').trim() ||
                                 quoteRepostVideoSlot) &&
                               !quoteRepostBusy &&
+                              !loungePostSubmitInFlight &&
                               !loungeQuoteRepostVideoPostBlocked &&
                               !loungePostUploadFailedOpen &&
                               loungeVideoCrop == null
