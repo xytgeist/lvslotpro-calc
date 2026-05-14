@@ -170,7 +170,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Production replay: run **`profile_handle_changed_at.sql`** (or full **`profile_lounge_fullscreen.sql`**) on prod before relying on column/trigger.
 
 - [x] Lounge feed media + repost UX (test)
-  - Change: Feed/detail carousels reset to **first slide** when post **re-enters viewport** (`LoungePostFeedMedia.jsx`); **repost** uses **anchored popover** under control including reposted-state actions (`LoungePostArticle.jsx`, `SocialFeed.jsx`); quote composer textarea sizing aligned with main composer; image-cap modal from picker/quote flows.
+  - Change: Feed/detail carousels reset to **first slide** when post **re-enters viewport** (`LoungePostFeedMedia.jsx`); **repost** uses **anchored popover** above the control including reposted-state actions (`LoungePostArticle.jsx`, `SocialFeed.jsx`); quote composer textarea sizing aligned with main composer; image-cap modal from picker/quote flows.
   - Source: files above.
   - Test validation: scroll multi-image post off/on; repost menu position; quote sheet height + media below text; 7th image attempt shows cap modal.
   - Production replay: N/A (client-only).
@@ -195,10 +195,18 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
     5. **Offers / calendars / push:** offers save; calendar surfaces; edge paths per §4 / §5 in production checklist (align with Edge Functions rows above).
     6. **Profile (Lounge):** own profile → edit → save display/avatar/about; change handle → **Confirm** → **Continue** completes save without a second Save; within 7 days of a handle change → **Cooldown** → **Continue** keeps handle, saves rest; **mod/admin** save retains `role`.
     7. **Feed carousels (incl. newly posted):** multi-image post — swipe to slide 2+; scroll the **feed** until that post’s media strip leaves the scroll area, then scroll back — carousel shows the **first** slide (scroll-root geometry + IO).
-    8. **Repost:** menu opens **under** the Repost control on feed + post detail; already-reposted row shows manage actions in the same anchored popover (no bottom sheet).
+    8. **Repost:** menu opens **above** the Repost control on feed + post detail (portaled / `bottom-full`); already-reposted row shows manage actions in the same anchored popover (no bottom sheet).
     9. **Rate limit:** when posting is blocked, error strip is **above** the composer even with a tall draft.
     10. **Quote repost:** same vertical rhythm as main composer — **toolbar** (image / GIF / counter / Post) one line below the last caption line; optional media carousel under text with `mt-1.5`; cap modal if >6 images.
     11. **Lounge video:** after SQL **`lounge_feed_post_stream_video.sql`** + Edge **`lounge-cf-stream-direct-upload`** + secrets on test — pick a clip **under 60 seconds** and **under 200 MB** in the composer → **Post** → video plays in feed and post detail (HLS); **feed** first visible Stream tile autoplays; **Tap for sound** enables audio on the autoplaying clip and strip shows **Tap to mute** with **speaker-on** glyph; mute again silences; **open post** (detail sheet) → **Quote repost** sheet appears **on top** (not behind); **Uploading post…** bar shows **Cancel** (capital C).
+    12. **Composer + quote (media) regression** — tick on **test** after Lounge composer / quote / stacking / lightbox churn:
+        - [ ] **Main composer (baseline):** short Stream video post; long video → **trim/crop** modal → confirm → post; **image-only** post; **GIF-only** post — behavior matches expectations (no regressions).
+        - [ ] **Quote + short video:** Add media → short video → prep → **Post** → quote child appears in feed; **original** post row shows updated interactions where applicable (repost count / your repost state).
+        - [ ] **Quote + long video:** long clip → **crop** modal → confirm → prep → **Post**.
+        - [ ] **Quote + video variants:** video-only (no caption); caption + video; **remove** video from preview then post (or confirm Post disabled until valid per design).
+        - [ ] **Quote + media rules:** attach **GIF** then video (expect GIF cleared / rules as designed); attach **images** then video (expect images cleared).
+        - [ ] **Quote + upload bar Cancel** while video is **preparing** (quote prep cancels; quote UI still usable; no stuck modal).
+        - [ ] *(Optional)* **Staff crown / badge tip:** hover or tap **`LoungeBadgeHoverTip`** (admin crown) — tip reads and positions sensibly.
   - **Sign-off:** Manual steps above passed on **test** (operator confirmation after latest `test` deploy).
   - **Sign-off (Stream poster + dims, 2026-05-17, Ryan):** Extended checklist (session items **2–13**): all **PASSED** on **test**; SQL **`lounge_feed_post_stream_video.sql`** (including **`stream_poster_url`**, **`stream_video_width`**, **`stream_video_height`**) applied on the test Supabase project.
   - Production replay: same ordered pass on production after deploy.
@@ -211,6 +219,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-18: **Smoke list:** Added manual checklist **§12** (main composer + quote video/media regression, optional staff crown tip); corrected smoke **§8** repost copy (**above** anchor, not under).
 - 2026-05-13: **Post detail vs profile z-index:** `SocialFeed.jsx` post detail overlay **`z-[98]`** (was **`z-[96]`**) so opening post detail from a post inside **`LoungeProfileFullScreen`** (`z-[97]`) or after dismissing media fullscreen shows the detail **above** the profile; quote/media layers remain **`z-[100]`+**.
 - 2026-05-13: **Lounge repost menu + quote / comment from media fullscreen:** Portaled feed repost submenus anchor **above** the repost control (`LoungePostInteractionBar.jsx`: `top` at button top + `-translate-y-full`; sheet/detail dropdowns use `bottom-full mb-1`); post-detail repost menu in `SocialFeed.jsx` matches. **Quote** and **Comment** from a media lightbox dismiss fullscreen first (`loungeLightboxFooterDismissQuote.js` merges `onQuoteRepost` + comment path into `onCommentClick` after dismiss; used in `LoungePostFeedMedia.jsx`, `LoungeInlineMediaUrl.jsx`, `LoungePostStreamVideo.jsx`).
 - 2026-05-13: **Lounge media fullscreen — post actions:** Image and Stream video lightboxes show the same **comment / repost / like / share / bookmark** row as the underlying post (`LoungePostInteractionBar.jsx`); feed/profile use feed-style + portaled repost menus (`z-[101]` above `z-[100]` lightbox); post detail + quoted-original embed use sheet-style (comment scrolls to `#lounge-detail-comments`); quote-repost composer preview uses feed bar with `z-[110]`. Files: `LoungeInlineMediaUrl.jsx`, `LoungePostFeedMedia.jsx`, `LoungePostStreamVideo.jsx`, `LoungePostArticle.jsx`, `SocialFeed.jsx`.
