@@ -12,7 +12,6 @@ import {
 } from '../profiles/profileGate'
 import {
   communityFeedPlainRepostInsertPayload,
-  communityFeedQuoteRepostInsertPayload,
   deleteLoungeFeedStreamPosterFromPublicUrl,
   feedPostAuthorEditMediaSeed,
   feedPostDisplayCaption,
@@ -20,13 +19,11 @@ import {
   feedPostStreamPosterUrl,
   feedPostStreamVideoUid,
   normalizeFeedCaption,
-  uploadLoungeFeedPostImage,
 } from '../../utils/communityFeedPost'
 import {
   isProbablyImageFile,
   isProbablyVideoFile,
   prepareAvatarImageForUpload,
-  prepareLoungeFeedImageForUpload,
 } from '../../utils/compressImageForUpload'
 import {
   LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES,
@@ -265,6 +262,14 @@ export default function SocialFeed({
   const quoteRepostImageItemsRef = useRef(quoteRepostImageItems)
   quoteRepostImageItemsRef.current = quoteRepostImageItems
   const [quoteRepostMediaUrl, setQuoteRepostMediaUrl] = useState('')
+  /** Quote repost sheet: optional video (same slot shape as main composer). */
+  const [quoteRepostVideoSlot, setQuoteRepostVideoSlot] = useState(null)
+  const quoteRepostVideoSlotRef = useRef(null)
+  const quoteRepostVideoPrepJobIdRef = useRef(0)
+  const quoteRepostVideoPrepAbortRef = useRef(null)
+  const quoteRepostVideoPrepSpecRef = useRef(null)
+  const quoteRepostVideoLastEncodedFileRef = useRef(/** @type {File | null} */ (null))
+  const quoteRepostVideoPrepHandoffRef = useRef(null)
   const quoteRepostTextareaRef = useRef(null)
   const quoteRepostMirrorRef = useRef(null)
   const quoteRepostScrollRef = useRef(null)
@@ -758,6 +763,10 @@ export default function SocialFeed({
   }, [composerVideoSlot])
 
   useEffect(() => {
+    quoteRepostVideoSlotRef.current = quoteRepostVideoSlot
+  }, [quoteRepostVideoSlot])
+
+  useEffect(() => {
     loungePostUploadFailureDetailsRef.current = loungePostUploadFailureDetails
   }, [loungePostUploadFailureDetails])
 
@@ -956,6 +965,179 @@ export default function SocialFeed({
     [supabaseClient],
   )
 
+  const startQuoteRepostVideoPrepFromSpec = useCallback(
+    (spec, slotBase) => {
+      const prevH = quoteRepostVideoPrepHandoffRef.current
+      if (prevH && !prevH.settled) {
+        try {
+          prevH.reject(new DOMException('Aborted', 'AbortError'))
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        quoteRepostVideoPrepAbortRef.current?.abort()
+      } catch {
+        // ignore
+      }
+      const jobId = (quoteRepostVideoPrepJobIdRef.current += 1)
+      quoteRepostVideoLastEncodedFileRef.current = null
+      const ac = new AbortController()
+      quoteRepostVideoPrepAbortRef.current = ac
+      quoteRepostVideoPrepSpecRef.current = spec
+
+      let resHandoff = /** @type {((v: { encodedFile: File, streamVideoUid: string }) => void) | null} */ (null)
+      let rejHandoff = /** @type {((e: unknown) => void) | null} */ (null)
+      const prepPromise = new Promise((res, rej) => {
+        resHandoff = res
+        rejHandoff = rej
+      })
+      const handoff = {
+        jobId,
+        settled: false,
+        promise: prepPromise,
+        resolve: (v) => {
+          if (handoff.settled) return
+          handoff.settled = true
+          resHandoff?.(v)
+        },
+        reject: (e) => {
+          if (handoff.settled) return
+          handoff.settled = true
+          rejHandoff?.(e)
+        },
+      }
+      quoteRepostVideoPrepHandoffRef.current = handoff
+
+      const nextSlot = {
+        ...slotBase,
+        prepJobId: jobId,
+        prepStatus: 'preparing',
+        prepError: '',
+      }
+      setQuoteRepostVideoSlot(nextSlot)
+      setLoungePostUploadBar({
+        mode: 'mediaPrep',
+        prepJobId: jobId,
+        progress: 0.02,
+        status: 'Starting…',
+        detail: '',
+      })
+
+      void (async () => {
+        try {
+          const result = await runComposerStreamVideoPrepWithRetries({
+            supabaseClient,
+            signal: ac.signal,
+            spec,
+            onEncodedFileReady: (f) => {
+              quoteRepostVideoLastEncodedFileRef.current = f
+            },
+            onProgress: (info) => {
+              if (quoteRepostVideoPrepJobIdRef.current !== jobId) return
+              setLoungePostUploadBar((bar) => {
+                if (!bar || bar?.mode !== 'mediaPrep' || bar.prepJobId !== jobId) return bar
+                const d = String(info.detail || '').trim()
+                return {
+                  mode: 'mediaPrep',
+                  prepJobId: jobId,
+                  progress: typeof info.progress === 'number' ? info.progress : 0,
+                  status: String(info.status || ''),
+                  detail: d !== '' ? d : typeof bar.detail === 'string' ? bar.detail : '',
+                }
+              })
+            },
+            onUploadDiagnostic: (detail) => {
+              if (quoteRepostVideoPrepJobIdRef.current !== jobId) return
+              setLoungePostUploadBar((bar) =>
+                bar?.mode === 'mediaPrep' && bar.prepJobId === jobId
+                  ? { ...bar, detail: String(detail).slice(0, 280) }
+                  : bar,
+              )
+            },
+          })
+          if (ac.signal.aborted || quoteRepostVideoPrepJobIdRef.current !== jobId) {
+            if (!handoff.settled) {
+              handoff.reject(new DOMException('Aborted', 'AbortError'))
+            }
+            return
+          }
+          handoff.resolve(result)
+          quoteRepostVideoLastEncodedFileRef.current = null
+          const { encodedFile, streamVideoUid } = result
+          setQuoteRepostVideoSlot((prev) => {
+            if (!prev || prev.prepJobId !== jobId) return prev
+            const oldPreview = prev.preview
+            const oldPoster = prev.posterUrl
+            const vidUrl = URL.createObjectURL(encodedFile)
+
+            const posterToKeep =
+              typeof oldPoster === 'string' && oldPoster && oldPoster !== vidUrl
+                ? oldPoster
+                : typeof oldPreview === 'string' && oldPreview && oldPreview !== vidUrl
+                  ? oldPreview
+                  : null
+
+            if (oldPreview && oldPreview !== posterToKeep) {
+              try {
+                URL.revokeObjectURL(oldPreview)
+              } catch {
+                // ignore
+              }
+            }
+            if (oldPoster && oldPoster !== posterToKeep) {
+              try {
+                URL.revokeObjectURL(oldPoster)
+              } catch {
+                // ignore
+              }
+            }
+            return {
+              ...prev,
+              file: encodedFile,
+              streamVideoUid,
+              preview: vidUrl,
+              posterUrl: posterToKeep,
+              prepStatus: 'ready',
+              prepError: '',
+            }
+          })
+          setLoungePostUploadBar((bar) =>
+            bar?.mode === 'mediaPrep' && bar.prepJobId === jobId && !bar.postSubmission ? null : bar,
+          )
+        } catch (e) {
+          if (!handoff.settled) {
+            handoff.reject(e instanceof Error ? e : new Error(String(e)))
+          }
+          if (e?.name === 'AbortError') {
+            if (quoteRepostVideoPrepJobIdRef.current !== jobId) return
+            setLoungePostUploadBar(null)
+            return
+          }
+          if (quoteRepostVideoPrepJobIdRef.current !== jobId) return
+          const msg =
+            (e instanceof Error ? e.message : String(e || '')).trim() ||
+            'Video upload failed after multiple attempts.'
+          const slotStill = quoteRepostVideoSlotRef.current
+          if (slotStill?.prepJobId === jobId) {
+            setQuoteRepostVideoSlot((prev) =>
+              prev?.prepJobId === jobId ? { ...prev, prepStatus: 'failed', prepError: msg } : prev,
+            )
+            setLoungePostUploadFailureDetails({
+              kind: 'mediaPrep',
+              target: 'quote',
+              phase: 'Uploading media…',
+              message: msg,
+            })
+            setLoungePostUploadFailedOpen(true)
+          }
+          setLoungePostUploadBar(null)
+        }
+      })()
+    },
+    [supabaseClient],
+  )
+
   const cancelComposerMediaPrep = useCallback(() => {
     const h = composerVideoPrepHandoffRef.current
     if (h && !h.settled) {
@@ -979,6 +1161,29 @@ export default function SocialFeed({
     setLoungePostUploadBar(null)
   }, [disposeComposerVideoMedia])
 
+  const cancelQuoteRepostMediaPrep = useCallback(() => {
+    const h = quoteRepostVideoPrepHandoffRef.current
+    if (h && !h.settled) {
+      try {
+        h.reject(new DOMException('Aborted', 'AbortError'))
+      } catch {
+        // ignore
+      }
+    }
+    quoteRepostVideoPrepHandoffRef.current = null
+    quoteRepostVideoPrepJobIdRef.current += 1
+    try {
+      quoteRepostVideoPrepAbortRef.current?.abort()
+    } catch {
+      // ignore
+    }
+    quoteRepostVideoPrepAbortRef.current = null
+    quoteRepostVideoLastEncodedFileRef.current = null
+    disposeComposerVideoMedia(quoteRepostVideoSlotRef.current)
+    setQuoteRepostVideoSlot(null)
+    setLoungePostUploadBar(null)
+  }, [disposeComposerVideoMedia])
+
   const queueLoungeVideoOrCrop = useCallback(
     async (vf, mode) => {
       const msgRead = (e) => (e instanceof Error ? e.message : 'Could not read this video file.')
@@ -986,6 +1191,7 @@ export default function SocialFeed({
         const dur = await probeVideoFileDurationSeconds(vf)
         if (!Number.isFinite(dur) || dur <= 0) {
           if (mode === 'composer') setPostErr('Could not read this video file.')
+          else if (mode === 'quote') setQuoteRepostErr('Could not read this video file.')
           else setLoungeDetailEditErr('Could not read this video file.')
           return
         }
@@ -1007,6 +1213,23 @@ export default function SocialFeed({
               streamVideoUid: null,
             })
             setComposerMediaUrl('')
+          } else if (mode === 'quote') {
+            disposeComposerVideoMedia(quoteRepostVideoSlotRef.current)
+            const spec = { kind: 'direct', file: vf }
+            const previewUrl = URL.createObjectURL(vf)
+            let posterUrl = null
+            try {
+              posterUrl = await captureVideoFilePosterObjectUrl(vf)
+            } catch {
+              posterUrl = null
+            }
+            startQuoteRepostVideoPrepFromSpec(spec, {
+              file: vf,
+              posterUrl: posterUrl || null,
+              preview: previewUrl,
+              streamVideoUid: null,
+            })
+            setQuoteRepostMediaUrl('')
           } else {
             setLoungeDetailEditMediaFile(vf)
             setLoungeDetailEditMediaKind('video')
@@ -1016,10 +1239,11 @@ export default function SocialFeed({
         setLoungeVideoCrop({ file: vf, mode, knownDurationSec: dur })
       } catch (e) {
         if (mode === 'composer') setPostErr(msgRead(e))
+        else if (mode === 'quote') setQuoteRepostErr(msgRead(e))
         else setLoungeDetailEditErr(msgRead(e))
       }
     },
-    [disposeComposerVideoMedia, startComposerVideoPrepFromSpec],
+    [disposeComposerVideoMedia, startComposerVideoPrepFromSpec, startQuoteRepostVideoPrepFromSpec],
   )
 
   const postAgeLabel = useCallback((createdAt) => {
@@ -1044,6 +1268,12 @@ export default function SocialFeed({
     if (!v) return false
     return v.prepStatus === 'failed'
   }, [composerVideoSlot])
+
+  const loungeQuoteRepostVideoPostBlocked = useMemo(() => {
+    const v = quoteRepostVideoSlot
+    if (!v) return false
+    return v.prepStatus === 'failed'
+  }, [quoteRepostVideoSlot])
 
   const actionIconClass = 'h-[20px] w-[20px] text-zinc-500'
 
@@ -1307,9 +1537,10 @@ export default function SocialFeed({
   }, [])
 
   const clearQuoteRepostMedia = useCallback(() => {
+    cancelQuoteRepostMediaPrep()
     clearQuoteRepostFileAttachment()
     setQuoteRepostMediaUrl('')
-  }, [clearQuoteRepostFileAttachment])
+  }, [cancelQuoteRepostMediaPrep, clearQuoteRepostFileAttachment])
 
   const handleKlipyGifPicked = useCallback(
     ({ gifUrl }) => {
@@ -1322,6 +1553,7 @@ export default function SocialFeed({
       const u = chk.value
       if (!u) return
       if (klipyPickerTarget === 'quote') {
+        cancelQuoteRepostMediaPrep()
         setQuoteRepostMediaUrl(u)
       } else {
         disposeComposerVideoMedia(composerVideoSlotRef.current)
@@ -1343,7 +1575,7 @@ export default function SocialFeed({
         setComposerMediaUrl(u)
       }
     },
-    [klipyPickerTarget, setPostErr, setQuoteRepostErr, disposeComposerVideoMedia],
+    [klipyPickerTarget, setPostErr, setQuoteRepostErr, disposeComposerVideoMedia, cancelQuoteRepostMediaPrep],
   )
 
   const openQuoteRepostComposer = useCallback(
@@ -1496,13 +1728,53 @@ export default function SocialFeed({
       return
     }
     const gifOnlyUrl = quoteGifCheck.value
-    const hasQuoteMedia =
-      quoteRepostImageItems.length > 0 || String(gifOnlyUrl || '').trim().length > 0
-    if (!cap && !hasQuoteMedia) {
-      setQuoteRepostErr('Add a comment, image, or GIF to repost.')
+    const slotNow = quoteRepostVideoSlotRef.current
+    const hasVideo = slotNow != null
+    if (hasVideo && gifOnlyUrl) {
+      setQuoteRepostErr('Remove the GIF before posting a video.')
       return
     }
+    if (hasVideo && slotNow?.file && slotNow.file.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
+      setQuoteRepostErr('Video must be 200 MB or smaller for upload.')
+      return
+    }
+    const hasQuoteMedia =
+      quoteRepostImageItems.length > 0 || String(gifOnlyUrl || '').trim().length > 0 || hasVideo
+    if (!cap && !hasQuoteMedia) {
+      setQuoteRepostErr('Add a comment, image, GIF, or video to repost.')
+      return
+    }
+    if (hasVideo && slotNow?.prepStatus === 'failed') {
+      setQuoteRepostErr(slotNow.prepError || 'Video processing failed. Remove the video or try again.')
+      return
+    }
+    if (hasVideo && slotNow?.prepStatus === 'preparing') {
+      const awaitingJob = slotNow.prepJobId
+      const h = quoteRepostVideoPrepHandoffRef.current
+      if (awaitingJob != null && h && h.jobId === awaitingJob) {
+        try {
+          await h.promise
+        } catch (e) {
+          if (e?.name !== 'AbortError') {
+            setQuoteRepostErr(e instanceof Error ? e.message : 'Video processing failed.')
+            return
+          }
+        }
+      }
+    }
+    let streamVideoUid = String(quoteRepostVideoSlotRef.current?.streamVideoUid || '').trim() || null
+    if (hasVideo && !streamVideoUid) {
+      if (quoteRepostVideoSlotRef.current?.prepStatus === 'preparing') {
+        setQuoteRepostErr('Wait for the video to finish processing, then try again.')
+        return
+      }
+      setQuoteRepostErr('Video is not ready to post yet.')
+      return
+    }
+
     setQuoteRepostBusy(true)
+    const ac = new AbortController()
+    let posterBlobForPin = /** @type {string | null} */ (null)
     try {
       const {
         data: { session },
@@ -1534,77 +1806,95 @@ export default function SocialFeed({
         setLoungeManageErr('Complete your profile to repost.')
         return
       }
-      const uploadedQuoteUrls = []
-      for (const item of quoteRepostImageItems) {
-        const { file: ready, error: cErr } = await prepareLoungeFeedImageForUpload(item.file)
-        if (cErr) {
-          setQuoteRepostErr(cErr.message)
-          return
-        }
-        const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
-          supabaseClient,
-          user: session.user,
-          file: ready,
-        })
-        if (upErr) {
-          setQuoteRepostErr(upErr.message || 'Could not upload image.')
-          return
-        }
-        if (!upUrl) {
-          setQuoteRepostErr('Could not upload image.')
-          return
-        }
-        uploadedQuoteUrls.push(upUrl)
-      }
-      const insertPayload = communityFeedQuoteRepostInsertPayload({
-        caption: cap,
-        originalPostId: originalId,
-        imageUrls: uploadedQuoteUrls.length > 0 ? uploadedQuoteUrls : undefined,
-        mediaUrl: uploadedQuoteUrls.length === 0 && gifOnlyUrl ? gifOnlyUrl : undefined,
-        gifUrl: uploadedQuoteUrls.length > 0 && gifOnlyUrl ? gifOnlyUrl : undefined,
-      })
-      const { error } = await supabaseClient.from('community_feed_posts').insert(insertPayload)
-      if (error) {
-        const msg = String(error.message || '')
-        if (error.code === '23505') {
-          setQuoteRepostErr('You already have a quote repost for this post.')
-          return
-        }
-        if (msg.toLowerCase().includes('rate limit exceeded')) {
-          setQuoteRepostErr(rateLimitMessage(msg))
-          return
-        }
-        if (error.code === '42501') {
-          setQuoteRepostErr('Reposting is blocked by current permissions.')
-          return
-        }
-        if (
-          msg.toLowerCase().includes('quote repost requires') ||
-          msg.toLowerCase().includes('non-empty caption') ||
-          msg.toLowerCase().includes('comment or media')
-        ) {
-          setQuoteRepostErr('Add a comment, image, or GIF to repost.')
-          return
-        }
-        if (msg.toLowerCase().includes('hidden') || msg.toLowerCase().includes('not found')) {
-          setQuoteRepostErr('That post is no longer available to quote.')
-          return
-        }
-        if (/media_url|gif_url|image_urls|stream_video_uid|stream_poster_url|stream_video_width|stream_video_height|schema cache/i.test(msg)) {
-          setQuoteRepostErr(
-            'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, supabase/lounge_feed_post_image_urls.sql, and supabase/lounge_feed_post_stream_video.sql in Supabase.'
+
+      const slot = quoteRepostVideoSlotRef.current
+      posterBlobForPin =
+        slot?.posterUrl && String(slot.posterUrl).startsWith('blob:') ? String(slot.posterUrl) : null
+
+      await executeLoungeCommunityPostSubmission({
+        supabaseClient,
+        signal: ac.signal,
+        snapshot: {
+          caption: cap,
+          gifOnlyUrl,
+          imageFiles: quoteRepostImageItems.map((it) => it.file),
+          videoFile: hasVideo && slot?.file ? slot.file : null,
+          streamVideoUid,
+          wantsPin: false,
+          isStaffPoster: false,
+          quoteRepostOfPostId: originalId,
+          sessionStreamPosterBlobUrl: posterBlobForPin,
+        },
+        onProgress: (info) => {
+          setLoungePostUploadBar((prev) => {
+            const d = String(info.detail || '').trim()
+            return {
+              mode: 'post',
+              progress: typeof info.progress === 'number' ? info.progress : 0,
+              status: String(info.status || ''),
+              detail: d !== '' ? d : prev && typeof prev.detail === 'string' ? prev.detail : '',
+            }
+          })
+        },
+        rateLimitMessage,
+        onUploadDiagnostic: (detail) => {
+          setLoungePostUploadBar((prev) =>
+            prev ? { ...prev, detail: String(detail).slice(0, 280) } : prev,
           )
-          return
-        }
-        setQuoteRepostErr(msg || 'Could not quote repost right now.')
-        return
+        },
+      })
+
+      const nu = String(streamVideoUid || '').trim()
+      if (nu && posterBlobForPin && posterBlobForPin.startsWith('blob:')) {
+        pinLoungeStreamSessionPoster(nu, posterBlobForPin)
       }
+
       setQuoteRepostModal(null)
       setQuoteRepostDraft('')
       clearQuoteRepostMedia()
       await loadCommunityFeed({ silent: true })
       await refreshLoungePostInteractions([originalId])
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+      const uidFail = String(streamVideoUid || '').trim()
+      if (uidFail && posterBlobForPin && posterBlobForPin.startsWith('blob:')) {
+        releaseLoungeStreamSessionPoster(uidFail)
+      }
+      const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Could not quote repost right now.'
+      const low = msg.toLowerCase()
+      if (low.includes('rate limit exceeded')) {
+        setQuoteRepostErr(rateLimitMessage(msg))
+        return
+      }
+      if (low.includes('duplicate key') || low.includes('unique constraint') || low.includes('23505')) {
+        setQuoteRepostErr('You already have a quote repost for this post.')
+        return
+      }
+      if (low.includes('42501') || low.includes('permissions')) {
+        setQuoteRepostErr('Reposting is blocked by current permissions.')
+        return
+      }
+      if (
+        low.includes('quote repost requires') ||
+        low.includes('comment or media') ||
+        low.includes('non-empty caption')
+      ) {
+        setQuoteRepostErr('Add a comment, image, GIF, or video to repost.')
+        return
+      }
+      if (low.includes('hidden') || low.includes('not found')) {
+        setQuoteRepostErr('That post is no longer available to quote.')
+        return
+      }
+      if (/media_url|gif_url|image_urls|stream_video_uid|stream_poster_url|stream_video_width|stream_video_height|schema cache/i.test(msg)) {
+        setQuoteRepostErr(
+          'Media attachments need the latest DB scripts. Run supabase/lounge_feed_post_media.sql, supabase/lounge_feed_post_gif_url.sql, supabase/lounge_feed_post_image_urls.sql, and supabase/lounge_feed_post_stream_video.sql in Supabase.',
+        )
+        return
+      }
+      setQuoteRepostErr(msg)
     } finally {
+      setLoungePostUploadBar(null)
       setQuoteRepostBusy(false)
     }
   }, [
@@ -2824,6 +3114,22 @@ export default function SocialFeed({
     const fail = loungePostUploadFailureDetailsRef.current
     setLoungePostUploadFailedOpen(false)
     if (fail?.kind === 'mediaPrep') {
+      if (fail?.target === 'quote') {
+        const spec = quoteRepostVideoPrepSpecRef.current
+        const slot = quoteRepostVideoSlotRef.current
+        if (spec && slot) {
+          void startQuoteRepostVideoPrepFromSpec(spec, {
+            ...slot,
+            file: spec.kind === 'direct' ? spec.file : null,
+            posterUrl: slot.posterUrl,
+            preview: slot.preview,
+            streamVideoUid: null,
+            prepError: '',
+          })
+        }
+        setLoungePostUploadFailureDetails(null)
+        return
+      }
       const spec = composerVideoPrepSpecRef.current
       const slot = composerVideoSlotRef.current
       if (spec && slot) {
@@ -2843,11 +3149,18 @@ export default function SocialFeed({
     setLoungePostUploadFailureDetails(null)
     if (!snap) return
     void runBackgroundLoungePostSubmission(snap)
-  }, [runBackgroundLoungePostSubmission, startComposerVideoPrepFromSpec])
+  }, [runBackgroundLoungePostSubmission, startComposerVideoPrepFromSpec, startQuoteRepostVideoPrepFromSpec])
 
   const onLoungePostUploadSaveDraft = useCallback(() => {
     const fail = loungePostUploadFailureDetailsRef.current
     if (fail?.kind === 'mediaPrep') {
+      if (fail?.target === 'quote') {
+        cancelQuoteRepostMediaPrep()
+        setQuoteRepostErr('Video was cleared — add a video again when you are ready.')
+        setLoungePostUploadFailedOpen(false)
+        setLoungePostUploadFailureDetails(null)
+        return
+      }
       persistLoungeComposerDraft(postText, false, false, String(composerMediaUrl || '').trim())
       disposeComposerVideoMedia(composerVideoSlotRef.current)
       setComposerVideoSlot(null)
@@ -2873,13 +3186,18 @@ export default function SocialFeed({
     loungePostJobRunningRef.current = false
     setLoungePostUploadFailedOpen(false)
     setLoungePostUploadFailureDetails(null)
-  }, [composerMediaUrl, disposeComposerVideoMedia, postText])
+  }, [cancelQuoteRepostMediaPrep, composerMediaUrl, disposeComposerVideoMedia, postText])
 
   const onLoungePostUploadFailureCancel = useCallback(() => {
     const fail = loungePostUploadFailureDetailsRef.current
     if (fail?.kind === 'mediaPrep') {
-      disposeComposerVideoMedia(composerVideoSlotRef.current)
-      setComposerVideoSlot(null)
+      if (fail?.target === 'quote') {
+        disposeComposerVideoMedia(quoteRepostVideoSlotRef.current)
+        setQuoteRepostVideoSlot(null)
+      } else {
+        disposeComposerVideoMedia(composerVideoSlotRef.current)
+        setComposerVideoSlot(null)
+      }
       setLoungePostUploadFailedOpen(false)
       setLoungePostUploadFailureDetails(null)
       return
@@ -5138,7 +5456,7 @@ export default function SocialFeed({
                             <input
                               ref={quoteRepostMediaInputRef}
                               type="file"
-                              accept="image/*"
+                              accept="image/*,video/*"
                               multiple
                               className="hidden"
                               onChange={(e) => {
@@ -5146,9 +5464,40 @@ export default function SocialFeed({
                                 const files = Array.from(input.files || [])
                                 if (!files.length) return
                                 setQuoteRepostErr('')
+                                const hasVideo = files.some((f) => isProbablyVideoFile(f))
+                                if (hasVideo) {
+                                  const vf = files.find((f) => isProbablyVideoFile(f))
+                                  if (!vf) {
+                                    try {
+                                      input.value = ''
+                                    } catch {
+                                      // ignore
+                                    }
+                                    return
+                                  }
+                                  setQuoteRepostImageItems((prev) => {
+                                    for (const it of prev) {
+                                      try {
+                                        URL.revokeObjectURL(it.preview)
+                                      } catch {
+                                        // ignore
+                                      }
+                                    }
+                                    return []
+                                  })
+                                  cancelQuoteRepostMediaPrep()
+                                  setQuoteRepostMediaUrl('')
+                                  try {
+                                    input.value = ''
+                                  } catch {
+                                    // ignore
+                                  }
+                                  void queueLoungeVideoOrCrop(vf, 'quote')
+                                  return
+                                }
                                 const bad = files.some((f) => !isProbablyImageFile(f))
                                 if (bad) {
-                                  setQuoteRepostErr('Please choose image files.')
+                                  setQuoteRepostErr('Unsupported media type. Please choose an image or video file.')
                                   try {
                                     input.value = ''
                                   } catch {
@@ -5156,6 +5505,8 @@ export default function SocialFeed({
                                   }
                                   return
                                 }
+                                cancelQuoteRepostMediaPrep()
+                                setQuoteRepostMediaUrl('')
                                 const prevImgs = quoteRepostImageItemsRef.current
                                 const { next, limitDialog } = mergeLoungePickedImageItems(prevImgs, files, newComposerImageId)
                                 quoteRepostImageItemsRef.current = next
@@ -5201,6 +5552,39 @@ export default function SocialFeed({
                                 />
                               )
                             })()}
+                            {quoteRepostVideoSlot ? (
+                              <div className="relative mt-1.5 inline-flex max-w-[min(78vw,18rem)] shrink-0 self-start overflow-hidden rounded-xl border border-zinc-700/80 bg-black leading-none">
+                                {!quoteRepostVideoSlot.file && quoteRepostVideoSlot.preview ? (
+                                  <img
+                                    src={quoteRepostVideoSlot.preview}
+                                    alt=""
+                                    className="block h-auto max-h-52 w-auto max-w-[min(78vw,18rem)] object-contain"
+                                  />
+                                ) : quoteRepostVideoSlot.preview ? (
+                                  <video
+                                    src={quoteRepostVideoSlot.preview}
+                                    poster={quoteRepostVideoSlot.posterUrl || undefined}
+                                    className="block h-auto max-h-52 w-auto max-w-[min(78vw,18rem)] object-contain"
+                                    controls
+                                    playsInline
+                                    preload="metadata"
+                                    aria-label="Video preview"
+                                  />
+                                ) : null}
+                                <button
+                                  type="button"
+                                  disabled={quoteRepostBusy}
+                                  onClick={() => {
+                                    cancelQuoteRepostMediaPrep()
+                                  }}
+                                  className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full border border-zinc-500/35 bg-black/25 text-base leading-none text-zinc-100 shadow-sm backdrop-blur-[2px] touch-manipulation hover:bg-black/45 active:bg-black/55 disabled:opacity-45"
+                                  aria-label="Remove video"
+                                  title="Remove video"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ) : null}
                             <div className="min-h-0 flex-1" aria-hidden />
                           </div>
                         </div>
@@ -5212,8 +5596,8 @@ export default function SocialFeed({
                             disabled={quoteRepostBusy}
                             onClick={() => quoteRepostMediaInputRef.current?.click()}
                             className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1.5 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]"
-                            title="Add image"
-                            aria-label="Add image"
+                            title="Add media"
+                            aria-label="Add media"
                           >
                             <svg className="h-8 w-8" viewBox="0 0 20 20" fill="none" aria-hidden>
                               <rect
@@ -5284,9 +5668,13 @@ export default function SocialFeed({
                             type="button"
                             disabled={
                               quoteRepostBusy ||
+                              loungeQuoteRepostVideoPostBlocked ||
+                              loungePostUploadFailedOpen ||
+                              loungeVideoCrop != null ||
                               (!normalizeFeedCaption(quoteRepostDraft) &&
                                 quoteRepostImageItems.length === 0 &&
-                                !String(quoteRepostMediaUrl || '').trim())
+                                !String(quoteRepostMediaUrl || '').trim() &&
+                                !quoteRepostVideoSlot)
                             }
                             aria-label={quoteRepostBusy ? 'Posting' : 'Post quote repost'}
                             aria-busy={quoteRepostBusy}
@@ -5297,8 +5685,12 @@ export default function SocialFeed({
                             } ${
                               (normalizeFeedCaption(quoteRepostDraft) ||
                                 quoteRepostImageItems.length > 0 ||
-                                !!String(quoteRepostMediaUrl || '').trim()) &&
-                              !quoteRepostBusy
+                                !!String(quoteRepostMediaUrl || '').trim() ||
+                                quoteRepostVideoSlot) &&
+                              !quoteRepostBusy &&
+                              !loungeQuoteRepostVideoPostBlocked &&
+                              !loungePostUploadFailedOpen &&
+                              loungeVideoCrop == null
                                 ? 'border-emerald-400/70 bg-emerald-500 text-white hover:bg-emerald-400'
                                 : 'border-zinc-600 bg-zinc-800/90 text-zinc-500'
                             }`}
@@ -5588,7 +5980,11 @@ export default function SocialFeed({
               type="button"
               onClick={() => {
                 if (loungePostUploadBar.mode === 'mediaPrep' && !loungePostUploadBar.postSubmission) {
-                  cancelComposerMediaPrep()
+                  if (quoteRepostVideoSlotRef.current?.prepStatus === 'preparing') {
+                    cancelQuoteRepostMediaPrep()
+                  } else {
+                    cancelComposerMediaPrep()
+                  }
                 } else {
                   cancelLoungePostUpload()
                 }
@@ -5615,17 +6011,23 @@ export default function SocialFeed({
             setLoungeVideoCrop(null)
           }}
           onConfirm={(result) => {
-            if (loungeVideoCrop.mode === 'composer') {
+            if (loungeVideoCrop.mode === 'composer' || loungeVideoCrop.mode === 'quote') {
+              const startPrep = loungeVideoCrop.mode === 'quote' ? startQuoteRepostVideoPrepFromSpec : startComposerVideoPrepFromSpec
+              const disposeSlot =
+                loungeVideoCrop.mode === 'quote'
+                  ? () => disposeComposerVideoMedia(quoteRepostVideoSlotRef.current)
+                  : () => disposeComposerVideoMedia(composerVideoSlotRef.current)
               if (result instanceof File) {
-                disposeComposerVideoMedia(composerVideoSlotRef.current)
+                disposeSlot()
                 const previewUrl = URL.createObjectURL(result)
-                startComposerVideoPrepFromSpec(
+                startPrep(
                   { kind: 'direct', file: result },
                   { file: result, posterUrl: null, preview: previewUrl, streamVideoUid: null },
                 )
-                setComposerMediaUrl('')
+                if (loungeVideoCrop.mode === 'quote') setQuoteRepostMediaUrl('')
+                else setComposerMediaUrl('')
               } else if (result && typeof result === 'object' && result.type === 'composerTrimJob') {
-                disposeComposerVideoMedia(composerVideoSlotRef.current)
+                disposeSlot()
                 const spec = {
                   kind: 'trim',
                   sourceFile: result.sourceFile,
@@ -5635,13 +6037,14 @@ export default function SocialFeed({
                   intrinsicWidth: result.intrinsicWidth,
                   intrinsicHeight: result.intrinsicHeight,
                 }
-                startComposerVideoPrepFromSpec(spec, {
+                startPrep(spec, {
                   file: null,
                   posterUrl: result.posterUrl,
                   preview: result.posterUrl,
                   streamVideoUid: null,
                 })
-                setComposerMediaUrl('')
+                if (loungeVideoCrop.mode === 'quote') setQuoteRepostMediaUrl('')
+                else setComposerMediaUrl('')
               }
             } else if (result instanceof File) {
               setLoungeDetailEditMediaFile(result)

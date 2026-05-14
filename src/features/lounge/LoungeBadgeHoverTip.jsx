@@ -5,7 +5,7 @@ const OUT_MS = 220
 /** Brief delay so pointer can move from anchor to portaled tip without dismissing. */
 const LEAVE_DELAY_MS = 140
 /** Coarse-pointer tap: show tip briefly (hover is unreliable on touch). */
-const TAP_TIP_MS = 2800
+const TAP_TIP_MS = Math.round(2800 / 3)
 
 function prefersFinePointerHover() {
   if (typeof window === 'undefined') return true
@@ -14,6 +14,8 @@ function prefersFinePointerHover() {
 
 const TONE = {
   amber: 'text-amber-200/95 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]',
+  /** Matches admin crown icon (`text-amber-400`). */
+  crown: 'text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.35)]',
   violet: 'text-violet-200/95 drop-shadow-[0_0_4px_rgba(167,139,250,0.35)]',
   sky: 'text-sky-200/95 drop-shadow-[0_0_4px_rgba(125,211,252,0.3)]',
 }
@@ -23,7 +25,7 @@ const TONE = {
  * Portaled above the anchor so feed scroll / overflow / paint containment cannot clip it,
  * with a short leave delay so the pointer can reach the tip (tip uses pointer-events).
  *
- * @param {{ tip: string, tone?: 'amber' | 'violet' | 'sky', children: import('react').ReactNode, className?: string }} props
+ * @param {{ tip: string, tone?: 'amber' | 'crown' | 'violet' | 'sky', children: import('react').ReactNode, className?: string }} props
  */
 export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, className = '' }) {
   const anchorRef = useRef(null)

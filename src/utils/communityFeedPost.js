@@ -175,8 +175,19 @@ export function communityFeedPostInsertPayload({
 
 /**
  * Insert payload for a quote repost: new visible row with caption + link to the original post.
+ * When `streamVideoUid` is set, matches main post Stream columns (`supabase/lounge_feed_post_stream_video.sql`).
  */
-export function communityFeedQuoteRepostInsertPayload({ caption, originalPostId, mediaUrl, gifUrl, imageUrls }) {
+export function communityFeedQuoteRepostInsertPayload({
+  caption,
+  originalPostId,
+  mediaUrl,
+  gifUrl,
+  imageUrls,
+  streamVideoUid,
+  streamPosterUrl,
+  streamVideoWidth,
+  streamVideoHeight,
+}) {
   const cap = normalizeFeedCaption(caption)
   const out = {
     caption: cap,
@@ -184,6 +195,22 @@ export function communityFeedQuoteRepostInsertPayload({ caption, originalPostId,
     game_slug: null,
     repost_of_post_id: originalPostId,
     is_plain_repost: false,
+  }
+  const sv = streamVideoUid != null ? String(streamVideoUid).trim() : ''
+  if (sv) {
+    out.stream_video_uid = sv
+    out.media_url = null
+    out.gif_url = null
+    out.image_urls = []
+    const pu = streamPosterUrl != null ? String(streamPosterUrl).trim() : ''
+    if (pu) out.stream_poster_url = pu
+    const w = Number(streamVideoWidth)
+    const h = Number(streamVideoHeight)
+    if (Number.isFinite(w) && Number.isFinite(h) && w >= 2 && h >= 2) {
+      out.stream_video_width = Math.round(w)
+      out.stream_video_height = Math.round(h)
+    }
+    return out
   }
   const imgs = Array.isArray(imageUrls)
     ? imageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)

@@ -1,5 +1,9 @@
 import { prepareLoungeFeedImageForUpload } from '../../utils/compressImageForUpload'
-import { communityFeedPostInsertPayload, uploadLoungeFeedPostImage } from '../../utils/communityFeedPost'
+import {
+  communityFeedPostInsertPayload,
+  communityFeedQuoteRepostInsertPayload,
+  uploadLoungeFeedPostImage,
+} from '../../utils/communityFeedPost'
 import {
   LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES,
   LOUNGE_VIDEO_MAX_SECONDS,
@@ -28,6 +32,7 @@ const LOUNGE_MAX_PINNED_ALERT =
  * @property {string | null | undefined} [sessionStreamPosterBlobUrl] Composer JPEG `blob:` URL to pin for feed until CF thumbnail loads (same-tab).
  * @property {boolean} wantsPin
  * @property {boolean} isStaffPoster
+ * @property {string | null | undefined} [quoteRepostOfPostId] When set, insert a quote repost row instead of a normal post.
  */
 
 /**
@@ -72,8 +77,17 @@ export async function executeLoungeCommunityPostSubmission({
     throw new Error('You must be signed in to post in Lounge.')
   }
 
-  const { caption, gifOnlyUrl, imageFiles, videoFile, streamVideoUid: preUploadedUid, wantsPin, isStaffPoster } =
-    snapshot
+  const {
+    caption,
+    gifOnlyUrl,
+    imageFiles,
+    videoFile,
+    streamVideoUid: preUploadedUid,
+    wantsPin,
+    isStaffPoster,
+    quoteRepostOfPostId,
+  } = snapshot
+  const quoteParentId = quoteRepostOfPostId != null ? String(quoteRepostOfPostId).trim() : ''
   const preUid = String(preUploadedUid || '').trim()
   const hasVideo = Boolean(videoFile) || Boolean(preUid)
   const nImg = Array.isArray(imageFiles) ? imageFiles.length : 0
@@ -224,10 +238,40 @@ export async function executeLoungeCommunityPostSubmission({
     }
 
     throwIfAborted()
-    report(0.9, 'Publishing post', 'Inserting into community feed…')
+    report(0.9, quoteParentId ? 'Publishing quote repost' : 'Publishing post', 'Inserting into community feed…')
 
     let insertPayload
-    if (streamVideoUid) {
+    if (quoteParentId) {
+      if (streamVideoUid) {
+        insertPayload = communityFeedQuoteRepostInsertPayload({
+          caption,
+          originalPostId: quoteParentId,
+          streamVideoUid,
+          streamPosterUrl: streamPosterPublicUrl || undefined,
+          streamVideoWidth: streamVideoWidthOut || undefined,
+          streamVideoHeight: streamVideoHeightOut || undefined,
+        })
+      } else if (uploadedUrls.length > 0) {
+        insertPayload = communityFeedQuoteRepostInsertPayload({
+          caption,
+          originalPostId: quoteParentId,
+          imageUrls: uploadedUrls,
+          mediaUrl: uploadedUrls.length === 0 && gifOnlyUrl ? gifOnlyUrl : undefined,
+          gifUrl: uploadedUrls.length > 0 && gifOnlyUrl ? gifOnlyUrl : undefined,
+        })
+      } else if (gifOnlyUrl) {
+        insertPayload = communityFeedQuoteRepostInsertPayload({
+          caption,
+          originalPostId: quoteParentId,
+          mediaUrl: gifOnlyUrl,
+        })
+      } else {
+        insertPayload = communityFeedQuoteRepostInsertPayload({
+          caption,
+          originalPostId: quoteParentId,
+        })
+      }
+    } else if (streamVideoUid) {
       insertPayload = communityFeedPostInsertPayload({
         caption,
         gameTitle: 'Lounge',

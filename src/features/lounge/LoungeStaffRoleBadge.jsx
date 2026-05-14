@@ -35,7 +35,7 @@ export default function LoungeStaffRoleBadge({ role, size = 'feed' }) {
 
   if (r === 'admin') {
     return (
-      <LoungeBadgeHoverTip tip="Admin" tone="violet" className="translate-y-[0.5px]">
+      <LoungeBadgeHoverTip tip="Admin" tone="crown" className="translate-y-[0.5px]">
         <span className="inline-flex items-center gap-x-0.5" role="img" aria-label="Admin">
           <CrownIcon className={`${crownClass} text-amber-400`} />
           <ShieldIcon className={`${shieldClass} text-blue-500`} />
