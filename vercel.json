@@ -8,6 +8,10 @@
   ],
   "rewrites": [
     { "source": "/reset-password", "destination": "/index.html" },
+    {
+      "source": "/lounge/p/:postId",
+      "destination": "/api/lounge-post-og?postId=:postId"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

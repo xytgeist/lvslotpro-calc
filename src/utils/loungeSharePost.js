@@ -10,14 +10,15 @@ export function isLoungePostShareId(value) {
 }
 
 /**
- * Canonical in-app permalink for a Lounge post (forces Lounge tab).
- * Uses the current origin and path; replaces/overrides `tab` + `post` query keys.
+ * Canonical **share** URL for a Lounge post: `/lounge/p/:id` (served by Vercel `api/lounge-post-og.js`
+ * with Open Graph meta for iMessage / Slack / etc.). Humans are redirected to `/?tab=home&post=…`.
  */
 export function buildLoungePostShareUrl(postId) {
   if (typeof window === 'undefined' || !postId) return ''
   const u = new URL(window.location.href)
-  u.searchParams.set('tab', 'home')
-  u.searchParams.set('post', String(postId))
+  u.pathname = `/lounge/p/${encodeURIComponent(String(postId))}`
+  u.search = ''
+  u.hash = ''
   return u.toString()
 }
 

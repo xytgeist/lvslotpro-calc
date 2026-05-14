@@ -23,6 +23,8 @@ npm install
 npm run dev
 ```
 
+**Lounge link previews (Open Graph):** Share URLs use **`/lounge/p/<post_uuid>`**. On **Vercel**, `vercel.json` rewrites that path to **`api/lounge-post-og.js`**, which returns HTML with `og:*` / Twitter Card meta (Supabase anon REST + RLS) and redirects browsers to **`/?tab=home&post=…`**. Plain `npm run dev` does not run that route; use **`vercel dev`** from the repo root to exercise it locally, and ensure **`VITE_SUPABASE_URL`** + **`VITE_SUPABASE_ANON_KEY`** are set (same as the Vite app on Vercel).
+
 Other scripts:
 
 | Command | Purpose |
