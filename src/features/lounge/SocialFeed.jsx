@@ -71,6 +71,7 @@ import { pinLoungeStreamSessionPoster, releaseLoungeStreamSessionPoster } from '
 import KlipyGifPicker from './KlipyGifPicker.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
+import { dockChromeHeightFromTitleBarPx } from '../../utils/loungeDockChrome.js'
 import LoungeDockSlidePanels from '../../components/LoungeDockSlidePanels.jsx'
 
 /** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
@@ -4074,16 +4075,20 @@ export default function SocialFeed({
 
   const showLoungeViewportDock = !loungePostDetail && !profileModalOpen
   const loungeTitleBarChromePx = loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56
-  const effectiveLoungeDockFooterHeight =
-    loungeDockFooterHeight > 0
-      ? loungeDockFooterHeight
-      : showLoungeViewportDock
-        ? loungeTitleBarChromePx + 40
-        : 0
-  const loungeFeedDockPaddingBottom = showLoungeViewportDock ? effectiveLoungeDockFooterHeight + 10 : 0
+  /** Scroll inset for the opaque dock icon row only — not home-indicator space; feed scrolls edge-to-edge (cf. Twitter/X). */
+  const loungeDockFeedContentInsetPx = showLoungeViewportDock
+    ? dockChromeHeightFromTitleBarPx(loungeTitleBarChromePx) + 6
+    : 0
+  const loungeFeedDockPaddingBottom = loungeDockFeedContentInsetPx
+  /** Slide panels add `env(safe-area-inset-bottom)` themselves; reserve icon row + gap only. */
+  const loungeDockSlideBottomReservePx = Math.max(48, loungeDockFeedContentInsetPx + 10)
 
   return (
-    <div className="mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div
+      className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden pt-[max(0px,env(safe-area-inset-top))] ${
+        showLoungeViewportDock ? 'pb-0' : 'pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+      }`}
+    >
       {quoteRepostQueuedToast ? (
         <div
           role="status"
@@ -5732,7 +5737,7 @@ export default function SocialFeed({
           openPanel={loungeDockPanel}
           onClose={() => setLoungeDockPanel(null)}
           communityPosts={communityPosts}
-          bottomReservePx={effectiveLoungeDockFooterHeight + 10}
+          bottomReservePx={loungeDockSlideBottomReservePx}
           onPickPost={onLoungeDockPickPostFromSearch}
         />
       ) : null}

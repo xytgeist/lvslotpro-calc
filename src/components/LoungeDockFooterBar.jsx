@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
+import { dockChromeHeightFromTitleBarPx } from '../utils/loungeDockChrome.js'
 
 const stroke = {
   stroke: 'currentColor',
@@ -70,8 +71,9 @@ const FALLBACK_SAFE_BOTTOM_PX = 40
  * `reveal` 1 = fully visible, 0 = slid off downward (paired with scroll-linked title hide).
  * Icon-only controls (no chrome around glyphs); active slot uses cyan icon color.
  *
- * @param {number} [matchTitleBarHeightPx=0] — When >0 (viewport dock), chrome row height matches measured
- *   lounge title bar (`SocialFeed` `loungeTitleBarHeight`); home-indicator inset is a separate strip below.
+ * @param {number} [matchTitleBarHeightPx=0] — When >0 (viewport dock), chrome row height is derived from the
+ *   measured lounge title bar (~⅔ height, min 36px). The strip under the icons uses transparent background so
+ *   feed content can show through the home-indicator zone (Twitter/X–style edge-to-edge scroll).
  * @param {'viewport' | 'sheet'} [layout='viewport'] — `sheet` pins to a full-screen sheet bottom (e.g. profile).
  */
 export default function LoungeDockFooterBar({
@@ -89,11 +91,12 @@ export default function LoungeDockFooterBar({
   const measureRef = useRef(null)
   const isSheet = layout === 'sheet'
   const useMatchedChrome = !isSheet && matchTitleBarHeightPx > 0
+  const dockChromePx = dockChromeHeightFromTitleBarPx(matchTitleBarHeightPx)
   const h =
     barHeightPx > 0
       ? barHeightPx
       : useMatchedChrome
-        ? matchTitleBarHeightPx + FALLBACK_SAFE_BOTTOM_PX
+        ? dockChromePx + FALLBACK_SAFE_BOTTOM_PX
         : 44
   const translateY = (1 - Math.min(1, Math.max(0, reveal))) * h
 
@@ -108,7 +111,7 @@ export default function LoungeDockFooterBar({
     const ro = new ResizeObserver(apply)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [onHeightChange, layout, matchTitleBarHeightPx])
+  }, [onHeightChange, layout, matchTitleBarHeightPx, dockChromePx])
 
   const dockBtn = (active, onClick, label, children) => (
     <button
@@ -140,7 +143,7 @@ export default function LoungeDockFooterBar({
 
   const chromeBarClass =
     'border-t border-zinc-800/95 bg-zinc-950/95 shadow-[0_-1px_0_rgba(0,0,0,0.22)] backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85'
-  const safeStripClass = 'shrink-0 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85'
+  const safeStripClass = 'shrink-0 bg-transparent'
 
   /** Sheet / legacy: single shell with bottom safe-area padding inside the bar. */
   const outerClassSingle = isSheet
@@ -162,11 +165,12 @@ export default function LoungeDockFooterBar({
       >
         <div
           className={`flex items-center justify-center gap-2 px-3 ${chromeBarClass}`}
-          style={{ height: matchTitleBarHeightPx, boxSizing: 'border-box' }}
+          style={{ height: dockChromePx, boxSizing: 'border-box' }}
         >
           {dockIcons}
         </div>
-        <div className={`${safeStripClass} pb-[max(0.25rem,env(safe-area-inset-bottom))]`} aria-hidden />      </div>
+        <div className={`${safeStripClass} pb-[max(0.25rem,env(safe-area-inset-bottom))]`} aria-hidden />
+      </div>
     )
   }
 
