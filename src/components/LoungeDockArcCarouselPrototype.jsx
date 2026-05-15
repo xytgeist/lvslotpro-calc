@@ -12,6 +12,7 @@ import {
   loungeDockFabPositionFromPct,
   loungeDockLShapeOffsets,
   loungeDockViewportSize,
+  loungeDockWheelCompactHomeOffset,
   loungeDockWheelLayout,
   readLoungeDockFabPrefs,
   writeLoungeDockFabPrefs,
@@ -884,7 +885,12 @@ export default function LoungeDockArcCarouselPrototype({
       ? (wheelLayout.offsets[wheelLayout.focusedIndex] ?? { x: 0, y: 0 })
       : { x: 0, y: 0 }
 
-  const renderMenuItem = (item, offset, { isFocused = false, offScreen = false } = {}) => {
+  const renderMenuItem = (item, offset, {
+    isFocused = false,
+    offScreen = false,
+    /** Wheel + dock panel: smoother home slide between L-spacing and ring position. */
+    wheelPanelChromeHome = false,
+  } = {}) => {
     const wheelOpen = menuExpanded
     const compactChip = panelCompactChrome && !menuExpanded
     const wheelTapOnly = wheelOpen && !spinEnabled
@@ -947,7 +953,7 @@ export default function LoungeDockArcCarouselPrototype({
       } ${spinning ? 'cursor-grabbing' : ''} disabled:cursor-not-allowed ${glow.textIdle} ${
         spinning
           ? ''
-          : fadesWithReveal
+          : wheelPanelChromeHome || fadesWithReveal
             ? 'transition-[left,top,opacity] duration-300 ease-out'
             : 'transition-[left,top,opacity] duration-200 ease-out'
       }`}
@@ -1056,10 +1062,16 @@ export default function LoungeDockArcCarouselPrototype({
 
       {visibleWheelItems.map((item) => {
         const i = wheelItems.indexOf(item)
-        const offset = wheelLayout.offsets[i] ?? { x: 0, y: 0, onScreen: true }
+        let offset = wheelLayout.offsets[i] ?? { x: 0, y: 0, onScreen: true }
+        const compactMenuClosed = panelCompactChrome && !menuExpanded
+        if (compactMenuClosed && !isCornerL && item.id === HOME_ITEM_ID) {
+          offset = loungeDockWheelCompactHomeOffset(fabCenterX, viewport.width)
+        }
         const isFocused = menuExpanded && spinEnabled && i === wheelLayout.focusedIndex
         const offScreen = menuExpanded && spinEnabled && !offset.onScreen
-        return renderMenuItem(item, offset, { isFocused, offScreen })
+        const wheelPanelChromeHome =
+          panelCompactChrome && !isCornerL && item.id === HOME_ITEM_ID
+        return renderMenuItem(item, offset, { isFocused, offScreen, wheelPanelChromeHome })
       })}
 
       <div

@@ -88,6 +88,16 @@ export function loungeDockFabCornerPosition(viewportW, viewportH, fabSize, align
 }
 
 /**
+ * Horizontal offset for home in Edge (L) mode (index 0 on the bottom leg).
+ * Use in Wheel (O) compact chrome so the home chip matches L spacing from the FAB; full wheel uses ring radius instead.
+ */
+export function loungeDockWheelCompactHomeOffset(fabCenterX, viewportW) {
+  const alignLeft = fabCenterX < viewportW / 2
+  const step = loungeDockLShapeStepPx()
+  return { x: alignLeft ? step : -step, y: 0, onScreen: true }
+}
+
+/**
  * L-shaped offsets from FAB center: first ⌈n/2⌉ items along bottom (into the screen),
  * rest along the vertical edge (up). Left corner: bottom goes +x; right corner: bottom goes −x.
  * @returns {{ x: number, y: number, onScreen: boolean }[]}
