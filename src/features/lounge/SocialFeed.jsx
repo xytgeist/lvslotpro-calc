@@ -6704,7 +6704,13 @@ export default function SocialFeed({
                 data-lounge-detail-comment-host
                 className="shrink-0 border-t border-zinc-800/90 bg-zinc-950/95 px-3 pt-1 pb-0 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/80"
                 style={{
-                  paddingBottom: `calc(max(0.5rem, env(safe-area-inset-bottom)) + ${loungeDetailCommentKbOverlapPx}px)`,
+                  // Keyboard open: `visualViewport` overlap already clears the keyboard — do not add
+                  // `env(safe-area-inset-bottom)` here; iOS often keeps ~34px inset while the keyboard is up,
+                  // which stacked under overlap and left a large dead band above the keys.
+                  paddingBottom:
+                    loungeDetailCommentKbOverlapPx > 0
+                      ? `${loungeDetailCommentKbOverlapPx}px`
+                      : `max(0.5rem, env(safe-area-inset-bottom))`,
                 }}
               >
                 {loungeDetailCommentErr ? (
