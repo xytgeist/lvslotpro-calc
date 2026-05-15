@@ -523,7 +523,7 @@ export default function LoungeDockArcCarouselPrototype({
         e.preventDefault()
         e.stopPropagation()
         armRepositionClickGuard()
-        snapFabToBottomCornerForDropSide()
+        if (isCornerL) snapFabToBottomCornerForDropSide()
         persistFabPrefs(fabPosRef.current)
         endFabReposition()
         try {
@@ -596,7 +596,7 @@ export default function LoungeDockArcCarouselPrototype({
       clearDocumentTextSelection()
       if (drag.dragging && repositioningRef.current) {
         armRepositionClickGuard()
-        snapFabToBottomCornerForDropSide()
+        if (isCornerL) snapFabToBottomCornerForDropSide()
         persistFabPrefs(fabPosRef.current)
       } else if (repositioningRef.current) {
         armRepositionClickGuard()
@@ -604,7 +604,13 @@ export default function LoungeDockArcCarouselPrototype({
       endFabReposition()
       fabDragRef.current = null
     },
-    [persistFabPrefs, endFabReposition, armRepositionClickGuard, snapFabToBottomCornerForDropSide],
+    [
+      persistFabPrefs,
+      endFabReposition,
+      armRepositionClickGuard,
+      snapFabToBottomCornerForDropSide,
+      isCornerL,
+    ],
   )
 
   const beginSpinGesture = useCallback(
@@ -904,16 +910,21 @@ export default function LoungeDockArcCarouselPrototype({
       {menuExpanded && fabVisible ? (
         <button
           type="button"
-          className="pointer-events-auto fixed inset-0 z-[5] touch-pan-y bg-black/35 backdrop-blur-[2px] [-webkit-tap-highlight-color:transparent]"
-          style={{ touchAction: 'pan-y' }}
+          className="pointer-events-auto fixed inset-0 z-[5] bg-black/35 backdrop-blur-[2px] [-webkit-tap-highlight-color:transparent]"
           aria-label="Close menu"
           onPointerDown={(e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return
-            flushSync(() => setOpen(false))
+            /**
+             * Defer unmount to the next frame so the same touch isn’t retargeted from a
+             * synchronously removed backdrop (iOS/WebKit: scroll “sticks” / rubber-bands).
+             */
+            requestAnimationFrame(() => {
+              setOpen(false)
+            })
           }}
           onClick={(e) => {
             e.preventDefault()
-            flushSync(() => setOpen(false))
+            setOpen(false)
           }}
         />
       ) : null}

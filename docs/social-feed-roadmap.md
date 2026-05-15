@@ -107,7 +107,7 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 | **Following filter** | Wheel **Following** toggles feed scope (`LoungeFeedScopeSwitch` / `loungeFeedScope.js`); **cyan filled** person+ when on; **mid border** on chip, not full “page active” glow. |
 | **Compose** | Wheel compose expands feed composer + keyboard (`loungeDockComposeFocus.js`; panel must close first). |
 | **Reposition** | Long-press FAB (~450ms), drag, release → position saved (`loungeDockFabPosition.js`). Native text-selection suppressed while held; **~1s** click-through guard after release (synthesized click on feed under finger). |
-| **Menu shape** | Settings (dock) → **Wheel (O)** (arc + spin) or **Edge (L)** — `localStorage` `loungeDockMenuLayout:v1`; L mode snaps FAB to bottom-left/right by screen half and lays icons in horizontal + vertical legs (`loungeDockLShapeOffsets` in `loungeDockFabPosition.js`). |
+| **Menu shape** | Settings (dock) → **Wheel (O)** (arc + spin) or **Edge (L)** — `localStorage` `loungeDockMenuLayout:v1`; L mode snaps FAB to bottom-left/right by screen half and lays icons in horizontal + vertical legs (`loungeDockLShapeOffsets` in `loungeDockFabPosition.js`). **After long-press reposition, bottom-corner snap is L only** (wheel keeps drop position). |
 | **Visual** | Unified neon-cyan wheel; **glow off**; border-only active state. Icon optical tweaks (e.g. bell `translate(-2, …)`). |
 
 **Likes (interaction row):** poker-chip + heart icon (`LoungeFlameIcon.jsx`, solar red when liked); **Share** only in card **⋯** menu.
