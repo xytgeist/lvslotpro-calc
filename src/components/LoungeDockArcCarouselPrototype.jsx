@@ -43,6 +43,12 @@ function angleFromPointer(fabCenterX, fabCenterY, clientX, clientY) {
   return Math.atan2(-(clientX - fabCenterX), -(clientY - fabCenterY))
 }
 
+function clearDocumentTextSelection() {
+  const sel = window.getSelection?.()
+  if (!sel || sel.rangeCount === 0) return
+  sel.removeAllRanges()
+}
+
 /**
  * Experimental Lounge nav: draggable FAB + full spin wheel (home anchors left/right of FAB) (prototype only).
  */
@@ -59,6 +65,8 @@ export default function LoungeDockArcCarouselPrototype({
   const [open, setOpen] = useState(defaultOpen)
   const [fabPos, setFabPos] = useState(null)
   const [repositioning, setRepositioning] = useState(false)
+  /** Blocks native text selection while the menu button is held (long-press reposition). */
+  const [fabSelectionLock, setFabSelectionLock] = useState(false)
   const [viewport, setViewport] = useState(() => loungeDockViewportSize())
   const [carouselRotation, setCarouselRotation] = useState(0)
   const [spinning, setSpinning] = useState(false)
@@ -112,6 +120,34 @@ export default function LoungeDockArcCarouselPrototype({
   useEffect(() => {
     repositioningRef.current = repositioning
   }, [repositioning])
+
+  useEffect(() => {
+    if (!fabSelectionLock && !repositioning) return undefined
+
+    clearDocumentTextSelection()
+
+    const prevBodyUserSelect = document.body.style.userSelect
+    const prevBodyWebkitUserSelect = document.body.style.webkitUserSelect
+    const prevHtmlUserSelect = document.documentElement.style.userSelect
+    document.body.style.userSelect = 'none'
+    document.body.style.webkitUserSelect = 'none'
+    document.documentElement.style.userSelect = 'none'
+
+    const blockSelect = (e) => {
+      e.preventDefault()
+      clearDocumentTextSelection()
+    }
+    document.addEventListener('selectstart', blockSelect, true)
+    document.addEventListener('dragstart', blockSelect, true)
+
+    return () => {
+      document.body.style.userSelect = prevBodyUserSelect
+      document.body.style.webkitUserSelect = prevBodyWebkitUserSelect
+      document.documentElement.style.userSelect = prevHtmlUserSelect
+      document.removeEventListener('selectstart', blockSelect, true)
+      document.removeEventListener('dragstart', blockSelect, true)
+    }
+  }, [fabSelectionLock, repositioning])
 
   useEffect(() => {
     openRef.current = open
@@ -313,10 +349,12 @@ export default function LoungeDockArcCarouselPrototype({
         longPressTimerRef.current = window.setTimeout(() => {
           longPressTimerRef.current = 0
           if (!longPressArmedRef.current) return
+          clearDocumentTextSelection()
           repositioningRef.current = true
           setRepositioning(true)
         }, FAB_REPOSITION_LONG_PRESS_MS)
       }
+      if (!openRef.current) setFabSelectionLock(true)
       e.currentTarget.setPointerCapture(e.pointerId)
     },
     [cancelFabLongPress],
@@ -339,7 +377,10 @@ export default function LoungeDockArcCarouselPrototype({
         }
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
         drag.dragging = true
+        clearDocumentTextSelection()
       }
+
+      if (repositioningRef.current) e.preventDefault()
 
       const next = clampFabPos(drag.originLeft + dx, drag.originTop + dy)
       fabPosRef.current = next
@@ -353,6 +394,8 @@ export default function LoungeDockArcCarouselPrototype({
       const drag = fabDragRef.current
       if (!drag || drag.pointerId !== e.pointerId) return
       fabDragRef.current = null
+      setFabSelectionLock(false)
+      clearDocumentTextSelection()
 
       if (drag.dragging && repositioningRef.current) {
         persistFabPrefs(fabPosRef.current)
@@ -381,6 +424,8 @@ export default function LoungeDockArcCarouselPrototype({
     (e) => {
       const drag = fabDragRef.current
       if (!drag || drag.pointerId !== e.pointerId) return
+      setFabSelectionLock(false)
+      clearDocumentTextSelection()
       if (drag.dragging && repositioningRef.current) persistFabPrefs(fabPosRef.current)
       endFabReposition()
       fabDragRef.current = null
@@ -747,20 +792,24 @@ export default function LoungeDockArcCarouselPrototype({
           onPointerMove={onFabPointerMove}
           onPointerUp={onFabPointerUp}
           onPointerCancel={onFabPointerCancel}
-          className={`pointer-events-auto absolute inset-0 rounded-full border-0 transition-[box-shadow,background-color,color] duration-300 ease-out [-webkit-tap-highlight-color:transparent] ${loungeDockFabCenterShadowClass(open)} ${
+          onContextMenu={(e) => {
+            if (repositioning || fabSelectionLock) e.preventDefault()
+          }}
+          className={`pointer-events-auto absolute inset-0 select-none rounded-full border-0 transition-[box-shadow,background-color,color] duration-300 ease-out [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] [-webkit-user-select:none] ${loungeDockFabCenterShadowClass(open)} ${
             open
               ? `${LOUNGE_DOCK_FAB_CENTER_GLOW.bgOpen} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text}`
               : `${LOUNGE_DOCK_FAB_CENTER_GLOW.bg} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text}`
           }`}
           style={{
-            touchAction: open || repositioning ? 'manipulation' : 'none',
+            touchAction: 'none',
             pointerEvents: fabVisible ? 'auto' : 'none',
           }}
         >
           <span
-            className={`block text-xl font-semibold leading-none text-black transition-transform duration-300 ${
+            className={`pointer-events-none block select-none text-xl font-semibold leading-none text-black transition-transform duration-300 ${
               open ? 'rotate-45' : ''
             }`}
+            aria-hidden
           >
             +
           </span>
