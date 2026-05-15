@@ -576,17 +576,15 @@ export default function LoungeDockArcCarouselPrototype({
         dragging: false,
       }
       cancelFabLongPress()
-      if (!openRef.current) {
-        longPressArmedRef.current = true
-        longPressTimerRef.current = window.setTimeout(() => {
-          longPressTimerRef.current = 0
-          if (!longPressArmedRef.current) return
-          clearDocumentTextSelection()
-          repositioningRef.current = true
-          setRepositioning(true)
-        }, FAB_REPOSITION_LONG_PRESS_MS)
-      }
-      if (!openRef.current) setFabSelectionLock(true)
+      longPressArmedRef.current = true
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTimerRef.current = 0
+        if (!longPressArmedRef.current) return
+        clearDocumentTextSelection()
+        repositioningRef.current = true
+        setRepositioning(true)
+      }, FAB_REPOSITION_LONG_PRESS_MS)
+      setFabSelectionLock(true)
       e.currentTarget.setPointerCapture(e.pointerId)
     },
     [cancelFabLongPress],
