@@ -101,7 +101,7 @@ export default function LoungeDockSlidePanels({
   }, [communityPosts, q])
 
   const panelTitleBarChromePx = panelTitleBarHeight > 0 ? panelTitleBarHeight : 56
-  const scrollBottomInsetPx = dockChromeHeightFromTitleBarPx(panelTitleBarChromePx) + 6
+  const scrollBottomInsetPx = loungeDockFabScrollBottomInsetPx()
   const titleHidePx = panelTitleBarHeight > 0 ? panelTitleBarHeight : 56
   const scrollPaddingTopPx = viewportTitleTopPx + panelTitleBarChromePx
 
