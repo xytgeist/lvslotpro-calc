@@ -2,6 +2,14 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
 import { isLoungePostShareId } from '../../utils/loungeSharePost'
+import {
+  fetchLoungeFollowingAuthorIds,
+  LOUNGE_FEED_SCOPE_ALL,
+  LOUNGE_FEED_SCOPE_FOLLOWING,
+  loungeFeedPageQuery,
+  loungeFeedPageQueryAfterCursor,
+  loungeFeedPinnedQuery,
+} from '../../utils/loungeFeedScope'
 import { renderRichCaption } from '../lounge/loungeCaption'
 import {
   OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX,
@@ -67,6 +75,9 @@ export default function AppShell({
   const [communityFeedCursor, setCommunityFeedCursor] = useState(null)
   /** Set when the feed query fails (e.g. missing column); avoids showing “no posts” when posts exist but select failed. */
   const [communityFeedQueryErr, setCommunityFeedQueryErr] = useState('')
+  const [loungeFeedScope, setLoungeFeedScope] = useState(LOUNGE_FEED_SCOPE_ALL)
+  const loungeFeedScopeRef = useRef(loungeFeedScope)
+  loungeFeedScopeRef.current = loungeFeedScope
   /** True while the first page of the Lounge feed is being reloaded (including silent pull-to-refresh). */
   const communityFeedHeadReloadingRef = useRef(false)
   const iosPwaGlobalPromptShownRef = useRef(false)
@@ -221,28 +232,39 @@ export default function AppShell({
 
   const loadCommunityFeed = useCallback(async (opts) => {
     const silent = opts?.silent === true
+    const scope = opts?.scope ?? loungeFeedScopeRef.current
     if (!silent) {
       setCommunityFeedLoading(true)
       setCommunityFeedLoadingMore(false)
     }
     communityFeedHeadReloadingRef.current = true
     try {
-      const selectCols =
-        'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height'
+      let followingAuthorIds = null
+      if (scope === LOUNGE_FEED_SCOPE_FOLLOWING) {
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        const viewerId = session?.user?.id
+        if (!viewerId) {
+          setCommunityFeedQueryErr('')
+          setCommunityPosts([])
+          setCommunityFeedHasMore(false)
+          setCommunityFeedCursor(null)
+          return
+        }
+        followingAuthorIds = await fetchLoungeFollowingAuthorIds(supabaseClient, viewerId)
+        if (followingAuthorIds.length === 0) {
+          setCommunityFeedQueryErr('')
+          setCommunityPosts([])
+          setCommunityFeedHasMore(false)
+          setCommunityFeedCursor(null)
+          return
+        }
+      }
+
       const [{ data: pinnedRows }, { data: rows, error }] = await Promise.all([
-        supabaseClient
-          .from('community_feed_posts')
-          .select(selectCols)
-          .eq('pinned', true)
-          .order('created_at', { ascending: false })
-          .limit(2),
-        supabaseClient
-          .from('community_feed_posts')
-          .select(selectCols)
-          .eq('pinned', false)
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(COMMUNITY_FEED_PAGE_SIZE + 1),
+        loungeFeedPinnedQuery(supabaseClient, scope, followingAuthorIds),
+        loungeFeedPageQuery(supabaseClient, scope, followingAuthorIds, COMMUNITY_FEED_PAGE_SIZE + 1),
       ])
 
       if (error) {
@@ -265,11 +287,37 @@ export default function AppShell({
       setCommunityPosts(hydrated)
       setCommunityFeedHasMore(hasMore)
       setCommunityFeedCursor(pageLast ? { created_at: pageLast.created_at, id: pageLast.id } : null)
+    } catch (e) {
+      setCommunityFeedQueryErr(String(e?.message || 'Could not load feed.'))
+      setCommunityPosts([])
+      setCommunityFeedHasMore(false)
+      setCommunityFeedCursor(null)
     } finally {
       communityFeedHeadReloadingRef.current = false
       if (!silent) setCommunityFeedLoading(false)
     }
   }, [COMMUNITY_FEED_PAGE_SIZE, hydrateCommunityPosts, supabaseClient])
+
+  const onLoungeFeedScopeChange = useCallback(
+    (nextScope) => {
+      if (nextScope !== LOUNGE_FEED_SCOPE_ALL && nextScope !== LOUNGE_FEED_SCOPE_FOLLOWING) return
+      if (nextScope === LOUNGE_FEED_SCOPE_FOLLOWING && browseMode === 'anonymous') {
+        onRequireAuth?.('login')
+        return
+      }
+      setLoungeFeedScope(nextScope)
+      loungeFeedScopeRef.current = nextScope
+      void loadCommunityFeed({ scope: nextScope })
+    },
+    [browseMode, loadCommunityFeed, onRequireAuth],
+  )
+
+  useEffect(() => {
+    if (browseMode !== 'anonymous') return
+    if (loungeFeedScope !== LOUNGE_FEED_SCOPE_FOLLOWING) return
+    setLoungeFeedScope(LOUNGE_FEED_SCOPE_ALL)
+    loungeFeedScopeRef.current = LOUNGE_FEED_SCOPE_ALL
+  }, [browseMode, loungeFeedScope])
 
   const loadCommunityFeedRef = useRef(loadCommunityFeed)
   loadCommunityFeedRef.current = loadCommunityFeed
@@ -285,15 +333,25 @@ export default function AppShell({
       return
     setCommunityFeedLoadingMore(true)
     try {
-      const cursorFilter = `created_at.lt.${communityFeedCursor.created_at},and(created_at.eq.${communityFeedCursor.created_at},id.lt.${communityFeedCursor.id})`
-      const { data: rows, error } = await supabaseClient
-        .from('community_feed_posts')
-        .select('id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height')
-        .eq('pinned', false)
-        .or(cursorFilter)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(COMMUNITY_FEED_PAGE_SIZE + 1)
+      const scope = loungeFeedScopeRef.current
+      let followingAuthorIds = null
+      if (scope === LOUNGE_FEED_SCOPE_FOLLOWING) {
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        const viewerId = session?.user?.id
+        if (!viewerId) return
+        followingAuthorIds = await fetchLoungeFollowingAuthorIds(supabaseClient, viewerId)
+        if (followingAuthorIds.length === 0) return
+      }
+
+      const { data: rows, error } = await loungeFeedPageQueryAfterCursor(
+        supabaseClient,
+        scope,
+        followingAuthorIds,
+        communityFeedCursor,
+        COMMUNITY_FEED_PAGE_SIZE + 1,
+      )
 
       if (error) return
 
@@ -493,6 +551,9 @@ export default function AppShell({
             titleBarNavSlot={renderTitleBarNavSlot()}
             hasActiveSubscription={hasActiveSubscription}
             isStaff={isStaff}
+            loungeFeedScope={loungeFeedScope}
+            onLoungeFeedScopeChange={onLoungeFeedScopeChange}
+            loungeFeedBrowseMode={browseMode}
           />
         </div>
       </Suspense>

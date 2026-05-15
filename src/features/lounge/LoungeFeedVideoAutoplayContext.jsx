@@ -56,16 +56,37 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
     }
   }, [store, scrollRootRef])
 
+  const resetFeedInlineSound = useCallback(() => {
+    setFeedInlineSoundUnmuted(false)
+  }, [])
+
   const value = useMemo(
     () => ({
       store,
       feedInlineSoundUnmuted,
       toggleFeedInlineSound,
+      resetFeedInlineSound,
     }),
-    [store, feedInlineSoundUnmuted, toggleFeedInlineSound],
+    [store, feedInlineSoundUnmuted, toggleFeedInlineSound, resetFeedInlineSound],
   )
 
   return <LoungeFeedVideoAutoplayContext.Provider value={value}>{children}</LoungeFeedVideoAutoplayContext.Provider>
+}
+
+/**
+ * Binds `resetRef.current` to `resetFeedInlineSound` from the nearest provider (for callers outside the subtree).
+ * @param {{ resetRef: React.MutableRefObject<() => void> }} props
+ */
+export function LoungeFeedInlineSoundResetBinder({ resetRef }) {
+  const ctx = useContext(LoungeFeedVideoAutoplayContext)
+  useLayoutEffect(() => {
+    const fn = ctx?.resetFeedInlineSound
+    resetRef.current = typeof fn === 'function' ? fn : () => {}
+    return () => {
+      resetRef.current = () => {}
+    }
+  }, [ctx, resetRef])
+  return null
 }
 
 /**

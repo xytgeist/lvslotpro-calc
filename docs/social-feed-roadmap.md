@@ -84,6 +84,7 @@ Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity)
 - Home feed:
   - Latest mode
   - infinite scroll cursor on `(created_at, id)`
+  - **Following tab (planned):** signed-in **Following** slice — posts where `user_id` is in the viewer’s **`profile_follows`**; separate from global home; empty state + query/index + `SocialFeed` tab UI — track in **`docs/test-buildout-backlog.md`** → *Planned (Lounge feed)*.
 - Pinned behavior:
   - prepend one pinned row (single query strategy or two-step fetch)
 - Logged-out UX:

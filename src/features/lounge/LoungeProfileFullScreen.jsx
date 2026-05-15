@@ -1170,6 +1170,9 @@ export default function LoungeProfileFullScreen({
             }}
             onHome={shellDock.onHome}
             onSearch={shellDock.onSearch}
+            onFollowingFilterToggle={shellDock.onFollowingFilterToggle}
+            followingFilterOn={shellDock.followingFilterOn ?? false}
+            followingFilterDisabled={shellDock.followingFilterDisabled ?? false}
             onNotifications={shellDock.onNotifications}
             onChat={shellDock.onChat}
             activePanel={shellDock.activePanel}

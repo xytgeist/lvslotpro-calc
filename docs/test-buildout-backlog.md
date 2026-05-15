@@ -43,6 +43,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ---
 
+## Planned (Lounge feed — not started)
+
+- [x] **Following filter on Lounge home:** **All** / **Following** segmented control (`LoungeFeedScopeSwitch.jsx`); **`profile_follows`**-scoped feed queries in **`AppShell.jsx`** via **`loungeFeedScope.js`**; session-persisted scope; empty states. **Test on test** before prod sign-off.
+
+---
+
 ## Planned (partner / server API — medium priority)
 
 - [ ] **Lounge — trusted partner auto-post (HTTP API):** Let an external system (cron, Zapier, another product’s backend) publish **text-first** Lounge posts **without** a browser session. **Do not** share Supabase **service role** with the partner; they call **your** URL only (e.g. **Vercel serverless** or **Supabase Edge Function**). **Auth:** `Authorization: Bearer <integration secret>` (rotate in env); optional **IP allowlist**; **`Idempotency-Key`** header to dedupe retries; tight **rate limit** (e.g. a few posts per day per key). **Implementation sketch:** server validates secret, then uses **service-role** Supabase on **your** side to `insert` into **`community_feed_posts`** with fixed **`user_id`** = a **dedicated** `auth.users` row + **`profiles`** (clear handle for attribution). Align insert columns with **`communityFeedPostInsertPayload`** in `src/utils/communityFeedPost.js` (caption ≤280; optional `game_title` / `game_slug`; extend later for image URL if product allows). **Watch:** existing **`rate_limit_events`** / `BEFORE INSERT` guard on posts (`feed_phase_a_profiles_public_read.sql` §A4) may apply to that user — decide exempt vs. partner account tuned for low volume. **Test validation:** `curl` happy path + wrong secret + duplicate idempotency key; confirm feed row + author profile in app. **Production replay:** env var names in `production-rollout-checklist.md` §1; add Edge row + §4 if shipped as a function.
@@ -264,6 +270,9 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-14: **Lounge Following feed filter:** **All** / **Following** switch on home (`LoungeFeedScopeSwitch`, `loungeFeedScope.js`, `AppShell` load/more queries). Backlog item checked; smoke on test pending.
+- 2026-05-14: **Planned (Lounge feed):** **Following** tab on Lounge home — backlog checkbox + Phase B roadmap note (`profile_follows`–scoped feed).
+- 2026-05-14: **Lounge feed Stream sound:** opening **post detail** resets **inline “Tap for sound”** to muted on the feed (`LoungeFeedVideoAutoplayContext` `resetFeedInlineSound` + `LoungeFeedInlineSoundResetBinder` in **`SocialFeed.jsx`**).
 - 2026-05-14: **Lounge nested comments (post detail):** `feed_comments.parent_id` threaded UI — **`LoungePostCommentThread.jsx`**, **`loungeFeedComments.js`**; **`SocialFeed.jsx`** loads full comment tree, Reply targets parent, **Show replies** expands; **post author** replies in a subtree show without expanding other replies. `comment_count` still top-level only (existing SQL).
 - 2026-05-13: **Chat RLS:** `chat_room_members` SELECT policy no longer uses `EXISTS` on the same table (Postgres **infinite recursion**). Policy is **own membership rows only**; **`LoungeChatPanel`** resolves DM peer display from **`chat_rooms.dm_key`**. Patch file **`supabase/chat_room_members_rls_recursion_fix.sql`** for DBs that already ran the old policy.
 - 2026-05-13: **Lounge chat MVP (wiring):** `LoungeChatPanel.jsx` + `loungeChatApi.js` / `loungeChatConstants.js`; **`LoungeDockSlidePanels.jsx`** embeds chat (flex scroll host for `h-full` panel); **`SocialFeed.jsx`** dock props + `chatDockInitialPeerUserId` / **`openChatWithUserFromProfile`**; **`AppShell.jsx`** passes **`hasActiveSubscription`** / **`isStaff`**; **`LoungeProfileFullScreen.jsx`** Message beside Follow. SQL **`supabase/chat_phase1.sql`** + Edge **`lounge-chat`** + test smoke **§13** documented in **`docs/test-buildout-backlog.md`** (apply SQL + deploy before validation).

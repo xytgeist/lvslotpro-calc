@@ -40,6 +40,9 @@ export default function LoungeDockSlidePanels({
   communityFeedLoading = false,
   onHome,
   onSearch,
+  onFollowingFilterToggle,
+  followingFilterOn = false,
+  followingFilterDisabled = false,
   onNotifications,
   onChat,
   onDockFooterHeightChange,
@@ -441,6 +444,9 @@ export default function LoungeDockSlidePanels({
           onHeightChange={onDockFooterHeightChange}
           onHome={onHome}
           onSearch={onSearch}
+          onFollowingFilterToggle={onFollowingFilterToggle}
+          followingFilterOn={followingFilterOn}
+          followingFilterDisabled={followingFilterDisabled}
           onNotifications={onNotifications}
           onChat={onChat}
           activePanel={activePanel}

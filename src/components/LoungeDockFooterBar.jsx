@@ -1,4 +1,11 @@
 import { useId, useLayoutEffect, useRef } from 'react'
+import {
+  LOUNGE_FOLLOWING_DOCK_VIEWBOX,
+  LOUNGE_FOLLOWING_PERSON_D,
+  LOUNGE_FOLLOWING_PLUS_D,
+  loungeFollowingArtStrokeWidth,
+  loungeFollowingDockTransform,
+} from '../assets/icons/loungeFollowingIcon.js'
 import { dockChromeHeightFromTitleBarPx } from '../utils/loungeDockChrome.js'
 
 const stroke = {
@@ -99,6 +106,41 @@ function IconChat({ className }) {
   )
 }
 
+const FOLLOWING_CYAN = '#22d3ee'
+
+const followingDockTransform = loungeFollowingDockTransform()
+
+const followingArtStrokeWidth = loungeFollowingArtStrokeWidth(stroke.strokeWidth)
+
+/** From `src/assets/icons/lounge-following.svg` — off: grey person + cyan plus; on: all cyan fill. */
+function IconFollowing({ className, active = false }) {
+  const personFill = active ? FOLLOWING_CYAN : 'currentColor'
+  const plusFill = FOLLOWING_CYAN
+  const filledPath = (fill) => ({
+    fill,
+    stroke: fill,
+    strokeWidth: followingArtStrokeWidth,
+    strokeLinejoin: 'round',
+    strokeLinecap: 'round',
+    paintOrder: 'stroke fill',
+  })
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox={LOUNGE_FOLLOWING_DOCK_VIEWBOX}
+      className={className}
+      aria-hidden
+      fill="none"
+    >
+      <g transform={followingDockTransform}>
+        <path {...filledPath(personFill)} d={LOUNGE_FOLLOWING_PERSON_D} />
+        <path {...filledPath(plusFill)} d={LOUNGE_FOLLOWING_PLUS_D} />
+      </g>
+    </svg>
+  )
+}
+
 /** Until ResizeObserver reports full footer height, underestimate safe-area for slide math (corrected next frame). */
 const FALLBACK_SAFE_BOTTOM_PX = 40
 
@@ -118,6 +160,9 @@ export default function LoungeDockFooterBar({
   onHeightChange,
   onHome,
   onSearch,
+  onFollowingFilterToggle,
+  followingFilterOn = false,
+  followingFilterDisabled = false,
   onNotifications,
   onChat,
   activePanel = null,
@@ -148,13 +193,15 @@ export default function LoungeDockFooterBar({
     return () => ro.disconnect()
   }, [onHeightChange, layout, matchTitleBarHeightPx, dockChromePx])
 
-  const dockBtn = (active, onClick, label, children) => (
+  const dockBtn = (active, onClick, label, children, { pressed = false, disabled = false } = {}) => (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
-      aria-current={active ? 'page' : undefined}
-      className={`flex min-w-0 flex-1 touch-manipulation items-center justify-center bg-transparent px-1 [-webkit-tap-highlight-color:transparent] transition-colors duration-150 ${
+      aria-current={pressed ? undefined : active ? 'page' : undefined}
+      aria-pressed={pressed ? active : undefined}
+      className={`flex min-w-0 flex-1 touch-manipulation items-center justify-center bg-transparent px-1 [-webkit-tap-highlight-color:transparent] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${
         useMatchedChrome ? 'h-full min-h-0 py-0' : 'min-h-10 py-0.5'
       } ${active ? 'text-cyan-300' : 'text-zinc-400 hover:text-zinc-100'}`}
     >
@@ -163,10 +210,20 @@ export default function LoungeDockFooterBar({
   )
 
   const dockIconClass = 'h-8 w-8 shrink-0 translate-y-1 opacity-95'
+  const followingLabel = followingFilterOn
+    ? 'Following feed on — show all posts'
+    : 'Following feed — show posts from people you follow'
   const dockIcons = (
     <>
       {dockBtn(false, onHome, 'Home', <IconHome className={dockIconClass} />)}
       {dockBtn(activePanel === 'search', onSearch, 'Search', <IconSearch className={dockIconClass} />)}
+      {dockBtn(
+        followingFilterOn,
+        onFollowingFilterToggle,
+        followingLabel,
+        <IconFollowing className={dockIconClass} active={followingFilterOn} />,
+        { pressed: true, disabled: followingFilterDisabled },
+      )}
       {dockBtn(
         activePanel === 'notifications',
         onNotifications,

@@ -61,7 +61,7 @@ import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFee
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
-import { LoungeFeedVideoAutoplayProvider } from './LoungeFeedVideoAutoplayContext.jsx'
+import { LoungeFeedInlineSoundResetBinder, LoungeFeedVideoAutoplayProvider } from './LoungeFeedVideoAutoplayContext.jsx'
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
@@ -71,6 +71,8 @@ import { pinLoungeStreamSessionPoster, releaseLoungeStreamSessionPoster } from '
 import KlipyGifPicker from './KlipyGifPicker.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
+import LoungeDockArcCarouselPrototype from '../../components/LoungeDockArcCarouselPrototype.jsx'
+import { buildLoungeDockArcCarouselItems } from '../../components/loungeDockArcCarouselItems.jsx'
 import { dockChromeHeightFromTitleBarPx } from '../../utils/loungeDockChrome.js'
 import {
   loungeTitleRevealAfterScrollStep,
@@ -78,6 +80,7 @@ import {
 } from '../../utils/loungeTitleRevealScroll.js'
 import LoungeDockSlidePanels from '../../components/LoungeDockSlidePanels.jsx'
 import LoungePostCommentThread from './LoungePostCommentThread.jsx'
+import { LOUNGE_FEED_SCOPE_ALL, LOUNGE_FEED_SCOPE_FOLLOWING } from '../../utils/loungeFeedScope'
 import { loungeCommentRootId } from '../../utils/loungeFeedComments.js'
 
 /** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
@@ -169,6 +172,9 @@ export default function SocialFeed({
   /** Shell subscription + staff (topic channels); merged in-feed with profile role where useful. */
   hasActiveSubscription = false,
   isStaff = false,
+  loungeFeedScope = LOUNGE_FEED_SCOPE_ALL,
+  onLoungeFeedScopeChange,
+  loungeFeedBrowseMode = 'member',
 }) {
   const BOOKMARKS_STORAGE_KEY = 'lounge_bookmarks_v1'
   const loungeComposerBoot = () => {
@@ -358,6 +364,8 @@ export default function SocialFeed({
   const loungeDetailEditMirrorRef = useRef(null)
   const loungeDetailEditMediaInputRef = useRef(null)
   const loungeFeedScrollRef = useRef(null)
+  /** Bound inside `LoungeFeedVideoAutoplayProvider` — reset feed inline sound when opening post detail. */
+  const resetFeedInlineSoundRef = useRef(() => {})
   const loungeTitleBarRef = useRef(null)
   const loungeScrollPrevTopRef = useRef(0)
   const loungeTitleRevealRef = useRef(1)
@@ -2161,6 +2169,11 @@ export default function SocialFeed({
         onRequireAuth?.('login')
         return
       }
+      try {
+        resetFeedInlineSoundRef.current?.()
+      } catch {
+        /* ignore */
+      }
       const wantEdit = opts?.startEditing === true
       const tid = loungePostDetailCloseFallbackTimerRef.current
       if (tid) {
@@ -2251,6 +2264,18 @@ export default function SocialFeed({
       return 'chat'
     })
   }, [])
+
+  const loungeFollowingFilterOn = loungeFeedScope === LOUNGE_FEED_SCOPE_FOLLOWING
+
+  const onLoungeFollowingFilterToggle = useCallback(() => {
+    if (loungeFeedBrowseMode === 'anonymous') {
+      onRequireAuth?.('login')
+      return
+    }
+    const next =
+      loungeFeedScope === LOUNGE_FEED_SCOPE_FOLLOWING ? LOUNGE_FEED_SCOPE_ALL : LOUNGE_FEED_SCOPE_FOLLOWING
+    onLoungeFeedScopeChange?.(next)
+  }, [loungeFeedBrowseMode, loungeFeedScope, onLoungeFeedScopeChange, onRequireAuth])
 
   const clearChatDockInitialPeer = useCallback(() => setChatDockInitialPeerUserId(null), [])
 
@@ -4146,6 +4171,30 @@ export default function SocialFeed({
     : 0
   const loungeFeedDockPaddingBottom = loungeDockFeedContentInsetPx
 
+  const loungeArcCarouselItems = useMemo(
+    () =>
+      buildLoungeDockArcCarouselItems({
+        onHome: onLoungeDockHome,
+        onSearch: onLoungeDockSearch,
+        onFollowingFilterToggle: onLoungeFollowingFilterToggle,
+        followingFilterOn: loungeFollowingFilterOn,
+        followingFilterDisabled: loungeFeedBrowseMode === 'anonymous',
+        onNotifications: onLoungeDockNotifications,
+        onChat: onLoungeDockChat,
+        activePanel: loungeDockPanel,
+      }),
+    [
+      onLoungeDockHome,
+      onLoungeDockSearch,
+      onLoungeFollowingFilterToggle,
+      loungeFollowingFilterOn,
+      loungeFeedBrowseMode,
+      onLoungeDockNotifications,
+      onLoungeDockChat,
+      loungeDockPanel,
+    ],
+  )
+
   return (
     <div
       className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden bg-zinc-950 pt-[max(0px,env(safe-area-inset-top))] pb-0`}
@@ -4201,11 +4250,18 @@ export default function SocialFeed({
           onHeightChange={onLoungeDockFooterHeight}
           onHome={onLoungeDockHome}
           onSearch={onLoungeDockSearch}
+          onFollowingFilterToggle={onLoungeFollowingFilterToggle}
+          followingFilterOn={loungeFollowingFilterOn}
+          followingFilterDisabled={loungeFeedBrowseMode === 'anonymous'}
           onNotifications={onLoungeDockNotifications}
           onChat={onLoungeDockChat}
           activePanel={loungeDockPanel}
           layout="viewport"
         />
+      ) : null}
+
+      {showLoungeViewportDock && !loungeDockPanel ? (
+        <LoungeDockArcCarouselPrototype items={loungeArcCarouselItems} />
       ) : null}
 
       <div
@@ -4214,6 +4270,7 @@ export default function SocialFeed({
         style={loungeFeedDockPaddingBottom > 0 ? { paddingBottom: loungeFeedDockPaddingBottom } : undefined}
       >
         <LoungeFeedVideoAutoplayProvider scrollRootRef={loungeFeedScrollRef}>
+        <LoungeFeedInlineSoundResetBinder resetRef={resetFeedInlineSoundRef} />
         <div
           aria-hidden
           className="shrink-0"
@@ -4803,6 +4860,11 @@ export default function SocialFeed({
                   request, fix the Supabase schema or RLS issue, then pull to refresh.
                 </p>
               )}
+            </div>
+          ) : loungeFeedScope === LOUNGE_FEED_SCOPE_FOLLOWING ? (
+            <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
+              No posts from people you follow yet. Follow members from their profile, or switch back to{' '}
+              <span className="text-zinc-300">All</span> to see the full lounge.
             </div>
           ) : (
             <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
@@ -5815,6 +5877,9 @@ export default function SocialFeed({
           communityFeedLoading={communityFeedLoading}
           onHome={onLoungeDockHome}
           onSearch={onLoungeDockSearch}
+          onFollowingFilterToggle={onLoungeFollowingFilterToggle}
+          followingFilterOn={loungeFollowingFilterOn}
+          followingFilterDisabled={loungeFeedBrowseMode === 'anonymous'}
           onNotifications={onLoungeDockNotifications}
           onChat={onLoungeDockChat}
           onDockFooterHeightChange={onLoungeDockFooterHeight}
@@ -5851,6 +5916,9 @@ export default function SocialFeed({
             activePanel: loungeDockPanel,
             onHome: onLoungeDockHome,
             onSearch: onLoungeDockSearch,
+            onFollowingFilterToggle: onLoungeFollowingFilterToggle,
+            followingFilterOn: loungeFollowingFilterOn,
+            followingFilterDisabled: loungeFeedBrowseMode === 'anonymous',
             onNotifications: onLoungeDockNotifications,
             onChat: onLoungeDockChat,
           }}
