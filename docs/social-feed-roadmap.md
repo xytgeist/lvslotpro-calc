@@ -159,7 +159,7 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 ## Phase E - Comments (threaded)
 
-- **Shipped (test, first slice):** `supabase/feed_interactions_phase_ef.sql` defines `feed_comments` + RLS + top-level-only post `comment_count` triggers; Lounge post detail has a flat comment list + reply composer (`SocialFeed.jsx`). Threading, ranking, and anon teaser rules below are not all implemented yet.
+- **Shipped (test, first slice):** `supabase/feed_interactions_phase_ef.sql` defines `feed_comments` + RLS + top-level-only post `comment_count` triggers; Lounge post detail lists **top-level** comments and drill-down for full threads. **Inline OP replies (post detail only):** replies authored by the **post owner** (`user_id === post.user_id`) with `parent_id` set to a **root** comment render **below** that parent in `LoungePostCommentThread.jsx` with the **same horizontal layout** as other comments; a **vertical connector** at the parent avatar column marks the thread (other replies stay drill-down only). Threading, ranking, and anon teaser rules below are not all implemented yet.
 - Table: `feed_comments` with `parent_id`, `post_id`, `body` (max **280** chars, same as post captions), `created_at`, `edited_at`, `hidden_at`.
 - RLS:
   - logged-out: no full comment body access (counts/teasers only as needed)
@@ -173,7 +173,7 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 ## Phase F - Likes + counts
 
-- **Shipped (test, first slice):** `post_likes`, `post_reposts`, `post_bookmarks` + triggers on `like_count` / `repost_count` in `feed_interactions_phase_ef.sql`; Lounge wiring persists toggles. `comment_likes` and periodic reconcile are still out of scope.
+- **Shipped (test, first slice):** `post_likes`, `post_reposts`, `post_bookmarks` + triggers on `like_count` / `repost_count` in `feed_interactions_phase_ef.sql`; Lounge wiring persists toggles. **Per-comment** interactions: **`feed_comment_likes`**, **`feed_comment_reposts`**, **`feed_comment_bookmarks`** + denormalized counts on **`feed_comments`** (migration **`20260515190000_feed_comment_interactions.sql`** + §5b in the same canonical SQL); post-detail comment rows use their own counts/toggles in **`SocialFeed.jsx`** / **`LoungePostCommentThread.jsx`**. Periodic reconcile for counts remains optional / out of scope.
 - **UX (test):** **Repost** opens a **fixed popover above the stat** (plain / quote / undo / remove quote as applicable) on feed + post detail; removed bottom-sheet “repost manage” for consistency.
 - `post_likes` and `comment_likes` with unique `(user_id, target)` constraints.
 - Count updates via triggers initially; periodic reconcile optional later.

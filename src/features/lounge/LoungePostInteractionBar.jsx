@@ -1,16 +1,20 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
-import LoungeFeedStatSlot from './LoungeFeedStatSlot'
-import { LoungeLikeStatContent } from './LoungeFlameIcon.jsx'
+import LoungeFlameIcon from './LoungeFlameIcon.jsx'
+import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
 
 /**
  * Comment / repost / like / bookmark row — same behavior as the feed post row or post-detail sheet.
- * Layout: `flex` + `justify-between` so spacing between the four clusters is even (grid `1fr` columns skewed when outer columns differ in width).
+ * Layout: **equal gaps between the four primary glyphs** — `flex` + `justify-between` with each rail’s
+ * **width fixed to its icon box**; counts hang at `left-full` and do not shift icons. Comment aligns
+ * caption-left; bookmark aligns caption-right (full-width row matches the caption band).
  *
- * @param {'feed' | 'sheet'} [props.variant='feed'] — `feed`: fixed portaled repost menus (feed card). `sheet`: absolute repost dropdown (post detail sheet styling).
+ * @param {'feed' | 'sheet' | 'comment'} [props.variant='feed'] — `feed`: portaled repost menus (feed card). `sheet`: post detail / lightbox row (larger glyphs). **`comment`**: under comment bodies — **smaller glyphs**, same repost behavior as `sheet` (inline menu).
  * @param {string} [props.repostMenuPortalClass='z-[48]'] — Tailwind z class for portaled repost menus (`feed` only). Use `z-[101]` above media lightboxes (`z-[100]`).
  * @param {() => void} [props.onCommentClick] — When set, runs instead of `onOpenComments` / `toggleInteraction('commented')` for the comment control.
+ * @param {(id: string) => void | Promise<unknown>} [props.onToggleLike] — When set, like control calls this with `post.id` instead of `toggleInteraction(post.id, 'liked')` (e.g. feed comment likes).
+ * @param {(id: string) => void | Promise<unknown>} [props.onToggleBookmark] — When set, bookmark control calls this with `post.id` instead of `toggleBookmark(post.id)`.
+ * @param {(id: string) => boolean} [props.getBookmarked] — When set, used instead of `bookmarkedByPost[id]` to decide bookmark highlight.
  * @param {boolean} [props.repostActionBusy=false] — Disables repost menu actions (`sheet` only).
  */
 export default function LoungePostInteractionBar({
@@ -31,6 +35,9 @@ export default function LoungePostInteractionBar({
   variant = 'feed',
   repostMenuPortalClass = 'z-[48]',
   onCommentClick,
+  onToggleLike,
+  onToggleBookmark,
+  getBookmarked,
   repostActionBusy = false,
   /** Extra classes on the outer grid wrapper (e.g. `w-full` in lightbox). */
   rootClassName = '',
@@ -40,7 +47,8 @@ export default function LoungePostInteractionBar({
   const repostMenuRef = useRef(null)
   const repostMenuPortalRef = useRef(null)
   const [repostMenuFixed, setRepostMenuFixed] = useState({ top: 0, left: 0 })
-  const isBookmarked = !!bookmarkedByPost[post.id]
+  const isBookmarked =
+    typeof getBookmarked === 'function' ? !!getBookmarked(post.id) : !!bookmarkedByPost[post.id]
   const baseComments = typeof post.comment_count === 'number' ? post.comment_count : 0
   const baseLikes = typeof post.like_count === 'number' ? post.like_count : 0
   const baseReposts = typeof post.repost_count === 'number' ? post.repost_count : 0
@@ -54,18 +62,34 @@ export default function LoungePostInteractionBar({
   const bookmarkClass = ro ? 'text-zinc-600' : isBookmarked ? 'text-lv-yellow' : 'text-zinc-500'
   const plainId = ui.plainRepostChildId
   const quoteId = ui.quoteRepostChildId
+  const commentBubbleD =
+    'M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z'
+  const bookmarkRibbonD =
+    'M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z'
+  /** Filled only when the viewer has that interaction; idle + read-only stay outline like repost. */
+  const commentGlyphFilled = !ro && ui.commented
+  const bookmarkGlyphFilled = !ro && isBookmarked
 
   const isFeed = variant === 'feed'
-  const iconSz = isFeed ? 'h-[22px] w-[22px]' : 'h-[24px] w-[24px]'
+  const isComment = variant === 'comment'
+  /** Feed + comment-thread rows: tighter stat padding; sheet = post detail / lightbox. */
+  const statsCompact = isFeed || isComment
+  /** `justify-between` flex basis = glyph width only (px), so inter-icon gaps match (L − Σw) / 3. */
+  const slotComment = isComment ? 20 : isFeed ? 22 : 24
+  const slotRepost = isComment ? 20 : isFeed ? 22 : 24
+  const slotLike = isComment ? 20 : isFeed ? 22 : 24
+  const slotBookmark = isComment ? 22 : isFeed ? 24 : 26
+  const railMinH = isComment ? 30 : isFeed ? 32 : 44
+  const iconSz = isComment ? 'h-[20px] w-[20px]' : isFeed ? 'h-[22px] w-[22px]' : 'h-[24px] w-[24px]'
   /** Bubble glyph sits low in the 20 viewBox — slight Y stretch so it matches the chip visually */
-  const iconSzComment = isFeed
-    ? 'h-[22px] w-[22px] origin-center scale-y-[1.1]'
-    : 'h-[24px] w-[24px] origin-center scale-y-[1.1]'
-  /** Matches `LoungeLikeStatContent` icon column — center glyph so gap to count matches the chip */
-  const iconColClass = isFeed ? 'w-[22px]' : 'w-[24px]'
+  const iconSzComment = isComment
+    ? 'h-[20px] w-[20px] origin-center scale-y-[1.1]'
+    : isFeed
+      ? 'h-[22px] w-[22px] origin-center scale-y-[1.1]'
+      : 'h-[24px] w-[24px] origin-center scale-y-[1.1]'
   /** Bookmark path is inset in the 20 viewBox — slightly larger box than other stats for visual parity with the chip */
-  const iconSzBookmark = isFeed ? 'h-[24px] w-[24px]' : 'h-[26px] w-[26px]'
-  /** Four clusters with equal space between neighbors (`justify-between`). */
+  const iconSzBookmark = isComment ? 'h-[22px] w-[22px]' : isFeed ? 'h-[24px] w-[24px]' : 'h-[26px] w-[26px]'
+  /** Stat hit targets (padding); inner layout is glyph rail + absolutely positioned count. */
   const statFeedComment =
     'inline-flex shrink-0 items-center gap-1.5 rounded px-1 py-1 hover:bg-zinc-900/70 touch-manipulation [-webkit-tap-highlight-color:transparent]'
   const statFeedMid =
@@ -131,8 +155,10 @@ export default function LoungePostInteractionBar({
   }
 
   const rowClass = isFeed
-    ? `flex w-full min-w-0 flex-nowrap items-center justify-between gap-x-1 text-[15px] ${rootClassName}`.trim()
-    : `flex w-full min-w-0 flex-nowrap items-center justify-between gap-x-1 text-[16px] ${rootClassName}`.trim()
+    ? `flex w-full min-w-0 flex-1 flex-nowrap items-center justify-between text-[15px] ${rootClassName}`.trim()
+    : isComment
+      ? `flex w-full min-w-0 flex-1 flex-nowrap items-center justify-between text-[14px] ${rootClassName}`.trim()
+      : `flex w-full min-w-0 flex-1 flex-nowrap items-center justify-between text-[16px] ${rootClassName}`.trim()
 
   const repostMenusFeed =
     typeof document !== 'undefined' &&
@@ -450,123 +476,162 @@ export default function LoungePostInteractionBar({
     ) : null
 
   return (
-    <div className={rowClass} onClick={(e) => e.stopPropagation()} role="group">
-        <LoungeFeedStatSlot
-          readOnly={ro}
-          title={ro ? 'Sign in to comment' : undefined}
-          onReadOnlyClick={requireLoungeAuth}
-          onClick={onComment}
-          className={isFeed ? statFeedComment : statSheetComment}
-        >
-          <span className={`flex shrink-0 justify-center ${iconColClass}`}>
-            <svg className={`block ${iconSzComment} ${commentClass}`} viewBox="0 0 20 20" aria-hidden>
+    <>
+      <div
+        className={rowClass}
+        data-lounge-post-interaction-bar
+        onClick={(e) => e.stopPropagation()}
+        role="group"
+      >
+      <LoungeInteractionGlyphRail
+        slotPx={slotComment}
+        glyphPx={slotComment}
+        railMinH={railMinH}
+        readOnly={ro}
+        title={ro ? 'Sign in to comment' : undefined}
+        onReadOnlyClick={requireLoungeAuth}
+        onClick={onComment}
+        statClass={statsCompact ? statFeedComment : statSheetComment}
+        glyph={
+          <svg className={`block shrink-0 ${iconSzComment} ${commentClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+            {commentGlyphFilled ? (
+              <path d={commentBubbleD} fill="currentColor" />
+            ) : (
               <path
-                d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z"
-                fill="currentColor"
+                d={commentBubbleD}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.25"
+                strokeLinejoin="round"
+                strokeLinecap="round"
               />
-            </svg>
-          </span>
-          {Number.isFinite(commentCount) ? (
-            <span className={commentClass} title={fullStatCountTitle(commentCount)}>
-              {formatCompactStatCount(commentCount)}
-            </span>
-          ) : null}
-        </LoungeFeedStatSlot>
-        <div className="relative shrink-0" ref={repostMenuRef}>
-          <LoungeFeedStatSlot
-            readOnly={ro}
-            title={ro ? 'Sign in to repost' : ui.reposted ? 'Repost options' : 'Repost or quote repost'}
-            onReadOnlyClick={requireLoungeAuth}
-            onClick={() => {
-              if (openProfileGateIfNeeded()) return
-              if (ui.reposted) {
-                setRepostMenuOpen((o) => !o)
-                return
-              }
-              if (onPlainRepost && onQuoteRepost) {
-                setRepostMenuOpen((o) => !o)
-                return
-              }
-              if (onQuoteRepost) {
-                onQuoteRepost(post)
-                return
-              }
-              void toggleInteraction(post.id, 'reposted')
-            }}
-            className={isFeed ? statFeedMid : statSheetMid}
-          >
-            <span className={`flex shrink-0 justify-center ${iconColClass}`}>
-              <svg className={`${iconSz} ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
-                <path
-                  d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
-                  stroke="currentColor"
-                  strokeWidth="1.35"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            {Number.isFinite(repostCount) ? (
-              <span className={repostClass} title={fullStatCountTitle(repostCount)}>
-                {formatCompactStatCount(repostCount)}
-              </span>
-            ) : null}
-          </LoungeFeedStatSlot>
-          {!isFeed ? repostMenuSheet : null}
-        </div>
-        {isFeed ? repostMenusFeed : null}
-        {isFeed ? repostMenusFeedNotReposted : null}
-        <div className="shrink-0">
-          <LoungeFeedStatSlot
-            readOnly={ro}
-            title={ro ? 'Sign in to like' : undefined}
-            onReadOnlyClick={requireLoungeAuth}
-            onClick={() => void toggleInteraction(post.id, 'liked')}
-            className={isFeed ? statFeedMid : statSheetMid}
-          >
-            <LoungeLikeStatContent
-              iconClassName={`${iconSz} ${likeClass}`}
-              countClassName={likeClass}
-              liked={ui.liked}
-              readOnly={ro}
-              likeCount={likeCount}
-              iconPx={isFeed ? 22 : 24}
+            )}
+          </svg>
+        }
+        countClass={commentClass}
+        countValue={commentCount}
+      />
+
+      <LoungeInteractionGlyphRail
+        railRef={repostMenuRef}
+        extraAfterStat={!isFeed ? repostMenuSheet : null}
+        slotPx={slotRepost}
+        glyphPx={slotRepost}
+        railMinH={railMinH}
+        readOnly={ro}
+        title={ro ? 'Sign in to repost' : ui.reposted ? 'Repost options' : 'Repost or quote repost'}
+        onReadOnlyClick={requireLoungeAuth}
+        onClick={() => {
+          if (openProfileGateIfNeeded()) return
+          if (ui.reposted) {
+            setRepostMenuOpen((o) => !o)
+            return
+          }
+          if (onPlainRepost && !onQuoteRepost) {
+            onPlainRepost(post)
+            return
+          }
+          if (onPlainRepost && onQuoteRepost) {
+            setRepostMenuOpen((o) => !o)
+            return
+          }
+          if (onQuoteRepost) {
+            onQuoteRepost(post)
+            return
+          }
+          void toggleInteraction(post.id, 'reposted')
+        }}
+        statClass={statsCompact ? statFeedMid : statSheetMid}
+        glyph={
+          <svg className={`block shrink-0 ${iconSz} ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+            <path
+              d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+              stroke="currentColor"
+              strokeWidth="1.35"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-          </LoungeFeedStatSlot>
-        </div>
+          </svg>
+        }
+        countClass={repostClass}
+        countValue={repostCount}
+      />
+
+      <LoungeInteractionGlyphRail
+        slotPx={slotLike}
+        glyphPx={slotLike}
+        railMinH={railMinH}
+        readOnly={ro}
+        title={ro ? 'Sign in to like' : undefined}
+        onReadOnlyClick={requireLoungeAuth}
+        onClick={() =>
+          typeof onToggleLike === 'function' ? void onToggleLike(post.id) : void toggleInteraction(post.id, 'liked')
+        }
+        statClass={statsCompact ? statFeedMid : statSheetMid}
+        glyph={<LoungeFlameIcon className={`shrink-0 ${iconSz} ${likeClass}`} liked={ui.liked} readOnly={ro} />}
+        countClass={likeClass}
+        countValue={likeCount}
+      />
+
+      <div
+        className="relative flex shrink-0 flex-none items-center justify-center self-center overflow-visible"
+        style={{ width: slotBookmark, minWidth: slotBookmark, minHeight: railMinH }}
+      >
         {ro ? (
           <button
             type="button"
             onClick={requireLoungeAuth}
             className={
-              isFeed
-                ? `${statFeedBookmark} text-zinc-600 hover:bg-zinc-900/70`
-                : `${statSheetBookmark} text-zinc-600`
+              statsCompact
+                ? `${statFeedBookmark} box-border flex size-full shrink-0 items-center justify-center text-zinc-600 hover:bg-zinc-900/70`
+                : `${statSheetBookmark} box-border flex size-full shrink-0 items-center justify-center text-zinc-600`
             }
             title="Sign in to save posts"
           >
-            <svg className={`${iconSzBookmark} ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
-              <path
-                d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
-                fill="currentColor"
-              />
+            <svg className={`block shrink-0 ${iconSzBookmark} ${bookmarkClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+              {bookmarkGlyphFilled ? (
+                <path d={bookmarkRibbonD} fill="currentColor" />
+              ) : (
+                <path
+                  d={bookmarkRibbonD}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.15"
+                  strokeLinejoin="round"
+                />
+              )}
             </svg>
           </button>
         ) : (
           <button
             type="button"
-            onClick={() => void toggleBookmark(post.id)}
-            className={isFeed ? statFeedBookmark : statSheetBookmark}
+            onClick={() =>
+              typeof onToggleBookmark === 'function'
+                ? void onToggleBookmark(post.id)
+                : void toggleBookmark(post.id)
+            }
+            className={`${statsCompact ? statFeedBookmark : statSheetBookmark} box-border flex size-full shrink-0 items-center justify-center`}
             title={isBookmarked ? 'Remove bookmark' : 'Save post'}
           >
-            <svg className={`${iconSzBookmark} ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
-              <path
-                d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
-                fill="currentColor"
-              />
+            <svg className={`block shrink-0 ${iconSzBookmark} ${bookmarkClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+              {bookmarkGlyphFilled ? (
+                <path d={bookmarkRibbonD} fill="currentColor" />
+              ) : (
+                <path
+                  d={bookmarkRibbonD}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.15"
+                  strokeLinejoin="round"
+                />
+              )}
             </svg>
           </button>
         )}
       </div>
+      </div>
+      {isFeed ? repostMenusFeed : null}
+      {isFeed ? repostMenusFeedNotReposted : null}
+    </>
   )
 }

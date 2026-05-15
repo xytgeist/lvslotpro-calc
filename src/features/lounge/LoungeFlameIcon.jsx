@@ -1,5 +1,10 @@
 /** Poker chip + heart like icon — simplified for ~22px (no rim micro-hearts). */
-import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
+import {
+  formatCompactStatCount,
+  fullStatCountTitle,
+  loungeInteractionStatCountCellClass,
+  loungeInteractionStatGridClass,
+} from '../../utils/formatCompactStatCount.js'
 
 const CHIP_RED = '#fd262d'
 
@@ -11,7 +16,11 @@ const HEART_NUDGE_X = -0.45
 const HEART_NUDGE_Y = -0.4
 
 /**
- * Icon + count with fixed grid columns so the chip does not shift when the count changes.
+ * Icon + count. Default `grid`: fixed icon track + `6ch` count track (no chip shift at 0 → 1).
+ * `trailing-fixed` / `leading-fixed`: flex row for **gutter** rows where the **icon** must stay
+ * pinned to the outer edge of its half-column; count sits in a reserved `6ch` cell beside it.
+ *
+ * @param {'grid' | 'leading-fixed' | 'trailing-fixed'} [props.clusterLayout='grid']
  */
 export function LoungeLikeStatContent({
   iconClassName = 'h-[22px] w-[22px]',
@@ -20,21 +29,76 @@ export function LoungeLikeStatContent({
   readOnly = false,
   likeCount,
   iconPx = 22,
+  clusterLayout = 'grid',
 }) {
-  const countCol = iconPx >= 24 ? '0.9375rem' : iconPx >= 22 ? '0.875rem' : '0.8125rem'
+  const showCount = Number.isFinite(likeCount) && likeCount > 0
+  const countLabel = showCount ? formatCompactStatCount(likeCount) : null
+  const countTitle = showCount ? fullStatCountTitle(likeCount) : undefined
+  const clusterMinW = `calc(${iconPx}px + 0.375rem + 6ch)`
+
+  if (clusterLayout === 'leading-fixed') {
+    return (
+      <span
+        className="inline-flex shrink-0 flex-row items-center justify-start gap-x-1.5 self-center"
+        style={{ minWidth: clusterMinW }}
+      >
+        <span
+          className="flex shrink-0 items-center justify-center"
+          style={{ width: iconPx, height: iconPx }}
+        >
+          <LoungeFlameIcon className={iconClassName} liked={liked} readOnly={readOnly} />
+        </span>
+        <span
+          className={`${loungeInteractionStatCountCellClass} min-w-[6ch] shrink-0 text-left ${countClassName}`}
+          title={countTitle}
+          aria-hidden={!showCount}
+        >
+          {countLabel}
+        </span>
+      </span>
+    )
+  }
+
+  if (clusterLayout === 'trailing-fixed') {
+    return (
+      <span
+        className="inline-flex shrink-0 flex-row items-center justify-end gap-x-1.5 self-center"
+        style={{ minWidth: clusterMinW }}
+      >
+        <span
+          className={`${loungeInteractionStatCountCellClass} min-w-[6ch] shrink-0 text-right ${countClassName}`}
+          title={countTitle}
+          aria-hidden={!showCount}
+        >
+          {countLabel}
+        </span>
+        <span
+          className="flex shrink-0 items-center justify-center"
+          style={{ width: iconPx, height: iconPx }}
+        >
+          <LoungeFlameIcon className={iconClassName} liked={liked} readOnly={readOnly} />
+        </span>
+      </span>
+    )
+  }
+
   return (
     <span
-      className="inline-grid items-center gap-x-1.5"
-      style={{ gridTemplateColumns: `${iconPx}px ${countCol}` }}
+      className={loungeInteractionStatGridClass}
+      style={{
+        /** Match comment/repost/bookmark: fixed icon track + `6ch` count track (no row jump at 0 → 1). */
+        gridTemplateColumns: `${iconPx}px 6ch`,
+      }}
     >
-      <span className="flex items-center justify-center">
+      <span className="flex w-full items-center justify-center">
         <LoungeFlameIcon className={iconClassName} liked={liked} readOnly={readOnly} />
       </span>
       <span
-        className={`tabular-nums leading-none ${countClassName}`}
-        title={fullStatCountTitle(likeCount)}
+        className={`${loungeInteractionStatCountCellClass} ${countClassName}`}
+        title={countTitle}
+        aria-hidden={!showCount}
       >
-        {Number.isFinite(likeCount) ? formatCompactStatCount(likeCount) : ''}
+        {countLabel}
       </span>
     </span>
   )
@@ -42,7 +106,8 @@ export function LoungeLikeStatContent({
 
 export default function LoungeFlameIcon({ className = 'h-[22px] w-[22px]', liked = false, readOnly = false }) {
   const lit = liked && !readOnly
-  const rimOpacity = readOnly ? 0.35 : lit ? 1 : 0.5
+  /** Idle chip: one dashed ring + heart outline at full `currentColor` so it matches other ~1.35px outline glyphs (no stacked low-opacity rings). */
+  const idleStrokeOpacity = readOnly ? 0.35 : 1
   const faceOpacity = readOnly ? 0.2 : 0.95
 
   /** Outer dashed rim stroke edge ≈ 9.25 + 0.8 — align red outline flush with that perimeter */
@@ -67,10 +132,10 @@ export default function LoungeFlameIcon({ className = 'h-[22px] w-[22px]', liked
         cy="12"
         r="9.25"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth={lit ? 1.6 : 1.35}
         strokeDasharray="2.85 2.15"
         fill="none"
-        strokeOpacity={rimOpacity}
+        strokeOpacity={lit ? 1 : idleStrokeOpacity}
       />
       {lit ? (
         <>
@@ -94,27 +159,17 @@ export default function LoungeFlameIcon({ className = 'h-[22px] w-[22px]', liked
             strokeOpacity={readOnly ? 0.3 : 0.68}
           />
         </>
-      ) : (
-        <circle
-          cx="12"
-          cy="12"
-          r="7.1"
-          stroke="currentColor"
-          strokeWidth="0.75"
-          strokeOpacity={readOnly ? 0.35 : 0.45}
-          fill="none"
-        />
-      )}
+      ) : null}
       {/* Heart after face + inset rings so the tip isn’t covered by those strokes */}
       <g transform={`translate(${HEART_NUDGE_X}, ${HEART_NUDGE_Y})`}>
         <path
           d={HEART}
           fill={lit ? CHIP_RED : 'none'}
           stroke={lit ? '#c0151c' : 'currentColor'}
-          strokeWidth={lit ? 0.38 : 1.1}
+          strokeWidth={lit ? 0.38 : 1.05}
           strokeLinejoin="round"
           fillOpacity={readOnly ? 0.25 : lit ? 1 : 0}
-          strokeOpacity={readOnly ? 0.35 : lit ? 1 : rimOpacity}
+          strokeOpacity={lit ? (readOnly ? 0.35 : 1) : idleStrokeOpacity}
         />
       </g>
     </svg>

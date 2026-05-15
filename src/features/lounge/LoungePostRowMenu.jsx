@@ -21,6 +21,8 @@ export default function LoungePostRowMenu({
   onShare,
   /** Optional scroll root (e.g. main feed) to keep the fixed menu aligned while scrolling. */
   positionScrollRootRef,
+  /** Accessible name for the ⋯ control (e.g. "Comment options"). */
+  menuAriaLabel = 'Post options',
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
@@ -185,7 +187,7 @@ export default function LoungePostRowMenu({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Post options"
+        aria-label={menuAriaLabel}
         onClick={(e) => {
           e.stopPropagation()
           setOpen((o) => !o)

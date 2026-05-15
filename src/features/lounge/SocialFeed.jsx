@@ -55,14 +55,19 @@ import {
   runComposerStreamVideoPrepWithRetries,
   uploadEncodedVideoToCfStreamWithRetries,
 } from './loungeComposerVideoPrep.js'
-import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
+import {
+  formatCompactStatCount,
+  fullStatCountTitle,
+  loungeInteractionStatCountCellClass,
+} from '../../utils/formatCompactStatCount.js'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
 import { renderRichCaption } from './loungeCaption'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
-import { LoungeLikeStatContent } from './LoungeFlameIcon.jsx'
+import LoungeFlameIcon from './LoungeFlameIcon.jsx'
+import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
 import { LoungeFeedInlineSoundResetBinder, LoungeFeedVideoAutoplayProvider } from './LoungeFeedVideoAutoplayContext.jsx'
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
@@ -93,13 +98,11 @@ import {
 import LoungeDockSlidePanels from '../../components/LoungeDockSlidePanels.jsx'
 import LoungePostCommentThread from './LoungePostCommentThread.jsx'
 import { LOUNGE_FEED_SCOPE_ALL, LOUNGE_FEED_SCOPE_FOLLOWING } from '../../utils/loungeFeedScope'
+import { LOUNGE_COMMENT_BODY_MAX } from '../../utils/loungeCommentLimits.js'
 
 /** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
 const LOUNGE_MAX_PINNED_ALERT =
   'The maximum number of pinned posts is two. Unpin a post to pin this one.'
-
-/** Matches feed caption cap (`feed_comments.body` check constraint after migration). */
-const LOUNGE_COMMENT_BODY_MAX = 280
 
 /** Post detail reply composer — collapsed pill copy when empty + expanded textarea placeholder. */
 const LOUNGE_DETAIL_COMMENT_PLACEHOLDER = "Post your reply (or don't, pussy)"
@@ -288,6 +291,12 @@ export default function SocialFeed({
   interactionByPostRef.current = interactionByPost
   const bookmarkedByPostRef = useRef(bookmarkedByPost)
   bookmarkedByPostRef.current = bookmarkedByPost
+  const [interactionByComment, setInteractionByComment] = useState({})
+  const [bookmarkedByComment, setBookmarkedByComment] = useState({})
+  const interactionByCommentRef = useRef(interactionByComment)
+  interactionByCommentRef.current = interactionByComment
+  const bookmarkedByCommentRef = useRef(bookmarkedByComment)
+  bookmarkedByCommentRef.current = bookmarkedByComment
   const bookmarksMigratedFromLocalRef = useRef(false)
   /** Maps original post id → this user's plain-repost row id (for undo). */
   const plainRepostChildIdRef = useRef({})
@@ -347,6 +356,10 @@ export default function SocialFeed({
   const [loungeDetailCommentKbOverlapPx, setLoungeDetailCommentKbOverlapPx] = useState(0)
   /** Drill-down into a comment thread (`slice(-1)` = composer reply parent). */
   const [loungeCommentDetailPathIds, setLoungeCommentDetailPathIds] = useState([])
+  const [loungeDetailCommentEditingId, setLoungeDetailCommentEditingId] = useState(null)
+  const [loungeDetailCommentEditDraft, setLoungeDetailCommentEditDraft] = useState('')
+  const [loungeDetailCommentEditBusy, setLoungeDetailCommentEditBusy] = useState(false)
+  const [loungeDetailCommentDeleteBusyId, setLoungeDetailCommentDeleteBusyId] = useState(null)
   const [composerUserId, setComposerUserId] = useState('')
   /** Session user for email-based initials before `profiles` exists. */
   const [composerAuthUser, setComposerAuthUser] = useState(null)
@@ -1643,6 +1656,11 @@ export default function SocialFeed({
     [interactionByPost, defaultInteraction]
   )
 
+  const interactionStateForComment = useCallback(
+    (commentId) => interactionByComment[commentId] || defaultInteraction,
+    [interactionByComment, defaultInteraction]
+  )
+
   const toggleInteraction = useCallback(
     async (postId, key) => {
       if (!composerUserId) return
@@ -2109,6 +2127,233 @@ export default function SocialFeed({
     return { ok: true, bookmarked: !was }
   }, [composerUserId, supabaseClient])
 
+  const noopLoungeBarPostToggle = useCallback(async () => undefined, [])
+
+  const getLoungeDetailCommentBookmarked = useCallback(
+    (commentId) => !!bookmarkedByComment[commentId],
+    [bookmarkedByComment]
+  )
+
+  const toggleLoungeDetailCommentLike = useCallback(
+    async (commentId) => {
+      if (!composerUserId || !commentId) return
+      const prevSnap = interactionByCommentRef.current[commentId] || defaultInteraction
+      const was = !!prevSnap.liked
+      const delta = was ? -1 : 1
+      setInteractionByComment((prev) => {
+        const cur = prev[commentId] || defaultInteraction
+        return { ...prev, [commentId]: { ...cur, liked: !was } }
+      })
+      setLoungeDetailComments((prev) =>
+        prev.map((row) =>
+          row.id === commentId
+            ? { ...row, like_count: Math.max(0, (Number(row.like_count) || 0) + delta) }
+            : row,
+        ),
+      )
+      const res = was
+        ? await supabaseClient
+            .from('feed_comment_likes')
+            .delete()
+            .eq('comment_id', commentId)
+            .eq('user_id', composerUserId)
+        : await supabaseClient
+            .from('feed_comment_likes')
+            .insert({ comment_id: commentId, user_id: composerUserId })
+      if (res.error) {
+        setInteractionByComment((prev) => {
+          const cur = prev[commentId] || defaultInteraction
+          return { ...prev, [commentId]: { ...cur, liked: was } }
+        })
+        setLoungeDetailComments((prev) =>
+          prev.map((row) =>
+            row.id === commentId
+              ? { ...row, like_count: Math.max(0, (Number(row.like_count) || 0) - delta) }
+              : row,
+          ),
+        )
+        setLoungeManageErr(res.error.message || 'Could not update.')
+        return
+      }
+      const { data: row } = await supabaseClient
+        .from('feed_comments')
+        .select('like_count')
+        .eq('id', commentId)
+        .maybeSingle()
+      if (row && typeof row.like_count === 'number') {
+        setLoungeDetailComments((prev) =>
+          prev.map((r) => (r.id === commentId ? { ...r, like_count: row.like_count } : r)),
+        )
+      }
+    },
+    [composerUserId, defaultInteraction, supabaseClient]
+  )
+
+  const toggleLoungeDetailCommentBookmark = useCallback(
+    async (commentId) => {
+      if (!composerUserId || !commentId) return
+      const was = !!bookmarkedByCommentRef.current[commentId]
+      const delta = was ? -1 : 1
+      setBookmarkedByComment((prev) => ({ ...prev, [commentId]: !was }))
+      setLoungeDetailComments((prev) =>
+        prev.map((row) =>
+          row.id === commentId
+            ? { ...row, bookmark_count: Math.max(0, (Number(row.bookmark_count) || 0) + delta) }
+            : row,
+        ),
+      )
+      const res = was
+        ? await supabaseClient
+            .from('feed_comment_bookmarks')
+            .delete()
+            .eq('comment_id', commentId)
+            .eq('user_id', composerUserId)
+        : await supabaseClient
+            .from('feed_comment_bookmarks')
+            .insert({ comment_id: commentId, user_id: composerUserId })
+      if (res.error) {
+        setBookmarkedByComment((prev) => ({ ...prev, [commentId]: was }))
+        setLoungeDetailComments((prev) =>
+          prev.map((row) =>
+            row.id === commentId
+              ? { ...row, bookmark_count: Math.max(0, (Number(row.bookmark_count) || 0) - delta) }
+              : row,
+          ),
+        )
+        setLoungeManageErr(res.error.message || 'Could not update bookmark.')
+        return
+      }
+      const { data: row } = await supabaseClient
+        .from('feed_comments')
+        .select('bookmark_count')
+        .eq('id', commentId)
+        .maybeSingle()
+      if (row && typeof row.bookmark_count === 'number') {
+        setLoungeDetailComments((prev) =>
+          prev.map((r) => (r.id === commentId ? { ...r, bookmark_count: row.bookmark_count } : r)),
+        )
+      }
+    },
+    [composerUserId, supabaseClient]
+  )
+
+  const addLoungeDetailCommentPlainRepost = useCallback(
+    async (commentId) => {
+      if (!composerUserId || !commentId) return
+      const prevSnap = interactionByCommentRef.current[commentId] || defaultInteraction
+      if (prevSnap.reposted) return
+      setInteractionByComment((prev) => {
+        const cur = prev[commentId] || defaultInteraction
+        return {
+          ...prev,
+          [commentId]: {
+            ...cur,
+            reposted: true,
+            plainRepostChildId: commentId,
+            quoteRepostChildId: null,
+          },
+        }
+      })
+      setLoungeDetailComments((prev) =>
+        prev.map((row) =>
+          row.id === commentId
+            ? { ...row, repost_count: Math.max(0, (Number(row.repost_count) || 0) + 1) }
+            : row,
+        ),
+      )
+      const res = await supabaseClient
+        .from('feed_comment_reposts')
+        .insert({ comment_id: commentId, user_id: composerUserId })
+      if (res.error) {
+        setInteractionByComment((prev) => {
+          const cur = prev[commentId] || defaultInteraction
+          return { ...prev, [commentId]: { ...cur, reposted: false, plainRepostChildId: null } }
+        })
+        setLoungeDetailComments((prev) =>
+          prev.map((row) =>
+            row.id === commentId
+              ? { ...row, repost_count: Math.max(0, (Number(row.repost_count) || 0) - 1) }
+              : row,
+          ),
+        )
+        setLoungeManageErr(res.error.message || 'Could not repost.')
+        return
+      }
+      const { data: row } = await supabaseClient
+        .from('feed_comments')
+        .select('repost_count')
+        .eq('id', commentId)
+        .maybeSingle()
+      if (row && typeof row.repost_count === 'number') {
+        setLoungeDetailComments((prev) =>
+          prev.map((r) => (r.id === commentId ? { ...r, repost_count: row.repost_count } : r)),
+        )
+      }
+    },
+    [composerUserId, defaultInteraction, supabaseClient]
+  )
+
+  const undoLoungeDetailCommentPlainRepost = useCallback(
+    async (commentId) => {
+      if (!composerUserId || !commentId) return
+      const prevSnap = interactionByCommentRef.current[commentId] || defaultInteraction
+      if (!prevSnap.reposted) return
+      setInteractionByComment((prev) => {
+        const cur = prev[commentId] || defaultInteraction
+        return {
+          ...prev,
+          [commentId]: { ...cur, reposted: false, plainRepostChildId: null, quoteRepostChildId: null },
+        }
+      })
+      setLoungeDetailComments((prev) =>
+        prev.map((row) =>
+          row.id === commentId
+            ? { ...row, repost_count: Math.max(0, (Number(row.repost_count) || 0) - 1) }
+            : row,
+        ),
+      )
+      const res = await supabaseClient
+        .from('feed_comment_reposts')
+        .delete()
+        .eq('comment_id', commentId)
+        .eq('user_id', composerUserId)
+      if (res.error) {
+        setInteractionByComment((prev) => {
+          const cur = prev[commentId] || defaultInteraction
+          return {
+            ...prev,
+            [commentId]: {
+              ...cur,
+              reposted: true,
+              plainRepostChildId: commentId,
+              quoteRepostChildId: null,
+            },
+          }
+        })
+        setLoungeDetailComments((prev) =>
+          prev.map((row) =>
+            row.id === commentId
+              ? { ...row, repost_count: Math.max(0, (Number(row.repost_count) || 0) + 1) }
+              : row,
+          ),
+        )
+        setLoungeManageErr(res.error.message || 'Could not undo repost.')
+        return
+      }
+      const { data: row } = await supabaseClient
+        .from('feed_comments')
+        .select('repost_count')
+        .eq('id', commentId)
+        .maybeSingle()
+      if (row && typeof row.repost_count === 'number') {
+        setLoungeDetailComments((prev) =>
+          prev.map((r) => (r.id === commentId ? { ...r, repost_count: row.repost_count } : r)),
+        )
+      }
+    },
+    [composerUserId, defaultInteraction, supabaseClient]
+  )
+
   const submitLoungeDetailComment = useCallback(async () => {
     if (!loungePostDetail?.id || !composerUserId || loungeReadOnly) return
     const body = loungeDetailCommentDraft.trim()
@@ -2128,7 +2373,7 @@ export default function SocialFeed({
     const { data, error } = await supabaseClient
       .from('feed_comments')
       .insert(insertRow)
-      .select('id,body,created_at,user_id,parent_id')
+      .select('id,body,created_at,user_id,parent_id,like_count,repost_count,bookmark_count')
       .single()
     setLoungeDetailCommentBusy(false)
     if (error) {
@@ -2172,23 +2417,162 @@ export default function SocialFeed({
     supabaseClient,
   ])
 
+  const cancelLoungeDetailCommentEdit = useCallback(() => {
+    setLoungeDetailCommentEditingId(null)
+    setLoungeDetailCommentEditDraft('')
+  }, [])
+
+  const onCommentMenuEditFromDetail = useCallback((c) => {
+    if (!c?.id) return
+    setLoungeDetailCommentEditingId(c.id)
+    setLoungeDetailCommentEditDraft(String(c.body ?? ''))
+  }, [])
+
+  const saveLoungeDetailCommentEdit = useCallback(async () => {
+    if (!loungePostDetail?.id || !composerUserId || !loungeDetailCommentEditingId) return
+    const body = loungeDetailCommentEditDraft.trim()
+    if (!body || body.length > LOUNGE_COMMENT_BODY_MAX) return
+    setLoungeDetailCommentEditBusy(true)
+    setLoungeDetailCommentErr('')
+    try {
+      const editedAt = new Date().toISOString()
+      const { error } = await supabaseClient
+        .from('feed_comments')
+        .update({ body, edited_at: editedAt })
+        .eq('id', loungeDetailCommentEditingId)
+        .eq('user_id', composerUserId)
+      if (error) {
+        const msg = String(error.message || '')
+        if (error.code === '42501') {
+          setLoungeDetailCommentErr('You do not have permission to edit this reply.')
+        } else {
+          setLoungeDetailCommentErr(msg || 'Could not save edit.')
+        }
+        return
+      }
+      setLoungeDetailComments((prev) =>
+        prev.map((row) =>
+          row.id === loungeDetailCommentEditingId ? { ...row, body, edited_at: editedAt } : row,
+        ),
+      )
+      cancelLoungeDetailCommentEdit()
+    } finally {
+      setLoungeDetailCommentEditBusy(false)
+    }
+  }, [
+    cancelLoungeDetailCommentEdit,
+    composerUserId,
+    loungeDetailCommentEditDraft,
+    loungeDetailCommentEditingId,
+    loungePostDetail?.id,
+    supabaseClient,
+  ])
+
+  const deleteLoungeDetailComment = useCallback(
+    async (c) => {
+      if (!c?.id || !composerUserId || !loungePostDetail?.id) return
+      const ok = window.confirm('Delete this reply? This cannot be undone.')
+      if (!ok) return
+      const removeIds = new Set([c.id])
+      let grew = true
+      while (grew) {
+        grew = false
+        for (const row of loungeDetailComments) {
+          if (row.parent_id && removeIds.has(row.parent_id) && !removeIds.has(row.id)) {
+            removeIds.add(row.id)
+            grew = true
+          }
+        }
+      }
+      setLoungeDetailCommentDeleteBusyId(c.id)
+      setLoungeDetailCommentErr('')
+      try {
+        const { error } = await supabaseClient
+          .from('feed_comments')
+          .delete()
+          .eq('id', c.id)
+          .eq('user_id', composerUserId)
+        if (error) {
+          const msg = String(error.message || '')
+          if (error.code === '42501') {
+            setLoungeDetailCommentErr('You do not have permission to delete this reply.')
+          } else {
+            setLoungeDetailCommentErr(msg || 'Could not delete.')
+          }
+          return
+        }
+        const wasRoot = !c.parent_id
+        setLoungeDetailComments((prev) => prev.filter((row) => !removeIds.has(row.id)))
+        setLoungeCommentDetailPathIds((p) => p.filter((id) => !removeIds.has(id)))
+        setInteractionByComment((prev) => {
+          const next = { ...prev }
+          for (const id of removeIds) delete next[id]
+          return next
+        })
+        setBookmarkedByComment((prev) => {
+          const next = { ...prev }
+          for (const id of removeIds) delete next[id]
+          return next
+        })
+        if (loungeDetailCommentEditingId && removeIds.has(loungeDetailCommentEditingId)) {
+          cancelLoungeDetailCommentEdit()
+        }
+        if (wasRoot) {
+          const { data: countRow } = await supabaseClient
+            .from('community_feed_posts')
+            .select('comment_count')
+            .eq('id', loungePostDetail.id)
+            .maybeSingle()
+          if (countRow && typeof countRow.comment_count === 'number') {
+            patchPostAggregate(loungePostDetail.id, { comment_count: countRow.comment_count })
+          }
+        }
+      } finally {
+        setLoungeDetailCommentDeleteBusyId(null)
+      }
+    },
+    [
+      cancelLoungeDetailCommentEdit,
+      composerUserId,
+      loungeDetailCommentEditingId,
+      loungeDetailComments,
+      loungePostDetail?.id,
+      patchPostAggregate,
+      supabaseClient,
+    ],
+  )
+
+  const onCommentMenuBlockFromDetail = useCallback((c) => {
+    void c
+    if (typeof window !== 'undefined') window.alert('Blocking users is not available yet.')
+  }, [])
+
+  const onCommentMenuReportFromDetail = useCallback((c) => {
+    void c
+    if (typeof window !== 'undefined') window.alert('Reporting comments is not available yet.')
+  }, [])
+
   useEffect(() => {
     if (!loungePostDetail?.id || loungeReadOnly) {
       setLoungeDetailComments([])
       setLoungeDetailCommentsLoading(false)
       setLoungeDetailCommentErr('')
       setLoungeCommentDetailPathIds([])
+      setInteractionByComment({})
+      setBookmarkedByComment({})
       return
     }
     let cancelled = false
     setLoungeCommentDetailPathIds([])
     setLoungeDetailCommentsLoading(true)
     setLoungeDetailCommentErr('')
+    setInteractionByComment({})
+    setBookmarkedByComment({})
     ;(async () => {
       const postId = loungePostDetail.id
       const { data, error } = await supabaseClient
         .from('feed_comments')
-        .select('id,body,created_at,user_id,parent_id')
+        .select('id,body,created_at,user_id,parent_id,like_count,repost_count,bookmark_count')
         .eq('post_id', postId)
         .is('hidden_at', null)
         .order('created_at', { ascending: true })
@@ -2197,6 +2581,8 @@ export default function SocialFeed({
       if (error) {
         setLoungeDetailCommentErr(error.message)
         setLoungeDetailComments([])
+        setInteractionByComment({})
+        setBookmarkedByComment({})
         return
       }
       const rows = data || []
@@ -2210,12 +2596,57 @@ export default function SocialFeed({
         if (!pr.error && pr.data) profileBy = Object.fromEntries(pr.data.map((p) => [p.user_id, p]))
       }
       if (cancelled) return
-      setLoungeDetailComments(rows.map((r) => ({ ...r, author_profile: profileBy[r.user_id] || null })))
+      const hydrated = rows.map((r) => ({ ...r, author_profile: profileBy[r.user_id] || null }))
+      setLoungeDetailComments(hydrated)
+      const cids = hydrated.map((r) => r.id).filter(Boolean)
+      if (!composerUserId || cids.length === 0) {
+        setInteractionByComment({})
+        setBookmarkedByComment({})
+        return
+      }
+      const [likesRes, repostsRes, bmRes] = await Promise.all([
+        supabaseClient.from('feed_comment_likes').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
+        supabaseClient.from('feed_comment_reposts').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
+        supabaseClient.from('feed_comment_bookmarks').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
+      ])
+      if (cancelled) return
+      const intErr = likesRes.error?.message || repostsRes.error?.message || bmRes.error?.message
+      if (intErr) {
+        console.warn('feed comment interactions:', intErr)
+        setInteractionByComment({})
+        setBookmarkedByComment({})
+        return
+      }
+      const nextInt = {}
+      for (const id of cids) {
+        nextInt[id] = { ...defaultInteraction }
+      }
+      for (const r of likesRes.data || []) {
+        const cid = r.comment_id
+        if (!cid || !nextInt[cid]) continue
+        nextInt[cid] = { ...nextInt[cid], liked: true }
+      }
+      for (const r of repostsRes.data || []) {
+        const cid = r.comment_id
+        if (!cid || !nextInt[cid]) continue
+        nextInt[cid] = {
+          ...nextInt[cid],
+          reposted: true,
+          plainRepostChildId: cid,
+          quoteRepostChildId: null,
+        }
+      }
+      const nextBm = {}
+      for (const r of bmRes.data || []) {
+        if (r.comment_id) nextBm[r.comment_id] = true
+      }
+      setInteractionByComment(nextInt)
+      setBookmarkedByComment(nextBm)
     })()
     return () => {
       cancelled = true
     }
-  }, [loungePostDetail?.id, loungeReadOnly, supabaseClient])
+  }, [composerUserId, defaultInteraction, loungePostDetail?.id, loungeReadOnly, supabaseClient])
 
   const finalizeLoungePostDetailClose = useCallback(() => {
     const tid = loungePostDetailCloseFallbackTimerRef.current
@@ -2242,6 +2673,8 @@ export default function SocialFeed({
     setLoungeDetailCommentBusy(false)
     setLoungeDetailCommentDraft('')
     setLoungeDetailCommentErr('')
+    setInteractionByComment({})
+    setBookmarkedByComment({})
     const ht = loungeDetailCommentComposerHintTimerRef.current
     if (ht) {
       window.clearTimeout(ht)
@@ -2251,6 +2684,10 @@ export default function SocialFeed({
     setLoungeDetailCommentComposerHint('')
     setLoungeDetailCommentKbOverlapPx(0)
     setLoungeCommentDetailPathIds([])
+    setLoungeDetailCommentEditingId(null)
+    setLoungeDetailCommentEditDraft('')
+    setLoungeDetailCommentEditBusy(false)
+    setLoungeDetailCommentDeleteBusyId(null)
     loungeTitleRevealRef.current = 1
     setLoungeTitleReveal(1)
   }, [])
@@ -2306,6 +2743,10 @@ export default function SocialFeed({
       setLoungeDetailCommentErr('')
       setLoungeDetailCommentComposerExpanded(false)
       setLoungeDetailCommentComposerHint('')
+      setLoungeDetailCommentEditingId(null)
+      setLoungeDetailCommentEditDraft('')
+      setLoungeDetailCommentEditBusy(false)
+      setLoungeDetailCommentDeleteBusyId(null)
       const hci = loungeDetailCommentComposerHintTimerRef.current
       if (hci) {
         window.clearTimeout(hci)
@@ -2663,21 +3104,23 @@ export default function SocialFeed({
       if (!comment?.id) return
       setLoungePostDetailMenuOpen(false)
       cancelLoungeDetailEdit()
+      cancelLoungeDetailCommentEdit()
       setLoungeCommentDetailPathIds([comment.id])
       requestAnimationFrame(() => {
         scrollLoungePostDetailToTopInstant()
       })
     },
-    [cancelLoungeDetailEdit, scrollLoungePostDetailToTopInstant],
+    [cancelLoungeDetailCommentEdit, cancelLoungeDetailEdit, scrollLoungePostDetailToTopInstant],
   )
 
   const drillDeeperIntoLoungeComment = useCallback((comment) => {
     if (!comment?.id) return
+    cancelLoungeDetailCommentEdit()
     setLoungeCommentDetailPathIds((prev) => [...prev, comment.id])
     requestAnimationFrame(() => {
       scrollLoungePostDetailToTopInstant()
     })
-  }, [scrollLoungePostDetailToTopInstant])
+  }, [cancelLoungeDetailCommentEdit, scrollLoungePostDetailToTopInstant])
 
   const buildLoungeCommentDrillPath = useCallback((commentId) => {
     const rows = loungeDetailComments
@@ -3083,11 +3526,24 @@ export default function SocialFeed({
         cancelLoungeDetailEdit()
         return
       }
+      if (loungeDetailCommentEditingId) {
+        e.preventDefault()
+        cancelLoungeDetailCommentEdit()
+        return
+      }
       closeLoungePostDetail()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cancelLoungeDetailEdit, closeLoungePostDetail, loungeDetailEditing, loungePostDetail, loungePostDetailMenuOpen])
+  }, [
+    cancelLoungeDetailCommentEdit,
+    cancelLoungeDetailEdit,
+    closeLoungePostDetail,
+    loungeDetailCommentEditingId,
+    loungeDetailEditing,
+    loungePostDetail,
+    loungePostDetailMenuOpen,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -5693,7 +6149,7 @@ export default function SocialFeed({
                 </>
               )}
 
-              <div className="mt-3 text-[14px] text-zinc-500">
+              <div className="mt-2 text-[14px] leading-tight text-zinc-500">
                 {formatLoungePostDetailWhen(loungePostDetail.created_at)}
                 {loungePostDetail.edited_at ? (
                   <span className="text-zinc-600"> · Edited</span>
@@ -5715,10 +6171,22 @@ export default function SocialFeed({
                 const likeClass = loungeReadOnly ? 'text-zinc-500' : ui.liked ? 'text-lv-red' : 'text-zinc-500'
                 const bookmarkClass = loungeReadOnly ? 'text-zinc-600' : isBookmarked ? 'text-lv-yellow' : 'text-zinc-500'
                 const ro = loungeReadOnly
+                const commentBubbleD =
+                  'M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z'
+                const bookmarkRibbonD =
+                  'M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z'
+                const commentGlyphFilled = !ro && ui.commented
+                const bookmarkGlyphFilled = !ro && isBookmarked
                 const plainId = ui.plainRepostChildId
                 const quoteId = ui.quoteRepostChildId
+                const dSlotComment = 24
+                const dSlotRepost = 24
+                const dSlotLike = 24
+                const dSlotBookmark = 26
+                /** Post detail: keep icons aligned but avoid a tall “dead” band above/below the row. */
+                const dRailMinH = 38
                 return (
-                  <div className="mt-0">
+                  <div className="mt-0.5">
                     {loungeDetailEditing ? (
                       <>
                         <input
@@ -5811,11 +6279,15 @@ export default function SocialFeed({
                       </>
                     ) : null}
                     <div
-                      className={`flex w-full min-w-0 flex-nowrap items-center justify-between gap-x-1 border-b border-zinc-800/90 py-1 text-[16px] ${loungeDetailEditing ? 'mt-1' : ''}`}
+                      className={`flex w-full min-w-0 flex-nowrap items-center justify-between border-b border-zinc-800/90 py-0.5 text-[16px] ${loungeDetailEditing ? 'mt-1' : ''}`}
                       onClick={(e) => e.stopPropagation()}
                       role="group"
                     >
-                      <LoungeFeedStatSlot
+                      <LoungeInteractionGlyphRail
+                        railAlign="start"
+                        slotPx={dSlotComment}
+                        glyphPx={dSlotComment}
+                        railMinH={dRailMinH}
                         readOnly={ro}
                         title={ro ? 'Sign in to comment' : undefined}
                         onReadOnlyClick={requireLoungeAuth}
@@ -5830,96 +6302,141 @@ export default function SocialFeed({
                             block: 'start',
                           })
                         }}
-                        className="inline-flex max-w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                      >
-                        <span className="flex w-[24px] shrink-0 justify-center">
+                        statClass="inline-flex w-full max-w-full shrink-0 items-center gap-0 rounded-lg px-0 py-0.5 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                        glyph={
                           <svg
-                            className={`block h-[24px] w-[24px] origin-center scale-y-[1.1] ${commentClass}`}
+                            className={`block shrink-0 h-[24px] w-[24px] origin-center scale-y-[1.1] ${commentClass}`}
                             viewBox="0 0 20 20"
+                            fill="none"
                             aria-hidden
                           >
-                            <path
-                              d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z"
-                              fill="currentColor"
-                            />
-                          </svg>
-                        </span>
-                        {Number.isFinite(commentCount) ? (
-                          <span className={commentClass} title={fullStatCountTitle(commentCount)}>
-                            {formatCompactStatCount(commentCount)}
-                          </span>
-                        ) : null}
-                      </LoungeFeedStatSlot>
-                      <div className="relative shrink-0" ref={loungeDetailRepostMenuRef}>
-                        <LoungeFeedStatSlot
-                          readOnly={ro}
-                          title={
-                            ro
-                              ? 'Sign in to repost'
-                              : ui.reposted
-                                ? 'Repost options'
-                                : 'Repost or quote repost'
-                          }
-                          onReadOnlyClick={requireLoungeAuth}
-                          onClick={() => {
-                            if (openProfileGateIfNeeded()) return
-                            setLoungeDetailRepostMenuOpen((o) => !o)
-                          }}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                        >
-                          <span className="flex w-[24px] shrink-0 justify-center">
-                            <svg className={`h-[24px] w-[24px] ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                            {commentGlyphFilled ? (
+                              <path d={commentBubbleD} fill="currentColor" />
+                            ) : (
                               <path
-                                d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                                d={commentBubbleD}
+                                fill="none"
                                 stroke="currentColor"
-                                strokeWidth="1.35"
-                                strokeLinecap="round"
+                                strokeWidth="1.25"
                                 strokeLinejoin="round"
+                                strokeLinecap="round"
                               />
-                            </svg>
-                          </span>
-                          {Number.isFinite(repostCount) ? (
-                            <span className={repostClass} title={fullStatCountTitle(repostCount)}>
-                              {formatCompactStatCount(repostCount)}
-                            </span>
-                          ) : null}
-                        </LoungeFeedStatSlot>
-                        {loungeDetailRepostMenuOpen && !ro ? (
-                          <div
-                            role="menu"
-                            className="absolute bottom-full left-1/2 z-[130] mb-1 min-w-[11.5rem] -translate-x-1/2 rounded-xl border border-zinc-700/90 bg-zinc-900/95 py-0.5 shadow-xl backdrop-blur-sm"
-                          >
-                            {ui.reposted ? (
-                              <>
-                                {plainId ? (
+                            )}
+                          </svg>
+                        }
+                        countClass={commentClass}
+                        countValue={commentCount}
+                      />
+                      <LoungeInteractionGlyphRail
+                        railRef={loungeDetailRepostMenuRef}
+                        extraAfterStat={
+                          loungeDetailRepostMenuOpen && !ro ? (
+                            <div
+                              role="menu"
+                              className="absolute bottom-full left-1/2 z-[130] mb-1 min-w-[11.5rem] -translate-x-1/2 rounded-xl border border-zinc-700/90 bg-zinc-900/95 py-0.5 shadow-xl backdrop-blur-sm"
+                            >
+                              {ui.reposted ? (
+                                <>
+                                  {plainId ? (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                                      disabled={repostManageBusy}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setLoungeDetailRepostMenuOpen(false)
+                                        void undoPlainRepostForOriginal(d.id)
+                                      }}
+                                    >
+                                      <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
+                                        <path
+                                          d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                                          stroke="currentColor"
+                                          strokeWidth="1.35"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Undo repost
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                                      disabled={repostManageBusy}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setLoungeDetailRepostMenuOpen(false)
+                                        void handlePlainRepost(d)
+                                      }}
+                                    >
+                                      <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
+                                        <path
+                                          d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                                          stroke="currentColor"
+                                          strokeWidth="1.35"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Repost
+                                    </button>
+                                  )}
+                                  {quoteId ? (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-rose-400 hover:bg-rose-950/35 touch-manipulation"
+                                      disabled={repostManageBusy}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setLoungeDetailRepostMenuOpen(false)
+                                        openRemoveQuoteRepostForPost(d)
+                                      }}
+                                    >
+                                      <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden>
+                                        <path
+                                          d="M6.5 6.5h7v9.5a1 1 0 01-1 1h-5a1 1 0 01-1-1V6.5zM8 6.5V5a1.5 1.5 0 013 0v1.5M4 6.5h12"
+                                          stroke="currentColor"
+                                          strokeWidth="1.35"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Remove quote
+                                    </button>
+                                  ) : null}
+                                  {!quoteId ? (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                                      disabled={repostManageBusy}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setLoungeDetailRepostMenuOpen(false)
+                                        openQuoteRepostComposer(d)
+                                      }}
+                                    >
+                                      <svg className="h-4 w-4 shrink-0 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                                        <path
+                                          d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Quote
+                                    </button>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <>
                                   <button
                                     type="button"
                                     role="menuitem"
                                     className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
-                                    disabled={repostManageBusy}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setLoungeDetailRepostMenuOpen(false)
-                                      void undoPlainRepostForOriginal(d.id)
-                                    }}
-                                  >
-                                    <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
-                                      <path
-                                        d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
-                                        stroke="currentColor"
-                                        strokeWidth="1.35"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                      />
-                                    </svg>
-                                    Undo repost
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
-                                    disabled={repostManageBusy}
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setLoungeDetailRepostMenuOpen(false)
@@ -5937,37 +6454,10 @@ export default function SocialFeed({
                                     </svg>
                                     Repost
                                   </button>
-                                )}
-                                {quoteId ? (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-rose-400 hover:bg-rose-950/35 touch-manipulation"
-                                    disabled={repostManageBusy}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setLoungeDetailRepostMenuOpen(false)
-                                      openRemoveQuoteRepostForPost(d)
-                                    }}
-                                  >
-                                    <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden>
-                                      <path
-                                        d="M6.5 6.5h7v9.5a1 1 0 01-1 1h-5a1 1 0 01-1-1V6.5zM8 6.5V5a1.5 1.5 0 013 0v1.5M4 6.5h12"
-                                        stroke="currentColor"
-                                        strokeWidth="1.35"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                      />
-                                    </svg>
-                                    Remove quote
-                                  </button>
-                                ) : null}
-                                {!quoteId ? (
                                   <button
                                     type="button"
                                     role="menuitem"
                                     className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
-                                    disabled={repostManageBusy}
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setLoungeDetailRepostMenuOpen(false)
@@ -5983,108 +6473,114 @@ export default function SocialFeed({
                                     </svg>
                                     Quote
                                   </button>
-                                ) : null}
-                              </>
-                            ) : (
-                              <>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setLoungeDetailRepostMenuOpen(false)
-                                void handlePlainRepost(d)
-                              }}
-                            >
-                              <svg className="h-4 w-4 shrink-0 text-emerald-400/90" viewBox="0 0 20 20" fill="none" aria-hidden>
+                                </>
+                              )}
+                            </div>
+                          ) : null
+                        }
+                        slotPx={dSlotRepost}
+                        glyphPx={dSlotRepost}
+                        railMinH={dRailMinH}
+                        readOnly={ro}
+                        title={
+                          ro
+                            ? 'Sign in to repost'
+                            : ui.reposted
+                              ? 'Repost options'
+                              : 'Repost or quote repost'
+                        }
+                        onReadOnlyClick={requireLoungeAuth}
+                        onClick={() => {
+                          if (openProfileGateIfNeeded()) return
+                          setLoungeDetailRepostMenuOpen((o) => !o)
+                        }}
+                        statClass="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-0.5 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                        glyph={
+                          <svg
+                            className={`block shrink-0 h-[24px] w-[24px] ${repostClass}`}
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            aria-hidden
+                          >
+                            <path
+                              d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                              stroke="currentColor"
+                              strokeWidth="1.35"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        }
+                        countClass={repostClass}
+                        countValue={repostCount}
+                      />
+                      <LoungeInteractionGlyphRail
+                        slotPx={dSlotLike}
+                        glyphPx={dSlotLike}
+                        railMinH={dRailMinH}
+                        readOnly={ro}
+                        title={ro ? 'Sign in to like' : undefined}
+                        onReadOnlyClick={requireLoungeAuth}
+                        onClick={() => void toggleInteraction(d.id, 'liked')}
+                        statClass="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-0.5 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                        glyph={<LoungeFlameIcon className={`shrink-0 h-[24px] w-[24px] ${likeClass}`} liked={ui.liked} readOnly={ro} />}
+                        countClass={likeClass}
+                        countValue={likeCount}
+                      />
+                      <div
+                        className="relative flex shrink-0 flex-none items-center justify-center self-center overflow-visible"
+                        style={{ width: dSlotBookmark, minWidth: dSlotBookmark, minHeight: dRailMinH }}
+                      >
+                        {ro ? (
+                          <button
+                            type="button"
+                            onClick={requireLoungeAuth}
+                            className="inline-flex size-full shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 py-0.5 text-zinc-600 box-border hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                            title="Sign in to save posts"
+                          >
+                            <svg className={`block shrink-0 h-[26px] w-[26px] ${bookmarkClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                              {bookmarkGlyphFilled ? (
+                                <path d={bookmarkRibbonD} fill="currentColor" />
+                              ) : (
                                 <path
-                                  d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                                  d={bookmarkRibbonD}
+                                  fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="1.35"
-                                  strokeLinecap="round"
+                                  strokeWidth="1.15"
                                   strokeLinejoin="round"
                                 />
-                              </svg>
-                              Repost
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setLoungeDetailRepostMenuOpen(false)
-                                openQuoteRepostComposer(d)
-                              }}
-                            >
-                              <svg className="h-4 w-4 shrink-0 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                              )}
+                            </svg>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void toggleBookmark(d.id)}
+                            className="inline-flex size-full shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 py-0.5 box-border hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                            title={isBookmarked ? 'Remove bookmark' : 'Save post'}
+                          >
+                            <svg className={`block shrink-0 h-[26px] w-[26px] ${bookmarkClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                              {bookmarkGlyphFilled ? (
+                                <path d={bookmarkRibbonD} fill="currentColor" />
+                              ) : (
                                 <path
-                                  d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"
-                                  strokeLinecap="round"
+                                  d={bookmarkRibbonD}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.15"
                                   strokeLinejoin="round"
                                 />
-                              </svg>
-                              Quote
-                            </button>
-                              </>
-                            )}
-                          </div>
-                        ) : null}
+                              )}
+                            </svg>
+                          </button>
+                        )}
                       </div>
-                      <div className="shrink-0">
-                        <LoungeFeedStatSlot
-                          readOnly={ro}
-                          title={ro ? 'Sign in to like' : undefined}
-                          onReadOnlyClick={requireLoungeAuth}
-                          onClick={() => void toggleInteraction(d.id, 'liked')}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                        >
-                          <LoungeLikeStatContent
-                            iconClassName={`h-[24px] w-[24px] ${likeClass}`}
-                            countClassName={likeClass}
-                            liked={ui.liked}
-                            readOnly={ro}
-                            likeCount={likeCount}
-                            iconPx={24}
-                          />
-                        </LoungeFeedStatSlot>
-                      </div>
-                      {ro ? (
-                        <button
-                          type="button"
-                          onClick={requireLoungeAuth}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-zinc-600 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                          title="Sign in to save posts"
-                        >
-                          <svg className={`h-[26px] w-[26px] ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
-                            <path
-                              d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
-                              fill="currentColor"
-                            />
-                          </svg>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void toggleBookmark(d.id)}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                          title={isBookmarked ? 'Remove bookmark' : 'Save post'}
-                        >
-                          <svg className={`h-[26px] w-[26px] ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
-                            <path
-                              d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
-                              fill="currentColor"
-                            />
-                          </svg>
-                        </button>
-                      )}
                     </div>
                   </div>
                 )
               })()}
 
-              <div id="lounge-detail-comments" className="pt-1">
+              <div id="lounge-detail-comments" className="pt-0">
                 {loungeReadOnly ? (
                   <p className="mt-1 text-[14px] text-zinc-500">
                     {typeof loungePostDetail.comment_count === 'number' && loungePostDetail.comment_count > 0
@@ -6099,8 +6595,11 @@ export default function SocialFeed({
                       <LoungePostCommentThread
                         variant="post"
                         comments={loungeDetailComments}
-                        postAuthorUserId={loungePostDetail.user_id || ''}
+                        postAuthorUserId={loungePostDetail.user_id}
                         postAgeLabel={postAgeLabel}
+                        displayNameFor={displayNameFor}
+                        handleFor={handleFor}
+                        viewerUserId={composerUserId}
                         loungeReadOnly={loungeReadOnly}
                         requireLoungeAuth={requireLoungeAuth}
                         openProfileGateIfNeeded={openProfileGateIfNeeded}
@@ -6112,6 +6611,28 @@ export default function SocialFeed({
                             author_profile: c.author_profile,
                           })
                         }
+                        positionScrollRootRef={loungePostDetailScrollRef}
+                        onCommentMenuEdit={onCommentMenuEditFromDetail}
+                        onCommentMenuDelete={deleteLoungeDetailComment}
+                        onCommentMenuBlock={onCommentMenuBlockFromDetail}
+                        onCommentMenuReport={onCommentMenuReportFromDetail}
+                        busyDeletingCommentId={loungeDetailCommentDeleteBusyId}
+                        editingCommentId={loungeDetailCommentEditingId}
+                        commentEditDraft={loungeDetailCommentEditDraft}
+                        onCommentEditDraftChange={setLoungeDetailCommentEditDraft}
+                        onCommentEditSave={saveLoungeDetailCommentEdit}
+                        onCommentEditCancel={cancelLoungeDetailCommentEdit}
+                        commentEditBusy={loungeDetailCommentEditBusy}
+                        interactionStateFor={interactionStateForComment}
+                        toggleInteraction={noopLoungeBarPostToggle}
+                        onPlainRepost={(p) => void addLoungeDetailCommentPlainRepost(p.id)}
+                        onUndoPlainRepost={(p) => void undoLoungeDetailCommentPlainRepost(p.id)}
+                        toggleBookmark={noopLoungeBarPostToggle}
+                        bookmarkedByPost={bookmarkedByPost}
+                        onToggleCommentLike={toggleLoungeDetailCommentLike}
+                        onToggleCommentBookmark={toggleLoungeDetailCommentBookmark}
+                        getCommentBookmarked={getLoungeDetailCommentBookmarked}
+                        repostActionBusy={repostManageBusy}
                       />
                     )}
                   </>
@@ -6133,8 +6654,10 @@ export default function SocialFeed({
                           loungeCommentDetailPathIds[loungeCommentDetailPathIds.length - 1]
                         }
                         comments={loungeDetailComments}
-                        postAuthorUserId={loungePostDetail.user_id || ''}
                         postAgeLabel={postAgeLabel}
+                        displayNameFor={displayNameFor}
+                        handleFor={handleFor}
+                        viewerUserId={composerUserId}
                         loungeReadOnly={loungeReadOnly}
                         requireLoungeAuth={requireLoungeAuth}
                         openProfileGateIfNeeded={openProfileGateIfNeeded}
@@ -6146,6 +6669,28 @@ export default function SocialFeed({
                             author_profile: c.author_profile,
                           })
                         }
+                        positionScrollRootRef={loungePostDetailScrollRef}
+                        onCommentMenuEdit={onCommentMenuEditFromDetail}
+                        onCommentMenuDelete={deleteLoungeDetailComment}
+                        onCommentMenuBlock={onCommentMenuBlockFromDetail}
+                        onCommentMenuReport={onCommentMenuReportFromDetail}
+                        busyDeletingCommentId={loungeDetailCommentDeleteBusyId}
+                        editingCommentId={loungeDetailCommentEditingId}
+                        commentEditDraft={loungeDetailCommentEditDraft}
+                        onCommentEditDraftChange={setLoungeDetailCommentEditDraft}
+                        onCommentEditSave={saveLoungeDetailCommentEdit}
+                        onCommentEditCancel={cancelLoungeDetailCommentEdit}
+                        commentEditBusy={loungeDetailCommentEditBusy}
+                        interactionStateFor={interactionStateForComment}
+                        toggleInteraction={noopLoungeBarPostToggle}
+                        onPlainRepost={(p) => void addLoungeDetailCommentPlainRepost(p.id)}
+                        onUndoPlainRepost={(p) => void undoLoungeDetailCommentPlainRepost(p.id)}
+                        toggleBookmark={noopLoungeBarPostToggle}
+                        bookmarkedByPost={bookmarkedByPost}
+                        onToggleCommentLike={toggleLoungeDetailCommentLike}
+                        onToggleCommentBookmark={toggleLoungeDetailCommentBookmark}
+                        getCommentBookmarked={getLoungeDetailCommentBookmarked}
+                        repostActionBusy={repostManageBusy}
                       />
                     )}
                   </>
