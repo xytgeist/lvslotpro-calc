@@ -147,7 +147,7 @@ export function buildLoungeDockArcCarouselItems({
   activePanel,
 }) {
   const onFeedHome = !activePanel
-  /** Source order = wheel ring order after `LoungeDockArcCarouselPrototype` prepends nothing: `home` stays index 0; `cornerL` L-shape uses first ⌈n/2⌉ along bottom (inside→out), rest up the side. */
+  /** Source order = wheel ring order: `home` index 0 at horizontal anchor; siblings follow clockwise. `cornerL`: first ⌈n/2⌉ along bottom (inside→out), rest up the side — home, compose, following, settings on bottom; search, chat, notifications on vertical leg. */
   return [
     {
       id: 'home',
@@ -155,29 +155,6 @@ export function buildLoungeDockArcCarouselItems({
       icon: <IconHome />,
       onSelect: onHome,
       active: onFeedHome,
-    },
-    {
-      id: 'notifications',
-      label: 'Alerts',
-      icon: <IconBell />,
-      iconScale: 1.2,
-      onSelect: onNotifications,
-      active: activePanel === 'notifications',
-    },
-    {
-      id: 'chat',
-      label: 'Chat',
-      icon: <IconChat />,
-      iconScale: 1.14,
-      onSelect: onChat,
-      active: activePanel === 'chat',
-    },
-    {
-      id: 'search',
-      label: 'Search',
-      icon: <IconSearch />,
-      onSelect: onSearch,
-      active: activePanel === 'search',
     },
     {
       id: 'compose',
@@ -202,6 +179,29 @@ export function buildLoungeDockArcCarouselItems({
       iconScale: 0.86,
       onSelect: onSettings,
       active: activePanel === 'settings',
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      icon: <IconSearch />,
+      onSelect: onSearch,
+      active: activePanel === 'search',
+    },
+    {
+      id: 'chat',
+      label: 'Chat',
+      icon: <IconChat />,
+      iconScale: 1.14,
+      onSelect: onChat,
+      active: activePanel === 'chat',
+    },
+    {
+      id: 'notifications',
+      label: 'Alerts',
+      icon: <IconBell />,
+      iconScale: 1.2,
+      onSelect: onNotifications,
+      active: activePanel === 'notifications',
     },
   ]
 }
