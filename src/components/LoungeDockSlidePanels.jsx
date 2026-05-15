@@ -55,7 +55,10 @@ export default function LoungeDockSlidePanels({
   chatIsStaff = false,
   chatInitialPeerUserId = null,
   onChatInitialPeerCleared,
-  /** While FAB wheel is open or just tapped — ignore hits on panel content under icons. */
+  /** `'wheel'` | `'cornerL'` — persisted in `loungeDockMenuLayout:v1`. */
+  dockMenuLayout = 'wheel',
+  onDockMenuLayoutChange,
+  /** When true (e.g. FAB long-press), block scroll-region hits so gestures don’t fight the dock. */
   blockUnderlyingPointer = false,
   /** Scroll-linked 0–1 reveal for `LoungeDockArcCarouselPrototype` (same curve as panel title bar). */
   onTitleRevealChange,
@@ -464,6 +467,45 @@ export default function LoungeDockSlidePanels({
               <p className="px-1 text-[13px] leading-relaxed text-zinc-500">
                 Edit handle, display name, avatar, and bio. More Lounge settings will land here.
               </p>
+            </div>
+
+            <div className="mt-6 border-t border-zinc-800 pt-5">
+              <h3 className="text-[15px] font-semibold text-zinc-100">Menu button layout</h3>
+              <p className="mt-1 text-[13px] leading-relaxed text-zinc-500">
+                Choose how the <span className="text-zinc-400">+</span> menu arranges shortcuts. Applies on the Lounge
+                feed (max-width column).
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => onDockMenuLayoutChange?.('wheel')}
+                  className={`min-h-12 w-full rounded-xl border px-4 py-3 text-left text-[15px] font-semibold touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                    dockMenuLayout === 'wheel'
+                      ? 'border-[#00f5ff]/90 bg-[#001828]/95 text-white shadow-[0_0_14px_rgba(0,245,255,0.35)]'
+                      : 'border-zinc-700/90 bg-zinc-950/80 text-zinc-200 hover:bg-zinc-900/70'
+                  }`}
+                >
+                  Wheel (O)
+                  <span className="mt-0.5 block text-[12px] font-normal text-zinc-500">
+                    Icons in an arc around the button; spin the ring if some sit off-screen.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDockMenuLayoutChange?.('cornerL')}
+                  className={`min-h-12 w-full rounded-xl border px-4 py-3 text-left text-[15px] font-semibold touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                    dockMenuLayout === 'cornerL'
+                      ? 'border-[#00f5ff]/90 bg-[#001828]/95 text-white shadow-[0_0_14px_rgba(0,245,255,0.35)]'
+                      : 'border-zinc-700/90 bg-zinc-950/80 text-zinc-200 hover:bg-zinc-900/70'
+                  }`}
+                >
+                  Edge (L)
+                  <span className="mt-0.5 block text-[12px] font-normal text-zinc-500">
+                    Button snaps to the bottom corner; icons run in an L along the bottom edge and side (mirrored on
+                    the right).
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (

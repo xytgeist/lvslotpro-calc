@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import {
   fetchOwnProfile,
   formatProfileSaveDebugError,
@@ -74,9 +74,17 @@ import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 // LOUNGE_DOCK_FOOTER_BAR_DISABLED — classic dock icon row (FAB wheel is primary nav). Re-enable import + JSX below to restore.
 // import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
 import LoungeDockArcCarouselPrototype from '../../components/LoungeDockArcCarouselPrototype.jsx'
-import { scheduleLoungeComposerTextareaFocus } from './loungeDockComposeFocus.js'
+import {
+  focusLoungeComposerCaption,
+  scheduleLoungeComposerTextareaFocus,
+} from './loungeDockComposeFocus.js'
 import { buildLoungeDockArcCarouselItems } from '../../components/loungeDockArcCarouselItems.jsx'
 import { dockChromeHeightFromTitleBarPx } from '../../utils/loungeDockChrome.js'
+import {
+  LOUNGE_DOCK_MENU_LAYOUT_KEY,
+  readLoungeDockMenuLayout,
+  writeLoungeDockMenuLayout,
+} from '../../utils/loungeDockFabPosition.js'
 import {
   loungeTitleRevealAfterScrollStep,
   loungeTitleRevealClampScrollDelta,
@@ -262,6 +270,8 @@ export default function SocialFeed({
   const profileModalCloseFallbackTimerRef = useRef(0)
   /** `closeProfileModal` is defined later; dock Home uses this ref. */
   const closeProfileModalRef = useRef(() => {})
+  /** `finalizeProfileModalClose` is defined later; dock compose dismisses profile without animation wait. */
+  const finalizeProfileModalCloseRef = useRef(() => {})
   const [profileModalLoading, setProfileModalLoading] = useState(false)
   const [profileModalErr, setProfileModalErr] = useState('')
   const [profileModalData, setProfileModalData] = useState(null)
@@ -337,6 +347,9 @@ export default function SocialFeed({
   /** Left dock: search / notifications / chat (Lounge shell). */
   const [loungeDockPanel, setLoungeDockPanel] = useState(null)
   const [loungeFabPointerBlocked, setLoungeFabPointerBlocked] = useState(false)
+  const [loungeDockMenuLayout, setLoungeDockMenuLayout] = useState(() =>
+    typeof window !== 'undefined' ? readLoungeDockMenuLayout() : 'wheel',
+  )
   const [loungePanelTitleReveal, setLoungePanelTitleReveal] = useState(1)
   /** When set, Chat panel opens a DM with this user (cleared after `open_dm` runs). */
   const [chatDockInitialPeerUserId, setChatDockInitialPeerUserId] = useState(null)
@@ -558,6 +571,19 @@ export default function SocialFeed({
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', sync)
+    }
+  }, [])
+
+  useEffect(() => {
+    const sync = () => setLoungeDockMenuLayout(readLoungeDockMenuLayout())
+    window.addEventListener('loungeDockMenuLayoutChange', sync)
+    const onStorage = (e) => {
+      if (e.key === LOUNGE_DOCK_MENU_LAYOUT_KEY) sync()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.removeEventListener('loungeDockMenuLayoutChange', sync)
+      window.removeEventListener('storage', onStorage)
     }
   }, [])
 
@@ -2286,27 +2312,39 @@ export default function SocialFeed({
       onRequireAuth?.('login')
       return
     }
-    setLoungeDockPanel(null)
-    setChatDockInitialPeerUserId(null)
-    if (profileModalOpen) closeProfileModalRef.current()
-    if (loungePostDetail) closeLoungePostDetail()
-    scrollLoungeFeedToTop()
-    loungeTitleRevealRef.current = 1
-    setLoungeTitleReveal(1)
-    composerFoldedFromFeedScrollRef.current = false
-    composerFoldRevealRef.current = 1
-    setComposerFoldReveal(1)
-    composerExpandedRef.current = true
-    setComposerExpanded(true)
-    setComposerFocusToken((t) => t + 1)
+    /** Dismiss z-stacked chrome synchronously so the caption is focusable in the same user gesture (iOS keyboard). */
+    if (loungePostDetail) finalizeLoungePostDetailClose()
+    if (profileModalOpen) finalizeProfileModalCloseRef.current?.()
+
+    flushSync(() => {
+      setLoungeDockPanel(null)
+      setChatDockInitialPeerUserId(null)
+      loungeTitleRevealRef.current = 1
+      setLoungeTitleReveal(1)
+      composerFoldedFromFeedScrollRef.current = false
+      composerFoldRevealRef.current = 1
+      setComposerFoldReveal(1)
+      composerExpandedRef.current = true
+      setComposerExpanded(true)
+      setComposerFocusToken((t) => t + 1)
+    })
+
+    scrollLoungeFeedToTopInstant()
+    focusLoungeComposerCaption(() => composerTextareaRef.current, {
+      scrollFeedToTop: scrollLoungeFeedToTopInstant,
+    })
+    scheduleLoungeComposerTextareaFocus({
+      getTextarea: () => composerTextareaRef.current,
+      scrollFeedToTop: scrollLoungeFeedToTopInstant,
+    })
   }, [
     loungeFeedBrowseMode,
     loungeReadOnly,
     onRequireAuth,
     profileModalOpen,
     loungePostDetail,
-    closeLoungePostDetail,
-    scrollLoungeFeedToTop,
+    finalizeLoungePostDetailClose,
+    scrollLoungeFeedToTopInstant,
   ])
 
   const loungeFollowingFilterOn = loungeFeedScope === LOUNGE_FEED_SCOPE_FOLLOWING
@@ -4003,6 +4041,10 @@ export default function SocialFeed({
     closeProfileModalRef.current = closeProfileModal
   }, [closeProfileModal])
 
+  useEffect(() => {
+    finalizeProfileModalCloseRef.current = finalizeProfileModalClose
+  }, [finalizeProfileModalClose])
+
   const openProfileModal = useCallback(
     async (post) => {
       if (loungeReadOnly) {
@@ -4335,6 +4377,7 @@ export default function SocialFeed({
           items={loungeArcCarouselItems}
           reveal={loungeDockPanel ? loungePanelTitleReveal : loungeTitleReveal}
           panelChrome={loungeDockPanel}
+          menuLayout={loungeDockMenuLayout}
           onPointerBlockChange={setLoungeFabPointerBlocked}
         />
       ) : null}
@@ -4599,9 +4642,19 @@ export default function SocialFeed({
                 onClick={() => {
                   composerFoldedFromFeedScrollRef.current = false
                   composerFoldRevealRef.current = 1
-                  setComposerFoldReveal(1)
-                  composerExpandedRef.current = true
-                  setComposerExpanded(true)
+                  flushSync(() => {
+                    setComposerFoldReveal(1)
+                    composerExpandedRef.current = true
+                    setComposerExpanded(true)
+                    setComposerFocusToken((t) => t + 1)
+                  })
+                  focusLoungeComposerCaption(() => composerTextareaRef.current, {
+                    scrollFeedToTop: scrollLoungeFeedToTopInstant,
+                  })
+                  scheduleLoungeComposerTextareaFocus({
+                    getTextarea: () => composerTextareaRef.current,
+                    scrollFeedToTop: scrollLoungeFeedToTopInstant,
+                  })
                 }}
                 className="mt-0.5 flex min-h-10 w-full min-w-0 touch-manipulation items-center justify-start sm:min-h-[2.75rem] text-left text-[17px] leading-[1.25] text-zinc-500"
               >
@@ -5959,6 +6012,8 @@ export default function SocialFeed({
           chatInitialPeerUserId={chatDockInitialPeerUserId}
           onChatInitialPeerCleared={clearChatDockInitialPeer}
           blockUnderlyingPointer={loungeFabPointerBlocked}
+          dockMenuLayout={loungeDockMenuLayout}
+          onDockMenuLayoutChange={writeLoungeDockMenuLayout}
           onTitleRevealChange={onLoungePanelTitleReveal}
         />
       ) : null}

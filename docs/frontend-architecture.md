@@ -62,4 +62,4 @@ Structural or bundling changes here should land in the **same PR** as the code. 
 
 ---
 
-_Last aligned with the modular `App` + `AppShell` + `features/*` layout; Lounge row expanded 2026-05-14 for FAB wheel nav, chip-heart likes, and dock compose focus._
+_Last aligned with the modular `App` + `AppShell` + `features/*` layout; Lounge row expanded 2026-05-14 for FAB wheel nav, chip-heart likes, and dock compose focus; 2026-05-15 adds Settings **`loungeDockMenuLayout:v1`** (wheel vs Edge L)._

@@ -1,5 +1,8 @@
 /** @typedef {{ xPct: number, yPct: number, locked: boolean }} LoungeDockFabPrefs */
 
+/** `'wheel'` = ring carousel (O); `'cornerL'` = bottom-corner L / Г. */
+export const LOUNGE_DOCK_MENU_LAYOUT_KEY = 'loungeDockMenuLayout:v1'
+
 export const LOUNGE_DOCK_FAB_STORAGE_KEY = 'loungeDockFab:v1'
 export const LOUNGE_DOCK_FAB_SIZE_PX = 50
 const EDGE_PAD_PX = 20
@@ -62,6 +65,71 @@ export function loungeDockFabPositionFromPct(xPct, yPct, bounds) {
   return {
     left: bounds.minLeft + clamp(xPct, 0, 1) * (bounds.maxLeft - bounds.minLeft),
     top: bounds.minTop + clamp(yPct, 0, 1) * (bounds.maxTop - bounds.minTop),
+  }
+}
+
+/** Gap between L-mode chip centers (matches visual spacing of wheel items). */
+const LOUNGE_DOCK_L_GAP_PX = 8
+
+export function loungeDockLShapeStepPx() {
+  return LOUNGE_DOCK_FAB_SIZE_PX + LOUNGE_DOCK_L_GAP_PX
+}
+
+/**
+ * Snap FAB to bottom-left or bottom-right corner (vertex of the L).
+ * @param {boolean} alignLeft — `true` → bottom-left, `false` → bottom-right
+ */
+export function loungeDockFabCornerPosition(viewportW, viewportH, fabSize, alignLeft) {
+  const b = loungeDockFabMoveBounds(viewportW, viewportH, fabSize)
+  return {
+    left: alignLeft ? b.minLeft : b.maxLeft,
+    top: b.maxTop,
+  }
+}
+
+/**
+ * L-shaped offsets from FAB center: first ⌈n/2⌉ items along bottom (into the screen),
+ * rest along the vertical edge (up). Left corner: bottom goes +x; right corner: bottom goes −x.
+ * @returns {{ x: number, y: number, onScreen: boolean }[]}
+ */
+export function loungeDockLShapeOffsets(itemCount, alignLeft) {
+  if (itemCount <= 0) return []
+  const step = loungeDockLShapeStepPx()
+  const nBottom = Math.ceil(itemCount / 2)
+  const out = []
+  for (let i = 0; i < itemCount; i += 1) {
+    if (i < nBottom) {
+      const k = i + 1
+      const x = alignLeft ? k * step : -k * step
+      out.push({ x, y: 0, onScreen: true })
+    } else {
+      const j = i - nBottom + 1
+      out.push({ x: 0, y: -j * step, onScreen: true })
+    }
+  }
+  return out
+}
+
+/** @returns {'wheel' | 'cornerL'} */
+export function readLoungeDockMenuLayout() {
+  if (typeof window === 'undefined') return 'wheel'
+  try {
+    const v = window.localStorage.getItem(LOUNGE_DOCK_MENU_LAYOUT_KEY)
+    return v === 'cornerL' ? 'cornerL' : 'wheel'
+  } catch {
+    return 'wheel'
+  }
+}
+
+/** @param {'wheel' | 'cornerL'} mode */
+export function writeLoungeDockMenuLayout(mode) {
+  if (typeof window === 'undefined') return
+  try {
+    const v = mode === 'cornerL' ? 'cornerL' : 'wheel'
+    window.localStorage.setItem(LOUNGE_DOCK_MENU_LAYOUT_KEY, v)
+    window.dispatchEvent(new Event('loungeDockMenuLayoutChange'))
+  } catch {
+    /* quota / private mode */
   }
 }
 

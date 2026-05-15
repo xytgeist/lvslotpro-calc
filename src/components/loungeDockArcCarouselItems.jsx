@@ -147,36 +147,14 @@ export function buildLoungeDockArcCarouselItems({
   activePanel,
 }) {
   const onFeedHome = !activePanel
+  /** Source order = wheel ring order after `LoungeDockArcCarouselPrototype` prepends nothing: `home` stays index 0; `cornerL` L-shape uses first ⌈n/2⌉ along bottom (inside→out), rest up the side. */
   return [
-    {
-      id: 'compose',
-      label: 'New post',
-      icon: <IconCompose />,
-      onSelect: onCompose,
-      active: composeActive,
-      disabled: composeDisabled,
-    },
     {
       id: 'home',
       label: 'Home',
       icon: <IconHome />,
       onSelect: onHome,
       active: onFeedHome,
-    },
-    {
-      id: 'search',
-      label: 'Search',
-      icon: <IconSearch />,
-      onSelect: onSearch,
-      active: activePanel === 'search',
-    },
-    {
-      id: 'following',
-      label: 'Following',
-      icon: <IconFollowing active={followingFilterOn} />,
-      onSelect: onFollowingFilterToggle,
-      filterOnBorder: followingFilterOn,
-      disabled: followingFilterDisabled,
     },
     {
       id: 'notifications',
@@ -193,6 +171,29 @@ export function buildLoungeDockArcCarouselItems({
       iconScale: 1.14,
       onSelect: onChat,
       active: activePanel === 'chat',
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      icon: <IconSearch />,
+      onSelect: onSearch,
+      active: activePanel === 'search',
+    },
+    {
+      id: 'compose',
+      label: 'New post',
+      icon: <IconCompose />,
+      onSelect: onCompose,
+      active: composeActive,
+      disabled: composeDisabled,
+    },
+    {
+      id: 'following',
+      label: 'Following',
+      icon: <IconFollowing active={followingFilterOn} />,
+      onSelect: onFollowingFilterToggle,
+      filterOnBorder: followingFilterOn,
+      disabled: followingFilterDisabled,
     },
     {
       id: 'settings',

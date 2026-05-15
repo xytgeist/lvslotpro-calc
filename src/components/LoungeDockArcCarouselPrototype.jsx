@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX,
+  LOUNGE_DOCK_CAROUSEL_RADIUS_PX,
   LOUNGE_DOCK_FAB_SIZE_PX,
   loungeDockCarouselSnapRotation,
+  loungeDockFabCornerPosition,
   loungeDockFabDefaultPosition,
   loungeDockFabMoveBounds,
   loungeDockFabPctFromPosition,
   loungeDockFabPositionFromPct,
+  loungeDockLShapeOffsets,
   loungeDockViewportSize,
   loungeDockWheelLayout,
   readLoungeDockFabPrefs,
@@ -79,8 +82,11 @@ export default function LoungeDockArcCarouselPrototype({
   panelChrome = null,
   /** True while the wheel is open or briefly after a wheel icon tap (blocks feed/panel hits). */
   onPointerBlockChange,
+  /** `'wheel'` = ring (O); `'cornerL'` = bottom-corner L / Г along edges. */
+  menuLayout = 'wheel',
 }) {
   const panelCompactChrome = panelChrome != null && PANEL_CHROME_PANELS.has(panelChrome)
+  const isCornerL = menuLayout === 'cornerL'
   const [open, setOpen] = useState(defaultOpen)
   const [fabPos, setFabPos] = useState(null)
   const [repositioning, setRepositioning] = useState(false)
@@ -258,6 +264,18 @@ export default function LoungeDockArcCarouselPrototype({
       }
     }
     const itemRadius = LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX / 2
+    const alignLeft = fabCenterX < viewport.width / 2
+    if (isCornerL) {
+      return {
+        offsets: loungeDockLShapeOffsets(wheelItems.length, alignLeft),
+        radius: LOUNGE_DOCK_CAROUSEL_RADIUS_PX,
+        pickerAngle: 0,
+        focusedIndex: 0,
+        step: 0,
+        homeAnchorAngle: 0,
+        spinEnabled: false,
+      }
+    }
     return loungeDockWheelLayout(
       fabCenterX,
       fabCenterY,
@@ -266,9 +284,17 @@ export default function LoungeDockArcCarouselPrototype({
       viewport,
       itemRadius,
     )
-  }, [fabCenterX, fabCenterY, wheelItems.length, carouselRotation, viewport.width, viewport.height])
+  }, [
+    fabCenterX,
+    fabCenterY,
+    wheelItems.length,
+    carouselRotation,
+    viewport.width,
+    viewport.height,
+    isCornerL,
+  ])
 
-  const spinEnabled = open && wheelLayout.spinEnabled
+  const spinEnabled = open && wheelLayout.spinEnabled && !isCornerL
 
   const spinHitRadiusPx =
     wheelLayout.radius > 0
@@ -284,6 +310,25 @@ export default function LoungeDockArcCarouselPrototype({
     },
     [viewport.width, viewport.height],
   )
+
+  /** When using L layout, snap FAB to bottom corner for the screen half (preferences / resize / mode switch). */
+  useEffect(() => {
+    if (!isCornerL) return
+    const cur = fabPosRef.current
+    if (!cur) return
+    const cx = cur.left + LOUNGE_DOCK_FAB_SIZE_PX / 2
+    const alignLeft = cx < viewport.width / 2
+    const pos = loungeDockFabCornerPosition(
+      viewport.width,
+      viewport.height,
+      LOUNGE_DOCK_FAB_SIZE_PX,
+      alignLeft,
+    )
+    if (Math.abs(pos.left - cur.left) < 0.5 && Math.abs(pos.top - cur.top) < 0.5) return
+    fabPosRef.current = pos
+    setFabPos(pos)
+    persistFabPrefs(pos)
+  }, [isCornerL, viewport.width, viewport.height, persistFabPrefs])
 
   const cancelFabLongPress = useCallback(() => {
     longPressArmedRef.current = false
@@ -493,10 +538,35 @@ export default function LoungeDockArcCarouselPrototype({
         setOpen(false)
         return
       }
+      if (isCornerL) {
+        const cur = fabPosRef.current
+        if (cur) {
+          const cx = cur.left + LOUNGE_DOCK_FAB_SIZE_PX / 2
+          const alignLeft = cx < viewport.width / 2
+          const pos = loungeDockFabCornerPosition(
+            viewport.width,
+            viewport.height,
+            LOUNGE_DOCK_FAB_SIZE_PX,
+            alignLeft,
+          )
+          fabPosRef.current = pos
+          setFabPos(pos)
+          persistFabPrefs(pos)
+        }
+      }
       resetWheelToHomeAnchor()
       setOpen(true)
     },
-    [persistFabPrefs, fabVisible, resetWheelToHomeAnchor, endFabReposition, armRepositionClickGuard],
+    [
+      persistFabPrefs,
+      fabVisible,
+      resetWheelToHomeAnchor,
+      endFabReposition,
+      armRepositionClickGuard,
+      isCornerL,
+      viewport.width,
+      viewport.height,
+    ],
   )
 
   const onFabPointerCancel = useCallback(
@@ -711,7 +781,7 @@ export default function LoungeDockArcCarouselPrototype({
       type="button"
       disabled={item.disabled}
       aria-label={item.label}
-      title={offScreen ? `${item.label} (spin wheel to reach)` : item.label}
+      title={isCornerL || !offScreen ? item.label : `${item.label} (spin wheel to reach)`}
       onPointerDown={
         wheelSpin ? onItemPointerDown : wheelTapOnly || compactChip ? blockPointerDefault : undefined
       }
@@ -863,7 +933,9 @@ export default function LoungeDockArcCarouselPrototype({
 
       <div
         ref={fabHostRef}
-        className="pointer-events-none fixed z-[25] overflow-visible transition-opacity duration-300 ease-out will-change-[opacity]"
+        className={`pointer-events-none fixed z-[25] overflow-visible transition-opacity duration-300 ease-out will-change-[opacity] ${
+          isCornerL ? 'transition-[left,top] duration-300 ease-out' : ''
+        }`}
         style={{
           left: fabPos.left,
           top: fabPos.top,
