@@ -17,6 +17,7 @@ import LoungePostArticle from './LoungePostArticle'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
+import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
 
 const PROFILE_TAB_IDS = ['posts', 'replies', 'likes', 'bookmarks']
 
@@ -24,13 +25,6 @@ const PROFILE_LIKED_POST_SELECT =
   'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height'
 
 const PROFILE_HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
-
-function formatCount(n) {
-  if (!Number.isFinite(n) || n < 0) return '0'
-  if (n < 1000) return String(n)
-  if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
-  return `${Math.round(n / 1000)}K`
-}
 
 function profileTabLabel(id) {
   if (id === 'posts') return 'Posts'
@@ -997,11 +991,15 @@ export default function LoungeProfileFullScreen({
 
             <div className="mt-4 flex gap-6 text-[15px]">
               <div>
-                <span className="font-bold text-white">{formatCount(followingCount)}</span>{' '}
+                <span className="font-bold text-white" title={fullStatCountTitle(followingCount)}>
+                  {formatCompactStatCount(followingCount)}
+                </span>{' '}
                 <span className="text-zinc-500">Following</span>
               </div>
               <div>
-                <span className="font-bold text-white">{formatCount(followerCount)}</span>{' '}
+                <span className="font-bold text-white" title={fullStatCountTitle(followerCount)}>
+                  {formatCompactStatCount(followerCount)}
+                </span>{' '}
                 <span className="text-zinc-500">Followers</span>
               </div>
             </div>

@@ -55,6 +55,7 @@ import {
   runComposerStreamVideoPrepWithRetries,
   uploadEncodedVideoToCfStreamWithRetries,
 } from './loungeComposerVideoPrep.js'
+import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
 import { renderRichCaption } from './loungeCaption'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
@@ -92,11 +93,16 @@ import {
 import LoungeDockSlidePanels from '../../components/LoungeDockSlidePanels.jsx'
 import LoungePostCommentThread from './LoungePostCommentThread.jsx'
 import { LOUNGE_FEED_SCOPE_ALL, LOUNGE_FEED_SCOPE_FOLLOWING } from '../../utils/loungeFeedScope'
-import { loungeCommentRootId } from '../../utils/loungeFeedComments.js'
 
 /** DB raises exception 'MAX_PINNED_POSTS' when a third visible pin is attempted. */
 const LOUNGE_MAX_PINNED_ALERT =
   'The maximum number of pinned posts is two. Unpin a post to pin this one.'
+
+/** Matches feed caption cap (`feed_comments.body` check constraint after migration). */
+const LOUNGE_COMMENT_BODY_MAX = 280
+
+/** Post detail reply composer — collapsed pill copy when empty + expanded textarea placeholder. */
+const LOUNGE_DETAIL_COMMENT_PLACEHOLDER = "Post your reply (or don't, pussy)"
 
 /** Shown in upload bar `detail` instead of raw telemetry when `onUploadDiagnostic` fires. */
 const LOUNGE_UPLOAD_BAR_GOBLIN_DETAIL = 'Ether goblins ate your shit...trying again...'
@@ -291,6 +297,9 @@ export default function SocialFeed({
   const [loungeDetailRepostMenuOpen, setLoungeDetailRepostMenuOpen] = useState(false)
   const loungeDetailRepostMenuRef = useRef(null)
   const loungePostDetailScrollRef = useRef(null)
+  const loungeDetailCommentTextareaRef = useRef(null)
+  const loungeDetailCommentDraftRef = useRef('')
+  const loungeDetailCommentComposerHintTimerRef = useRef(0)
   const loungePostDetailTitleBarRef = useRef(null)
   const loungePostDetailTitleRevealRef = useRef(1)
   const [loungePostDetailTitleReveal, setLoungePostDetailTitleReveal] = useState(1)
@@ -331,10 +340,13 @@ export default function SocialFeed({
   const [loungeDetailCommentBusy, setLoungeDetailCommentBusy] = useState(false)
   const [loungeDetailCommentDraft, setLoungeDetailCommentDraft] = useState('')
   const [loungeDetailCommentErr, setLoungeDetailCommentErr] = useState('')
-  /** Reply target: `null` = top-level comment on the post. */
-  const [loungeCommentReplyTo, setLoungeCommentReplyTo] = useState(null)
-  /** Thread roots to auto-expand after posting a reply (merged in `LoungePostCommentThread`). */
-  const [loungeCommentExpandRoots, setLoungeCommentExpandRoots] = useState([])
+  /** Mirrors feed composer: collapsed one-line affordance → expanded textarea + toolbar. */
+  const [loungeDetailCommentComposerExpanded, setLoungeDetailCommentComposerExpanded] = useState(false)
+  const [loungeDetailCommentComposerHint, setLoungeDetailCommentComposerHint] = useState('')
+  /** iOS / visualViewport: lift footer above software keyboard. */
+  const [loungeDetailCommentKbOverlapPx, setLoungeDetailCommentKbOverlapPx] = useState(0)
+  /** Drill-down into a comment thread (`slice(-1)` = composer reply parent). */
+  const [loungeCommentDetailPathIds, setLoungeCommentDetailPathIds] = useState([])
   const [composerUserId, setComposerUserId] = useState('')
   /** Session user for email-based initials before `profiles` exists. */
   const [composerAuthUser, setComposerAuthUser] = useState(null)
@@ -426,8 +438,9 @@ export default function SocialFeed({
   )
 
   const loungeDetailShowPostMenu = useMemo(
-    () => Boolean(loungePostDetail?.id && !loungeDetailEditing),
-    [loungePostDetail?.id, loungeDetailEditing]
+    () =>
+      Boolean(loungePostDetail?.id && !loungeDetailEditing && loungeCommentDetailPathIds.length === 0),
+    [loungePostDetail?.id, loungeDetailEditing, loungeCommentDetailPathIds.length]
   )
 
   /** Starter row from `ensureDefaultProfileRow`: must confirm once (cannot dismiss until Save). */
@@ -495,6 +508,81 @@ export default function SocialFeed({
     if (!el) return
     el.scrollTo({ top: 0, behavior: 'auto' })
   }, [])
+
+  const scrollLoungePostDetailToTopInstant = useCallback(() => {
+    const el = loungePostDetailScrollRef.current
+    if (!el) return
+    el.scrollTo({ top: 0, behavior: 'auto' })
+    loungePostDetailScrollPrevTopRef.current = 0
+    loungePostDetailTitleRevealRef.current = 1
+    setLoungePostDetailTitleReveal(1)
+  }, [])
+
+  const expandAndFocusLoungeDetailCommentComposer = useCallback(() => {
+    flushSync(() => {
+      setLoungeDetailCommentComposerExpanded(true)
+    })
+    scrollLoungePostDetailToTopInstant()
+    focusLoungeComposerCaption(() => loungeDetailCommentTextareaRef.current, {
+      scrollFeedToTop: scrollLoungePostDetailToTopInstant,
+    })
+    scheduleLoungeComposerTextareaFocus({
+      getTextarea: () => loungeDetailCommentTextareaRef.current,
+      scrollFeedToTop: scrollLoungePostDetailToTopInstant,
+    })
+  }, [scrollLoungePostDetailToTopInstant])
+
+  const flashLoungeDetailCommentComposerHint = useCallback((msg) => {
+    setLoungeDetailCommentComposerHint(msg)
+    const prev = loungeDetailCommentComposerHintTimerRef.current
+    if (prev) window.clearTimeout(prev)
+    loungeDetailCommentComposerHintTimerRef.current = window.setTimeout(() => {
+      loungeDetailCommentComposerHintTimerRef.current = 0
+      setLoungeDetailCommentComposerHint('')
+    }, 4200)
+  }, [])
+
+  useEffect(() => {
+    loungeDetailCommentDraftRef.current = loungeDetailCommentDraft
+  }, [loungeDetailCommentDraft])
+
+  useEffect(() => {
+    if (!loungePostDetail || loungeReadOnly) {
+      setLoungeDetailCommentKbOverlapPx(0)
+      return undefined
+    }
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return undefined
+    const sync = () => {
+      try {
+        const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+        setLoungeDetailCommentKbOverlapPx(Number.isFinite(overlap) ? overlap : 0)
+      } catch {
+        setLoungeDetailCommentKbOverlapPx(0)
+      }
+    }
+    sync()
+    vv.addEventListener('resize', sync)
+    vv.addEventListener('scroll', sync)
+    return () => {
+      vv.removeEventListener('resize', sync)
+      vv.removeEventListener('scroll', sync)
+      setLoungeDetailCommentKbOverlapPx(0)
+    }
+  }, [loungePostDetail, loungeReadOnly])
+
+  useLayoutEffect(() => {
+    const ta = loungeDetailCommentTextareaRef.current
+    if (!ta || !loungeDetailCommentComposerExpanded || !loungePostDetail) return
+    try {
+      ta.style.height = 'auto'
+      const max = Math.round(Math.min(window.innerHeight * 0.42, 352))
+      const lineFloor = 38
+      ta.style.height = `${Math.min(Math.max(ta.scrollHeight, lineFloor), max)}px`
+    } catch {
+      // ignore
+    }
+  }, [loungeDetailCommentDraft, loungeDetailCommentComposerExpanded, loungePostDetail])
 
   useEffect(() => {
     if (!composerExpanded || composerFoldReveal < 0.88 || loungeDockPanel) return undefined
@@ -2025,7 +2113,14 @@ export default function SocialFeed({
     if (!loungePostDetail?.id || !composerUserId || loungeReadOnly) return
     const body = loungeDetailCommentDraft.trim()
     if (body.length === 0) return
-    const parentId = loungeCommentReplyTo?.id || null
+    if (body.length > LOUNGE_COMMENT_BODY_MAX) {
+      setLoungeDetailCommentErr(`Reply must be ${LOUNGE_COMMENT_BODY_MAX} characters or fewer.`)
+      return
+    }
+    const parentId =
+      loungeCommentDetailPathIds.length > 0
+        ? loungeCommentDetailPathIds[loungeCommentDetailPathIds.length - 1]
+        : null
     setLoungeDetailCommentBusy(true)
     setLoungeDetailCommentErr('')
     const insertRow = { post_id: loungePostDetail.id, user_id: composerUserId, body }
@@ -2046,17 +2141,9 @@ export default function SocialFeed({
       .eq('user_id', composerUserId)
       .maybeSingle()
     const row = { ...data, author_profile: pr.data || composerUserProfile || null }
-    setLoungeDetailComments((c) => {
-      const next = [...c, row]
-      if (parentId) {
-        const byId = new Map(next.map((r) => [r.id, r]))
-        const rootId = loungeCommentRootId(parentId, byId)
-        if (rootId) setLoungeCommentExpandRoots([rootId])
-      }
-      return next
-    })
+    setLoungeDetailComments((c) => [...c, row])
     setLoungeDetailCommentDraft('')
-    setLoungeCommentReplyTo(null)
+    setLoungeDetailCommentComposerExpanded(false)
     if (!parentId) {
       const { data: countRow } = await supabaseClient
         .from('community_feed_posts')
@@ -2076,7 +2163,7 @@ export default function SocialFeed({
     composerUserId,
     composerUserProfile,
     defaultInteraction,
-    loungeCommentReplyTo?.id,
+    loungeCommentDetailPathIds,
     loungeDetailCommentDraft,
     loungePostDetail?.id,
     loungeReadOnly,
@@ -2085,26 +2172,16 @@ export default function SocialFeed({
     supabaseClient,
   ])
 
-  const onLoungeCommentReply = useCallback((comment) => {
-    if (!comment?.id) return
-    const p = comment.author_profile
-    const h = String(p?.handle || '').trim()
-    const label = h ? `@${h}` : String(p?.display_name || 'Member').trim() || 'Member'
-    setLoungeCommentReplyTo({ id: comment.id, label })
-    setLoungeDetailCommentErr('')
-    requestAnimationFrame(() => {
-      document.getElementById('lounge-detail-comment')?.focus()
-    })
-  }, [])
-
   useEffect(() => {
     if (!loungePostDetail?.id || loungeReadOnly) {
       setLoungeDetailComments([])
       setLoungeDetailCommentsLoading(false)
       setLoungeDetailCommentErr('')
+      setLoungeCommentDetailPathIds([])
       return
     }
     let cancelled = false
+    setLoungeCommentDetailPathIds([])
     setLoungeDetailCommentsLoading(true)
     setLoungeDetailCommentErr('')
     ;(async () => {
@@ -2165,8 +2242,15 @@ export default function SocialFeed({
     setLoungeDetailCommentBusy(false)
     setLoungeDetailCommentDraft('')
     setLoungeDetailCommentErr('')
-    setLoungeCommentReplyTo(null)
-    setLoungeCommentExpandRoots([])
+    const ht = loungeDetailCommentComposerHintTimerRef.current
+    if (ht) {
+      window.clearTimeout(ht)
+      loungeDetailCommentComposerHintTimerRef.current = 0
+    }
+    setLoungeDetailCommentComposerExpanded(false)
+    setLoungeDetailCommentComposerHint('')
+    setLoungeDetailCommentKbOverlapPx(0)
+    setLoungeCommentDetailPathIds([])
     loungeTitleRevealRef.current = 1
     setLoungeTitleReveal(1)
   }, [])
@@ -2217,6 +2301,16 @@ export default function SocialFeed({
       setLoungeDetailEditMediaKind('')
       setLoungePostDetailMenuOpen(false)
       setLoungeDetailRepostMenuOpen(false)
+      setLoungeCommentDetailPathIds([])
+      setLoungeDetailCommentDraft('')
+      setLoungeDetailCommentErr('')
+      setLoungeDetailCommentComposerExpanded(false)
+      setLoungeDetailCommentComposerHint('')
+      const hci = loungeDetailCommentComposerHintTimerRef.current
+      if (hci) {
+        window.clearTimeout(hci)
+        loungeDetailCommentComposerHintTimerRef.current = 0
+      }
       setLoungePostDetail(post)
       setLoungeDetailEditImageUrls([])
       setLoungeDetailEditGifUrl('')
@@ -2471,7 +2565,11 @@ export default function SocialFeed({
         repostMenuScrollRootRef={loungePostDetailScrollRef}
         onCommentClick={() => {
           if (openProfileGateIfNeeded()) return
-          document.getElementById('lounge-detail-comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          const elId =
+            loungeCommentDetailPathIds.length > 0
+              ? 'lounge-detail-comments-thread'
+              : 'lounge-detail-comments'
+          document.getElementById(elId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }}
         repostActionBusy={repostManageBusy}
       />
@@ -2490,6 +2588,7 @@ export default function SocialFeed({
       requireLoungeAuth,
       openProfileGateIfNeeded,
       loungePostDetailScrollRef,
+      loungeCommentDetailPathIds.length,
       repostManageBusy,
     ],
   )
@@ -2558,6 +2657,73 @@ export default function SocialFeed({
       // ignore
     }
   }, [])
+
+  const openLoungeCommentDrillFromRoots = useCallback(
+    (comment) => {
+      if (!comment?.id) return
+      setLoungePostDetailMenuOpen(false)
+      cancelLoungeDetailEdit()
+      setLoungeCommentDetailPathIds([comment.id])
+      requestAnimationFrame(() => {
+        scrollLoungePostDetailToTopInstant()
+      })
+    },
+    [cancelLoungeDetailEdit, scrollLoungePostDetailToTopInstant],
+  )
+
+  const drillDeeperIntoLoungeComment = useCallback((comment) => {
+    if (!comment?.id) return
+    setLoungeCommentDetailPathIds((prev) => [...prev, comment.id])
+    requestAnimationFrame(() => {
+      scrollLoungePostDetailToTopInstant()
+    })
+  }, [scrollLoungePostDetailToTopInstant])
+
+  const buildLoungeCommentDrillPath = useCallback((commentId) => {
+    const rows = loungeDetailComments
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    const chain = []
+    let cur = byId.get(commentId)
+    if (!cur) return chain
+    while (cur) {
+      chain.unshift(cur.id)
+      const pid = cur.parent_id
+      cur = pid && byId.has(pid) ? byId.get(pid) : null
+    }
+    return chain
+  }, [loungeDetailComments])
+
+  const onLoungeCommentReplyInteraction = useCallback(
+    (comment) => {
+      if (!comment?.id) return
+      if (loungeReadOnly) {
+        requireLoungeAuth()
+        return
+      }
+      if (openProfileGateIfNeeded()) return
+      cancelLoungeDetailEdit()
+      setLoungePostDetailMenuOpen(false)
+      const chain = buildLoungeCommentDrillPath(comment.id)
+      if (chain.length === 0) return
+      setLoungeCommentDetailPathIds((prev) => {
+        const same = prev.length === chain.length && prev.every((id, i) => id === chain[i])
+        queueMicrotask(() => {
+          if (!same) scrollLoungePostDetailToTopInstant()
+          expandAndFocusLoungeDetailCommentComposer()
+        })
+        return same ? prev : chain
+      })
+    },
+    [
+      buildLoungeCommentDrillPath,
+      cancelLoungeDetailEdit,
+      expandAndFocusLoungeDetailCommentComposer,
+      loungeReadOnly,
+      openProfileGateIfNeeded,
+      requireLoungeAuth,
+      scrollLoungePostDetailToTopInstant,
+    ],
+  )
 
   const saveLoungeDetailCaption = useCallback(async () => {
     if (!loungePostDetail?.id) return
@@ -5131,17 +5297,19 @@ export default function SocialFeed({
                     return
                   }
                   if (loungeDetailEditing) cancelLoungeDetailEdit()
-                  else closeLoungePostDetail()
+                  else if (loungeCommentDetailPathIds.length > 0) {
+                    setLoungeCommentDetailPathIds((p) => p.slice(0, -1))
+                  } else closeLoungePostDetail()
                 }}
                 className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white [-webkit-tap-highlight-color:transparent]"
-                aria-label="Back to Lounge"
+                aria-label={loungeCommentDetailPathIds.length > 0 ? 'Back' : 'Back to Lounge'}
               >
                 <span className="text-[22px] leading-none" aria-hidden>
                   ←
                 </span>
               </button>
               <h2 id="lounge-post-detail-title" className="min-w-0 flex-1 text-center text-[17px] font-bold text-white">
-                Post
+                {loungeCommentDetailPathIds.length > 0 ? 'Reply' : 'Post'}
               </h2>
               {loungeDetailShowPostMenu ? (
                 <div ref={loungePostDetailMenuWrapRef} className="relative flex h-10 w-10 shrink-0 justify-end">
@@ -5250,6 +5418,7 @@ export default function SocialFeed({
               </div>
             </div>
 
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
               ref={loungePostDetailScrollRef}
               className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
@@ -5259,13 +5428,15 @@ export default function SocialFeed({
                 className="shrink-0"
                 style={{ height: loungePostDetailTitleBarHeight > 0 ? loungePostDetailTitleBarHeight : 56 }}
               />
-              <div className="px-4 py-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+              <div className="px-4 py-4 pb-4">
               {loungeManageErr ? (
                 <div className="mb-4 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] leading-tight text-rose-200">
                   {loungeManageErr}
                 </div>
               ) : null}
 
+              {loungeCommentDetailPathIds.length === 0 ? (
+              <>
               <div className="flex items-start gap-3">
                 <button
                   type="button"
@@ -5522,7 +5693,7 @@ export default function SocialFeed({
                 </>
               )}
 
-              <div className="mt-4 text-[14px] text-zinc-500">
+              <div className="mt-3 text-[14px] text-zinc-500">
                 {formatLoungePostDetailWhen(loungePostDetail.created_at)}
                 {loungePostDetail.edited_at ? (
                   <span className="text-zinc-600"> · Edited</span>
@@ -5547,7 +5718,7 @@ export default function SocialFeed({
                 const plainId = ui.plainRepostChildId
                 const quoteId = ui.quoteRepostChildId
                 return (
-                  <div className="mt-5 border-t border-zinc-800/90 pt-4">
+                  <div className="mt-0">
                     {loungeDetailEditing ? (
                       <>
                         <input
@@ -5581,7 +5752,7 @@ export default function SocialFeed({
                             }
                           }}
                         />
-                        <div className="mb-2 flex w-full items-center gap-2 pr-2 pt-1.5 pb-1">
+                        <div className="mb-1 flex w-full items-center gap-2 pr-2 pb-1 pt-1.5">
                           <button
                             type="button"
                             onClick={() => loungeDetailEditMediaInputRef.current?.click()}
@@ -5640,7 +5811,7 @@ export default function SocialFeed({
                       </>
                     ) : null}
                     <div
-                      className={`flex w-full min-w-0 flex-nowrap items-center justify-between gap-x-1 text-[16px] ${loungeDetailEditing ? 'mt-1' : ''}`}
+                      className={`flex w-full min-w-0 flex-nowrap items-center justify-between gap-x-1 border-b border-zinc-800/90 py-1 text-[16px] ${loungeDetailEditing ? 'mt-1' : ''}`}
                       onClick={(e) => e.stopPropagation()}
                       role="group"
                     >
@@ -5650,25 +5821,34 @@ export default function SocialFeed({
                         onReadOnlyClick={requireLoungeAuth}
                         onClick={() => {
                           if (openProfileGateIfNeeded()) return
-                          document.getElementById('lounge-detail-comments')?.scrollIntoView({
+                          const elId =
+                            loungeCommentDetailPathIds.length > 0
+                              ? 'lounge-detail-comments-thread'
+                              : 'lounge-detail-comments'
+                          document.getElementById(elId)?.scrollIntoView({
                             behavior: 'smooth',
                             block: 'start',
                           })
                         }}
-                        className="inline-flex max-w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                        className="inline-flex max-w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                       >
-                        <svg className={`h-[24px] w-[24px] ${commentClass}`} viewBox="0 0 20 20" aria-hidden>
-                          <path
-                            d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z"
-                            fill="currentColor"
-                            fillOpacity={ro ? 0.08 : ui.commented ? 0.42 : 0.18}
-                            stroke="currentColor"
-                            strokeWidth="1.35"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        {Number.isFinite(commentCount) ? <span className={commentClass}>{commentCount}</span> : null}
+                        <span className="flex w-[24px] shrink-0 justify-center">
+                          <svg
+                            className={`block h-[24px] w-[24px] origin-center scale-y-[1.1] ${commentClass}`}
+                            viewBox="0 0 20 20"
+                            aria-hidden
+                          >
+                            <path
+                              d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        </span>
+                        {Number.isFinite(commentCount) ? (
+                          <span className={commentClass} title={fullStatCountTitle(commentCount)}>
+                            {formatCompactStatCount(commentCount)}
+                          </span>
+                        ) : null}
                       </LoungeFeedStatSlot>
                       <div className="relative shrink-0" ref={loungeDetailRepostMenuRef}>
                         <LoungeFeedStatSlot
@@ -5685,18 +5865,24 @@ export default function SocialFeed({
                             if (openProfileGateIfNeeded()) return
                             setLoungeDetailRepostMenuOpen((o) => !o)
                           }}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                         >
-                          <svg className={`h-[24px] w-[24px] ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
-                            <path
-                              d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
-                              stroke="currentColor"
-                              strokeWidth="1.35"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                          {Number.isFinite(repostCount) ? <span className={repostClass}>{repostCount}</span> : null}
+                          <span className="flex w-[24px] shrink-0 justify-center">
+                            <svg className={`h-[24px] w-[24px] ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                              <path
+                                d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                                stroke="currentColor"
+                                strokeWidth="1.35"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                          {Number.isFinite(repostCount) ? (
+                            <span className={repostClass} title={fullStatCountTitle(repostCount)}>
+                              {formatCompactStatCount(repostCount)}
+                            </span>
+                          ) : null}
                         </LoungeFeedStatSlot>
                         {loungeDetailRepostMenuOpen && !ro ? (
                           <div
@@ -5852,7 +6038,7 @@ export default function SocialFeed({
                           title={ro ? 'Sign in to like' : undefined}
                           onReadOnlyClick={requireLoungeAuth}
                           onClick={() => void toggleInteraction(d.id, 'liked')}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                         >
                           <LoungeLikeStatContent
                             iconClassName={`h-[24px] w-[24px] ${likeClass}`}
@@ -5868,18 +6054,13 @@ export default function SocialFeed({
                         <button
                           type="button"
                           onClick={requireLoungeAuth}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-zinc-600 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-zinc-600 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                           title="Sign in to save posts"
                         >
-                          <svg className={`h-[24px] w-[24px] ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
+                          <svg className={`h-[26px] w-[26px] ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
                             <path
                               d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
                               fill="currentColor"
-                              fillOpacity={0.08}
-                              stroke="currentColor"
-                              strokeWidth="1.35"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
                             />
                           </svg>
                         </button>
@@ -5887,18 +6068,13 @@ export default function SocialFeed({
                         <button
                           type="button"
                           onClick={() => void toggleBookmark(d.id)}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                           title={isBookmarked ? 'Remove bookmark' : 'Save post'}
                         >
-                          <svg className={`h-[24px] w-[24px] ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
+                          <svg className={`h-[26px] w-[26px] ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
                             <path
                               d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
                               fill="currentColor"
-                              fillOpacity={isBookmarked ? 0.55 : 0.18}
-                              stroke="currentColor"
-                              strokeWidth="1.35"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
                             />
                           </svg>
                         </button>
@@ -5908,10 +6084,9 @@ export default function SocialFeed({
                 )
               })()}
 
-              <div id="lounge-detail-comments" className="mt-6 border-t border-zinc-800/90 pt-4">
-                <div className="text-[15px] font-bold text-zinc-200">Comments</div>
+              <div id="lounge-detail-comments" className="pt-1">
                 {loungeReadOnly ? (
-                  <p className="mt-2 text-[14px] text-zinc-500">
+                  <p className="mt-1 text-[14px] text-zinc-500">
                     {typeof loungePostDetail.comment_count === 'number' && loungePostDetail.comment_count > 0
                       ? `${loungePostDetail.comment_count} comment${loungePostDetail.comment_count === 1 ? '' : 's'} · Sign in to read and reply`
                       : 'Sign in to join the conversation.'}
@@ -5919,69 +6094,280 @@ export default function SocialFeed({
                 ) : (
                   <>
                     {loungeDetailCommentsLoading ? (
-                      <div className="mt-2 text-[14px] text-zinc-500">Loading comments…</div>
+                      <div className="mt-1 text-[14px] text-zinc-500">Loading comments…</div>
                     ) : (
                       <LoungePostCommentThread
+                        variant="post"
                         comments={loungeDetailComments}
                         postAuthorUserId={loungePostDetail.user_id || ''}
                         postAgeLabel={postAgeLabel}
-                        readOnly={loungeReadOnly}
-                        onReply={onLoungeCommentReply}
-                        autoExpandThreadRootIds={loungeCommentExpandRoots}
-                        composerSlot={
-                          <>
-                            {loungeDetailCommentErr ? (
-                              <div className="mt-3 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] text-rose-200">
-                                {loungeDetailCommentErr}
-                              </div>
-                            ) : null}
-                            {loungeCommentReplyTo ? (
-                              <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-zinc-700/80 bg-zinc-900/70 px-3 py-2 text-[13px] text-zinc-400">
-                                <span className="min-w-0 truncate">
-                                  Replying to{' '}
-                                  <span className="font-semibold text-zinc-200">{loungeCommentReplyTo.label}</span>
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setLoungeCommentReplyTo(null)}
-                                  className="shrink-0 min-h-9 rounded-lg px-2 text-[13px] font-semibold text-zinc-500 touch-manipulation hover:text-zinc-200"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : null}
-                            <div className="mt-4">
-                              <label htmlFor="lounge-detail-comment" className="sr-only">
-                                {loungeCommentReplyTo ? 'Write a reply' : 'Write a comment'}
-                              </label>
-                              <textarea
-                                id="lounge-detail-comment"
-                                value={loungeDetailCommentDraft}
-                                onChange={(e) => setLoungeDetailCommentDraft(e.target.value)}
-                                placeholder={loungeCommentReplyTo ? 'Write a reply…' : 'Write a comment…'}
-                                maxLength={2000}
-                                rows={3}
-                                className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-[16px] leading-snug text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
-                              />
-                              <div className="mt-2 flex justify-end">
-                                <button
-                                  type="button"
-                                  disabled={loungeDetailCommentBusy || !loungeDetailCommentDraft.trim()}
-                                  onClick={() => void submitLoungeDetailComment()}
-                                  className="min-h-10 rounded-xl bg-violet-600 px-4 text-[14px] font-bold text-white touch-manipulation hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
-                                >
-                                  {loungeDetailCommentBusy ? 'Posting…' : loungeCommentReplyTo ? 'Reply' : 'Comment'}
-                                </button>
-                              </div>
-                            </div>
-                          </>
+                        loungeReadOnly={loungeReadOnly}
+                        requireLoungeAuth={requireLoungeAuth}
+                        openProfileGateIfNeeded={openProfileGateIfNeeded}
+                        onCommentReplyInteraction={onLoungeCommentReplyInteraction}
+                        onOpenCommentThread={openLoungeCommentDrillFromRoots}
+                        onAvatarClickProfile={(c) =>
+                          void openProfileModal({
+                            user_id: c.user_id,
+                            author_profile: c.author_profile,
+                          })
                         }
                       />
                     )}
                   </>
                 )}
               </div>
+              </>
+              ) : (
+              <div id="lounge-detail-comments-thread" className="pt-1">
+                {loungeReadOnly ? (
+                  <p className="mt-1 text-[14px] text-zinc-500">Sign in to read replies and participate.</p>
+                ) : (
+                  <>
+                    {loungeDetailCommentsLoading ? (
+                      <div className="mt-1 text-[14px] text-zinc-500">Loading comments…</div>
+                    ) : (
+                      <LoungePostCommentThread
+                        variant="commentDetail"
+                        focusCommentId={
+                          loungeCommentDetailPathIds[loungeCommentDetailPathIds.length - 1]
+                        }
+                        comments={loungeDetailComments}
+                        postAuthorUserId={loungePostDetail.user_id || ''}
+                        postAgeLabel={postAgeLabel}
+                        loungeReadOnly={loungeReadOnly}
+                        requireLoungeAuth={requireLoungeAuth}
+                        openProfileGateIfNeeded={openProfileGateIfNeeded}
+                        onCommentReplyInteraction={onLoungeCommentReplyInteraction}
+                        onOpenCommentThread={drillDeeperIntoLoungeComment}
+                        onAvatarClickProfile={(c) =>
+                          void openProfileModal({
+                            user_id: c.user_id,
+                            author_profile: c.author_profile,
+                          })
+                        }
+                      />
+                    )}
+                  </>
+                )}
               </div>
+              )}
+              </div>
+            </div>
+            {!loungeReadOnly ? (
+              <div
+                data-lounge-detail-comment-host
+                className="shrink-0 border-t border-zinc-800/90 bg-zinc-950/95 px-3 pt-1 pb-0 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/80"
+                style={{
+                  paddingBottom: `calc(max(0.5rem, env(safe-area-inset-bottom)) + ${loungeDetailCommentKbOverlapPx}px)`,
+                }}
+              >
+                {loungeDetailCommentErr ? (
+                  <div className="mb-1 rounded-xl border border-rose-500/45 bg-rose-950/25 px-2.5 py-1.5 text-[13px] leading-snug text-rose-200">
+                    {loungeDetailCommentErr}
+                  </div>
+                ) : null}
+                {loungeDetailCommentComposerExpanded ? (
+                  <div className="relative shrink-0 rounded-xl border border-zinc-600/65 bg-zinc-700/55 px-2.5 pt-2 pb-1">
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!composerUserId) return
+                          if (openProfileGateIfNeeded()) return
+                          void openProfileModal({
+                            user_id: composerUserId,
+                            author_profile: composerUserProfile,
+                          })
+                        }}
+                        className="mt-px flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 text-[14px] font-bold text-zinc-200 touch-manipulation hover:border-zinc-600 sm:h-10 sm:w-10 sm:text-[15px]"
+                        title="Open your profile"
+                        aria-label="Open your profile"
+                      >
+                        {composerUserProfile?.avatar_url ? (
+                          <img
+                            key={composerUserProfile.avatar_url}
+                            src={composerUserProfile.avatar_url}
+                            alt=""
+                            className="h-full w-full rounded-full object-cover"
+                            loading="eager"
+                            decoding="async"
+                          />
+                        ) : !composerAuthResolved ? (
+                          <span className="block h-full w-full animate-pulse rounded-full bg-zinc-700/55" aria-hidden />
+                        ) : (
+                          <span
+                            className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarToneClass(
+                              composerUserProfile?.user_id || composerUserId || 'me',
+                            )}`}
+                          >
+                            {(() => {
+                              if (composerUserProfile?.display_name?.trim() || composerUserProfile?.handle?.trim()) {
+                                return avatarText({ author_profile: composerUserProfile })
+                              }
+                              if (composerAuthUser) {
+                                const seed = profileSeedFromUser(composerAuthUser)
+                                return profileAvatarInitials(seed.displayName, seed.baseHandle)
+                              }
+                              if (composerUserId) return composerStableInitialsFromUid(composerUserId)
+                              return avatarText({ author_profile: { display_name: 'Me', handle: '' } })
+                            })()}
+                          </span>
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <label htmlFor="lounge-detail-comment" className="sr-only">
+                          Write a reply
+                        </label>
+                        <textarea
+                          ref={loungeDetailCommentTextareaRef}
+                          id="lounge-detail-comment"
+                          value={loungeDetailCommentDraft}
+                          onChange={(e) => {
+                            setLoungeDetailCommentDraft(e.target.value)
+                            setLoungeDetailCommentComposerHint('')
+                          }}
+                          onBlur={(e) => {
+                            const host = e.currentTarget.closest('[data-lounge-detail-comment-host]')
+                            const next = e.relatedTarget
+                            if (host && next instanceof Node && host.contains(next)) return
+                            window.setTimeout(() => {
+                              if (!loungeDetailCommentDraftRef.current.trim()) {
+                                setLoungeDetailCommentComposerExpanded(false)
+                              }
+                            }, 220)
+                          }}
+                          placeholder={LOUNGE_DETAIL_COMMENT_PLACEHOLDER}
+                          maxLength={LOUNGE_COMMENT_BODY_MAX}
+                          rows={1}
+                          className="min-h-[38px] w-full resize-none overflow-hidden bg-transparent px-0 py-1 text-[17px] leading-[1.3] text-zinc-100 outline-none placeholder:text-zinc-500 selection:bg-cyan-500/25 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                          aria-label="Write a reply"
+                        />
+                        {loungeDetailCommentComposerHint ? (
+                          <p className="mb-0.5 text-[12px] leading-snug text-amber-200/90">{loungeDetailCommentComposerHint}</p>
+                        ) : null}
+                        <div className="mx-auto mt-0.5 h-px w-[92%] bg-zinc-700/85" role="presentation" aria-hidden />
+                        <div className="mt-0.5 flex w-full items-center gap-1.5 pb-0 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => flashLoungeDetailCommentComposerHint('Photos and videos are not supported in replies yet.')}
+                            className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 [-webkit-tap-highlight-color:transparent]"
+                            title="Add media"
+                            aria-label="Add media"
+                          >
+                            <svg className="h-7 w-7" viewBox="0 0 20 20" fill="none" aria-hidden>
+                              <rect
+                                x="3.75"
+                                y="3.75"
+                                width="12.5"
+                                height="12.5"
+                                rx="2"
+                                fill="currentColor"
+                                fillOpacity="0.14"
+                                stroke="currentColor"
+                                strokeWidth="1.35"
+                              />
+                              <path
+                                d="M6.25 13.25 8.25 10.25l1.75 2 2.25-3 3.5 4"
+                                stroke="currentColor"
+                                strokeWidth="1.25"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <circle cx="8" cy="8" r="1" fill="currentColor" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => flashLoungeDetailCommentComposerHint('GIFs are not supported in replies yet.')}
+                            className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 [-webkit-tap-highlight-color:transparent]"
+                            title="Add GIF"
+                            aria-label="Add GIF"
+                          >
+                            <svg className="h-7 w-7" viewBox="0 0 20 20" fill="none" aria-hidden>
+                              <rect
+                                x="3.75"
+                                y="3.75"
+                                width="12.5"
+                                height="12.5"
+                                rx="2"
+                                fill="currentColor"
+                                fillOpacity="0.14"
+                                stroke="currentColor"
+                                strokeWidth="1.35"
+                              />
+                              <text
+                                x="10"
+                                y="12.85"
+                                textAnchor="middle"
+                                fill="currentColor"
+                                style={{
+                                  fontSize: '5.35px',
+                                  fontWeight: 800,
+                                  fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+                                }}
+                              >
+                                GIF
+                              </text>
+                            </svg>
+                          </button>
+                          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+                            <span
+                              className={`shrink-0 text-[12px] tabular-nums ${loungeCharCounterClass(loungeDetailCommentDraft.length)}`}
+                              aria-live="polite"
+                            >
+                              {loungeDetailCommentDraft.length}/{LOUNGE_COMMENT_BODY_MAX}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void submitLoungeDetailComment()}
+                              disabled={
+                                loungeDetailCommentBusy ||
+                                !loungeDetailCommentDraft.trim() ||
+                                loungeDetailCommentDraft.length > LOUNGE_COMMENT_BODY_MAX
+                              }
+                              className="min-h-7 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-2 py-0.5 text-[13px] font-bold leading-none text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40 [-webkit-tap-highlight-color:transparent]"
+                            >
+                              {loungeDetailCommentBusy ? 'Posting…' : 'Reply'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (openProfileGateIfNeeded()) return
+                      expandAndFocusLoungeDetailCommentComposer()
+                    }}
+                    className="flex min-h-10 w-full touch-manipulation items-center rounded-full border border-zinc-600/80 bg-zinc-900/90 px-3 py-2 text-left text-[15px] leading-tight text-zinc-500 [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900 active:bg-zinc-800/90"
+                  >
+                    {(() => {
+                      const firstLine = String(loungeDetailCommentDraft || '')
+                        .split('\n')[0]
+                        .trim()
+                      if (firstLine) {
+                        return (
+                          <span className="block w-full min-w-0 truncate text-zinc-100 [&_a]:pointer-events-none">
+                            {renderRichCaption(firstLine, {
+                              linkClassName:
+                                'pointer-events-none font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70',
+                            })}
+                          </span>
+                        )
+                      }
+                      return (
+                        <span className="block w-full min-w-0 truncate text-zinc-500">
+                          {LOUNGE_DETAIL_COMMENT_PLACEHOLDER}
+                        </span>
+                      )
+                    })()}
+                  </button>
+                )}
+              </div>
+            ) : null}
             </div>
           </div>
 

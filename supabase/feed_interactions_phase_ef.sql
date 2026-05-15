@@ -117,7 +117,7 @@ create table if not exists public.feed_comments (
   created_at timestamptz not null default now(),
   edited_at timestamptz,
   hidden_at timestamptz,
-  constraint feed_comments_body_len check (char_length(body) >= 1 and char_length(body) <= 2000)
+  constraint feed_comments_body_len check (char_length(body) >= 1 and char_length(body) <= 280)
 );
 
 create index if not exists feed_comments_post_idx on public.feed_comments (post_id, created_at);

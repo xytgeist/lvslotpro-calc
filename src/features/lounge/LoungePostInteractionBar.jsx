@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import { LoungeLikeStatContent } from './LoungeFlameIcon.jsx'
 
@@ -56,6 +57,14 @@ export default function LoungePostInteractionBar({
 
   const isFeed = variant === 'feed'
   const iconSz = isFeed ? 'h-[22px] w-[22px]' : 'h-[24px] w-[24px]'
+  /** Bubble glyph sits low in the 20 viewBox — slight Y stretch so it matches the chip visually */
+  const iconSzComment = isFeed
+    ? 'h-[22px] w-[22px] origin-center scale-y-[1.1]'
+    : 'h-[24px] w-[24px] origin-center scale-y-[1.1]'
+  /** Matches `LoungeLikeStatContent` icon column — center glyph so gap to count matches the chip */
+  const iconColClass = isFeed ? 'w-[22px]' : 'w-[24px]'
+  /** Bookmark path is inset in the 20 viewBox — slightly larger box than other stats for visual parity with the chip */
+  const iconSzBookmark = isFeed ? 'h-[24px] w-[24px]' : 'h-[26px] w-[26px]'
   /** Four clusters with equal space between neighbors (`justify-between`). */
   const statFeedComment =
     'inline-flex shrink-0 items-center gap-1.5 rounded px-1 py-1 hover:bg-zinc-900/70 touch-manipulation [-webkit-tap-highlight-color:transparent]'
@@ -449,18 +458,19 @@ export default function LoungePostInteractionBar({
           onClick={onComment}
           className={isFeed ? statFeedComment : statSheetComment}
         >
-          <svg className={`${iconSz} ${commentClass}`} viewBox="0 0 20 20" aria-hidden>
-            <path
-              d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z"
-              fill="currentColor"
-              fillOpacity={ro ? 0.08 : ui.commented ? 0.42 : 0.18}
-              stroke="currentColor"
-              strokeWidth="1.35"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {Number.isFinite(commentCount) ? <span className={commentClass}>{commentCount}</span> : null}
+          <span className={`flex shrink-0 justify-center ${iconColClass}`}>
+            <svg className={`block ${iconSzComment} ${commentClass}`} viewBox="0 0 20 20" aria-hidden>
+              <path
+                d="M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z"
+                fill="currentColor"
+              />
+            </svg>
+          </span>
+          {Number.isFinite(commentCount) ? (
+            <span className={commentClass} title={fullStatCountTitle(commentCount)}>
+              {formatCompactStatCount(commentCount)}
+            </span>
+          ) : null}
         </LoungeFeedStatSlot>
         <div className="relative shrink-0" ref={repostMenuRef}>
           <LoungeFeedStatSlot
@@ -485,16 +495,22 @@ export default function LoungePostInteractionBar({
             }}
             className={isFeed ? statFeedMid : statSheetMid}
           >
-            <svg className={`${iconSz} ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
-              <path
-                d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
-                stroke="currentColor"
-                strokeWidth="1.35"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            {Number.isFinite(repostCount) ? <span className={repostClass}>{repostCount}</span> : null}
+            <span className={`flex shrink-0 justify-center ${iconColClass}`}>
+              <svg className={`${iconSz} ${repostClass}`} viewBox="0 0 20 20" fill="none" aria-hidden>
+                <path
+                  d="M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2"
+                  stroke="currentColor"
+                  strokeWidth="1.35"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            {Number.isFinite(repostCount) ? (
+              <span className={repostClass} title={fullStatCountTitle(repostCount)}>
+                {formatCompactStatCount(repostCount)}
+              </span>
+            ) : null}
           </LoungeFeedStatSlot>
           {!isFeed ? repostMenuSheet : null}
         </div>
@@ -529,15 +545,10 @@ export default function LoungePostInteractionBar({
             }
             title="Sign in to save posts"
           >
-            <svg className={`${iconSz} ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
+            <svg className={`${iconSzBookmark} ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
               <path
                 d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
                 fill="currentColor"
-                fillOpacity={0.08}
-                stroke="currentColor"
-                strokeWidth="1.35"
-                strokeLinecap="round"
-                strokeLinejoin="round"
               />
             </svg>
           </button>
@@ -548,15 +559,10 @@ export default function LoungePostInteractionBar({
             className={isFeed ? statFeedBookmark : statSheetBookmark}
             title={isBookmarked ? 'Remove bookmark' : 'Save post'}
           >
-            <svg className={`${iconSz} ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
+            <svg className={`${iconSzBookmark} ${bookmarkClass}`} viewBox="0 0 20 20" aria-hidden>
               <path
                 d="M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z"
                 fill="currentColor"
-                fillOpacity={isBookmarked ? 0.55 : 0.18}
-                stroke="currentColor"
-                strokeWidth="1.35"
-                strokeLinecap="round"
-                strokeLinejoin="round"
               />
             </svg>
           </button>

@@ -1,24 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   profileAvatarInitials,
   profileAvatarToneClass,
 } from '../profiles/profileGate'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
-import {
-  buildLoungeCommentForest,
-  loungeCommentDescendantCount,
-  loungeCommentOpRepliesInSubtree,
-} from '../../utils/loungeFeedComments'
-
-const INDENT_PX = 20
-const MAX_VISUAL_DEPTH = 4
-
-function profileHandleLabel(profile) {
-  const h = String(profile?.handle || '').trim()
-  if (h) return `@${h}`
-  return String(profile?.display_name || 'Member').trim() || 'Member'
-}
+import LoungeCommentInteractionBar from './LoungeCommentInteractionBar.jsx'
 
 function CommentAvatar({ profile, comment, className }) {
   if (profile?.avatar_url) {
@@ -35,230 +22,214 @@ function CommentAvatar({ profile, comment, className }) {
   )
 }
 
-function CommentThreadLayout({ depth, children }) {
-  if (depth <= 0) {
-    return <div className="flex gap-2.5">{children}</div>
-  }
-  const pad = Math.min(depth, MAX_VISUAL_DEPTH) * INDENT_PX
-  return (
-    <div className="flex min-w-0" style={{ paddingLeft: pad }}>
-      <div className="relative flex min-w-0 flex-1 gap-2.5 pl-3">
-        <span className="pointer-events-none absolute bottom-0 left-0 top-0 w-px bg-zinc-700/90" aria-hidden />
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function CommentRow({
+/**
+ * @param {boolean} navigable — Whole row opens the comment thread (not nested interactive buttons except avatar).
+ */
+function LoungeCommentCard({
   comment,
-  depth,
   postAuthorUserId,
   postAgeLabel,
-  readOnly,
-  onReply,
-  isPostAuthorComment,
-  replyingToLabel,
+  navigable,
+  onOpenCommentThread,
+  onAvatarClickProfile,
+  directReplyCount = 0,
+  loungeReadOnly = false,
+  requireLoungeAuth,
+  openProfileGateIfNeeded,
+  onCommentReplyInteraction,
 }) {
   const profile = comment.author_profile
   const displayName = profile?.display_name || profile?.handle || 'Member'
-  const avatarSize = depth > 0 ? 'h-8 w-8 text-[12px]' : 'h-9 w-9 text-[13px]'
-  const isPostAuthor = Boolean(
-    isPostAuthorComment ?? (postAuthorUserId && comment.user_id === postAuthorUserId),
-  )
+  const avatarClass =
+    'h-9 w-9 shrink-0 overflow-hidden rounded-full border border-zinc-800 bg-zinc-900 font-bold text-zinc-200 text-[13px]'
+  const isPostAuthor = Boolean(postAuthorUserId && comment.user_id === postAuthorUserId)
 
-  return (
-    <article className="min-w-0">
-      {replyingToLabel ? (
-        <p className="mb-1 truncate text-[12px] text-zinc-500">
-          Replying to <span className="font-semibold text-zinc-400">{replyingToLabel}</span>
-        </p>
-      ) : null}
-      <CommentThreadLayout depth={depth}>
-        <CommentAvatar profile={profile} comment={comment} className={`${avatarSize} shrink-0 overflow-hidden rounded-full border border-zinc-800 bg-zinc-900 font-bold text-zinc-200`} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2 text-[13px] text-zinc-500">
-            <span className="flex min-w-0 items-baseline gap-1.5 truncate font-semibold text-zinc-300">
-              <span className="min-w-0 truncate">{displayName}</span>
-              {isPostAuthor ? (
-                <span className="shrink-0 rounded-md bg-violet-950/50 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-violet-300">
-                  Author
-                </span>
-              ) : null}
-              <LoungeStaffRoleBadge role={profile?.role} size="detail" />
-              <LoungeOgBadge isOg={profile?.is_og} size="detail" />
-            </span>
-            <span className="shrink-0 tabular-nums">{postAgeLabel(comment.created_at)}</span>
-          </div>
-          <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-snug text-zinc-100">
-            {comment.body}
-          </p>
-          {!readOnly ? (
-            <button
-              type="button"
-              onClick={() => onReply(comment)}
-              className="mt-1.5 min-h-9 rounded-lg px-1 text-[13px] font-semibold text-zinc-500 touch-manipulation hover:text-violet-300 [-webkit-tap-highlight-color:transparent]"
-            >
-              Reply
-            </button>
-          ) : null}
+  const metaRow = (
+    <div className="flex min-w-0 flex-1 items-start gap-2.5">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onAvatarClickProfile?.(comment)
+        }}
+        className="shrink-0 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+        aria-label={`Open profile for ${displayName}`}
+      >
+        <CommentAvatar profile={profile} comment={comment} className={avatarClass} />
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center justify-between gap-2 text-[13px] text-zinc-500">
+          <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-zinc-300">
+            <span className="min-w-0 truncate">{displayName}</span>
+            {isPostAuthor ? (
+              <span className="shrink-0 rounded-md bg-violet-950/50 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-violet-300">
+                Author
+              </span>
+            ) : null}
+            <LoungeStaffRoleBadge role={profile?.role} size="detail" />
+            <LoungeOgBadge isOg={profile?.is_og} size="detail" />
+          </span>
+          <span className="shrink-0 tabular-nums">{postAgeLabel(comment.created_at)}</span>
         </div>
-      </CommentThreadLayout>
-    </article>
-  )
-}
-
-function CommentNode({
-  comment,
-  depth,
-  postAuthorUserId,
-  postAgeLabel,
-  readOnly,
-  expandedIds,
-  onToggleExpand,
-  onReply,
-}) {
-  const isExpanded = expandedIds.has(comment.id)
-  const descendantCount = loungeCommentDescendantCount(comment)
-  const opReplies = useMemo(
-    () => loungeCommentOpRepliesInSubtree(comment, postAuthorUserId),
-    [comment, postAuthorUserId],
-  )
-
-  if (isExpanded) {
-    return (
-      <li className="space-y-3">
-        <CommentRow
-          comment={comment}
-          depth={depth}
-          postAuthorUserId={postAuthorUserId}
-          postAgeLabel={postAgeLabel}
-          readOnly={readOnly}
-          onReply={onReply}
+        <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] leading-snug text-zinc-100">
+          {comment.body}
+        </p>
+        <LoungeCommentInteractionBar
+          loungeReadOnly={loungeReadOnly}
+          replyCount={directReplyCount}
+          requireLoungeAuth={requireLoungeAuth}
+          openProfileGateIfNeeded={openProfileGateIfNeeded}
+          onReply={() => onCommentReplyInteraction?.(comment)}
         />
-        {comment.children?.length ? (
-          <ul className="space-y-3">
-            {comment.children.map((child) => (
-              <CommentNode
-                key={child.id}
-                comment={child}
-                depth={depth + 1}
-                postAuthorUserId={postAuthorUserId}
-                postAgeLabel={postAgeLabel}
-                readOnly={readOnly}
-                expandedIds={expandedIds}
-                onToggleExpand={onToggleExpand}
-                onReply={onReply}
-              />
-            ))}
-          </ul>
-        ) : null}
-      </li>
+      </div>
+    </div>
+  )
+
+  if (navigable && onOpenCommentThread) {
+    return (
+      <article
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpenCommentThread(comment)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onOpenCommentThread(comment)
+          }
+        }}
+        className="min-w-0 cursor-pointer rounded-lg px-1 py-1 touch-manipulation outline-none hover:bg-zinc-900/50 [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-violet-500/40"
+      >
+        {metaRow}
+      </article>
     )
   }
 
-  const hiddenCount = descendantCount - opReplies.length
-
-  return (
-    <li className="space-y-3">
-      <CommentRow
-        comment={comment}
-        depth={depth}
-        postAuthorUserId={postAuthorUserId}
-        postAgeLabel={postAgeLabel}
-        readOnly={readOnly}
-        onReply={onReply}
-      />
-      {opReplies.map(({ comment: opComment, parent }) => {
-        const parentVisible = parent?.id === comment.id
-        const replyingToLabel = parentVisible ? null : profileHandleLabel(parent?.author_profile)
-        return (
-          <CommentRow
-            key={opComment.id}
-            comment={opComment}
-            depth={depth + 1}
-            postAuthorUserId={postAuthorUserId}
-            postAgeLabel={postAgeLabel}
-            readOnly={readOnly}
-            onReply={onReply}
-            isPostAuthorComment
-            replyingToLabel={replyingToLabel}
-          />
-        )
-      })}
-      {hiddenCount > 0 ? (
-        <button
-          type="button"
-          onClick={() => onToggleExpand(comment.id)}
-          className="min-h-10 rounded-lg px-1 text-[13px] font-semibold text-violet-400 touch-manipulation hover:text-violet-300 [-webkit-tap-highlight-color:transparent]"
-          style={{ marginLeft: Math.min(depth + 1, MAX_VISUAL_DEPTH) * INDENT_PX }}
-        >
-          Show {hiddenCount} repl{hiddenCount === 1 ? 'y' : 'ies'}
-        </button>
-      ) : null}
-    </li>
-  )
+  return <article className="min-w-0 px-1 py-1">{metaRow}</article>
 }
 
 /**
- * Threaded comments for Lounge post detail — collapsed by default; auto-surfaces post-author replies only.
+ * Post detail comments — roots tap through into threaded replies on separate drill-down screens.
+ *
+ * @param {'post' | 'commentDetail'} variant
+ * @param {string | null} focusCommentId — Required when `variant === 'commentDetail'`.
  */
 export default function LoungePostCommentThread({
   comments,
+  /** Original feed post author id (`community_feed_posts.user_id`). */
   postAuthorUserId = '',
   postAgeLabel,
-  readOnly = false,
-  onReply,
-  composerSlot,
-  autoExpandThreadRootIds = [],
+  variant = 'post',
+  focusCommentId = null,
+  loungeReadOnly = false,
+  requireLoungeAuth = () => {},
+  openProfileGateIfNeeded = () => false,
+  onCommentReplyInteraction,
+  onOpenCommentThread,
+  onAvatarClickProfile,
 }) {
-  const forest = useMemo(() => buildLoungeCommentForest(comments), [comments])
-  const [userExpandedIds, setUserExpandedIds] = useState(() => new Set())
+  const byId = useMemo(() => new Map((comments || []).map((c) => [c.id, c])), [comments])
 
-  const expandedIds = useMemo(() => {
-    const next = new Set(userExpandedIds)
-    for (const id of autoExpandThreadRootIds || []) {
-      if (id) next.add(id)
+  const directReplyCountByCommentId = useMemo(() => {
+    const m = new Map()
+    for (const c of comments || []) {
+      const pid = c.parent_id
+      if (!pid) continue
+      m.set(pid, (m.get(pid) || 0) + 1)
     }
-    return next
-  }, [userExpandedIds, autoExpandThreadRootIds])
+    return m
+  }, [comments])
 
-  const onToggleExpand = useCallback((commentId) => {
-    setUserExpandedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(commentId)) next.delete(commentId)
-      else next.add(commentId)
-      return next
-    })
-  }, [])
+  const rootsSorted = useMemo(() => {
+    return [...(comments || [])]
+      .filter((c) => !c.parent_id)
+      .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+  }, [comments])
 
-  if (forest.length === 0) {
+  const focusComment = useMemo(() => {
+    if (!focusCommentId) return null
+    return byId.get(focusCommentId) || null
+  }, [byId, focusCommentId])
+
+  const directRepliesNewestFirst = useMemo(() => {
+    if (!focusCommentId) return []
+    return [...(comments || [])]
+      .filter((c) => c.parent_id === focusCommentId)
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  }, [comments, focusCommentId])
+
+  if (variant === 'commentDetail') {
+    if (!focusComment || !focusCommentId) {
+      return (
+        <p className="mt-1 text-[14px] text-zinc-500">Could not load this comment.</p>
+      )
+    }
     return (
       <>
-        <p className="mt-2 text-[14px] text-zinc-500">No comments yet. Be the first.</p>
-        {composerSlot}
+        <LoungeCommentCard
+          comment={focusComment}
+          postAuthorUserId={postAuthorUserId}
+          postAgeLabel={postAgeLabel}
+          navigable={false}
+          onOpenCommentThread={onOpenCommentThread}
+          onAvatarClickProfile={onAvatarClickProfile}
+          directReplyCount={directReplyCountByCommentId.get(focusComment.id) ?? 0}
+          loungeReadOnly={loungeReadOnly}
+          requireLoungeAuth={requireLoungeAuth}
+          openProfileGateIfNeeded={openProfileGateIfNeeded}
+          onCommentReplyInteraction={onCommentReplyInteraction}
+        />
+        {directRepliesNewestFirst.length ? (
+          <ul className="mt-1.5 divide-y divide-zinc-800/70 space-y-0 border-t border-zinc-800/70 pt-1.5">
+            {directRepliesNewestFirst.map((r) => (
+              <li key={r.id}>
+                <LoungeCommentCard
+                  comment={r}
+                  postAuthorUserId={postAuthorUserId}
+                  postAgeLabel={postAgeLabel}
+                  navigable={Boolean(onOpenCommentThread)}
+                  onOpenCommentThread={onOpenCommentThread}
+                  onAvatarClickProfile={onAvatarClickProfile}
+                  directReplyCount={directReplyCountByCommentId.get(r.id) ?? 0}
+                  loungeReadOnly={loungeReadOnly}
+                  requireLoungeAuth={requireLoungeAuth}
+                  openProfileGateIfNeeded={openProfileGateIfNeeded}
+                  onCommentReplyInteraction={onCommentReplyInteraction}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1.5 border-t border-zinc-800/70 pt-1.5 text-[14px] text-zinc-500">No replies yet.</p>
+        )}
       </>
     )
   }
 
+  if (rootsSorted.length === 0) {
+    return <p className="mt-1 text-[14px] text-zinc-500">No comments yet. Be the first.</p>
+  }
+
   return (
     <>
-      <ul className="mt-3 space-y-4">
-        {forest.map((root) => (
-          <CommentNode
-            key={root.id}
-            comment={root}
-            depth={0}
-            postAuthorUserId={postAuthorUserId}
-            postAgeLabel={postAgeLabel}
-            readOnly={readOnly}
-            expandedIds={expandedIds}
-            onToggleExpand={onToggleExpand}
-            onReply={onReply}
-          />
+      <ul className="mt-0 divide-y divide-zinc-800/70 space-y-0">
+        {rootsSorted.map((root) => (
+          <li key={root.id}>
+            <LoungeCommentCard
+              comment={root}
+              postAuthorUserId={postAuthorUserId}
+              postAgeLabel={postAgeLabel}
+              navigable={Boolean(onOpenCommentThread)}
+              onOpenCommentThread={onOpenCommentThread}
+              onAvatarClickProfile={onAvatarClickProfile}
+              directReplyCount={directReplyCountByCommentId.get(root.id) ?? 0}
+              loungeReadOnly={loungeReadOnly}
+              requireLoungeAuth={requireLoungeAuth}
+              openProfileGateIfNeeded={openProfileGateIfNeeded}
+              onCommentReplyInteraction={onCommentReplyInteraction}
+            />
+          </li>
         ))}
       </ul>
-      {composerSlot}
     </>
   )
 }

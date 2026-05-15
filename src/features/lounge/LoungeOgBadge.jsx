@@ -22,8 +22,8 @@ export default function LoungeOgBadge({ isOg, size = 'feed' }) {
   const iconClass = `${s.cls} shrink-0 object-contain`
 
   return (
-    <LoungeBadgeHoverTip tip="OG" tone="amber" className="translate-y-[0.5px] -mx-0.5">
-      <span className="inline-flex leading-none" role="img" aria-label="OG">
+    <LoungeBadgeHoverTip tip="OG" tone="amber" className="-mx-0.5 inline-flex items-center">
+      <span className="inline-flex items-center leading-none" role="img" aria-label="OG">
         <img src={BADGE_SRC} alt="" className={iconClass} draggable={false} width={s.px} height={s.px} aria-hidden />
       </span>
     </LoungeBadgeHoverTip>

@@ -160,7 +160,7 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 ## Phase E - Comments (threaded)
 
 - **Shipped (test, first slice):** `supabase/feed_interactions_phase_ef.sql` defines `feed_comments` + RLS + top-level-only post `comment_count` triggers; Lounge post detail has a flat comment list + reply composer (`SocialFeed.jsx`). Threading, ranking, and anon teaser rules below are not all implemented yet.
-- Table: `feed_comments` with `parent_id`, `post_id`, `body`, `created_at`, `edited_at`, `hidden_at`.
+- Table: `feed_comments` with `parent_id`, `post_id`, `body` (max **280** chars, same as post captions), `created_at`, `edited_at`, `hidden_at`.
 - RLS:
   - logged-out: no full comment body access (counts/teasers only as needed)
   - signed-in: full thread access by policy

@@ -1,4 +1,6 @@
 /** Poker chip + heart like icon — simplified for ~22px (no rim micro-hearts). */
+import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
+
 const CHIP_RED = '#fd262d'
 
 const HEART =
@@ -28,8 +30,11 @@ export function LoungeLikeStatContent({
       <span className="flex items-center justify-center">
         <LoungeFlameIcon className={iconClassName} liked={liked} readOnly={readOnly} />
       </span>
-      <span className={`tabular-nums leading-none ${countClassName}`}>
-        {Number.isFinite(likeCount) ? likeCount : ''}
+      <span
+        className={`tabular-nums leading-none ${countClassName}`}
+        title={fullStatCountTitle(likeCount)}
+      >
+        {Number.isFinite(likeCount) ? formatCompactStatCount(likeCount) : ''}
       </span>
     </span>
   )
