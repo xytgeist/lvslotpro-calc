@@ -127,6 +127,11 @@ export function readLoungeDockMenuLayout() {
   if (typeof window === 'undefined') return 'wheel'
   try {
     const v = window.localStorage.getItem(LOUNGE_DOCK_MENU_LAYOUT_KEY)
+    /** First visit: persist Wheel (O) so new users match the default layout. */
+    if (v == null) {
+      writeLoungeDockMenuLayout('wheel')
+      return 'wheel'
+    }
     return v === 'cornerL' ? 'cornerL' : 'wheel'
   } catch {
     return 'wheel'
