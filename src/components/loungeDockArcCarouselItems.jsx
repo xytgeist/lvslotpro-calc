@@ -1,5 +1,8 @@
 /** Dock-style glyphs for the arc carousel prototype (mirrors `LoungeDockFooterBar` strokes). */
 
+/** Matches dock neon cyan (`loungeDockFabGlow` / center FAB). */
+const LOUNGE_DOCK_CYAN = '#00f5ff'
+
 const stroke = {
   stroke: 'currentColor',
   strokeWidth: 1.65,
@@ -9,7 +12,7 @@ const stroke = {
 }
 
 const accentStroke = {
-  stroke: '#e4e4e7',
+  stroke: 'currentColor',
   strokeWidth: 1.85,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
@@ -18,7 +21,7 @@ const accentStroke = {
 
 function IconHome() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
       <path {...stroke} d="M4.5 10.25 12 4l7.5 6.25V19a.75.75 0 01-.75.75h-4.5a.75.75 0 01-.75-.75v-4.5h-4v4.5a.75.75 0 01-.75.75H5.25a.75.75 0 01-.75-.75v-8.75z" />
       <path {...accentStroke} d="M4.5 10.25 12 4 19.5 10.25" />
     </svg>
@@ -27,7 +30,7 @@ function IconHome() {
 
 function IconSearch() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
       <circle {...stroke} cx="10.25" cy="10.25" r="6.25" />
       <path {...stroke} d="M15.5 15.5 21 21" />
     </svg>
@@ -35,32 +38,46 @@ function IconSearch() {
 }
 
 function IconFollowing({ active }) {
-  const c = active ? '#fafafa' : 'currentColor'
-  const plus = active ? '#e4e4e7' : '#d4d4d8'
+  if (active) {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
+        <circle cx="9" cy="7.5" r="3.25" fill={LOUNGE_DOCK_CYAN} stroke="none" />
+        <path
+          fill={LOUNGE_DOCK_CYAN}
+          stroke="none"
+          d="M3.5 19.5c0-3.1 2.46-5.25 5.5-5.25s5.5 2.15 5.5 5.25"
+        />
+        <path
+          stroke={LOUNGE_DOCK_CYAN}
+          strokeWidth="1.85"
+          strokeLinecap="round"
+          d="M16.5 14.5h4M18.5 12.5v4"
+        />
+      </svg>
+    )
+  }
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
-      <circle cx="9" cy="7.5" r="3.25" fill="none" stroke={c} strokeWidth="1.65" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
+      <circle {...stroke} cx="9" cy="7.5" r="3.25" />
       <path
-        fill="none"
-        stroke={c}
-        strokeWidth="1.65"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        {...stroke}
         d="M3.5 19.5c0-3.1 2.46-5.25 5.5-5.25s5.5 2.15 5.5 5.25"
       />
-      <path stroke={plus} strokeWidth="1.65" strokeLinecap="round" d="M16.5 14.5h4M18.5 12.5v4" />
+      <path {...stroke} strokeLinecap="round" d="M16.5 14.5h4M18.5 12.5v4" />
     </svg>
   )
 }
 
 function IconBell() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
-      <path
-        {...stroke}
-        d="M10.5 6.75a3.75 3.75 0 017.5 0v.75c0 4.25 1.75 6.5 1.75 6.5H8.75S10.5 12.75 10.5 8.5v-.75z"
-      />
-      <circle cx="12" cy="19.25" r="1.35" className="fill-zinc-300" stroke="none" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
+      <g transform="translate(-1.15 0.1)">
+        <path
+          {...stroke}
+          d="M10.5 6.75a3.75 3.75 0 017.5 0v.75c0 4.25 1.75 6.5 1.75 6.5H8.75S10.5 12.75 10.5 8.5v-.75z"
+        />
+        <circle cx="12" cy="19.25" r="1.35" className="fill-current" stroke="none" />
+      </g>
     </svg>
   )
 }
@@ -69,7 +86,7 @@ function IconBell() {
 function IconCompose() {
   const penStroke = { ...stroke, strokeWidth: 1.75 }
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
       <path
         {...penStroke}
         d="M12 4.25H6.5a2 2 0 0 0-2 2v11.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6.75"
@@ -86,21 +103,23 @@ function IconCompose() {
 
 function IconChat() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
-      <path
-        {...stroke}
-        d="M6.75 5.25h10.5a2.25 2.25 0 012.25 2.25v6a2.25 2.25 0 01-2.25 2.25h-5.03l-3.72 2.48V15.75H6.75a2.25 2.25 0 01-2.25-2.25v-6a2.25 2.25 0 012.25-2.25z"
-      />
-      <circle cx="9" cy="10.5" r="1.05" className="fill-zinc-300" stroke="none" />
-      <circle cx="12" cy="10.5" r="1.05" className="fill-zinc-300" stroke="none" />
-      <circle cx="15" cy="10.5" r="1.05" className="fill-zinc-300" stroke="none" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
+      <g transform="translate(0.35 0.15)">
+        <path
+          {...stroke}
+          d="M6.75 5.25h10.5a2.25 2.25 0 012.25 2.25v6a2.25 2.25 0 01-2.25 2.25h-5.03l-3.72 2.48V15.75H6.75a2.25 2.25 0 01-2.25-2.25v-6a2.25 2.25 0 012.25-2.25z"
+        />
+        <circle cx="9" cy="10.5" r="1.05" className="fill-current" stroke="none" />
+        <circle cx="12" cy="10.5" r="1.05" className="fill-current" stroke="none" />
+        <circle cx="15" cy="10.5" r="1.05" className="fill-current" stroke="none" />
+      </g>
     </svg>
   )
 }
 
 function IconSettings() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden className="block h-full w-full">
       <path
         {...stroke}
         d="M12 15a3 3 0 100-6 3 3 0 000 6z"
@@ -127,6 +146,7 @@ export function buildLoungeDockArcCarouselItems({
   onSettings,
   activePanel,
 }) {
+  const onFeedHome = !activePanel
   return [
     {
       id: 'compose',
@@ -141,7 +161,7 @@ export function buildLoungeDockArcCarouselItems({
       label: 'Home',
       icon: <IconHome />,
       onSelect: onHome,
-      active: false,
+      active: onFeedHome,
     },
     {
       id: 'search',
@@ -155,13 +175,14 @@ export function buildLoungeDockArcCarouselItems({
       label: 'Following',
       icon: <IconFollowing active={followingFilterOn} />,
       onSelect: onFollowingFilterToggle,
-      active: followingFilterOn,
+      filterOnBorder: followingFilterOn,
       disabled: followingFilterDisabled,
     },
     {
       id: 'notifications',
       label: 'Alerts',
       icon: <IconBell />,
+      iconScale: 1.2,
       onSelect: onNotifications,
       active: activePanel === 'notifications',
     },
@@ -169,6 +190,7 @@ export function buildLoungeDockArcCarouselItems({
       id: 'chat',
       label: 'Chat',
       icon: <IconChat />,
+      iconScale: 1.14,
       onSelect: onChat,
       active: activePanel === 'chat',
     },
@@ -176,6 +198,7 @@ export function buildLoungeDockArcCarouselItems({
       id: 'settings',
       label: 'Settings',
       icon: <IconSettings />,
+      iconScale: 0.86,
       onSelect: onSettings,
       active: activePanel === 'settings',
     },

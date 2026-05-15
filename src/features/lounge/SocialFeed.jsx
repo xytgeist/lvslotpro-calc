@@ -74,6 +74,7 @@ import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 // LOUNGE_DOCK_FOOTER_BAR_DISABLED — classic dock icon row (FAB wheel is primary nav). Re-enable import + JSX below to restore.
 // import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
 import LoungeDockArcCarouselPrototype from '../../components/LoungeDockArcCarouselPrototype.jsx'
+import { scheduleLoungeComposerTextareaFocus } from './loungeDockComposeFocus.js'
 import { buildLoungeDockArcCarouselItems } from '../../components/loungeDockArcCarouselItems.jsx'
 import { dockChromeHeightFromTitleBarPx } from '../../utils/loungeDockChrome.js'
 import {
@@ -192,6 +193,7 @@ export default function SocialFeed({
     return d?.postText ?? ''
   })
   const [composerExpanded, setComposerExpanded] = useState(loungeComposerInitial.expanded)
+  const [composerFocusToken, setComposerFocusToken] = useState(0)
   const [composerFoldReveal, setComposerFoldReveal] = useState(loungeComposerInitial.fold)
   /** Pending uploaded images (local previews). */
   const [composerImageItems, setComposerImageItems] = useState([])
@@ -475,16 +477,19 @@ export default function SocialFeed({
   const pullMaxVisualPx = 300
   const pullFingerGain = 1
 
-  useLayoutEffect(() => {
-    if (!composerExpanded || composerFoldReveal < 0.88) return
-    const el = composerTextareaRef.current
+  const scrollLoungeFeedToTopInstant = useCallback(() => {
+    const el = loungeFeedScrollRef.current
     if (!el) return
-    try {
-      el.focus({ preventScroll: true })
-    } catch {
-      el.focus()
-    }
-  }, [composerExpanded, composerFoldReveal])
+    el.scrollTo({ top: 0, behavior: 'auto' })
+  }, [])
+
+  useEffect(() => {
+    if (!composerExpanded || composerFoldReveal < 0.88 || loungeDockPanel) return undefined
+    return scheduleLoungeComposerTextareaFocus({
+      getTextarea: () => composerTextareaRef.current,
+      scrollFeedToTop: scrollLoungeFeedToTopInstant,
+    })
+  }, [composerExpanded, composerFoldReveal, loungeDockPanel, composerFocusToken, scrollLoungeFeedToTopInstant])
 
   useLayoutEffect(() => {
     const ta = composerTextareaRef.current
@@ -2293,6 +2298,7 @@ export default function SocialFeed({
     setComposerFoldReveal(1)
     composerExpandedRef.current = true
     setComposerExpanded(true)
+    setComposerFocusToken((t) => t + 1)
   }, [
     loungeFeedBrowseMode,
     loungeReadOnly,
