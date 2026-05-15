@@ -4294,7 +4294,7 @@ export default function SocialFeed({
       ) : null}
 
       {showLoungeViewportDock && !loungeDockPanel ? (
-        <LoungeDockArcCarouselPrototype items={loungeArcCarouselItems} />
+        <LoungeDockArcCarouselPrototype items={loungeArcCarouselItems} reveal={loungeTitleReveal} />
       ) : null}
 
       <div
