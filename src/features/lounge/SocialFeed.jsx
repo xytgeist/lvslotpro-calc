@@ -2265,6 +2265,33 @@ export default function SocialFeed({
     })
   }, [])
 
+  const onLoungeDockCompose = useCallback(() => {
+    if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
+      onRequireAuth?.('login')
+      return
+    }
+    setLoungeDockPanel(null)
+    setChatDockInitialPeerUserId(null)
+    if (profileModalOpen) closeProfileModalRef.current()
+    if (loungePostDetail) closeLoungePostDetail()
+    scrollLoungeFeedToTop()
+    loungeTitleRevealRef.current = 1
+    setLoungeTitleReveal(1)
+    composerFoldedFromFeedScrollRef.current = false
+    composerFoldRevealRef.current = 1
+    setComposerFoldReveal(1)
+    composerExpandedRef.current = true
+    setComposerExpanded(true)
+  }, [
+    loungeFeedBrowseMode,
+    loungeReadOnly,
+    onRequireAuth,
+    profileModalOpen,
+    loungePostDetail,
+    closeLoungePostDetail,
+    scrollLoungeFeedToTop,
+  ])
+
   const loungeFollowingFilterOn = loungeFeedScope === LOUNGE_FEED_SCOPE_FOLLOWING
 
   const onLoungeFollowingFilterToggle = useCallback(() => {
@@ -4174,6 +4201,9 @@ export default function SocialFeed({
   const loungeArcCarouselItems = useMemo(
     () =>
       buildLoungeDockArcCarouselItems({
+        onCompose: onLoungeDockCompose,
+        composeActive: composerExpanded,
+        composeDisabled: loungeFeedBrowseMode === 'anonymous' || loungeReadOnly,
         onHome: onLoungeDockHome,
         onSearch: onLoungeDockSearch,
         onFollowingFilterToggle: onLoungeFollowingFilterToggle,
@@ -4184,6 +4214,9 @@ export default function SocialFeed({
         activePanel: loungeDockPanel,
       }),
     [
+      onLoungeDockCompose,
+      composerExpanded,
+      loungeReadOnly,
       onLoungeDockHome,
       onLoungeDockSearch,
       onLoungeFollowingFilterToggle,

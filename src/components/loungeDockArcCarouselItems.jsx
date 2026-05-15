@@ -64,6 +64,18 @@ function IconBell() {
   )
 }
 
+function IconCompose() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+      <path
+        {...stroke}
+        d="M16.862 4.487 19.513 7.138M5 19.5l3.25-1 9.25-9.25 2.651 2.651-9.25 9.25-1 3.25z"
+      />
+      <path {...cyanStroke} d="M14.25 6.75 17.25 9.75" />
+    </svg>
+  )
+}
+
 function IconChat() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
@@ -79,6 +91,9 @@ function IconChat() {
 }
 
 export function buildLoungeDockArcCarouselItems({
+  onCompose,
+  composeActive = false,
+  composeDisabled = false,
   onHome,
   onSearch,
   onFollowingFilterToggle,
@@ -89,6 +104,14 @@ export function buildLoungeDockArcCarouselItems({
   activePanel,
 }) {
   return [
+    {
+      id: 'compose',
+      label: 'New post',
+      icon: <IconCompose />,
+      onSelect: onCompose,
+      active: composeActive,
+      disabled: composeDisabled,
+    },
     {
       id: 'home',
       label: 'Home',
