@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   LOUNGE_DOCK_FAB_SIZE_PX,
-  loungeDockCarouselLayout,
   loungeDockCarouselSnapRotation,
   loungeDockFabDefaultPosition,
   loungeDockFabMoveBounds,
   loungeDockFabPctFromPosition,
   loungeDockFabPositionFromPct,
+  loungeDockHomeOffset,
+  loungeDockMenuLayout,
   loungeDockViewportSize,
   readLoungeDockFabPrefs,
   writeLoungeDockFabPrefs,
 } from '../utils/loungeDockFabPosition.js'
+
+const HOME_ITEM_ID = 'home'
+const PANEL_CHROME_PANELS = new Set(['search', 'notifications', 'chat'])
 
 const ITEM_CIRCLE_PX = 40
 const ITEM_ICON_PX = 23
@@ -47,13 +51,16 @@ function IconLock({ locked }) {
 }
 
 /**
- * Experimental Lounge nav: draggable FAB + full-ring spin carousel (prototype only).
+ * Experimental Lounge nav: draggable FAB + fan menu or spin wheel when items clip off-screen (prototype only).
  */
 export default function LoungeDockArcCarouselPrototype({
   items = [],
   defaultOpen = false,
   reveal = 1,
+  /** When set (search / notifications / chat), FAB + home stay visible; tap FAB to expand full menu. */
+  panelChrome = null,
 }) {
+  const panelCompactChrome = panelChrome != null && PANEL_CHROME_PANELS.has(panelChrome)
   const [open, setOpen] = useState(defaultOpen)
   const [locked, setLocked] = useState(false)
   const [fabPos, setFabPos] = useState(null)
@@ -117,24 +124,42 @@ export default function LoungeDockArcCarouselPrototype({
   const fabCenterX = fabPos ? fabPos.left + LOUNGE_DOCK_FAB_SIZE_PX / 2 : null
   const fabCenterY = fabPos ? fabPos.top + LOUNGE_DOCK_FAB_SIZE_PX / 2 : null
 
-  const carouselLayout = useMemo(() => {
-    if (fabCenterX == null || fabCenterY == null || items.length === 0) {
-      return { offsets: [], radius: 0, pickerAngle: 0, focusedIndex: 0, step: 0 }
+  const homeItem = useMemo(() => items.find((item) => item.id === HOME_ITEM_ID) ?? null, [items])
+  const orbitItems = useMemo(() => items.filter((item) => item.id !== HOME_ITEM_ID), [items])
+
+  const homeOffset = useMemo(() => {
+    if (fabCenterX == null) return { x: 0, y: 0, onScreen: true }
+    return loungeDockHomeOffset(fabCenterX, viewport.width)
+  }, [fabCenterX, viewport.width])
+
+  const menuLayout = useMemo(() => {
+    if (fabCenterX == null || fabCenterY == null || orbitItems.length === 0) {
+      return {
+        mode: 'fan',
+        offsets: [],
+        radius: 0,
+        pickerAngle: 0,
+        focusedIndex: 0,
+        step: 0,
+        spinEnabled: false,
+      }
     }
     const itemRadius = ITEM_CIRCLE_PX / 2
-    return loungeDockCarouselLayout(
+    return loungeDockMenuLayout(
       fabCenterX,
       fabCenterY,
-      items.length,
+      orbitItems.length,
       carouselRotation,
       viewport,
       itemRadius,
     )
-  }, [fabCenterX, fabCenterY, items.length, carouselRotation, viewport.width, viewport.height])
+  }, [fabCenterX, fabCenterY, orbitItems.length, carouselRotation, viewport.width, viewport.height])
+
+  const wheelMode = menuLayout.mode === 'wheel'
 
   const spinHitRadiusPx =
-    carouselLayout.radius > 0
-      ? carouselLayout.radius + ITEM_CIRCLE_PX + LOUNGE_DOCK_FAB_SIZE_PX / 2
+    menuLayout.radius > 0
+      ? menuLayout.radius + ITEM_CIRCLE_PX + LOUNGE_DOCK_FAB_SIZE_PX / 2
       : 120
 
   const persistFabPrefs = useCallback(
@@ -149,23 +174,24 @@ export default function LoungeDockArcCarouselPrototype({
 
   const snapCarouselToPicker = useCallback(
     (rotation) => {
-      if (fabCenterX == null || fabCenterY == null || items.length === 0) return rotation
+      if (fabCenterX == null || fabCenterY == null || orbitItems.length === 0) return rotation
       const itemRadius = ITEM_CIRCLE_PX / 2
-      const layout = loungeDockCarouselLayout(
+      const layout = loungeDockMenuLayout(
         fabCenterX,
         fabCenterY,
-        items.length,
+        orbitItems.length,
         rotation,
         viewport,
         itemRadius,
       )
+      if (!layout.spinEnabled) return 0
       return loungeDockCarouselSnapRotation(
         layout.focusedIndex,
         layout.step,
         layout.pickerAngle,
       )
     },
-    [items.length, viewport.width, viewport.height, fabCenterX, fabCenterY],
+    [orbitItems.length, viewport.width, viewport.height, fabCenterX, fabCenterY],
   )
 
   const applyCarouselSnap = useCallback(
@@ -177,6 +203,35 @@ export default function LoungeDockArcCarouselPrototype({
     },
     [snapCarouselToPicker],
   )
+
+  const prepareMenuOpen = useCallback(() => {
+    if (fabCenterX == null || fabCenterY == null || orbitItems.length === 0) return
+    const itemRadius = ITEM_CIRCLE_PX / 2
+    const layout = loungeDockMenuLayout(
+      fabCenterX,
+      fabCenterY,
+      orbitItems.length,
+      carouselRotationRef.current,
+      viewport,
+      itemRadius,
+    )
+    if (layout.spinEnabled) {
+      applyCarouselSnap(carouselRotationRef.current)
+    } else {
+      carouselRotationRef.current = 0
+      setCarouselRotation(0)
+    }
+  }, [fabCenterX, fabCenterY, orbitItems.length, viewport, applyCarouselSnap])
+
+  useEffect(() => {
+    setOpen(false)
+  }, [panelChrome])
+
+  useEffect(() => {
+    if (!open || wheelMode) return
+    carouselRotationRef.current = 0
+    setCarouselRotation(0)
+  }, [open, wheelMode, fabPos?.left, fabPos?.top, viewport.width, viewport.height])
 
   useEffect(() => {
     if (!open) return undefined
@@ -256,10 +311,10 @@ export default function LoungeDockArcCarouselPrototype({
         setOpen(false)
         return
       }
-      applyCarouselSnap(carouselRotationRef.current)
+      prepareMenuOpen()
       setOpen(true)
     },
-    [persistFabPrefs, fabVisible, applyCarouselSnap],
+    [persistFabPrefs, fabVisible, prepareMenuOpen],
   )
 
   const onFabPointerCancel = useCallback((e) => {
@@ -271,7 +326,7 @@ export default function LoungeDockArcCarouselPrototype({
 
   const onSpinPointerDown = useCallback(
     (e) => {
-      if (!openRef.current || fabCenterX == null || fabCenterY == null || e.button !== 0) return
+      if (!openRef.current || !wheelMode || fabCenterX == null || fabCenterY == null || e.button !== 0) return
       spinRef.current = {
         pointerId: e.pointerId,
         startPointerAngle: angleFromPointer(fabCenterX, fabCenterY, e.clientX, e.clientY),
@@ -304,9 +359,9 @@ export default function LoungeDockArcCarouselPrototype({
       if (!spin || spin.pointerId !== pointerId) return
       spinRef.current = null
       setSpinning(false)
-      applyCarouselSnap(carouselRotationRef.current)
+      if (wheelMode) applyCarouselSnap(carouselRotationRef.current)
     },
-    [applyCarouselSnap],
+    [applyCarouselSnap, wheelMode],
   )
 
   const onSpinWheel = useCallback(
@@ -343,11 +398,57 @@ export default function LoungeDockArcCarouselPrototype({
 
   if (items.length === 0 || !fabPos || fabCenterX == null || fabCenterY == null) return null
 
-  const pickerOffset = carouselLayout.offsets[carouselLayout.focusedIndex] ?? { x: 0, y: 0 }
+  const showHomeChip = Boolean(homeItem) && (open || panelCompactChrome)
+  const showOrbitItems = open
+  const menuExpanded = open
+
+  const pickerOffset = wheelMode && menuExpanded
+    ? (menuLayout.offsets[menuLayout.focusedIndex] ?? { x: 0, y: 0 })
+    : { x: 0, y: 0 }
+
+  const renderMenuItem = (item, offset, { isFocused = false, offScreen = false } = {}) => (
+    <button
+      key={item.id}
+      type="button"
+      disabled={item.disabled || offScreen}
+      aria-label={item.label}
+      title={offScreen ? `${item.label} (spin wheel to reach)` : item.label}
+      onClick={(e) => {
+        e.stopPropagation()
+        selectItem(item)
+      }}
+      className={`pointer-events-auto fixed z-[2] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center disabled:cursor-not-allowed ${
+        offScreen ? 'opacity-30' : 'opacity-100'
+      } ${item.active ? 'text-cyan-300' : 'text-zinc-100'} ${
+        spinning || !wheelMode ? '' : 'transition-[left,top,opacity] duration-200 ease-out'
+      }`}
+      style={{
+        left: fabCenterX + offset.x,
+        top: fabCenterY + offset.y,
+        zIndex: isFocused ? 32 : 20,
+      }}
+    >
+      <span
+        className={`flex items-center justify-center rounded-full border shadow-lg backdrop-blur-sm ${
+          isFocused || item.active
+            ? 'border-cyan-400/70 bg-zinc-900/95 shadow-cyan-500/20 ring-2 ring-cyan-400/40'
+            : 'border-zinc-700/90 bg-zinc-950/90'
+        }`}
+        style={{ width: ITEM_CIRCLE_PX, height: ITEM_CIRCLE_PX }}
+      >
+        <span
+          className="flex items-center justify-center [&_svg]:h-full [&_svg]:w-full"
+          style={{ width: ITEM_ICON_PX, height: ITEM_ICON_PX }}
+        >
+          {item.icon}
+        </span>
+      </span>
+    </button>
+  )
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[58]">
-      {open && fabVisible ? (
+      {menuExpanded && fabVisible ? (
         <button
           type="button"
           className="pointer-events-auto fixed inset-0 z-0 bg-black/35 backdrop-blur-[2px] [-webkit-tap-highlight-color:transparent]"
@@ -356,7 +457,7 @@ export default function LoungeDockArcCarouselPrototype({
         />
       ) : null}
 
-      {open && fabVisible ? (
+      {menuExpanded && fabVisible && wheelMode ? (
         <div
           className="pointer-events-auto fixed z-[1] touch-none select-none rounded-full"
           style={{
@@ -373,10 +474,10 @@ export default function LoungeDockArcCarouselPrototype({
           onPointerCancel={(e) => endSpin(e.pointerId)}
         >
           <div
-            className="pointer-events-none absolute left-1/2 top-1/2 rounded-full border border-cyan-500/25"
+            className="pointer-events-none absolute left-1/2 top-1/2 rounded-full border border-dashed border-cyan-500/40"
             style={{
-              width: carouselLayout.radius * 2,
-              height: carouselLayout.radius * 2,
+              width: menuLayout.radius * 2,
+              height: menuLayout.radius * 2,
               transform: 'translate(-50%, -50%)',
             }}
             aria-hidden
@@ -391,47 +492,14 @@ export default function LoungeDockArcCarouselPrototype({
         </div>
       ) : null}
 
-      {open
-        ? items.map((item, i) => {
-            const offset = carouselLayout.offsets[i] ?? { x: 0, y: 0 }
-            const isFocused = i === carouselLayout.focusedIndex
-            return (
-              <button
-                key={item.id}
-                type="button"
-                disabled={item.disabled}
-                aria-label={item.label}
-                title={item.label}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  selectItem(item)
-                }}
-                className={`pointer-events-auto fixed z-[2] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 ${
-                  item.active ? 'text-cyan-300' : 'text-zinc-100'
-                } ${spinning ? '' : 'transition-[left,top] duration-200 ease-out'}`}
-                style={{
-                  left: fabCenterX + offset.x,
-                  top: fabCenterY + offset.y,
-                  zIndex: isFocused ? 32 : 20,
-                }}
-              >
-                <span
-                  className={`flex items-center justify-center rounded-full border shadow-lg backdrop-blur-sm ${
-                    isFocused || item.active
-                      ? 'border-cyan-400/70 bg-zinc-900/95 shadow-cyan-500/20 ring-2 ring-cyan-400/40'
-                      : 'border-zinc-700/90 bg-zinc-950/90'
-                  }`}
-                  style={{ width: ITEM_CIRCLE_PX, height: ITEM_CIRCLE_PX }}
-                >
-                  <span
-                    className="flex items-center justify-center [&_svg]:h-full [&_svg]:w-full"
-                    style={{ width: ITEM_ICON_PX, height: ITEM_ICON_PX }}
-                  >
-                    {item.icon}
-                  </span>
-                </span>
-              </button>
-            )
+      {showHomeChip ? renderMenuItem(homeItem, homeOffset) : null}
+
+      {showOrbitItems
+        ? orbitItems.map((item, i) => {
+            const offset = menuLayout.offsets[i] ?? { x: 0, y: 0, onScreen: true }
+            const isFocused = wheelMode && i === menuLayout.focusedIndex
+            const offScreen = wheelMode && !offset.onScreen
+            return renderMenuItem(item, offset, { isFocused, offScreen })
           })
         : null}
 
@@ -450,14 +518,16 @@ export default function LoungeDockArcCarouselPrototype({
           type="button"
           aria-label={
             locked
-              ? open
+              ? menuExpanded
                 ? 'Close lounge menu'
                 : 'Open lounge menu (position locked)'
-              : open
+              : menuExpanded
                 ? 'Close lounge menu'
-                : 'Open lounge menu (drag to reposition)'
+                : panelCompactChrome
+                  ? 'Open lounge menu'
+                  : 'Open lounge menu (drag to reposition)'
           }
-          aria-expanded={open}
+          aria-expanded={menuExpanded}
           onPointerDown={onFabPointerDown}
           onPointerMove={onFabPointerMove}
           onPointerUp={onFabPointerUp}

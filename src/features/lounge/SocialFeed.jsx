@@ -4293,8 +4293,12 @@ export default function SocialFeed({
         />
       ) : null}
 
-      {showLoungeViewportDock && !loungeDockPanel ? (
-        <LoungeDockArcCarouselPrototype items={loungeArcCarouselItems} reveal={loungeTitleReveal} />
+      {showLoungeViewportDock ? (
+        <LoungeDockArcCarouselPrototype
+          items={loungeArcCarouselItems}
+          reveal={loungeDockPanel ? 1 : loungeTitleReveal}
+          panelChrome={loungeDockPanel}
+        />
       ) : null}
 
       <div
