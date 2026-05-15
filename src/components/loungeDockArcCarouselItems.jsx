@@ -77,7 +77,7 @@ function IconCompose() {
       <g transform="translate(0 -4.5)">
         <path
           {...penStroke}
-          d="M17.9 4.9a.95.95 0 0 1 1.35 0l2.45 2.45a.95.95 0 0 1 0 1.35l-8.1 8.1-4 1.35 1.35-4 8.1-8.1Z"
+          d="M17.9 4.9l2.45 2.45a.95.95 0 0 1 0 1.35l-8.1 8.1-4 1.35 1.35-4 8.1-8.1Z"
         />
       </g>
     </svg>
@@ -98,6 +98,21 @@ function IconChat() {
   )
 }
 
+function IconSettings() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+      <path
+        {...stroke}
+        d="M12 15a3 3 0 100-6 3 3 0 000 6z"
+      />
+      <path
+        {...stroke}
+        d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
+      />
+    </svg>
+  )
+}
+
 export function buildLoungeDockArcCarouselItems({
   onCompose,
   composeActive = false,
@@ -109,6 +124,7 @@ export function buildLoungeDockArcCarouselItems({
   followingFilterDisabled,
   onNotifications,
   onChat,
+  onSettings,
   activePanel,
 }) {
   return [
@@ -155,6 +171,13 @@ export function buildLoungeDockArcCarouselItems({
       icon: <IconChat />,
       onSelect: onChat,
       active: activePanel === 'chat',
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: <IconSettings />,
+      onSelect: onSettings,
+      active: activePanel === 'settings',
     },
   ]
 }

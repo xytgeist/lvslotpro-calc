@@ -44,6 +44,8 @@ export default function LoungeDockSlidePanels({
   followingFilterDisabled = false,
   onNotifications,
   onChat,
+  onSettings,
+  onOpenOwnProfile,
   activePanel = null,
   /** Open a post from search (full row); closes the panel and opens post detail like the main feed. */
   onOpenPostFromSearch,
@@ -326,7 +328,15 @@ export default function LoungeDockSlidePanels({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={openPanel === 'search' ? 'Search lounge' : openPanel === 'notifications' ? 'Notifications' : 'Chat'}
+        aria-label={
+          openPanel === 'search'
+            ? 'Search lounge'
+            : openPanel === 'notifications'
+              ? 'Notifications'
+              : openPanel === 'settings'
+                ? 'Settings'
+                : 'Chat'
+        }
         className="pointer-events-auto relative flex h-full w-full max-w-2xl flex-col overflow-hidden bg-zinc-950 shadow-[0_0_0_1px_rgba(24,24,27,0.6)] will-change-transform motion-reduce:transition-none"
         style={{
           transform: `translate3d(${tx}px, 0, 0)`,
@@ -436,6 +446,25 @@ export default function LoungeDockSlidePanels({
               initialPeerUserId={chatInitialPeerUserId}
               onClearInitialPeer={onChatInitialPeerCleared}
             />
+          </div>
+        ) : openPanel === 'settings' ? (
+          <div className="px-3 py-4">
+            <h2 className="text-[17px] font-semibold text-zinc-100">Settings</h2>
+            <p className="mt-1 text-[14px] leading-relaxed text-zinc-500">
+              Lounge account and preferences.
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenOwnProfile?.()}
+                className="min-h-12 w-full rounded-xl border border-[#ff3dff]/75 bg-[#180018]/90 px-4 py-3 text-left text-[15px] font-semibold text-white shadow-[0_0_18px_rgba(255,61,255,0.45)] touch-manipulation hover:bg-[#280028]/95 [-webkit-tap-highlight-color:transparent]"
+              >
+                Profile &amp; account
+              </button>
+              <p className="px-1 text-[13px] leading-relaxed text-zinc-500">
+                Edit handle, display name, avatar, and bio. More Lounge settings will land here.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="px-3 py-4">

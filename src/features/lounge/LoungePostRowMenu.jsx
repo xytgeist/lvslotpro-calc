@@ -17,6 +17,8 @@ export default function LoungePostRowMenu({
   onStaffDelete,
   onBlock,
   onReport,
+  /** Share / copy permalink (allowed when read-only). */
+  onShare,
   /** Optional scroll root (e.g. main feed) to keep the fixed menu aligned while scrolling. */
   positionScrollRootRef,
 }) {
@@ -86,6 +88,20 @@ export default function LoungePostRowMenu({
       className="fixed z-[200] min-w-[10.5rem] rounded-xl border border-zinc-700 bg-zinc-900 py-0.5 shadow-xl"
       style={{ top: fixedStyle.top, right: fixedStyle.right }}
     >
+          {typeof onShare === 'function' ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-1.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+              onClick={(e) => {
+                e.stopPropagation()
+                close()
+                onShare()
+              }}
+            >
+              Share
+            </button>
+          ) : null}
           {isOwn ? (
             <>
               {showEdit ? (

@@ -61,6 +61,7 @@ import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFee
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
+import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import { LoungeFeedInlineSoundResetBinder, LoungeFeedVideoAutoplayProvider } from './LoungeFeedVideoAutoplayContext.jsx'
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
@@ -70,7 +71,8 @@ import LoungeVideoCropModal from './LoungeVideoCropModal.jsx'
 import { pinLoungeStreamSessionPoster, releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 import KlipyGifPicker from './KlipyGifPicker.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
-import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
+// LOUNGE_DOCK_FOOTER_BAR_DISABLED — classic dock icon row (FAB wheel is primary nav). Re-enable import + JSX below to restore.
+// import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
 import LoungeDockArcCarouselPrototype from '../../components/LoungeDockArcCarouselPrototype.jsx'
 import { buildLoungeDockArcCarouselItems } from '../../components/loungeDockArcCarouselItems.jsx'
 import { dockChromeHeightFromTitleBarPx } from '../../utils/loungeDockChrome.js'
@@ -409,14 +411,8 @@ export default function SocialFeed({
   )
 
   const loungeDetailShowPostMenu = useMemo(
-    () =>
-      Boolean(
-        composerUserId &&
-          loungePostDetail?.id &&
-          !loungeDetailEditing &&
-          (loungeDetailIsOwn || loungeViewerIsStaff)
-      ),
-    [composerUserId, loungePostDetail?.id, loungeDetailEditing, loungeDetailIsOwn, loungeViewerIsStaff]
+    () => Boolean(loungePostDetail?.id && !loungeDetailEditing),
+    [loungePostDetail?.id, loungeDetailEditing]
   )
 
   /** Starter row from `ensureDefaultProfileRow`: must confirm once (cannot dismiss until Save). */
@@ -2272,6 +2268,14 @@ export default function SocialFeed({
     })
   }, [])
 
+  const onLoungeDockSettings = useCallback(() => {
+    if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
+      onRequireAuth?.('login')
+      return
+    }
+    setLoungeDockPanel((p) => (p === 'settings' ? null : 'settings'))
+  }, [loungeFeedBrowseMode, loungeReadOnly, onRequireAuth])
+
   const onLoungeDockCompose = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
       onRequireAuth?.('login')
@@ -2426,7 +2430,6 @@ export default function SocialFeed({
           document.getElementById('lounge-detail-comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }}
         repostActionBusy={repostManageBusy}
-        onSharePost={handleShareLoungePost}
       />
     ),
     [
@@ -2444,7 +2447,6 @@ export default function SocialFeed({
       openProfileGateIfNeeded,
       loungePostDetailScrollRef,
       repostManageBusy,
-      handleShareLoungePost,
     ],
   )
 
@@ -2468,7 +2470,6 @@ export default function SocialFeed({
         requireLoungeAuth={requireLoungeAuth}
         openProfileGateIfNeeded={openProfileGateIfNeeded}
         repostMenuScrollRootRef={quoteRepostScrollRef}
-        onSharePost={handleShareLoungePost}
       />
     ),
     [
@@ -2485,7 +2486,6 @@ export default function SocialFeed({
       requireLoungeAuth,
       openProfileGateIfNeeded,
       quoteRepostScrollRef,
-      handleShareLoungePost,
     ],
   )
 
@@ -4088,6 +4088,26 @@ export default function SocialFeed({
     [hydrateCommunityPosts, loungeReadOnly, onRequireAuth, supabaseClient]
   )
 
+  const onLoungeDockOpenOwnProfile = useCallback(() => {
+    if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
+      onRequireAuth?.('login')
+      return
+    }
+    if (!composerUserId) return
+    setLoungeDockPanel(null)
+    void openProfileModal({
+      user_id: composerUserId,
+      author_profile: composerUserProfile,
+    })
+  }, [
+    loungeFeedBrowseMode,
+    loungeReadOnly,
+    onRequireAuth,
+    composerUserId,
+    composerUserProfile,
+    openProfileModal,
+  ])
+
   const onProfileScreenUpdated = useCallback((next) => {
     setProfileModalData((prev) => ({ ...(prev || {}), ...next }))
     if (next?.user_id && composerUserId && next.user_id === composerUserId) {
@@ -4218,6 +4238,7 @@ export default function SocialFeed({
         followingFilterDisabled: loungeFeedBrowseMode === 'anonymous',
         onNotifications: onLoungeDockNotifications,
         onChat: onLoungeDockChat,
+        onSettings: onLoungeDockSettings,
         activePanel: loungeDockPanel,
       }),
     [
@@ -4231,6 +4252,7 @@ export default function SocialFeed({
       loungeFeedBrowseMode,
       onLoungeDockNotifications,
       onLoungeDockChat,
+      onLoungeDockSettings,
       loungeDockPanel,
     ],
   )
@@ -4282,6 +4304,7 @@ export default function SocialFeed({
         </div>
       ) : null}
 
+      {/* LOUNGE_DOCK_FOOTER_BAR_DISABLED — see import above
       {showLoungeViewportDock && !loungeDockPanel ? (
         <LoungeDockFooterBar
           reveal={loungeTitleReveal}
@@ -4299,6 +4322,7 @@ export default function SocialFeed({
           layout="viewport"
         />
       ) : null}
+      */}
 
       {showLoungeViewportDock ? (
         <LoungeDockArcCarouselPrototype
@@ -5080,6 +5104,17 @@ export default function SocialFeed({
                       role="menu"
                       className="absolute right-0 top-full z-[20] mt-1 min-w-[11rem] rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
                     >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full px-4 py-3 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+                        onClick={() => {
+                          setLoungePostDetailMenuOpen(false)
+                          handleShareLoungePost(loungePostDetail)
+                        }}
+                      >
+                        Share
+                      </button>
                       {loungeDetailIsOwn && isLoungePostWithinAuthorEditWindow(loungePostDetail.created_at) ? (
                         <button
                           type="button"
@@ -5442,8 +5477,8 @@ export default function SocialFeed({
                 const repostCount = baseReposts
                 const commentClass = loungeReadOnly ? 'text-zinc-500' : ui.commented ? 'text-zinc-100' : 'text-zinc-500'
                 const repostClass = loungeReadOnly ? 'text-zinc-500' : ui.reposted ? 'text-emerald-400' : 'text-zinc-500'
-                const likeClass = loungeReadOnly ? 'text-zinc-500' : ui.liked ? 'text-rose-400' : 'text-zinc-500'
-                const bookmarkClass = loungeReadOnly ? 'text-zinc-600' : isBookmarked ? 'text-amber-300' : 'text-zinc-500'
+                const likeClass = loungeReadOnly ? 'text-zinc-500' : ui.liked ? 'text-[#ff3824]' : 'text-zinc-500'
+                const bookmarkClass = loungeReadOnly ? 'text-zinc-600' : isBookmarked ? 'text-[#ffd024]' : 'text-zinc-500'
                 const ro = loungeReadOnly
                 const plainId = ui.plainRepostChildId
                 const quoteId = ui.quoteRepostChildId
@@ -5541,7 +5576,7 @@ export default function SocialFeed({
                       </>
                     ) : null}
                     <div
-                      className={`grid grid-cols-5 items-center gap-1 text-[15px] ${loungeDetailEditing ? 'mt-1' : ''}`}
+                      className={`grid grid-cols-4 items-center gap-1 text-[15px] ${loungeDetailEditing ? 'mt-1' : ''}`}
                       onClick={(e) => e.stopPropagation()}
                       role="group"
                     >
@@ -5754,39 +5789,9 @@ export default function SocialFeed({
                         onClick={() => void toggleInteraction(d.id, 'liked')}
                         className="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 hover:bg-zinc-900/80 touch-manipulation"
                       >
-                        <svg className={`h-[22px] w-[22px] ${likeClass}`} viewBox="0 0 20 20" aria-hidden>
-                          <path
-                            d="M10 16.1l-.85-.78C5.65 12.1 3.5 10.16 3.5 7.78A3.28 3.28 0 016.78 4.5c1.07 0 2.1.5 2.72 1.29A3.55 3.55 0 0112.22 4.5a3.28 3.28 0 013.28 3.28c0 2.38-2.15 4.33-5.65 7.54l-.85.78z"
-                            fill="currentColor"
-                            fillOpacity={ro ? 0.06 : ui.liked ? 1 : 0.2}
-                            stroke={ui.liked ? 'none' : 'currentColor'}
-                            strokeWidth={ui.liked ? 0 : 1.35}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+                        <LoungeFlameIcon className={`h-[22px] w-[22px] ${likeClass}`} liked={ui.liked} readOnly={ro} />
                         {Number.isFinite(likeCount) ? <span className={likeClass}>{likeCount}</span> : null}
                       </LoungeFeedStatSlot>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleShareLoungePost(d)
-                        }}
-                        className="inline-flex items-center justify-center rounded-lg px-2 py-2 text-zinc-500 hover:bg-zinc-900/80 hover:text-zinc-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                        title="Share post"
-                        aria-label="Share post"
-                      >
-                        <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
-                          <path
-                            d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4"
-                            stroke="currentColor"
-                            strokeWidth="1.35"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
                       {ro ? (
                         <button
                           type="button"
@@ -5930,6 +5935,8 @@ export default function SocialFeed({
           followingFilterDisabled={loungeFeedBrowseMode === 'anonymous'}
           onNotifications={onLoungeDockNotifications}
           onChat={onLoungeDockChat}
+          onSettings={onLoungeDockSettings}
+          onOpenOwnProfile={onLoungeDockOpenOwnProfile}
           activePanel={loungeDockPanel}
           postCardProps={profilePostCardProps}
           onOpenPostFromSearch={onLoungeDockOpenPostFromSearch}

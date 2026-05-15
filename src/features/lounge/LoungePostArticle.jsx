@@ -64,13 +64,14 @@ export default function LoungePostArticle({
       (typeof captionEditableInMenu !== 'function' || captionEditableInMenu(post)),
   )
   const showPostRowMenu = Boolean(
-    !ro &&
-      viewerUserId &&
-      (onPostMenuEdit ||
-        onPostMenuDelete ||
-        onPostMenuBlock ||
-        onPostMenuReport ||
-        (loungeViewerIsStaff && !menuIsOwn && typeof onStaffPostDelete === 'function'))
+    typeof onSharePost === 'function' ||
+      (!ro &&
+        viewerUserId &&
+        (onPostMenuEdit ||
+          onPostMenuDelete ||
+          onPostMenuBlock ||
+          onPostMenuReport ||
+          (loungeViewerIsStaff && !menuIsOwn && typeof onStaffPostDelete === 'function')))
   )
 
   const renderMediaLightboxFooter = useCallback(
@@ -90,7 +91,6 @@ export default function LoungePostArticle({
         toggleBookmark={toggleBookmark}
         bookmarkedByPost={bookmarkedByPost}
         onOpenComments={onOpenComments}
-        onSharePost={onSharePost}
         requireLoungeAuth={requireLoungeAuth}
         openProfileGateIfNeeded={openProfileGateIfNeeded}
         repostMenuScrollRootRef={repostMenuScrollRootRef}
@@ -107,7 +107,6 @@ export default function LoungePostArticle({
       toggleBookmark,
       bookmarkedByPost,
       onOpenComments,
-      onSharePost,
       requireLoungeAuth,
       openProfileGateIfNeeded,
       repostMenuScrollRootRef,
@@ -192,6 +191,7 @@ export default function LoungePostArticle({
               onStaffDelete={() => onStaffPostDelete?.(post)}
               onBlock={() => onPostMenuBlock?.(post)}
               onReport={() => onPostMenuReport?.(post)}
+              onShare={typeof onSharePost === 'function' ? () => onSharePost(post) : undefined}
               positionScrollRootRef={repostMenuScrollRootRef}
             />
           ) : null}
@@ -337,7 +337,6 @@ export default function LoungePostArticle({
           toggleBookmark={toggleBookmark}
           bookmarkedByPost={bookmarkedByPost}
           onOpenComments={onOpenComments}
-          onSharePost={onSharePost}
           requireLoungeAuth={requireLoungeAuth}
           openProfileGateIfNeeded={openProfileGateIfNeeded}
           repostMenuScrollRootRef={repostMenuScrollRootRef}

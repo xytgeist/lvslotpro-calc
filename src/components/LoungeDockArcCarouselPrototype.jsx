@@ -12,9 +12,10 @@ import {
   readLoungeDockFabPrefs,
   writeLoungeDockFabPrefs,
 } from '../utils/loungeDockFabPosition.js'
+import { LOUNGE_DOCK_FAB_CENTER_GLOW, loungeDockItemGlow } from '../utils/loungeDockFabGlow.js'
 
 const HOME_ITEM_ID = 'home'
-const PANEL_CHROME_PANELS = new Set(['search', 'notifications', 'chat'])
+const PANEL_CHROME_PANELS = new Set(['search', 'notifications', 'chat', 'settings'])
 
 const ITEM_ICON_PX = Math.round((23 * LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX) / 40)
 const DRAG_THRESHOLD_PX = 8
@@ -546,6 +547,8 @@ export default function LoungeDockArcCarouselPrototype({
     const wheelSpin = wheelOpen && spinEnabled
     /** Panel chrome: home chip fades with scroll-linked `reveal` like the FAB. */
     const fadesWithReveal = compactChip
+    const glow = loungeDockItemGlow(item.id)
+    const lit = isFocused || item.active
     return (
     <button
       key={item.id}
@@ -588,7 +591,7 @@ export default function LoungeDockArcCarouselPrototype({
             : 'cursor-grab opacity-100'
           : 'cursor-pointer opacity-100'
       } ${spinning ? 'cursor-grabbing' : ''} disabled:cursor-not-allowed ${
-        item.active ? 'text-zinc-50' : 'text-zinc-300'
+        lit ? glow.textLit : glow.textIdle
       } ${
         spinning
           ? ''
@@ -606,9 +609,9 @@ export default function LoungeDockArcCarouselPrototype({
     >
       <span
         className={`flex items-center justify-center rounded-full border backdrop-blur-sm ${
-          isFocused || item.active
-            ? 'border-zinc-400/60 bg-zinc-900/95 shadow-[0_0_18px_rgba(255,255,255,0.14)] ring-2 ring-white/10'
-            : 'border-zinc-700/80 bg-zinc-950/90 shadow-lg shadow-black/25'
+          lit
+            ? `${glow.bgLit} ${glow.borderLit} ${glow.ringLit} ${glow.shadowLit}`
+            : `${glow.bgIdle} ${glow.borderIdle} ${glow.shadowIdle}`
         }`}
         style={{ width: LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX, height: LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX }}
       >
@@ -658,7 +661,7 @@ export default function LoungeDockArcCarouselPrototype({
           onPointerCancel={(e) => onSpinPointerEnd(e.pointerId)}
         >
           <div
-            className="pointer-events-none absolute left-1/2 top-1/2 rounded-full border border-dashed border-zinc-500/35"
+            className="pointer-events-none absolute left-1/2 top-1/2 rounded-full border border-dashed border-[#00f5ff]/45"
             style={{
               width: wheelLayout.radius * 2,
               height: wheelLayout.radius * 2,
@@ -667,7 +670,7 @@ export default function LoungeDockArcCarouselPrototype({
             aria-hidden
           />
           <div
-            className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 rounded-full border-2 border-zinc-300/55 bg-white/15 shadow-[0_0_12px_rgba(255,255,255,0.22)]"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 rounded-full border-2 border-[#7ffbff] bg-[#00f5ff]/25 shadow-[0_0_16px_rgba(0,245,255,0.75),0_0_28px_rgba(0,245,255,0.35)]"
             style={{
               transform: `translate(calc(-50% + ${pickerOffset.x}px), calc(-50% + ${pickerOffset.y}px))`,
             }}
@@ -713,12 +716,10 @@ export default function LoungeDockArcCarouselPrototype({
           onPointerMove={onFabPointerMove}
           onPointerUp={onFabPointerUp}
           onPointerCancel={onFabPointerCancel}
-          className={`pointer-events-auto absolute inset-0 rounded-full border shadow-xl backdrop-blur-md transition-[border-color,box-shadow,colors] duration-300 ease-out [-webkit-tap-highlight-color:transparent] ${
+          className={`pointer-events-auto absolute inset-0 rounded-full border-0 shadow-xl transition-[box-shadow,background-color,color] duration-300 ease-out [-webkit-tap-highlight-color:transparent] ${
             open
-              ? 'border-zinc-400/55 bg-zinc-900/95 text-zinc-100 shadow-[0_0_24px_rgba(255,255,255,0.16)]'
-              : locked
-                ? 'border-zinc-600/90 bg-zinc-950/95 text-zinc-200 shadow-lg shadow-black/30'
-                : 'border-dashed border-zinc-500/80 bg-zinc-950/95 text-zinc-200 shadow-lg shadow-black/30'
+              ? `${LOUNGE_DOCK_FAB_CENTER_GLOW.bgOpen} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text} ${LOUNGE_DOCK_FAB_CENTER_GLOW.shadowOpen}`
+              : `${LOUNGE_DOCK_FAB_CENTER_GLOW.bg} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text} ${LOUNGE_DOCK_FAB_CENTER_GLOW.shadow}`
           }`}
           style={{
             touchAction: locked || open ? 'manipulation' : 'none',
@@ -726,7 +727,7 @@ export default function LoungeDockArcCarouselPrototype({
           }}
         >
           <span
-            className={`block text-xl font-light leading-none transition-transform duration-300 ${
+            className={`block text-xl font-semibold leading-none text-black transition-transform duration-300 ${
               open ? 'rotate-45' : ''
             }`}
           >

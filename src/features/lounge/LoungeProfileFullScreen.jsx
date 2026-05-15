@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
+// LOUNGE_DOCK_FOOTER_BAR_DISABLED — classic dock icon row on profile sheet. Re-enable import + JSX below to restore.
+// import LoungeDockFooterBar from '../../components/LoungeDockFooterBar.jsx'
 import {
   formatProfileSaveDebugError,
   handleSlugFromAtInput,
@@ -739,17 +740,13 @@ export default function LoungeProfileFullScreen({
         }}
       >
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* LOUNGE_DOCK_FOOTER_BAR_DISABLED: was style paddingBottom Math.max(56, profileDockFooterMeasured) + 8 when shellDock */}
         <div
           ref={profileBodyScrollRef}
           className={
             showOwnEditControls
               ? 'min-h-0 flex-1 overflow-hidden overscroll-y-none pb-[max(0.5rem,env(safe-area-inset-bottom))]'
               : 'min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-[max(0.5rem,env(safe-area-inset-bottom))]'
-          }
-          style={
-            shellDock && !showOwnEditControls
-              ? { paddingBottom: Math.max(56, profileDockFooterMeasured) + 8 }
-              : undefined
           }
         >
           {/* Banner; ⋯ in corner (edit mode: sheet does not scroll, so absolute only). */}
@@ -1159,6 +1156,7 @@ export default function LoungeProfileFullScreen({
             </div>
           </div>
         </div>
+        {/* LOUNGE_DOCK_FOOTER_BAR_DISABLED — see import above
         {shellDock && !showOwnEditControls ? (
           <LoungeDockFooterBar
             layout="sheet"
@@ -1178,6 +1176,7 @@ export default function LoungeProfileFullScreen({
             activePanel={shellDock.activePanel}
           />
         ) : null}
+        */}
         </div>
       </div>
 

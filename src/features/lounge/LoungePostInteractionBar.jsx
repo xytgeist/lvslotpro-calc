@@ -1,17 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
-
-const actionIconClassFeed = 'h-[20px] w-[20px] text-zinc-500'
-const actionIconClassSheet = 'h-[20px] w-[20px] text-zinc-500'
+import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 
 /**
- * Comment / repost / like / share / bookmark row — same behavior as the feed post row or post-detail sheet.
+ * Comment / repost / like / bookmark row — same behavior as the feed post row or post-detail sheet.
  *
  * @param {'feed' | 'sheet'} [props.variant='feed'] — `feed`: fixed portaled repost menus (feed card). `sheet`: absolute repost dropdown (post detail sheet styling).
  * @param {string} [props.repostMenuPortalClass='z-[48]'] — Tailwind z class for portaled repost menus (`feed` only). Use `z-[101]` above media lightboxes (`z-[100]`).
  * @param {() => void} [props.onCommentClick] — When set, runs instead of `onOpenComments` / `toggleInteraction('commented')` for the comment control.
- * @param {(post: object) => void} [props.onSharePost] — Share / copy permalink (works when `loungeReadOnly`; does not use `requireLoungeAuth`).
  * @param {boolean} [props.repostActionBusy=false] — Disables repost menu actions (`sheet` only).
  */
 export default function LoungePostInteractionBar({
@@ -32,7 +29,6 @@ export default function LoungePostInteractionBar({
   variant = 'feed',
   repostMenuPortalClass = 'z-[48]',
   onCommentClick,
-  onSharePost,
   repostActionBusy = false,
   /** Extra classes on the outer grid wrapper (e.g. `w-full` in lightbox). */
   rootClassName = '',
@@ -52,14 +48,13 @@ export default function LoungePostInteractionBar({
   const ro = loungeReadOnly
   const commentClass = ro ? 'text-zinc-500' : ui.commented ? 'text-zinc-100' : 'text-zinc-500'
   const repostClass = ro ? 'text-zinc-500' : ui.reposted ? 'text-emerald-400' : 'text-zinc-500'
-  const likeClass = ro ? 'text-zinc-500' : ui.liked ? 'text-rose-400' : 'text-zinc-500'
-  const bookmarkClass = ro ? 'text-zinc-600' : isBookmarked ? 'text-amber-300' : 'text-zinc-500'
+  const likeClass = ro ? 'text-zinc-500' : ui.liked ? 'text-[#ff3824]' : 'text-zinc-500'
+  const bookmarkClass = ro ? 'text-zinc-600' : isBookmarked ? 'text-[#ffd024]' : 'text-zinc-500'
   const plainId = ui.plainRepostChildId
   const quoteId = ui.quoteRepostChildId
 
   const isFeed = variant === 'feed'
   const iconSz = isFeed ? 'h-[20px] w-[20px]' : 'h-[22px] w-[22px]'
-  const actionIconClass = isFeed ? actionIconClassFeed : actionIconClassSheet
   const statFeedComment = 'inline-flex items-center justify-start gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70'
   const statFeedCenter = 'inline-flex items-center justify-center gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70'
   const statFeedBookmark = 'inline-flex items-center justify-end gap-1.5 rounded px-1.5 py-1 hover:bg-zinc-900/70'
@@ -122,8 +117,8 @@ export default function LoungePostInteractionBar({
   }
 
   const gridClass = isFeed
-    ? `grid grid-cols-5 items-center text-[14px] ${rootClassName}`.trim()
-    : `grid grid-cols-5 items-center gap-1 text-[15px] ${rootClassName}`.trim()
+    ? `grid grid-cols-4 items-center text-[14px] ${rootClassName}`.trim()
+    : `grid grid-cols-4 items-center gap-1 text-[15px] ${rootClassName}`.trim()
 
   const repostMenusFeed =
     typeof document !== 'undefined' &&
@@ -507,65 +502,9 @@ export default function LoungePostInteractionBar({
           onClick={() => void toggleInteraction(post.id, 'liked')}
           className={isFeed ? statFeedCenter : statSheetCenter}
         >
-          <svg className={`${iconSz} ${likeClass}`} viewBox="0 0 20 20" aria-hidden>
-            <path
-              d="M10 16.1l-.85-.78C5.65 12.1 3.5 10.16 3.5 7.78A3.28 3.28 0 016.78 4.5c1.07 0 2.1.5 2.72 1.29A3.55 3.55 0 0112.22 4.5a3.28 3.28 0 013.28 3.28c0 2.38-2.15 4.33-5.65 7.54l-.85.78z"
-              fill="currentColor"
-              fillOpacity={ro ? 0.06 : ui.liked ? 1 : 0.2}
-              stroke={ui.liked ? 'none' : 'currentColor'}
-              strokeWidth={ui.liked ? 0 : 1.35}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <LoungeFlameIcon className={`${iconSz} ${likeClass}`} liked={ui.liked} readOnly={ro} />
           {Number.isFinite(likeCount) ? <span className={likeClass}>{likeCount}</span> : null}
         </LoungeFeedStatSlot>
-        {typeof onSharePost === 'function' ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onSharePost(post)
-            }}
-            className={
-              isFeed
-                ? `${statFeedCenter} touch-manipulation [-webkit-tap-highlight-color:transparent] text-zinc-500 hover:bg-zinc-900/70`
-                : `${statSheetCenter} touch-manipulation [-webkit-tap-highlight-color:transparent] text-zinc-500 hover:bg-zinc-900/80`
-            }
-            title="Share post"
-            aria-label="Share post"
-          >
-            <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
-              <path
-                d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4"
-                stroke="currentColor"
-                strokeWidth="1.35"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        ) : (
-          <span
-            className={
-              isFeed
-                ? 'inline-flex items-center justify-center gap-1.5 rounded px-1.5 py-1 text-zinc-600'
-                : 'inline-flex items-center justify-center rounded-lg px-2 py-2 text-zinc-600'
-            }
-            title="Share"
-            aria-hidden
-          >
-            <svg className={actionIconClass} viewBox="0 0 20 20" fill="none" aria-hidden>
-              <path
-                d="M11.5 4.75h3.75V8.5M15 5l-6.25 6.25M12.75 10.5v4a.75.75 0 01-.75.75H5.5a.75.75 0 01-.75-.75V8a.75.75 0 01.75-.75h4"
-                stroke="currentColor"
-                strokeWidth="1.35"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-        )}
         {ro ? (
           <button
             type="button"
