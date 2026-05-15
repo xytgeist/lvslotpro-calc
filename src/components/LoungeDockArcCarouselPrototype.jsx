@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import {
   LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX,
   LOUNGE_DOCK_CAROUSEL_RADIUS_PX,
@@ -437,6 +438,22 @@ export default function LoungeDockArcCarouselPrototype({
     [viewport.width, viewport.height],
   )
 
+  /** After long-press reposition, snap FAB to the bottom-left or bottom-right corner for the drop side (half-width). */
+  const snapFabToBottomCornerForDropSide = useCallback(() => {
+    const cur = fabPosRef.current
+    if (!cur) return
+    const cx = cur.left + LOUNGE_DOCK_FAB_SIZE_PX / 2
+    const alignLeft = cx < viewport.width / 2
+    const pos = loungeDockFabCornerPosition(
+      viewport.width,
+      viewport.height,
+      LOUNGE_DOCK_FAB_SIZE_PX,
+      alignLeft,
+    )
+    fabPosRef.current = pos
+    setFabPos(pos)
+  }, [viewport.width, viewport.height])
+
   const onFabPointerDown = useCallback(
     (e) => {
       if (e.button !== 0) return
@@ -506,6 +523,7 @@ export default function LoungeDockArcCarouselPrototype({
         e.preventDefault()
         e.stopPropagation()
         armRepositionClickGuard()
+        snapFabToBottomCornerForDropSide()
         persistFabPrefs(fabPosRef.current)
         endFabReposition()
         try {
@@ -566,6 +584,7 @@ export default function LoungeDockArcCarouselPrototype({
       isCornerL,
       viewport.width,
       viewport.height,
+      snapFabToBottomCornerForDropSide,
     ],
   )
 
@@ -577,6 +596,7 @@ export default function LoungeDockArcCarouselPrototype({
       clearDocumentTextSelection()
       if (drag.dragging && repositioningRef.current) {
         armRepositionClickGuard()
+        snapFabToBottomCornerForDropSide()
         persistFabPrefs(fabPosRef.current)
       } else if (repositioningRef.current) {
         armRepositionClickGuard()
@@ -584,7 +604,7 @@ export default function LoungeDockArcCarouselPrototype({
       endFabReposition()
       fabDragRef.current = null
     },
-    [persistFabPrefs, endFabReposition, armRepositionClickGuard],
+    [persistFabPrefs, endFabReposition, armRepositionClickGuard, snapFabToBottomCornerForDropSide],
   )
 
   const beginSpinGesture = useCallback(
@@ -622,6 +642,11 @@ export default function LoungeDockArcCarouselPrototype({
     (e) => {
       const spin = spinRef.current
       if (!spin || spin.pointerId !== e.pointerId || fabCenterX == null || fabCenterY == null) return
+      try {
+        e.preventDefault()
+      } catch {
+        /* passive listener on some hosts */
+      }
       const cur = angleFromPointer(fabCenterX, fabCenterY, e.clientX, e.clientY)
       let delta = cur - spin.startPointerAngle
       if (delta > Math.PI) delta -= Math.PI * 2
@@ -674,6 +699,15 @@ export default function LoungeDockArcCarouselPrototype({
   }, [open, spinEnabled, onSpinWheel])
 
   useEffect(() => {
+    if (!spinning || typeof document === 'undefined') return undefined
+    const block = (e) => {
+      e.preventDefault()
+    }
+    document.addEventListener('touchmove', block, { passive: false, capture: true })
+    return () => document.removeEventListener('touchmove', block, { capture: true })
+  }, [spinning])
+
+  useEffect(() => {
     if (!open || !spinEnabled) return undefined
     let wheelSnapTimer = null
     const onWheelEnd = () => {
@@ -694,13 +728,12 @@ export default function LoungeDockArcCarouselPrototype({
   const selectItem = useCallback(
     (item) => {
       if (item.disabled) return
-      armPointerGuard()
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          item.onSelect?.()
-          setOpen(false)
-        })
+      /** Close menu first so feed is not `pointer-events: none` during focus (iOS keyboard). */
+      flushSync(() => {
+        setOpen(false)
       })
+      item.onSelect?.()
+      armPointerGuard()
     },
     [armPointerGuard],
   )
@@ -871,12 +904,16 @@ export default function LoungeDockArcCarouselPrototype({
       {menuExpanded && fabVisible ? (
         <button
           type="button"
-          className="pointer-events-auto fixed inset-0 z-[5] bg-black/35 backdrop-blur-[2px] [-webkit-tap-highlight-color:transparent]"
+          className="pointer-events-auto fixed inset-0 z-[5] touch-pan-y bg-black/35 backdrop-blur-[2px] [-webkit-tap-highlight-color:transparent]"
+          style={{ touchAction: 'pan-y' }}
           aria-label="Close menu"
-          onPointerDown={(e) => e.preventDefault()}
+          onPointerDown={(e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return
+            flushSync(() => setOpen(false))
+          }}
           onClick={(e) => {
             e.preventDefault()
-            setOpen(false)
+            flushSync(() => setOpen(false))
           }}
         />
       ) : null}
