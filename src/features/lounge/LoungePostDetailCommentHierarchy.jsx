@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { LoungeCommentCard } from './LoungePostCommentThread.jsx'
+import { LOUNGE_FEED_POST_DETAIL_COMMENT_ROW_CLASS } from './loungeFeedAvatar.js'
 import { formatLoungePostDetailWhen } from './loungeFormat.js'
 
 const END_PAD_PX = 3
@@ -117,7 +118,7 @@ function HierarchyCommentRow({
           <button
             type="button"
             onClick={() => onNavigateToPathIndex(pathIndex)}
-            className="block w-full min-w-0 cursor-pointer rounded-lg px-1 py-1 text-left touch-manipulation outline-none hover:bg-zinc-900/50 [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-violet-500/40"
+            className={`block w-full ${LOUNGE_FEED_POST_DETAIL_COMMENT_ROW_CLASS} cursor-pointer rounded-lg text-left touch-manipulation outline-none hover:bg-zinc-900/50 [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-violet-500/40`}
             aria-label="View this comment in thread"
           >
             {card}

@@ -40,7 +40,7 @@ export default function LoungeStaffRoleBadge({ role, size = 'feed' }) {
           <span className="inline-flex translate-y-[1.5px]">
             <CrownIcon className={`${crownClass} text-amber-400`} />
           </span>
-          <span className="inline-flex translate-y-0.5">
+          <span className="inline-flex translate-y-0">
             <ShieldIcon className={`${shieldClass} text-blue-500`} />
           </span>
         </span>

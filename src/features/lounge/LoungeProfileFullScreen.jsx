@@ -14,6 +14,7 @@ import {
 } from '../profiles/profileGate'
 import { prepareAvatarImageForUpload, isProbablyImageFile } from '../../utils/compressImageForUpload'
 import LoungePostArticle from './LoungePostArticle'
+import { LOUNGE_FEED_POST_ROW_CLASS } from './loungeFeedAvatar.js'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
@@ -1068,7 +1069,7 @@ export default function LoungeProfileFullScreen({
                     <article
                       key={post.id}
                       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
-                      className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                      className={LOUNGE_FEED_POST_ROW_CLASS}
                       onClick={(e) => {
                         const t = e.target
                         if (!(t instanceof Element)) return
@@ -1122,7 +1123,7 @@ export default function LoungeProfileFullScreen({
                     <article
                       key={post.id}
                       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
-                      className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                      className={LOUNGE_FEED_POST_ROW_CLASS}
                       onClick={(e) => {
                         const t = e.target
                         if (!(t instanceof Element)) return

@@ -3,8 +3,7 @@ import {
   profileAvatarInitials,
   profileAvatarToneClass,
 } from '../profiles/profileGate'
-import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
-import LoungeOgBadge from './LoungeOgBadge'
+import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
@@ -20,21 +19,22 @@ import {
   orderPostDetailRootComments,
 } from '../../utils/loungeFeedCommentSort.js'
 import { LOUNGE_COMMENT_BODY_MAX } from '../../utils/loungeCommentLimits.js'
-
-function CommentAvatar({ profile, comment, className }) {
-  if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" className={`${className} object-cover`} />
-  }
-  return (
-    <span
-      className={`grid place-items-center font-bold text-white ${profileAvatarToneClass(
-        profile?.user_id || profile?.handle || comment?.user_id || 'member',
-      )} ${className}`}
-    >
-      {profileAvatarInitials(profile?.display_name, profile?.handle)}
-    </span>
-  )
-}
+import { renderRichCaption } from './loungeCaption'
+import {
+  LOUNGE_FEED_CAPTION_TEXT_CLASS,
+  LOUNGE_FEED_CAPTION_TOP_CLASS,
+  LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS,
+  LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS,
+  LOUNGE_FEED_DISPLAY_NAME_CLASS,
+  LOUNGE_FEED_META_HANDLE_TIME_CLASS,
+  LOUNGE_FEED_META_ROW_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_AVATAR_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_ROW_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_INTERACTIONS_CLASS,
+  LOUNGE_FEED_POST_CARD_MENU_ANCHOR_CLASS,
+} from './loungeFeedAvatar.js'
 
 /**
  * Meta row matches `LoungePostArticle`: name, badges, handle · time (left); ⋯ menu on the right.
@@ -94,8 +94,6 @@ export function LoungeCommentCard({
   const profile = comment.author_profile
   const displayName = typeof displayNameFor === 'function' ? displayNameFor(comment) : profile?.display_name || profile?.handle || 'Member'
   const handleLabel = typeof handleFor === 'function' ? handleFor(comment) : '@member'
-  const avatarClass =
-    'mt-0.5 h-10 w-10 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 font-bold text-zinc-200 text-[15px] sm:h-[2.75rem] sm:w-[2.75rem] sm:text-[16px]'
   const interactionBarPost = useMemo(() => {
     if (!comment?.id) return null
     return {
@@ -121,43 +119,6 @@ export function LoungeCommentCard({
         typeof onCommentMenuReport === 'function'),
   )
 
-  const metaHeader = (
-    <div className="flex min-w-0 items-start gap-2 pt-0.5">
-      <div className="min-w-0 flex-1 overflow-hidden text-left">
-        <div className="flex min-w-0 flex-nowrap items-center justify-start gap-x-1.5 text-[15px] leading-snug">
-          <span className="min-w-0 truncate font-semibold text-zinc-100">{displayName}</span>
-          <span className="shrink-0">
-            <LoungeStaffRoleBadge role={profile?.role} />
-          </span>
-          <span className="shrink-0">
-            <LoungeOgBadge isOg={profile?.is_og} />
-          </span>
-          <span className="inline-flex min-w-0 max-w-[min(11rem,52vw)] shrink-[3] items-center gap-x-1 overflow-hidden text-[15px] text-zinc-500 sm:max-w-[13rem]">
-            <span className="min-w-0 truncate">{handleLabel}</span>
-            <span className="shrink-0 text-zinc-600">·</span>
-            <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">{postAgeLabel(comment.created_at)}</span>
-          </span>
-        </div>
-      </div>
-      {showCommentMenu ? (
-        <div className="shrink-0 self-start translate-y-px">
-          <LoungePostRowMenu
-            menuAriaLabel="Comment options"
-            isOwn={menuIsOwn}
-            showEdit={Boolean(menuIsOwn && typeof onCommentMenuEdit === 'function')}
-            deleteBusy={Boolean(busyDeletingCommentId && busyDeletingCommentId === comment.id)}
-            onEdit={() => onCommentMenuEdit?.(comment)}
-            onDelete={() => onCommentMenuDelete?.(comment)}
-            showStaffDelete={false}
-            onBlock={() => onCommentMenuBlock?.(comment)}
-            onReport={() => onCommentMenuReport?.(comment)}
-            positionScrollRootRef={positionScrollRootRef}
-          />
-        </div>
-      ) : null}
-    </div>
-  )
-
   const bodyEditing = editingCommentId === comment.id
 
   const bodyBlock = bodyEditing ? (
@@ -175,7 +136,7 @@ export function LoungeCommentCard({
         onChange={(e) => onCommentEditDraftChange?.(e.target.value)}
         rows={3}
         maxLength={LOUNGE_COMMENT_BODY_MAX}
-        className="w-full resize-y rounded-xl border border-zinc-600/70 bg-zinc-900/90 px-3 py-2 text-[15px] leading-snug text-zinc-100 outline-none focus:border-cyan-600/55 touch-manipulation"
+        className={`w-full resize-y rounded-xl border border-zinc-600/70 bg-zinc-900/90 px-3 py-2 ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-100 outline-none focus:border-cyan-600/55 touch-manipulation`}
         aria-label="Edit reply"
       />
       <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -209,9 +170,11 @@ export function LoungeCommentCard({
       const bodyText = String(comment.body || '').trim()
       if (!bodyText) return null
       return (
-        <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] leading-snug text-zinc-100">
-          {comment.body}
-        </p>
+        <div
+          className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}
+        >
+          {renderRichCaption(bodyText)}
+        </div>
       )
     })()
   )
@@ -221,7 +184,11 @@ export function LoungeCommentCard({
       <LoungePostFeedImagesAndGif
         post={comment}
         variant={mediaFeedVariant}
-        firstMarginTopClass={String(comment.body || '').trim() ? 'mt-1.5' : 'mt-0.5'}
+        firstMarginTopClass={
+          String(comment.body || '').trim()
+            ? LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS
+            : LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS
+        }
         visibilityResetRootRef={positionScrollRootRef}
       />
     ) : null
@@ -235,13 +202,63 @@ export function LoungeCommentCard({
           e.stopPropagation()
           onAvatarClickProfile?.(comment)
         }}
-        className="shrink-0 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+        className={`${LOUNGE_FEED_POST_DETAIL_COMMENT_AVATAR_CLASS} flex items-center justify-center touch-manipulation hover:border-zinc-600 [-webkit-tap-highlight-color:transparent]`}
         aria-label={`Open profile for ${displayName}`}
       >
-        <CommentAvatar profile={profile} comment={comment} className={avatarClass} />
+        {profile?.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt=""
+            className="h-full w-full rounded-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <span
+            className={`flex h-full w-full items-center justify-center font-bold text-white ${profileAvatarToneClass(
+              profile?.user_id || profile?.handle || comment?.user_id || 'member',
+            )}`}
+          >
+            {profileAvatarInitials(profile?.display_name, profile?.handle)}
+          </span>
+        )}
       </button>
       <div className="min-w-0 flex-1">
-        {metaHeader}
+        <div className="relative min-w-0">
+          <div className={`min-w-0 overflow-hidden text-left ${showCommentMenu ? 'pr-7' : ''}`}>
+            <div className={LOUNGE_FEED_META_ROW_CLASS}>
+              <LoungeFeedAuthorMetaBadges
+                role={profile?.role}
+                isOg={profile?.is_og}
+                displayName={displayName}
+                displayNameClassName={LOUNGE_FEED_DISPLAY_NAME_CLASS}
+              />
+              <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
+                <span className="min-w-0 truncate">{handleLabel}</span>
+                <span className="shrink-0 text-zinc-600">·</span>
+                <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">
+                  {postAgeLabel(comment.created_at)}
+                </span>
+              </span>
+            </div>
+          </div>
+          {showCommentMenu ? (
+            <div className={LOUNGE_FEED_POST_CARD_MENU_ANCHOR_CLASS}>
+              <LoungePostRowMenu
+                menuAriaLabel="Comment options"
+                isOwn={menuIsOwn}
+                showEdit={Boolean(menuIsOwn && typeof onCommentMenuEdit === 'function')}
+                deleteBusy={Boolean(busyDeletingCommentId && busyDeletingCommentId === comment.id)}
+                onEdit={() => onCommentMenuEdit?.(comment)}
+                onDelete={() => onCommentMenuDelete?.(comment)}
+                showStaffDelete={false}
+                onBlock={() => onCommentMenuBlock?.(comment)}
+                onReport={() => onCommentMenuReport?.(comment)}
+                positionScrollRootRef={positionScrollRootRef}
+              />
+            </div>
+          ) : null}
+        </div>
         {bodyBlock}
         {commentMediaBlock}
         {showDetailTimestamp && detailTimestampLabel && !bodyEditing ? (
@@ -251,7 +268,7 @@ export function LoungeCommentCard({
           <LoungePostInteractionBar
             post={interactionBarPost}
             variant="comment"
-            rootClassName="mt-1 w-full"
+            rootClassName={LOUNGE_FEED_POST_DETAIL_COMMENT_INTERACTIONS_CLASS}
             loungeReadOnly={loungeReadOnly}
             interactionStateFor={interactionStateFor}
             toggleInteraction={toggleInteraction}
@@ -300,14 +317,14 @@ export function LoungeCommentCard({
           e.preventDefault()
           openRow()
         }}
-        className="min-w-0 cursor-pointer rounded-lg px-1 py-1 touch-manipulation outline-none hover:bg-zinc-900/50 [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-violet-500/40"
+        className={`${LOUNGE_FEED_POST_DETAIL_COMMENT_ROW_CLASS} cursor-pointer rounded-lg touch-manipulation outline-none hover:bg-zinc-900/50 [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-violet-500/40`}
       >
         {metaRow}
       </article>
     )
   }
 
-  return <article className="min-w-0 px-1 py-1">{metaRow}</article>
+  return <article className={LOUNGE_FEED_POST_DETAIL_COMMENT_ROW_CLASS}>{metaRow}</article>
 }
 
 /**
@@ -478,9 +495,9 @@ export default function LoungePostCommentThread({
       return <p className="mt-1 text-[14px] text-zinc-500">Could not load this comment.</p>
     }
     return directRepliesSorted.length ? (
-      <ul className="mt-1.5 divide-y divide-zinc-800/70 space-y-0 border-t border-zinc-800/70 pt-1.5">
+      <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
         {directRepliesSorted.map((r) => (
-          <li key={r.id}>
+          <li key={r.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
             <LoungeCommentCard
               comment={r}
               navigable={Boolean(onOpenCommentThread)}
@@ -492,7 +509,7 @@ export default function LoungePostCommentThread({
         ))}
       </ul>
     ) : (
-      <p className="mt-1.5 border-t border-zinc-800/70 pt-1.5 text-[14px] text-zinc-500">No replies yet.</p>
+      <p className="mt-1 text-[14px] text-zinc-500">No replies yet.</p>
     )
   }
 
@@ -501,9 +518,9 @@ export default function LoungePostCommentThread({
   }
 
   return (
-    <ul className="mt-0 divide-y divide-zinc-800/70 space-y-0">
+    <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
       {rootsSorted.map((root) => (
-        <li key={root.id} className="min-w-0">
+        <li key={root.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
           <LoungeCommentCard
             comment={root}
             navigable={Boolean(onOpenCommentThread)}
@@ -514,7 +531,7 @@ export default function LoungePostCommentThread({
         </li>
       ))}
       {orphanOpAuthorReplies.map((c) => (
-        <li key={c.id} className="min-w-0">
+        <li key={c.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
           <LoungeCommentCard
             comment={c}
             navigable={Boolean(onOpenCommentThread)}

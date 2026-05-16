@@ -80,6 +80,7 @@ import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
 import { LoungeFeedInlineSoundResetBinder, LoungeFeedVideoAutoplayProvider } from './LoungeFeedVideoAutoplayContext.jsx'
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
+import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import LoungeVideoCropModal from './LoungeVideoCropModal.jsx'
@@ -112,17 +113,18 @@ import LoungePostCommentThread from './LoungePostCommentThread.jsx'
 import {
   LOUNGE_COMMENT_DETAIL_THREAD_PAD,
   LOUNGE_FEED_AVATAR_CLASS,
-  LOUNGE_FEED_META_BADGE_WRAP_CLASS,
-  LOUNGE_FEED_META_HANDLE_TIME_CLASS,
-  LOUNGE_FEED_OG_AFTER_STAFF_CLASS,
-  loungeFeedAuthorIdentityClusterClass,
-  LOUNGE_FEED_DISPLAY_NAME_CLASS,
+  LOUNGE_FEED_CAPTION_TEXT_CLASS,
   LOUNGE_FEED_DISPLAY_NAME_DETAIL_CLASS,
-  LOUNGE_FEED_META_ROW_CLASS,
   LOUNGE_FEED_POST_DETAIL_AUTHOR_BLOCK_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_SEPARATOR_CLASS,
+  LOUNGE_FEED_POST_ROW_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_ROW_CLASS,
+  LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_SECTION_CLASS,
+  LOUNGE_FEED_POST_DETAIL_INTERACTIONS_WRAP_CLASS,
   LOUNGE_FEED_POST_DETAIL_HANDLE_TIME_CLASS,
-  LOUNGE_FEED_POST_DETAIL_NAME_BADGE_ROW_CLASS,
-  loungeFeedAuthorHasStaffBadge,
+  LOUNGE_FEED_META_ROW_CLASS,
+  LOUNGE_FEED_TITLE_BAR_ROW_CLASS,
+  LOUNGE_FEED_TITLE_BAR_SIDE_SLOT_CLASS,
 } from './loungeFeedAvatar.js'
 import LoungePostDetailCommentSort from './LoungePostDetailCommentSort.jsx'
 import LoungePostDetailCommentHierarchy from './LoungePostDetailCommentHierarchy.jsx'
@@ -6196,7 +6198,7 @@ export default function SocialFeed({
             pointerEvents: loungeTitleReveal > 0.12 ? 'auto' : 'none',
           }}
         >
-          <div className="flex items-center justify-between gap-3 px-3 py-2">
+          <div className={`flex items-center justify-between gap-3 ${LOUNGE_FEED_TITLE_BAR_ROW_CLASS}`}>
             <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
             <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
               <div className="pointer-events-none truncate text-right text-zinc-600 text-[13px]">
@@ -6877,7 +6879,7 @@ export default function SocialFeed({
               <article
                 key={post.id}
                 style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
-                className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                className={LOUNGE_FEED_POST_ROW_CLASS}
                 onClick={(e) => {
                   const t = e.target
                   if (!(t instanceof Element)) return
@@ -6973,7 +6975,7 @@ export default function SocialFeed({
             }}
           />
           <div
-            className={`fixed inset-y-0 right-0 z-10 flex h-dvh max-h-dvh w-full max-w-2xl flex-col overflow-hidden border-l border-zinc-800/70 bg-zinc-950/94 shadow-[-12px_0_40px_rgba(0,0,0,0.45)] backdrop-blur-md transition-transform duration-300 ease-out motion-reduce:transition-none ${
+            className={`fixed inset-y-0 right-0 z-10 flex h-dvh max-h-dvh w-full max-w-2xl flex-col overflow-hidden border-l border-zinc-800/70 bg-zinc-950/94 pt-[max(0px,env(safe-area-inset-top))] shadow-[-12px_0_40px_rgba(0,0,0,0.45)] backdrop-blur-md transition-transform duration-300 ease-out motion-reduce:transition-none ${
               loungePostDetailVisible ? 'translate-x-0' : 'translate-x-full'
             }`}
             onTransitionEnd={onLoungePostDetailPanelTransitionEnd}
@@ -6982,13 +6984,13 @@ export default function SocialFeed({
           >
             <div
               ref={loungePostDetailTitleBarRef}
-              className="absolute inset-x-0 top-0 z-30 border-b border-zinc-800/70 bg-zinc-950/80 px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/70 sm:py-3 shadow-[0_1px_0_rgba(0,0,0,0.18)] will-change-transform"
+              className="absolute inset-x-0 top-0 z-30 border-b border-zinc-800/70 bg-zinc-950/80 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/70 shadow-[0_1px_0_rgba(0,0,0,0.18)] will-change-transform"
               style={{
                 transform: `translate3d(0, ${-(1 - loungePostDetailTitleReveal) * (loungePostDetailTitleBarHeight > 0 ? loungePostDetailTitleBarHeight : 56)}px, 0)`,
                 pointerEvents: loungePostDetailTitleReveal > 0.12 ? 'auto' : 'none',
               }}
             >
-              <div className="flex shrink-0 items-center gap-2">
+              <div className={`flex shrink-0 items-center gap-2 ${LOUNGE_FEED_TITLE_BAR_ROW_CLASS}`}>
               <button
                 type="button"
                 onClick={() => {
@@ -7007,7 +7009,7 @@ export default function SocialFeed({
                     })
                   } else closeLoungePostDetail()
                 }}
-                className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white [-webkit-tap-highlight-color:transparent]"
+                className={`flex ${LOUNGE_FEED_TITLE_BAR_SIDE_SLOT_CLASS} touch-manipulation items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white [-webkit-tap-highlight-color:transparent]`}
                 aria-label={loungeCommentDetailPathIds.length > 0 ? 'Back' : 'Back to Lounge'}
               >
                 <span className="text-[22px] leading-none" aria-hidden>
@@ -7018,14 +7020,14 @@ export default function SocialFeed({
                 {loungeCommentDetailPathIds.length > 0 ? 'Reply' : 'Post'}
               </h2>
               {loungeDetailShowPostMenu ? (
-                <div ref={loungePostDetailMenuWrapRef} className="relative flex h-10 w-10 shrink-0 justify-end">
+                <div ref={loungePostDetailMenuWrapRef} className={`relative flex ${LOUNGE_FEED_TITLE_BAR_SIDE_SLOT_CLASS} justify-end`}>
                   <button
                     type="button"
                     aria-haspopup="menu"
                     aria-expanded={loungePostDetailMenuOpen}
                     aria-label="Post options"
                     onClick={() => setLoungePostDetailMenuOpen((o) => !o)}
-                    className="flex h-10 w-10 touch-manipulation items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white [-webkit-tap-highlight-color:transparent]"
+                    className={`flex ${LOUNGE_FEED_TITLE_BAR_SIDE_SLOT_CLASS} touch-manipulation items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white [-webkit-tap-highlight-color:transparent]`}
                   >
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
                       <circle cx="4" cy="10" r="1.65" />
@@ -7119,7 +7121,7 @@ export default function SocialFeed({
                   ) : null}
                 </div>
               ) : (
-                <div className="h-12 w-12 shrink-0 sm:h-[3.3rem] sm:w-[3.3rem]" aria-hidden />
+                <div className={LOUNGE_FEED_TITLE_BAR_SIDE_SLOT_CLASS} aria-hidden />
               )}
               </div>
             </div>
@@ -7191,39 +7193,16 @@ export default function SocialFeed({
                     className="block w-full min-w-0 text-left hover:text-cyan-300"
                   >
                     <div className={LOUNGE_FEED_POST_DETAIL_AUTHOR_BLOCK_CLASS}>
-                      <div className={LOUNGE_FEED_POST_DETAIL_NAME_BADGE_ROW_CLASS}>
-                      <span
-                        className={loungeFeedAuthorIdentityClusterClass(
-                          loungeFeedAuthorHasStaffBadge(loungePostDetail?.author_profile?.role),
-                          loungePostDetail?.author_profile?.is_og === true,
-                        )}
-                      >
-                        <span className={LOUNGE_FEED_DISPLAY_NAME_DETAIL_CLASS}>
-                          {displayNameFor(loungePostDetail)}
-                        </span>
-                        {loungeFeedAuthorHasStaffBadge(loungePostDetail?.author_profile?.role) ? (
-                          <span className={LOUNGE_FEED_META_BADGE_WRAP_CLASS}>
-                            <LoungeStaffRoleBadge role={loungePostDetail?.author_profile?.role} size="detail" />
-                          </span>
-                        ) : loungePostDetail?.author_profile?.is_og === true ? (
-                          <span className={LOUNGE_FEED_META_BADGE_WRAP_CLASS}>
-                            <LoungeOgBadge isOg size="detail" />
-                          </span>
-                        ) : null}
-                      </span>
-                      {loungeFeedAuthorHasStaffBadge(loungePostDetail?.author_profile?.role) &&
-                      loungePostDetail?.author_profile?.is_og === true ? (
-                        <span className={LOUNGE_FEED_OG_AFTER_STAFF_CLASS}>
-                          <LoungeOgBadge isOg size="detail" />
-                        </span>
-                      ) : null}
+                      <div className={LOUNGE_FEED_META_ROW_CLASS}>
+                        <LoungeFeedAuthorMetaBadges
+                          role={loungePostDetail?.author_profile?.role}
+                          isOg={loungePostDetail?.author_profile?.is_og === true}
+                          displayName={displayNameFor(loungePostDetail)}
+                          displayNameClassName={LOUNGE_FEED_DISPLAY_NAME_DETAIL_CLASS}
+                        />
                       </div>
                       <span className={LOUNGE_FEED_POST_DETAIL_HANDLE_TIME_CLASS}>
                         <span className="min-w-0 truncate">{handleFor(loungePostDetail)}</span>
-                        <span className="shrink-0 text-zinc-600">·</span>
-                        <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">
-                          {postAgeLabel(loungePostDetail.created_at)}
-                        </span>
                       </span>
                     </div>
                   </button>
@@ -7276,7 +7255,7 @@ export default function SocialFeed({
                       <div
                         ref={loungeDetailEditMirrorRef}
                         aria-hidden
-                        className="pointer-events-none min-h-[5rem] w-full overflow-y-auto whitespace-pre-wrap break-words border border-transparent px-0 py-0 text-left text-[18px] leading-snug text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                        className={`pointer-events-none min-h-[5rem] w-full overflow-y-auto border border-transparent px-0 py-0 text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden`}
                       >
                         {loungeDetailDraftCaption ? (
                           renderRichCaption(loungeDetailDraftCaption, {
@@ -7296,7 +7275,7 @@ export default function SocialFeed({
                           const m = loungeDetailEditMirrorRef.current
                           if (m) m.scrollTop = e.currentTarget.scrollTop
                         }}
-                        className="z-10 min-h-[5rem] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 text-[18px] leading-snug text-transparent caret-white outline-none selection:bg-cyan-500/25"
+                        className={`z-10 min-h-[5rem] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-transparent caret-white outline-none selection:bg-cyan-500/25`}
                         placeholder=""
                         aria-label="Edit caption"
                         maxLength={280}
@@ -7336,7 +7315,7 @@ export default function SocialFeed({
                 <>
                   {feedPostDisplayCaption(loungePostDetail) ? (
                     <div
-                      className={`text-left text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${
+                      className={`text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-100 ${
                         loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
                       } ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
                     >
@@ -7407,7 +7386,7 @@ export default function SocialFeed({
                 <>
                   {feedPostDisplayCaption(loungePostDetail) ? (
                     <div
-                      className={`text-left text-[18px] leading-snug text-zinc-100 whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${
+                      className={`text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-100 ${
                         loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
                       } ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
                     >
@@ -7476,7 +7455,7 @@ export default function SocialFeed({
                 const dRailMinH = 38
                 return (
                   <div
-                    className={`mt-0.5 ${
+                    className={`${LOUNGE_FEED_POST_DETAIL_INTERACTIONS_WRAP_CLASS} ${
                       loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''
                     }`}
                   >
@@ -7873,18 +7852,18 @@ export default function SocialFeed({
                 )
               })()}
 
-              {!loungeReadOnly &&
-              !loungeDetailCommentsLoading &&
-              loungeCommentDetailPathIds.length === 0 ? (
-                <div className="flex justify-start pb-1 pt-0.5">
-                  <LoungePostDetailCommentSort
-                    value={loungeDetailCommentSort}
-                    onChange={setLoungeDetailCommentSort}
-                  />
-                </div>
-              ) : null}
               {loungeCommentDetailPathIds.length === 0 ? (
-                <div className="border-b border-zinc-800/90" aria-hidden />
+                <div className={LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_SECTION_CLASS}>
+                  {!loungeReadOnly && !loungeDetailCommentsLoading ? (
+                    <div className={LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_ROW_CLASS}>
+                      <LoungePostDetailCommentSort
+                        value={loungeDetailCommentSort}
+                        onChange={setLoungeDetailCommentSort}
+                      />
+                    </div>
+                  ) : null}
+                  <div className={LOUNGE_FEED_POST_DETAIL_COMMENT_SEPARATOR_CLASS} aria-hidden />
+                </div>
               ) : null}
 
               {loungeCommentDetailPathIds.length > 0 ? (
@@ -7946,6 +7925,20 @@ export default function SocialFeed({
                   }}
                 />
               ) : null}
+
+              {loungeCommentDetailPathIds.length > 0 ? (
+                <div className={LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_SECTION_CLASS}>
+                  {!loungeReadOnly && !loungeDetailCommentsLoading ? (
+                    <div className={LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_ROW_CLASS}>
+                      <LoungePostDetailCommentSort
+                        value={loungeDetailCommentSort}
+                        onChange={setLoungeDetailCommentSort}
+                      />
+                    </div>
+                  ) : null}
+                  <div className={LOUNGE_FEED_POST_DETAIL_COMMENT_SEPARATOR_CLASS} aria-hidden />
+                </div>
+              ) : null}
               </div>
 
               <div
@@ -7970,14 +7963,6 @@ export default function SocialFeed({
                       <div className="mt-1 text-[14px] text-zinc-500">Loading comments…</div>
                     ) : (
                       <>
-                        {loungeCommentDetailPathIds.length > 0 ? (
-                          <div className="flex justify-start pb-1 pt-0.5">
-                            <LoungePostDetailCommentSort
-                              value={loungeDetailCommentSort}
-                              onChange={setLoungeDetailCommentSort}
-                            />
-                          </div>
-                        ) : null}
                         <LoungePostCommentThread
                           variant={
                             loungeCommentDetailPathIds.length > 0 ? 'commentDetailReplies' : 'post'

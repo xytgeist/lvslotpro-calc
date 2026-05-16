@@ -2,22 +2,23 @@ import { useCallback } from 'react'
 import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
 import { renderRichCaption } from './loungeCaption'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
+import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import {
-  LOUNGE_FEED_META_BADGE_WRAP_CLASS,
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
-  LOUNGE_FEED_OG_AFTER_STAFF_CLASS,
-  loungeFeedAuthorIdentityClusterClass,
   LOUNGE_FEED_AVATAR_CLASS,
+  LOUNGE_FEED_CAPTION_TEXT_CLASS,
   LOUNGE_FEED_CAPTION_TOP_CLASS,
   LOUNGE_FEED_DISPLAY_NAME_CLASS,
   LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS,
   LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS,
   LOUNGE_FEED_META_ROW_CLASS,
-  LOUNGE_FEED_POST_ROW_MENU_ANCHOR_CLASS,
+  LOUNGE_FEED_POST_INTERACTIONS_CLASS,
+  LOUNGE_FEED_POST_ROW_INNER_CLASS,
+  LOUNGE_FEED_POST_CARD_MENU_ANCHOR_CLASS,
   loungeFeedAuthorHasStaffBadge,
 } from './loungeFeedAvatar.js'
 
@@ -141,7 +142,7 @@ export default function LoungePostArticle({
   const showOgBadge = post?.author_profile?.is_og === true
 
   return (
-    <div className="flex items-start gap-3">
+    <div className={`flex items-start gap-3 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
       <button
         type="button"
         title="View profile"
@@ -172,23 +173,12 @@ export default function LoungePostArticle({
             className={`min-w-0 overflow-hidden text-left ${showPostRowMenu ? 'pr-7' : ''}`}
           >
             <div className={LOUNGE_FEED_META_ROW_CLASS}>
-          <span className={loungeFeedAuthorIdentityClusterClass(hasStaffBadge, showOgBadge)}>
-            <span className={LOUNGE_FEED_DISPLAY_NAME_CLASS}>{displayNameFor(post)}</span>
-            {hasStaffBadge ? (
-              <span className={LOUNGE_FEED_META_BADGE_WRAP_CLASS}>
-                <LoungeStaffRoleBadge role={authorRole} />
-              </span>
-            ) : showOgBadge ? (
-              <span className={LOUNGE_FEED_META_BADGE_WRAP_CLASS}>
-                <LoungeOgBadge isOg />
-              </span>
-            ) : null}
-          </span>
-          {hasStaffBadge && showOgBadge ? (
-            <span className={LOUNGE_FEED_OG_AFTER_STAFF_CLASS}>
-              <LoungeOgBadge isOg />
-            </span>
-          ) : null}
+          <LoungeFeedAuthorMetaBadges
+            role={authorRole}
+            isOg={showOgBadge}
+            displayName={displayNameFor(post)}
+            displayNameClassName={LOUNGE_FEED_DISPLAY_NAME_CLASS}
+          />
           <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
             <span className="min-w-0 truncate">{handleFor(post)}</span>
             <span className="shrink-0 text-zinc-600">·</span>
@@ -206,7 +196,7 @@ export default function LoungePostArticle({
         ) : null}
           </div>
           {showPostRowMenu ? (
-            <div className={LOUNGE_FEED_POST_ROW_MENU_ANCHOR_CLASS}>
+            <div className={LOUNGE_FEED_POST_CARD_MENU_ANCHOR_CLASS}>
               <LoungePostRowMenu
             isOwn={menuIsOwn}
             showEdit={menuShowEdit}
@@ -298,7 +288,7 @@ export default function LoungePostArticle({
           ) : (
             <>
               {feedPostDisplayCaption(post) ? (
-                <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-[17px] leading-snug text-zinc-200 whitespace-pre-wrap break-words [overflow-wrap:anywhere]`}>
+                <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}>
                   {renderRichCaption(feedPostDisplayCaption(post))}
                 </div>
               ) : null}
@@ -358,7 +348,7 @@ export default function LoungePostArticle({
         ) : (
           <>
             {feedPostDisplayCaption(post) ? (
-              <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-[17px] leading-snug text-zinc-200 whitespace-pre-wrap break-words [overflow-wrap:anywhere]`}>
+              <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}>
                 {renderRichCaption(feedPostDisplayCaption(post))}
               </div>
             ) : null}
@@ -381,7 +371,7 @@ export default function LoungePostArticle({
         <LoungePostInteractionBar
           post={post}
           variant="feed"
-          rootClassName="mt-2"
+          rootClassName={LOUNGE_FEED_POST_INTERACTIONS_CLASS}
           repostMenuPortalClass="z-[48]"
           loungeReadOnly={loungeReadOnly}
           interactionStateFor={interactionStateFor}

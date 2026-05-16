@@ -8,6 +8,61 @@ For day-to-day implementation status, use `docs/test-buildout-backlog.md`. For w
 
 ---
 
+## Lounge UI glossary (post detail & comment threads)
+
+Shared vocabulary for product talk, tickets, and `SocialFeed.jsx` / `LoungePostCommentThread.jsx`. The feed card is **`LoungePostArticle`**; the **OP block on post detail is not** that component (inline markup in `SocialFeed.jsx`).
+
+### Navigation stack
+
+| Step | Call it | Code / notes |
+| --- | --- | --- |
+| Lounge home → tap post | **Post detail** (sheet) | `loungePostDetail`; dialog `aria-labelledby="lounge-post-detail-title"` |
+| Post detail, `pathIds` empty | **Post detail — root comment list** | `#lounge-detail-comments`; `LoungePostCommentThread` `variant="post"` |
+| Tap any comment or nested reply | **Comment thread view** (same mode at every depth) | `loungeCommentDetailPathIds.length ≥ 1`; title bar shows **Reply** for all depths |
+
+There is **no** separate “reply detail” or “reply-to-reply detail” screen type. Each tap rebuilds the full **thread path** from root → focus (`buildLoungeCommentDrillPath` in `SocialFeed.jsx`).
+
+### Post detail — OP block (top of scroll)
+
+| UI piece | Call it | Code / notes |
+| --- | --- | --- |
+| Whole original post at top | **OP block** / **OP post** | Inline in `SocialFeed.jsx` inside `px-4` scroll content |
+| Avatar + name + handle | **OP header** | `LOUNGE_FEED_POST_DETAIL_*` in `loungeFeedAvatar.js`; avatar `id="lounge-detail-post-avatar"` |
+| Caption / media / quote embed | **OP body** | `LoungePostFeedMedia` variants `detail` / `embed` |
+| “2h ago · Edited” | **When row** / **date row** | `formatLoungePostDetailWhen` |
+| Comment / repost / like / bookmark row | **Interaction row** | `LOUNGE_FEED_POST_DETAIL_INTERACTIONS_WRAP_CLASS` |
+| “Relevant ▾” + rule below | **Comment sort** + **separator** | `LoungePostDetailCommentSort`; `LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_*` |
+
+### Comments on post detail
+
+| UI piece | Call it | Code / notes |
+| --- | --- | --- |
+| Rows under the separator (no drill) | **Root comments** | `feed_comments` with no parent in the roots list; `parent_id` null at DB |
+| Post owner reply under a root on main list (no drill) | **OP inline reply** | `user_id === post.user_id`, `parent_id` → root; connector in `LoungePostCommentThread.jsx` |
+| After tap — entire drilled UI | **Comment thread view** / **comment drill-down** | Umbrella term; `loungeCommentDetailPathIds` = **thread path** or **drill path** |
+| Cards above the focus | **Ancestry** / **thread chain** | `LoungePostDetailCommentHierarchy`; `#lounge-detail-comments-thread` |
+| Bottom card in hierarchy (you are here) | **Focused comment** | Last id in `loungeCommentDetailPathIds` |
+| List under the focus | **Direct replies** | `variant="commentDetailReplies"`; `orderCommentDetailDirectReplies`; `parent_id ===` focus |
+| Whole subtree in DB | **Descendants** / **thread** | `feedCommentDescendantCount*`; nested `parent_id` chain |
+| Sticky bottom composer | **Detail comment composer** | `data-lounge-detail-comment-host`; `#lounge-detail-comment`; composes with `parent_id` = focused comment |
+
+**Depth:** `loungeCommentDetailPathIds.length` (1 = first drill from post detail, 2 = reply focus, etc.). Prefer “thread view focused on X, depth N” over inventing new screen names per level.
+
+### DB vs UI words
+
+| Layer | Database | UI label |
+| --- | --- | --- |
+| Top-level on a post | `feed_comments` row, `parent_id` null | **comment** |
+| Child of focused comment | same table, `parent_id` set | **reply** / **direct reply** |
+| Deeper nesting | same table | still **replies**; depth is navigation, not a type |
+
+### Avoid
+
+- **“Reply detail screen”** — use **comment thread view** + **focused comment**.
+- **“Post article” on detail** — that name is the **feed card** (`LoungePostArticle`), not the OP block.
+
+---
+
 ## Freemium & subscriptions (cross-cutting — planned)
 
 Product direction (not fully implemented yet; today’s **anonymous shell + open auth** is the stepping stone):

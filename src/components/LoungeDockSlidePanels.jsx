@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { feedPostDisplayCaption, loungePostInteractionScore } from '../utils/communityFeedPost'
 import EdgeLogoWithEasterEgg from './EdgeLogoWithEasterEgg.jsx'
 import LoungePostArticle from '../features/lounge/LoungePostArticle.jsx'
+import { LOUNGE_FEED_POST_ROW_CLASS } from '../features/lounge/loungeFeedAvatar.js'
 import { LoungeFeedVideoAutoplayProvider } from '../features/lounge/LoungeFeedVideoAutoplayContext.jsx'
 import LoungeChatPanel from '../features/lounge/LoungeChatPanel.jsx'
 import { loungeDockFabScrollBottomInsetPx } from '../utils/loungeDockFabPosition.js'
@@ -411,7 +412,7 @@ export default function LoungeDockSlidePanels({
                   <article
                     key={post.id}
                     style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
-                    className="border-t border-zinc-800 bg-zinc-950/35 px-3 py-4 transition-colors active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                    className={LOUNGE_FEED_POST_ROW_CLASS}
                     onClick={(e) => {
                       const t = e.target
                       if (!(t instanceof Element)) return
