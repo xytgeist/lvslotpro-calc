@@ -28,6 +28,46 @@ export function focusLoungeComposerCaption(getTextarea, opts = {}) {
   return true
 }
 
+/**
+ * Try to raise the software keyboard — must run synchronously inside a user-activation handler
+ * (e.g. file input `change` right after the user taps Add in Photos). Delayed `focus()` only moves
+ * the caret; iOS will not show the keyboard without a fresh tap.
+ *
+ * @returns {boolean} whether the textarea is the active element after the attempt
+ */
+export function invokeLoungeComposerCaptionKeyboard(getTextarea, opts = {}) {
+  opts.scrollFeedToTop?.()
+  const el = getTextarea?.()
+  if (!el) return false
+  try {
+    el.readOnly = true
+    el.readOnly = false
+  } catch {
+    // ignore
+  }
+  try {
+    el.focus({ preventScroll: true })
+  } catch {
+    try {
+      el.focus()
+    } catch {
+      return false
+    }
+  }
+  try {
+    el.click()
+  } catch {
+    // ignore
+  }
+  const len = typeof el.value === 'string' ? el.value.length : 0
+  try {
+    el.setSelectionRange(len, len)
+  } catch {
+    // ignore
+  }
+  return document.activeElement === el
+}
+
 /** Dismiss the software keyboard before a full-screen picker (e.g. Klipy) opens. */
 export function blurLoungeComposerCaption(getTextarea) {
   const el = getTextarea?.()
