@@ -88,6 +88,7 @@ import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import LoungeDockArcCarouselPrototype from '../../components/LoungeDockArcCarouselPrototype.jsx'
 import {
   focusLoungeComposerCaption,
+  LOUNGE_COMPOSER_FOCUS_AFTER_MEDIA_DELAYS_MS,
   scheduleLoungeComposerTextareaFocus,
 } from './loungeDockComposeFocus.js'
 import { buildLoungeDockArcCarouselItems } from '../../components/loungeDockArcCarouselItems.jsx'
@@ -556,14 +557,8 @@ export default function SocialFeed({
     setLoungePostDetailTitleReveal(1)
   }, [])
 
-  /** Re-open the software keyboard after native/Klipy/crop pickers dismiss (iOS loses focus). */
-  const scheduleLoungeComposerCaptionRefocus = useCallback(
+  const loungeComposerCaptionTargetConfig = useCallback(
     (target) => {
-      if (target === 'detailComment') {
-        flushSync(() => {
-          setLoungeDetailCommentComposerExpanded(true)
-        })
-      }
       const scrollFeedToTop =
         target === 'detailComment'
           ? scrollLoungePostDetailToTopInstant
@@ -575,17 +570,14 @@ export default function SocialFeed({
         if (target === 'quote') return quoteRepostTextareaRef.current
         return composerTextareaRef.current
       }
-      scheduleLoungeComposerTextareaFocus({
-        getTextarea,
-        scrollFeedToTop,
-        isBlocked: () => {
-          if (target === 'detailComment') return !loungePostDetail
-          if (target === 'quote') {
-            return !quoteRepostModal || quoteRepostModal.mode !== 'compose'
-          }
-          return !composerExpanded
-        },
-      })
+      const isBlocked = () => {
+        if (target === 'detailComment') return !loungePostDetail
+        if (target === 'quote') {
+          return !quoteRepostModal || quoteRepostModal.mode !== 'compose'
+        }
+        return !composerExpanded
+      }
+      return { getTextarea, scrollFeedToTop, isBlocked }
     },
     [
       composerExpanded,
@@ -594,6 +586,43 @@ export default function SocialFeed({
       scrollLoungeFeedToTopInstant,
       scrollLoungePostDetailToTopInstant,
     ],
+  )
+
+  /** Sync focus while the file-picker user gesture is still active (before previews mount). */
+  const focusLoungeComposerCaptionNow = useCallback(
+    (target) => {
+      if (target === 'detailComment') {
+        flushSync(() => {
+          setLoungeDetailCommentComposerExpanded(true)
+        })
+      }
+      const { getTextarea } = loungeComposerCaptionTargetConfig(target)
+      focusLoungeComposerCaption(getTextarea)
+    },
+    [loungeComposerCaptionTargetConfig],
+  )
+
+  /** Re-open the software keyboard after native/Klipy/crop pickers dismiss (iOS loses focus). */
+  const scheduleLoungeComposerCaptionRefocus = useCallback(
+    (target, opts = {}) => {
+      const { immediate = true, afterMedia = false, skipExpand = false } = opts
+      if (target === 'detailComment' && !skipExpand) {
+        flushSync(() => {
+          setLoungeDetailCommentComposerExpanded(true)
+        })
+      }
+      const { getTextarea, scrollFeedToTop, isBlocked } = loungeComposerCaptionTargetConfig(target)
+      if (immediate) {
+        focusLoungeComposerCaption(getTextarea, { scrollFeedToTop })
+      }
+      return scheduleLoungeComposerTextareaFocus({
+        getTextarea,
+        scrollFeedToTop,
+        isBlocked,
+        extraDelaysMs: afterMedia ? LOUNGE_COMPOSER_FOCUS_AFTER_MEDIA_DELAYS_MS : [],
+      })
+    },
+    [loungeComposerCaptionTargetConfig],
   )
 
   const beginLoungeDetailCommentMediaSession = useCallback(() => {
@@ -1693,7 +1722,7 @@ export default function SocialFeed({
               streamVideoUid: null,
             })
             setComposerMediaUrl('')
-            scheduleLoungeComposerCaptionRefocus('composer')
+            scheduleLoungeComposerCaptionRefocus('composer', { immediate: false, afterMedia: true })
           } else if (mode === 'quote') {
             disposeComposerVideoMedia(quoteRepostVideoSlotRef.current)
             const spec = { kind: 'direct', file: vf }
@@ -1711,7 +1740,7 @@ export default function SocialFeed({
               streamVideoUid: null,
             })
             setQuoteRepostMediaUrl('')
-            scheduleLoungeComposerCaptionRefocus('quote')
+            scheduleLoungeComposerCaptionRefocus('quote', { immediate: false, afterMedia: true })
           } else if (mode === 'detailComment') {
             disposeComposerVideoMedia(loungeDetailCommentVideoSlotRef.current)
             const spec = { kind: 'direct', file: vf }
@@ -1730,12 +1759,19 @@ export default function SocialFeed({
             })
             setLoungeDetailCommentMediaUrl('')
             loungeDetailCommentMediaSessionRef.current = false
-            scheduleLoungeComposerCaptionRefocus('detailComment')
+            scheduleLoungeComposerCaptionRefocus('detailComment', {
+              immediate: false,
+              afterMedia: true,
+              skipExpand: true,
+            })
           } else {
             setLoungeDetailEditMediaFile(vf)
             setLoungeDetailEditMediaKind('video')
           }
           return
+        }
+        if (mode === 'detailComment') {
+          focusLoungeComposerCaption(() => loungeDetailCommentTextareaRef.current)
         }
         setLoungeVideoCrop({ file: vf, mode, knownDurationSec: dur })
       } catch (e) {
@@ -1750,6 +1786,7 @@ export default function SocialFeed({
     [
       disposeComposerVideoMedia,
       scheduleLoungeComposerCaptionRefocus,
+      focusLoungeComposerCaptionNow,
       startComposerVideoPrepFromSpec,
       startLoungeDetailCommentVideoPrepFromSpec,
       startQuoteRepostVideoPrepFromSpec,
@@ -2087,6 +2124,7 @@ export default function SocialFeed({
       }
       const u = chk.value
       if (!u) return
+      focusLoungeComposerCaptionNow(klipyPickerTarget)
       if (klipyPickerTarget === 'quote') {
         cancelQuoteRepostMediaPrep()
         setQuoteRepostMediaUrl(u)
@@ -2113,7 +2151,11 @@ export default function SocialFeed({
         }
         setComposerMediaUrl(u)
       }
-      scheduleLoungeComposerCaptionRefocus(klipyPickerTarget)
+      scheduleLoungeComposerCaptionRefocus(klipyPickerTarget, {
+        immediate: false,
+        afterMedia: true,
+        skipExpand: klipyPickerTarget === 'detailComment',
+      })
     },
     [
       klipyPickerTarget,
@@ -2123,6 +2165,7 @@ export default function SocialFeed({
       cancelQuoteRepostMediaPrep,
       cancelLoungeDetailCommentMediaPrep,
       endLoungeDetailCommentMediaSession,
+      focusLoungeComposerCaptionNow,
       scheduleLoungeComposerCaptionRefocus,
     ],
   )
@@ -5787,6 +5830,7 @@ export default function SocialFeed({
                 const input = e.target
                 const files = Array.from(input.files || [])
                 if (!files.length) return
+                focusLoungeComposerCaptionNow('composer')
                 setPostErr('')
                 const hasVideo = files.some((f) => isProbablyVideoFile(f))
                 if (hasVideo) {
@@ -5840,7 +5884,7 @@ export default function SocialFeed({
                 } catch {
                   // ignore
                 }
-                scheduleLoungeComposerCaptionRefocus('composer')
+                scheduleLoungeComposerCaptionRefocus('composer', { immediate: false, afterMedia: true })
               }}
             />
             <div className="mt-1 flex w-full items-center gap-2 pr-2 pt-1.5 pb-1">
@@ -7305,6 +7349,7 @@ export default function SocialFeed({
                               return
                             }
                             beginLoungeDetailCommentMediaSession()
+                            focusLoungeComposerCaption(() => loungeDetailCommentTextareaRef.current)
                             setLoungeDetailCommentErr('')
                             const hasVideo = files.some((f) => isProbablyVideoFile(f))
                             if (hasVideo) {
@@ -7361,7 +7406,11 @@ export default function SocialFeed({
                               // ignore
                             }
                             endLoungeDetailCommentMediaSession()
-                            scheduleLoungeComposerCaptionRefocus('detailComment')
+                            scheduleLoungeComposerCaptionRefocus('detailComment', {
+                              immediate: false,
+                              afterMedia: true,
+                              skipExpand: true,
+                            })
                           }}
                         />
                         {(() => {
@@ -7834,6 +7883,7 @@ export default function SocialFeed({
                                 const input = e.target
                                 const files = Array.from(input.files || [])
                                 if (!files.length) return
+                                focusLoungeComposerCaptionNow('quote')
                                 setQuoteRepostErr('')
                                 const hasVideo = files.some((f) => isProbablyVideoFile(f))
                                 if (hasVideo) {
@@ -7888,7 +7938,7 @@ export default function SocialFeed({
                                 } catch {
                                   // ignore
                                 }
-                                scheduleLoungeComposerCaptionRefocus('quote')
+                                scheduleLoungeComposerCaptionRefocus('quote', { immediate: false, afterMedia: true })
                               }}
                             />
                             {(() => {
@@ -8451,7 +8501,11 @@ export default function SocialFeed({
             setLoungeVideoCrop(null)
             if (cropMode === 'composer' || cropMode === 'quote' || cropMode === 'detailComment') {
               if (cropMode === 'detailComment') loungeDetailCommentMediaSessionRef.current = false
-              scheduleLoungeComposerCaptionRefocus(cropMode)
+              scheduleLoungeComposerCaptionRefocus(cropMode, {
+                immediate: false,
+                afterMedia: true,
+                skipExpand: cropMode === 'detailComment',
+              })
             }
           }}
         />

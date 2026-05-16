@@ -28,25 +28,33 @@ export function focusLoungeComposerCaption(getTextarea, opts = {}) {
   return true
 }
 
+/** Extra retries after image carousel mounts / previews decode (iOS often blurs again). */
+export const LOUNGE_COMPOSER_FOCUS_AFTER_MEDIA_DELAYS_MS = [600, 1000, 1500]
+
 /**
  * Focus the Lounge composer textarea after expand — retries cover panel close + lazy layout.
+ *
+ * @param {{ extraDelaysMs?: number[] }} [opts]
  */
-export function scheduleLoungeComposerTextareaFocus({ getTextarea, scrollFeedToTop, isBlocked }) {
+export function scheduleLoungeComposerTextareaFocus({
+  getTextarea,
+  scrollFeedToTop,
+  isBlocked,
+  extraDelaysMs = [],
+}) {
   const run = () => {
     if (isBlocked?.()) return
     focusLoungeComposerCaption(getTextarea, { scrollFeedToTop })
   }
 
   run()
-  const t1 = window.setTimeout(run, 50)
-  const t2 = window.setTimeout(run, 150)
-  const t3 = window.setTimeout(run, 340)
+  const baseDelays = [50, 150, 340]
+  const delays = [...baseDelays, ...extraDelaysMs]
+  const timers = delays.map((ms) => window.setTimeout(run, ms))
   const raf = typeof window.requestAnimationFrame === 'function' ? window.requestAnimationFrame(run) : 0
 
   return () => {
-    window.clearTimeout(t1)
-    window.clearTimeout(t2)
-    window.clearTimeout(t3)
+    for (const id of timers) window.clearTimeout(id)
     if (raf) window.cancelAnimationFrame(raf)
   }
 }
