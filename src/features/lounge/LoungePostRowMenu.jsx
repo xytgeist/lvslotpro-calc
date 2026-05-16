@@ -19,6 +19,11 @@ export default function LoungePostRowMenu({
   onReport,
   /** Share / copy permalink (allowed when read-only). */
   onShare,
+  /** Moderator/admin: pin or unpin this post. */
+  showPin,
+  pinned,
+  pinBusy,
+  onPinToggle,
   /** Optional scroll root (e.g. main feed) to keep the fixed menu aligned while scrolling. */
   positionScrollRootRef,
   /** Accessible name for the ⋯ control (e.g. "Comment options"). */
@@ -102,6 +107,21 @@ export default function LoungePostRowMenu({
               }}
             >
               Share
+            </button>
+          ) : null}
+          {showPin ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-1.5 text-left text-[15px] font-medium text-fuchsia-200 hover:bg-zinc-800 touch-manipulation disabled:opacity-50"
+              disabled={pinBusy}
+              onClick={(e) => {
+                e.stopPropagation()
+                close()
+                onPinToggle?.()
+              }}
+            >
+              {pinned ? 'Unpin' : 'Pin'}
             </button>
           ) : null}
           {isOwn ? (

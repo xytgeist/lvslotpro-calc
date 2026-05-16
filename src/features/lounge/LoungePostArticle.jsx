@@ -6,6 +6,20 @@ import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
+import {
+  LOUNGE_FEED_META_BADGE_WRAP_CLASS,
+  LOUNGE_FEED_META_HANDLE_TIME_CLASS,
+  LOUNGE_FEED_OG_AFTER_STAFF_CLASS,
+  loungeFeedAuthorIdentityClusterClass,
+  LOUNGE_FEED_AVATAR_CLASS,
+  LOUNGE_FEED_CAPTION_TOP_CLASS,
+  LOUNGE_FEED_DISPLAY_NAME_CLASS,
+  LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS,
+  LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS,
+  LOUNGE_FEED_META_ROW_CLASS,
+  LOUNGE_FEED_POST_ROW_MENU_ANCHOR_CLASS,
+  loungeFeedAuthorHasStaffBadge,
+} from './loungeFeedAvatar.js'
 
 /**
  * Single Lounge feed post (avatar row, caption, stats). Used on main feed and profile post list.
@@ -63,8 +77,11 @@ export default function LoungePostArticle({
       typeof onPostMenuEdit === 'function' &&
       (typeof captionEditableInMenu !== 'function' || captionEditableInMenu(post)),
   )
+  const showStaffPin =
+    Boolean(loungeViewerIsStaff && !ro && typeof setLoungePostPinned === 'function')
   const showPostRowMenu = Boolean(
     typeof onSharePost === 'function' ||
+      showStaffPin ||
       (!ro &&
         viewerUserId &&
         (onPostMenuEdit ||
@@ -119,13 +136,17 @@ export default function LoungePostArticle({
     onAvatarClick(post)
   }
 
+  const authorRole = post?.author_profile?.role
+  const hasStaffBadge = loungeFeedAuthorHasStaffBadge(authorRole)
+  const showOgBadge = post?.author_profile?.is_og === true
+
   return (
     <div className="flex items-start gap-3">
       <button
         type="button"
         title="View profile"
         onClick={onAvatar}
-        className="mt-0.5 h-10 w-10 shrink-0 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 text-[15px] font-bold flex items-center justify-center overflow-hidden touch-manipulation hover:border-zinc-600 sm:h-[2.75rem] sm:w-[2.75rem] sm:text-[16px]"
+        className={`${LOUNGE_FEED_AVATAR_CLASS} flex items-center justify-center touch-manipulation hover:border-zinc-600 [-webkit-tap-highlight-color:transparent]`}
       >
         {post?.author_profile?.avatar_url ? (
           <img
@@ -145,63 +166,63 @@ export default function LoungePostArticle({
           </span>
         )}
       </button>
-      <div className="min-w-0 flex-1 pt-0.5">
-        <div className="flex min-w-0 items-start gap-2">
-          <div className="min-w-0 flex-1 overflow-hidden text-left">
-            {/* Meta row: left-packed (no flex-1 on name — avoids pushing badges/handle right); handle shrinks before name */}
-            <div className="flex min-w-0 flex-nowrap items-center justify-start gap-x-1.5 text-[15px] leading-snug">
-              <span className="min-w-0 truncate font-semibold text-zinc-100">
-                {displayNameFor(post)}
+      <div className="min-w-0 flex-1">
+        <div className="relative min-w-0">
+          <div
+            className={`min-w-0 overflow-hidden text-left ${showPostRowMenu ? 'pr-7' : ''}`}
+          >
+            <div className={LOUNGE_FEED_META_ROW_CLASS}>
+          <span className={loungeFeedAuthorIdentityClusterClass(hasStaffBadge, showOgBadge)}>
+            <span className={LOUNGE_FEED_DISPLAY_NAME_CLASS}>{displayNameFor(post)}</span>
+            {hasStaffBadge ? (
+              <span className={LOUNGE_FEED_META_BADGE_WRAP_CLASS}>
+                <LoungeStaffRoleBadge role={authorRole} />
               </span>
-              <span className="shrink-0">
-                <LoungeStaffRoleBadge role={post?.author_profile?.role} />
+            ) : showOgBadge ? (
+              <span className={LOUNGE_FEED_META_BADGE_WRAP_CLASS}>
+                <LoungeOgBadge isOg />
               </span>
-              <span className="shrink-0">
-                <LoungeOgBadge isOg={post?.author_profile?.is_og} />
-              </span>
-              <span className="inline-flex min-w-0 max-w-[min(11rem,52vw)] shrink-[3] items-center gap-x-1 overflow-hidden text-zinc-500 sm:max-w-[13rem]">
-                <span className="min-w-0 truncate">{handleFor(post)}</span>
-                <span className="shrink-0 text-zinc-600">·</span>
-                <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">{postAgeLabel(post.created_at)}</span>
-              </span>
-            </div>
-            {post.pinned || (loungeViewerIsStaff && !loungeReadOnly) ? (
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                {post.pinned ? (
-                  <span className="shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
-                    Pinned
-                  </span>
-                ) : null}
-                {loungeViewerIsStaff && !loungeReadOnly ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void setLoungePostPinned(post.id, !post.pinned)
-                    }}
-                    disabled={loungePinBusy}
-                    className="shrink-0 rounded-full border border-zinc-600/90 bg-zinc-900/80 px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-zinc-300 hover:border-fuchsia-500/50 hover:text-fuchsia-100 disabled:opacity-50 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                  >
-                    {post.pinned ? 'Unpin' : 'Pin'}
-                  </button>
-                ) : null}
-              </div>
             ) : null}
+          </span>
+          {hasStaffBadge && showOgBadge ? (
+            <span className={LOUNGE_FEED_OG_AFTER_STAFF_CLASS}>
+              <LoungeOgBadge isOg />
+            </span>
+          ) : null}
+          <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
+            <span className="min-w-0 truncate">{handleFor(post)}</span>
+            <span className="shrink-0 text-zinc-600">·</span>
+            <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">
+              {postAgeLabel(post.created_at)}
+            </span>
+          </span>
+        </div>
+        {post.pinned ? (
+          <div className="mt-1">
+            <span className="inline-flex shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
+              Pinned
+            </span>
+          </div>
+        ) : null}
           </div>
           {showPostRowMenu ? (
-            <div className="shrink-0 self-start translate-y-px">
+            <div className={LOUNGE_FEED_POST_ROW_MENU_ANCHOR_CLASS}>
               <LoungePostRowMenu
-                isOwn={menuIsOwn}
-                showEdit={menuShowEdit}
-                deleteBusy={Boolean(busyDeletingPostId && busyDeletingPostId === post.id)}
-                onEdit={() => onPostMenuEdit?.(post)}
-                onDelete={() => onPostMenuDelete?.(post)}
-                showStaffDelete={Boolean(loungeViewerIsStaff && !menuIsOwn && typeof onStaffPostDelete === 'function')}
-                staffDeleteBusy={Boolean(busyDeletingPostId && busyDeletingPostId === post.id)}
-                onStaffDelete={() => onStaffPostDelete?.(post)}
-                onBlock={() => onPostMenuBlock?.(post)}
-                onReport={() => onPostMenuReport?.(post)}
-                onShare={typeof onSharePost === 'function' ? () => onSharePost(post) : undefined}
+            isOwn={menuIsOwn}
+            showEdit={menuShowEdit}
+            deleteBusy={Boolean(busyDeletingPostId && busyDeletingPostId === post.id)}
+            onEdit={() => onPostMenuEdit?.(post)}
+            onDelete={() => onPostMenuDelete?.(post)}
+            showStaffDelete={Boolean(loungeViewerIsStaff && !menuIsOwn && typeof onStaffPostDelete === 'function')}
+            staffDeleteBusy={Boolean(busyDeletingPostId && busyDeletingPostId === post.id)}
+            onStaffDelete={() => onStaffPostDelete?.(post)}
+            onBlock={() => onPostMenuBlock?.(post)}
+            onReport={() => onPostMenuReport?.(post)}
+            onShare={typeof onSharePost === 'function' ? () => onSharePost(post) : undefined}
+            showPin={showStaffPin}
+            pinned={Boolean(post?.pinned)}
+            pinBusy={loungePinBusy}
+            onPinToggle={() => void setLoungePostPinned(post.id, !post.pinned)}
                 positionScrollRootRef={repostMenuScrollRootRef}
               />
             </div>
@@ -277,14 +298,18 @@ export default function LoungePostArticle({
           ) : (
             <>
               {feedPostDisplayCaption(post) ? (
-                <div className="mt-1.5 text-left text-[17px] leading-snug text-zinc-200 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-[17px] leading-snug text-zinc-200 whitespace-pre-wrap break-words [overflow-wrap:anywhere]`}>
                   {renderRichCaption(feedPostDisplayCaption(post))}
                 </div>
               ) : null}
               <LoungePostFeedImagesAndGif
                 post={post}
                 variant="feed"
-                firstMarginTopClass={feedPostDisplayCaption(post) ? 'mt-2' : 'mt-1.5'}
+                firstMarginTopClass={
+                feedPostDisplayCaption(post)
+                  ? LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS
+                  : LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS
+              }
                 visibilityResetRootRef={repostMenuScrollRootRef}
                 renderMediaLightboxFooter={renderMediaLightboxFooter}
               />
@@ -333,14 +358,18 @@ export default function LoungePostArticle({
         ) : (
           <>
             {feedPostDisplayCaption(post) ? (
-              <div className="mt-1.5 text-left text-[17px] leading-snug text-zinc-200 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+              <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-[17px] leading-snug text-zinc-200 whitespace-pre-wrap break-words [overflow-wrap:anywhere]`}>
                 {renderRichCaption(feedPostDisplayCaption(post))}
               </div>
             ) : null}
             <LoungePostFeedImagesAndGif
               post={post}
               variant="feed"
-              firstMarginTopClass={feedPostDisplayCaption(post) ? 'mt-2' : 'mt-1.5'}
+              firstMarginTopClass={
+                feedPostDisplayCaption(post)
+                  ? LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS
+                  : LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS
+              }
               visibilityResetRootRef={repostMenuScrollRootRef}
               renderMediaLightboxFooter={renderMediaLightboxFooter}
             />

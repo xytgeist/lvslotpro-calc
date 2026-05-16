@@ -35,10 +35,14 @@ export default function LoungeStaffRoleBadge({ role, size = 'feed' }) {
 
   if (r === 'admin') {
     return (
-      <LoungeBadgeHoverTip tip="Admin" tone="crown" className="translate-y-[0.5px]">
+      <LoungeBadgeHoverTip tip="Admin" tone="crown" className="inline-flex translate-y-[0.5px] items-center">
         <span className="inline-flex items-center gap-x-0.5" role="img" aria-label="Admin">
-          <CrownIcon className={`${crownClass} text-amber-400`} />
-          <ShieldIcon className={`${shieldClass} text-blue-500`} />
+          <span className="inline-flex translate-y-[1.5px]">
+            <CrownIcon className={`${crownClass} text-amber-400`} />
+          </span>
+          <span className="inline-flex translate-y-0.5">
+            <ShieldIcon className={`${shieldClass} text-blue-500`} />
+          </span>
         </span>
       </LoungeBadgeHoverTip>
     )
@@ -46,7 +50,7 @@ export default function LoungeStaffRoleBadge({ role, size = 'feed' }) {
 
   return (
     <LoungeBadgeHoverTip tip="Mod" tone="sky" className="translate-y-[0.5px]">
-      <span className="inline-flex items-center justify-center" role="img" aria-label="Mod">
+      <span className="inline-flex translate-y-0.5 items-center justify-center" role="img" aria-label="Mod">
         <ShieldIcon className={`${shieldClass} text-blue-500`} />
       </span>
     </LoungeBadgeHoverTip>
