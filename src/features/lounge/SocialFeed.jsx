@@ -1561,31 +1561,37 @@ export default function SocialFeed({
     [supabaseClient],
   )
 
-  const cancelComposerMediaPrep = useCallback(() => {
-    const h = composerVideoPrepHandoffRef.current
-    if (h && !h.settled) {
+  const cancelComposerMediaPrep = useCallback(
+    (opts = {}) => {
+      const userInitiated = Boolean(opts.userInitiated)
+      const h = composerVideoPrepHandoffRef.current
+      if (h && !h.settled) {
+        try {
+          h.reject(new DOMException('Aborted', 'AbortError'))
+        } catch {
+          // ignore
+        }
+      }
+      composerVideoPrepHandoffRef.current = null
+      composerVideoPrepJobIdRef.current += 1
       try {
-        h.reject(new DOMException('Aborted', 'AbortError'))
+        composerVideoPrepAbortRef.current?.abort()
       } catch {
         // ignore
       }
-    }
-    composerVideoPrepHandoffRef.current = null
-    composerVideoPrepJobIdRef.current += 1
-    try {
-      composerVideoPrepAbortRef.current?.abort()
-    } catch {
-      // ignore
-    }
-    composerVideoPrepAbortRef.current = null
-    composerVideoLastEncodedFileRef.current = null
-    disposeComposerVideoMedia(composerVideoSlotRef.current)
-    setComposerVideoSlot(null)
-    dismissLoungePostUploadBarIfIdle()
-  }, [disposeComposerVideoMedia, dismissLoungePostUploadBarIfIdle])
+      composerVideoPrepAbortRef.current = null
+      composerVideoLastEncodedFileRef.current = null
+      disposeComposerVideoMedia(composerVideoSlotRef.current)
+      setComposerVideoSlot(null)
+      if (userInitiated) setLoungePostUploadBar(null)
+      else dismissLoungePostUploadBarIfIdle()
+    },
+    [disposeComposerVideoMedia, dismissLoungePostUploadBarIfIdle],
+  )
 
-  const cancelQuoteRepostMediaPrep = useCallback(() => {
-    const preserveForBackgroundQuote = quoteRepostBackgroundUploadInFlight()
+  const cancelQuoteRepostMediaPrep = useCallback((opts = {}) => {
+    const userInitiated = Boolean(opts.userInitiated)
+    const preserveForBackgroundQuote = !userInitiated && quoteRepostBackgroundUploadInFlight()
     if (!preserveForBackgroundQuote) {
       const h = quoteRepostVideoPrepHandoffRef.current
       if (h && !h.settled) {
@@ -1607,11 +1613,13 @@ export default function SocialFeed({
       disposeComposerVideoMedia(quoteRepostVideoSlotRef.current)
       setQuoteRepostVideoSlot(null)
     }
-    dismissLoungePostUploadBarIfIdle()
+    if (userInitiated) setLoungePostUploadBar(null)
+    else dismissLoungePostUploadBarIfIdle()
   }, [disposeComposerVideoMedia, dismissLoungePostUploadBarIfIdle, quoteRepostBackgroundUploadInFlight])
 
-  const cancelLoungeDetailCommentMediaPrep = useCallback(() => {
-    const preserveForBackgroundComment = loungeDetailCommentBackgroundUploadInFlight()
+  const cancelLoungeDetailCommentMediaPrep = useCallback((opts = {}) => {
+    const userInitiated = Boolean(opts.userInitiated)
+    const preserveForBackgroundComment = !userInitiated && loungeDetailCommentBackgroundUploadInFlight()
     if (!preserveForBackgroundComment) {
       const h = loungeDetailCommentVideoPrepHandoffRef.current
       if (h && !h.settled) {
@@ -1633,7 +1641,8 @@ export default function SocialFeed({
       disposeComposerVideoMedia(loungeDetailCommentVideoSlotRef.current)
       setLoungeDetailCommentVideoSlot(null)
     }
-    dismissLoungePostUploadBarIfIdle()
+    if (userInitiated) setLoungePostUploadBar(null)
+    else dismissLoungePostUploadBarIfIdle()
   }, [
     disposeComposerVideoMedia,
     dismissLoungePostUploadBarIfIdle,
@@ -4745,24 +4754,64 @@ export default function SocialFeed({
     loungePostUploadLastPhaseRef.current = ''
     setLoungePostUploadFailureDetails(null)
     setLoungePostUploadBar(null)
+    const commentSnapForPrep = loungeDetailCommentSnapshotRef.current
+    if (commentSnapForPrep?.awaitingDetailCommentVideoPrepJobId != null) {
+      const h = loungeDetailCommentVideoPrepHandoffRef.current
+      if (h && !h.settled) {
+        try {
+          h.reject(new DOMException('Aborted', 'AbortError'))
+        } catch {
+          // ignore
+        }
+      }
+      loungeDetailCommentVideoPrepHandoffRef.current = null
+      loungeDetailCommentVideoPrepJobIdRef.current += 1
+      try {
+        loungeDetailCommentVideoPrepAbortRef.current?.abort()
+      } catch {
+        // ignore
+      }
+      loungeDetailCommentVideoPrepAbortRef.current = null
+      loungeDetailCommentVideoLastEncodedFileRef.current = null
+    }
     const snap = loungePostSnapshotRef.current
     if (snap?.awaitingComposerVideoPrepJobId != null) {
       if (String(snap.quoteRepostOfPostId || '').trim()) {
+        const qh = quoteRepostVideoPrepHandoffRef.current
+        if (qh && !qh.settled) {
+          try {
+            qh.reject(new DOMException('Aborted', 'AbortError'))
+          } catch {
+            // ignore
+          }
+        }
+        quoteRepostVideoPrepHandoffRef.current = null
+        quoteRepostVideoPrepJobIdRef.current += 1
         try {
           quoteRepostVideoPrepAbortRef.current?.abort()
         } catch {
           // ignore
         }
-        quoteRepostVideoPrepJobIdRef.current += 1
-        quoteRepostVideoPrepHandoffRef.current = null
+        quoteRepostVideoPrepAbortRef.current = null
+        quoteRepostVideoLastEncodedFileRef.current = null
       } else {
+        const ch = composerVideoPrepHandoffRef.current
+        if (ch && !ch.settled) {
+          try {
+            ch.reject(new DOMException('Aborted', 'AbortError'))
+          } catch {
+            // ignore
+          }
+        }
+        composerVideoPrepHandoffRef.current = null
+        composerVideoPrepJobIdRef.current += 1
         try {
           composerVideoPrepAbortRef.current?.abort()
         } catch {
           // ignore
         }
-        composerVideoPrepJobIdRef.current += 1
-        composerVideoPrepHandoffRef.current = null
+        composerVideoPrepAbortRef.current = null
+        composerVideoLastEncodedFileRef.current = null
       }
     }
     const cancelSnap = loungePostSnapshotRef.current
@@ -8992,16 +9041,22 @@ export default function SocialFeed({
             <button
               type="button"
               onClick={() => {
-                if (loungePostUploadBar.mode === 'mediaPrep' && !loungePostUploadBar.postSubmission) {
-                  if (loungeDetailCommentVideoSlotRef.current?.prepStatus === 'preparing') {
-                    cancelLoungeDetailCommentMediaPrep()
-                  } else if (quoteRepostVideoSlotRef.current?.prepStatus === 'preparing') {
-                    cancelQuoteRepostMediaPrep()
-                  } else {
-                    cancelComposerMediaPrep()
-                  }
-                } else {
+                const backgroundUploadActive =
+                  loungePostJobRunningRef.current || loungeDetailCommentJobRunningRef.current
+                if (
+                  backgroundUploadActive ||
+                  loungePostUploadBar.postSubmission ||
+                  loungePostUploadBar.mode !== 'mediaPrep'
+                ) {
                   cancelLoungePostUpload()
+                  return
+                }
+                if (loungeDetailCommentVideoSlotRef.current?.prepStatus === 'preparing') {
+                  cancelLoungeDetailCommentMediaPrep({ userInitiated: true })
+                } else if (quoteRepostVideoSlotRef.current?.prepStatus === 'preparing') {
+                  cancelQuoteRepostMediaPrep({ userInitiated: true })
+                } else {
+                  cancelComposerMediaPrep({ userInitiated: true })
                 }
               }}
               aria-label="Cancel upload"
