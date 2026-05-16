@@ -1786,7 +1786,6 @@ export default function SocialFeed({
       return null
     })
     endLoungeDetailCommentMediaSession()
-    setLoungeCommentDetailPathIds([])
     setLoungeDetailCommentComposerExpanded(false)
     try {
       const el = loungeDetailCommentMediaInputRef.current
@@ -3106,6 +3105,9 @@ export default function SocialFeed({
       userId: composerUserId,
       awaitingDetailCommentVideoPrepJobId: awaiting,
       videoPrepSpec: specForSnap,
+      /** Screen to return to after post (comment detail vs OP post detail). */
+      commentDetailPathIds:
+        loungeCommentDetailPathIds.length > 0 ? [...loungeCommentDetailPathIds] : [],
     }
 
     const preserveVideoPrep = snapshot.awaitingDetailCommentVideoPrepJobId != null
@@ -5412,6 +5414,11 @@ export default function SocialFeed({
           return { ...prev, [snap.postId]: { ...cur, commented: true } }
         })
         scheduleLoungePostDetailTitleAfterReply()
+        if (snap.parentId) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => scrollLoungePostDetailToFocusedComment())
+          })
+        }
       } catch (e) {
         if (e?.name === 'AbortError') return
         const failUid = String(snap.streamVideoUid || '').trim()
@@ -5427,6 +5434,11 @@ export default function SocialFeed({
         }
         if (String(snap.streamVideoUid || '').trim()) {
           loungeDetailCommentSnapshotRef.current = snap
+        }
+        if (Array.isArray(snap.commentDetailPathIds) && snap.commentDetailPathIds.length > 0) {
+          setLoungeCommentDetailPathIds((prev) =>
+            prev.length > 0 ? prev : snap.commentDetailPathIds,
+          )
         }
         const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Could not post reply.'
         setLoungeDetailCommentErr(msg)
@@ -5448,6 +5460,7 @@ export default function SocialFeed({
       defaultInteraction,
       patchPostAggregate,
       scheduleLoungePostDetailTitleAfterReply,
+      scrollLoungePostDetailToFocusedComment,
       supabaseClient,
     ],
   )
@@ -5492,6 +5505,9 @@ export default function SocialFeed({
       const commentSnap = loungeDetailCommentSnapshotRef.current
       setLoungePostUploadFailureDetails(null)
       if (!commentSnap) return
+      if (Array.isArray(commentSnap.commentDetailPathIds) && commentSnap.commentDetailPathIds.length > 0) {
+        setLoungeCommentDetailPathIds(commentSnap.commentDetailPathIds)
+      }
       void runBackgroundLoungeDetailCommentSubmissionRef.current(commentSnap)
       return
     }
@@ -5506,6 +5522,9 @@ export default function SocialFeed({
     if (fail?.kind === 'comment') {
       const commentSnap = loungeDetailCommentSnapshotRef.current
       if (commentSnap) {
+        if (Array.isArray(commentSnap.commentDetailPathIds) && commentSnap.commentDetailPathIds.length > 0) {
+          setLoungeCommentDetailPathIds(commentSnap.commentDetailPathIds)
+        }
         setLoungeDetailCommentDraft(String(commentSnap.body || ''))
         setLoungeDetailCommentMediaUrl(String(commentSnap.gifOnlyUrl || ''))
         setLoungeDetailCommentErr('Reply draft restored. Re-add photos or video if you had any.')
