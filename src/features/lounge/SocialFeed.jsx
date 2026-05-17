@@ -12,6 +12,7 @@ import {
 } from '../profiles/profileGate'
 import {
   communityFeedPlainRepostInsertPayload,
+  communityFeedCommentRepostInsertPayload,
   deleteLoungeFeedStreamPosterFromPublicUrl,
   feedPostAuthorEditMediaSeed,
   feedPostDisplayCaption,
@@ -2388,16 +2389,27 @@ export default function SocialFeed({
     async (commentIds) => {
       const cids = [...new Set((commentIds || []).map((id) => String(id)).filter(Boolean))]
       if (!composerUserId || cids.length === 0 || loungeReadOnly) return
-      const [likesRes, repostsRes, bmRes] = await Promise.all([
+      // Check both legacy feed_comment_reposts table and the new community_feed_posts path.
+      const [likesRes, legacyRepostsRes, newRepostsRes, bmRes] = await Promise.all([
         supabaseClient.from('feed_comment_likes').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
         supabaseClient.from('feed_comment_reposts').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
+        supabaseClient
+          .from('community_feed_posts')
+          .select('repost_of_comment_id')
+          .eq('user_id', composerUserId)
+          .eq('is_plain_repost', true)
+          .in('repost_of_comment_id', cids),
         supabaseClient.from('feed_comment_bookmarks').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
       ])
-      const intErr = likesRes.error?.message || repostsRes.error?.message || bmRes.error?.message
+      const intErr = likesRes.error?.message || legacyRepostsRes.error?.message || bmRes.error?.message
       if (intErr) {
         console.warn('profile comment interactions:', intErr)
         return
       }
+      const repostedCommentIds = new Set([
+        ...(legacyRepostsRes.data || []).map((r) => r.comment_id).filter(Boolean),
+        ...(newRepostsRes.data || []).map((r) => r.repost_of_comment_id).filter(Boolean),
+      ])
       setInteractionByComment((prev) => {
         const next = { ...prev }
         for (const id of cids) {
@@ -2408,9 +2420,8 @@ export default function SocialFeed({
           if (!cid || !next[cid]) continue
           next[cid] = { ...next[cid], liked: true }
         }
-        for (const r of repostsRes.data || []) {
-          const cid = r.comment_id
-          if (!cid || !next[cid]) continue
+        for (const cid of repostedCommentIds) {
+          if (!next[cid]) continue
           next[cid] = {
             ...next[cid],
             reposted: true,
@@ -2622,6 +2633,44 @@ export default function SocialFeed({
           setLoungeManageErr('Complete your profile to repost.')
           return
         }
+
+        // ── Chain collapse ──────────────────────────────────────────────────
+        // If the card being reposted is itself a plain repost, target the original.
+        if (post.is_plain_repost) {
+          if (post.repost_of_comment_id) {
+            // Repost of a comment card → create a new comment-repost feed card
+            const { error: cErr } = await supabaseClient
+              .from('community_feed_posts')
+              .insert(communityFeedCommentRepostInsertPayload({ originalCommentId: post.repost_of_comment_id }))
+            if (cErr) {
+              setLoungeManageErr(
+                cErr.code === '23505' ? 'You already reposted this comment.' : cErr.message || 'Could not repost.'
+              )
+              return
+            }
+            await loadCommunityFeed({ silent: true })
+            return
+          }
+          if (post.repost_of_post_id) {
+            // Repost of a post card → target the original post ID directly
+            const { error } = await supabaseClient
+              .from('community_feed_posts')
+              .insert(communityFeedPlainRepostInsertPayload({ originalPostId: post.repost_of_post_id }))
+            if (error) {
+              const msg = String(error.message || '')
+              setLoungeManageErr(
+                error.code === '23505'
+                  ? 'You already have a plain repost for this post.'
+                  : msg || 'Could not repost right now.'
+              )
+              return
+            }
+            await loadCommunityFeed({ silent: true })
+            await refreshLoungePostInteractions([post.repost_of_post_id])
+            return
+          }
+        }
+
         const { error } = await supabaseClient
           .from('community_feed_posts')
           .insert(communityFeedPlainRepostInsertPayload({ originalPostId: post.id }))
@@ -3040,6 +3089,7 @@ export default function SocialFeed({
       if (!composerUserId || !commentId) return
       const prevSnap = interactionByCommentRef.current[commentId] || defaultInteraction
       if (prevSnap.reposted) return
+      // Optimistic update
       setInteractionByComment((prev) => {
         const cur = prev[commentId] || defaultInteraction
         return {
@@ -3059,10 +3109,12 @@ export default function SocialFeed({
             : row,
         ),
       )
+      // Create a community_feed_posts row so the repost appears in the main feed.
       const res = await supabaseClient
-        .from('feed_comment_reposts')
-        .insert({ comment_id: commentId, user_id: composerUserId })
+        .from('community_feed_posts')
+        .insert(communityFeedCommentRepostInsertPayload({ originalCommentId: commentId }))
       if (res.error) {
+        // Roll back optimistic update
         setInteractionByComment((prev) => {
           const cur = prev[commentId] || defaultInteraction
           return { ...prev, [commentId]: { ...cur, reposted: false, plainRepostChildId: null } }
@@ -3074,9 +3126,14 @@ export default function SocialFeed({
               : row,
           ),
         )
-        setLoungeManageErr(res.error.message || 'Could not repost.')
+        if (res.error.code === '23505') {
+          setLoungeManageErr('You already reposted this comment.')
+        } else {
+          setLoungeManageErr(res.error.message || 'Could not repost.')
+        }
         return
       }
+      // Sync true count from DB (trigger on community_feed_posts updated it)
       const { data: row } = await supabaseClient
         .from('feed_comments')
         .select('repost_count')
@@ -3087,8 +3144,9 @@ export default function SocialFeed({
           prev.map((r) => (r.id === commentId ? { ...r, repost_count: row.repost_count } : r)),
         )
       }
+      await loadCommunityFeed({ silent: true })
     },
-    [composerUserId, defaultInteraction, supabaseClient]
+    [composerUserId, defaultInteraction, loadCommunityFeed, supabaseClient]
   )
 
   const undoLoungeDetailCommentPlainRepost = useCallback(
@@ -3096,6 +3154,7 @@ export default function SocialFeed({
       if (!composerUserId || !commentId) return
       const prevSnap = interactionByCommentRef.current[commentId] || defaultInteraction
       if (!prevSnap.reposted) return
+      // Optimistic update
       setInteractionByComment((prev) => {
         const cur = prev[commentId] || defaultInteraction
         return {
@@ -3110,12 +3169,23 @@ export default function SocialFeed({
             : row,
         ),
       )
-      const res = await supabaseClient
-        .from('feed_comment_reposts')
-        .delete()
-        .eq('comment_id', commentId)
-        .eq('user_id', composerUserId)
-      if (res.error) {
+      // Delete from community_feed_posts (new path) and legacy feed_comment_reposts in parallel.
+      const [newRes] = await Promise.all([
+        supabaseClient
+          .from('community_feed_posts')
+          .delete()
+          .eq('user_id', composerUserId)
+          .eq('repost_of_comment_id', commentId)
+          .eq('is_plain_repost', true),
+        // Legacy cleanup — no-op if row doesn't exist
+        supabaseClient
+          .from('feed_comment_reposts')
+          .delete()
+          .eq('comment_id', commentId)
+          .eq('user_id', composerUserId),
+      ])
+      if (newRes.error) {
+        // Roll back optimistic update
         setInteractionByComment((prev) => {
           const cur = prev[commentId] || defaultInteraction
           return {
@@ -3135,7 +3205,7 @@ export default function SocialFeed({
               : row,
           ),
         )
-        setLoungeManageErr(res.error.message || 'Could not undo repost.')
+        setLoungeManageErr(newRes.error.message || 'Could not undo repost.')
         return
       }
       const { data: row } = await supabaseClient
@@ -3148,8 +3218,9 @@ export default function SocialFeed({
           prev.map((r) => (r.id === commentId ? { ...r, repost_count: row.repost_count } : r)),
         )
       }
+      await loadCommunityFeed({ silent: true })
     },
-    [composerUserId, defaultInteraction, supabaseClient]
+    [composerUserId, defaultInteraction, loadCommunityFeed, supabaseClient]
   )
 
   /** Post-detail reply: clear composer immediately and upload in the background (feed composer parity). */
@@ -3508,19 +3579,29 @@ export default function SocialFeed({
         setBookmarkedByComment({})
         return
       }
-      const [likesRes, repostsRes, bmRes] = await Promise.all([
+      const [likesRes, legacyRepostsRes, newRepostsRes, bmRes] = await Promise.all([
         supabaseClient.from('feed_comment_likes').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
         supabaseClient.from('feed_comment_reposts').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
+        supabaseClient
+          .from('community_feed_posts')
+          .select('repost_of_comment_id')
+          .eq('user_id', composerUserId)
+          .eq('is_plain_repost', true)
+          .in('repost_of_comment_id', cids),
         supabaseClient.from('feed_comment_bookmarks').select('comment_id').eq('user_id', composerUserId).in('comment_id', cids),
       ])
       if (cancelled) return
-      const intErr = likesRes.error?.message || repostsRes.error?.message || bmRes.error?.message
+      const intErr = likesRes.error?.message || legacyRepostsRes.error?.message || bmRes.error?.message
       if (intErr) {
         console.warn('feed comment interactions:', intErr)
         setInteractionByComment({})
         setBookmarkedByComment({})
         return
       }
+      const repostedCommentIds = new Set([
+        ...(legacyRepostsRes.data || []).map((r) => r.comment_id).filter(Boolean),
+        ...(newRepostsRes.data || []).map((r) => r.repost_of_comment_id).filter(Boolean),
+      ])
       const nextInt = {}
       for (const id of cids) {
         nextInt[id] = { ...defaultInteraction }
@@ -3530,9 +3611,8 @@ export default function SocialFeed({
         if (!cid || !nextInt[cid]) continue
         nextInt[cid] = { ...nextInt[cid], liked: true }
       }
-      for (const r of repostsRes.data || []) {
-        const cid = r.comment_id
-        if (!cid || !nextInt[cid]) continue
+      for (const cid of repostedCommentIds) {
+        if (!nextInt[cid]) continue
         nextInt[cid] = {
           ...nextInt[cid],
           reposted: true,
@@ -3728,6 +3808,35 @@ export default function SocialFeed({
       })
     },
     [composerUserId, loungeReadOnly, onRequireAuth, profileModalOpen, profileOverlayStack.length]
+  )
+
+  /**
+   * Tap on a comment-repost feed card → open the parent post's detail with the comment in focus.
+   * Looks up the post in the current feed first; falls back to a DB fetch.
+   */
+  const openCommentRepostDetail = useCallback(
+    async (repostedComment) => {
+      if (!repostedComment?.post_id || !repostedComment?.id) return
+      let parentPost = communityPosts.find((p) => String(p.id) === String(repostedComment.post_id))
+      if (!parentPost) {
+        const { data } = await supabaseClient
+          .from('community_feed_posts')
+          .select(
+            'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height'
+          )
+          .eq('id', repostedComment.post_id)
+          .is('hidden_at', null)
+        if (data?.length) {
+          const hydrated = await hydrateCommunityPosts(data)
+          parentPost = hydrated?.[0]
+        }
+        if (!parentPost) {
+          parentPost = { id: repostedComment.post_id }
+        }
+      }
+      openLoungePostDetail(parentPost, { focusCommentId: repostedComment.id })
+    },
+    [communityPosts, hydrateCommunityPosts, openLoungePostDetail, supabaseClient],
   )
 
   const scrollLoungeFeedToTop = useCallback(() => {
@@ -7270,8 +7379,9 @@ export default function SocialFeed({
                 onClick={(e) => {
                   const t = e.target
                   if (!(t instanceof Element)) return
+                  // Quote-repost embed tap
                   const origHost = t.closest('[data-lounge-original-embed]')
-                  if (origHost && post.reposted_post?.id) {
+                  if (origHost && post.reposted_post?.id && !post.is_plain_repost) {
                     openLoungePostDetail(post.reposted_post)
                     return
                   }
@@ -7281,6 +7391,16 @@ export default function SocialFeed({
                     )
                   )
                     return
+                  // Plain post repost → open original
+                  if (post.is_plain_repost && post.reposted_post?.id) {
+                    openLoungePostDetail(post.reposted_post)
+                    return
+                  }
+                  // Comment repost → open parent post with comment in focus
+                  if (post.is_plain_repost && post.reposted_comment?.post_id) {
+                    void openCommentRepostDetail(post.reposted_comment)
+                    return
+                  }
                   openLoungePostDetail(post)
                 }}
               >
@@ -7326,6 +7446,13 @@ export default function SocialFeed({
                   onPostMenuBlock={onPostMenuBlockFromFeed}
                   onPostMenuReport={onPostMenuReportFromFeed}
                   busyDeletingPostId={loungeFeedDeleteBusyPostId}
+                  interactionStateForComment={interactionStateForComment}
+                  onCommentPlainRepost={(p) => void addLoungeDetailCommentPlainRepost(p.id)}
+                  onCommentUndoPlainRepost={(p) => void undoLoungeDetailCommentPlainRepost(p.id)}
+                  onToggleCommentLike={toggleLoungeDetailCommentLike}
+                  onToggleCommentBookmark={toggleLoungeDetailCommentBookmark}
+                  getCommentBookmarked={getLoungeDetailCommentBookmarked}
+                  onOpenCommentDetail={(rc) => void openCommentRepostDetail(rc)}
                 />
               </article>
             ))}

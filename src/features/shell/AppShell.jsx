@@ -185,7 +185,7 @@ export default function AppShell({
       }
 
       const originalPostSelect =
-        'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height'
+        'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height'
 
       let repostById = {}
       if (depth === 0) {
@@ -212,12 +212,99 @@ export default function AppShell({
         }
       }
 
+      // ── Comment reposts ──────────────────────────────────────────────────
+      // Fetch the original comment + its author + the "in reply to" parent context.
+      let repostedCommentById = {}
+      if (depth === 0) {
+        const commentRepostTargetIds = [
+          ...new Set(
+            rows
+              .filter((r) => r.repost_of_comment_id != null && r.repost_of_comment_id !== '')
+              .map((r) => uidKey(r.repost_of_comment_id))
+          ),
+        ]
+        if (commentRepostTargetIds.length > 0) {
+          const commentSelect =
+            'id,body,post_id,parent_id,user_id,created_at,like_count,repost_count,comment_count,image_urls,gif_url,media_url,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height'
+          const { data: commentRows, error: commentErr } = await supabaseClient
+            .from('feed_comments')
+            .select(commentSelect)
+            .in('id', commentRepostTargetIds)
+            .is('hidden_at', null)
+          if (!commentErr && commentRows?.length) {
+            const commentUserIds = commentRows.map((c) => c.user_id).filter(Boolean)
+            const parentCommentIds = commentRows.filter((c) => c.parent_id).map((c) => c.parent_id).filter(Boolean)
+            const rootPostIds = commentRows
+              .filter((c) => !c.parent_id && c.post_id)
+              .map((c) => c.post_id)
+              .filter(Boolean)
+
+            const [parentCommentRes, rootPostRes] = await Promise.all([
+              parentCommentIds.length > 0
+                ? supabaseClient.from('feed_comments').select('id,user_id').in('id', parentCommentIds)
+                : Promise.resolve({ data: [] }),
+              rootPostIds.length > 0
+                ? supabaseClient.from('community_feed_posts').select('id,user_id').in('id', rootPostIds)
+                : Promise.resolve({ data: [] }),
+            ])
+
+            const parentCommentByParentId = Object.fromEntries(
+              (parentCommentRes.data || []).map((r) => [r.id, r])
+            )
+            const rootPostByPostId = Object.fromEntries(
+              (rootPostRes.data || []).map((r) => [r.id, r])
+            )
+
+            const allParentUserIds = [
+              ...(parentCommentRes.data || []).map((r) => r.user_id),
+              ...(rootPostRes.data || []).map((r) => r.user_id),
+            ].filter(Boolean)
+
+            const allCommentUserIds = [...new Set([...commentUserIds, ...allParentUserIds])]
+            const { data: commentProfiles } =
+              allCommentUserIds.length > 0
+                ? await supabaseClient
+                    .from('profiles')
+                    .select('user_id,handle,display_name,avatar_url,role,is_og')
+                    .in('user_id', allCommentUserIds)
+                : { data: [] }
+
+            const commentProfileById = Object.fromEntries(
+              (commentProfiles || []).map((p) => [uidKey(p.user_id), p])
+            )
+
+            repostedCommentById = Object.fromEntries(
+              commentRows.map((c) => {
+                let replyToProfile = null
+                if (c.parent_id && parentCommentByParentId[c.parent_id]) {
+                  replyToProfile = commentProfileById[uidKey(parentCommentByParentId[c.parent_id].user_id)] || null
+                } else if (!c.parent_id && c.post_id && rootPostByPostId[c.post_id]) {
+                  replyToProfile = commentProfileById[uidKey(rootPostByPostId[c.post_id].user_id)] || null
+                }
+                return [
+                  uidKey(c.id),
+                  {
+                    ...c,
+                    author_profile: commentProfileById[uidKey(c.user_id)] || null,
+                    reply_to_profile: replyToProfile,
+                  },
+                ]
+              })
+            )
+          }
+        }
+      }
+
       return rows.map((r) => ({
         ...r,
         author_profile: profileByUserId[uidKey(r.user_id)] || null,
         reposted_post:
           depth === 0 && r.repost_of_post_id != null && r.repost_of_post_id !== ''
             ? repostById[uidKey(r.repost_of_post_id)] || null
+            : null,
+        reposted_comment:
+          depth === 0 && r.repost_of_comment_id != null && r.repost_of_comment_id !== ''
+            ? repostedCommentById[uidKey(r.repost_of_comment_id)] || null
             : null,
       }))
     },

@@ -249,6 +249,20 @@ export function communityFeedPlainRepostInsertPayload({ originalPostId }) {
   }
 }
 
+/**
+ * Plain repost of a comment: creates a community_feed_posts row owned by the reposter
+ * so the repost appears in the main feed (see `supabase/migrations/20260517000000_feed_comment_repost_on_feed.sql`).
+ */
+export function communityFeedCommentRepostInsertPayload({ originalCommentId }) {
+  return {
+    caption: '',
+    game_title: '',
+    game_slug: null,
+    repost_of_comment_id: originalCommentId,
+    is_plain_repost: true,
+  }
+}
+
 const LOUNGE_FEED_MEDIA_BUCKET = 'lounge-feed'
 
 /**
