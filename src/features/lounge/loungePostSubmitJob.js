@@ -19,6 +19,17 @@ import {
 const LOUNGE_MAX_PINNED_ALERT =
   'The maximum number of pinned posts is two. Unpin a post to pin this one.'
 
+/** True when a background Lounge post/comment job includes Stream video (not images/GIF-only). */
+export function loungeSubmissionSnapshotIncludesVideo(snapshot) {
+  if (!snapshot) return false
+  if (String(snapshot.streamVideoUid || '').trim()) return true
+  if (snapshot.videoFile instanceof File) return true
+  if (snapshot.videoPrepSpec) return true
+  if (snapshot.awaitingComposerVideoPrepJobId != null) return true
+  if (snapshot.awaitingDetailCommentVideoPrepJobId != null) return true
+  return false
+}
+
 /**
  * @typedef {object} LoungePostSubmissionSnapshot
  * @property {string} caption

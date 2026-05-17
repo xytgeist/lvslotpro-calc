@@ -58,7 +58,10 @@ import {
   loungeProfileNeedsGate,
   writeProfileGateAck,
 } from './loungeStorage'
-import { executeLoungeCommunityPostSubmission } from './loungePostSubmitJob'
+import {
+  executeLoungeCommunityPostSubmission,
+  loungeSubmissionSnapshotIncludesVideo,
+} from './loungePostSubmitJob'
 import { executeLoungeCommentSubmission } from './loungeCommentSubmitJob.js'
 import {
   runComposerStreamVideoPrepWithRetries,
@@ -5066,9 +5069,12 @@ export default function SocialFeed({
       const prepSource = String(snapshot.quoteRepostOfPostId || '').trim() ? 'quote' : 'composer'
       const lastEncRef =
         prepSource === 'quote' ? quoteRepostVideoLastEncodedFileRef : composerVideoLastEncodedFileRef
+      const submissionHasVideo = loungeSubmissionSnapshotIncludesVideo(snapshot)
       const uidBar = String(snapshot.streamVideoUid || '').trim()
       const mediaUploadBarSkin =
-        !uidBar && (snapshot.awaitingComposerVideoPrepJobId != null || Boolean(snapshot.videoPrepSpec))
+        submissionHasVideo &&
+        !uidBar &&
+        (snapshot.awaitingComposerVideoPrepJobId != null || Boolean(snapshot.videoPrepSpec))
       const prepHudId = snapshot.awaitingComposerVideoPrepJobId ?? 0
 
       loungePostJobRunningRef.current = true
@@ -5078,22 +5084,24 @@ export default function SocialFeed({
       const ac = new AbortController()
       loungePostAbortRef.current = ac
 
-      setLoungePostUploadBar((prev) => {
-        if (mediaUploadBarSkin) {
-          const p = typeof prev?.progress === 'number' ? prev.progress : 0
-          const st = prev?.mode === 'mediaPrep' && prev.status ? prev.status : 'Starting…'
-          const det = prev?.mode === 'mediaPrep' && prev.detail ? prev.detail : ''
-          return {
-            mode: 'mediaPrep',
-            postSubmission: true,
-            prepJobId: prepHudId,
-            progress: p,
-            status: st,
-            detail: det,
+      if (submissionHasVideo) {
+        setLoungePostUploadBar((prev) => {
+          if (mediaUploadBarSkin) {
+            const p = typeof prev?.progress === 'number' ? prev.progress : 0
+            const st = prev?.mode === 'mediaPrep' && prev.status ? prev.status : 'Starting…'
+            const det = prev?.mode === 'mediaPrep' && prev.detail ? prev.detail : ''
+            return {
+              mode: 'mediaPrep',
+              postSubmission: true,
+              prepJobId: prepHudId,
+              progress: p,
+              status: st,
+              detail: det,
+            }
           }
-        }
-        return { mode: 'post', progress: 0, status: 'Starting…', detail: '' }
-      })
+          return { mode: 'post', progress: 0, status: 'Starting…', detail: '' }
+        })
+      }
 
       let snap = { ...snapshot }
       try {
@@ -5103,15 +5111,17 @@ export default function SocialFeed({
           (snap.awaitingComposerVideoPrepJobId != null || snap.videoPrepSpec)
         ) {
           loungePostUploadLastPhaseRef.current = 'Waiting for video'
-          setLoungePostUploadBar((prev) => ({
-            ...(mediaUploadBarSkin
-              ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
-              : { mode: 'post' }),
-            progress:
-              mediaUploadBarSkin && typeof prev?.progress === 'number' ? Math.max(0.06, prev.progress) : 0.06,
-            status: 'Waiting for video',
-            detail: mediaUploadBarSkin && prev?.detail ? prev.detail : '',
-          }))
+          if (submissionHasVideo) {
+            setLoungePostUploadBar((prev) => ({
+              ...(mediaUploadBarSkin
+                ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                : { mode: 'post' }),
+              progress:
+                mediaUploadBarSkin && typeof prev?.progress === 'number' ? Math.max(0.06, prev.progress) : 0.06,
+              status: 'Waiting for video',
+              detail: mediaUploadBarSkin && prev?.detail ? prev.detail : '',
+            }))
+          }
 
           /** @type {{ encodedFile: File, streamVideoUid: string }} */
           let out
@@ -5211,29 +5221,33 @@ export default function SocialFeed({
           supabaseClient,
           snapshot: snap,
           signal: ac.signal,
-          onProgress: (info) => {
-            loungePostUploadLastPhaseRef.current = String(info?.status || '')
-            setLoungePostUploadBar((prev) => {
-              const d = String(info?.detail || '').trim()
-              return {
-                ...(mediaUploadBarSkin
-                  ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
-                  : { mode: 'post' }),
-                progress: typeof info?.progress === 'number' ? info.progress : 0,
-                status: String(info?.status || ''),
-                detail: d !== '' ? d : prev && typeof prev.detail === 'string' ? prev.detail : '',
+          onProgress: submissionHasVideo
+            ? (info) => {
+                loungePostUploadLastPhaseRef.current = String(info?.status || '')
+                setLoungePostUploadBar((prev) => {
+                  const d = String(info?.detail || '').trim()
+                  return {
+                    ...(mediaUploadBarSkin
+                      ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                      : { mode: 'post' }),
+                    progress: typeof info?.progress === 'number' ? info.progress : 0,
+                    status: String(info?.status || ''),
+                    detail: d !== '' ? d : prev && typeof prev.detail === 'string' ? prev.detail : '',
+                  }
+                })
               }
-            })
-          },
+            : undefined,
           rateLimitMessage,
-          onUploadDiagnostic: (detail) => {
-            if (ac.signal.aborted) return
-            const d = String(detail || '').trim()
-            if (!d) return
-            setLoungePostUploadBar((prev) =>
-              prev ? { ...prev, detail: LOUNGE_UPLOAD_BAR_GOBLIN_DETAIL } : prev,
-            )
-          },
+          onUploadDiagnostic: submissionHasVideo
+            ? (detail) => {
+                if (ac.signal.aborted) return
+                const d = String(detail || '').trim()
+                if (!d) return
+                setLoungePostUploadBar((prev) =>
+                  prev ? { ...prev, detail: LOUNGE_UPLOAD_BAR_GOBLIN_DETAIL } : prev,
+                )
+              }
+            : undefined,
         })
         loungePostSnapshotRef.current = null
         await loadCommunityFeed()
@@ -5278,8 +5292,10 @@ export default function SocialFeed({
 
   const runBackgroundLoungeDetailCommentSubmission = useCallback(
     async (snapshot) => {
+      const submissionHasVideo = loungeSubmissionSnapshotIncludesVideo(snapshot)
       const uidBar = String(snapshot.streamVideoUid || '').trim()
       const mediaUploadBarSkin =
+        submissionHasVideo &&
         !uidBar &&
         (snapshot.awaitingDetailCommentVideoPrepJobId != null || Boolean(snapshot.videoPrepSpec))
       const prepHudId = snapshot.awaitingDetailCommentVideoPrepJobId ?? 0
@@ -5290,37 +5306,41 @@ export default function SocialFeed({
       const ac = new AbortController()
       loungeDetailCommentAbortRef.current = ac
 
-      setLoungePostUploadBar((prev) => {
-        if (mediaUploadBarSkin) {
-          const p = typeof prev?.progress === 'number' ? prev.progress : 0
-          const st = prev?.mode === 'mediaPrep' && prev.status ? prev.status : 'Starting…'
-          const det = prev?.mode === 'mediaPrep' && prev.detail ? prev.detail : ''
-          return {
-            mode: 'mediaPrep',
-            postSubmission: true,
-            prepJobId: prepHudId,
-            progress: p,
-            status: st,
-            detail: det,
+      if (submissionHasVideo) {
+        setLoungePostUploadBar((prev) => {
+          if (mediaUploadBarSkin) {
+            const p = typeof prev?.progress === 'number' ? prev.progress : 0
+            const st = prev?.mode === 'mediaPrep' && prev.status ? prev.status : 'Starting…'
+            const det = prev?.mode === 'mediaPrep' && prev.detail ? prev.detail : ''
+            return {
+              mode: 'mediaPrep',
+              postSubmission: true,
+              prepJobId: prepHudId,
+              progress: p,
+              status: st,
+              detail: det,
+            }
           }
-        }
-        return { mode: 'post', progress: 0, status: 'Publishing reply', detail: '' }
-      })
+          return { mode: 'post', progress: 0, status: 'Publishing reply', detail: '' }
+        })
+      }
 
       let snap = { ...snapshot }
       try {
         const uid0 = String(snap.streamVideoUid || '').trim()
         if (!uid0 && (snap.awaitingDetailCommentVideoPrepJobId != null || snap.videoPrepSpec)) {
           loungePostUploadLastPhaseRef.current = 'Waiting for video'
-          setLoungePostUploadBar((prev) => ({
-            ...(mediaUploadBarSkin
-              ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
-              : { mode: 'post' }),
-            progress:
-              mediaUploadBarSkin && typeof prev?.progress === 'number' ? Math.max(0.06, prev.progress) : 0.06,
-            status: 'Waiting for video',
-            detail: mediaUploadBarSkin && prev?.detail ? prev.detail : '',
-          }))
+          if (submissionHasVideo) {
+            setLoungePostUploadBar((prev) => ({
+              ...(mediaUploadBarSkin
+                ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                : { mode: 'post' }),
+              progress:
+                mediaUploadBarSkin && typeof prev?.progress === 'number' ? Math.max(0.06, prev.progress) : 0.06,
+              status: 'Waiting for video',
+              detail: mediaUploadBarSkin && prev?.detail ? prev.detail : '',
+            }))
+          }
 
           const onPrepProgressWhilePosting = (info) => {
             if (ac.signal.aborted) return
@@ -5425,28 +5445,32 @@ export default function SocialFeed({
             userId: snap.userId,
           },
           signal: ac.signal,
-          onProgress: (info) => {
-            loungePostUploadLastPhaseRef.current = String(info?.status || '')
-            setLoungePostUploadBar((prev) => {
-              const d = String(info?.detail || '').trim()
-              return {
-                ...(mediaUploadBarSkin
-                  ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
-                  : { mode: 'post' }),
-                progress: typeof info?.progress === 'number' ? info.progress : 0,
-                status: String(info?.status || ''),
-                detail: d !== '' ? d : prev && typeof prev.detail === 'string' ? prev.detail : '',
+          onProgress: submissionHasVideo
+            ? (info) => {
+                loungePostUploadLastPhaseRef.current = String(info?.status || '')
+                setLoungePostUploadBar((prev) => {
+                  const d = String(info?.detail || '').trim()
+                  return {
+                    ...(mediaUploadBarSkin
+                      ? { mode: 'mediaPrep', postSubmission: true, prepJobId: prepHudId }
+                      : { mode: 'post' }),
+                    progress: typeof info?.progress === 'number' ? info.progress : 0,
+                    status: String(info?.status || ''),
+                    detail: d !== '' ? d : prev && typeof prev.detail === 'string' ? prev.detail : '',
+                  }
+                })
               }
-            })
-          },
-          onUploadDiagnostic: (detail) => {
-            if (ac.signal.aborted) return
-            const d = String(detail || '').trim()
-            if (!d) return
-            setLoungePostUploadBar((prev) =>
-              prev ? { ...prev, detail: LOUNGE_UPLOAD_BAR_GOBLIN_DETAIL } : prev,
-            )
-          },
+            : undefined,
+          onUploadDiagnostic: submissionHasVideo
+            ? (detail) => {
+                if (ac.signal.aborted) return
+                const d = String(detail || '').trim()
+                if (!d) return
+                setLoungePostUploadBar((prev) =>
+                  prev ? { ...prev, detail: LOUNGE_UPLOAD_BAR_GOBLIN_DETAIL } : prev,
+                )
+              }
+            : undefined,
         })
 
         loungeDetailCommentSnapshotRef.current = null
