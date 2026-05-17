@@ -528,7 +528,7 @@ function App() {
                 ← Continue without signing in
               </button>
               <h2 id="auth-modal-title" className="text-2xl font-bold text-white mb-6 text-center">
-                Edge
+                Find Your Edge
               </h2>
 
               <AuthModalPanel
