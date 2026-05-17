@@ -2,18 +2,24 @@ import { useCallback, useRef, useState } from 'react'
 
 const DISMISS_DRAG_PX = 72
 
-function shouldIgnoreSwipeTarget(target) {
+function shouldIgnoreSwipeTarget(target, { allowSwipeOnVideo = false } = {}) {
   if (!(target instanceof Element)) return true
-  return Boolean(
-    target.closest('button, a, input, textarea, select, video, [data-lounge-lightbox-no-swipe]'),
-  )
+  const blockers = ['button', 'a', 'input', 'textarea', 'select', '[data-lounge-lightbox-no-swipe]']
+  if (!allowSwipeOnVideo) blockers.push('video')
+  return Boolean(target.closest(blockers.join(', ')))
 }
 
 /**
  * Vertical swipe (or drag) to dismiss fullscreen Lounge media.
  * Optional horizontal swipe when `onSwipeHorizontal` is set (e.g. carousel in image lightbox).
+ * @param {boolean} [allowSwipeOnVideo] — when true, swipes starting on `<video>` count (fullscreen video lightbox).
  */
-export function useLoungeLightboxSwipeDismiss({ onClose, onSwipeHorizontal, className = '' }) {
+export function useLoungeLightboxSwipeDismiss({
+  onClose,
+  onSwipeHorizontal,
+  className = '',
+  allowSwipeOnVideo = false,
+}) {
   const dragRef = useRef(null)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [dragging, setDragging] = useState(false)
@@ -26,7 +32,7 @@ export function useLoungeLightboxSwipeDismiss({ onClose, onSwipeHorizontal, clas
 
   const onPointerDown = useCallback((e) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
-    if (shouldIgnoreSwipeTarget(e.target)) return
+    if (shouldIgnoreSwipeTarget(e.target, { allowSwipeOnVideo })) return
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -35,7 +41,7 @@ export function useLoungeLightboxSwipeDismiss({ onClose, onSwipeHorizontal, clas
     setDragging(true)
     setOffset({ x: 0, y: 0 })
     e.currentTarget.setPointerCapture(e.pointerId)
-  }, [])
+  }, [allowSwipeOnVideo])
 
   const onPointerMove = useCallback((e) => {
     const drag = dragRef.current

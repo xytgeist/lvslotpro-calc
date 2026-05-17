@@ -220,6 +220,7 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
 function LoungeStreamVideoLightbox({ uid, onClose, footer }) {
   const { swipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
     onClose,
+    allowSwipeOnVideo: true,
     className: 'relative flex min-h-0 flex-1 flex-col',
   })
   const videoRef = useRef(null)
