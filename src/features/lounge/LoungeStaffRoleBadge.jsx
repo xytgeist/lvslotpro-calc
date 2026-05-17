@@ -26,7 +26,7 @@ function ShieldIcon({ className }) {
 const STAFF_BADGE_LAYOUT = {
   feed: {
     wrap: 'translate-y-[0.5px]',
-    crown: 'translate-y-[1.5px]',
+    crown: '-translate-y-[2px]',
     shield: '-translate-y-[2px]',
     modInner: 'translate-y-0',
   },
@@ -61,7 +61,7 @@ export default function LoungeStaffRoleBadge({ role, size = 'feed' }) {
   if (r === 'admin') {
     return (
       <LoungeBadgeHoverTip tip="Admin" tone="crown" className={`inline-flex items-center ${layout.wrap}`}>
-        <span className="inline-flex items-center gap-x-0.5" role="img" aria-label="Admin">
+        <span className="inline-flex items-baseline gap-x-0.5" role="img" aria-label="Admin">
           <span className={`inline-flex ${layout.crown}`}>
             <CrownIcon className={`${crownClass} text-amber-400`} />
           </span>
