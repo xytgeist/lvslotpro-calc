@@ -27,8 +27,8 @@ const STAFF_BADGE_LAYOUT = {
   feed: {
     wrap: 'translate-y-[0.5px]',
     crown: 'translate-y-[1.5px]',
-    shield: 'translate-y-0',
-    modInner: 'translate-y-0.5',
+    shield: '-translate-y-[2px]',
+    modInner: 'translate-y-0',
   },
   detail: {
     wrap: 'translate-y-[0.5px]',
