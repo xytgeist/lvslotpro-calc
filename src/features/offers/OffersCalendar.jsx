@@ -23,9 +23,8 @@ import {
   OFFERS_DELETE_CONFIRM_SKIP_KEY_PREFIX,
   OFFERS_IOS_ALERT_SETUP_SEEN_STORAGE_KEY_PREFIX,
   OFFERS_IOS_ALERT_REMINDER_SUPPRESS_STORAGE_KEY_PREFIX,
-  OFFERS_IOS_PWA_NOTIF_PROMPT_KEY_PREFIX,
-  OFFERS_IOS_PWA_ENABLE_PENDING_KEY_PREFIX,
 } from './offerStorageKeys'
+import { consumePwaNotifEnablePending } from '../../utils/pwaNotificationPrompt'
 
 export default function OffersCalendar({
   supabaseClient,
@@ -92,8 +91,6 @@ export default function OffersCalendar({
     (userId) => `${OFFERS_IOS_ALERT_REMINDER_SUPPRESS_STORAGE_KEY_PREFIX}${userId}`,
     []
   )
-  const getIosPwaNotifPromptStorageKeyForUser = useCallback((userId) => `${OFFERS_IOS_PWA_NOTIF_PROMPT_KEY_PREFIX}${userId}`, [])
-
   const setStoredAlertDefaultForCurrentUser = useCallback(
     async (nextPreset) => {
       const {
@@ -386,10 +383,11 @@ export default function OffersCalendar({
     []
   )
 
+  /** Finish push subscribe after user accepts iOS PWA notification permission in AppShell. */
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!isIosDevice || !isStandaloneMode) return
-    if (pushSubscribed || pushPermission === 'denied') return
+    if (pushSubscribed) return
     let cancelled = false
     ;(async () => {
       const {
@@ -397,59 +395,13 @@ export default function OffersCalendar({
       } = await supabaseClient.auth.getSession()
       const userId = session?.user?.id
       if (!userId || cancelled) return
-      const key = getIosPwaNotifPromptStorageKeyForUser(userId)
-      const pendingEnableKey = `${OFFERS_IOS_PWA_ENABLE_PENDING_KEY_PREFIX}${userId}`
-      let shouldAutoEnable = false
-      try {
-        shouldAutoEnable = window.localStorage.getItem(pendingEnableKey) === '1'
-      } catch {
-        shouldAutoEnable = false
-      }
-      if (shouldAutoEnable) {
-        await enablePush()
-        try {
-          window.localStorage.removeItem(pendingEnableKey)
-        } catch {
-          // Ignore local storage failures.
-        }
-        return
-      }
-      let alreadyPrompted = false
-      try {
-        alreadyPrompted = window.localStorage.getItem(key) === '1'
-      } catch {
-        alreadyPrompted = false
-      }
-      if (alreadyPrompted) return
-      const shouldEnable = await showAppConfirm({
-        title: 'Enable Notifications',
-        message: '',
-        confirmLabel: 'Enable',
-        cancelLabel: 'Not now'
-      })
-      if (cancelled) return
-      try {
-        window.localStorage.setItem(key, '1')
-      } catch {
-        // ignore storage failures
-      }
-      if (shouldEnable) {
-        await enablePush()
-      }
+      if (!consumePwaNotifEnablePending(userId)) return
+      await enablePush()
     })()
     return () => {
       cancelled = true
     }
-  }, [
-    enablePush,
-    getIosPwaNotifPromptStorageKeyForUser,
-    isIosDevice,
-    isStandaloneMode,
-    pushPermission,
-    pushSubscribed,
-    showAppConfirm,
-    supabaseClient,
-  ])
+  }, [enablePush, isIosDevice, isStandaloneMode, pushSubscribed, supabaseClient])
 
   const maybeResolveAlertPresetWithPrompt = useCallback(
     async (alertPreset) => {

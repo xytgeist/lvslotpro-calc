@@ -591,10 +591,17 @@ function App() {
                   <div className="pt-1">
                     <button
                       type="button"
-                      onClick={() => setShowForgotPassword(true)}
+                      onClick={() => {
+                        setShowForgotPassword(true)
+                        setForgotError('')
+                        setForgotMessage('')
+                        if (email.trim() && !forgotEmail.trim()) {
+                          setForgotEmail(email.trim())
+                        }
+                      }}
                       className="w-full min-h-12 text-base text-orange-400 hover:text-orange-300 touch-manipulation py-3 text-center"
                     >
-                      Forgot Password?
+                      Trouble signing in?
                     </button>
                   </div>
                 </form>
@@ -677,10 +684,42 @@ function App() {
                   </button>
                 </form>
               ) : (
-                <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-white text-center">Trouble signing in?</h3>
+                  <div
+                    className="rounded-2xl border border-zinc-600/80 bg-zinc-800/60 p-4 text-sm text-zinc-300 leading-relaxed space-y-3"
+                    role="note"
+                  >
+                    <p>
+                      <span className="font-semibold text-white">Signed up with Google?</span>
+                      {' '}
+                      Use <span className="text-orange-300">Continue with Google</span> below — you don&apos;t have an Edge password.
+                    </p>
+                    <p>
+                      <span className="font-semibold text-white">Use email + password?</span>
+                      {' '}
+                      Enter your email and we&apos;ll send a reset link.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isOAuthLoading}
+                    onClick={() => {
+                      setForgotError('')
+                      setForgotMessage('')
+                      void handleOAuthSignIn('google', { setError: setForgotError })
+                    }}
+                    className={`${btnPrimary} flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed`}
+                    aria-label="Continue with Google"
+                  >
+                    <GoogleIcon />
+                    Continue with Google
+                  </button>
+                  <OAuthDivider />
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
                   <input
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder="Email for password reset"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     className={inputBase}
@@ -707,12 +746,21 @@ function App() {
                     disabled={isSendingReset}
                     className={`${btnPrimary} bg-orange-600 hover:bg-orange-500 rounded-2xl disabled:opacity-60 disabled:cursor-not-allowed`}
                   >
-                    {isSendingReset ? 'Sending...' : 'Send Reset Link'}
+                    {isSendingReset ? 'Sending...' : 'Send reset link'}
                   </button>
-                  <button type="button" onClick={() => setShowForgotPassword(false)} className={`${linkBtn} text-sm sm:text-base`}>
-                    ← Back to Login
+                  </form>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false)
+                      setForgotError('')
+                      setForgotMessage('')
+                    }}
+                    className={`${linkBtn} text-sm sm:text-base w-full`}
+                  >
+                    ← Back to login
                   </button>
-                </form>
+                </div>
               )}
             </div>
           </div>

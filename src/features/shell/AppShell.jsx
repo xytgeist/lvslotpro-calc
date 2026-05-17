@@ -17,9 +17,15 @@ import {
   OFFERS_DELETE_CONFIRM_SKIP_KEY_PREFIX,
   OFFERS_IOS_ALERT_SETUP_SEEN_STORAGE_KEY_PREFIX,
   OFFERS_IOS_ALERT_REMINDER_SUPPRESS_STORAGE_KEY_PREFIX,
-  OFFERS_IOS_PWA_NOTIF_PROMPT_KEY_PREFIX,
-  OFFERS_IOS_PWA_ENABLE_PENDING_KEY_PREFIX,
 } from '../offers/offerStorageKeys'
+import {
+  hasSeenPwaNotifPrompt,
+  isIosDevice,
+  isPwaNotifPromptAuthEvent,
+  isStandalonePwa,
+  markPwaNotifPromptSeen,
+  setPwaNotifEnablePending,
+} from '../../utils/pwaNotificationPrompt'
 
 const SocialFeed = lazy(() => import('../lounge/SocialFeed.jsx'))
 const OffersCalendar = lazy(() => import('../offers/OffersCalendar.jsx'))
@@ -80,7 +86,7 @@ export default function AppShell({
   loungeFeedScopeRef.current = loungeFeedScope
   /** True while the first page of the Lounge feed is being reloaded (including silent pull-to-refresh). */
   const communityFeedHeadReloadingRef = useRef(false)
-  const iosPwaGlobalPromptShownRef = useRef(false)
+  const iosPwaNotifPromptInFlightRef = useRef(false)
   const [globalConfirmState, setGlobalConfirmState] = useState({
     open: false,
     title: '',
@@ -114,60 +120,48 @@ export default function AppShell({
     []
   )
 
+  /** One-time iOS Home Screen (PWA) notification opt-in — first auth in standalone only. */
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const ua = window.navigator.userAgent || ''
-    const isIos = /iPhone|iPad|iPod/i.test(ua)
-    const standaloneViaMedia = window.matchMedia?.('(display-mode: standalone)')?.matches === true
-    const standaloneViaNavigator = window.navigator.standalone === true
-    const isStandalone = standaloneViaMedia || standaloneViaNavigator
-    if (!isIos || !isStandalone || iosPwaGlobalPromptShownRef.current) return
-    let cancelled = false
-    ;(async () => {
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession()
+    if (!isIosDevice() || !isStandalonePwa()) return
+
+    const {
+      data: { subscription },
+    } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (!isPwaNotifPromptAuthEvent(event)) return
       const userId = session?.user?.id
-      if (!userId || cancelled) return
-      const promptKey = `${OFFERS_IOS_PWA_NOTIF_PROMPT_KEY_PREFIX}${userId}`
-      const pendingEnableKey = `${OFFERS_IOS_PWA_ENABLE_PENDING_KEY_PREFIX}${userId}`
-      let alreadyPrompted = false
-      try {
-        alreadyPrompted = window.localStorage.getItem(promptKey) === '1'
-      } catch {
-        alreadyPrompted = false
+      if (!userId || hasSeenPwaNotifPrompt(userId) || iosPwaNotifPromptInFlightRef.current) return
+      const permission = window.Notification?.permission
+      if (permission === 'granted' || permission === 'denied') {
+        markPwaNotifPromptSeen(userId)
+        return
       }
-      if (alreadyPrompted) return
-      iosPwaGlobalPromptShownRef.current = true
-      const shouldEnable = await showGlobalConfirm({
-        title: 'Enable Notifications',
-        message: 'Allow notifications for this Home Screen app now?',
-        confirmLabel: 'Enable',
-        cancelLabel: 'Not now'
-      })
-      if (cancelled) return
-      try {
-        window.localStorage.setItem(promptKey, '1')
-      } catch {
-        // Ignore local storage failures.
-      }
-      if (!shouldEnable) return
-      try {
-        const permission = await window.Notification?.requestPermission?.()
-        if (permission === 'granted') {
-          try {
-            window.localStorage.setItem(pendingEnableKey, '1')
-          } catch {
-            // Ignore local storage failures.
+
+      iosPwaNotifPromptInFlightRef.current = true
+      markPwaNotifPromptSeen(userId)
+
+      void (async () => {
+        try {
+          const shouldEnable = await showGlobalConfirm({
+            title: 'Enable Notifications',
+            message: 'Allow notifications for this Home Screen app now?',
+            confirmLabel: 'Enable',
+            cancelLabel: 'Not now',
+          })
+          if (!shouldEnable) return
+          const nextPermission = await window.Notification?.requestPermission?.()
+          if (nextPermission === 'granted') {
+            setPwaNotifEnablePending(userId)
           }
+        } catch {
+          // User can enable later from Offers.
+        } finally {
+          iosPwaNotifPromptInFlightRef.current = false
         }
-      } catch {
-        // Ignore prompt errors; user can still enable later.
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
+      })()
+    })
+
+    return () => subscription.unsubscribe()
   }, [showGlobalConfirm, supabaseClient])
 
   const hydrateCommunityPosts = useCallback(
