@@ -4,7 +4,7 @@ const BADGE_SRC = `${import.meta.env.BASE_URL}og-cohort-badge.svg`
 
 /** @type {Record<'feed' | 'detail' | 'modal', { cls: string, px: number, yClass?: string }>} */
 const OG_BADGE_SIZE = {
-  feed: { cls: 'h-4 w-4', px: 16, yClass: 'translate-y-[3px]' },
+  feed: { cls: 'h-4 w-4', px: 16, yClass: 'translate-y-[1px]' },
   detail: { cls: 'h-[17px] w-[17px]', px: 17, yClass: 'translate-y-[3px]' },
   /** Profile full-screen header — between feed (+3px) and cap-align. */
   modal: { cls: 'h-5 w-5', px: 20, yClass: 'translate-y-[2px]' },
