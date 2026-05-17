@@ -52,9 +52,128 @@ const FAB_REVEAL_VISIBLE = 0.12
 /** Visible FAB dims to half opacity after this long without interaction. */
 const FAB_IDLE_DIM_MS = 3000
 const FAB_IDLE_DIM_OPACITY = 0.5
+const FAB_LONG_PRESS_RING_COUNT = 4
+/** ms per phase: ring2 in → ring3 in → ring4 in → rings 2–4 out (loops; ring1 stays). */
+const FAB_LONG_PRESS_RING_SEGMENT_MS = 280
+/** Circle 1 → 4: heaviest stroke innermost, thinnest outermost (user example 4→1). */
+const FAB_LONG_PRESS_RING_STROKES_PX = [3.5, 2.65, 1.75, 1]
+/** Ring 1 sits just outside the FAB; each next ring is one fixed step further out. */
+const FAB_LONG_PRESS_RING_INSET_PX = 3
+const FAB_LONG_PRESS_RING_GAP_PX = 7
+
+function fabLongPressRingScale(ringIndex, fabSizePx) {
+  const radius =
+    fabSizePx / 2 + FAB_LONG_PRESS_RING_INSET_PX + ringIndex * FAB_LONG_PRESS_RING_GAP_PX
+  return (radius * 2) / fabSizePx
+}
 
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n))
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t
+}
+
+function hiddenFabLongPressRing() {
+  return { visible: false, opacity: 0, scale: 1, strokePx: 1 }
+}
+
+function fabLongPressRingAt(fabSizePx, ringIndex, opacity, visible = true) {
+  return {
+    visible,
+    opacity,
+    scale: fabLongPressRingScale(ringIndex, fabSizePx),
+    strokePx: FAB_LONG_PRESS_RING_STROKES_PX[ringIndex],
+  }
+}
+
+/** Fixed concentric rings; 2–4 appear in order at their radius, fade, loop until release. */
+function fabLongPressRingStatesFromElapsed(elapsedMs, fabSizePx) {
+  const ring1 = fabLongPressRingAt(fabSizePx, 0, 0.92)
+  const outer = [1, 2, 3].map(() => hiddenFabLongPressRing())
+
+  if (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+  ) {
+    return [ring1, ...outer]
+  }
+
+  const seg = FAB_LONG_PRESS_RING_SEGMENT_MS
+
+  if (elapsedMs < seg) {
+    const intro = clamp(elapsedMs / (seg * 0.45), 0, 1)
+    return [fabLongPressRingAt(fabSizePx, 0, lerp(0.25, 0.92, intro)), ...outer]
+  }
+
+  const loopT = elapsedMs - seg
+  const cycleLen = seg * 4
+  const t = loopT % cycleLen
+  const phase = Math.min(3, Math.floor(t / seg))
+  const local = clamp((t % seg) / seg, 0, 1)
+
+  if (phase === 0) {
+    outer[0] = fabLongPressRingAt(fabSizePx, 1, lerp(0.2, 0.9, local))
+  } else if (phase === 1) {
+    outer[0] = fabLongPressRingAt(fabSizePx, 1, 0.9)
+    outer[1] = fabLongPressRingAt(fabSizePx, 2, lerp(0.2, 0.9, local))
+  } else if (phase === 2) {
+    outer[0] = fabLongPressRingAt(fabSizePx, 1, 0.9)
+    outer[1] = fabLongPressRingAt(fabSizePx, 2, 0.9)
+    outer[2] = fabLongPressRingAt(fabSizePx, 3, lerp(0.2, 0.9, local))
+  } else {
+    const out = 1 - local
+    outer[0] = fabLongPressRingAt(fabSizePx, 1, 0.9 * out, out > 0.04)
+    outer[1] = fabLongPressRingAt(fabSizePx, 2, 0.9 * out, out > 0.04)
+    outer[2] = fabLongPressRingAt(fabSizePx, 3, 0.9 * out, out > 0.04)
+  }
+
+  return [ring1, ...outer]
+}
+
+/** Cyan glow scaled by ring index (inner = stronger) and current opacity. */
+function fabLongPressRingGlow(ringIndex, opacity) {
+  const o = clamp(opacity, 0, 1)
+  const tier = [1, 0.82, 0.64, 0.48][ringIndex] ?? 0.48
+  const a = o * tier
+  return [
+    `0 0 ${6 + ringIndex}px rgba(6, 206, 252, ${0.65 * a})`,
+    `0 0 ${12 + ringIndex * 2}px rgba(6, 206, 252, ${0.42 * a})`,
+    `0 0 ${20 + ringIndex * 3}px rgba(148, 243, 253, ${0.28 * a})`,
+  ].join(', ')
+}
+
+function FabLongPressRingIndicator({ rings, sizePx }) {
+  return (
+    <span
+      className="pointer-events-none absolute left-1/2 top-1/2 z-0"
+      style={{
+        width: sizePx,
+        height: sizePx,
+        marginLeft: -sizePx / 2,
+        marginTop: -sizePx / 2,
+      }}
+      aria-hidden
+    >
+      {rings.map((ring, ringIndex) => {
+        if (!ring.visible) return null
+        return (
+          <span
+            key={ringIndex}
+            className="absolute inset-0 box-border rounded-full border-[#06cefc]"
+            style={{
+              borderWidth: ring.strokePx,
+              transform: `scale(${ring.scale})`,
+              opacity: ring.opacity,
+              boxShadow: fabLongPressRingGlow(ringIndex, ring.opacity),
+              filter: `drop-shadow(0 0 ${5 + ringIndex}px rgba(6, 206, 252, ${0.45 * ring.opacity}))`,
+            }}
+          />
+        )
+      })}
+    </span>
+  )
 }
 
 function angleFromPointer(fabCenterX, fabCenterY, clientX, clientY) {
@@ -223,6 +342,10 @@ export default function LoungeDockArcCarouselPrototype({
   const longPressRafRef = useRef(0)
   const longPressStartedAtRef = useRef(0)
   const [fabLongPressProgress, setFabLongPressProgress] = useState(0)
+  const [fabLongPressRingsActive, setFabLongPressRingsActive] = useState(false)
+  const [fabLongPressRings, setFabLongPressRings] = useState(() =>
+    Array.from({ length: FAB_LONG_PRESS_RING_COUNT }, () => hiddenFabLongPressRing()),
+  )
   /** Half-opacity rest state when visible but idle (not scroll-hidden). */
   const [fabIdleDimmed, setFabIdleDimmed] = useState(false)
   /** Brief scale pop when waking from idle dim. */
@@ -486,24 +609,37 @@ export default function LoungeDockArcCarouselPrototype({
       longPressRafRef.current = 0
     }
     setFabLongPressProgress(0)
+    setFabLongPressRingsActive(false)
+    setFabLongPressRings(
+      Array.from({ length: FAB_LONG_PRESS_RING_COUNT }, () => hiddenFabLongPressRing()),
+    )
   }, [])
 
   const startFabLongPressProgress = useCallback(() => {
-    clearFabLongPressProgress()
+    if (longPressRafRef.current) {
+      cancelAnimationFrame(longPressRafRef.current)
+      longPressRafRef.current = 0
+    }
     longPressStartedAtRef.current = performance.now()
+    setFabLongPressRingsActive(true)
     const tick = () => {
-      if (!longPressArmedRef.current) return
-      const elapsed = performance.now() - longPressStartedAtRef.current
-      const p = Math.min(1, elapsed / FAB_REPOSITION_LONG_PRESS_MS)
-      setFabLongPressProgress(p)
-      if (p < 1) {
-        longPressRafRef.current = requestAnimationFrame(tick)
-      } else {
+      const holding = longPressArmedRef.current || repositioningRef.current
+      if (!holding) {
         longPressRafRef.current = 0
+        setFabLongPressProgress(0)
+        setFabLongPressRingsActive(false)
+        setFabLongPressRings(
+          Array.from({ length: FAB_LONG_PRESS_RING_COUNT }, () => hiddenFabLongPressRing()),
+        )
+        return
       }
+      const elapsed = performance.now() - longPressStartedAtRef.current
+      setFabLongPressProgress(Math.min(1, elapsed / FAB_REPOSITION_LONG_PRESS_MS))
+      setFabLongPressRings(fabLongPressRingStatesFromElapsed(elapsed, LOUNGE_DOCK_FAB_SIZE_PX))
+      longPressRafRef.current = requestAnimationFrame(tick)
     }
     longPressRafRef.current = requestAnimationFrame(tick)
-  }, [clearFabLongPressProgress])
+  }, [])
 
   const cancelFabLongPress = useCallback(() => {
     longPressArmedRef.current = false
@@ -694,7 +830,6 @@ export default function LoungeDockArcCarouselPrototype({
         longPressTimerRef.current = 0
         if (!longPressArmedRef.current) return
         clearDocumentTextSelection()
-        setFabLongPressProgress(1)
         repositioningRef.current = true
         setRepositioning(true)
       }, FAB_REPOSITION_LONG_PRESS_MS)
@@ -1326,6 +1461,9 @@ export default function LoungeDockArcCarouselPrototype({
           opacity: fabDisplayOpacity,
         }}
       >
+        {fabLongPressRingsActive && !open ? (
+          <FabLongPressRingIndicator rings={fabLongPressRings} sizePx={LOUNGE_DOCK_FAB_SIZE_PX} />
+        ) : null}
         <button
           type="button"
           aria-label={
@@ -1351,7 +1489,7 @@ export default function LoungeDockArcCarouselPrototype({
           onContextMenu={(e) => {
             if (repositioning || fabSelectionLock) e.preventDefault()
           }}
-          className={`pointer-events-auto absolute inset-0 select-none rounded-full border-0 transition-[box-shadow,background-color,color,transform] duration-300 ease-out [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] [-webkit-user-select:none] ${loungeDockFabCenterShadowClass(open)} ${
+          className={`pointer-events-auto absolute inset-0 z-[1] select-none rounded-full border-0 transition-[box-shadow,background-color,color,transform] duration-300 ease-out [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] [-webkit-user-select:none] ${loungeDockFabCenterShadowClass(open)} ${
             open
               ? `${LOUNGE_DOCK_FAB_CENTER_GLOW.bgOpen} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text}`
               : `${LOUNGE_DOCK_FAB_CENTER_GLOW.bg} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text}`
@@ -1360,9 +1498,7 @@ export default function LoungeDockArcCarouselPrototype({
               ? 'scale-[1.06]'
               : fabWakePop
                 ? 'scale-[1.05]'
-                : fabLongPressProgress > 0
-                  ? 'scale-[1.03]'
-                  : fabIdleDimmed && fabVisible && !open
+                : fabIdleDimmed && fabVisible && !open
                     ? 'scale-[0.97]'
                     : ''
           }`}
@@ -1371,38 +1507,6 @@ export default function LoungeDockArcCarouselPrototype({
             pointerEvents: fabVisible ? 'auto' : 'none',
           }}
         >
-          {fabLongPressProgress > 0 && !open ? (
-            <span
-              className="pointer-events-none absolute inset-0 rounded-full"
-              aria-hidden
-            >
-              <svg
-                className="h-full w-full -rotate-90"
-                viewBox={`0 0 ${LOUNGE_DOCK_FAB_SIZE_PX} ${LOUNGE_DOCK_FAB_SIZE_PX}`}
-              >
-                <circle
-                  cx={LOUNGE_DOCK_FAB_SIZE_PX / 2}
-                  cy={LOUNGE_DOCK_FAB_SIZE_PX / 2}
-                  r={LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3}
-                  fill="none"
-                  stroke="rgba(6, 206, 252, 0.22)"
-                  strokeWidth="2.5"
-                />
-                <circle
-                  cx={LOUNGE_DOCK_FAB_SIZE_PX / 2}
-                  cy={LOUNGE_DOCK_FAB_SIZE_PX / 2}
-                  r={LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3}
-                  fill="none"
-                  stroke="#06cefc"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeDasharray={`${
-                    2 * Math.PI * (LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3) * fabLongPressProgress
-                  } ${2 * Math.PI * (LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3)}`}
-                />
-              </svg>
-            </span>
-          ) : null}
           {repositioning ? (
             <span
               className="pointer-events-none absolute -inset-1 rounded-full border-2 border-cyan-300/90 shadow-[0_0_14px_rgba(6,206,252,0.45)]"
