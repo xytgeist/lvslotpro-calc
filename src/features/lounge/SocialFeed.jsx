@@ -9164,8 +9164,9 @@ export default function SocialFeed({
           )
         : null}
 
-      {profileGateOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" role="dialog" aria-modal>
+      {profileGateOpen && typeof document !== 'undefined'
+        ? createPortal(
+            <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" role="dialog" aria-modal>
           <button
             type="button"
             className="absolute inset-0 z-0 cursor-default"
@@ -9297,8 +9298,10 @@ export default function SocialFeed({
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
 
       <ProfileAvatarCropModal
         open={Boolean(profileGateAvatarCropFile)}

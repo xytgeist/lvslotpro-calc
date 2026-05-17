@@ -1183,7 +1183,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
       ) : null}
 
       {profileGateOpen ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/75" role="dialog" aria-modal>
+        <div className="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-black/75" role="dialog" aria-modal>
           <button
             type="button"
             className="absolute inset-0 z-0 cursor-default"
