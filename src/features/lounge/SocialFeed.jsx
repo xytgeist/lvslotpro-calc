@@ -323,6 +323,7 @@ export default function SocialFeed({
   const [profileGateAvatarPreview, setProfileGateAvatarPreview] = useState('')
   /** Raw pick before crop modal (Complete your profile). */
   const [profileGateAvatarCropFile, setProfileGateAvatarCropFile] = useState(null)
+  const profileGateAvatarInputRef = useRef(null)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [profileModalVisible, setProfileModalVisible] = useState(true)
   const profileModalVisibleRef = useRef(true)
@@ -6024,6 +6025,22 @@ export default function SocialFeed({
     [hydrateCommunityPosts, loungeReadOnly, onRequireAuth, supabaseClient]
   )
 
+  /** Open another member's profile from a post/comment row (`user_id` + optional `author_profile`). */
+  const openAuthorProfile = useCallback(
+    (entity) => {
+      const userId = entity?.user_id
+      if (!userId) return
+      if (openProfileGateIfNeeded()) return
+      void openProfileModal({
+        user_id: userId,
+        ...(entity?.author_profile && typeof entity.author_profile === 'object'
+          ? { author_profile: entity.author_profile }
+          : {}),
+      })
+    },
+    [openProfileGateIfNeeded, openProfileModal]
+  )
+
   const onLoungeDockOpenOwnProfile = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
       onRequireAuth?.('login')
@@ -6095,7 +6112,7 @@ export default function SocialFeed({
       openProfileGateIfNeeded,
       onOpenComments: openLoungePostDetail,
       onSharePost: handleShareLoungePost,
-      onAvatarClick: (p) => void openProfileModal(p),
+      onAvatarClick: openAuthorProfile,
       loungeViewerIsStaff,
       setLoungePostPinned,
       loungePinBusy,
@@ -6137,6 +6154,7 @@ export default function SocialFeed({
       requireLoungeAuth,
       openProfileGateIfNeeded,
       openLoungePostDetail,
+      openAuthorProfile,
       openProfileModal,
       handleShareLoungePost,
       loungeViewerIsStaff,
@@ -6975,7 +6993,7 @@ export default function SocialFeed({
                   onSharePost={handleShareLoungePost}
                   requireLoungeAuth={requireLoungeAuth}
                   openProfileGateIfNeeded={openProfileGateIfNeeded}
-                  onAvatarClick={(p) => void openProfileModal(p)}
+                  onAvatarClick={openAuthorProfile}
                   loungeViewerIsStaff={loungeViewerIsStaff}
                   setLoungePostPinned={setLoungePostPinned}
                   loungePinBusy={loungePinBusy}
@@ -7217,11 +7235,10 @@ export default function SocialFeed({
                   type="button"
                   id="lounge-detail-post-avatar"
                   ref={loungePostDetailPostAvatarRef}
-                  onClick={() => {
-                    const p = loungePostDetail
-                    void openProfileModal(p)
-                  }}
-                  className={LOUNGE_FEED_AVATAR_CLASS}
+                  onClick={() => openAuthorProfile(loungePostDetail)}
+                  className={`${LOUNGE_FEED_AVATAR_CLASS} touch-manipulation hover:border-zinc-600 [-webkit-tap-highlight-color:transparent]`}
+                  aria-label={`Open profile for ${displayNameFor(loungePostDetail)}`}
+                  title="View profile"
                 >
                   {loungePostDetail?.author_profile?.avatar_url ? (
                     <img
@@ -7246,11 +7263,8 @@ export default function SocialFeed({
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      const p = loungePostDetail
-                      void openProfileModal(p)
-                    }}
-                    className="block w-full min-w-0 text-left hover:text-cyan-300"
+                    onClick={() => openAuthorProfile(loungePostDetail)}
+                    className="block w-full min-w-0 text-left hover:text-cyan-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                   >
                     <div className={LOUNGE_FEED_POST_DETAIL_AUTHOR_BLOCK_CLASS}>
                       <div className={LOUNGE_FEED_META_ROW_CLASS}>
@@ -7954,11 +7968,7 @@ export default function SocialFeed({
                     onToggleCommentBookmark: toggleLoungeDetailCommentBookmark,
                     getCommentBookmarked: getLoungeDetailCommentBookmarked,
                     repostActionBusy: repostManageBusy,
-                    onAvatarClickProfile: (c) =>
-                      void openProfileModal({
-                        user_id: c.user_id,
-                        author_profile: c.author_profile,
-                      }),
+                    onAvatarClickProfile: openAuthorProfile,
                     positionScrollRootRef: loungePostDetailScrollRef,
                     onCommentMenuEdit: onCommentMenuEditFromDetail,
                     onCommentMenuDelete: deleteLoungeDetailComment,
@@ -8046,12 +8056,7 @@ export default function SocialFeed({
                               ? drillDeeperIntoLoungeComment
                               : openLoungeCommentDrillFromRoots
                           }
-                          onAvatarClickProfile={(c) =>
-                            void openProfileModal({
-                              user_id: c.user_id,
-                              author_profile: c.author_profile,
-                            })
-                          }
+                          onAvatarClickProfile={openAuthorProfile}
                           positionScrollRootRef={loungePostDetailScrollRef}
                           onCommentMenuEdit={onCommentMenuEditFromDetail}
                           onCommentMenuDelete={deleteLoungeDetailComment}
@@ -9169,11 +9174,12 @@ export default function SocialFeed({
                 : 'Pick a handle and display name for Lounge posts.'}
             </div>
             <div className="mt-4 space-y-3">
-            <label className="block">
+            <div className="block">
               <span className="text-zinc-400 text-[13px] font-semibold uppercase tracking-wide">Profile photo</span>
               <div className="mt-1 flex items-center gap-3">
-                <label className="relative h-[3.3rem] w-[3.3rem] shrink-0 cursor-pointer overflow-hidden rounded-full border border-zinc-700 bg-zinc-950 grid place-items-center">
-                  {profileGateAvatarPreview ? (
+                <div className="relative shrink-0">
+                  <div className="flex h-[3.3rem] w-[3.3rem] overflow-hidden rounded-full border border-zinc-700 bg-zinc-950 text-[13px] font-bold text-zinc-200">
+                    {profileGateAvatarPreview ? (
                     <img
                       src={profileGateAvatarPreview}
                       alt=""
@@ -9190,25 +9196,9 @@ export default function SocialFeed({
                       {profileAvatarInitials(profileGateDisplayName, profileGateHandle)}
                     </span>
                   )}
-                  <span
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                    aria-hidden
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-1/2 w-1/2 text-cyan-400"
-                      fill="none"
-                      aria-hidden
-                    >
-                      <path
-                        d="M12 4v16M4 12h16"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
+                  </div>
                   <input
+                    ref={profileGateAvatarInputRef}
                     type="file"
                     accept="image/*"
                     className="hidden"
@@ -9229,9 +9219,17 @@ export default function SocialFeed({
                       setProfileGateAvatarCropFile(file)
                     }}
                   />
-                </label>
+                  <button
+                    type="button"
+                    onClick={() => profileGateAvatarInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 z-10 rounded-full border border-zinc-600/90 bg-zinc-950/95 px-2 py-0.5 text-[10px] font-semibold leading-tight text-zinc-200 shadow-md hover:bg-zinc-900 touch-manipulation sm:px-2.5 sm:py-1 sm:text-[11px] [-webkit-tap-highlight-color:transparent]"
+                    aria-label="Change profile photo"
+                  >
+                    Photo
+                  </button>
+                </div>
               </div>
-            </label>
+            </div>
               <label className="block">
                 <span className="text-zinc-400 text-[13px] font-semibold uppercase tracking-wide">Display name</span>
                 <input

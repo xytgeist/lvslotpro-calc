@@ -134,6 +134,8 @@ export default function LoungePostArticle({
   const onAvatar = (e) => {
     e.stopPropagation()
     if (suppressAvatarProfileNavigation && profileOwnerUserId && post.user_id === profileOwnerUserId) return
+    if (openProfileGateIfNeeded?.()) return
+    if (typeof onAvatarClick !== 'function') return
     onAvatarClick(post)
   }
 

@@ -200,6 +200,7 @@ export function LoungeCommentCard({
         type="button"
         onClick={(e) => {
           e.stopPropagation()
+          if (openProfileGateIfNeeded?.()) return
           onAvatarClickProfile?.(comment)
         }}
         className={`${LOUNGE_FEED_POST_DETAIL_COMMENT_AVATAR_CLASS} flex items-center justify-center touch-manipulation hover:border-zinc-600 [-webkit-tap-highlight-color:transparent]`}

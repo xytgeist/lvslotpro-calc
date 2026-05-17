@@ -958,7 +958,7 @@ export default function LoungeProfileFullScreen({
   )
 
   return (
-    <div className="fixed inset-0 z-[97] sm:bg-black/85" role="dialog" aria-modal="true" aria-label="Profile">
+    <div className="fixed inset-0 z-[99] sm:bg-black/85" role="dialog" aria-modal="true" aria-label="Profile">
       <button
         type="button"
         className="absolute inset-0 z-0 hidden cursor-default sm:block"
