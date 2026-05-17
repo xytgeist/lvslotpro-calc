@@ -643,10 +643,9 @@ export default function SocialFeed({
     const nextTop = Math.max(0, sc.scrollTop + (elRect.top - scRect.top) - barH)
     sc.scrollTo({ top: nextTop, behavior: 'auto' })
     loungePostDetailScrollPrevTopRef.current = nextTop
-    const maxScroll = sc.scrollHeight - sc.clientHeight
-    const reveal = maxScroll > 8 ? 1 - Math.min(1, Math.max(0, nextTop) / maxScroll) : 1
-    loungePostDetailTitleRevealRef.current = reveal
-    setLoungePostDetailTitleReveal(reveal)
+    // Always keep the title bar (back button) visible when landing on a focused comment.
+    loungePostDetailTitleRevealRef.current = 1
+    setLoungePostDetailTitleReveal(1)
     // Flash the focused comment so it's unmissable even when the list is too short to scroll.
     el.classList.remove('lounge-focus-flash')
     requestAnimationFrame(() => {
