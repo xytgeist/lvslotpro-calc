@@ -26,7 +26,7 @@ function ShieldIcon({ className }) {
 const STAFF_BADGE_LAYOUT = {
   feed: {
     wrap: 'translate-y-[0.5px]',
-    crown: '-translate-y-[2px]',
+    crown: 'translate-y-0',
     shield: '-translate-y-[2px]',
     modInner: 'translate-y-0',
   },
