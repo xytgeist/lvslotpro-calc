@@ -71,6 +71,12 @@ export function loungeFeedAuthorHasStaffBadge(role) {
   return r === 'admin' || r === 'moderator'
 }
 
+/**
+ * Meta column beside ⋯ menu — avoid `overflow-hidden` here; feed badges use
+ * negative translate-Y and get a dark clip line against the row background.
+ */
+export const LOUNGE_FEED_META_TEXT_COLUMN_CLASS = 'min-w-0 text-left'
+
 /** Staff / OG icons — slight lift vs display name on the meta row. */
 export const LOUNGE_FEED_META_BADGE_WRAP_CLASS = 'shrink-0 -translate-y-px'
 

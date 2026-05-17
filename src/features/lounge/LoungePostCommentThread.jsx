@@ -28,6 +28,7 @@ import {
   LOUNGE_FEED_DISPLAY_NAME_CLASS,
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
   LOUNGE_FEED_META_ROW_CLASS,
+  LOUNGE_FEED_META_TEXT_COLUMN_CLASS,
   LOUNGE_FEED_POST_DETAIL_COMMENT_AVATAR_CLASS,
   LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS,
   LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS,
@@ -229,7 +230,7 @@ export function LoungeCommentCard({
       </button>
       <div className="min-w-0 flex-1">
         <div className="relative min-w-0">
-          <div className={`min-w-0 overflow-hidden text-left ${showCommentMenu ? 'pr-7' : ''}`}>
+          <div className={`${LOUNGE_FEED_META_TEXT_COLUMN_CLASS} ${showCommentMenu ? 'pr-7' : ''}`}>
             <div className={LOUNGE_FEED_META_ROW_CLASS}>
               <LoungeFeedAuthorMetaBadges
                 role={profile?.role}

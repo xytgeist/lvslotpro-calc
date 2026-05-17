@@ -16,6 +16,7 @@ import {
   LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS,
   LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS,
   LOUNGE_FEED_META_ROW_CLASS,
+  LOUNGE_FEED_META_TEXT_COLUMN_CLASS,
   LOUNGE_FEED_POST_INTERACTIONS_CLASS,
   LOUNGE_FEED_POST_ROW_INNER_CLASS,
   LOUNGE_FEED_POST_CARD_MENU_ANCHOR_CLASS,
@@ -190,7 +191,7 @@ export default function LoungePostArticle({
       <div className="min-w-0 flex-1">
         <div className="relative min-w-0">
           <div
-            className={`min-w-0 overflow-hidden text-left ${showPostRowMenu ? 'pr-7' : ''}`}
+            className={`${LOUNGE_FEED_META_TEXT_COLUMN_CLASS} ${showPostRowMenu ? 'pr-7' : ''}`}
           >
             <div className={LOUNGE_FEED_META_ROW_CLASS}>
           <LoungeFeedAuthorMetaBadges
