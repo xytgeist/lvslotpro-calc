@@ -296,7 +296,7 @@ export default function AppShell({
     (nextScope) => {
       if (nextScope !== LOUNGE_FEED_SCOPE_ALL && nextScope !== LOUNGE_FEED_SCOPE_FOLLOWING) return
       if (nextScope === LOUNGE_FEED_SCOPE_FOLLOWING && browseMode === 'anonymous') {
-        onRequireAuth?.('login')
+        onRequireAuth?.()
         return
       }
       setLoungeFeedScope(nextScope)
@@ -394,7 +394,7 @@ export default function AppShell({
         : []
       if (targetTab === 'offers') {
         if (browseMode === 'anonymous') {
-          onRequireAuthRef.current?.('login')
+          onRequireAuthRef.current?.()
         } else {
           setTab('offers')
         }
@@ -402,7 +402,7 @@ export default function AppShell({
       if (targetEventId && !targetEventIds.includes(targetEventId)) targetEventIds.unshift(targetEventId)
       if (targetEventIds.length > 0) {
         if (browseMode === 'anonymous') {
-          onRequireAuthRef.current?.('login')
+          onRequireAuthRef.current?.()
         } else {
           setPendingOfferEventIds(targetEventIds)
         }
@@ -423,7 +423,7 @@ export default function AppShell({
     const handleServiceWorkerMessage = (event) => {
       if (event?.data?.type !== 'offers-open-tab') return
       if (browseMode === 'anonymous') {
-        onRequireAuthRef.current?.('login')
+        onRequireAuthRef.current?.()
         return
       }
       setTab('offers')
@@ -434,7 +434,7 @@ export default function AppShell({
 
   const openCalculator = (key) => {
     if (browseMode === 'anonymous') {
-      onRequireAuth?.('login')
+      onRequireAuth?.()
       setMenuOpen(false)
       return
     }
@@ -467,7 +467,7 @@ export default function AppShell({
           title={showLock ? 'Subscribe to unlock full access here' : undefined}
           onClick={() => {
             if (browseMode === 'anonymous' && item.id !== 'home') {
-              onRequireAuth?.('login')
+              onRequireAuth?.()
               setMenuOpen(false)
               return
             }

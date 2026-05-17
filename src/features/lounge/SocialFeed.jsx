@@ -564,7 +564,7 @@ export default function SocialFeed({
   }, [composerUserId, composerAuthUser, loungeReadOnly, composerUserProfile])
 
   const requireLoungeAuth = useCallback(() => {
-    onRequireAuth?.('login')
+    onRequireAuth?.()
   }, [onRequireAuth])
 
   useEffect(() => {
@@ -2541,7 +2541,7 @@ export default function SocialFeed({
           data: { session },
         } = await supabaseClient.auth.getSession()
         if (!session?.user) {
-          onRequireAuth?.('login')
+          onRequireAuth?.()
           return
         }
         const { data: ownProfile, error: profileErr } = await fetchOwnProfile(supabaseClient, session.user.id)
@@ -2697,7 +2697,7 @@ export default function SocialFeed({
         data: { session },
       } = await supabaseClient.auth.getSession()
       if (!session?.user) {
-        onRequireAuth?.('login')
+        onRequireAuth?.()
         return
       }
       const { data: ownProfile, error: profileErr } = await fetchOwnProfile(supabaseClient, session.user.id)
@@ -3574,7 +3574,7 @@ export default function SocialFeed({
     (post, opts) => {
       if (!post?.id) return
       if (loungeReadOnly && !opts?.fromPublicLink) {
-        onRequireAuth?.('login')
+        onRequireAuth?.()
         return
       }
       try {
@@ -3696,7 +3696,7 @@ export default function SocialFeed({
 
   const onLoungeDockSettings = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
-      onRequireAuth?.('login')
+      onRequireAuth?.()
       return
     }
     setLoungeDockPanel((p) => (p === 'settings' ? null : 'settings'))
@@ -3704,7 +3704,7 @@ export default function SocialFeed({
 
   const onLoungeDockCompose = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
-      onRequireAuth?.('login')
+      onRequireAuth?.()
       return
     }
     /** Dismiss z-stacked chrome synchronously so the caption is focusable in the same user gesture (iOS keyboard). */
@@ -3746,7 +3746,7 @@ export default function SocialFeed({
 
   const onLoungeFollowingFilterToggle = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous') {
-      onRequireAuth?.('login')
+      onRequireAuth?.()
       return
     }
     const next =
@@ -4108,7 +4108,7 @@ export default function SocialFeed({
         data: { session },
       } = await supabaseClient.auth.getSession()
       if (!session?.user) {
-        onRequireAuth?.('login')
+        onRequireAuth?.()
         setLoungeDetailEditErr('You must be signed in.')
         return
       }
@@ -5724,7 +5724,7 @@ export default function SocialFeed({
       } = await supabaseClient.auth.getSession()
       if (!session?.user) {
         setPostErr('You must be signed in to post in Lounge.')
-        onRequireAuth?.('login')
+        onRequireAuth?.()
         return
       }
 
@@ -5851,7 +5851,7 @@ export default function SocialFeed({
       if (!session?.user) {
         setProfileGateAvatarCropFile(null)
         setProfileGateOpen(false)
-        onRequireAuth?.('login')
+        onRequireAuth?.()
         return
       }
       let avatarUrl
@@ -5940,7 +5940,7 @@ export default function SocialFeed({
   const openProfileModal = useCallback(
     async (post) => {
       if (loungeReadOnly) {
-        onRequireAuth?.('login')
+        onRequireAuth?.()
         return
       }
       const userId = post?.user_id
@@ -6046,7 +6046,7 @@ export default function SocialFeed({
 
   const onLoungeDockOpenOwnProfile = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
-      onRequireAuth?.('login')
+      onRequireAuth?.()
       return
     }
     if (!composerUserId) return
