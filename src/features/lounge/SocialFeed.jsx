@@ -336,6 +336,8 @@ export default function SocialFeed({
   const [profileModalErr, setProfileModalErr] = useState('')
   const [profileModalData, setProfileModalData] = useState(null)
   const [profileModalPosts, setProfileModalPosts] = useState([])
+  /** Scroll-linked FAB reveal while profile sheet is open. */
+  const [loungeProfileDockReveal, setLoungeProfileDockReveal] = useState(1)
   const [interactionByPost, setInteractionByPost] = useState({})
   const [bookmarkedByPost, setBookmarkedByPost] = useState({})
   const interactionByPostRef = useRef(interactionByPost)
@@ -5906,6 +5908,7 @@ export default function SocialFeed({
     setProfileModalPosts([])
     setProfileModalErr('')
     setProfileModalVisible(true)
+    setLoungeProfileDockReveal(1)
   }, [])
 
   const closeProfileModal = useCallback(() => {
@@ -6180,8 +6183,7 @@ export default function SocialFeed({
     getLoungeStreamLightboxOpen,
     () => false,
   )
-  const showLoungeViewportDock =
-    !loungePostDetail && !profileModalOpen && !loungeStreamLightboxOpen
+  const showLoungeViewportDock = !loungePostDetail && !loungeStreamLightboxOpen
   const loungeTitleBarChromePx = loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56
   /** Scroll inset for the opaque dock icon row only. Outer column uses `pb-0`; home-indicator inset lives in feed bottom padding + scroll content. */
   const loungeDockFeedContentInsetPx = showLoungeViewportDock
@@ -6311,7 +6313,13 @@ export default function SocialFeed({
         <LoungeDockArcCarouselPrototype
           items={loungeDockWheelItems}
           cornerLItems={loungeDockCornerLItems}
-          reveal={loungeDockPanel ? loungePanelTitleReveal : loungeTitleReveal}
+          reveal={
+            profileModalOpen
+              ? loungeProfileDockReveal
+              : loungeDockPanel
+                ? loungePanelTitleReveal
+                : loungeTitleReveal
+          }
           panelChrome={loungeDockPanel}
           menuLayout={loungeDockMenuLayout}
           bottomObstacleInsetPx={loungeDockFabBottomObstaclePx}
@@ -7038,7 +7046,9 @@ export default function SocialFeed({
 
       {loungePostDetail ? (
         <div
-          className="fixed inset-0 z-[98] sm:bg-black/55 sm:backdrop-blur-[2px]"
+          className={`fixed inset-0 sm:bg-black/55 sm:backdrop-blur-[2px] ${
+            profileModalOpen ? 'z-[100]' : 'z-[98]'
+          }`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="lounge-post-detail-title"
@@ -8595,6 +8605,7 @@ export default function SocialFeed({
           }}
           onOpenChatWithUser={openChatWithUserFromProfile}
           viewerCanUseLoungeChat={viewerCanUseLoungeChat}
+          onDockRevealChange={setLoungeProfileDockReveal}
         />
       ) : null}
 

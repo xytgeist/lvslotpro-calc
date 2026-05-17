@@ -34,6 +34,7 @@ import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
+import { LOUNGE_DOCK_FAB_SIZE_PX } from '../../utils/loungeDockFabPosition.js'
 
 const PROFILE_TAB_IDS = ['posts', 'replies', 'likes', 'bookmarks']
 
@@ -75,7 +76,7 @@ function ProfileReplyRow({ item, profile, postCardProps, onOpenProfileReply, pro
 
   return (
     <article
-      className={LOUNGE_FEED_POST_ROW_CLASS}
+      className={`${LOUNGE_FEED_POST_ROW_CLASS} cursor-pointer`}
       onClick={(e) => {
         const t = e.target
         if (!(t instanceof Element)) return
@@ -210,6 +211,8 @@ export default function LoungeProfileFullScreen({
   onOpenChatWithUser = null,
   /** Viewer has handle + display and can call chat Edge actions. */
   viewerCanUseLoungeChat = false,
+  /** Scroll-linked FAB reveal while profile is open (arc carousel dock). */
+  onDockRevealChange = null,
 }) {
   const [tab, setTab] = useState('posts')
   const [interactionPosts, setInteractionPosts] = useState([])
@@ -259,6 +262,8 @@ export default function LoungeProfileFullScreen({
   const profileTabsVisible = isOwnProfile ? PROFILE_TAB_IDS : PROFILE_TAB_IDS.slice(0, 2)
   const profileTabBtnClass =
     profileTabsVisible.length > 2 ? 'min-h-11 px-1 text-[13px]' : 'min-h-11 px-2 text-[15px]'
+  const profileFabBottomPadPx =
+    shellDock && !showOwnEditControls ? LOUNGE_DOCK_FAB_SIZE_PX + 28 : 0
 
   /** Drop rows from Likes/Bookmarks lists after successful unlike / un-bookmark on that tab. */
   const postCardPropsForLists = useMemo(() => {
@@ -647,14 +652,15 @@ export default function LoungeProfileFullScreen({
     if (!open || !panelVisible) return
     profileDockRevealRef.current = 1
     setProfileDockReveal(1)
+    onDockRevealChange?.(1)
     const el = profileBodyScrollRef.current
     if (el) profileDockScrollPrevTopRef.current = el.scrollTop
-  }, [open, panelVisible])
+  }, [open, panelVisible, onDockRevealChange])
 
   useEffect(() => {
     const el = profileBodyScrollRef.current
     if (!el || typeof window === 'undefined') return
-    if (!shellDock || showOwnEditControls || !open || !panelVisible) return
+    if ((!shellDock && !onDockRevealChange) || showOwnEditControls || !open || !panelVisible) return
     profileDockScrollPrevTopRef.current = el.scrollTop
     const titleRevealPerScrollPx = 220
     const titleHidePerScrollPx = 190
@@ -664,7 +670,9 @@ export default function LoungeProfileFullScreen({
       if (profileDockScrollRafRef.current) return
       profileDockScrollRafRef.current = window.requestAnimationFrame(() => {
         profileDockScrollRafRef.current = 0
-        setProfileDockReveal(profileDockRevealRef.current)
+        const r = profileDockRevealRef.current
+        setProfileDockReveal(r)
+        onDockRevealChange?.(r)
       })
     }
     const onScroll = () => {
@@ -692,7 +700,7 @@ export default function LoungeProfileFullScreen({
       el.removeEventListener('scroll', onScroll)
       if (profileDockScrollRafRef.current) window.cancelAnimationFrame(profileDockScrollRafRef.current)
     }
-  }, [shellDock, showOwnEditControls, open, panelVisible])
+  }, [shellDock, onDockRevealChange, showOwnEditControls, open, panelVisible])
 
   const toggleFollow = async () => {
     if (!viewerUserId || !profileUserId || isOwnProfile || socialBusy) return
@@ -985,7 +993,16 @@ export default function LoungeProfileFullScreen({
           className={
             showOwnEditControls
               ? 'min-h-0 flex-1 overflow-hidden overscroll-y-none pb-[max(0.5rem,env(safe-area-inset-bottom))]'
-              : 'min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+              : 'min-h-0 flex-1 overflow-y-auto overscroll-y-contain'
+          }
+          style={
+            showOwnEditControls
+              ? undefined
+              : {
+                  paddingBottom: `max(${
+                    profileFabBottomPadPx > 0 ? `${profileFabBottomPadPx}px` : '0.5rem'
+                  }, env(safe-area-inset-bottom))`,
+                }
           }
         >
           {/* Banner; ⋯ in corner (edit mode: sheet does not scroll, so absolute only). */}
@@ -1313,7 +1330,7 @@ export default function LoungeProfileFullScreen({
                     <article
                       key={post.id}
                       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
-                      className={LOUNGE_FEED_POST_ROW_CLASS}
+                      className={`${LOUNGE_FEED_POST_ROW_CLASS} cursor-pointer`}
                       onClick={(e) => {
                         const t = e.target
                         if (!(t instanceof Element)) return
@@ -1382,7 +1399,7 @@ export default function LoungeProfileFullScreen({
                     <article
                       key={post.id}
                       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
-                      className={LOUNGE_FEED_POST_ROW_CLASS}
+                      className={`${LOUNGE_FEED_POST_ROW_CLASS} cursor-pointer`}
                       onClick={(e) => {
                         const t = e.target
                         if (!(t instanceof Element)) return

@@ -98,6 +98,7 @@ export function loungeDockLShapeStepPx() {
 /**
  * Snap FAB to bottom-left or bottom-right corner (vertex of the L).
  * @param {boolean} alignLeft — `true` → bottom-left, `false` → bottom-right
+ * @param {{ raised?: boolean }} [options] — `raised: true` moves FAB up one L step (avoids iOS edge long-press).
  */
 export function loungeDockFabCornerPosition(
   viewportW,
@@ -105,17 +106,22 @@ export function loungeDockFabCornerPosition(
   fabSize,
   alignLeft,
   bottomObstaclePx = 0,
+  options = {},
 ) {
   const b = loungeDockFabMoveBounds(viewportW, viewportH, fabSize, bottomObstaclePx)
+  const raised = Boolean(options?.raised)
+  const stepUp = raised ? loungeDockLShapeStepPx() : 0
   return {
     left: alignLeft ? b.minLeft : b.maxLeft,
-    top: b.maxTop,
+    top: b.maxTop - stepUp,
   }
 }
 
+/** First N dock items in Edge (L) order sit on the vertical leg (up from FAB). */
+export const LOUNGE_DOCK_L_VERTICAL_ITEM_COUNT = 3
+
 /**
- * Horizontal offset for home in Edge (L) mode (index 0 on the bottom leg).
- * Use in Wheel (O) compact chrome so the home chip matches L spacing from the FAB; full wheel uses ring radius instead.
+ * Horizontal offset for home beside the FAB (one L step) — Wheel (O) panel chrome when menu is collapsed.
  */
 export function loungeDockWheelCompactHomeOffset(fabCenterX, viewportW) {
   const alignLeft = fabCenterX < viewportW / 2
@@ -123,24 +129,33 @@ export function loungeDockWheelCompactHomeOffset(fabCenterX, viewportW) {
   return { x: alignLeft ? step : -step, y: 0, onScreen: true }
 }
 
+/** Edge (L) panel chrome: home one step above the FAB (first vertical slot). */
+export function loungeDockCornerLCompactHomeOffset() {
+  const step = loungeDockLShapeStepPx()
+  return { x: 0, y: -step, onScreen: true }
+}
+
 /**
- * L-shaped offsets from FAB center: first ⌈n/2⌉ items along bottom (into the screen),
- * rest along the vertical edge (up). Left corner: bottom goes +x; right corner: bottom goes −x.
+ * L-shaped offsets from FAB center. Item order must be:
+ * vertical leg (up): home → compose → following;
+ * bottom leg (down one step, then along the edge): search under the FAB, then notifications → chat → settings.
+ * Right corner: bottom leg runs −x; left corner: bottom leg runs +x.
  * @returns {{ x: number, y: number, onScreen: boolean }[]}
  */
 export function loungeDockLShapeOffsets(itemCount, alignLeft) {
   if (itemCount <= 0) return []
   const step = loungeDockLShapeStepPx()
-  const nBottom = Math.ceil(itemCount / 2)
+  const nVertical = Math.min(LOUNGE_DOCK_L_VERTICAL_ITEM_COUNT, itemCount)
+  const bottomY = step
   const out = []
   for (let i = 0; i < itemCount; i += 1) {
-    if (i < nBottom) {
+    if (i < nVertical) {
       const k = i + 1
-      const x = alignLeft ? k * step : -k * step
-      out.push({ x, y: 0, onScreen: true })
+      out.push({ x: 0, y: -k * step, onScreen: true })
     } else {
-      const j = i - nBottom + 1
-      out.push({ x: 0, y: -j * step, onScreen: true })
+      const k = i - nVertical + 1
+      const x = k === 1 ? 0 : alignLeft ? (k - 1) * step : -(k - 1) * step
+      out.push({ x, y: bottomY, onScreen: true })
     }
   }
   return out

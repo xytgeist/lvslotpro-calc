@@ -206,11 +206,10 @@ export function buildLoungeDockArcCarouselItems({
   /**
    * Wheel (O) and Edge (L) use different source orderings; `LoungeDockArcCarouselPrototype` picks by `menuLayout`.
    * Wheel: home at anchor; compose→…→notifications on the ring.
-   * Edge L (`loungeDockLShapeOffsets`): first ⌈n/2⌉ along bottom (inside→out), rest up the side — classic bottom leg
-   * **home → notifications → chat → search**, vertical leg **compose → following → settings**.
+   * Edge L (`loungeDockLShapeOffsets`): up **home → compose → following**; along bottom (search under +) **search → notifications → chat → settings**.
    */
   return {
     wheelItems: [home, compose, following, settings, search, chat, notifications],
-    cornerLItems: [home, notifications, chat, search, compose, following, settings],
+    cornerLItems: [home, compose, following, search, notifications, chat, settings],
   }
 }

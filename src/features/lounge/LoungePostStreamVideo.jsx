@@ -5,6 +5,7 @@ import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx
 import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
 import { releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 import { notifyLoungeStreamLightboxOpen } from './loungeStreamLightboxRegistry.js'
+import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 
 /** Keep in sync with `imgClassByVariant` in `LoungePostFeedMedia.jsx` (same caps; media sets frame width via w-auto). */
 const videoClassByVariant = {
@@ -217,6 +218,10 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
 }
 
 function LoungeStreamVideoLightbox({ uid, onClose, footer }) {
+  const { swipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
+    onClose,
+    className: 'relative flex min-h-0 flex-1 flex-col',
+  })
   const videoRef = useRef(null)
   const recoveryBurstRef = useRef(0)
   const [attachKey, setAttachKey] = useState(0)
@@ -286,7 +291,7 @@ function LoungeStreamVideoLightbox({ uid, onClose, footer }) {
       aria-label="Full screen video"
       onClick={onClose}
     >
-      <div className="flex shrink-0 justify-end">
+      <div className="flex shrink-0 justify-end" data-lounge-lightbox-no-swipe>
         <button
           type="button"
           onClick={(e) => {
@@ -298,10 +303,8 @@ function LoungeStreamVideoLightbox({ uid, onClose, footer }) {
           Close
         </button>
       </div>
-      <div
-        className="relative flex min-h-0 flex-1 items-center justify-center p-2"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div onClick={(e) => e.stopPropagation()} {...swipeSurfaceProps}>
+      <div className="relative flex min-h-0 flex-1 items-center justify-center p-2">
         <video
           ref={videoRef}
           className="max-h-full max-w-full object-contain"
@@ -346,6 +349,7 @@ function LoungeStreamVideoLightbox({ uid, onClose, footer }) {
           {footer}
         </div>
       ) : null}
+      </div>
     </div>,
     document.body,
   )

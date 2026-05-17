@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
+import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 import { createPortal } from 'react-dom'
 
 function normalizeUrlList(urls) {
@@ -40,6 +41,22 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose, foot
     setIdx((i) => (list.length <= 1 ? i : i >= list.length - 1 ? 0 : i + 1))
   }, [list.length])
 
+  const multi = list.length > 1
+
+  const onSwipeHorizontal = useCallback(
+    (dir) => {
+      if (dir > 0) goNext()
+      else goPrev()
+    },
+    [goNext, goPrev],
+  )
+
+  const { swipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
+    onClose,
+    onSwipeHorizontal: multi ? onSwipeHorizontal : undefined,
+    className: 'relative flex min-h-0 flex-1 flex-col',
+  })
+
   useEffect(() => {
     if (!current) return
     const prev = document.body.style.overflow
@@ -66,8 +83,6 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose, foot
 
   if (!current) return null
 
-  const multi = list.length > 1
-
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex flex-col bg-black/75 backdrop-blur-[2px] p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]"
@@ -76,7 +91,7 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose, foot
       aria-label={multi ? `Image ${idx + 1} of ${list.length}` : 'Full image'}
       onClick={onClose}
     >
-      <div className="flex shrink-0 justify-end">
+      <div className="flex shrink-0 justify-end" data-lounge-lightbox-no-swipe>
         <button
           type="button"
           onClick={(e) => {
@@ -88,10 +103,8 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose, foot
           Close
         </button>
       </div>
-      <div
-        className="relative flex min-h-0 flex-1 items-center justify-center p-2"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div onClick={(e) => e.stopPropagation()} {...swipeSurfaceProps}>
+      <div className="relative flex min-h-0 flex-1 items-center justify-center p-2">
         {multi ? (
           <>
             <button
@@ -142,6 +155,7 @@ export function LoungeImageLightbox({ url, urls, initialIndex = 0, onClose, foot
           {footer}
         </div>
       ) : null}
+      </div>
     </div>,
     document.body
   )

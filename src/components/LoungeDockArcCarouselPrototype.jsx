@@ -13,6 +13,7 @@ import {
   loungeDockFabPositionFromPct,
   loungeDockLShapeOffsets,
   loungeDockViewportSize,
+  loungeDockCornerLCompactHomeOffset,
   loungeDockWheelCompactHomeOffset,
   loungeDockWheelLayout,
   readLoungeDockFabPrefs,
@@ -46,6 +47,11 @@ const REPOSITION_POINTER_GUARD_MS = 1000
 const FAB_REPOSITION_LONG_PRESS_MS = 450
 /** Backdrop: past this movement = pan/scroll (close menu, release capture); below = tap (close only, block click-through). */
 const BACKDROP_PAN_THRESHOLD_PX = 12
+/** Scroll-hide: below this `reveal` the FAB is treated as gone (no idle dim). */
+const FAB_REVEAL_VISIBLE = 0.12
+/** Visible FAB dims to half opacity after this long without interaction. */
+const FAB_IDLE_DIM_MS = 3000
+const FAB_IDLE_DIM_OPACITY = 0.5
 
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n))
@@ -124,9 +130,9 @@ function LoungeDockMenuLayoutCoachDiagrams() {
           viewBox="0 0 80 80"
           className="mx-auto aspect-square w-full max-w-[108px] text-lv-blue/85"
         >
-          {/* Bottom-left corner L: vertical leg up the left, horizontal leg along the bottom — FAB at the inner corner. */}
+          {/* Bottom-left corner L: up home→compose→following; down+along bottom search (under +) → … → settings. */}
           <path
-            d="M 22 20 V 56 H 62"
+            d="M 22 12 V 40 H 68 V 52"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.35"
@@ -135,15 +141,17 @@ function LoungeDockMenuLayoutCoachDiagrams() {
             strokeDasharray="3 3"
             opacity="0.5"
           />
-          <circle cx="22" cy="32" r="3.6" fill="currentColor" opacity="0.55" />
-          <circle cx="22" cy="44" r="3.6" fill="currentColor" opacity="0.55" />
-          <circle cx="36" cy="56" r="3.6" fill="currentColor" opacity="0.55" />
-          <circle cx="48" cy="56" r="3.6" fill="currentColor" opacity="0.55" />
-          <circle cx="58" cy="56" r="3.6" fill="currentColor" opacity="0.55" />
-          <circle cx="22" cy="56" r="9" fill="#057698" stroke="#06cefc" strokeWidth="1" />
+          <circle cx="22" cy="34" r="3.6" fill="currentColor" opacity="0.55" />
+          <circle cx="22" cy="24" r="3.6" fill="currentColor" opacity="0.55" />
+          <circle cx="22" cy="14" r="3.6" fill="currentColor" opacity="0.55" />
+          <circle cx="22" cy="52" r="3.6" fill="currentColor" opacity="0.55" />
+          <circle cx="34" cy="52" r="3.6" fill="currentColor" opacity="0.55" />
+          <circle cx="46" cy="52" r="3.6" fill="currentColor" opacity="0.55" />
+          <circle cx="58" cy="52" r="3.6" fill="currentColor" opacity="0.55" />
+          <circle cx="22" cy="40" r="9" fill="#057698" stroke="#06cefc" strokeWidth="1" />
           <text
             x="22"
-            y="56"
+            y="40"
             textAnchor="middle"
             dominantBaseline="central"
             fontSize="13"
@@ -212,6 +220,16 @@ export default function LoungeDockArcCarouselPrototype({
   const repositioningRef = useRef(false)
   const longPressTimerRef = useRef(0)
   const longPressArmedRef = useRef(false)
+  const longPressRafRef = useRef(0)
+  const longPressStartedAtRef = useRef(0)
+  const [fabLongPressProgress, setFabLongPressProgress] = useState(0)
+  /** Half-opacity rest state when visible but idle (not scroll-hidden). */
+  const [fabIdleDimmed, setFabIdleDimmed] = useState(false)
+  /** Brief scale pop when waking from idle dim. */
+  const [fabWakePop, setFabWakePop] = useState(false)
+  const fabIdleTimerRef = useRef(0)
+  const fabWakePopTimerRef = useRef(0)
+  const fabIdleDimmedRef = useRef(false)
   const openRef = useRef(false)
   const carouselRotationRef = useRef(0)
   const pointerGuardRef = useRef(false)
@@ -454,6 +472,7 @@ export default function LoungeDockArcCarouselPrototype({
       LOUNGE_DOCK_FAB_SIZE_PX,
       alignLeft,
       bottomObstaclePx,
+      { raised: true },
     )
     if (Math.abs(pos.left - cur.left) < 0.5 && Math.abs(pos.top - cur.top) < 0.5) return
     fabPosRef.current = pos
@@ -461,13 +480,39 @@ export default function LoungeDockArcCarouselPrototype({
     persistFabPrefs(pos)
   }, [isCornerL, viewport.width, viewport.height, bottomObstaclePx, persistFabPrefs])
 
+  const clearFabLongPressProgress = useCallback(() => {
+    if (longPressRafRef.current) {
+      cancelAnimationFrame(longPressRafRef.current)
+      longPressRafRef.current = 0
+    }
+    setFabLongPressProgress(0)
+  }, [])
+
+  const startFabLongPressProgress = useCallback(() => {
+    clearFabLongPressProgress()
+    longPressStartedAtRef.current = performance.now()
+    const tick = () => {
+      if (!longPressArmedRef.current) return
+      const elapsed = performance.now() - longPressStartedAtRef.current
+      const p = Math.min(1, elapsed / FAB_REPOSITION_LONG_PRESS_MS)
+      setFabLongPressProgress(p)
+      if (p < 1) {
+        longPressRafRef.current = requestAnimationFrame(tick)
+      } else {
+        longPressRafRef.current = 0
+      }
+    }
+    longPressRafRef.current = requestAnimationFrame(tick)
+  }, [clearFabLongPressProgress])
+
   const cancelFabLongPress = useCallback(() => {
     longPressArmedRef.current = false
     if (longPressTimerRef.current) {
       window.clearTimeout(longPressTimerRef.current)
       longPressTimerRef.current = 0
     }
-  }, [])
+    clearFabLongPressProgress()
+  }, [clearFabLongPressProgress])
 
   const endFabReposition = useCallback(() => {
     cancelFabLongPress()
@@ -475,13 +520,66 @@ export default function LoungeDockArcCarouselPrototype({
     setRepositioning(false)
   }, [cancelFabLongPress])
 
+  const clearFabIdleTimer = useCallback(() => {
+    if (fabIdleTimerRef.current) {
+      window.clearTimeout(fabIdleTimerRef.current)
+      fabIdleTimerRef.current = 0
+    }
+  }, [])
+
+  const armFabIdleTimer = useCallback(() => {
+    clearFabIdleTimer()
+    fabIdleTimerRef.current = window.setTimeout(() => {
+      fabIdleTimerRef.current = 0
+      setFabIdleDimmed(true)
+    }, FAB_IDLE_DIM_MS)
+  }, [clearFabIdleTimer])
+
+  const wakeFabFromIdle = useCallback(() => {
+    if (fabIdleDimmedRef.current) {
+      setFabWakePop(true)
+      if (fabWakePopTimerRef.current) window.clearTimeout(fabWakePopTimerRef.current)
+      fabWakePopTimerRef.current = window.setTimeout(() => {
+        fabWakePopTimerRef.current = 0
+        setFabWakePop(false)
+      }, 320)
+    }
+    setFabIdleDimmed(false)
+    armFabIdleTimer()
+  }, [armFabIdleTimer])
+
+  const fabVisible = reveal > FAB_REVEAL_VISIBLE
+  const fabScrollOpacity = clamp(reveal, 0, 1)
+  const fabDisplayOpacity =
+    fabScrollOpacity * (fabIdleDimmed && fabVisible && !open && !repositioning ? FAB_IDLE_DIM_OPACITY : 1)
+
+  useEffect(() => {
+    fabIdleDimmedRef.current = fabIdleDimmed
+  }, [fabIdleDimmed])
+
+  useEffect(() => {
+    if (!fabVisible || open || repositioning) {
+      clearFabIdleTimer()
+      setFabIdleDimmed(false)
+      setFabWakePop(false)
+      return undefined
+    }
+    /** Scroll / reveal changes count as activity — undim and restart the idle clock. */
+    setFabIdleDimmed(false)
+    armFabIdleTimer()
+    return clearFabIdleTimer
+  }, [fabVisible, open, repositioning, reveal, armFabIdleTimer, clearFabIdleTimer])
+
   useEffect(
     () => () => {
       if (pointerGuardTimerRef.current) window.clearTimeout(pointerGuardTimerRef.current)
       clearRepositionCapture()
       cancelFabLongPress()
+      clearFabLongPressProgress()
+      clearFabIdleTimer()
+      if (fabWakePopTimerRef.current) window.clearTimeout(fabWakePopTimerRef.current)
     },
-    [cancelFabLongPress, clearRepositionCapture],
+    [cancelFabLongPress, clearFabLongPressProgress, clearFabIdleTimer, clearRepositionCapture],
   )
 
   const snapCarouselToPicker = useCallback(
@@ -550,12 +648,9 @@ export default function LoungeDockArcCarouselPrototype({
   }, [open])
 
   useEffect(() => {
-    if (reveal > 0.12) return
+    if (reveal > FAB_REVEAL_VISIBLE) return
     setOpen(false)
   }, [reveal])
-
-  const fabVisible = reveal > 0.12
-  const fabOpacity = clamp(reveal, 0, 1)
 
   const clampFabPos = useCallback(
     (left, top) => loungeDockFabClampToBounds(left, top, fabMoveBounds),
@@ -574,6 +669,7 @@ export default function LoungeDockArcCarouselPrototype({
       LOUNGE_DOCK_FAB_SIZE_PX,
       alignLeft,
       bottomObstaclePx,
+      { raised: true },
     )
     fabPosRef.current = pos
     setFabPos(pos)
@@ -582,6 +678,7 @@ export default function LoungeDockArcCarouselPrototype({
   const onFabPointerDown = useCallback(
     (e) => {
       if (e.button !== 0) return
+      wakeFabFromIdle()
       fabDragRef.current = {
         pointerId: e.pointerId,
         startX: e.clientX,
@@ -592,17 +689,19 @@ export default function LoungeDockArcCarouselPrototype({
       }
       cancelFabLongPress()
       longPressArmedRef.current = true
+      startFabLongPressProgress()
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = 0
         if (!longPressArmedRef.current) return
         clearDocumentTextSelection()
+        setFabLongPressProgress(1)
         repositioningRef.current = true
         setRepositioning(true)
       }, FAB_REPOSITION_LONG_PRESS_MS)
       setFabSelectionLock(true)
       e.currentTarget.setPointerCapture(e.pointerId)
     },
-    [cancelFabLongPress],
+    [cancelFabLongPress, startFabLongPressProgress, wakeFabFromIdle],
   )
 
   const onFabPointerMove = useCallback(
@@ -690,6 +789,7 @@ export default function LoungeDockArcCarouselPrototype({
             LOUNGE_DOCK_FAB_SIZE_PX,
             alignLeft,
             bottomObstaclePx,
+            { raised: true },
           )
           fabPosRef.current = pos
           setFabPos(pos)
@@ -1023,8 +1123,8 @@ export default function LoungeDockArcCarouselPrototype({
   const renderMenuItem = (item, offset, {
     isFocused = false,
     offScreen = false,
-    /** Wheel + dock panel: smoother home slide between L-spacing and ring position. */
-    wheelPanelChromeHome = false,
+    /** Panel chrome: smoother home slide between compact side offset and full menu slot. */
+    panelChromeHomeAnim = false,
   } = {}) => {
     const wheelOpen = menuExpanded
     const compactChip = panelCompactChrome && !menuExpanded
@@ -1092,7 +1192,7 @@ export default function LoungeDockArcCarouselPrototype({
       } ${spinning ? 'cursor-grabbing' : ''} disabled:cursor-not-allowed ${glow.textIdle} ${
         spinning
           ? ''
-          : wheelPanelChromeHome || fadesWithReveal
+          : panelChromeHomeAnim || fadesWithReveal
             ? 'transition-[left,top,opacity] duration-300 ease-out'
             : 'transition-[left,top,opacity] duration-200 ease-out'
       }`}
@@ -1108,7 +1208,7 @@ export default function LoungeDockArcCarouselPrototype({
             : isFocused
               ? 44
               : 34,
-        opacity: fadesWithReveal ? fabOpacity : 1,
+        opacity: fadesWithReveal ? fabDisplayOpacity : 1,
         pointerEvents: fadesWithReveal && !fabVisible ? 'none' : undefined,
       }}
     >
@@ -1209,19 +1309,21 @@ export default function LoungeDockArcCarouselPrototype({
 
       <div
         ref={fabHostRef}
-        className={`pointer-events-none fixed overflow-visible transition-opacity duration-300 ease-out will-change-[opacity] ${
+        className={`pointer-events-none fixed overflow-visible transition-[opacity,transform] duration-300 ease-out will-change-[opacity,transform] ${
           isCornerL
-            ? 'z-[25] transition-[left,top] duration-300 ease-out'
+            ? 'z-[25] transition-[left,top,opacity,transform] duration-300 ease-out'
             : menuExpanded
               ? 'z-20'
               : 'z-[25]'
+        } ${fabIdleDimmed && fabVisible && !menuExpanded ? 'scale-[0.97]' : ''} ${
+          fabWakePop ? 'scale-100' : ''
         }`}
         style={{
           left: fabPos.left,
           top: fabPos.top,
           width: LOUNGE_DOCK_FAB_SIZE_PX,
           height: LOUNGE_DOCK_FAB_SIZE_PX,
-          opacity: fabOpacity,
+          opacity: fabDisplayOpacity,
         }}
       >
         <button
@@ -1249,18 +1351,66 @@ export default function LoungeDockArcCarouselPrototype({
           onContextMenu={(e) => {
             if (repositioning || fabSelectionLock) e.preventDefault()
           }}
-          className={`pointer-events-auto absolute inset-0 select-none rounded-full border-0 transition-[box-shadow,background-color,color] duration-300 ease-out [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] [-webkit-user-select:none] ${loungeDockFabCenterShadowClass(open)} ${
+          className={`pointer-events-auto absolute inset-0 select-none rounded-full border-0 transition-[box-shadow,background-color,color,transform] duration-300 ease-out [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] [-webkit-user-select:none] ${loungeDockFabCenterShadowClass(open)} ${
             open
               ? `${LOUNGE_DOCK_FAB_CENTER_GLOW.bgOpen} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text}`
               : `${LOUNGE_DOCK_FAB_CENTER_GLOW.bg} ${LOUNGE_DOCK_FAB_CENTER_GLOW.text}`
+          } ${
+            repositioning
+              ? 'scale-[1.06]'
+              : fabWakePop
+                ? 'scale-[1.05]'
+                : fabLongPressProgress > 0
+                  ? 'scale-[1.03]'
+                  : fabIdleDimmed && fabVisible && !open
+                    ? 'scale-[0.97]'
+                    : ''
           }`}
           style={{
             touchAction: 'none',
             pointerEvents: fabVisible ? 'auto' : 'none',
           }}
         >
+          {fabLongPressProgress > 0 && !open ? (
+            <span
+              className="pointer-events-none absolute inset-0 rounded-full"
+              aria-hidden
+            >
+              <svg
+                className="h-full w-full -rotate-90"
+                viewBox={`0 0 ${LOUNGE_DOCK_FAB_SIZE_PX} ${LOUNGE_DOCK_FAB_SIZE_PX}`}
+              >
+                <circle
+                  cx={LOUNGE_DOCK_FAB_SIZE_PX / 2}
+                  cy={LOUNGE_DOCK_FAB_SIZE_PX / 2}
+                  r={LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3}
+                  fill="none"
+                  stroke="rgba(6, 206, 252, 0.22)"
+                  strokeWidth="2.5"
+                />
+                <circle
+                  cx={LOUNGE_DOCK_FAB_SIZE_PX / 2}
+                  cy={LOUNGE_DOCK_FAB_SIZE_PX / 2}
+                  r={LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3}
+                  fill="none"
+                  stroke="#06cefc"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray={`${
+                    2 * Math.PI * (LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3) * fabLongPressProgress
+                  } ${2 * Math.PI * (LOUNGE_DOCK_FAB_SIZE_PX / 2 - 3)}`}
+                />
+              </svg>
+            </span>
+          ) : null}
+          {repositioning ? (
+            <span
+              className="pointer-events-none absolute -inset-1 rounded-full border-2 border-cyan-300/90 shadow-[0_0_14px_rgba(6,206,252,0.45)]"
+              aria-hidden
+            />
+          ) : null}
           <span
-            className={`pointer-events-none block select-none text-xl font-semibold leading-none text-black transition-transform duration-300 ${
+            className={`pointer-events-none relative z-[1] block select-none text-xl font-semibold leading-none text-black transition-transform duration-300 ${
               open ? 'rotate-45' : ''
             }`}
             aria-hidden
@@ -1274,14 +1424,16 @@ export default function LoungeDockArcCarouselPrototype({
         const i = dockItems.indexOf(item)
         let offset = wheelLayout.offsets[i] ?? { x: 0, y: 0, onScreen: true }
         const compactMenuClosed = panelCompactChrome && !menuExpanded
-        if (compactMenuClosed && !isCornerL && item.id === HOME_ITEM_ID) {
-          offset = loungeDockWheelCompactHomeOffset(fabCenterX, viewport.width)
+        if (compactMenuClosed && item.id === HOME_ITEM_ID) {
+          offset = isCornerL
+            ? loungeDockCornerLCompactHomeOffset()
+            : loungeDockWheelCompactHomeOffset(fabCenterX, viewport.width)
         }
         const isFocused = menuExpanded && spinEnabled && i === wheelLayout.focusedIndex
         const offScreen = menuExpanded && spinEnabled && !offset.onScreen
-        const wheelPanelChromeHome =
-          panelCompactChrome && !isCornerL && item.id === HOME_ITEM_ID
-        return renderMenuItem(item, offset, { isFocused, offScreen, wheelPanelChromeHome })
+        const panelChromeHomeAnim =
+          panelCompactChrome && item.id === HOME_ITEM_ID
+        return renderMenuItem(item, offset, { isFocused, offScreen, panelChromeHomeAnim })
       })}
 
       {repositionCoachOpen ? (
@@ -1307,15 +1459,17 @@ export default function LoungeDockArcCarouselPrototype({
                 Move the menu button
               </h2>
               <p className="mt-3 text-[15px] leading-relaxed text-zinc-300">
-                Press and hold the <span className="font-semibold text-cyan-200">+</span> button (about 1 second), then
-                drag it anywhere on the screen. Release to drop it where it&apos;s most comfortable.
+                Press and hold the <span className="font-semibold text-cyan-200">+</span> button until the ring
+                completes (about half a second), then drag it anywhere on the screen. Release to drop it where it&apos;s
+                most comfortable.
               </p>
               <p className="mt-3 text-[14px] leading-relaxed text-zinc-400">
                 <span className="font-semibold text-zinc-200">Wheel (O)</span> is the default — shortcuts form a ring around
                 the button. If you prefer a more traditional corner menu, switch to{' '}
                 <span className="font-semibold text-zinc-200">Edge (L)</span> in{' '}
                 <span className="text-zinc-200">Settings</span> (open the dock panel): the button hugs a bottom corner and
-                icons run in an L along the edges.
+                icons wrap the corner (home, compose, and following above; search under the button, then notifications
+                through settings along the bottom).
               </p>
               <LoungeDockMenuLayoutCoachDiagrams />
             </div>
