@@ -2390,21 +2390,6 @@ export default function SocialFeed({
     }
   }, [composerUserId, loungeReadOnly, feedPostIdsKey, refreshLoungePostInteractions, supabaseClient])
 
-  // Hydrate like/repost/bookmark state for comments that appear as repost cards in the feed.
-  useEffect(() => {
-    if (!composerUserId || loungeReadOnly) return
-    const ids = feedCommentRepostIdsKey ? feedCommentRepostIdsKey.split(',').filter(Boolean) : []
-    if (ids.length === 0) return
-    let cancelled = false
-    ;(async () => {
-      if (cancelled) return
-      await hydrateCommentInteractionsForIds(ids)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [composerUserId, loungeReadOnly, feedCommentRepostIdsKey, hydrateCommentInteractionsForIds])
-
   const interactionStateFor = useCallback(
     (postId) => interactionByPost[postId] || defaultInteraction,
     [interactionByPost, defaultInteraction]
@@ -2471,6 +2456,21 @@ export default function SocialFeed({
     },
     [composerUserId, defaultInteraction, loungeReadOnly, supabaseClient],
   )
+
+  // Hydrate like/repost/bookmark state for comments that appear as repost cards in the feed.
+  useEffect(() => {
+    if (!composerUserId || loungeReadOnly) return
+    const ids = feedCommentRepostIdsKey ? feedCommentRepostIdsKey.split(',').filter(Boolean) : []
+    if (ids.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      if (cancelled) return
+      await hydrateCommentInteractionsForIds(ids)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [composerUserId, loungeReadOnly, feedCommentRepostIdsKey, hydrateCommentInteractionsForIds])
 
   const toggleInteraction = useCallback(
     async (postId, key) => {
