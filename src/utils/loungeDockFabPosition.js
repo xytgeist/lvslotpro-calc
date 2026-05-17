@@ -250,6 +250,62 @@ export function loungeDockViewportSize() {
   }
 }
 
+/** FAB position + clamp bounds: layout viewport height (keyboard opening must not yank the menu). */
+export function loungeDockLayoutViewportSize() {
+  if (typeof window === 'undefined') {
+    return { width: 0, height: 0 }
+  }
+  const vv = window.visualViewport
+  return {
+    width: vv?.width ?? window.innerWidth,
+    height: window.innerHeight,
+  }
+}
+
+/** Mark any on-screen UI (fixed or in-scroll) that should push the draggable menu up when it overlaps the FAB horizontally. */
+export const LOUNGE_FAB_OBSTACLE_SELECTOR = '[data-lounge-fab-obstacle]'
+
+function loungeFabRectsOverlapHorizontally(a, b) {
+  return a.left < b.right - 1 && a.right > b.left + 1
+}
+
+function loungeFabRectsOverlapVertically(a, b, gap = 0) {
+  return a.top < b.bottom + gap && a.bottom > b.top - gap
+}
+
+/**
+ * Bottom inset (px) so a FAB at `fabRect` clears an on-screen obstacle (fixed or in-scroll).
+ * @param {{ left: number, top: number, right: number, bottom: number }} fabRect
+ * @param {DOMRect} obstacleRect
+ * @param {number} viewportH
+ * @param {number} [gap]
+ */
+export function loungeDockFabBottomInsetForObstacleRect(fabRect, obstacleRect, viewportH, gap = 10) {
+  if (!loungeFabRectsOverlapHorizontally(fabRect, obstacleRect)) return 0
+  if (!loungeFabRectsOverlapVertically(fabRect, obstacleRect, gap)) return 0
+  const targetMaxFabBottom = obstacleRect.top - gap
+  if (fabRect.bottom <= targetMaxFabBottom) return 0
+  return Math.max(0, viewportH - obstacleRect.top + gap - EDGE_PAD_PX)
+}
+
+/**
+ * Max bottom inset needed to clear all `[data-lounge-fab-obstacle]` nodes overlapping the FAB horizontally.
+ * @param {{ left: number, top: number, right: number, bottom: number }} fabRect
+ * @param {number} [viewportH]
+ * @param {number} [gap]
+ */
+export function loungeDockFabCollisionBottomInsetPx(fabRect, viewportH, gap = 10) {
+  if (typeof document === 'undefined') return 0
+  const vh = viewportH ?? window.innerHeight
+  let inset = 0
+  document.querySelectorAll(LOUNGE_FAB_OBSTACLE_SELECTOR).forEach((el) => {
+    const r = el.getBoundingClientRect()
+    if (r.height < 2 || r.width < 2) return
+    inset = Math.max(inset, loungeDockFabBottomInsetForObstacleRect(fabRect, r, vh, gap))
+  })
+  return inset
+}
+
 function fanBounds(viewport, itemRadius) {
   return {
     minX: EDGE_PAD_PX + itemRadius,

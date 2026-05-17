@@ -12,7 +12,9 @@ import {
   loungeDockFabPctFromPosition,
   loungeDockFabPositionFromPct,
   loungeDockLShapeOffsets,
-  loungeDockViewportSize,
+  loungeDockFabCollisionBottomInsetPx,
+  loungeDockLayoutViewportSize,
+  LOUNGE_FAB_OBSTACLE_SELECTOR,
   loungeDockCornerLCompactHomeOffset,
   loungeDockWheelCompactHomeOffset,
   loungeDockWheelLayout,
@@ -328,7 +330,8 @@ export default function LoungeDockArcCarouselPrototype({
   /** Blocks native text selection while the menu button is held (long-press reposition). */
   const [fabSelectionLock, setFabSelectionLock] = useState(false)
   const [clickShield, setClickShield] = useState(false)
-  const [viewport, setViewport] = useState(() => loungeDockViewportSize())
+  const [viewport, setViewport] = useState(() => loungeDockLayoutViewportSize())
+  const [collisionInsetPx, setCollisionInsetPx] = useState(0)
   const [carouselRotation, setCarouselRotation] = useState(0)
   const [spinning, setSpinning] = useState(false)
   /** One-time overlay after first menu open: long-press drag to move FAB. */
@@ -366,14 +369,16 @@ export default function LoungeDockArcCarouselPrototype({
   const backdropGestureRef = useRef(null)
 
   const bottomObstaclePx = Math.max(0, Math.round(Number(bottomObstacleInsetPx) || 0))
+  const totalBottomObstaclePx = bottomObstaclePx + collisionInsetPx
 
   const fabMoveBounds = useMemo(
-    () => loungeDockFabMoveBounds(viewport.width, viewport.height, LOUNGE_DOCK_FAB_SIZE_PX, bottomObstaclePx),
-    [viewport.width, viewport.height, bottomObstaclePx],
+    () =>
+      loungeDockFabMoveBounds(viewport.width, viewport.height, LOUNGE_DOCK_FAB_SIZE_PX, totalBottomObstaclePx),
+    [viewport.width, viewport.height, totalBottomObstaclePx],
   )
 
   const syncViewport = useCallback(() => {
-    const next = loungeDockViewportSize()
+    const next = loungeDockLayoutViewportSize()
     setViewport((prev) =>
       prev.width === next.width && prev.height === next.height ? prev : next,
     )
@@ -408,7 +413,69 @@ export default function LoungeDockArcCarouselPrototype({
     if (Math.abs(next.left - cur.left) < 0.5 && Math.abs(next.top - cur.top) < 0.5) return
     fabPosRef.current = next
     setFabPos(next)
-  }, [fabMoveBounds, bottomObstaclePx])
+  }, [fabMoveBounds, totalBottomObstaclePx])
+
+  /** Push FAB up only when it overlaps marked UI (fixed bars or in-scroll controls) — not when the keyboard opens alone. */
+  useEffect(() => {
+    const measureCollision = () => {
+      const cur = fabPosRef.current
+      if (!cur) {
+        setCollisionInsetPx(0)
+        return
+      }
+      const fabRect = {
+        left: cur.left,
+        top: cur.top,
+        right: cur.left + LOUNGE_DOCK_FAB_SIZE_PX,
+        bottom: cur.top + LOUNGE_DOCK_FAB_SIZE_PX,
+      }
+      const next = loungeDockFabCollisionBottomInsetPx(fabRect, window.innerHeight)
+      setCollisionInsetPx((prev) => (Math.abs(prev - next) < 0.5 ? prev : next))
+    }
+
+    let scrollRaf = 0
+    const measureCollisionOnScroll = () => {
+      if (scrollRaf) return
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0
+        measureCollision()
+      })
+    }
+
+    measureCollision()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measureCollision) : null
+    const observeObstacles = () => {
+      if (!ro) return
+      ro.disconnect()
+      document.querySelectorAll(LOUNGE_FAB_OBSTACLE_SELECTOR).forEach((el) => ro.observe(el))
+    }
+    observeObstacles()
+
+    const mo =
+      typeof MutationObserver !== 'undefined'
+        ? new MutationObserver(() => {
+            observeObstacles()
+            measureCollision()
+          })
+        : null
+    mo?.observe(document.body, { childList: true, subtree: true })
+
+    window.addEventListener('resize', measureCollision)
+    window.addEventListener('scroll', measureCollisionOnScroll, true)
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', measureCollision)
+    vv?.addEventListener('scroll', measureCollisionOnScroll)
+
+    return () => {
+      if (scrollRaf) cancelAnimationFrame(scrollRaf)
+      ro?.disconnect()
+      mo?.disconnect()
+      window.removeEventListener('resize', measureCollision)
+      window.removeEventListener('scroll', measureCollisionOnScroll, true)
+      vv?.removeEventListener('resize', measureCollision)
+      vv?.removeEventListener('scroll', measureCollisionOnScroll)
+    }
+  }, [fabPos, bottomObstaclePx])
 
   useEffect(() => {
     fabPosRef.current = fabPos
@@ -597,14 +664,14 @@ export default function LoungeDockArcCarouselPrototype({
       viewport.height,
       LOUNGE_DOCK_FAB_SIZE_PX,
       alignLeft,
-      bottomObstaclePx,
+      totalBottomObstaclePx,
       { raised: true },
     )
     if (Math.abs(pos.left - cur.left) < 0.5 && Math.abs(pos.top - cur.top) < 0.5) return
     fabPosRef.current = pos
     setFabPos(pos)
     persistFabPrefs(pos)
-  }, [isCornerL, viewport.width, viewport.height, bottomObstaclePx, persistFabPrefs])
+  }, [isCornerL, viewport.width, viewport.height, totalBottomObstaclePx, persistFabPrefs])
 
   const clearFabLongPressProgress = useCallback(() => {
     if (longPressRafRef.current) {
@@ -807,12 +874,12 @@ export default function LoungeDockArcCarouselPrototype({
       viewport.height,
       LOUNGE_DOCK_FAB_SIZE_PX,
       alignLeft,
-      bottomObstaclePx,
+      totalBottomObstaclePx,
       { raised: true },
     )
     fabPosRef.current = pos
     setFabPos(pos)
-  }, [viewport.width, viewport.height, bottomObstaclePx])
+  }, [viewport.width, viewport.height, totalBottomObstaclePx])
 
   const onFabPointerDown = useCallback(
     (e) => {
@@ -926,7 +993,7 @@ export default function LoungeDockArcCarouselPrototype({
             viewport.height,
             LOUNGE_DOCK_FAB_SIZE_PX,
             alignLeft,
-            bottomObstaclePx,
+            totalBottomObstaclePx,
             { raised: true },
           )
           fabPosRef.current = pos
@@ -950,7 +1017,7 @@ export default function LoungeDockArcCarouselPrototype({
       viewport.width,
       viewport.height,
       snapFabToBottomCornerForDropSide,
-      bottomObstaclePx,
+      totalBottomObstaclePx,
     ],
   )
 

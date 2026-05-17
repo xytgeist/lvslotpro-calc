@@ -277,7 +277,6 @@ export default function SocialFeed({
   /** Bottom bar during background lounge post submission (`progress` 0–1, plus diagnostic copy). */
   const [loungePostUploadBar, setLoungePostUploadBar] = useState(null)
   const loungeUploadBarRef = useRef(null)
-  const [loungeUploadBarHeightPx, setLoungeUploadBarHeightPx] = useState(0)
   /** Last step label when a background submission throws (paired with `loungePostUploadFailureDetails`). */
   const loungePostUploadLastPhaseRef = useRef('')
   /** Set on failed background submission for the retry modal. */
@@ -1218,29 +1217,6 @@ export default function SocialFeed({
     if (loungePostJobRunningRef.current || loungeDetailCommentJobRunningRef.current) return
     setLoungePostUploadBar(null)
   }, [])
-
-  /** Reserve bottom space for the dock FAB when the upload bar would overlap Cancel. */
-  useEffect(() => {
-    if (!loungePostUploadBar) {
-      setLoungeUploadBarHeightPx(0)
-      return undefined
-    }
-    const el = loungeUploadBarRef.current
-    if (!el) return undefined
-    const measure = () => {
-      const h = el.getBoundingClientRect().height
-      if (h > 0) setLoungeUploadBarHeightPx(Math.ceil(h))
-    }
-    measure()
-    if (typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(() => measure())
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [loungePostUploadBar])
-
-  const loungeDockFabBottomObstaclePx = loungePostUploadBar
-    ? loungeUploadBarHeightPx + 10
-    : 0
 
   const quoteRepostBackgroundUploadInFlight = useCallback(
     () =>
@@ -6431,7 +6407,6 @@ export default function SocialFeed({
           }
           panelChrome={loungeDockPanel}
           menuLayout={loungeDockMenuLayout}
-          bottomObstacleInsetPx={loungeDockFabBottomObstaclePx}
           onPointerBlockChange={setLoungeFabPointerBlocked}
         />
       ) : null}
@@ -6820,7 +6795,10 @@ export default function SocialFeed({
                 })
               }}
             />
-            <div className="mt-1 flex w-full items-center gap-2 pr-2 pt-1.5 pb-1">
+            <div
+              data-lounge-fab-obstacle
+              className="mt-1 flex w-full items-center gap-2 pr-2 pt-1.5 pb-1"
+            >
               <label
                 htmlFor={LOUNGE_COMPOSER_MEDIA_INPUT_ID}
                 onPointerDown={() => beginLoungeComposerMediaPicker('composer')}
@@ -8219,6 +8197,7 @@ export default function SocialFeed({
             {!loungeReadOnly ? (
               <div
                 data-lounge-detail-comment-host
+                data-lounge-fab-obstacle
                 className="shrink-0 border-t border-zinc-800/90 bg-zinc-950/95 px-3 pt-1 pb-0 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/80"
                 style={{
                   // Keyboard open: `visualViewport` overlap already clears the keyboard — do not add
@@ -9453,6 +9432,7 @@ export default function SocialFeed({
       {loungePostUploadBar ? (
         <div
           ref={loungeUploadBarRef}
+          data-lounge-fab-obstacle
           className="pointer-events-auto fixed inset-x-0 bottom-0 z-[94] border-t border-zinc-700/90 bg-zinc-950/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md shadow-[0_-8px_30px_rgba(0,0,0,0.35)]"
         >
           <div className="mx-auto flex max-w-2xl items-center gap-3">
