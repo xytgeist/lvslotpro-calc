@@ -70,6 +70,13 @@ import {
   uploadEncodedVideoToCfStreamWithRetries,
 } from './loungeComposerVideoPrep.js'
 import {
+  awaitQueuedVideoPrepForJob,
+  resolveLoungeSubmissionVideoPrep,
+  snapshotNeedsBackgroundVideoPrep,
+  startParallelQueuedVideoPrep,
+  startParallelQueuedVideoPrepForWaitingJobs,
+} from './loungeQueuedVideoPrep.js'
+import {
   formatCompactStatCount,
   fullStatCountTitle,
   loungeInteractionStatCountCellClass,
@@ -304,7 +311,9 @@ export default function SocialFeed({
   /** True while a background lounge post job may be in flight (guards double submit). */
   const loungePostJobRunningRef = useRef(false)
   /** Video-only submission queue — text/image/GIF use the fast lane (parallel). */
-  const loungeSubmitQueueRef = useRef(/** @type {Array<{id:string,type:string,snapshot:object}>} */ ([]))
+  const loungeSubmitQueueRef = useRef(
+    /** @type {Array<{id:string,type:string,snapshot:object,videoPrep?:import('./loungeQueuedVideoPrep.js').LoungeQueuedVideoPrepSlot}>} */ ([]),
+  )
   /** True while the video queue drain loop is actively running. */
   const loungeSubmitQueueRunningRef = useRef(false)
   /** Monotonic batch counters for "Post X of Y" bar display (video jobs only). */
@@ -325,8 +334,10 @@ export default function SocialFeed({
   const loungeDetailCommentJobRunningRef = useRef(false)
   /** Patched after definitions so early `submitQuoteRepost` can call `clearQuoteRepostForPostAttempt` / `runBackgroundLoungePostSubmission` without reordering hooks. */
   const clearQuoteRepostForPostAttemptRef = useRef(/** @type {(opts?: { preserveQuoteVideoPrep?: boolean }) => void} */ (() => {}))
-  const runBackgroundLoungePostSubmissionRef = useRef(/** @type {(snapshot: unknown) => void} */ (() => {}))
-  const runBackgroundLoungeDetailCommentSubmissionRef = useRef(/** @type {(snapshot: unknown) => void} */ (() => {}))
+  const runBackgroundLoungePostSubmissionRef = useRef(/** @type {(jobOrSnapshot: unknown) => void} */ (() => {}))
+  const runBackgroundLoungeDetailCommentSubmissionRef = useRef(
+    /** @type {(jobOrSnapshot: unknown) => void} */ (() => {}),
+  )
   /** Stable ref so early submit callbacks can call the enqueue function before its useCallback is defined. */
   const enqueueAndRunLoungeSubmitRef = useRef(/** @type {(type: string, snapshot: object) => void} */ (() => {}))
   /** Mirrors `composerVideoSlot` for async prep / dispose (avoid stale closures). */
@@ -5576,7 +5587,15 @@ export default function SocialFeed({
   }, [disposeComposerVideoMedia])
 
   const runBackgroundLoungePostSubmission = useCallback(
-    async (snapshot) => {
+    async (jobOrSnapshot) => {
+      const job =
+        jobOrSnapshot != null &&
+        typeof jobOrSnapshot === 'object' &&
+        Object.prototype.hasOwnProperty.call(jobOrSnapshot, 'snapshot')
+          ? jobOrSnapshot
+          : { snapshot: jobOrSnapshot, videoPrep: undefined }
+      const snapshot = job.snapshot
+      const isQueuedJob = Boolean(job?.id)
       const prepSource = String(snapshot.quoteRepostOfPostId || '').trim() ? 'quote' : 'composer'
       const lastEncRef =
         prepSource === 'quote' ? quoteRepostVideoLastEncodedFileRef : composerVideoLastEncodedFileRef
@@ -5617,11 +5636,7 @@ export default function SocialFeed({
 
       let snap = { ...snapshot }
       try {
-        const uid0 = String(snap.streamVideoUid || '').trim()
-        if (
-          !uid0 &&
-          (snap.awaitingComposerVideoPrepJobId != null || snap.videoPrepSpec)
-        ) {
+        if (snapshotNeedsBackgroundVideoPrep(snap)) {
           loungePostUploadLastPhaseRef.current = 'Waiting for video'
           if (submissionHasVideo) {
             setLoungePostUploadBar((prev) => ({
@@ -5661,53 +5676,28 @@ export default function SocialFeed({
             )
           }
 
-          const runPrepForPosting = async () => {
-            if (!snap.videoPrepSpec) throw new Error('Video preparation was interrupted.')
+          const priorParallel = await awaitQueuedVideoPrepForJob(job)
+          if (priorParallel) {
+            out = priorParallel
+          } else if (!isQueuedJob && lastEncRef.current && snap.videoPrepSpec) {
             const reuse = lastEncRef.current
-            if (reuse) {
-              const { streamVideoUid } = await uploadEncodedVideoToCfStreamWithRetries({
-                supabaseClient,
-                signal: ac.signal,
-                uploadFile: reuse,
-                onProgress: onPrepProgressWhilePosting,
-                onUploadDiagnostic: onPrepUploadDiagnostic,
-              })
-              lastEncRef.current = null
-              return { encodedFile: reuse, streamVideoUid }
-            }
-            const prepOut = await runComposerStreamVideoPrepWithRetries({
+            const { streamVideoUid } = await uploadEncodedVideoToCfStreamWithRetries({
               supabaseClient,
               signal: ac.signal,
-              spec: snap.videoPrepSpec,
-              onEncodedFileReady: (f) => {
-                lastEncRef.current = f
-              },
+              uploadFile: reuse,
               onProgress: onPrepProgressWhilePosting,
               onUploadDiagnostic: onPrepUploadDiagnostic,
             })
             lastEncRef.current = null
-            return prepOut
-          }
-
-          const awaitingId = snap.awaitingComposerVideoPrepJobId
-          // Use snapshot-captured handoff first (safe for queued jobs), fall back to shared ref
-          const h =
-            snapshot._capturedPrepHandoff ??
-            (prepSource === 'quote'
-              ? quoteRepostVideoPrepHandoffRef.current
-              : composerVideoPrepHandoffRef.current)
-          if (awaitingId != null && h && h.jobId === awaitingId) {
-            try {
-              out = await h.promise
-            } catch (e) {
-              if (e?.name === 'AbortError') throw e
-              if (!snap.videoPrepSpec) throw e
-              out = await runPrepForPosting()
-            }
-          } else if (snap.videoPrepSpec) {
-            out = await runPrepForPosting()
+            out = { encodedFile: reuse, streamVideoUid }
           } else {
-            throw new Error('Video preparation was interrupted.')
+            out = await resolveLoungeSubmissionVideoPrep({
+              snapshot: snap,
+              supabaseClient,
+              signal: ac.signal,
+              onProgress: onPrepProgressWhilePosting,
+              onUploadDiagnostic: onPrepUploadDiagnostic,
+            })
           }
           snap = {
             ...snap,
@@ -5722,10 +5712,12 @@ export default function SocialFeed({
           if (nu && pend.startsWith('blob:')) {
             pinLoungeStreamSessionPoster(nu, pend)
           }
-          if (snapshot.awaitingComposerVideoPrepJobId != null) {
+          if (snapshot.awaitingComposerVideoPrepJobId != null || snapshot._capturedPrepHandoff?.jobId != null) {
+            const handoffJobId =
+              snapshot.awaitingComposerVideoPrepJobId ?? snapshot._capturedPrepHandoff?.jobId
             const href =
               prepSource === 'quote' ? quoteRepostVideoPrepHandoffRef : composerVideoPrepHandoffRef
-            if (href.current?.jobId === snapshot.awaitingComposerVideoPrepJobId) {
+            if (href.current?.jobId === handoffJobId) {
               href.current = null
             }
           }
@@ -5804,7 +5796,15 @@ export default function SocialFeed({
   runBackgroundLoungePostSubmissionRef.current = runBackgroundLoungePostSubmission
 
   const runBackgroundLoungeDetailCommentSubmission = useCallback(
-    async (snapshot) => {
+    async (jobOrSnapshot) => {
+      const job =
+        jobOrSnapshot != null &&
+        typeof jobOrSnapshot === 'object' &&
+        Object.prototype.hasOwnProperty.call(jobOrSnapshot, 'snapshot')
+          ? jobOrSnapshot
+          : { snapshot: jobOrSnapshot, videoPrep: undefined }
+      const snapshot = job.snapshot
+      const isQueuedJob = Boolean(job?.id)
       const submissionHasVideo = loungeSubmissionSnapshotIncludesVideo(snapshot)
       const uidBar = String(snapshot.streamVideoUid || '').trim()
       const mediaUploadBarSkin =
@@ -5841,8 +5841,7 @@ export default function SocialFeed({
 
       let snap = { ...snapshot }
       try {
-        const uid0 = String(snap.streamVideoUid || '').trim()
-        if (!uid0 && (snap.awaitingDetailCommentVideoPrepJobId != null || snap.videoPrepSpec)) {
+        if (snapshotNeedsBackgroundVideoPrep(snap)) {
           loungePostUploadLastPhaseRef.current = 'Waiting for video'
           if (submissionHasVideo) {
             setLoungePostUploadBar((prev) => ({
@@ -5880,50 +5879,30 @@ export default function SocialFeed({
             )
           }
 
-          const runPrepForPosting = async () => {
-            if (!snap.videoPrepSpec) throw new Error('Video preparation was interrupted.')
+          /** @type {{ encodedFile: File, streamVideoUid: string }} */
+          let out
+          const priorParallel = await awaitQueuedVideoPrepForJob(job)
+          if (priorParallel) {
+            out = priorParallel
+          } else if (!isQueuedJob && loungeDetailCommentVideoLastEncodedFileRef.current && snap.videoPrepSpec) {
             const reuse = loungeDetailCommentVideoLastEncodedFileRef.current
-            if (reuse) {
-              const { streamVideoUid } = await uploadEncodedVideoToCfStreamWithRetries({
-                supabaseClient,
-                signal: ac.signal,
-                uploadFile: reuse,
-                onProgress: onPrepProgressWhilePosting,
-                onUploadDiagnostic: onPrepUploadDiagnostic,
-              })
-              loungeDetailCommentVideoLastEncodedFileRef.current = null
-              return { encodedFile: reuse, streamVideoUid }
-            }
-            const prepOut = await runComposerStreamVideoPrepWithRetries({
+            const { streamVideoUid } = await uploadEncodedVideoToCfStreamWithRetries({
               supabaseClient,
               signal: ac.signal,
-              spec: snap.videoPrepSpec,
-              onEncodedFileReady: (f) => {
-                loungeDetailCommentVideoLastEncodedFileRef.current = f
-              },
+              uploadFile: reuse,
               onProgress: onPrepProgressWhilePosting,
               onUploadDiagnostic: onPrepUploadDiagnostic,
             })
             loungeDetailCommentVideoLastEncodedFileRef.current = null
-            return prepOut
-          }
-
-          const awaitingId = snap.awaitingDetailCommentVideoPrepJobId
-          // Use snapshot-captured handoff first (safe for queued jobs), fall back to shared ref
-          const h = snapshot._capturedPrepHandoff ?? loungeDetailCommentVideoPrepHandoffRef.current
-          let out
-          if (awaitingId != null && h && h.jobId === awaitingId) {
-            try {
-              out = await h.promise
-            } catch (e) {
-              if (e?.name === 'AbortError') throw e
-              if (!snap.videoPrepSpec) throw e
-              out = await runPrepForPosting()
-            }
-          } else if (snap.videoPrepSpec) {
-            out = await runPrepForPosting()
+            out = { encodedFile: reuse, streamVideoUid }
           } else {
-            throw new Error('Video preparation was interrupted.')
+            out = await resolveLoungeSubmissionVideoPrep({
+              snapshot: snap,
+              supabaseClient,
+              signal: ac.signal,
+              onProgress: onPrepProgressWhilePosting,
+              onUploadDiagnostic: onPrepUploadDiagnostic,
+            })
           }
           snap = {
             ...snap,
@@ -5938,9 +5917,14 @@ export default function SocialFeed({
           if (nu && pend.startsWith('blob:')) {
             pinLoungeStreamSessionPoster(nu, pend)
           }
-          if (snapshot.awaitingDetailCommentVideoPrepJobId != null) {
+          if (
+            snapshot.awaitingDetailCommentVideoPrepJobId != null ||
+            snapshot._capturedPrepHandoff?.jobId != null
+          ) {
+            const handoffJobId =
+              snapshot.awaitingDetailCommentVideoPrepJobId ?? snapshot._capturedPrepHandoff?.jobId
             const href = loungeDetailCommentVideoPrepHandoffRef
-            if (href.current?.jobId === snapshot.awaitingDetailCommentVideoPrepJobId) {
+            if (href.current?.jobId === handoffJobId) {
               href.current = null
             }
           }
@@ -6235,8 +6219,7 @@ export default function SocialFeed({
   }, [runBackgroundLoungePostSubmission, startComposerVideoPrepFromSpec, startQuoteRepostVideoPrepFromSpec])
 
   /**
-   * Drain the video submit queue sequentially — one Stream video job at a time so prep handoff
-   * refs are never shared. Fast-lane posts (text/image/GIF) bypass this loop entirely.
+   * Resume composer/quote/comment video prep slots deferred while the submit queue owned the bar.
    */
   const resumeDeferredVideoPrepSlots = useCallback(() => {
     const composerSlot = composerVideoSlotRef.current
@@ -6278,16 +6261,21 @@ export default function SocialFeed({
     startQuoteRepostVideoPrepFromSpec,
   ])
 
+  /**
+   * Drain the video submit queue — DB insert stays sequential; waiting jobs prep/upload in parallel.
+   * Fast-lane posts (text/image/GIF) bypass this loop entirely.
+   */
   const drainLoungeSubmitQueue = useCallback(async () => {
     try {
       while (loungeSubmitQueueRef.current.length > 0) {
+        startParallelQueuedVideoPrepForWaitingJobs(loungeSubmitQueueRef.current, supabaseClient)
         const job = loungeSubmitQueueRef.current[0]
         const batch = loungeSubmitQueueBatchRef.current
         setLoungeSubmitQueueDisplay({ index: batch.completed + 1, total: batch.total })
         if (job.type === 'post' || job.type === 'quote') {
-          await runBackgroundLoungePostSubmissionRef.current?.(job.snapshot)
+          await runBackgroundLoungePostSubmissionRef.current?.(job)
         } else {
-          await runBackgroundLoungeDetailCommentSubmissionRef.current?.(job.snapshot)
+          await runBackgroundLoungeDetailCommentSubmissionRef.current?.(job)
         }
         loungeSubmitQueueRef.current.shift()
         loungeSubmitQueueBatchRef.current = {
@@ -6307,7 +6295,7 @@ export default function SocialFeed({
       resumeDeferredVideoPrepSlots()
       flushPendingFastLaneFailure()
     }
-  }, [dismissLoungePostUploadBarIfIdle, flushPendingFastLaneFailure, resumeDeferredVideoPrepSlots])
+  }, [dismissLoungePostUploadBarIfIdle, flushPendingFastLaneFailure, resumeDeferredVideoPrepSlots, supabaseClient])
 
   /** Video jobs queue; text/image/GIF run immediately on the fast lane. */
   const enqueueAndRunLoungeSubmit = useCallback(
@@ -6322,9 +6310,11 @@ export default function SocialFeed({
         completed: loungeSubmitQueueBatchRef.current.completed,
       }
       const id = `lsq-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      loungeSubmitQueueRef.current.push({ id, type, snapshot })
+      const job = { id, type, snapshot }
+      loungeSubmitQueueRef.current.push(job)
       // Mark running before returning so a rapid second submit cannot overwrite snapshot refs.
       if (loungeSubmitQueueRunningRef.current) {
+        startParallelQueuedVideoPrep(job, supabaseClient)
         setLoungeSubmitQueueDisplay((prev) => ({
           index: prev.index,
           total: loungeSubmitQueueBatchRef.current.total,
@@ -6334,7 +6324,7 @@ export default function SocialFeed({
         void drainLoungeSubmitQueue()
       }
     },
-    [drainLoungeSubmitQueue],
+    [drainLoungeSubmitQueue, supabaseClient],
   )
   enqueueAndRunLoungeSubmitRef.current = enqueueAndRunLoungeSubmit
 
