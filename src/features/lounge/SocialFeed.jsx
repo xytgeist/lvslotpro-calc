@@ -1713,6 +1713,10 @@ export default function SocialFeed({
   const cancelComposerMediaPrep = useCallback(
     (opts = {}) => {
       const userInitiated = Boolean(opts.userInitiated)
+      // Background queue job may still own composer prep handoff / abort — never tear down from composer dismiss.
+      if (loungeBackgroundSubmitBusy()) {
+        return
+      }
       const h = composerVideoPrepHandoffRef.current
       if (h && !h.settled) {
         try {
@@ -1735,7 +1739,7 @@ export default function SocialFeed({
       if (userInitiated) setLoungePostUploadBar(null)
       else dismissLoungePostUploadBarIfIdle()
     },
-    [disposeComposerVideoMedia, dismissLoungePostUploadBarIfIdle],
+    [disposeComposerVideoMedia, dismissLoungePostUploadBarIfIdle, loungeBackgroundSubmitBusy],
   )
 
   const cancelQuoteRepostMediaPrep = useCallback((opts = {}) => {
