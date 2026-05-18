@@ -337,6 +337,8 @@ export default function LoungeDockArcCarouselPrototype({
   /** Flash label shown beside the Following button when the filter toggles. */
   const [followingFlash, setFollowingFlash] = useState(/** @type {{ label: string, key: number } | null} */ (null))
   const followingFlashTimerRef = useRef(0)
+  /** Last known viewport center of the Following button (updated while menu is open). */
+  const followingItemCenterRef = useRef(/** @type {{ x: number, y: number } | null} */ (null))
   /** One-time overlay after first menu open: long-press drag to move FAB. */
   const [repositionCoachOpen, setRepositionCoachOpen] = useState(false)
 
@@ -1446,6 +1448,9 @@ export default function LoungeDockArcCarouselPrototype({
               ? ''
               : 'transition-[left,top,opacity] duration-200 ease-out'
       }`}
+      ref={item.id === 'following' ? (el) => {
+        if (el) followingItemCenterRef.current = { x: fabCenterX + offset.x, y: fabCenterY + offset.y }
+      } : undefined}
       style={{
         left: fabCenterX + offset.x,
         top: fabCenterY + offset.y,
@@ -1488,19 +1493,6 @@ export default function LoungeDockArcCarouselPrototype({
           {item.icon}
         </span>
       </span>
-      {item.id === 'following' && followingFlash ? (
-        <span
-          className="pointer-events-none absolute left-1/2 top-full z-[70] mt-1 -translate-x-1/2 whitespace-nowrap"
-          aria-hidden
-        >
-          <span
-            key={followingFlash.key}
-            className={`lounge-filter-flash-fizzle inline-block text-[11px] font-semibold tracking-wide drop-shadow-[0_0_8px_rgba(6,206,252,0.75)] ${followingFlash.label === 'Following' ? 'text-[#06cefc]' : 'text-zinc-200'}`}
-          >
-            {followingFlash.label}
-          </span>
-        </span>
-      ) : null}
     </button>
     )
   }
@@ -1724,6 +1716,25 @@ export default function LoungeDockArcCarouselPrototype({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {/* Following-filter toggle flash — rendered here so it survives the menu closing before the flash fires */}
+      {followingFlash && followingItemCenterRef.current ? (
+        <span
+          className="pointer-events-none fixed z-[116] -translate-x-1/2 whitespace-nowrap"
+          style={{
+            left: followingItemCenterRef.current.x,
+            top: followingItemCenterRef.current.y + LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX / 2 + 6,
+          }}
+          aria-hidden
+        >
+          <span
+            key={followingFlash.key}
+            className={`lounge-filter-flash-fizzle inline-block text-[11px] font-semibold tracking-wide drop-shadow-[0_0_8px_rgba(6,206,252,0.75)] ${followingFlash.label === 'Following' ? 'text-[#06cefc]' : 'text-zinc-200'}`}
+          >
+            {followingFlash.label}
+          </span>
+        </span>
       ) : null}
     </div>
   )
