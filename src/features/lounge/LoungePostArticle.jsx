@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
 import { renderRichCaption } from './loungeCaption'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
@@ -94,6 +94,10 @@ export default function LoungePostArticle({
   onMentionClick,
   /** Open search filtered by hashtag (tapping #tag in caption). */
   onHashtagClick,
+  /** Set of user IDs the viewer follows. When provided (with `onFollowUser`), shows the follow pill. */
+  viewerFollowingUserIds,
+  /** Follow the given user ID. Called with the author's user_id on pill tap. */
+  onFollowUser,
 }) {
   const ro = loungeReadOnly
   // ── Plain repost type detection ──────────────────────────────────────────
@@ -192,6 +196,25 @@ export default function LoungePostArticle({
   const hasStaffBadge = loungeFeedAuthorHasStaffBadge(authorRole)
   const showOgBadge = displayEntity?.author_profile?.is_og === true
 
+  // ── Follow pill ───────────────────────────────────────────────────────────
+  const displayAuthorUserId = displayEntity?.user_id
+  const showFollowPill = Boolean(
+    !isCommentRepost &&
+      typeof onFollowUser === 'function' &&
+      viewerUserId &&
+      displayAuthorUserId &&
+      displayAuthorUserId !== viewerUserId &&
+      viewerFollowingUserIds instanceof Set &&
+      !viewerFollowingUserIds.has(displayAuthorUserId),
+  )
+  const [followPillTapped, setFollowPillTapped] = useState(false)
+  const handleFollowTap = (e) => {
+    e.stopPropagation()
+    if (followPillTapped) return
+    setFollowPillTapped(true)
+    onFollowUser(displayAuthorUserId)
+  }
+
   // Shared repost-header SVG icon
   const repostIcon = (
     <svg className="h-3.5 w-3.5 shrink-0 text-emerald-500/90" viewBox="0 0 20 20" fill="none" aria-hidden>
@@ -247,7 +270,15 @@ export default function LoungePostArticle({
         {/* ── Meta row ────────────────────────────────────────────────────── */}
         <div className="relative min-w-0">
           <div
-            className={`${LOUNGE_FEED_META_TEXT_COLUMN_CLASS} ${showPostRowMenu ? 'pr-7' : ''}`}
+            className={`${LOUNGE_FEED_META_TEXT_COLUMN_CLASS} ${
+              showFollowPill && showPostRowMenu
+                ? 'pr-14'
+                : showFollowPill
+                  ? 'pr-8'
+                  : showPostRowMenu
+                    ? 'pr-7'
+                    : ''
+            }`}
           >
             <div className={LOUNGE_FEED_META_ROW_CLASS}>
               <LoungeFeedAuthorMetaBadges
@@ -293,6 +324,19 @@ export default function LoungePostArticle({
                 onPinToggle={() => void setLoungePostPinned(post.id, !post.pinned)}
                 positionScrollRootRef={repostMenuScrollRootRef}
               />
+            </div>
+          ) : null}
+          {showFollowPill ? (
+            <div
+              className={`absolute top-0 z-10 -translate-y-2 ${showPostRowMenu ? 'right-7' : 'right-0'}`}
+            >
+              <button
+                type="button"
+                onClick={handleFollowTap}
+                className="inline-flex items-center rounded-full border border-zinc-700 px-2 py-0.5 text-[11px] leading-none text-zinc-500 touch-manipulation active:opacity-60 [-webkit-tap-highlight-color:transparent]"
+              >
+                +
+              </button>
             </div>
           ) : null}
         </div>

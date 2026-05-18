@@ -423,6 +423,8 @@ export default function SocialFeed({
   const [loungeDetailViewerPinnedCommentIds, setLoungeDetailViewerPinnedCommentIds] = useState([])
   const [loungeDetailCommentSort, setLoungeDetailCommentSort] = useState(() => readLoungeDetailCommentSort())
   const [loungeDetailFollowingUserIds, setLoungeDetailFollowingUserIds] = useState([])
+  /** Set of user IDs the viewer follows — drives the follow pill on feed/profile cards. */
+  const [loungeFollowingUserIds, setLoungeFollowingUserIds] = useState(() => new Set())
   const [loungeDetailCommentDraft, setLoungeDetailCommentDraft] = useState('')
   const [loungeDetailCommentErr, setLoungeDetailCommentErr] = useState('')
   /** Mirrors feed composer: collapsed one-line affordance → expanded textarea + toolbar. */
@@ -3021,6 +3023,24 @@ export default function SocialFeed({
     return { ok: true, bookmarked: !was }
   }, [composerUserId, supabaseClient])
 
+  const handleLoungeFollowUser = useCallback(
+    async (userId) => {
+      if (!composerUserId || !userId || userId === composerUserId) return
+      setLoungeFollowingUserIds((prev) => new Set([...prev, userId]))
+      const { error } = await supabaseClient
+        .from('profile_follows')
+        .insert({ follower_id: composerUserId, following_id: userId })
+      if (error) {
+        setLoungeFollowingUserIds((prev) => {
+          const next = new Set(prev)
+          next.delete(userId)
+          return next
+        })
+      }
+    },
+    [composerUserId, supabaseClient],
+  )
+
   const noopLoungeBarPostToggle = useCallback(async () => undefined, [])
 
   const getLoungeDetailCommentBookmarked = useCallback(
@@ -4778,6 +4798,25 @@ export default function SocialFeed({
       setProfileGateOpen(false)
     }
   }, [composerAuthResolved, composerUserId, composerAuthUser, composerUserProfile])
+
+  useEffect(() => {
+    if (!composerUserId) {
+      setLoungeFollowingUserIds(new Set())
+      return
+    }
+    let cancelled = false
+    supabaseClient
+      .from('profile_follows')
+      .select('following_id')
+      .eq('follower_id', composerUserId)
+      .then(({ data, error }) => {
+        if (cancelled || error) return
+        setLoungeFollowingUserIds(new Set((data || []).map((r) => r.following_id).filter(Boolean)))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [composerUserId, supabaseClient])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -6618,6 +6657,8 @@ export default function SocialFeed({
       busyDeletingPostId: loungeFeedDeleteBusyPostId,
       onMentionClick: openProfileByHandle,
       onHashtagClick: openSearchByHashtag,
+      viewerFollowingUserIds: loungeReadOnly ? null : loungeFollowingUserIds,
+      onFollowUser: loungeReadOnly ? undefined : handleLoungeFollowUser,
     }),
     [
       loungeReadOnly,
@@ -6665,6 +6706,8 @@ export default function SocialFeed({
       loungeDetailCommentDeleteBusyId,
       openProfileByHandle,
       openSearchByHashtag,
+      loungeFollowingUserIds,
+      handleLoungeFollowUser,
     ]
   )
 
@@ -7550,6 +7593,8 @@ export default function SocialFeed({
                   onOpenCommentDetail={(rc) => void openCommentRepostDetail(rc)}
                   onMentionClick={openProfileByHandle}
                   onHashtagClick={openSearchByHashtag}
+                  viewerFollowingUserIds={loungeReadOnly ? null : loungeFollowingUserIds}
+                  onFollowUser={loungeReadOnly ? undefined : handleLoungeFollowUser}
                 />
               </article>
             ))}
