@@ -119,14 +119,16 @@ function HierarchyCommentRow({
       ) : null}
       <div id={isFocus ? 'lounge-detail-focus-comment' : undefined} className="relative z-[1]">
         {canNavigate ? (
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => onNavigateToPathIndex(pathIndex)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigateToPathIndex(pathIndex) } }}
             className={`block w-full ${LOUNGE_FEED_POST_DETAIL_COMMENT_ROW_CLASS} cursor-pointer rounded-lg text-left touch-manipulation outline-none hover:bg-zinc-900/50 [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-violet-500/40`}
             aria-label="View this comment in thread"
           >
             {card}
-          </button>
+          </div>
         ) : (
           card
         )}
