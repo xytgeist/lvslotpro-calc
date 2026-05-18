@@ -292,13 +292,21 @@ export default function SocialFeed({
   const loungePostUploadLastPhaseRef = useRef('')
   /** Set on failed background submission for the retry modal. */
   const [loungePostUploadFailureDetails, setLoungePostUploadFailureDetails] = useState(null)
-  /** True while any background lounge post submission is running (keeps Post disabled without the video bar). */
+  /** True while any background lounge post submission is running (kept for bar visibility; no longer gates submit buttons). */
   const [loungePostSubmitInFlight, setLoungePostSubmitInFlight] = useState(false)
   const [loungePostUploadFailedOpen, setLoungePostUploadFailedOpen] = useState(false)
   const loungePostSnapshotRef = useRef(null)
   const loungePostAbortRef = useRef(null)
   /** True while a background lounge post job may be in flight (guards double submit). */
   const loungePostJobRunningRef = useRef(false)
+  /** Sequential submission queue — entries: { id, type: 'post'|'comment'|'quote', snapshot }. */
+  const loungeSubmitQueueRef = useRef(/** @type {Array<{id:string,type:string,snapshot:object}>} */ ([]))
+  /** True while the queue drain loop is actively running. */
+  const loungeSubmitQueueRunningRef = useRef(false)
+  /** Monotonic batch counters for "Post X of Y" bar display. */
+  const loungeSubmitQueueBatchRef = useRef({ total: 0, completed: 0 })
+  /** React state mirror of batch counters so the bar header re-renders. */
+  const [loungeSubmitQueueDisplay, setLoungeSubmitQueueDisplay] = useState({ index: 0, total: 0 })
   /** Snapshot + abort for background post-detail reply submission (same pattern as feed composer). */
   const loungeDetailCommentSnapshotRef = useRef(null)
   const loungeDetailCommentAbortRef = useRef(null)
@@ -307,6 +315,8 @@ export default function SocialFeed({
   const clearQuoteRepostForPostAttemptRef = useRef(/** @type {(opts?: { preserveQuoteVideoPrep?: boolean }) => void} */ (() => {}))
   const runBackgroundLoungePostSubmissionRef = useRef(/** @type {(snapshot: unknown) => void} */ (() => {}))
   const runBackgroundLoungeDetailCommentSubmissionRef = useRef(/** @type {(snapshot: unknown) => void} */ (() => {}))
+  /** Stable ref so early submit callbacks can call the enqueue function before its useCallback is defined. */
+  const enqueueAndRunLoungeSubmitRef = useRef(/** @type {(type: string, snapshot: object) => void} */ (() => {}))
   /** Mirrors `composerVideoSlot` for async prep / dispose (avoid stale closures). */
   const composerVideoSlotRef = useRef(null)
   /** Monotonic id so an older prep run cannot clear UI after a newer one starts. */
@@ -1268,7 +1278,7 @@ export default function SocialFeed({
 
   /** Feed / quote / reply background jobs share one upload bar — do not clear it from unrelated surface cleanup. */
   const dismissLoungePostUploadBarIfIdle = useCallback(() => {
-    if (loungePostJobRunningRef.current || loungeDetailCommentJobRunningRef.current) return
+    if (loungePostJobRunningRef.current || loungeDetailCommentJobRunningRef.current || loungeSubmitQueueRunningRef.current) return
     setLoungePostUploadBar(null)
   }, [])
 
@@ -2839,7 +2849,6 @@ export default function SocialFeed({
       setQuoteRepostErr('Add a comment, image, GIF, or video to repost.')
       return
     }
-    if (loungePostJobRunningRef.current) return
     if (loungeQuoteRepostVideoPostBlocked) return
     if (hasVideo && slotNow?.prepStatus === 'failed') {
       setQuoteRepostErr(slotNow.prepError || 'Video processing failed. Remove the video or try again.')
@@ -2912,6 +2921,8 @@ export default function SocialFeed({
         wantsPin: false,
         isStaffPoster: false,
         quoteRepostOfPostId: originalId,
+        // Capture prep handoff by reference so queued jobs don't race on the shared ref
+        _capturedPrepHandoff: quoteRepostVideoPrepHandoffRef.current ?? null,
       }
     } finally {
       setQuoteRepostBusy(false)
@@ -2922,7 +2933,7 @@ export default function SocialFeed({
     const preserveVideoPrep = snapshot.awaitingComposerVideoPrepJobId != null
     loungePostSnapshotRef.current = snapshot
     clearQuoteRepostForPostAttemptRef.current?.({ preserveQuoteVideoPrep: preserveVideoPrep })
-    void runBackgroundLoungePostSubmissionRef.current?.(snapshot)
+    enqueueAndRunLoungeSubmitRef.current('quote', snapshot)
 
     const quoteMediaOrPrepPending =
       (Array.isArray(snapshot.imageFiles) && snapshot.imageFiles.length > 0) ||
@@ -3292,7 +3303,7 @@ export default function SocialFeed({
   /** Post-detail reply: clear composer immediately and upload in the background (feed composer parity). */
   const submitLoungeDetailComment = useCallback(async () => {
     if (!loungePostDetail?.id || !composerUserId || loungeReadOnly) return
-    if (loungeDetailCommentJobRunningRef.current || loungePostJobRunningRef.current) return
+    if (loungeDetailCommentJobRunningRef.current) return
     const body = loungeDetailCommentDraft.trim()
     setLoungeDetailCommentErr('')
     const gifCheck = validateAtMostOneGifUrl(loungeDetailCommentMediaUrl)
@@ -3355,12 +3366,14 @@ export default function SocialFeed({
       /** Screen to return to after post (comment detail vs OP post detail). */
       commentDetailPathIds:
         loungeCommentDetailPathIds.length > 0 ? [...loungeCommentDetailPathIds] : [],
+      // Capture prep handoff by reference so queued jobs don't race on the shared ref
+      _capturedPrepHandoff: loungeDetailCommentVideoPrepHandoffRef.current ?? null,
     }
 
     const preserveVideoPrep = snapshot.awaitingDetailCommentVideoPrepJobId != null
     loungeDetailCommentSnapshotRef.current = snapshot
     clearLoungeDetailCommentForPostAttempt({ preserveDetailCommentVideoPrep: preserveVideoPrep })
-    void runBackgroundLoungeDetailCommentSubmissionRef.current(snapshot)
+    enqueueAndRunLoungeSubmitRef.current('comment', snapshot)
 
     const commentMediaOrPrepPending =
       (Array.isArray(snapshot.imageFiles) && snapshot.imageFiles.length > 0) ||
@@ -5466,10 +5479,12 @@ export default function SocialFeed({
           }
 
           const awaitingId = snap.awaitingComposerVideoPrepJobId
+          // Use snapshot-captured handoff first (safe for queued jobs), fall back to shared ref
           const h =
-            prepSource === 'quote'
+            snapshot._capturedPrepHandoff ??
+            (prepSource === 'quote'
               ? quoteRepostVideoPrepHandoffRef.current
-              : composerVideoPrepHandoffRef.current
+              : composerVideoPrepHandoffRef.current)
           if (awaitingId != null && h && h.jobId === awaitingId) {
             try {
               out = await h.promise
@@ -5683,7 +5698,8 @@ export default function SocialFeed({
           }
 
           const awaitingId = snap.awaitingDetailCommentVideoPrepJobId
-          const h = loungeDetailCommentVideoPrepHandoffRef.current
+          // Use snapshot-captured handoff first (safe for queued jobs), fall back to shared ref
+          const h = snapshot._capturedPrepHandoff ?? loungeDetailCommentVideoPrepHandoffRef.current
           let out
           if (awaitingId != null && h && h.jobId === awaitingId) {
             try {
@@ -5898,6 +5914,60 @@ export default function SocialFeed({
     void runBackgroundLoungePostSubmission(snap)
   }, [runBackgroundLoungePostSubmission, startComposerVideoPrepFromSpec, startQuoteRepostVideoPrepFromSpec])
 
+  /**
+   * Drain the submit queue sequentially — runs one job at a time so video prep handoff refs
+   * are never shared across concurrent executions. The upload bar and setLoungePostSubmitInFlight
+   * are managed by each individual background runner; this loop just serialises them.
+   */
+  const drainLoungeSubmitQueue = useCallback(async () => {
+    if (loungeSubmitQueueRunningRef.current) return
+    loungeSubmitQueueRunningRef.current = true
+    try {
+      while (loungeSubmitQueueRef.current.length > 0) {
+        const job = loungeSubmitQueueRef.current[0]
+        const batch = loungeSubmitQueueBatchRef.current
+        setLoungeSubmitQueueDisplay({ index: batch.completed + 1, total: batch.total })
+        if (job.type === 'post' || job.type === 'quote') {
+          await runBackgroundLoungePostSubmissionRef.current?.(job.snapshot)
+        } else {
+          await runBackgroundLoungeDetailCommentSubmissionRef.current?.(job.snapshot)
+        }
+        loungeSubmitQueueRef.current.shift()
+        loungeSubmitQueueBatchRef.current = {
+          total: loungeSubmitQueueBatchRef.current.total,
+          completed: loungeSubmitQueueBatchRef.current.completed + 1,
+        }
+      }
+    } finally {
+      loungeSubmitQueueRunningRef.current = false
+      loungeSubmitQueueBatchRef.current = { total: 0, completed: 0 }
+      setLoungeSubmitQueueDisplay({ index: 0, total: 0 })
+    }
+  }, [])
+
+  /** Add a submission to the queue and kick the drain loop if it isn't already running. */
+  const enqueueAndRunLoungeSubmit = useCallback(
+    (type, snapshot) => {
+      loungeSubmitQueueBatchRef.current = {
+        total: loungeSubmitQueueBatchRef.current.total + 1,
+        completed: loungeSubmitQueueBatchRef.current.completed,
+      }
+      const id = `lsq-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      loungeSubmitQueueRef.current.push({ id, type, snapshot })
+      // If queue is already running, update displayed total immediately so bar shows "X of Y"
+      if (loungeSubmitQueueRunningRef.current) {
+        setLoungeSubmitQueueDisplay((prev) => ({
+          index: prev.index,
+          total: loungeSubmitQueueBatchRef.current.total,
+        }))
+      } else {
+        void drainLoungeSubmitQueue()
+      }
+    },
+    [drainLoungeSubmitQueue],
+  )
+  enqueueAndRunLoungeSubmitRef.current = enqueueAndRunLoungeSubmit
+
   const onLoungePostUploadSaveDraft = useCallback(() => {
     const fail = loungePostUploadFailureDetailsRef.current
     if (fail?.kind === 'comment') {
@@ -6017,7 +6087,6 @@ export default function SocialFeed({
       setPostErr('Caption must be 280 characters or fewer.')
       return
     }
-    if (loungePostJobRunningRef.current) return
     if (loungeComposerVideoPostBlocked) return
 
     if (hasVideo && composerVideoSlot?.file) {
@@ -6106,6 +6175,8 @@ export default function SocialFeed({
         sessionStreamPosterBlobUrl: sessionPosterBlob,
         wantsPin: composerPinOnPost,
         isStaffPoster,
+        // Capture prep handoff by reference so queued jobs don't race on the shared ref
+        _capturedPrepHandoff: composerVideoPrepHandoffRef.current ?? null,
       }
     } finally {
       setPostBusy(false)
@@ -6116,7 +6187,7 @@ export default function SocialFeed({
     const preserveVideoPrep = snapshot.awaitingComposerVideoPrepJobId != null
     loungePostSnapshotRef.current = snapshot
     clearComposerForPostAttempt({ preserveComposerVideoPrep: preserveVideoPrep })
-    void runBackgroundLoungePostSubmission(snapshot)
+    enqueueAndRunLoungeSubmitRef.current('post', snapshot)
   }, [
     loungeComposerVideoPostBlocked,
     clearComposerForPostAttempt,
@@ -6128,7 +6199,6 @@ export default function SocialFeed({
     composerVideoSlot,
     onRequireAuth,
     postText,
-    runBackgroundLoungePostSubmission,
     supabaseClient,
   ])
 
@@ -7345,7 +7415,6 @@ export default function SocialFeed({
                     onClick={() => void submitLoungePost()}
                     disabled={
                       postBusy ||
-                      loungePostSubmitInFlight ||
                       loungeComposerVideoPostBlocked ||
                       loungePostUploadFailedOpen ||
                       loungeVideoCrop != null ||
@@ -9033,7 +9102,6 @@ export default function SocialFeed({
                               type="button"
                               onClick={() => void submitLoungeDetailComment()}
                               disabled={
-                                loungePostSubmitInFlight ||
                                 loungeDetailCommentVideoPostBlocked ||
                                 (!loungeDetailCommentDraft.trim() &&
                                   loungeDetailCommentImageItems.length === 0 &&
@@ -9671,7 +9739,6 @@ export default function SocialFeed({
                             type="button"
                             disabled={
                               quoteRepostBusy ||
-                              loungePostSubmitInFlight ||
                               loungeQuoteRepostVideoPostBlocked ||
                               loungePostUploadFailedOpen ||
                               loungeVideoCrop != null ||
@@ -9692,7 +9759,6 @@ export default function SocialFeed({
                                 !!String(quoteRepostMediaUrl || '').trim() ||
                                 quoteRepostVideoSlot) &&
                               !quoteRepostBusy &&
-                              !loungePostSubmitInFlight &&
                               !loungeQuoteRepostVideoPostBlocked &&
                               !loungePostUploadFailedOpen &&
                               loungeVideoCrop == null
@@ -9960,7 +10026,11 @@ export default function SocialFeed({
           <div className="mx-auto flex max-w-2xl items-center gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-medium text-zinc-200">
-                {loungePostUploadBar.mode === 'mediaPrep' ? 'Uploading media…' : 'Uploading post…'}
+                {loungeSubmitQueueDisplay.total > 1
+                  ? `Post ${loungeSubmitQueueDisplay.index} of ${loungeSubmitQueueDisplay.total}`
+                  : loungePostUploadBar.mode === 'mediaPrep'
+                    ? 'Uploading media…'
+                    : 'Uploading post…'}
               </div>
               <div className="mt-0.5 text-[12px] leading-snug text-cyan-200/90">
                 <span className="font-semibold text-cyan-300/95">Now:</span>{' '}
