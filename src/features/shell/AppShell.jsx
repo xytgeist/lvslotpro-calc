@@ -635,6 +635,7 @@ export default function AppShell({
             loungeFeedScope={loungeFeedScope}
             onLoungeFeedScopeChange={onLoungeFeedScopeChange}
             loungeFeedBrowseMode={browseMode}
+            isActivePage={tab === 'home'}
           />
         </div>
       </Suspense>

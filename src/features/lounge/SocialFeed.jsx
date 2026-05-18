@@ -251,6 +251,8 @@ export default function SocialFeed({
   loungeFeedScope = LOUNGE_FEED_SCOPE_ALL,
   onLoungeFeedScopeChange,
   loungeFeedBrowseMode = 'member',
+  /** True only when the Lounge tab is the active/visible screen; gates the portaled dock FAB. */
+  isActivePage = true,
 }) {
   const BOOKMARKS_STORAGE_KEY = 'lounge_bookmarks_v1'
   const loungeComposerBoot = () => {
@@ -6668,7 +6670,7 @@ export default function SocialFeed({
     getLoungeStreamLightboxOpen,
     () => false,
   )
-  const showLoungeViewportDock = !loungePostDetail && !loungeStreamLightboxOpen
+  const showLoungeViewportDock = isActivePage && !loungePostDetail && !loungeStreamLightboxOpen
   const loungeTitleBarChromePx = loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56
   /** Scroll inset for the opaque dock icon row only. Outer column uses `pb-0`; home-indicator inset lives in feed bottom padding + scroll content. */
   const loungeDockFeedContentInsetPx = showLoungeViewportDock
