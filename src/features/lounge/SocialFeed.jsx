@@ -1291,6 +1291,15 @@ export default function SocialFeed({
     [],
   )
 
+  /** Only the active (non-queued) submit should pin the shared snapshot ref before drain starts. */
+  const shouldAssignLoungePostSnapshotRef = useCallback(
+    () =>
+      !loungePostJobRunningRef.current &&
+      !loungeDetailCommentJobRunningRef.current &&
+      !loungeSubmitQueueRunningRef.current,
+    [],
+  )
+
   const quoteRepostBackgroundUploadInFlight = useCallback(
     () =>
       Boolean(
@@ -1845,7 +1854,7 @@ export default function SocialFeed({
       if (sl?.posterUrl && sl.posterUrl === pendingPoster) skipRevoke.add(sl.posterUrl)
     }
     if (!preserve) {
-      if (!loungeDetailCommentJobRunningRef.current && !loungeSubmitQueueRunningRef.current) {
+      if (!loungeBackgroundSubmitBusy()) {
         const h = loungeDetailCommentVideoPrepHandoffRef.current
         if (h && !h.settled) {
           try {
@@ -1861,8 +1870,8 @@ export default function SocialFeed({
           // ignore
         }
         loungeDetailCommentVideoPrepAbortRef.current = null
+        loungeDetailCommentVideoPrepHandoffRef.current = null
       }
-      loungeDetailCommentVideoPrepHandoffRef.current = null
     }
     setLoungeDetailCommentDraft('')
     setLoungeDetailCommentErr('')
@@ -2634,8 +2643,8 @@ export default function SocialFeed({
               // ignore
             }
             composerVideoPrepAbortRef.current = null
+            composerVideoPrepHandoffRef.current = null
           }
-          composerVideoPrepHandoffRef.current = null
           setComposerVideoSlot(null)
           dismissLoungePostUploadBarIfIdle()
           try {
@@ -2953,7 +2962,9 @@ export default function SocialFeed({
     if (!snapshot) return
 
     const preserveVideoPrep = snapshot.awaitingComposerVideoPrepJobId != null
-    loungePostSnapshotRef.current = snapshot
+    if (shouldAssignLoungePostSnapshotRef()) {
+      loungePostSnapshotRef.current = snapshot
+    }
     clearQuoteRepostForPostAttemptRef.current?.({ preserveQuoteVideoPrep: preserveVideoPrep })
     enqueueAndRunLoungeSubmitRef.current('quote', snapshot)
 
@@ -3394,7 +3405,9 @@ export default function SocialFeed({
     }
 
     const preserveVideoPrep = snapshot.awaitingDetailCommentVideoPrepJobId != null
-    loungeDetailCommentSnapshotRef.current = snapshot
+    if (shouldAssignLoungePostSnapshotRef()) {
+      loungeDetailCommentSnapshotRef.current = snapshot
+    }
     clearLoungeDetailCommentForPostAttempt({ preserveDetailCommentVideoPrep: preserveVideoPrep })
     enqueueAndRunLoungeSubmitRef.current('comment', snapshot)
 
@@ -4945,7 +4958,7 @@ export default function SocialFeed({
       if (sl?.preview && sl.preview === pendingPoster) skipRevoke.add(sl.preview)
     }
     if (!preserve) {
-      if (!loungePostJobRunningRef.current && !loungeSubmitQueueRunningRef.current) {
+      if (!loungeBackgroundSubmitBusy()) {
         const h = composerVideoPrepHandoffRef.current
         if (h && !h.settled) {
           try {
@@ -4961,8 +4974,8 @@ export default function SocialFeed({
           // ignore
         }
         composerVideoPrepAbortRef.current = null
+        composerVideoPrepHandoffRef.current = null
       }
-      composerVideoPrepHandoffRef.current = null
     }
     setPostText('')
     setComposerImageItems((prev) => {
@@ -5192,7 +5205,7 @@ export default function SocialFeed({
       if (sl?.posterUrl && sl.posterUrl === pendingPoster) skipRevoke.add(sl.posterUrl)
     }
     if (!preserve) {
-      if (!loungePostJobRunningRef.current && !loungeSubmitQueueRunningRef.current) {
+      if (!loungeBackgroundSubmitBusy()) {
         const h = quoteRepostVideoPrepHandoffRef.current
         if (h && !h.settled) {
           try {
@@ -5208,8 +5221,8 @@ export default function SocialFeed({
           // ignore
         }
         quoteRepostVideoPrepAbortRef.current = null
+        quoteRepostVideoPrepHandoffRef.current = null
       }
-      quoteRepostVideoPrepHandoffRef.current = null
     }
     setQuoteRepostModal(null)
     setQuoteRepostDraft('')
@@ -5405,6 +5418,7 @@ export default function SocialFeed({
         (snapshot.awaitingComposerVideoPrepJobId != null || Boolean(snapshot.videoPrepSpec))
       const prepHudId = snapshot.awaitingComposerVideoPrepJobId ?? 0
 
+      loungePostSnapshotRef.current = snapshot
       loungePostJobRunningRef.current = true
       setLoungePostSubmitInFlight(true)
       loungePostUploadLastPhaseRef.current = ''
@@ -5629,6 +5643,7 @@ export default function SocialFeed({
         (snapshot.awaitingDetailCommentVideoPrepJobId != null || Boolean(snapshot.videoPrepSpec))
       const prepHudId = snapshot.awaitingDetailCommentVideoPrepJobId ?? 0
 
+      loungeDetailCommentSnapshotRef.current = snapshot
       loungeDetailCommentJobRunningRef.current = true
       setLoungePostSubmitInFlight(true)
       loungePostUploadLastPhaseRef.current = ''
@@ -5945,8 +5960,6 @@ export default function SocialFeed({
    * are managed by each individual background runner; this loop just serialises them.
    */
   const drainLoungeSubmitQueue = useCallback(async () => {
-    if (loungeSubmitQueueRunningRef.current) return
-    loungeSubmitQueueRunningRef.current = true
     try {
       while (loungeSubmitQueueRef.current.length > 0) {
         const job = loungeSubmitQueueRef.current[0]
@@ -5984,13 +5997,14 @@ export default function SocialFeed({
       }
       const id = `lsq-${Date.now()}-${Math.random().toString(36).slice(2)}`
       loungeSubmitQueueRef.current.push({ id, type, snapshot })
-      // If queue is already running, update displayed total immediately so bar shows "X of Y"
+      // Mark running before returning so a rapid second submit cannot overwrite snapshot refs.
       if (loungeSubmitQueueRunningRef.current) {
         setLoungeSubmitQueueDisplay((prev) => ({
           index: prev.index,
           total: loungeSubmitQueueBatchRef.current.total,
         }))
       } else {
+        loungeSubmitQueueRunningRef.current = true
         void drainLoungeSubmitQueue()
       }
     },
@@ -6215,7 +6229,9 @@ export default function SocialFeed({
     if (!snapshot) return
 
     const preserveVideoPrep = snapshot.awaitingComposerVideoPrepJobId != null
-    loungePostSnapshotRef.current = snapshot
+    if (shouldAssignLoungePostSnapshotRef()) {
+      loungePostSnapshotRef.current = snapshot
+    }
     clearComposerForPostAttempt({ preserveComposerVideoPrep: preserveVideoPrep })
     enqueueAndRunLoungeSubmitRef.current('post', snapshot)
   }, [
