@@ -1,36 +1,48 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { profileAvatarToneClass, profileAvatarInitials } from '../profiles/profileGate'
 
 /**
  * Autocomplete dropdown for @mention suggestions.
- * Opens downward by default; flips upward if it would overflow the viewport bottom.
+ * Renders into document.body via portal (escapes any overflow:hidden ancestor).
+ * Opens below the anchor by default; flips above if it would overflow the viewport bottom.
  *
  * Props:
  *   suggestions  – array of profile rows { user_id, handle, display_name, avatar_url }
  *   activeIndex  – currently highlighted row index (controlled by parent)
  *   loading      – show a loading shimmer
- *   onSelect     – (profile) => void — called when a row is tapped/clicked
- *   portalClass  – extra z-index class (e.g. 'z-[132]')
+ *   onSelect     – (profile) => void
+ *   anchorRef    – ref to the element to position relative to (the relative wrapper div)
+ *   zIndex       – CSS z-index value (number, default 9999)
  */
 export default function LoungeMentionDropdown({
   suggestions = [],
   activeIndex = 0,
   loading = false,
   onSelect,
-  portalClass = 'z-[132]',
+  anchorRef,
+  zIndex = 9999,
 }) {
   const ref = useRef(null)
-  const [openUp, setOpenUp] = useState(false)
+  const [pos, setPos] = useState(null) // { top, left, width } fixed coords
 
-  // Flip upward if the dropdown would overflow the viewport bottom.
-  // useLayoutEffect fires before paint so there's no visible flash.
+  // Position the portal dropdown relative to the anchor after each render.
+  // useLayoutEffect fires before paint — no visible flash.
   useLayoutEffect(() => {
-    if (!ref.current) return
-    const rect = ref.current.getBoundingClientRect()
-    setOpenUp(rect.bottom > window.innerHeight - 8)
-  }, [suggestions.length, loading])
+    if (!anchorRef?.current || !ref.current) return
+    const anchor = anchorRef.current.getBoundingClientRect()
+    const dropH = ref.current.offsetHeight
+    const gap = 4
+    const spaceBelow = window.innerHeight - anchor.bottom - gap
+    const openUp = spaceBelow < dropH && anchor.top > dropH + gap
+    setPos({
+      left: anchor.left,
+      width: anchor.width,
+      top: openUp ? anchor.top - dropH - gap : anchor.bottom + gap,
+    })
+  }, [suggestions.length, loading, anchorRef])
 
-  // Scroll the active row into view inside the dropdown list
+  // Scroll the active row into view
   useEffect(() => {
     const el = ref.current?.querySelector(`[data-mention-idx="${activeIndex}"]`)
     el?.scrollIntoView({ block: 'nearest' })
@@ -38,24 +50,28 @@ export default function LoungeMentionDropdown({
 
   if (!loading && suggestions.length === 0) return null
 
-  const positionClass = openUp ? 'bottom-full mb-1' : 'top-full mt-1'
-
-  return (
+  const content = (
     <div
       ref={ref}
       role="listbox"
       aria-label="Mention suggestions"
-      className={`absolute left-0 right-0 overflow-hidden rounded-xl border border-zinc-700/80 bg-zinc-900/98 shadow-2xl backdrop-blur-sm ${positionClass} ${portalClass}`}
+      style={{
+        position: 'fixed',
+        zIndex,
+        left: pos?.left ?? -9999,
+        top: pos?.top ?? -9999,
+        width: pos?.width ?? 'auto',
+        // Hidden until positioned to avoid a 1-frame flash at (0,0)
+        visibility: pos ? 'visible' : 'hidden',
+      }}
+      className="overflow-hidden rounded-xl border border-zinc-700/80 bg-zinc-900/98 shadow-2xl backdrop-blur-sm"
     >
       {loading && suggestions.length === 0 ? (
         <div className="px-3 py-2.5 text-[13px] text-zinc-500">Searching…</div>
       ) : (
         suggestions.map((profile, i) => {
           const isActive = i === activeIndex
-          const initials = profileAvatarInitials(
-            profile.display_name || '',
-            profile.handle || ''
-          )
+          const initials = profileAvatarInitials(profile.display_name || '', profile.handle || '')
           const toneClass = profileAvatarToneClass(profile.user_id || profile.handle || '')
           return (
             <button
@@ -65,8 +81,7 @@ export default function LoungeMentionDropdown({
               role="option"
               aria-selected={isActive}
               onMouseDown={(e) => {
-                // mousedown fires before blur; prevent textarea blur
-                e.preventDefault()
+                e.preventDefault() // prevent textarea blur before onSelect fires
                 onSelect?.(profile)
               }}
               className={`flex w-full items-center gap-2.5 px-3 py-2 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] ${
@@ -104,4 +119,6 @@ export default function LoungeMentionDropdown({
       )}
     </div>
   )
+
+  return createPortal(content, document.body)
 }

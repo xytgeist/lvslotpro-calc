@@ -506,6 +506,9 @@ export default function SocialFeed({
   const composerMediaInputRef = useRef(null)
   const composerTextareaRef = useRef(null)
   const composerMirrorRef = useRef(null)
+  const mentionComposerAnchorRef = useRef(null)
+  const mentionDetailCommentAnchorRef = useRef(null)
+  const mentionQuoteRepostAnchorRef = useRef(null)
   const loungeDetailEditTextareaRef = useRef(null)
   const loungeDetailEditMirrorRef = useRef(null)
   const loungeDetailEditMediaInputRef = useRef(null)
@@ -6928,7 +6931,7 @@ export default function SocialFeed({
                 }}
               >
                 <div className="mt-0.5 flex min-h-[6.5rem] flex-col pr-8">
-                  <div className="relative">
+                  <div ref={mentionComposerAnchorRef}>
                   <div className="grid min-h-[2.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1 sm:min-h-[3rem]">
                     <div
                       ref={composerMirrorRef}
@@ -6967,7 +6970,7 @@ export default function SocialFeed({
                     activeIndex={mentionComposer.activeIndex}
                     loading={mentionComposer.loading}
                     onSelect={(p) => mentionComposer.onMentionSelect(p, setPostText, composerTextareaRef.current)}
-                    portalClass="z-[50]"
+                    anchorRef={mentionComposerAnchorRef}
                   />
                   </div>
                   {(() => {
@@ -8679,7 +8682,7 @@ export default function SocialFeed({
                         <label htmlFor="lounge-detail-comment" className="sr-only">
                           Write a reply
                         </label>
-                        <div className="relative">
+                        <div ref={mentionDetailCommentAnchorRef}>
                         <textarea
                           ref={loungeDetailCommentTextareaRef}
                           id="lounge-detail-comment"
@@ -8717,7 +8720,7 @@ export default function SocialFeed({
                           activeIndex={mentionDetailComment.activeIndex}
                           loading={mentionDetailComment.loading}
                           onSelect={(p) => mentionDetailComment.onMentionSelect(p, setLoungeDetailCommentDraft, loungeDetailCommentTextareaRef.current)}
-                          portalClass="z-[132]"
+                          anchorRef={mentionDetailCommentAnchorRef}
                         />
                         </div>
                         <input
@@ -9304,7 +9307,7 @@ export default function SocialFeed({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="mt-0.5 flex min-h-[6.5rem] flex-col">
-                            <div className="relative">
+                            <div ref={mentionQuoteRepostAnchorRef}>
                             <div className="grid min-h-[2.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 sm:min-h-[3rem] [&>*]:col-start-1 [&>*]:row-start-1">
                               <div
                                 ref={quoteRepostMirrorRef}
@@ -9340,7 +9343,7 @@ export default function SocialFeed({
                               activeIndex={mentionQuoteRepost.activeIndex}
                               loading={mentionQuoteRepost.loading}
                               onSelect={(p) => mentionQuoteRepost.onMentionSelect(p, setQuoteRepostDraft, quoteRepostTextareaRef.current)}
-                              portalClass="z-[112]"
+                              anchorRef={mentionQuoteRepostAnchorRef}
                             />
                             </div>
                             <input
