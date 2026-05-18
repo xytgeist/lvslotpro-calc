@@ -1341,6 +1341,17 @@ export default function SocialFeed({
 
   const startComposerVideoPrepFromSpec = useCallback(
     (spec, slotBase) => {
+      if (loungeBackgroundSubmitBusy()) {
+        composerVideoPrepSpecRef.current = spec
+        composerVideoLastEncodedFileRef.current = null
+        setComposerVideoSlot({
+          ...slotBase,
+          prepJobId: null,
+          prepStatus: 'queued',
+          prepError: '',
+        })
+        return
+      }
       const prevH = composerVideoPrepHandoffRef.current
       if (prevH && !prevH.settled) {
         try {
@@ -1520,11 +1531,22 @@ export default function SocialFeed({
         }
       })()
     },
-    [supabaseClient],
+    [supabaseClient, loungeBackgroundSubmitBusy],
   )
 
   const startQuoteRepostVideoPrepFromSpec = useCallback(
     (spec, slotBase) => {
+      if (loungeBackgroundSubmitBusy()) {
+        quoteRepostVideoPrepSpecRef.current = spec
+        quoteRepostVideoLastEncodedFileRef.current = null
+        setQuoteRepostVideoSlot({
+          ...slotBase,
+          prepJobId: null,
+          prepStatus: 'queued',
+          prepError: '',
+        })
+        return
+      }
       const prevH = quoteRepostVideoPrepHandoffRef.current
       if (prevH && !prevH.settled) {
         try {
@@ -1707,7 +1729,7 @@ export default function SocialFeed({
         }
       })()
     },
-    [supabaseClient],
+    [supabaseClient, loungeBackgroundSubmitBusy],
   )
 
   const cancelComposerMediaPrep = useCallback(
@@ -1945,6 +1967,17 @@ export default function SocialFeed({
 
   const startLoungeDetailCommentVideoPrepFromSpec = useCallback(
     (spec, slotBase) => {
+      if (loungeBackgroundSubmitBusy()) {
+        loungeDetailCommentVideoPrepSpecRef.current = spec
+        loungeDetailCommentVideoLastEncodedFileRef.current = null
+        setLoungeDetailCommentVideoSlot({
+          ...slotBase,
+          prepJobId: null,
+          prepStatus: 'queued',
+          prepError: '',
+        })
+        return
+      }
       const prevH = loungeDetailCommentVideoPrepHandoffRef.current
       if (prevH && !prevH.settled) {
         try {
@@ -2114,7 +2147,7 @@ export default function SocialFeed({
         }
       })()
     },
-    [supabaseClient],
+    [supabaseClient, loungeBackgroundSubmitBusy],
   )
 
   const queueLoungeVideoOrCrop = useCallback(
@@ -2933,7 +2966,10 @@ export default function SocialFeed({
         typeof slot?.prepJobId === 'number'
           ? slot.prepJobId
           : null
-      const specForSnap = awaiting != null ? quoteRepostVideoPrepSpecRef.current : null
+      const specForSnap =
+        hasVideo && !uid && quoteRepostVideoPrepSpecRef.current
+          ? quoteRepostVideoPrepSpecRef.current
+          : null
       const trimRestore =
         awaiting != null && specForSnap && specForSnap.kind === 'trim' && slot
           ? { posterUrl: slot.posterUrl, preview: slot.preview }
@@ -3383,7 +3419,10 @@ export default function SocialFeed({
       hasVideo && !uid && slotNow?.prepStatus === 'preparing' && typeof slotNow?.prepJobId === 'number'
         ? slotNow.prepJobId
         : null
-    const specForSnap = awaiting != null ? loungeDetailCommentVideoPrepSpecRef.current : null
+    const specForSnap =
+      hasVideo && !uid && loungeDetailCommentVideoPrepSpecRef.current
+        ? loungeDetailCommentVideoPrepSpecRef.current
+        : null
     const sessionPosterBlob =
       hasVideo && slotNow?.posterUrl && String(slotNow.posterUrl).startsWith('blob:')
         ? String(slotNow.posterUrl)
@@ -5963,6 +6002,46 @@ export default function SocialFeed({
    * are never shared across concurrent executions. The upload bar and setLoungePostSubmitInFlight
    * are managed by each individual background runner; this loop just serialises them.
    */
+  const resumeDeferredVideoPrepSlots = useCallback(() => {
+    const composerSlot = composerVideoSlotRef.current
+    const composerSpec = composerVideoPrepSpecRef.current
+    if (composerSlot?.prepStatus === 'queued' && composerSpec) {
+      startComposerVideoPrepFromSpec(composerSpec, {
+        file: composerSpec.kind === 'direct' ? composerSpec.file : composerSlot.file,
+        posterUrl: composerSlot.posterUrl,
+        preview: composerSlot.preview,
+        streamVideoUid: composerSlot.streamVideoUid ?? null,
+        prepError: '',
+      })
+    }
+    const quoteSlot = quoteRepostVideoSlotRef.current
+    const quoteSpec = quoteRepostVideoPrepSpecRef.current
+    if (quoteSlot?.prepStatus === 'queued' && quoteSpec) {
+      startQuoteRepostVideoPrepFromSpec(quoteSpec, {
+        file: quoteSpec.kind === 'direct' ? quoteSpec.file : quoteSlot.file,
+        posterUrl: quoteSlot.posterUrl,
+        preview: quoteSlot.preview,
+        streamVideoUid: quoteSlot.streamVideoUid ?? null,
+        prepError: '',
+      })
+    }
+    const commentSlot = loungeDetailCommentVideoSlotRef.current
+    const commentSpec = loungeDetailCommentVideoPrepSpecRef.current
+    if (commentSlot?.prepStatus === 'queued' && commentSpec) {
+      startLoungeDetailCommentVideoPrepFromSpec(commentSpec, {
+        file: commentSpec.kind === 'direct' ? commentSpec.file : commentSlot.file,
+        posterUrl: commentSlot.posterUrl,
+        preview: commentSlot.preview,
+        streamVideoUid: commentSlot.streamVideoUid ?? null,
+        prepError: '',
+      })
+    }
+  }, [
+    startComposerVideoPrepFromSpec,
+    startLoungeDetailCommentVideoPrepFromSpec,
+    startQuoteRepostVideoPrepFromSpec,
+  ])
+
   const drainLoungeSubmitQueue = useCallback(async () => {
     try {
       while (loungeSubmitQueueRef.current.length > 0) {
@@ -5989,8 +6068,9 @@ export default function SocialFeed({
       loungeSubmitQueueBatchRef.current = { total: 0, completed: 0 }
       setLoungeSubmitQueueDisplay({ index: 0, total: 0 })
       dismissLoungePostUploadBarIfIdle()
+      resumeDeferredVideoPrepSlots()
     }
-  }, [dismissLoungePostUploadBarIfIdle])
+  }, [dismissLoungePostUploadBarIfIdle, resumeDeferredVideoPrepSlots])
 
   /** Add a submission to the queue and kick the drain loop if it isn't already running. */
   const enqueueAndRunLoungeSubmit = useCallback(
@@ -6200,7 +6280,10 @@ export default function SocialFeed({
         typeof slot?.prepJobId === 'number'
           ? slot.prepJobId
           : null
-      const specForSnap = awaiting != null ? composerVideoPrepSpecRef.current : null
+      const specForSnap =
+        hasVideo && !uid && composerVideoPrepSpecRef.current
+          ? composerVideoPrepSpecRef.current
+          : null
       const trimRestore =
         awaiting != null && specForSnap && specForSnap.kind === 'trim' && slot
           ? { posterUrl: slot.posterUrl, preview: slot.preview }
