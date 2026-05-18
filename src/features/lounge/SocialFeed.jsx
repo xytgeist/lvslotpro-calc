@@ -76,6 +76,8 @@ import {
 } from '../../utils/formatCompactStatCount.js'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
 import { renderRichCaption } from './loungeCaption'
+import { useMentionState } from './loungeMentionAutocomplete'
+import LoungeMentionDropdown from './LoungeMentionDropdown'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
@@ -539,6 +541,11 @@ export default function SocialFeed({
 
   /** No composer, server-only counts, gated taps until session is known and user is signed in. */
   const loungeReadOnly = !composerAuthResolved || !composerUserId
+
+  // ── @mention autocomplete — one instance per composer ──────────────────────
+  const mentionComposer = useMentionState(postText, supabaseClient, !loungeReadOnly)
+  const mentionDetailComment = useMentionState(loungeDetailCommentDraft, supabaseClient, !loungeReadOnly)
+  const mentionQuoteRepost = useMentionState(quoteRepostDraft, supabaseClient, !loungeReadOnly)
 
   const loungeViewerIsStaff = useMemo(() => {
     const r = composerUserProfile?.role
@@ -6920,7 +6927,7 @@ export default function SocialFeed({
                   opacity: Math.min(1, 0.2 + 0.8 * composerFoldReveal),
                 }}
               >
-                <div className="mt-0.5 flex min-h-[6.5rem] flex-col pr-8">
+                <div className="relative mt-0.5 flex min-h-[6.5rem] flex-col pr-8">
                   <div className="grid min-h-[2.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1 sm:min-h-[3rem]">
                     <div
                       ref={composerMirrorRef}
@@ -6939,7 +6946,11 @@ export default function SocialFeed({
                     <textarea
                       ref={composerTextareaRef}
                       value={postText}
-                      onChange={(e) => setPostText(e.target.value)}
+                      onChange={(e) => { setPostText(e.target.value); mentionComposer.onCursorMove(e) }}
+                      onKeyUp={mentionComposer.onCursorMove}
+                      onMouseUp={mentionComposer.onCursorMove}
+                      onKeyDown={(e) => mentionComposer.onMentionKeyDown(e, setPostText, composerTextareaRef.current)}
+                      onBlur={() => window.setTimeout(() => mentionComposer.clearMention(), 150)}
                       onScroll={(e) => {
                         const m = composerMirrorRef.current
                         if (m) m.scrollTop = e.currentTarget.scrollTop
@@ -6950,6 +6961,13 @@ export default function SocialFeed({
                       maxLength={280}
                     />
                   </div>
+                  <LoungeMentionDropdown
+                    suggestions={mentionComposer.suggestions}
+                    activeIndex={mentionComposer.activeIndex}
+                    loading={mentionComposer.loading}
+                    onSelect={(p) => mentionComposer.onMentionSelect(p, setPostText, composerTextareaRef.current)}
+                    portalClass="z-[20]"
+                  />
                   {(() => {
                     const gifUrl = String(composerMediaUrl || '').trim()
                     const imageUrls = composerImageItems.map((x) => x.preview)
@@ -8655,7 +8673,7 @@ export default function SocialFeed({
                           </span>
                         )}
                       </button>
-                      <div className="min-w-0 flex-1 pr-8">
+                      <div className="relative min-w-0 flex-1 pr-8">
                         <label htmlFor="lounge-detail-comment" className="sr-only">
                           Write a reply
                         </label>
@@ -8663,12 +8681,16 @@ export default function SocialFeed({
                           ref={loungeDetailCommentTextareaRef}
                           id="lounge-detail-comment"
                           value={loungeDetailCommentDraft}
-                          onChange={(e) => setLoungeDetailCommentDraft(e.target.value)}
+                          onChange={(e) => { setLoungeDetailCommentDraft(e.target.value); mentionDetailComment.onCursorMove(e) }}
+                          onKeyUp={mentionDetailComment.onCursorMove}
+                          onMouseUp={mentionDetailComment.onCursorMove}
+                          onKeyDown={(e) => mentionDetailComment.onMentionKeyDown(e, setLoungeDetailCommentDraft, loungeDetailCommentTextareaRef.current)}
                           onBlur={(e) => {
                             const host = e.currentTarget.closest('[data-lounge-detail-comment-host]')
                             const next = e.relatedTarget
                             if (host && next instanceof Node && host.contains(next)) return
                             window.setTimeout(() => {
+                              mentionDetailComment.clearMention()
                               if (loungeDetailCommentMediaSessionRef.current) return
                               if (loungeVideoCrop?.mode === 'detailComment') return
                               const t = loungeDetailCommentDraftRef.current.trim()
@@ -8686,6 +8708,13 @@ export default function SocialFeed({
                           rows={1}
                           className="min-h-[38px] w-full resize-none overflow-hidden bg-transparent px-0 py-1 text-[17px] leading-[1.3] text-zinc-100 outline-none placeholder:text-zinc-500 selection:bg-cyan-500/25 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                           aria-label="Write a reply"
+                        />
+                        <LoungeMentionDropdown
+                          suggestions={mentionDetailComment.suggestions}
+                          activeIndex={mentionDetailComment.activeIndex}
+                          loading={mentionDetailComment.loading}
+                          onSelect={(p) => mentionDetailComment.onMentionSelect(p, setLoungeDetailCommentDraft, loungeDetailCommentTextareaRef.current)}
+                          portalClass="z-[132]"
                         />
                         <input
                           id={LOUNGE_DETAIL_COMMENT_MEDIA_INPUT_ID}
@@ -9270,7 +9299,7 @@ export default function SocialFeed({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="mt-0.5 flex min-h-[6.5rem] flex-col">
+                          <div className="relative mt-0.5 flex min-h-[6.5rem] flex-col">
                             <div className="grid min-h-[2.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 sm:min-h-[3rem] [&>*]:col-start-1 [&>*]:row-start-1">
                               <div
                                 ref={quoteRepostMirrorRef}
@@ -9286,7 +9315,11 @@ export default function SocialFeed({
                               <textarea
                                 ref={quoteRepostTextareaRef}
                                 value={quoteRepostDraft}
-                                onChange={(e) => setQuoteRepostDraft(e.target.value)}
+                                onChange={(e) => { setQuoteRepostDraft(e.target.value); mentionQuoteRepost.onCursorMove(e) }}
+                                onKeyUp={mentionQuoteRepost.onCursorMove}
+                                onMouseUp={mentionQuoteRepost.onCursorMove}
+                                onKeyDown={(e) => mentionQuoteRepost.onMentionKeyDown(e, setQuoteRepostDraft, quoteRepostTextareaRef.current)}
+                                onBlur={() => window.setTimeout(() => mentionQuoteRepost.clearMention(), 150)}
                                 onScroll={(e) => {
                                   const m = quoteRepostMirrorRef.current
                                   if (m) m.scrollTop = e.currentTarget.scrollTop
@@ -9297,6 +9330,13 @@ export default function SocialFeed({
                                 aria-label="Quote for repost"
                               />
                             </div>
+                            <LoungeMentionDropdown
+                              suggestions={mentionQuoteRepost.suggestions}
+                              activeIndex={mentionQuoteRepost.activeIndex}
+                              loading={mentionQuoteRepost.loading}
+                              onSelect={(p) => mentionQuoteRepost.onMentionSelect(p, setQuoteRepostDraft, quoteRepostTextareaRef.current)}
+                              portalClass="z-[112]"
+                            />
                             <input
                               id={LOUNGE_QUOTE_REPOST_MEDIA_INPUT_ID}
                               ref={quoteRepostMediaInputRef}

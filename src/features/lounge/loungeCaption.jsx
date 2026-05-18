@@ -16,27 +16,61 @@ export function hrefForUrlDisplay(display) {
 }
 
 /**
- * Lounge caption: `http(s)://…` and `www.…` links (opens new tab), plus Unicode `#tags` with `_` / `-`.
- * @param {{ hashtagClassName?: string, linkClassName?: string }} [opts]
+ * Lounge caption: `http(s)://…` and `www.…` links (opens new tab), Unicode `#tags`, and `@handles`.
+ * @param {{ hashtagClassName?: string, linkClassName?: string, mentionClassName?: string, onMentionClick?: (handle: string, e: MouseEvent) => void }} [opts]
  */
 export function renderRichCaption(
   text,
   {
     hashtagClassName = 'font-semibold text-cyan-400',
     linkClassName = 'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+    mentionClassName = 'font-medium text-orange-400',
+    onMentionClick = null,
   } = {}
 ) {
   const s = String(text ?? '')
   if (!s) return null
   const out = []
   let rk = 0
+
+  const pushMentionParsed = (fragment) => {
+    if (!fragment) return
+    let last = 0
+    const re = /@([\w]+)/g
+    let m
+    while ((m = re.exec(fragment)) !== null) {
+      if (m.index > last) out.push(fragment.slice(last, m.index))
+      const handle = m[1]
+      if (onMentionClick) {
+        out.push(
+          <button
+            key={`rk-m-${rk++}`}
+            type="button"
+            onClick={(e) => onMentionClick(handle, e)}
+            className={`${mentionClassName} touch-manipulation [-webkit-tap-highlight-color:transparent]`}
+          >
+            @{handle}
+          </button>
+        )
+      } else {
+        out.push(
+          <span key={`rk-m-${rk++}`} className={mentionClassName}>
+            @{handle}
+          </span>
+        )
+      }
+      last = m.index + m[0].length
+    }
+    if (last < fragment.length) out.push(fragment.slice(last))
+  }
+
   const pushHashtagParsed = (fragment) => {
     if (!fragment) return
     let last = 0
     const re = /#(?:[\p{L}\p{N}_-]+)/gu
     let m
     while ((m = re.exec(fragment)) !== null) {
-      if (m.index > last) out.push(fragment.slice(last, m.index))
+      if (m.index > last) pushMentionParsed(fragment.slice(last, m.index))
       out.push(
         <span key={`rk-h-${rk++}`} className={hashtagClassName}>
           {m[0]}
@@ -44,7 +78,7 @@ export function renderRichCaption(
       )
       last = m.index + m[0].length
     }
-    if (last < fragment.length) out.push(fragment.slice(last))
+    if (last < fragment.length) pushMentionParsed(fragment.slice(last))
   }
 
   let last = 0
