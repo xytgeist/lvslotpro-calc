@@ -91,7 +91,11 @@ import LoungePostArticle from './LoungePostArticle'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
-import { LoungeFeedInlineSoundResetBinder, LoungeFeedVideoAutoplayProvider } from './LoungeFeedVideoAutoplayContext.jsx'
+import {
+  LoungeFeedAutoplayPostsKick,
+  LoungeFeedInlineSoundResetBinder,
+  LoungeFeedVideoAutoplayProvider,
+} from './LoungeFeedVideoAutoplayContext.jsx'
 import {
   getLoungeStreamLightboxOpen,
   subscribeLoungeStreamLightboxOpen,
@@ -7331,6 +7335,7 @@ export default function SocialFeed({
         }}
       >
         <LoungeFeedVideoAutoplayProvider scrollRootRef={loungeFeedScrollRef}>
+        <LoungeFeedAutoplayPostsKick postCount={communityPosts.length} />
         <LoungeFeedInlineSoundResetBinder resetRef={resetFeedInlineSoundRef} />
         <div
           aria-hidden

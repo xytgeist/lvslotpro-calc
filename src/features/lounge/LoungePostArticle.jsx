@@ -391,6 +391,7 @@ export default function LoungePostArticle({
             <LoungePostFeedImagesAndGif
               post={displayPost}
               variant="feed"
+              feedAutoplayRowId={post.id}
               firstMarginTopClass={
                 feedPostDisplayCaption(displayPost)
                   ? LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS

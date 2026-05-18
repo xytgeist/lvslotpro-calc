@@ -108,6 +108,34 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
   return <LoungeFeedVideoAutoplayContext.Provider value={value}>{children}</LoungeFeedVideoAutoplayContext.Provider>
 }
 
+/** Schedule a mid-scroll autoplay winner recompute (e.g. after feed pagination appends rows). */
+// eslint-disable-next-line react-refresh/only-export-components -- colocated store hook for this context module
+export function useLoungeFeedVideoAutoplaySchedule() {
+  const ctx = useContext(LoungeFeedVideoAutoplayContext)
+  return ctx?.store?.schedule ?? (() => {})
+}
+
+/**
+ * Re-run autoplay winner pick after feed length changes (infinite scroll append).
+ * @param {{ postCount: number }} props
+ */
+export function LoungeFeedAutoplayPostsKick({ postCount }) {
+  const schedule = useLoungeFeedVideoAutoplaySchedule()
+  useLayoutEffect(() => {
+    schedule()
+    const raf1 = requestAnimationFrame(() => {
+      schedule()
+      requestAnimationFrame(schedule)
+    })
+    const tid = window.setTimeout(schedule, 160)
+    return () => {
+      cancelAnimationFrame(raf1)
+      window.clearTimeout(tid)
+    }
+  }, [postCount, schedule])
+  return null
+}
+
 /**
  * Binds `resetRef.current` to `resetFeedInlineSound` from the nearest provider (for callers outside the subtree).
  * @param {{ resetRef: React.MutableRefObject<() => void> }} props

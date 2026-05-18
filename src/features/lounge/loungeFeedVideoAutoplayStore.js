@@ -1,6 +1,14 @@
 /** Match `LAZY_ATTACH_ROOT_MARGIN` in `LoungePostStreamVideo.jsx` (expanded intersection for prefetch). */
 const SCROLL_ROOT_PAD_TOP = 180
 const SCROLL_ROOT_PAD_BOTTOM = 240
+/** Ignore sliver tiles (e.g. previous page peeking at top) so load-more rows can win mid-scroll. */
+const MIN_CANDIDATE_VISIBLE_PX = 48
+
+function candidateVisiblePx(rect, rootTop, rootBottom, vh) {
+  const visTop = Math.max(rect.top, rootTop, 0)
+  const visBottom = Math.min(rect.bottom, rootBottom, vh)
+  return Math.max(0, visBottom - visTop)
+}
 
 /**
  * External store for mid-scroll Stream “winner” (no React state inside recompute).
@@ -36,7 +44,7 @@ export function createAutoplayStore() {
     const rootBottom = rootRect ? rootRect.bottom : typeof window !== 'undefined' ? window.innerHeight : 800
     const vh = typeof window !== 'undefined' ? window.innerHeight : rootBottom
 
-    /** @type {{ id: string, centerY: number, top: number, bottom: number }[]} */
+    /** @type {{ id: string, centerY: number, top: number, bottom: number, visiblePx: number }[]} */
     const candidates = []
     for (const [id, getEl] of entries) {
       const el = getEl()
@@ -48,8 +56,10 @@ export function createAutoplayStore() {
       const intersectsRootStrict = rect.bottom > rootTop && rect.top < rootBottom
       const intersectsViewport = rect.bottom > 0 && rect.top < vh
       if (!intersectsViewport || (!intersectsRootLoose && !intersectsRootStrict)) continue
+      const visiblePx = candidateVisiblePx(rect, rootTop, rootBottom, vh)
+      if (visiblePx < MIN_CANDIDATE_VISIBLE_PX) continue
       const centerY = (rect.top + rect.bottom) / 2
-      candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom })
+      candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom, visiblePx })
     }
 
     /** @type {string | null} */
@@ -62,8 +72,10 @@ export function createAutoplayStore() {
         const rect = el.getBoundingClientRect()
         if (rect.width < 2 || rect.height < 2) continue
         if (rect.bottom <= 0 || rect.top >= vh) continue
+        const visiblePx = candidateVisiblePx(rect, rootTop, rootBottom, vh)
+        if (visiblePx < MIN_CANDIDATE_VISIBLE_PX) continue
         const centerY = (rect.top + rect.bottom) / 2
-        candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom })
+        candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom, visiblePx })
       }
     }
 
@@ -87,7 +99,9 @@ export function createAutoplayStore() {
       }
     }
 
-    if (next !== winnerId) {
+    const candidateIds = new Set(candidates.map((c) => c.id))
+    const prevWinnerStale = Boolean(winnerId && !candidateIds.has(winnerId))
+    if (next !== winnerId || prevWinnerStale) {
       winnerId = next
       emit()
     }
