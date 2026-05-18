@@ -522,7 +522,7 @@ export default function LoungeDockArcCarouselPrototype({
     if (prev === null) return // skip first mount
     if (prev === followingFilterOnForFlash) return
     window.clearTimeout(followingFlashTimerRef.current)
-    setFollowingFlash({ label: followingFilterOnForFlash ? 'Following' : 'Everyone', key: Date.now() })
+    setFollowingFlash({ label: followingFilterOnForFlash ? 'Only Frens' : 'Discover', key: Date.now() })
     followingFlashTimerRef.current = window.setTimeout(() => {
       followingFlashTimerRef.current = 0
       setFollowingFlash(null)
@@ -1730,7 +1730,7 @@ export default function LoungeDockArcCarouselPrototype({
         >
           <span
             key={followingFlash.key}
-            className={`lounge-filter-flash-fizzle inline-block text-[11px] font-semibold tracking-wide drop-shadow-[0_0_8px_rgba(6,206,252,0.75)] ${followingFlash.label === 'Following' ? 'text-[#06cefc]' : 'text-zinc-200'}`}
+            className={`lounge-filter-flash-fizzle inline-block text-[11px] font-semibold tracking-wide ${followingFlash.label === 'Only Frens' ? 'text-[#00AFF0] drop-shadow-[0_0_8px_rgba(0,175,240,0.75)]' : 'text-zinc-200 drop-shadow-[0_0_8px_rgba(6,206,252,0.55)]'}`}
           >
             {followingFlash.label}
           </span>
