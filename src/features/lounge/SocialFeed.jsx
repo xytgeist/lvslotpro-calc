@@ -6721,7 +6721,7 @@ export default function SocialFeed({
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed left-1/2 z-[102] w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-cyan-500/50 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-cyan-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md"
+          className={`pointer-events-none fixed left-1/2 w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-cyan-500/50 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-cyan-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
           style={{ top: 'max(0.5rem, env(safe-area-inset-top))' }}
         >
           Sending your quote... You&apos;ll have 30 minutes to edit after it posts.
@@ -6731,21 +6731,21 @@ export default function SocialFeed({
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed left-1/2 z-[102] w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-cyan-500/50 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-cyan-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md"
+          className={`pointer-events-none fixed left-1/2 w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-cyan-500/50 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-cyan-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
           style={{
             top: quoteRepostQueuedToast
               ? 'max(4.25rem, calc(0.5rem + 3.25rem + env(safe-area-inset-top)))'
               : 'max(0.5rem, env(safe-area-inset-top))',
           }}
         >
-          Sending your reply… You can keep browsing while it uploads.
+          Sending your reply… You&apos;ll have 30 minutes to edit after it posts.
         </div>
       ) : null}
       {loungeShareFlash ? (
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed left-1/2 z-[102] w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-emerald-500/45 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-emerald-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md"
+          className={`pointer-events-none fixed left-1/2 w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-emerald-500/45 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-emerald-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
           style={{
             top:
               quoteRepostQueuedToast || loungeDetailCommentQueuedToast

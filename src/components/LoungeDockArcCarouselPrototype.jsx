@@ -334,6 +334,9 @@ export default function LoungeDockArcCarouselPrototype({
   const [collisionInsetPx, setCollisionInsetPx] = useState(0)
   const [carouselRotation, setCarouselRotation] = useState(0)
   const [spinning, setSpinning] = useState(false)
+  /** Flash label shown beside the Following button when the filter toggles. */
+  const [followingFlash, setFollowingFlash] = useState(/** @type {{ label: string, key: number } | null} */ (null))
+  const followingFlashTimerRef = useRef(0)
   /** One-time overlay after first menu open: long-press drag to move FAB. */
   const [repositionCoachOpen, setRepositionCoachOpen] = useState(false)
 
@@ -402,7 +405,27 @@ export default function LoungeDockArcCarouselPrototype({
     const pos = saved
       ? loungeDockFabPositionFromPct(saved.xPct, saved.yPct, bounds)
       : loungeDockFabDefaultPosition(width, height, LOUNGE_DOCK_FAB_SIZE_PX, bottomObstaclePx)
-    setFabPos(pos)
+    // If the pref-restored position overlaps a visible obstacle (e.g. upload bar still on screen
+    // from a prior session or during remount), pre-adjust to the obstacle-aware position so the
+    // FAB never flickers down-then-up while the collision effect catches up.
+    const tentativeRect = {
+      left: pos.left,
+      top: pos.top,
+      right: pos.left + LOUNGE_DOCK_FAB_SIZE_PX,
+      bottom: pos.top + LOUNGE_DOCK_FAB_SIZE_PX,
+    }
+    const liveObstacleInset = loungeDockFabCollisionBottomInsetPx(tentativeRect, height)
+    if (liveObstacleInset > 0.5) {
+      const totalInset = bottomObstaclePx + liveObstacleInset
+      const adjustedBounds = loungeDockFabMoveBounds(width, height, LOUNGE_DOCK_FAB_SIZE_PX, totalInset)
+      setFabPos(
+        saved
+          ? loungeDockFabPositionFromPct(saved.xPct, saved.yPct, adjustedBounds)
+          : loungeDockFabDefaultPosition(width, height, LOUNGE_DOCK_FAB_SIZE_PX, totalInset),
+      )
+    } else {
+      setFabPos(pos)
+    }
   }, [viewport.width, viewport.height, bottomObstaclePx])
 
   /** Nudge FAB up when a bottom obstacle (upload bar) appears under it — keeps Cancel tappable. */
@@ -484,6 +507,26 @@ export default function LoungeDockArcCarouselPrototype({
   useEffect(() => {
     repositioningRef.current = repositioning
   }, [repositioning])
+
+  /** Detect following-filter toggle and show a "Following" / "Everyone" fizzle flash. */
+  const followingFilterOnForFlash = useMemo(() => {
+    const allItems = [...items, ...(cornerLItems ?? [])]
+    return Boolean(allItems.find((it) => it.id === 'following')?.filterOnBorder)
+  }, [items, cornerLItems])
+  const prevFollowingFilterOnRef = useRef(/** @type {boolean | null} */ (null))
+  useEffect(() => {
+    const prev = prevFollowingFilterOnRef.current
+    prevFollowingFilterOnRef.current = followingFilterOnForFlash
+    if (prev === null) return // skip first mount
+    if (prev === followingFilterOnForFlash) return
+    window.clearTimeout(followingFlashTimerRef.current)
+    setFollowingFlash({ label: followingFilterOnForFlash ? 'Following' : 'Everyone', key: Date.now() })
+    followingFlashTimerRef.current = window.setTimeout(() => {
+      followingFlashTimerRef.current = 0
+      setFollowingFlash(null)
+    }, 950)
+    return () => window.clearTimeout(followingFlashTimerRef.current)
+  }, [followingFilterOnForFlash])
 
   useEffect(() => {
     if (!fabSelectionLock && !repositioning) return undefined
@@ -1429,7 +1472,11 @@ export default function LoungeDockArcCarouselPrototype({
             ? `${glow.bgLit} ${glow.ringLit} ${glow.shadowLit}`
             : `${glow.bgIdle} ${glow.shadowIdle}`
         }`}
-        style={{ width: LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX, height: LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX }}
+        style={{
+          width: LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX,
+          height: LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX,
+          ...(item.filterOnBorder ? { backgroundColor: 'white' } : {}),
+        }}
       >
         <span
           className="flex items-center justify-center"
@@ -1441,6 +1488,19 @@ export default function LoungeDockArcCarouselPrototype({
           {item.icon}
         </span>
       </span>
+      {item.id === 'following' && followingFlash ? (
+        <span
+          className="pointer-events-none absolute left-1/2 top-full z-[70] mt-1 -translate-x-1/2 whitespace-nowrap"
+          aria-hidden
+        >
+          <span
+            key={followingFlash.key}
+            className={`lounge-filter-flash-fizzle inline-block text-[11px] font-semibold tracking-wide drop-shadow-[0_0_8px_rgba(6,206,252,0.75)] ${followingFlash.label === 'Following' ? 'text-[#06cefc]' : 'text-zinc-200'}`}
+          >
+            {followingFlash.label}
+          </span>
+        </span>
+      ) : null}
     </button>
     )
   }
