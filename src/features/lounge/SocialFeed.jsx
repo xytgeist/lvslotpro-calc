@@ -654,7 +654,7 @@ export default function SocialFeed({
     const barH = loungePostDetailTitleBarHeight > 0 ? loungePostDetailTitleBarHeight : 56
     // 4px matches the mt-1 row-separator in LoungePostDetailCommentHierarchy so the title
     // bar lands just at the bottom of the interaction row of the card above the focused comment.
-    const GAP_PX = 4
+    const GAP_PX = 8
     const scRect = sc.getBoundingClientRect()
     const elRect = el.getBoundingClientRect()
     const nextTop = Math.max(0, sc.scrollTop + (elRect.top - scRect.top) - barH - GAP_PX)
