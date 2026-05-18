@@ -66,6 +66,27 @@ The agent should treat the following as **standing instructions for this session
 
 **Supabase:** **test** (project ref: jtjgtucumuoswnbauxry)
 
-**Goal:** today we really need to knock out the rest of the comments UI/UX and bugs so we can get back on track and figure out where we are in our phase plan
+**Goal:** _[one line: what you want done this session]_
 
 **Start by reading:** `AGENTS.md`, `docs/social-feed-roadmap.md`, `docs/test-buildout-backlog.md`, `docs/frontend-architecture.md`, then propose a plan.
+
+---
+
+## Last session recap (May 18 2026, branch `test`)
+
+Knocked out a pile of Lounge polish and bug fixes — all committed and pushed:
+
+| Commit | What |
+|---|---|
+| `1206f0a` | Upload toast z-index (`z-[107]` when detail above profile), FAB flicker on upload bar fixed (effect-1 pre-checks obstacles), following filter flash + white-bg |
+| `35974bc` | Following filter flash was invisible (menu closes before flash fires) — moved flash to dock layer as standalone `fixed` element using saved button coords |
+| `8f7a0df` | More breathing room around detail comment activation pill (`pt-1` → `pt-2.5`, slight bottom bump) |
+
+Previous session fixes (still in scope):
+- `@handle` taps open profile, `#hashtag` taps open search with 3-tier hashtag ordering
+- FAB hidden on non-Lounge screens (calculators, offers, etc.) via `isActivePage` prop
+- Comment media lightbox z-index when detail opened from profile tab
+- Focused comment scroll padding + gap tuning (GAP_PX = 8)
+- Reply composer no longer scrolls away the focused comment (`skipScrollToTop`)
+- Discard prompt visible when detail is above profile (`z-[106]`)
+- Nested `<button>` HTML error in comment hierarchy → `div[role=button]`
