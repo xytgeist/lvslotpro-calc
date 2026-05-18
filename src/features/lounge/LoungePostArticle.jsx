@@ -308,11 +308,11 @@ export default function LoungePostArticle({
           <>
             {rc?.reply_to_profile?.handle ? (
               <div className="mt-0.5 text-[12px] leading-snug text-zinc-500">
-                …in reply to{' '}
+                <em>…in reply to</em>{' '}
                 <button
                   type="button"
                   onClick={(e) => onEmbeddedAuthorProfile(e, rc.reply_to_profile)}
-                  className="font-medium text-zinc-400 hover:text-cyan-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                  className="font-medium text-orange-400 hover:text-orange-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                 >
                   @{rc.reply_to_profile.handle}
                 </button>
