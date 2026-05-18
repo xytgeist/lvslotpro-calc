@@ -11,6 +11,7 @@ import {
   uploadVideoToCfStreamResumableTus,
   waitForCfStreamManifestReady,
 } from '../../utils/loungeVideoUpload'
+import { fetchLoungeStreamPosterFileFromSnapshot } from './loungeStreamSessionPoster.js'
 
 /**
  * Uploads media and inserts `feed_comments`.
@@ -141,13 +142,13 @@ export async function executeLoungeCommentSubmission({
       }
 
       let posterFile = null
-      const sess = String(sessionStreamPosterBlobUrl || '').trim()
-      if (sess.startsWith('blob:')) {
-        throwIfAborted()
-        const res = await fetch(sess)
-        const b = await res.blob()
-        if (b?.size) posterFile = new File([b], 'stream-poster.jpg', { type: 'image/jpeg' })
-      } else if (fileProbe) {
+      throwIfAborted()
+      posterFile = await fetchLoungeStreamPosterFileFromSnapshot(
+        { sessionStreamPosterBlobUrl },
+        streamVideoUid,
+        signal,
+      )
+      if (!posterFile && fileProbe) {
         throwIfAborted()
         const obj = await captureVideoFilePosterObjectUrl(fileProbe)
         if (obj) {

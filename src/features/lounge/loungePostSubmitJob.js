@@ -14,6 +14,7 @@ import {
   uploadVideoToCfStreamResumableTus,
   waitForCfStreamManifestReady,
 } from '../../utils/loungeVideoUpload'
+import { fetchLoungeStreamPosterFileFromSnapshot } from './loungeStreamSessionPoster.js'
 
 /** Mirrors `SocialFeed` so insert failures surface the same copy. */
 const LOUNGE_MAX_PINNED_ALERT =
@@ -185,15 +186,9 @@ export async function executeLoungeCommunityPostSubmission({
       }
 
       let posterFile = null
-      const sess = String(snapshot.sessionStreamPosterBlobUrl || '').trim()
-      if (sess.startsWith('blob:')) {
-        throwIfAborted()
-        const res = await fetch(sess)
-        const b = await res.blob()
-        if (b?.size) {
-          posterFile = new File([b], 'stream-poster.jpg', { type: 'image/jpeg' })
-        }
-      } else if (fileProbe) {
+      throwIfAborted()
+      posterFile = await fetchLoungeStreamPosterFileFromSnapshot(snapshot, streamVideoUid, signal)
+      if (!posterFile && fileProbe) {
         throwIfAborted()
         const obj = await captureVideoFilePosterObjectUrl(fileProbe)
         if (obj) {

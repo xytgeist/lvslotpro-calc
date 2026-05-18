@@ -701,6 +701,10 @@ export default function LoungeProfileFullScreen({
         })
         const hydrated = await hydratePosts(sorted)
         if (!cancelled) setInteractionPosts(hydrated || [])
+        const refreshFn = postCardProps?.refreshPostInteractions
+        if (!cancelled && typeof refreshFn === 'function' && orderedIds.length > 0) {
+          void refreshFn(orderedIds)
+        }
       } catch (e) {
         if (!cancelled) {
           setInteractionErr(e?.message || 'Could not load.')
@@ -713,7 +717,7 @@ export default function LoungeProfileFullScreen({
     return () => {
       cancelled = true
     }
-  }, [open, tab, isOwnProfile, profileUserId, supabaseClient, hydratePosts])
+  }, [open, tab, isOwnProfile, profileUserId, supabaseClient, hydratePosts, postCardProps?.refreshPostInteractions])
 
   useEffect(() => {
     if (!open || !profileUserId || tab !== 'replies') {

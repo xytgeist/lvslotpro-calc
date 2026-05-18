@@ -44,3 +44,47 @@ export function releaseLoungeStreamSessionPoster(uid) {
   }
   byUid.delete(id)
 }
+
+/** Blob URLs on a submit snapshot that must stay alive until the background job finishes. */
+export function loungeSubmitSnapshotBlobUrls(snapshot) {
+  /** @type {Set<string>} */
+  const urls = new Set()
+  if (!snapshot) return urls
+  const poster = String(snapshot.sessionStreamPosterBlobUrl || '').trim()
+  if (poster.startsWith('blob:')) urls.add(poster)
+  const restore = snapshot.videoPrepSlotRestore
+  if (restore && typeof restore === 'object') {
+    const po = String(restore.posterUrl || '').trim()
+    const pr = String(restore.preview || '').trim()
+    if (po.startsWith('blob:')) urls.add(po)
+    if (pr.startsWith('blob:')) urls.add(pr)
+  }
+  return urls
+}
+
+/**
+ * Resolve a JPEG poster `File` from snapshot blob URL and/or session pin for a Stream uid.
+ * @param {{ sessionStreamPosterBlobUrl?: string | null }} snapshot
+ * @param {string} streamVideoUid
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<File | null>}
+ */
+export async function fetchLoungeStreamPosterFileFromSnapshot(snapshot, streamVideoUid, signal) {
+  /** @type {string[]} */
+  const candidates = []
+  const sess = String(snapshot?.sessionStreamPosterBlobUrl || '').trim()
+  if (sess.startsWith('blob:')) candidates.push(sess)
+  const pinned = peekLoungeStreamSessionPoster(streamVideoUid)
+  if (pinned.startsWith('blob:') && !candidates.includes(pinned)) candidates.push(pinned)
+  for (const url of candidates) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    try {
+      const res = await fetch(url)
+      const b = await res.blob()
+      if (b?.size) return new File([b], 'stream-poster.jpg', { type: 'image/jpeg' })
+    } catch {
+      // try next candidate
+    }
+  }
+  return null
+}

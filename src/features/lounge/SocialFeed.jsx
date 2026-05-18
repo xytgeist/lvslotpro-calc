@@ -101,7 +101,11 @@ import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import LoungeVideoCropModal from './LoungeVideoCropModal.jsx'
-import { pinLoungeStreamSessionPoster, releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
+import {
+  loungeSubmitSnapshotBlobUrls,
+  pinLoungeStreamSessionPoster,
+  releaseLoungeStreamSessionPoster,
+} from './loungeStreamSessionPoster.js'
 import KlipyGifPicker from './KlipyGifPicker.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 // LOUNGE_DOCK_FOOTER_BAR_DISABLED — classic dock icon row (FAB wheel is primary nav). Re-enable import + JSX below to restore.
@@ -299,12 +303,20 @@ export default function SocialFeed({
   const loungePostAbortRef = useRef(null)
   /** True while a background lounge post job may be in flight (guards double submit). */
   const loungePostJobRunningRef = useRef(false)
-  /** Sequential submission queue — entries: { id, type: 'post'|'comment'|'quote', snapshot }. */
+  /** Video-only submission queue — text/image/GIF use the fast lane (parallel). */
   const loungeSubmitQueueRef = useRef(/** @type {Array<{id:string,type:string,snapshot:object}>} */ ([]))
-  /** True while the queue drain loop is actively running. */
+  /** True while the video queue drain loop is actively running. */
   const loungeSubmitQueueRunningRef = useRef(false)
-  /** Monotonic batch counters for "Post X of Y" bar display. */
+  /** Monotonic batch counters for "Post X of Y" bar display (video jobs only). */
   const loungeSubmitQueueBatchRef = useRef({ total: 0, completed: 0 })
+  /** Parallel fast-lane submits (no Stream video) in flight. */
+  const loungeFastLaneInFlightRef = useRef(0)
+  /** Fast-lane failure deferred while a video job owns the upload failure modal. */
+  const loungePendingFastLaneFailureRef = useRef(
+    /** @type {{ kind: 'post' | 'comment', snapshot: object, phase: string, message: string } | null} */ (null),
+  )
+  /** Ref-count for `loungePostSubmitInFlight` across fast-lane + video jobs. */
+  const loungeSubmitInFlightCountRef = useRef(0)
   /** React state mirror of batch counters so the bar header re-renders. */
   const [loungeSubmitQueueDisplay, setLoungeSubmitQueueDisplay] = useState({ index: 0, total: 0 })
   /** Snapshot + abort for background post-detail reply submission (same pattern as feed composer). */
@@ -1276,13 +1288,18 @@ export default function SocialFeed({
     return () => window.clearTimeout(tid)
   }, [loungeShareFlash])
 
+  const bumpLoungeSubmitInFlight = useCallback((delta) => {
+    loungeSubmitInFlightCountRef.current = Math.max(0, loungeSubmitInFlightCountRef.current + delta)
+    setLoungePostSubmitInFlight(loungeSubmitInFlightCountRef.current > 0)
+  }, [])
+
   /** Feed / quote / reply background jobs share one upload bar — do not clear it from unrelated surface cleanup. */
   const dismissLoungePostUploadBarIfIdle = useCallback(() => {
     if (loungePostJobRunningRef.current || loungeDetailCommentJobRunningRef.current) return
     setLoungePostUploadBar(null)
   }, [])
 
-  /** True while a queued/running submit job may still own shared video prep / upload bar state. */
+  /** True while a video submit queue job may still own shared video prep / upload bar state. */
   const loungeBackgroundSubmitBusy = useCallback(
     () =>
       loungePostJobRunningRef.current ||
@@ -1290,6 +1307,53 @@ export default function SocialFeed({
       loungeSubmitQueueRunningRef.current,
     [],
   )
+
+  const flushPendingFastLaneFailure = useCallback(() => {
+    const pending = loungePendingFastLaneFailureRef.current
+    if (!pending) return
+    loungePendingFastLaneFailureRef.current = null
+    if (pending.kind === 'comment') {
+      loungeDetailCommentSnapshotRef.current = pending.snapshot
+      const pathIds = pending.snapshot.commentDetailPathIds
+      if (Array.isArray(pathIds) && pathIds.length > 0) {
+        setLoungeCommentDetailPathIds((prev) => (prev.length > 0 ? prev : pathIds))
+      }
+      setLoungeDetailCommentErr(pending.message)
+    } else {
+      loungePostSnapshotRef.current = pending.snapshot
+    }
+    setLoungePostUploadFailureDetails({
+      kind: pending.kind,
+      phase: pending.phase,
+      message: pending.message,
+    })
+    setLoungePostUploadFailedOpen(true)
+  }, [])
+
+  const deferOrShowFastLaneFailure = useCallback((kind, snapshot, phase, message) => {
+    const payload = { kind, snapshot, phase, message }
+    if (
+      loungePostJobRunningRef.current ||
+      loungeDetailCommentJobRunningRef.current ||
+      loungeSubmitQueueRunningRef.current
+    ) {
+      loungePendingFastLaneFailureRef.current = payload
+      return
+    }
+    loungePendingFastLaneFailureRef.current = null
+    if (kind === 'comment') {
+      loungeDetailCommentSnapshotRef.current = snapshot
+      const pathIds = snapshot.commentDetailPathIds
+      if (Array.isArray(pathIds) && pathIds.length > 0) {
+        setLoungeCommentDetailPathIds((prev) => (prev.length > 0 ? prev : pathIds))
+      }
+      setLoungeDetailCommentErr(message)
+    } else {
+      loungePostSnapshotRef.current = snapshot
+    }
+    setLoungePostUploadFailureDetails({ kind, phase, message })
+    setLoungePostUploadFailedOpen(true)
+  }, [])
 
   /** Only the active (non-queued) submit should pin the shared snapshot ref before drain starts. */
   const shouldAssignLoungePostSnapshotRef = useCallback(
@@ -1867,14 +1931,13 @@ export default function SocialFeed({
 
   const clearLoungeDetailCommentForPostAttempt = useCallback((opts = {}) => {
     const preserve = Boolean(opts.preserveDetailCommentVideoPrep)
-    const snap = loungeDetailCommentSnapshotRef.current
+    const snap = opts.pendingSnapshot ?? loungeDetailCommentSnapshotRef.current
     const pendingPoster =
       snap && typeof snap.sessionStreamPosterBlobUrl === 'string'
         ? snap.sessionStreamPosterBlobUrl.trim()
         : ''
-    const skipRevoke = new Set()
+    const skipRevoke = loungeSubmitSnapshotBlobUrls(snap)
     if (pendingPoster.startsWith('blob:')) {
-      skipRevoke.add(pendingPoster)
       const sl = loungeDetailCommentVideoSlotRef.current
       if (sl?.preview && sl.preview === pendingPoster) skipRevoke.add(sl.preview)
       if (sl?.posterUrl && sl.posterUrl === pendingPoster) skipRevoke.add(sl.posterUrl)
@@ -2594,6 +2657,23 @@ export default function SocialFeed({
         ? await supabaseClient.from('post_likes').delete().eq('post_id', postId).eq('user_id', composerUserId)
         : await supabaseClient.from('post_likes').insert({ post_id: postId, user_id: composerUserId })
       if (res.error) {
+        const dupLike =
+          !was &&
+          (res.error.code === '23505' ||
+            /duplicate key value violates unique constraint "post_likes_pk"/i.test(String(res.error.message || '')))
+        if (dupLike) {
+          setInteractionByPost((prev) => {
+            const cur = prev[postId] || defaultInteraction
+            return { ...prev, [postId]: { ...cur, liked: true } }
+          })
+          const { data: row } = await supabaseClient
+            .from('community_feed_posts')
+            .select('like_count,comment_count,repost_count')
+            .eq('id', postId)
+            .maybeSingle()
+          if (row) patchPostAggregate(postId, row)
+          return { ok: true, liked: true }
+        }
         setInteractionByPost((prev) => {
           const cur = prev[postId] || defaultInteraction
           return { ...prev, [postId]: { ...cur, [key]: was } }
@@ -3005,7 +3085,18 @@ export default function SocialFeed({
     if (shouldAssignLoungePostSnapshotRef()) {
       loungePostSnapshotRef.current = snapshot
     }
-    clearQuoteRepostForPostAttemptRef.current?.({ preserveQuoteVideoPrep: preserveVideoPrep })
+    const quotePosterBlob =
+      typeof snapshot.sessionStreamPosterBlobUrl === 'string'
+        ? snapshot.sessionStreamPosterBlobUrl.trim()
+        : ''
+    const quotePostUid = String(snapshot.streamVideoUid || '').trim()
+    if (quotePostUid && quotePosterBlob.startsWith('blob:')) {
+      pinLoungeStreamSessionPoster(quotePostUid, quotePosterBlob)
+    }
+    clearQuoteRepostForPostAttemptRef.current?.({
+      preserveQuoteVideoPrep: preserveVideoPrep,
+      pendingSnapshot: snapshot,
+    })
     enqueueAndRunLoungeSubmitRef.current('quote', snapshot)
 
     const quoteMediaOrPrepPending =
@@ -3158,6 +3249,29 @@ export default function SocialFeed({
             .from('feed_comment_likes')
             .insert({ comment_id: commentId, user_id: composerUserId })
       if (res.error) {
+        const dupLike =
+          !was &&
+          (res.error.code === '23505' ||
+            /duplicate key value violates unique constraint "feed_comment_likes_pk"/i.test(
+              String(res.error.message || ''),
+            ))
+        if (dupLike) {
+          setInteractionByComment((prev) => {
+            const cur = prev[commentId] || defaultInteraction
+            return { ...prev, [commentId]: { ...cur, liked: true } }
+          })
+          const { data: row } = await supabaseClient
+            .from('feed_comments')
+            .select('like_count')
+            .eq('id', commentId)
+            .maybeSingle()
+          if (row && typeof row.like_count === 'number') {
+            setLoungeDetailComments((prev) =>
+              prev.map((r) => (r.id === commentId ? { ...r, like_count: row.like_count } : r)),
+            )
+          }
+          return
+        }
         setInteractionByComment((prev) => {
           const cur = prev[commentId] || defaultInteraction
           return { ...prev, [commentId]: { ...cur, liked: was } }
@@ -3451,7 +3565,18 @@ export default function SocialFeed({
     if (shouldAssignLoungePostSnapshotRef()) {
       loungeDetailCommentSnapshotRef.current = snapshot
     }
-    clearLoungeDetailCommentForPostAttempt({ preserveDetailCommentVideoPrep: preserveVideoPrep })
+    const commentPosterBlob =
+      typeof snapshot.sessionStreamPosterBlobUrl === 'string'
+        ? snapshot.sessionStreamPosterBlobUrl.trim()
+        : ''
+    const commentPostUid = String(snapshot.streamVideoUid || '').trim()
+    if (commentPostUid && commentPosterBlob.startsWith('blob:')) {
+      pinLoungeStreamSessionPoster(commentPostUid, commentPosterBlob)
+    }
+    clearLoungeDetailCommentForPostAttempt({
+      preserveDetailCommentVideoPrep: preserveVideoPrep,
+      pendingSnapshot: snapshot,
+    })
     enqueueAndRunLoungeSubmitRef.current('comment', snapshot)
 
     const commentMediaOrPrepPending =
@@ -3929,6 +4054,9 @@ export default function SocialFeed({
       setLoungeDetailCommentDeleteBusyId(null)
       setLoungePostDetail(post)
       setLoungePostDetailAboveProfile(profileModalOpen || profileOverlayStack.length > 0)
+      if (composerUserId) {
+        void refreshLoungePostInteractions([post.id])
+      }
       setLoungeDetailEditImageUrls([])
       setLoungeDetailEditGifUrl('')
       if (
@@ -3965,7 +4093,7 @@ export default function SocialFeed({
         requestAnimationFrame(() => setLoungePostDetailVisible(true))
       })
     },
-    [composerUserId, loungeReadOnly, onRequireAuth, profileModalOpen, profileOverlayStack.length]
+    [composerUserId, loungeReadOnly, onRequireAuth, profileModalOpen, profileOverlayStack.length, refreshLoungePostInteractions]
   )
 
   /**
@@ -4989,16 +5117,16 @@ export default function SocialFeed({
 
   const clearComposerForPostAttempt = useCallback((opts = {}) => {
     const preserve = Boolean(opts.preserveComposerVideoPrep)
-    const snap = loungePostSnapshotRef.current
+    const snap = opts.pendingSnapshot ?? loungePostSnapshotRef.current
     const pendingPoster =
       snap && typeof snap.sessionStreamPosterBlobUrl === 'string'
         ? snap.sessionStreamPosterBlobUrl.trim()
         : ''
-    const skipRevoke = new Set()
+    const skipRevoke = loungeSubmitSnapshotBlobUrls(snap)
     if (pendingPoster.startsWith('blob:')) {
-      skipRevoke.add(pendingPoster)
       const sl = composerVideoSlotRef.current
       if (sl?.preview && sl.preview === pendingPoster) skipRevoke.add(sl.preview)
+      if (sl?.posterUrl && sl.posterUrl === pendingPoster) skipRevoke.add(sl.posterUrl)
     }
     if (!preserve) {
       if (!loungeBackgroundSubmitBusy()) {
@@ -5235,14 +5363,13 @@ export default function SocialFeed({
 
   const clearQuoteRepostForPostAttempt = useCallback((opts = {}) => {
     const preserve = Boolean(opts.preserveQuoteVideoPrep)
-    const snap = loungePostSnapshotRef.current
+    const snap = opts.pendingSnapshot ?? loungePostSnapshotRef.current
     const pendingPoster =
       snap && typeof snap.sessionStreamPosterBlobUrl === 'string'
         ? snap.sessionStreamPosterBlobUrl.trim()
         : ''
-    const skipRevoke = new Set()
+    const skipRevoke = loungeSubmitSnapshotBlobUrls(snap)
     if (pendingPoster.startsWith('blob:')) {
-      skipRevoke.add(pendingPoster)
       const sl = quoteRepostVideoSlotRef.current
       if (sl?.preview && sl.preview === pendingPoster) skipRevoke.add(sl.preview)
       if (sl?.posterUrl && sl.posterUrl === pendingPoster) skipRevoke.add(sl.posterUrl)
@@ -5463,7 +5590,7 @@ export default function SocialFeed({
 
       loungePostSnapshotRef.current = snapshot
       loungePostJobRunningRef.current = true
-      setLoungePostSubmitInFlight(true)
+      bumpLoungeSubmitInFlight(1)
       loungePostUploadLastPhaseRef.current = ''
       setLoungePostUploadFailureDetails(null)
       const ac = new AbortController()
@@ -5669,10 +5796,10 @@ export default function SocialFeed({
       } finally {
         loungePostAbortRef.current = null
         loungePostJobRunningRef.current = false
-        setLoungePostSubmitInFlight(false)
+        bumpLoungeSubmitInFlight(-1)
       }
     },
-    [loadCommunityFeed, rateLimitMessage, refreshLoungePostInteractions, supabaseClient],
+    [loadCommunityFeed, rateLimitMessage, refreshLoungePostInteractions, supabaseClient, bumpLoungeSubmitInFlight],
   )
   runBackgroundLoungePostSubmissionRef.current = runBackgroundLoungePostSubmission
 
@@ -5688,7 +5815,7 @@ export default function SocialFeed({
 
       loungeDetailCommentSnapshotRef.current = snapshot
       loungeDetailCommentJobRunningRef.current = true
-      setLoungePostSubmitInFlight(true)
+      bumpLoungeSubmitInFlight(1)
       loungePostUploadLastPhaseRef.current = ''
       const ac = new AbortController()
       loungeDetailCommentAbortRef.current = ac
@@ -5932,7 +6059,7 @@ export default function SocialFeed({
       } finally {
         loungeDetailCommentAbortRef.current = null
         loungeDetailCommentJobRunningRef.current = false
-        setLoungePostSubmitInFlight(false)
+        bumpLoungeSubmitInFlight(-1)
       }
     },
     [
@@ -5942,9 +6069,119 @@ export default function SocialFeed({
       scheduleLoungePostDetailTitleAfterReply,
       scrollLoungePostDetailToFocusedComment,
       supabaseClient,
+      bumpLoungeSubmitInFlight,
     ],
   )
   runBackgroundLoungeDetailCommentSubmissionRef.current = runBackgroundLoungeDetailCommentSubmission
+
+  /** Text/image/GIF-only submits — run in parallel without blocking the video queue. */
+  const runFastLaneLoungeSubmit = useCallback(
+    async (type, snapshot) => {
+      loungeFastLaneInFlightRef.current += 1
+      bumpLoungeSubmitInFlight(1)
+      const ac = new AbortController()
+      try {
+        if (type === 'comment') {
+          const snap = snapshot
+          const data = await executeLoungeCommentSubmission({
+            supabaseClient,
+            snapshot: {
+              body: snap.body,
+              gifOnlyUrl: snap.gifOnlyUrl,
+              imageFiles: snap.imageFiles,
+              videoFile: snap.videoFile,
+              streamVideoUid: snap.streamVideoUid,
+              sessionStreamPosterBlobUrl: snap.sessionStreamPosterBlobUrl,
+              postId: snap.postId,
+              parentId: snap.parentId,
+              userId: snap.userId,
+            },
+            signal: ac.signal,
+          })
+          const pr = await supabaseClient
+            .from('profiles')
+            .select('user_id,handle,display_name,avatar_url,role,is_og')
+            .eq('user_id', snap.userId)
+            .maybeSingle()
+          const row = { ...data, author_profile: pr.data || composerUserProfile || null }
+          if (row.id) {
+            setLoungeDetailViewerPinnedCommentIds((ids) =>
+              ids[0] === row.id ? ids : [row.id, ...ids.filter((id) => id !== row.id)],
+            )
+          }
+          setLoungeDetailComments((c) => {
+            const withNew = c.some((r) => r.id === row.id) ? c : [...c, row]
+            return snap.parentId
+              ? bumpFeedCommentAncestorCountsInList(withNew, snap.parentId, 1)
+              : withNew
+          })
+          const { data: countRow } = await supabaseClient
+            .from('community_feed_posts')
+            .select('comment_count')
+            .eq('id', snap.postId)
+            .maybeSingle()
+          if (countRow && typeof countRow.comment_count === 'number') {
+            patchPostAggregate(snap.postId, { comment_count: countRow.comment_count })
+            setLoungePostDetail((prev) =>
+              prev?.id === snap.postId ? { ...prev, comment_count: countRow.comment_count } : prev,
+            )
+          }
+          setInteractionByPost((prev) => {
+            const cur = prev[snap.postId] || defaultInteraction
+            return { ...prev, [snap.postId]: { ...cur, commented: true } }
+          })
+          scheduleLoungePostDetailTitleAfterReply()
+          if (snap.parentId) {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => scrollLoungePostDetailToFocusedComment())
+            })
+          }
+        } else {
+          await executeLoungeCommunityPostSubmission({
+            supabaseClient,
+            snapshot,
+            signal: ac.signal,
+            rateLimitMessage,
+          })
+          await loadCommunityFeed({ silent: true })
+          const quoteOrigId = String(snapshot.quoteRepostOfPostId || '').trim()
+          if (quoteOrigId) {
+            await refreshLoungePostInteractions([quoteOrigId])
+          }
+        }
+      } catch (e) {
+        if (e?.name === 'AbortError') return
+        const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Could not post right now.'
+        if (msg === LOUNGE_MAX_PINNED_ALERT && typeof window !== 'undefined') window.alert(LOUNGE_MAX_PINNED_ALERT)
+        deferOrShowFastLaneFailure(
+          type === 'comment' ? 'comment' : 'post',
+          snapshot,
+          'Publishing',
+          msg,
+        )
+      } finally {
+        loungeFastLaneInFlightRef.current = Math.max(0, loungeFastLaneInFlightRef.current - 1)
+        bumpLoungeSubmitInFlight(-1)
+        dismissLoungePostUploadBarIfIdle()
+      }
+    },
+    [
+      bumpLoungeSubmitInFlight,
+      composerUserProfile,
+      defaultInteraction,
+      deferOrShowFastLaneFailure,
+      dismissLoungePostUploadBarIfIdle,
+      loadCommunityFeed,
+      patchPostAggregate,
+      rateLimitMessage,
+      refreshLoungePostInteractions,
+      scheduleLoungePostDetailTitleAfterReply,
+      scrollLoungePostDetailToFocusedComment,
+      supabaseClient,
+    ],
+  )
+  const runFastLaneLoungeSubmitRef = useRef(runFastLaneLoungeSubmit)
+  runFastLaneLoungeSubmitRef.current = runFastLaneLoungeSubmit
 
   const retryLoungePostUpload = useCallback(() => {
     const fail = loungePostUploadFailureDetailsRef.current
@@ -5998,9 +6235,8 @@ export default function SocialFeed({
   }, [runBackgroundLoungePostSubmission, startComposerVideoPrepFromSpec, startQuoteRepostVideoPrepFromSpec])
 
   /**
-   * Drain the submit queue sequentially — runs one job at a time so video prep handoff refs
-   * are never shared across concurrent executions. The upload bar and setLoungePostSubmitInFlight
-   * are managed by each individual background runner; this loop just serialises them.
+   * Drain the video submit queue sequentially — one Stream video job at a time so prep handoff
+   * refs are never shared. Fast-lane posts (text/image/GIF) bypass this loop entirely.
    */
   const resumeDeferredVideoPrepSlots = useCallback(() => {
     const composerSlot = composerVideoSlotRef.current
@@ -6069,12 +6305,18 @@ export default function SocialFeed({
       setLoungeSubmitQueueDisplay({ index: 0, total: 0 })
       dismissLoungePostUploadBarIfIdle()
       resumeDeferredVideoPrepSlots()
+      flushPendingFastLaneFailure()
     }
-  }, [dismissLoungePostUploadBarIfIdle, resumeDeferredVideoPrepSlots])
+  }, [dismissLoungePostUploadBarIfIdle, flushPendingFastLaneFailure, resumeDeferredVideoPrepSlots])
 
-  /** Add a submission to the queue and kick the drain loop if it isn't already running. */
+  /** Video jobs queue; text/image/GIF run immediately on the fast lane. */
   const enqueueAndRunLoungeSubmit = useCallback(
     (type, snapshot) => {
+      if (!loungeSubmissionSnapshotIncludesVideo(snapshot)) {
+        void runFastLaneLoungeSubmitRef.current(type, snapshot)
+        return
+      }
+
       loungeSubmitQueueBatchRef.current = {
         total: loungeSubmitQueueBatchRef.current.total + 1,
         completed: loungeSubmitQueueBatchRef.current.completed,
@@ -6319,7 +6561,18 @@ export default function SocialFeed({
     if (shouldAssignLoungePostSnapshotRef()) {
       loungePostSnapshotRef.current = snapshot
     }
-    clearComposerForPostAttempt({ preserveComposerVideoPrep: preserveVideoPrep })
+    const posterBlob =
+      typeof snapshot.sessionStreamPosterBlobUrl === 'string'
+        ? snapshot.sessionStreamPosterBlobUrl.trim()
+        : ''
+    const postUid = String(snapshot.streamVideoUid || '').trim()
+    if (postUid && posterBlob.startsWith('blob:')) {
+      pinLoungeStreamSessionPoster(postUid, posterBlob)
+    }
+    clearComposerForPostAttempt({
+      preserveComposerVideoPrep: preserveVideoPrep,
+      pendingSnapshot: snapshot,
+    })
     enqueueAndRunLoungeSubmitRef.current('post', snapshot)
   }, [
     loungeComposerVideoPostBlocked,
@@ -6790,6 +7043,7 @@ export default function SocialFeed({
       loungeReadOnly,
       interactionStateFor,
       toggleInteraction,
+      refreshPostInteractions: refreshLoungePostInteractions,
       onPlainRepost: handlePlainRepost,
       onUndoPlainRepost: (p) => {
         void undoPlainRepostForOriginal(p.id)
@@ -6867,6 +7121,7 @@ export default function SocialFeed({
       loungeReadOnly,
       interactionStateFor,
       toggleInteraction,
+      refreshLoungePostInteractions,
       handlePlainRepost,
       undoPlainRepostForOriginal,
       openRemoveQuoteRepostForPost,
