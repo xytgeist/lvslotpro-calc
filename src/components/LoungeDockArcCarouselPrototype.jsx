@@ -1730,7 +1730,7 @@ export default function LoungeDockArcCarouselPrototype({
         >
           <span
             key={followingFlash.key}
-            className="lounge-filter-flash-fizzle inline-block text-sm font-semibold tracking-wide"
+            className="lounge-filter-flash-fizzle inline-block text-sm font-semibold italic tracking-wide"
           >
             {followingFlash.label === 'Only Frens' ? (
               <>
