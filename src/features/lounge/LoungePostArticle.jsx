@@ -314,7 +314,7 @@ export default function LoungePostArticle({
                   onClick={(e) => onEmbeddedAuthorProfile(e, rc.reply_to_profile)}
                   className="font-medium text-orange-400 hover:text-orange-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                 >
-                  @{rc.reply_to_profile.handle}
+                  <em>@{rc.reply_to_profile.handle}</em>
                 </button>
               </div>
             ) : null}
