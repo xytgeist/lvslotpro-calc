@@ -93,9 +93,12 @@ const STREAM_FADE_LAST_RESORT_MS = 6500
 
 /** Feed tile → hero full-screen grow (same `<video>`, no second HLS attach). */
 const HERO_EXPAND_MS = 380
+/** Hero → feed tile shrink (reverse flyout); slightly slower so dismiss reads clearly. */
+const HERO_SHRINK_MS = 560
 /** GPU transform FLIP — gentler start than width/top tweens on mobile. */
 const HERO_MOTION_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const HERO_MOTION_TRANSITION = `${HERO_EXPAND_MS}ms ${HERO_MOTION_CURVE}`
+const HERO_SHRINK_TRANSITION = `${HERO_SHRINK_MS}ms ${HERO_MOTION_CURVE}`
 /** Lightbox chrome fades in only after the flyout lands. */
 const HERO_CHROME_FADE_MS = 220
 /** Hero stack (bottom → top): scrim 100, flyout 101, transparent gesture 102, chrome 103. */
@@ -1712,10 +1715,10 @@ export default function LoungePostStreamVideo({
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
         if (cancelled || heroPhaseRef.current !== 'closing') return
-        flyout.style.transition = `transform ${HERO_MOTION_TRANSITION}, border-radius ${HERO_MOTION_TRANSITION}`
+        flyout.style.transition = `transform ${HERO_SHRINK_TRANSITION}, border-radius ${HERO_SHRINK_TRANSITION}`
         flyout.style.transform = 'none'
         flyout.addEventListener('transitionend', onTransitionEnd)
-        fallbackTid = window.setTimeout(finishDomShrink, HERO_EXPAND_MS + 96)
+        fallbackTid = window.setTimeout(finishDomShrink, HERO_SHRINK_MS + 96)
       })
     })
 
@@ -2074,7 +2077,11 @@ export default function LoungePostStreamVideo({
 
   const heroBackdropAnimating =
     heroBackdropArmed && (heroPhase === 'opening' || heroPhase === 'closing')
-  const heroBackdropTransitionCss = heroBackdropAnimating ? `opacity ${HERO_MOTION_TRANSITION}` : 'none'
+  const heroBackdropTransitionCss = heroBackdropAnimating
+    ? heroPhase === 'closing'
+      ? `opacity ${HERO_SHRINK_TRANSITION}`
+      : `opacity ${HERO_MOTION_TRANSITION}`
+    : 'none'
   const heroBackdropOpacityClass =
     heroPhase === 'closing'
       ? 'opacity-0'
