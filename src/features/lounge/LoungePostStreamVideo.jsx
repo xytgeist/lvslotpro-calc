@@ -573,6 +573,8 @@ export default function LoungePostStreamVideo({
   const heroWantsSoundRef = useRef(true)
   const recoveryBurstRef = useRef(0)
   const lastPlayErrorRef = useRef('')
+  /** Prevent stacked play() calls on iOS (AbortError / NotAllowedError storms). */
+  const inlinePlayInFlightRef = useRef(false)
   /** Feed sound snapshot when hero opens (restored on close; same `<video>` keeps time). */
   const inlineFeedSoundSnapshotRef = useRef(
     /** @type {{ unmuted: boolean, explicitlyMuted: boolean, coordinated: boolean } | null} */ (null),
@@ -903,6 +905,7 @@ export default function LoungePostStreamVideo({
     if (coordinatorActive && !isActiveRef.current) return false
     if (coordinatorActive && tileRatio <= 0) return false
     if (lazyStream && v.readyState < HTMLMediaElement.HAVE_METADATA) return false
+    if (inlinePlayInFlightRef.current) return false
     const reportPlayError = (err) => {
       const msg =
         err instanceof Error
@@ -924,17 +927,24 @@ export default function LoungePostStreamVideo({
     try {
       // iOS blocks unmuted programmatic play(); start muted, unmute only after play resolves.
       v.muted = true
+      inlinePlayInFlightRef.current = true
+      const finishPlayAttempt = () => {
+        inlinePlayInFlightRef.current = false
+      }
       const p = v.play()
       if (p && typeof p.then === 'function') {
         p.then(() => {
+          finishPlayAttempt()
           lastPlayErrorRef.current = ''
           if (coordinatedInlineSound) syncCoordinatedSoundMuted()
           else applyAudibleAfterPlay()
         }).catch((err) => {
+          finishPlayAttempt()
           reportPlayError(err)
           scheduleRecompute()
         })
       } else {
+        finishPlayAttempt()
         lastPlayErrorRef.current = ''
         if (!v.paused) {
           if (coordinatedInlineSound) syncCoordinatedSoundMuted()
@@ -1094,7 +1104,7 @@ export default function LoungePostStreamVideo({
     tryCoordinatedInlinePlay,
   ])
 
-  /** Active tile paused with media ready — retry play, then release incumbent (same heal as hero close). */
+  /** Active tile paused with media ready — retry play; release incumbent only after repeated failures. */
   useEffect(() => {
     if (!coordinatorActive || !feedAutoplayEnabled || !lazyStream || !isActive || !attachStream) {
       return undefined
@@ -1110,21 +1120,23 @@ export default function LoungePostStreamVideo({
         stallTicks = 0
         return
       }
-      if (v.readyState < HTMLMediaElement.HAVE_METADATA) return
+      if (inlinePlayInFlightRef.current) return
+      if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
       stallTicks += 1
-      if (stallTicks <= 2) {
+      if (stallTicks <= 5) {
         tryCoordinatedInlinePlay()
         return
       }
+      const err = lastPlayErrorRef.current
+      if (!err || stallTicks < 10) return
       stallTicks = 0
       releaseStalledActive(feedAutoplayClientId)
       if (videoDebugEnabled) {
-        reportLoungeVideoDebugEvent(feedAutoplayClientId, 'stall', 'released active after paused stall')
+        reportLoungeVideoDebugEvent(feedAutoplayClientId, 'stall', `released active: ${err}`)
       }
     }
 
-    const intervalId = window.setInterval(tick, 900)
-    tick()
+    const intervalId = window.setInterval(tick, 1000)
     return () => window.clearInterval(intervalId)
   }, [
     attachStream,

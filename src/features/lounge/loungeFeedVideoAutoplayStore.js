@@ -372,11 +372,15 @@ export function createAutoplayStore() {
     return bestDist + LOUNGE_VIDEO_IDLE_HANDOFF_CENTER_GAP_PX < incDist ? bestCenter : next
   }
 
-  const needsIdleWatchdog = (orderedIds, ratios) =>
-    orderedIds.some((id) => (ratios[id] ?? 0) > 0)
+  const needsIdleWatchdog = (orderedIds, ratios, active) => {
+    if (!orderedIds.length) return false
+    if (!active) return orderedIds.some((id) => (ratios[id] ?? 0) > 0)
+    if ((ratios[active] ?? 0) > 0) return false
+    return orderedIds.some((id) => (ratios[id] ?? 0) > 0)
+  }
 
-  const armIdleWatchdog = (orderedIds, ratios) => {
-    if (!needsIdleWatchdog(orderedIds, ratios)) {
+  const armIdleWatchdog = (orderedIds, ratios, active) => {
+    if (!needsIdleWatchdog(orderedIds, ratios, active)) {
       if (idleWatchdogTimer) {
         window.clearTimeout(idleWatchdogTimer)
         idleWatchdogTimer = null
@@ -510,7 +514,7 @@ export function createAutoplayStore() {
     const orderedIds = buildOrderedIds(rootEl)
     const { ratios, centerYs } = computeTileMetrics(rootEl, orderedIds)
     publish(orderedIds, ratios, centerYs, rootEl)
-    armIdleWatchdog(orderedIds, ratios)
+    armIdleWatchdog(orderedIds, ratios, activeId)
   }
 
   const schedule = () => {
