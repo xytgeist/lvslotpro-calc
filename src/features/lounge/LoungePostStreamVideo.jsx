@@ -85,6 +85,8 @@ const HERO_MOTION_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const HERO_MOTION_TRANSITION = `${HERO_EXPAND_MS}ms ${HERO_MOTION_CURVE}`
 /** Lightbox chrome fades in only after the flyout lands. */
 const HERO_CHROME_FADE_MS = 220
+/** Flyout video sits below the portaled scrim + gesture layer so swipes are not stolen by iOS `<video>`. */
+const HERO_FLYOUT_Z_INDEX = 99
 
 /** @returns {{ top: number, left: number, width: number, height: number }} */
 function readElementViewportRect(el) {
@@ -188,7 +190,7 @@ function snapFlyoutToHeroTile(flyout, host, fromRect) {
   flyout.style.left = `${fromRect.left}px`
   flyout.style.width = `${fromRect.width}px`
   flyout.style.height = `${fromRect.height}px`
-  flyout.style.zIndex = '101'
+  flyout.style.zIndex = String(HERO_FLYOUT_Z_INDEX)
   flyout.style.transformOrigin = '0 0'
   flyout.style.transform = 'none'
   flyout.style.transition = 'none'
@@ -953,8 +955,48 @@ export default function LoungePostStreamVideo({
     finalizeHeroClose()
   }, [feedAutoplayEnabled, restoreFeedInlineSound, finalizeHeroClose, displayW, displayH])
 
+  const toggleHeroVideoPlayPause = useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    try {
+      if (v.paused) {
+        const p = v.play()
+        if (p && typeof p.catch === 'function') p.catch(() => {})
+      } else {
+        v.pause()
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const onHeroGestureTap = useCallback(
+    (e) => {
+      if (heroPhaseRef.current !== 'open') return
+      const layout = heroTargetRectRef.current || heroLayout
+      const cx = e?.clientX
+      const cy = e?.clientY
+      if (layout && typeof cx === 'number' && typeof cy === 'number') {
+        const inside =
+          cx >= layout.left &&
+          cx <= layout.left + layout.width &&
+          cy >= layout.top &&
+          cy <= layout.top + layout.height
+        if (inside) {
+          toggleHeroVideoPlayPause()
+          return
+        }
+        closeLightbox()
+        return
+      }
+      toggleHeroVideoPlayPause()
+    },
+    [closeLightbox, heroLayout, toggleHeroVideoPlayPause],
+  )
+
   const { swipeSurfaceProps: heroSwipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
     onClose: closeLightbox,
+    onTap: onHeroGestureTap,
     allowSwipeOnVideo: true,
     className: '',
   })
@@ -971,21 +1013,6 @@ export default function LoungePostStreamVideo({
     () => mergeLightboxDismissOnQuoteRepost(mediaLightboxFooter, closeLightbox),
     [mediaLightboxFooter, closeLightbox],
   )
-
-  const toggleHeroVideoPlayPause = useCallback(() => {
-    const v = videoRef.current
-    if (!v) return
-    try {
-      if (v.paused) {
-        const p = v.play()
-        if (p && typeof p.catch === 'function') p.catch(() => {})
-      } else {
-        v.pause()
-      }
-    } catch {
-      // ignore
-    }
-  }, [])
 
   const openLightbox = useCallback(() => {
     if (lightboxOpenRef.current) return
@@ -1553,7 +1580,7 @@ export default function LoungePostStreamVideo({
           left: heroLayout.left,
           width: heroLayout.width,
           height: heroLayout.height,
-          zIndex: 101,
+          zIndex: HERO_FLYOUT_Z_INDEX,
           transformOrigin: '0 0',
           transform: heroFlipTransform,
           transition: heroTransformTransition,
@@ -1563,21 +1590,9 @@ export default function LoungePostStreamVideo({
         }
       : undefined
   const heroFlyoutShellClass = heroExpanded
-    ? `overflow-hidden ${heroPhase === 'opening' ? 'bg-transparent' : 'bg-black'} ${heroSwipeTouchClass || 'touch-none'}`.trim()
+    ? `overflow-hidden ${heroPhase === 'opening' ? 'bg-transparent' : 'bg-black'} touch-none`.trim()
     : 'absolute inset-0 z-[1] h-full w-full overflow-hidden bg-transparent'
-  const heroFlyoutPointerProps = heroExpanded
-    ? {
-        onPointerDown: heroSwipePointerDown,
-        onPointerMove: heroSwipePointerMove,
-        onPointerUp: heroSwipePointerUp,
-        onPointerCancel: heroSwipePointerCancel,
-        onClick: (e) => {
-          if (heroPhase !== 'open') return
-          e.stopPropagation()
-          toggleHeroVideoPlayPause()
-        },
-      }
-    : {}
+  const heroFlyoutPointerProps = {}
   const inlineVideoOpacityClass =
     heroExpanded || (attachStream && effectiveStreamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
   const inlinePosterOpacityClass =
@@ -1776,18 +1791,21 @@ export default function LoungePostStreamVideo({
               aria-label="Full screen video"
             >
               <div
-                className={`absolute inset-0 bg-black ${heroBackdropOpacityClass} ${heroSwipeTouchClass || ''} ${
-                  heroBackdropInteractive ? '' : 'pointer-events-none'
-                }`.trim()}
+                className={`absolute inset-0 z-0 bg-black ${heroBackdropOpacityClass} pointer-events-none`}
                 style={{ transition: heroBackdropTransitionCss }}
-                onClick={heroBackdropInteractive ? closeLightbox : undefined}
-                onPointerDown={heroBackdropInteractive ? heroSwipePointerDown : undefined}
-                onPointerMove={heroBackdropInteractive ? heroSwipePointerMove : undefined}
-                onPointerUp={heroBackdropInteractive ? heroSwipePointerUp : undefined}
-                onPointerCancel={heroBackdropInteractive ? heroSwipePointerCancel : undefined}
                 aria-hidden
               />
-              <div className="pointer-events-none fixed inset-0 flex flex-col">
+              {heroBackdropInteractive ? (
+                <div
+                  className={`absolute inset-0 z-[1] ${heroSwipeTouchClass || 'touch-none'}`.trim()}
+                  aria-hidden
+                  onPointerDown={heroSwipePointerDown}
+                  onPointerMove={heroSwipePointerMove}
+                  onPointerUp={heroSwipePointerUp}
+                  onPointerCancel={heroSwipePointerCancel}
+                />
+              ) : null}
+              <div className="pointer-events-none absolute inset-0 z-[2] flex flex-col">
                 <div
                   className={`flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
                     heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
@@ -1812,6 +1830,7 @@ export default function LoungePostStreamVideo({
                       heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                     }`}
                     style={heroChromeFadeStyle}
+                    data-lounge-lightbox-no-swipe
                     onClick={(e) => e.stopPropagation()}
                   >
                     {heroChromeVisible ? mediaLightboxFooterMerged : null}

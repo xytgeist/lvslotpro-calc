@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 
 const DISMISS_DRAG_PX = 72
+const TAP_SLOP_PX = 12
 
 function shouldIgnoreSwipeTarget(target, { allowSwipeOnVideo = false } = {}) {
   if (!(target instanceof Element)) return true
@@ -17,6 +18,8 @@ function shouldIgnoreSwipeTarget(target, { allowSwipeOnVideo = false } = {}) {
 export function useLoungeLightboxSwipeDismiss({
   onClose,
   onSwipeHorizontal,
+  /** Fired on pointer up when movement stayed within tap slop (e.g. play/pause on hero video). */
+  onTap,
   className = '',
   allowSwipeOnVideo = false,
 }) {
@@ -76,9 +79,13 @@ export function useLoungeLightboxSwipeDismiss({
       }
       if (onSwipeHorizontal && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) >= DISMISS_DRAG_PX) {
         onSwipeHorizontal(dx < 0 ? 1 : -1)
+        return
+      }
+      if (onTap && Math.abs(dx) <= TAP_SLOP_PX && Math.abs(dy) <= TAP_SLOP_PX) {
+        onTap(e)
       }
     },
-    [onClose, onSwipeHorizontal, resetDrag],
+    [onClose, onSwipeHorizontal, onTap, resetDrag],
   )
 
   const onPointerUp = useCallback(
