@@ -696,6 +696,8 @@ export default function LoungePostStreamVideo({
   /** While true, shrink-back close runs on the flyout DOM node (React must not clear transform). */
   const [heroShrinkDomActive, setHeroShrinkDomActive] = useState(false)
   const [streamAttachKey, setStreamAttachKey] = useState(0)
+  /** Detect HLS reattach bumps — must reset poster-over-video fade (avoid black layer at opacity-100). */
+  const prevFadeAttachKeyRef = useRef(0)
   const [showStreamRetry, setShowStreamRetry] = useState(false)
   const [streamInView, setStreamInView] = useState(false)
   /** After `playing` (or timeout): fade video in over poster; poster stays in-flow for layout (avoids Safari default video width flash). */
@@ -1380,7 +1382,9 @@ export default function LoungePostStreamVideo({
         setStreamFadeShowVideo(false)
         return
       }
-      if (streamFadeShowVideo && attachStream) return
+      const attachKeyBumped = prevFadeAttachKeyRef.current !== streamAttachKey
+      prevFadeAttachKeyRef.current = streamAttachKey
+      if (streamFadeShowVideo && attachStream && !attachKeyBumped) return
       setStreamFadeShowVideo(false)
 
       const arm = () => {

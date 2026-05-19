@@ -529,6 +529,13 @@ export function createAutoplayStore() {
       )
     }
 
+    const warmRingHandoff =
+      prevActiveId &&
+      nextActive &&
+      prevActiveId !== nextActive &&
+      snapshot.ringIds.includes(prevActiveId) &&
+      snapshot.ringIds.includes(nextActive)
+
     if (
       prevActiveId &&
       nextActive &&
@@ -536,17 +543,23 @@ export function createAutoplayStore() {
       !heroLocked &&
       !coordinatorSuspended
     ) {
-      handoffCount += 1
-      if (handoffCount % LOUNGE_VIDEO_SOFT_RESET_HANDOFF_EVERY === 0) {
-        softResetEpoch += 1
-        const resetEpoch = softResetEpoch
-        reportCoordDebug(`softReset epoch=${resetEpoch} handoff#=${handoffCount} → clear active`)
-        queueMicrotask(() => {
-          if (heroLocked || coordinatorSuspended) return
-          activeId = null
-          reportCoordDebug(`softReset epoch=${resetEpoch} active cleared`)
-          schedule()
-        })
+      if (warmRingHandoff) {
+        reportCoordDebug(
+          `softReset skipped warm ${shortCoordId(prevActiveId)}→${shortCoordId(nextActive)}`,
+        )
+      } else {
+        handoffCount += 1
+        if (handoffCount % LOUNGE_VIDEO_SOFT_RESET_HANDOFF_EVERY === 0) {
+          softResetEpoch += 1
+          const resetEpoch = softResetEpoch
+          reportCoordDebug(`softReset epoch=${resetEpoch} handoff#=${handoffCount} → clear active`)
+          queueMicrotask(() => {
+            if (heroLocked || coordinatorSuspended) return
+            activeId = null
+            reportCoordDebug(`softReset epoch=${resetEpoch} active cleared`)
+            schedule()
+          })
+        }
       }
     }
 
