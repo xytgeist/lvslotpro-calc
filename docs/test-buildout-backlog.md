@@ -121,10 +121,10 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Test validation: Logged-out feed readability + signed-in posting flow.
   - Production replay: `production-rollout-checklist.md` §2
 
-- [ ] Feed interactions Phase E/F (likes, reposts, bookmarks, comments) on test  
-  - Change: Tables + RLS + triggers for Lounge engagement; `repost_count` on posts; client wiring in `SocialFeed.jsx` / `LoungePostArticle.jsx` / `AppShell.jsx`.
+- [x] Feed interactions Phase E/F (likes, reposts, bookmarks, comments) on test  
+  - Change: Tables + RLS + triggers for Lounge engagement; `repost_count` on posts; client wiring in `SocialFeed.jsx` / `LoungePostArticle.jsx` / `AppShell.jsx`. Comment-row interactions via **`20260515190000_feed_comment_interactions.sql`** (§5b in canonical SQL).
   - Source: `supabase/feed_interactions_phase_ef.sql`
-  - Test validation: Run SQL on test project; signed-in user can like/repost/bookmark and post top-level comments; counts update; anon still read-only on actions.
+  - Test validation: Run SQL on test project; signed-in user can like/repost/bookmark and post top-level comments; counts update; anon still read-only on actions. Ryan sign-off **PASSED** on **test** @ **`b8d55d3`** (2026-05-18) — feed, post detail, profile tabs, quote repost; comment like/repost/bookmark on post detail.
   - Production replay: `production-rollout-checklist.md` §2
 
 - [ ] Additional SQL parity audit against test history  
@@ -295,6 +295,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - **Sign-off (Stream poster + dims, 2026-05-17, Ryan):** Extended checklist (session items **2–13**): all **PASSED** on **test**; SQL **`lounge_feed_post_stream_video.sql`** (including **`stream_poster_url`**, **`stream_video_width`**, **`stream_video_height`**) applied on the test Supabase project.
   - **Sign-off (Lounge Stream autoplay + detail overlay, 2026-05-18, Ryan):** Feed handoff pause frame, profile Posts autoplay, comment/detail HLS + lightbox, background audio stop on post/comment detail open — **good enough for now** on **test** @ **`dbd4fa1`** (iPhone PWA).
   - **Sign-off (feed video perf diet, 2026-05-18, Ryan):** 30s feed scroll (smooth, one winner), hero tap without poster-on-top flash, load-more **28** rows — **PASSED** on **test** @ **`dbd4fa1`**.
+  - **Sign-off (feed interactions Phase E/F, 2026-05-18, Ryan):** Likes, reposts, bookmarks, post + comment threads on feed/post detail/profile — counts and toggles **PASSED** on **test** @ **`b8d55d3`** (SQL applied on test project).
   - Production replay: same ordered pass on production after deploy.
 
 - [ ] Final pre-prod gate
