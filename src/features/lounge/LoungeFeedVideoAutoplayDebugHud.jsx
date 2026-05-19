@@ -15,6 +15,7 @@ import {
   readLoungeFeedVideoAutoplayEnabled,
   subscribeLoungeFeedVideoAutoplayEnabled,
 } from '../../utils/loungeFeedVideoAutoplayPref.js'
+import { APP_BUILD_SHA } from '../../utils/appBuildInfo.js'
 
 function shortId(id) {
   const s = String(id || '')
@@ -82,7 +83,7 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
     const ids = new Set([
       ...debugInfo.registeredIds,
       ...Object.keys(tileSnapshots),
-      ...coordinatorSnapshot.domBudgetIds,
+      ...coordinatorSnapshot.domBudgetIds ?? [],
       ...coordinatorSnapshot.ringIds,
       coordinatorSnapshot.activeId,
     ].filter(Boolean))
@@ -93,7 +94,7 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
         ratio: Number(coordinatorSnapshot.tileRatios[id] ?? 0),
         isActive: coordinatorSnapshot.activeId === id,
         inRing: coordinatorSnapshot.ringIds.includes(id),
-        inDomBudget: coordinatorSnapshot.domBudgetIds.includes(id),
+        inDomBudget: (coordinatorSnapshot.domBudgetIds ?? []).includes(id),
         registered: debugInfo.registeredIds.includes(id),
       }))
       .sort((a, b) => {
@@ -107,6 +108,7 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
   const buildExportPayload = useCallback(() => {
     return {
       exportedAt: new Date().toISOString(),
+      build: { sha: APP_BUILD_SHA },
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
       feedAutoplayEnabled,
       anyStreamLightboxOpen,
@@ -171,7 +173,7 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
       className="pointer-events-auto fixed left-3 z-[115] rounded-full border border-amber-400/50 bg-black/90 px-3 py-1.5 font-mono text-[11px] font-semibold text-amber-200 shadow-lg backdrop-blur-sm"
       onClick={() => setCollapsed(false)}
     >
-      Video debug
+      Video debug · {APP_BUILD_SHA}
     </button>
   ) : (
     <div
@@ -180,7 +182,9 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
       data-lounge-video-debug-hud
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-amber-400/25 bg-amber-950/40 px-2 py-1.5">
-        <span className="text-[11px] font-semibold text-amber-200">Lounge video debug</span>
+        <span className="text-[11px] font-semibold text-amber-200">
+          Lounge video debug · <span className="font-mono text-amber-100">{APP_BUILD_SHA}</span>
+        </span>
         <div className="flex items-center gap-1">
           {copyStatus ? <span className="text-[9px] text-emerald-300">{copyStatus}</span> : null}
           <button type="button" className="rounded px-1.5 py-0.5 text-amber-100 hover:bg-amber-900/50" onClick={onCopy}>
@@ -204,6 +208,8 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-1.5">
         <div className="mb-2 space-y-0.5 text-zinc-300">
           <div>
+            build: <span className="font-mono text-white">{APP_BUILD_SHA}</span>
+            {' · '}
             autoplay pref: <span className="text-white">{feedAutoplayEnabled ? 'on' : 'off'}</span>
             {' · '}
             lightbox: <span className="text-white">{anyStreamLightboxOpen ? 'open' : 'closed'}</span>
@@ -217,12 +223,12 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
               : '—'}
           </div>
           <div>
-            dom [{coordinatorSnapshot.domBudgetIds.length}]:{' '}
-            {coordinatorSnapshot.domBudgetIds.length
+            dom [{(coordinatorSnapshot.domBudgetIds ?? []).length}]:{' '}
+            {(coordinatorSnapshot.domBudgetIds ?? []).length
               ? coordinatorSnapshot.domBudgetIds.map((id) => shortId(id)).join(', ')
               : '—'}
             {' · '}
-            softReset #{coordinatorSnapshot.softResetEpoch}
+            softReset #{coordinatorSnapshot.softResetEpoch ?? 0}
           </div>
           <div>
             flinger: <span className="text-white">{coordinatorSnapshot.flingerMode ? 'yes' : 'no'}</span>
