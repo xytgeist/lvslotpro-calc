@@ -166,6 +166,31 @@ function clearInlinePosterHeroStyles(slot) {
   img.style.opacity = ''
 }
 
+const HERO_FLYOUT_POSTER_SEL = '[data-lounge-hero-flyout-poster]'
+
+/** Covers the flyout while `<video>` reparents — tile-sized fixed layer matches what the user sees on frame 1. */
+function ensureFlyoutPosterCover(flyout, src) {
+  if (!flyout || !src) return
+  let img = flyout.querySelector(HERO_FLYOUT_POSTER_SEL)
+  if (!img) {
+    img = document.createElement('img')
+    img.dataset.loungeHeroFlyoutPoster = '1'
+    img.alt = ''
+    img.draggable = false
+    img.decoding = 'sync'
+    img.className = 'pointer-events-none absolute inset-0 z-[2] h-full w-full object-contain'
+    flyout.insertBefore(img, flyout.firstChild)
+  }
+  if (img.getAttribute('src') !== src) img.setAttribute('src', src)
+  img.style.transition = 'none'
+  img.style.opacity = '1'
+}
+
+function clearFlyoutPosterCover(flyout) {
+  if (!flyout) return
+  flyout.querySelector(HERO_FLYOUT_POSTER_SEL)?.remove()
+}
+
 /**
  * @param {React.RefObject<HTMLVideoElement | null>} videoRef
  * @param {string} src manifest URL
@@ -395,6 +420,8 @@ export default function LoungePostStreamVideo({
   const [heroChromeVisible, setHeroChromeVisible] = useState(false)
   /** After FLIP “from” paint, width/height/top/left may animate (not during initial opening snap). */
   const [heroTransitionArmed, setHeroTransitionArmed] = useState(false)
+  /** Poster over flyout `<video>` during opening — Safari can flash black when the node reparents to body. */
+  const [heroFlyoutPosterVisible, setHeroFlyoutPosterVisible] = useState(false)
   const [streamAttachKey, setStreamAttachKey] = useState(0)
   const [showStreamRetry, setShowStreamRetry] = useState(false)
   const [streamInView, setStreamInView] = useState(false)
@@ -428,6 +455,8 @@ export default function LoungePostStreamVideo({
     if (!cfPosterActive && sessionPosterUrl) return sessionPosterUrl
     return posterDisplayUrl
   }, [hasPersistedPoster, persistedPosterTrim, cfPosterActive, sessionPosterUrl, posterDisplayUrl])
+  const visiblePosterSrcRef = useRef(visiblePosterSrc)
+  visiblePosterSrcRef.current = visiblePosterSrc
 
   const showOpen = enableLightbox && variant !== 'composer'
   const heroExpanded = lightboxOpen && heroPhase !== 'idle'
@@ -745,6 +774,8 @@ export default function LoungePostStreamVideo({
   }, [attachStream, poster, id, streamAttachKey])
 
   const finalizeHeroClose = useCallback(() => {
+    clearFlyoutPosterCover(videoFlyoutRef.current)
+    setHeroFlyoutPosterVisible(false)
     setLightboxOpen(false)
     setHeroPhase('idle')
     setHeroLayout(null)
@@ -853,6 +884,9 @@ export default function LoungePostStreamVideo({
       }
     }
     revealInlinePosterForHero(slot)
+    const posterSrc = visiblePosterSrcRef.current || poster
+    ensureFlyoutPosterCover(videoFlyoutRef.current, posterSrc)
+    setHeroFlyoutPosterVisible(true)
     const host = ensureHeroBodyHost()
     const flyout = videoFlyoutRef.current
     snapFlyoutToHeroRect(flyout, host, from)
@@ -871,6 +905,7 @@ export default function LoungePostStreamVideo({
     feedInlineSoundUnmuted,
     toggleFeedInlineSound,
     ensureHeroBodyHost,
+    poster,
   ])
 
   /** Bottom strip: coordinated tiles share provider mute; others toggle this tile only. */
@@ -976,6 +1011,19 @@ export default function LoungePostStreamVideo({
 
   /** Hero open: snap to tile rect (no transition), then grow to target on `document.body`. */
   useLayoutEffect(() => {
+    if (!lightboxOpen || heroPhase === 'idle') {
+      clearFlyoutPosterCover(videoFlyoutRef.current)
+      return undefined
+    }
+    if (heroPhase === 'opening' || (heroPhase === 'open' && heroFlyoutPosterVisible)) {
+      ensureFlyoutPosterCover(videoFlyoutRef.current, visiblePosterSrcRef.current || poster)
+    } else {
+      clearFlyoutPosterCover(videoFlyoutRef.current)
+    }
+    return undefined
+  }, [lightboxOpen, heroPhase, heroFlyoutPosterVisible, poster])
+
+  useLayoutEffect(() => {
     if (!lightboxOpen || heroPhase !== 'opening') return undefined
     const from = heroFromRectRef.current
     if (!from) return undefined
@@ -995,6 +1043,47 @@ export default function LoungePostStreamVideo({
       if (raf2) cancelAnimationFrame(raf2)
     }
   }, [lightboxOpen, heroPhase])
+
+  /** Drop flyout poster once hero lands and the reparented `<video>` is painting again. */
+  useEffect(() => {
+    if (heroPhase !== 'open' || !heroFlyoutPosterVisible) return undefined
+    const flyout = videoFlyoutRef.current
+    const v = videoRef.current
+    let tid = 0
+    let cleaned = false
+    const finish = () => {
+      if (cleaned) return
+      clearFlyoutPosterCover(flyout)
+      setHeroFlyoutPosterVisible(false)
+    }
+    const fadeOut = () => {
+      const img = flyout?.querySelector(HERO_FLYOUT_POSTER_SEL)
+      if (!(img instanceof HTMLImageElement)) {
+        finish()
+        return
+      }
+      img.style.transition = 'opacity 120ms ease-out'
+      img.style.opacity = '0'
+      tid = window.setTimeout(finish, 160)
+    }
+    const run = () => {
+      if (cleaned) return
+      if (v && typeof v.requestVideoFrameCallback === 'function') {
+        try {
+          v.requestVideoFrameCallback(() => fadeOut())
+          return
+        } catch {
+          // fall through
+        }
+      }
+      fadeOut()
+    }
+    run()
+    return () => {
+      cleaned = true
+      window.clearTimeout(tid)
+    }
+  }, [heroPhase, heroFlyoutPosterVisible])
 
   /** iOS sometimes skips `transitionend` on width — ensure chrome still appears after land. */
   useEffect(() => {
@@ -1302,7 +1391,7 @@ export default function LoungePostStreamVideo({
         }
       : undefined
   const heroFlyoutShellClass = heroExpanded
-    ? `overflow-hidden bg-black touch-manipulation ${heroSwipeTouchClass || ''}`.trim()
+    ? `overflow-hidden touch-manipulation ${heroPhase === 'opening' ? 'bg-transparent' : 'bg-black'} ${heroSwipeTouchClass || ''}`.trim()
     : 'absolute inset-0 z-[1] h-full w-full overflow-hidden bg-transparent'
   const heroFlyoutPointerProps = heroExpanded
     ? {
