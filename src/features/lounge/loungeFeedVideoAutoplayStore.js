@@ -8,7 +8,11 @@ export const LOUNGE_VIDEO_STRONG_IN_MIN = 0.95
 export const LOUNGE_VIDEO_CONTEST_OUT_MAX = 0.5
 export const LOUNGE_VIDEO_CONTEST_IN_MIN = 0.5
 /** Primary handoff: challenger tile midpoint vs scroll-column centerline (see pickCenterCrossTakeover). */
-/** #fuckflingers — only defer cold-start on new tiles; handoff + mute still run while scrolling. */
+/** Incumbent mostly clipped — release active immediately (don't wait for ratio === 0). */
+export const LOUNGE_VIDEO_ACTIVE_RELEASE_RATIO = 0.12
+/** Incumbent sliding off — promote center / scroll-leading visible tile at first pixel. */
+export const LOUNGE_VIDEO_ACTIVE_SCROLL_CONTEST_MAX = 0.38
+/** #fuckflingers — shrink ring while scrolling; handoff + active play still run. */
 export const LOUNGE_VIDEO_FLINGER_IDLE_MS = 120
 
 const EMPTY_RING = Object.freeze([])
@@ -33,7 +37,7 @@ const INITIAL_SNAPSHOT = Object.freeze({
  * @property {string | null} prefetchPrevId — feed-order predecessor in `{prev, active, next}` ring.
  * @property {string | null} prefetchNextId — feed-order successor in ring.
  * @property {readonly string[]} ringIds — up to three client ids allowed HLS attach (paused warm outside active).
- * @property {boolean} flingerMode — fast scroll: poster only, no new play/handoff.
+ * @property {boolean} flingerMode — fast scroll: shrink prefetch ring; active still plays.
  * @property {boolean} heroLocked — hero flyout owns resources; ring collapses to hero tile only.
  * @property {string | null} heroClientId
  * @property {boolean} coordinatorSuspended — overlay/detail: freeze feed coordinator.
@@ -235,6 +239,74 @@ export function createAutoplayStore() {
     return best
   }
 
+  /** First visible Stream tile in feed order ahead of scroll (for flinger HLS warm). */
+  const pickLeadingVisibleInFeed = (orderedIds, ratios, fromIdx, direction) => {
+    if (fromIdx < 0) return null
+    if (direction > 0) {
+      for (let i = fromIdx + 1; i < orderedIds.length; i += 1) {
+        const id = orderedIds[i]
+        if ((ratios[id] ?? 0) > 0) return id
+      }
+      return null
+    }
+    if (direction < 0) {
+      for (let i = fromIdx - 1; i >= 0; i -= 1) {
+        const id = orderedIds[i]
+        if ((ratios[id] ?? 0) > 0) return id
+      }
+      return null
+    }
+    for (let i = fromIdx + 1; i < orderedIds.length; i += 1) {
+      const id = orderedIds[i]
+      if ((ratios[id] ?? 0) > 0) return id
+    }
+    for (let i = fromIdx - 1; i >= 0; i -= 1) {
+      const id = orderedIds[i]
+      if ((ratios[id] ?? 0) > 0) return id
+    }
+    return null
+  }
+
+  const resolveActiveId = (orderedIds, ratios, centerYs, midY, incumbent) => {
+    const bestCenter = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY)
+    let next = incumbent
+
+    if (!next) {
+      return bestCenter ?? orderedIds.find((id) => (ratios[id] ?? 0) > 0) ?? null
+    }
+
+    if (bestCenter && bestCenter !== next) {
+      const incRatio = ratios[next] ?? 0
+      const incIdx = orderedIds.indexOf(next)
+      const bestIdx = orderedIds.indexOf(bestCenter)
+
+      if (incRatio <= LOUNGE_VIDEO_ACTIVE_RELEASE_RATIO) {
+        return bestCenter
+      }
+
+      const centerTakeover = pickCenterCrossTakeover(next, orderedIds, ratios, centerYs, midY, scrollDirection)
+      const clipTakeover = centerTakeover ? null : pickClipTakeover(next, orderedIds, ratios)
+      const thresholdTakeover = centerTakeover ?? clipTakeover
+      if (thresholdTakeover) return thresholdTakeover
+
+      if (incRatio <= LOUNGE_VIDEO_ACTIVE_SCROLL_CONTEST_MAX && incIdx >= 0 && bestIdx >= 0) {
+        const scrollingToNext = scrollDirection > 0 && bestIdx > incIdx
+        const scrollingToPrev = scrollDirection < 0 && bestIdx < incIdx
+        const scrollIdlePick =
+          scrollDirection === 0 &&
+          Math.abs((centerYs[bestCenter] ?? 0) - midY) <
+            Math.abs((centerYs[next] ?? 0) - midY) - 10
+        if (scrollingToNext || scrollingToPrev || scrollIdlePick) return bestCenter
+      }
+    }
+
+    if ((ratios[next] ?? 0) <= 0) {
+      return bestCenter ?? null
+    }
+
+    return next
+  }
+
   const publish = (orderedIds, ratios, centerYs, rootEl) => {
     const midY = scrollPortMidY(rootEl)
     let nextActive = activeId
@@ -248,33 +320,7 @@ export function createAutoplayStore() {
       prefetchPrevId = null
       prefetchNextId = null
     } else if (!coordinatorSuspended) {
-      if (!nextActive) {
-        const firstVisible = orderedIds.find((id) => (ratios[id] ?? 0) > 0)
-        if (firstVisible) nextActive = firstVisible
-      }
-
-      if (nextActive) {
-        const centerTakeover = pickCenterCrossTakeover(
-          nextActive,
-          orderedIds,
-          ratios,
-          centerYs,
-          midY,
-          scrollDirection,
-        )
-        const clipTakeover = centerTakeover
-          ? null
-          : pickClipTakeover(nextActive, orderedIds, ratios)
-        const takeover = centerTakeover ?? clipTakeover
-        if (takeover) nextActive = takeover
-
-        const incRatio = ratios[nextActive] ?? 0
-        if (incRatio <= 0) {
-          nextActive = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY, nextActive)
-        }
-      } else {
-        nextActive = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY)
-      }
+      nextActive = resolveActiveId(orderedIds, ratios, centerYs, midY, nextActive)
 
       if (nextActive) {
         const idx = orderedIds.indexOf(nextActive)
@@ -282,8 +328,10 @@ export function createAutoplayStore() {
           prefetchPrevId = idx > 0 ? orderedIds[idx - 1] : null
           prefetchNextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null
           if (flingerMode) {
-            /** Fling: keep one decoder on active only — no ring expansion until scroll settles. */
-            ringIds = [nextActive]
+            /** Fling: active + one leading visible successor/predecessor — warm HLS before handoff. */
+            const lead = pickLeadingVisibleInFeed(orderedIds, ratios, idx, scrollDirection)
+            ringIds =
+              lead && lead !== nextActive ? [nextActive, lead] : [nextActive]
           } else {
             ringIds = [prefetchPrevId, nextActive, prefetchNextId].filter(Boolean)
           }

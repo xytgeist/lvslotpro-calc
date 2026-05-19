@@ -853,7 +853,15 @@ export default function LoungePostStreamVideo({
     }
 
     if (flingerMode) {
-      if (!isActive || tileRatio <= 0) {
+      if (isActive && tileRatio > 0) {
+        try {
+          v.muted = coordinatedInlineSound ? computeCoordinatedSoundMuted() : !localStripSoundUnmuted
+          const p = v.play()
+          if (p && typeof p.catch === 'function') p.catch(() => {})
+        } catch {
+          // ignore
+        }
+      } else {
         try {
           v.pause()
           v.muted = true
@@ -1495,14 +1503,30 @@ export default function LoungePostStreamVideo({
     finalizeHeroClose,
   ])
 
-  /** Non-coordinated surfaces: IO attach/play. Coordinated tiles rely on store ratios + layout effect above. */
+  /** Coordinated: poke store on visibility changes. Non-coordinated: IO attach/play. */
   useEffect(() => {
     const wrap = containerRef.current
     const v = videoRef.current
     if (!wrap || !v || !showOpen || !id) return undefined
+
+    const root = visibilityResetRootRef?.current ?? null
+    const thresholds = [0, 0.02, 0.04, 0.08, 0.12, 0.18, 0.25, 0.35, 0.5, 0.65, 0.8, 1]
+
     if (coordinatorActive && lazyStream) {
-      inViewRef.current = tileRatio > 0
-      return undefined
+      const applyIo = (entries) => {
+        const e = entries[0]
+        const ratio = typeof e?.intersectionRatio === 'number' ? e.intersectionRatio : 0
+        inViewRef.current = Boolean(e?.isIntersecting && ratio > 0)
+        scheduleRecompute()
+      }
+      let io
+      try {
+        io = new IntersectionObserver(applyIo, { root, rootMargin: '0px', threshold: thresholds })
+      } catch {
+        io = new IntersectionObserver(applyIo, { root: null, rootMargin: '0px', threshold: thresholds })
+      }
+      io.observe(wrap)
+      return () => io.disconnect()
     }
 
     const applyIo = (entries) => {
@@ -1530,19 +1554,18 @@ export default function LoungePostStreamVideo({
       }
     }
 
-    const root = visibilityResetRootRef?.current ?? null
     let io
     try {
       io = new IntersectionObserver(applyIo, {
         root,
         rootMargin: '0px',
-        threshold: [0, 0.02, 0.04, 0.08, 0.12, 0.18, 0.25, 0.35, 0.5, 0.65, 0.8, 1],
+        threshold: thresholds,
       })
     } catch {
       io = new IntersectionObserver(applyIo, {
         root: null,
         rootMargin: '0px',
-        threshold: [0, 0.02, 0.04, 0.08, 0.12, 0.18, 0.25, 0.35, 0.5, 0.65, 0.8, 1],
+        threshold: thresholds,
       })
     }
     io.observe(wrap)
@@ -1552,11 +1575,11 @@ export default function LoungePostStreamVideo({
     showOpen,
     lazyStream,
     coordinatorActive,
-    tileRatio,
     visibilityResetRootRef,
     streamAttachKey,
     localStripSoundUnmuted,
     feedAutoplayEnabled,
+    scheduleRecompute,
   ])
 
   /** After lazy HLS attach, start playback once media is ready — active tile only (never prefetch ring). */
@@ -1573,7 +1596,6 @@ export default function LoungePostStreamVideo({
       if (cleaned) return
       if (anyStreamLightboxOpen && !lightboxOpenRef.current) return
       if (heroLocked && !lightboxOpenRef.current) return
-      if (flingerMode && !lightboxOpenRef.current) return
       if (coordinatorActive && !isActiveRef.current && !lightboxOpenRef.current) return
       try {
         if (lightboxOpenRef.current) {
@@ -1657,7 +1679,6 @@ export default function LoungePostStreamVideo({
     if (!v || !showOpen) return
     if (coordinatorActive) {
       if (!isActive && !inRing) return
-      if (flingerMode) return
     } else if (!inViewRef.current) {
       return
     }
