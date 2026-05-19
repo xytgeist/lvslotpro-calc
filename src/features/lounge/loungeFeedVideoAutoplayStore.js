@@ -330,32 +330,34 @@ export function createAutoplayStore() {
     orderedIds.find((id) => (ratios[id] ?? 0) > 0) ?? null
 
   /**
-   * Up to three ids allowed HLS attach: active + visible tiles nearest center (+ feed neighbors when room).
-   * Avoids deep-feed stalls where active stays on a clipped predecessor and later visible tiles miss the ring.
+   * Up to three ids allowed HLS attach: active + feed-order {prev, next} + visible near center.
+   * Feed neighbors stay in ring at ratio 0 so outgoing tiles pause (keep currentTime) instead of HLS teardown.
    */
   const buildRingIds = (orderedIds, ratios, centerYs, midY, active, maxCount) => {
     if (!active) return []
     /** @type {Set<string>} */
     const pickSet = new Set([active])
 
-    const visible = orderedIds.filter((id) => (ratios[id] ?? 0) > 0)
-    const byNearCenter = visible
-      .map((id) => ({
-        id,
-        dist: Math.abs((centerYs[id] ?? 0) - midY),
-        idx: orderedIds.indexOf(id),
-      }))
-      .sort((a, b) => a.dist - b.dist || a.idx - b.idx)
-
-    for (const row of byNearCenter) {
-      if (pickSet.size >= maxCount) break
-      pickSet.add(row.id)
-    }
-
     const idx = orderedIds.indexOf(active)
     if (idx >= 0) {
-      if (pickSet.size < maxCount && idx > 0) pickSet.add(orderedIds[idx - 1])
-      if (pickSet.size < maxCount && idx < orderedIds.length - 1) pickSet.add(orderedIds[idx + 1])
+      if (idx > 0) pickSet.add(orderedIds[idx - 1])
+      if (idx < orderedIds.length - 1) pickSet.add(orderedIds[idx + 1])
+    }
+
+    if (pickSet.size < maxCount) {
+      const visible = orderedIds.filter((id) => (ratios[id] ?? 0) > 0)
+      const byNearCenter = visible
+        .map((id) => ({
+          id,
+          dist: Math.abs((centerYs[id] ?? 0) - midY),
+          idx: orderedIds.indexOf(id),
+        }))
+        .sort((a, b) => a.dist - b.dist || a.idx - b.idx)
+
+      for (const row of byNearCenter) {
+        if (pickSet.size >= maxCount) break
+        pickSet.add(row.id)
+      }
     }
 
     return orderedIds.filter((id) => pickSet.has(id))
@@ -479,13 +481,19 @@ export function createAutoplayStore() {
           prefetchPrevId = idx > 0 ? orderedIds[idx - 1] : null
           prefetchNextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null
           if (flingerMode) {
-            /** Fling: active + visible/center neighbors (max 2) — warm HLS before handoff. */
-            const lead = pickLeadingVisibleInFeed(orderedIds, ratios, idx, scrollDirection)
-            const flingerRing = buildRingIds(orderedIds, ratios, centerYs, midY, nextActive, 2)
-            if (lead && lead !== nextActive && !flingerRing.includes(lead)) {
-              ringIds = [nextActive, lead]
+            /** Fling: active + feed neighbor on scroll axis — keep outgoing tile HLS warm (pause, not reset). */
+            ringIds = [nextActive]
+            const ringMate =
+              scrollDirection > 0
+                ? prefetchPrevId
+                : scrollDirection < 0
+                  ? prefetchNextId
+                  : prefetchNextId || prefetchPrevId
+            if (ringMate && ringMate !== nextActive) {
+              ringIds.push(ringMate)
             } else {
-              ringIds = flingerRing
+              const lead = pickLeadingVisibleInFeed(orderedIds, ratios, idx, scrollDirection)
+              if (lead && lead !== nextActive) ringIds.push(lead)
             }
           } else {
             ringIds = buildRingIds(orderedIds, ratios, centerYs, midY, nextActive, 3)

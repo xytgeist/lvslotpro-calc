@@ -1076,7 +1076,7 @@ export default function LoungePostStreamVideo({
         // ignore
       }
       if (inRing) return
-      if (tileRatio <= 0) {
+      if (tileRatio <= 0 && !inDomBudget) {
         try {
           v.currentTime = 0
         } catch {
@@ -1105,6 +1105,7 @@ export default function LoungePostStreamVideo({
     coordinatorActive,
     flingerMode,
     heroLocked,
+    inDomBudget,
     inRing,
     isActive,
     lazyStream,
