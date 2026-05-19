@@ -819,6 +819,38 @@ export default function LoungePostStreamVideo({
     releaseHeroBodyHost()
   }, [heroExpanded, ensureHeroBodyHost, releaseHeroBodyHost])
 
+  const tryCoordinatedInlinePlay = useCallback(() => {
+    const v = videoRef.current
+    if (!v || !showOpen || lightboxOpenRef.current) return false
+    if (anyStreamLightboxOpen && !lightboxOpenRef.current) return false
+    if (heroLocked && !lightboxOpenRef.current) return false
+    if (coordinatorActive && !isActiveRef.current) return false
+    if (coordinatorActive && tileRatio <= 0) return false
+    try {
+      v.muted = coordinatedInlineSound ? computeCoordinatedSoundMuted() : !localStripSoundUnmuted
+      const p = v.play()
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => {
+          scheduleRecompute()
+        })
+      }
+      return !v.paused
+    } catch {
+      scheduleRecompute()
+      return false
+    }
+  }, [
+    anyStreamLightboxOpen,
+    computeCoordinatedSoundMuted,
+    coordinatedInlineSound,
+    coordinatorActive,
+    heroLocked,
+    localStripSoundUnmuted,
+    scheduleRecompute,
+    showOpen,
+    tileRatio,
+  ])
+
   useEffect(() => () => releaseHeroBodyHost(), [releaseHeroBodyHost])
 
   /** Coordinator + hero resource budget: one `play()`, `{prev,active,next}` ring attach, hero lock collapses ring. */
@@ -854,13 +886,7 @@ export default function LoungePostStreamVideo({
 
     if (flingerMode) {
       if (isActive && tileRatio > 0) {
-        try {
-          v.muted = coordinatedInlineSound ? computeCoordinatedSoundMuted() : !localStripSoundUnmuted
-          const p = v.play()
-          if (p && typeof p.catch === 'function') p.catch(() => {})
-        } catch {
-          // ignore
-        }
+        tryCoordinatedInlinePlay()
       } else {
         try {
           v.pause()
@@ -892,13 +918,7 @@ export default function LoungePostStreamVideo({
 
     if (isActive) {
       if (tileRatio > 0) {
-        try {
-          v.muted = coordinatedInlineSound ? computeCoordinatedSoundMuted() : !localStripSoundUnmuted
-          const p = v.play()
-          if (p && typeof p.catch === 'function') p.catch(() => {})
-        } catch {
-          // ignore
-        }
+        tryCoordinatedInlinePlay()
       } else {
         try {
           v.pause()
@@ -924,7 +944,50 @@ export default function LoungePostStreamVideo({
     showOpen,
     tileRatio,
     lightboxOpen,
+    tryCoordinatedInlinePlay,
   ])
+
+  /** Active tile: retry muted play when HLS becomes ready or mobile silently rejects autoplay. */
+  useEffect(() => {
+    if (!coordinatorActive || !lazyStream || !feedAutoplayEnabled || !isActive || !attachStream) return undefined
+    if (tileRatio <= 0 || lightboxOpen) return undefined
+    const v = videoRef.current
+    if (!v) return undefined
+
+    let cancelled = false
+    const nudge = () => {
+      if (cancelled || lightboxOpenRef.current) return
+      if (!isActiveRef.current) return
+      if (!v.paused) return
+      tryCoordinatedInlinePlay()
+    }
+
+    v.addEventListener('loadeddata', nudge)
+    v.addEventListener('canplay', nudge)
+    v.addEventListener('playing', nudge)
+    const tid = window.setInterval(nudge, 450)
+    queueMicrotask(nudge)
+    return () => {
+      cancelled = true
+      window.clearInterval(tid)
+      v.removeEventListener('loadeddata', nudge)
+      v.removeEventListener('canplay', nudge)
+      v.removeEventListener('playing', nudge)
+    }
+  }, [
+    attachStream,
+    coordinatorActive,
+    feedAutoplayEnabled,
+    isActive,
+    lazyStream,
+    lightboxOpen,
+    tileRatio,
+    tryCoordinatedInlinePlay,
+  ])
+
+  useEffect(() => {
+    if (isActive || inRing) recoveryBurstRef.current = 0
+  }, [isActive, inRing])
 
   useEffect(() => {
     if (!streamInView && lazyStream) recoveryBurstRef.current = 0
@@ -1609,7 +1672,11 @@ export default function LoungePostStreamVideo({
         }
         if (coordinatorActive && !isActiveRef.current && !lightboxOpenRef.current) return
         const p = v.play()
-        if (p && typeof p.catch === 'function') p.catch(() => {})
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {
+            scheduleRecompute()
+          })
+        }
       } catch {
         // ignore
       }

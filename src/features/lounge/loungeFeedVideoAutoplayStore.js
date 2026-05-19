@@ -14,6 +14,10 @@ export const LOUNGE_VIDEO_ACTIVE_RELEASE_RATIO = 0.12
 export const LOUNGE_VIDEO_ACTIVE_SCROLL_CONTEST_MAX = 0.38
 /** #fuckflingers — shrink ring while scrolling; handoff + active play still run. */
 export const LOUNGE_VIDEO_FLINGER_IDLE_MS = 120
+/** Only tiles near the scroll port participate in active/ring (mounted feed keeps every Stream row). */
+export const LOUNGE_VIDEO_COORDINATOR_VIEWPORT_MARGIN_RATIO = 1.5
+/** Recompute while idle so deep-feed stalls self-heal without opening hero. */
+export const LOUNGE_VIDEO_COORDINATOR_IDLE_WATCHDOG_MS = 600
 
 const EMPTY_RING = Object.freeze([])
 const EMPTY_RATIOS = Object.freeze({})
@@ -87,6 +91,8 @@ export function createAutoplayStore() {
   let scrollDirection = 0
   /** @type {ReturnType<typeof setTimeout> | null} */
   let flingerIdleTimer = null
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let idleWatchdogTimer = null
 
   const emit = () => {
     listeners.forEach((l) => {
@@ -98,12 +104,27 @@ export function createAutoplayStore() {
     })
   }
 
+  const coordinatorWindowMarginPx = (rootEl) => {
+    if (!rootEl) return 480
+    const rootRect = rootEl.getBoundingClientRect()
+    return Math.max(rootRect.height * LOUNGE_VIDEO_COORDINATOR_VIEWPORT_MARGIN_RATIO, 320)
+  }
+
+  const isInCoordinatorWindow = (el, rootEl) => {
+    if (!el || !rootEl) return false
+    const tileRect = el.getBoundingClientRect()
+    const rootRect = rootEl.getBoundingClientRect()
+    const margin = coordinatorWindowMarginPx(rootEl)
+    return tileRect.bottom >= rootRect.top - margin && tileRect.top <= rootRect.bottom + margin
+  }
+
   const buildOrderedIds = (rootEl) => {
     /** @type {{ id: string, top: number, left: number }[]} */
     const rows = []
     for (const [id, getEl] of entries) {
       const el = getEl()
-      if (!el) continue
+      if (!el || !rootEl) continue
+      if (!isInCoordinatorWindow(el, rootEl)) continue
       const rect = el.getBoundingClientRect()
       rows.push({ id, top: rect.top, left: rect.left })
     }
@@ -111,12 +132,18 @@ export function createAutoplayStore() {
     return rows.map((r) => r.id)
   }
 
-  const computeTileMetrics = (rootEl) => {
+  const computeTileMetrics = (rootEl, orderedIds) => {
     /** @type {Record<string, number>} */
     const ratios = {}
     /** @type {Record<string, number>} */
     const centerYs = {}
+    const inWindow = new Set(orderedIds)
     for (const [id, getEl] of entries) {
+      if (!inWindow.has(id)) {
+        ratios[id] = 0
+        centerYs[id] = 0
+        continue
+      }
       const el = getEl()
       if (!el || !rootEl) {
         ratios[id] = 0
@@ -315,35 +342,43 @@ export function createAutoplayStore() {
     if (incRatio <= 0) return pickVisibleFallback()
     if (incRatio <= LOUNGE_VIDEO_ACTIVE_RELEASE_RATIO) return pickVisibleFallback()
 
-    if (bestCenter && bestCenter !== next) {
-      const incIdx = orderedIds.indexOf(next)
-      const bestIdx = orderedIds.indexOf(bestCenter)
-      const incDist = Math.abs((centerYs[next] ?? 0) - midY)
-      const bestDist = Math.abs((centerYs[bestCenter] ?? 0) - midY)
+    if (!bestCenter || bestCenter === next) return next
 
-      const centerTakeover = pickCenterCrossTakeover(next, orderedIds, ratios, centerYs, midY, scrollDirection)
-      const clipTakeover = centerTakeover ? null : pickClipTakeover(next, orderedIds, ratios)
-      const thresholdTakeover = centerTakeover ?? clipTakeover
-      if (thresholdTakeover) return thresholdTakeover
+    const incIdx = orderedIds.indexOf(next)
+    const bestIdx = orderedIds.indexOf(bestCenter)
+    const incDist = Math.abs((centerYs[next] ?? 0) - midY)
+    const bestDist = Math.abs((centerYs[bestCenter] ?? 0) - midY)
 
-      if (flinger || scrollDirection !== 0) {
-        if (incRatio <= LOUNGE_VIDEO_ACTIVE_SCROLL_CONTEST_MAX && incIdx >= 0 && bestIdx >= 0) {
-          const scrollingToNext = scrollDirection > 0 && bestIdx > incIdx
-          const scrollingToPrev = scrollDirection < 0 && bestIdx < incIdx
-          if (scrollingToNext || scrollingToPrev) return bestCenter
-        }
-        if (bestDist + 12 < incDist) return bestCenter
-        return next
+    const centerTakeover = pickCenterCrossTakeover(next, orderedIds, ratios, centerYs, midY, scrollDirection)
+    const clipTakeover = centerTakeover ? null : pickClipTakeover(next, orderedIds, ratios)
+    const thresholdTakeover = centerTakeover ?? clipTakeover
+    if (thresholdTakeover) return thresholdTakeover
+
+    if (flinger || scrollDirection !== 0) {
+      if (incRatio <= LOUNGE_VIDEO_ACTIVE_SCROLL_CONTEST_MAX && incIdx >= 0 && bestIdx >= 0) {
+        const scrollingToNext = scrollDirection > 0 && bestIdx > incIdx
+        const scrollingToPrev = scrollDirection < 0 && bestIdx < incIdx
+        if (scrollingToNext || scrollingToPrev) return bestCenter
       }
-
-      if (bestDist + 4 < incDist) return bestCenter
+      if (bestDist + 12 < incDist) return bestCenter
+      return next
     }
 
-    return next
+    return bestCenter
+  }
+
+  const armIdleWatchdog = () => {
+    if (idleWatchdogTimer) window.clearTimeout(idleWatchdogTimer)
+    idleWatchdogTimer = window.setTimeout(() => {
+      idleWatchdogTimer = null
+      schedule()
+    }, LOUNGE_VIDEO_COORDINATOR_IDLE_WATCHDOG_MS)
   }
 
   const publish = (orderedIds, ratios, centerYs, rootEl) => {
     const midY = scrollPortMidY(rootEl)
+    if (activeId && !orderedIds.includes(activeId)) activeId = null
+    if (activeId && (ratios[activeId] ?? 0) <= 0) activeId = null
     let nextActive = activeId
     let prefetchPrevId = null
     let prefetchNextId = null
@@ -454,8 +489,9 @@ export function createAutoplayStore() {
     scheduled = false
     const rootEl = rootRef?.current ?? null
     const orderedIds = buildOrderedIds(rootEl)
-    const { ratios, centerYs } = computeTileMetrics(rootEl)
+    const { ratios, centerYs } = computeTileMetrics(rootEl, orderedIds)
     publish(orderedIds, ratios, centerYs, rootEl)
+    armIdleWatchdog()
   }
 
   const schedule = () => {
@@ -532,9 +568,15 @@ export function createAutoplayStore() {
       schedule()
     },
     exitHeroLock() {
-      if (!heroLocked) return
+      if (!heroLocked && !heroClientId) return
       heroLocked = false
       heroClientId = null
+      activeId = null
+      flingerMode = false
+      if (flingerIdleTimer) {
+        window.clearTimeout(flingerIdleTimer)
+        flingerIdleTimer = null
+      }
       schedule()
     },
     /** Post detail / overlay: freeze handoff and shrink ring (feed stays mounted). */
