@@ -614,7 +614,17 @@ export default function SocialFeed({
     writeLoungeFeedVideoDebugEnabled(enabled)
   }, [])
 
-  const loungeFeedVideoDebugHudOnFeed = loungeFeedVideoDebugEnabled && !loungePostDetail?.id && loungeDockPanel !== 'search'
+  const loungeFeedVideoDebugHudOnFeed =
+    loungeFeedVideoDebugEnabled &&
+    !loungePostDetail?.id &&
+    loungeDockPanel !== 'search' &&
+    !profileModalOpen &&
+    profileOverlayStack.length === 0
+  const loungeProfileVideoDebugHud =
+    loungeFeedVideoDebugEnabled &&
+    !loungePostDetail?.id &&
+    !loungeDockPanel &&
+    (profileModalOpen || profileOverlayStack.length > 0)
 
   // ── @mention autocomplete — one instance per composer ──────────────────────
   const mentionComposer = useMentionState(postText, supabaseClient, !loungeReadOnly)
@@ -7318,7 +7328,11 @@ export default function SocialFeed({
       >
         <LoungeFeedVideoAutoplayProvider scrollRootRef={loungeFeedScrollRef} showDebugHud={loungeFeedVideoDebugHudOnFeed}>
         <LoungeFeedAutoplayPostsKick postCount={communityPosts.length} />
-        <LoungeFeedCoordinatorSuspendBinder suspended={Boolean(loungePostDetail?.id)} />
+        <LoungeFeedCoordinatorSuspendBinder
+          suspended={Boolean(
+            loungePostDetail?.id || profileModalOpen || profileOverlayStack.length > 0,
+          )}
+        />
         <div
           aria-hidden
           className="shrink-0"
@@ -9629,6 +9643,8 @@ export default function SocialFeed({
           onNavigateToProfile={openAuthorProfile}
           onShareProfile={handleShareLoungeProfile}
           onBlockProfile={handleBlockLoungeProfile}
+          suspendVideoCoordinator={Boolean(loungePostDetail?.id)}
+          showVideoDebugHud={loungeProfileVideoDebugHud}
         />
       ) : null}
 
@@ -9661,6 +9677,8 @@ export default function SocialFeed({
               onNavigateToProfile={openAuthorProfile}
               onShareProfile={handleShareLoungeProfile}
               onBlockProfile={handleBlockLoungeProfile}
+              suspendVideoCoordinator={Boolean(loungePostDetail?.id)}
+              showVideoDebugHud={loungeProfileVideoDebugHud && isTop}
             />
           </div>
         )

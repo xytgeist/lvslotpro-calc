@@ -38,6 +38,11 @@ import {
 import LoungePostDetailCommentHierarchy from './LoungePostDetailCommentHierarchy.jsx'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
+import {
+  LoungeFeedAutoplayPostsKick,
+  LoungeFeedCoordinatorSuspendBinder,
+  LoungeFeedVideoAutoplayProvider,
+} from './LoungeFeedVideoAutoplayContext.jsx'
 import LoungeOgBadge from './LoungeOgBadge'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import LoungeProfileFollowList from './LoungeProfileFollowList.jsx'
@@ -465,6 +470,10 @@ export default function LoungeProfileFullScreen({
   onNavigateToProfile = null,
   /** Stacked profile opened from a parent sheet (follow list); uses absolute overlay. */
   stackedOverlay = false,
+  /** Pause profile scroll-root autoplay when post detail (or other overlay) owns video budget. */
+  suspendVideoCoordinator = false,
+  /** Settings → Video debug HUD while this profile sheet is the active surface. */
+  showVideoDebugHud = false,
 }) {
   const [tab, setTab] = useState('posts')
   const [interactionPosts, setInteractionPosts] = useState([])
@@ -527,6 +536,14 @@ export default function LoungeProfileFullScreen({
   const profileTabsVisible = isOwnProfile ? PROFILE_TAB_IDS : PROFILE_TAB_IDS.slice(0, 2)
   const profileTabBtnClass =
     profileTabsVisible.length > 2 ? 'min-h-11 px-1 text-[13px]' : 'min-h-11 px-2 text-[15px]'
+  const profileAutoplayPostCount =
+    tab === 'posts'
+      ? posts.length
+      : tab === 'likes' || tab === 'bookmarks'
+        ? interactionPosts.length
+        : tab === 'replies'
+          ? profileReplies.length
+          : 0
   const profileFabBottomPadPx =
     shellDock && !showOwnEditControls ? LOUNGE_DOCK_FAB_SIZE_PX + 28 : 0
 
@@ -1975,6 +1992,12 @@ export default function LoungeProfileFullScreen({
             </div>
 
             <div className="min-h-[12rem] pb-4">
+              <LoungeFeedVideoAutoplayProvider
+                scrollRootRef={profileBodyScrollRef}
+                showDebugHud={showVideoDebugHud}
+              >
+                <LoungeFeedCoordinatorSuspendBinder suspended={suspendVideoCoordinator} />
+                <LoungeFeedAutoplayPostsKick postCount={profileAutoplayPostCount} />
               {error ? (
                 <div className="m-3 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] text-rose-200">{error}</div>
               ) : tab === 'posts' ? (
@@ -2105,6 +2128,7 @@ export default function LoungeProfileFullScreen({
                   ))
                 )
               ) : null}
+              </LoungeFeedVideoAutoplayProvider>
             </div>
           </div>
         </div>
@@ -2178,6 +2202,8 @@ export default function LoungeProfileFullScreen({
               }}
               onShareProfile={onShareProfile}
               onBlockProfile={onBlockProfile}
+              suspendVideoCoordinator={suspendVideoCoordinator}
+              showVideoDebugHud={showVideoDebugHud}
             />
           )
         })}
