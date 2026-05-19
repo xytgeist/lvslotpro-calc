@@ -219,6 +219,8 @@ const EMPTY_AUTOPLAY_SNAPSHOT = Object.freeze({
   prefetchPrevId: null,
   prefetchNextId: null,
   ringIds: Object.freeze([]),
+  domBudgetIds: Object.freeze([]),
+  softResetEpoch: 0,
   flingerMode: false,
   heroLocked: false,
   heroClientId: null,
@@ -259,6 +261,9 @@ export function useLoungeFeedVideoAutoplay(clientId, getContainerEl) {
   const inRing = Boolean(
     ctx && clientId && feedAutoplayEnabled && autoplaySnapshot.ringIds.includes(clientId),
   )
+  const inDomBudget = Boolean(
+    ctx && clientId && feedAutoplayEnabled && autoplaySnapshot.domBudgetIds.includes(clientId),
+  )
   const tileRatio =
     clientId && feedAutoplayEnabled ? Number(autoplaySnapshot.tileRatios[clientId] ?? 0) : 0
 
@@ -266,6 +271,8 @@ export function useLoungeFeedVideoAutoplay(clientId, getContainerEl) {
     coordinatorActive,
     isActive,
     inRing,
+    inDomBudget,
+    softResetEpoch: autoplaySnapshot.softResetEpoch,
     tileRatio,
     flingerMode: autoplaySnapshot.flingerMode,
     heroLocked: autoplaySnapshot.heroLocked,

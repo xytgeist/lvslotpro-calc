@@ -82,6 +82,7 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
     const ids = new Set([
       ...debugInfo.registeredIds,
       ...Object.keys(tileSnapshots),
+      ...coordinatorSnapshot.domBudgetIds,
       ...coordinatorSnapshot.ringIds,
       coordinatorSnapshot.activeId,
     ].filter(Boolean))
@@ -92,11 +93,13 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
         ratio: Number(coordinatorSnapshot.tileRatios[id] ?? 0),
         isActive: coordinatorSnapshot.activeId === id,
         inRing: coordinatorSnapshot.ringIds.includes(id),
+        inDomBudget: coordinatorSnapshot.domBudgetIds.includes(id),
         registered: debugInfo.registeredIds.includes(id),
       }))
       .sort((a, b) => {
         if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
         if (a.inRing !== b.inRing) return a.inRing ? -1 : 1
+        if (a.inDomBudget !== b.inDomBudget) return a.inDomBudget ? -1 : 1
         return b.ratio - a.ratio
       })
   }, [coordinatorSnapshot, debugInfo.registeredIds, tileSnapshots, pollTick])
@@ -110,7 +113,14 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
       scroll: { scrollTop, scrollHeight, clientHeight },
       coordinator: coordinatorSnapshot,
       store: debugInfo,
-      tiles: tileRows.map((row) => ({ id: row.id, ratio: row.ratio, isActive: row.isActive, inRing: row.inRing, ...row.snap })),
+      tiles: tileRows.map((row) => ({
+        id: row.id,
+        ratio: row.ratio,
+        isActive: row.isActive,
+        inRing: row.inRing,
+        inDomBudget: row.inDomBudget,
+        ...row.snap,
+      })),
       events: debugEvents,
     }
   }, [
@@ -207,6 +217,14 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
               : '—'}
           </div>
           <div>
+            dom [{coordinatorSnapshot.domBudgetIds.length}]:{' '}
+            {coordinatorSnapshot.domBudgetIds.length
+              ? coordinatorSnapshot.domBudgetIds.map((id) => shortId(id)).join(', ')
+              : '—'}
+            {' · '}
+            softReset #{coordinatorSnapshot.softResetEpoch}
+          </div>
+          <div>
             flinger: <span className="text-white">{coordinatorSnapshot.flingerMode ? 'yes' : 'no'}</span>
             {' · '}
             hero: <span className="text-white">{coordinatorSnapshot.heroLocked ? shortId(coordinatorSnapshot.heroClientId) : 'no'}</span>
@@ -231,9 +249,10 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
               const v = row.snap?.video ?? {}
               const flags = []
               if (row.isActive) flags.push('ACTIVE')
-              if (row.inRing) flags.push('ring')
+              if (row.inRing) flags.push('hls')
+              if (row.inDomBudget) flags.push('dom')
               if (row.registered) flags.push('reg')
-              if (row.snap?.attachStream) flags.push('hls')
+              if (row.snap?.attachStream) flags.push('attach')
               if (v.present && !v.paused) flags.push('playing')
               return (
                 <div key={row.id} className="rounded border border-zinc-700/80 bg-zinc-900/70 px-1.5 py-1">

@@ -22,8 +22,13 @@ export const LOUNGE_VIDEO_COORDINATOR_IDLE_WATCHDOG_MS = 1200
 export const LOUNGE_VIDEO_IDLE_HANDOFF_CENTER_GAP_PX = 24
 /** Ignore tiny ratio deltas on ring tiles — cuts scroll-time React churn. */
 export const LOUNGE_VIDEO_RATIO_EMIT_EPSILON = 0.022
+/** Max inline `<video>` nodes: `{prev, active, next}` ring + two feed-order lookahead shells. */
+export const LOUNGE_VIDEO_DOM_BUDGET_MAX = 5
+/** Periodic soft reset (hero-exit style) to release iOS media pressure deep in feed. */
+export const LOUNGE_VIDEO_SOFT_RESET_HANDOFF_EVERY = 5
 
 const EMPTY_RING = Object.freeze([])
+const EMPTY_DOM_BUDGET = Object.freeze([])
 const EMPTY_RATIOS = Object.freeze({})
 
 /** @type {import('./loungeFeedVideoAutoplayStore.js').LoungeFeedAutoplaySnapshot} */
@@ -32,6 +37,8 @@ const INITIAL_SNAPSHOT = Object.freeze({
   prefetchPrevId: null,
   prefetchNextId: null,
   ringIds: EMPTY_RING,
+  domBudgetIds: EMPTY_DOM_BUDGET,
+  softResetEpoch: 0,
   flingerMode: false,
   heroLocked: false,
   heroClientId: null,
@@ -45,6 +52,8 @@ const INITIAL_SNAPSHOT = Object.freeze({
  * @property {string | null} prefetchPrevId — feed-order predecessor in `{prev, active, next}` ring.
  * @property {string | null} prefetchNextId — feed-order successor in ring.
  * @property {readonly string[]} ringIds — up to three client ids allowed HLS attach (paused warm outside active).
+ * @property {readonly string[]} domBudgetIds — up to five client ids that mount an inline `<video>` (ring + lookahead).
+ * @property {number} softResetEpoch — bumps on periodic handoff reset (tiles reattach HLS).
  * @property {boolean} flingerMode — fast scroll: shrink prefetch ring; active still plays.
  * @property {boolean} heroLocked — hero flyout owns resources; ring collapses to hero tile only.
  * @property {string | null} heroClientId
@@ -98,6 +107,8 @@ export function createAutoplayStore() {
   let flingerIdleTimer = null
   /** @type {ReturnType<typeof setTimeout> | null} */
   let idleWatchdogTimer = null
+  let handoffCount = 0
+  let softResetEpoch = 0
 
   const emit = () => {
     listeners.forEach((l) => {
@@ -334,6 +345,35 @@ export function createAutoplayStore() {
     return orderedIds.filter((id) => pickSet.has(id))
   }
 
+  /** Ring (≤3) + feed-order neighbors (≤5 total) mount `<video>` without extra HLS beyond ring. */
+  const buildDomBudgetIds = (orderedIds, ringIds, active, direction, maxCount = LOUNGE_VIDEO_DOM_BUDGET_MAX) => {
+    /** @type {Set<string>} */
+    const pick = new Set(ringIds.filter(Boolean))
+    if (pick.size >= maxCount || !active) {
+      return orderedIds.filter((id) => pick.has(id))
+    }
+    const idx = orderedIds.indexOf(active)
+    if (idx < 0) return orderedIds.filter((id) => pick.has(id))
+
+    const tryAdd = (i) => {
+      if (pick.size >= maxCount) return
+      const id = orderedIds[i]
+      if (id) pick.add(id)
+    }
+
+    if (direction > 0) {
+      for (let i = idx + 1; i < orderedIds.length && pick.size < maxCount; i += 1) tryAdd(i)
+      for (let i = idx - 1; i >= 0 && pick.size < maxCount; i -= 1) tryAdd(i)
+    } else if (direction < 0) {
+      for (let i = idx - 1; i >= 0 && pick.size < maxCount; i -= 1) tryAdd(i)
+      for (let i = idx + 1; i < orderedIds.length && pick.size < maxCount; i += 1) tryAdd(i)
+    } else {
+      for (let i = idx + 1; i < orderedIds.length && pick.size < maxCount; i += 1) tryAdd(i)
+      for (let i = idx - 1; i >= 0 && pick.size < maxCount; i -= 1) tryAdd(i)
+    }
+    return orderedIds.filter((id) => pick.has(id))
+  }
+
   const resolveActiveId = (orderedIds, ratios, centerYs, midY, incumbent, { flinger }) => {
     const bestCenter = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY)
     const pickVisibleFallback = () => bestCenter ?? pickFirstVisible(orderedIds, ratios)
@@ -406,9 +446,12 @@ export function createAutoplayStore() {
     let prefetchNextId = null
     /** @type {string[]} */
     let ringIds = []
+    /** @type {string[]} */
+    let domBudgetIds = []
 
     if (heroLocked && heroClientId) {
       ringIds = [heroClientId]
+      domBudgetIds = [heroClientId]
       prefetchPrevId = null
       prefetchNextId = null
     } else if (!coordinatorSuspended) {
@@ -433,8 +476,10 @@ export function createAutoplayStore() {
           }
         }
       }
+      domBudgetIds = buildDomBudgetIds(orderedIds, ringIds, nextActive, scrollDirection)
     } else if (coordinatorSuspended) {
       ringIds = nextActive ? [nextActive] : []
+      domBudgetIds = nextActive ? [nextActive] : []
       if (nextActive) {
         const idx = orderedIds.indexOf(nextActive)
         if (idx >= 0) {
@@ -446,6 +491,24 @@ export function createAutoplayStore() {
 
     const prevActiveId = activeId
     activeId = nextActive
+
+    if (
+      prevActiveId &&
+      nextActive &&
+      prevActiveId !== nextActive &&
+      !heroLocked &&
+      !coordinatorSuspended
+    ) {
+      handoffCount += 1
+      if (handoffCount % LOUNGE_VIDEO_SOFT_RESET_HANDOFF_EVERY === 0) {
+        softResetEpoch += 1
+        queueMicrotask(() => {
+          if (heroLocked || coordinatorSuspended) return
+          activeId = null
+          schedule()
+        })
+      }
+    }
 
     if (prevActiveId && prevActiveId !== nextActive) {
       try {
@@ -466,6 +529,8 @@ export function createAutoplayStore() {
       prefetchPrevId,
       prefetchNextId,
       ringIds: Object.freeze(ringIds),
+      domBudgetIds: Object.freeze(domBudgetIds),
+      softResetEpoch,
       flingerMode,
       heroLocked,
       heroClientId,
@@ -481,12 +546,22 @@ export function createAutoplayStore() {
       nextSnapshot.heroLocked !== snapshot.heroLocked ||
       nextSnapshot.heroClientId !== snapshot.heroClientId ||
       nextSnapshot.coordinatorSuspended !== snapshot.coordinatorSuspended ||
+      nextSnapshot.softResetEpoch !== snapshot.softResetEpoch ||
       nextSnapshot.ringIds.length !== snapshot.ringIds.length ||
-      nextSnapshot.ringIds.some((id, i) => id !== snapshot.ringIds[i])
+      nextSnapshot.ringIds.some((id, i) => id !== snapshot.ringIds[i]) ||
+      nextSnapshot.domBudgetIds.length !== snapshot.domBudgetIds.length ||
+      nextSnapshot.domBudgetIds.some((id, i) => id !== snapshot.domBudgetIds[i])
 
     const ratioIds = new Set([...Object.keys(snapshot.tileRatios), ...Object.keys(ratios)])
     const ratioEmitIds = new Set(
-      [nextActive, snapshot.activeId, ...ringIds, ...snapshot.ringIds].filter(Boolean),
+      [
+        nextActive,
+        snapshot.activeId,
+        ...ringIds,
+        ...snapshot.ringIds,
+        ...domBudgetIds,
+        ...snapshot.domBudgetIds,
+      ].filter(Boolean),
     )
     let ratiosChanged = false
     let soundBandCrossed = false

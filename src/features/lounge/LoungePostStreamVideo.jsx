@@ -355,6 +355,7 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
   const {
     enabled = true,
     feedStyleAbr = false,
+    ringWarmPrefetch = false,
     recoveryBurstRef = null,
     onAutoReattach = null,
     onDebugHlsError = null,
@@ -401,9 +402,11 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
       .then(({ default: Hls }) => {
         if (cancelled || !videoRef.current || videoRef.current !== video) return
         if (Hls.isSupported()) {
+          const maxBufferLength = feedStyleAbr ? (ringWarmPrefetch ? 6 : 18) : 45
+          const maxMaxBufferLength = feedStyleAbr ? (ringWarmPrefetch ? 12 : 36) : 120
           const hls = new Hls({
-            maxBufferLength: feedStyleAbr ? 18 : 45,
-            maxMaxBufferLength: feedStyleAbr ? 36 : 120,
+            maxBufferLength,
+            maxMaxBufferLength,
             lowLatencyMode: false,
             ...(feedStyleAbr ? { startLevel: 0, capLevelToPlayerSize: true } : {}),
           })
@@ -737,6 +740,8 @@ export default function LoungePostStreamVideo({
     coordinatorActive,
     isActive,
     inRing,
+    inDomBudget,
+    softResetEpoch,
     tileRatio,
     flingerMode,
     heroLocked,
@@ -778,15 +783,16 @@ export default function LoungePostStreamVideo({
   const attachStream = heroExpanded
     ? Boolean(id)
     : lazyStream
-      ? feedAutoplayEnabled && (coordinatorActive ? isActive : streamInView)
+      ? feedAutoplayEnabled && (coordinatorActive ? inRing : streamInView)
       : true
-  /** iOS: one inline `<video>` in the DOM — mount only for active / hero / legacy in-view. */
+  /** iOS: ≤5 inline `<video>` nodes (ring + lookahead); HLS only on ring (≤3). */
   const mountStreamVideo = Boolean(id) && (
-    attachStream ||
+    (coordinatorActive && inDomBudget) ||
     heroExpanded ||
     lightboxOpen ||
     (!coordinatorActive && lazyStream && streamInView)
   )
+  const ringWarmPrefetch = coordinatorActive && inRing && !isActive && attachStream
 
   const computeCoordinatedSoundMuted = useCallback(() => {
     if (feedInlineSoundExplicitlyMuted || !feedInlineSoundUnmuted) return true
@@ -1231,9 +1237,20 @@ export default function LoungePostStreamVideo({
     setStreamAttachKey((k) => k + 1)
   }, [])
 
+  const lastSoftResetEpochRef = useRef(0)
+  useEffect(() => {
+    if (!coordinatorActive || !softResetEpoch) return
+    if (softResetEpoch === lastSoftResetEpochRef.current) return
+    lastSoftResetEpochRef.current = softResetEpoch
+    if (!attachStream && !mountStreamVideo) return
+    recoveryBurstRef.current = 0
+    setStreamAttachKey((k) => k + 1)
+  }, [softResetEpoch, coordinatorActive, attachStream, mountStreamVideo])
+
   useStreamHlsAttachment(videoRef, src, streamAttachKey, {
     enabled: attachStream,
     feedStyleAbr: feedStyleAbr,
+    ringWarmPrefetch,
     recoveryBurstRef,
     onAutoReattach: bumpStreamAttach,
     onDebugHlsError:
@@ -1248,8 +1265,11 @@ export default function LoungePostStreamVideo({
       variant,
       isActive,
       inRing,
+      inDomBudget,
+      mountStreamVideo,
       tileRatio,
       attachStream,
+      ringWarmPrefetch,
       flingerMode,
       heroLocked,
       coordinatorActive,
@@ -1267,8 +1287,11 @@ export default function LoungePostStreamVideo({
       flingerMode,
       heroLocked,
       id,
+      inDomBudget,
       inRing,
       isActive,
+      mountStreamVideo,
+      ringWarmPrefetch,
       showStreamRetry,
       streamAttachKey,
       tileRatio,
@@ -2161,7 +2184,6 @@ export default function LoungePostStreamVideo({
   }
   const streamVideoEl = mountStreamVideo ? (
     <video
-      key={`stream-v-${streamAttachKey}`}
       ref={videoRef}
       className={`${streamVideoClass} ${heroExpanded ? '' : 'transition-opacity ease-out'} ${inlineVideoOpacityClass}`}
       style={heroExpanded ? undefined : streamFadeTransitionStyle}
