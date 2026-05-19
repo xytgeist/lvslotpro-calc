@@ -427,6 +427,7 @@ function pauseOtherLoungeStreamVideos(exceptVideo) {
  * @param {React.MutableRefObject<number> | null} [opts.recoveryBurstRef] auto-reattach budget (shared with `<video onError>`)
  * @param {(() => void) | null} [opts.onAutoReattach] bump attachKey after built-in Hls recovery fails
  * @param {((detail: string) => void) | null} [opts.onDebugHlsError] dev HUD: fatal HLS error detail
+ * @param {((detail: string) => void) | null} [opts.onDebugLifecycle] dev HUD: attach/detach lifecycle
  */
 function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
   const {
@@ -436,6 +437,7 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
     recoveryBurstRef = null,
     onAutoReattach = null,
     onDebugHlsError = null,
+    onDebugLifecycle = null,
   } = opts
 
   useEffect(() => {
@@ -455,6 +457,8 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
       cleanupVideo()
       return undefined
     }
+
+    if (onDebugLifecycle) onDebugLifecycle(`attach key=${attachKey}`)
 
     let cancelled = false
     let hlsInstance = null
@@ -552,6 +556,7 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
 
     return () => {
       cancelled = true
+      if (onDebugLifecycle) onDebugLifecycle(`detach key=${attachKey}`)
       video.removeEventListener('canplay', onRecovered)
       if (hlsInstance) {
         try {
@@ -975,6 +980,11 @@ export default function LoungePostStreamVideo({
           inlinePlayBackoffUntilMsRef.current = 0
           lastPlayErrorRef.current = ''
           applyAudibleAfterPlay()
+          if (videoDebugEnabled && feedAutoplayClientId) {
+            const rs = v?.readyState ?? 0
+            const ct = Number.isFinite(v?.currentTime) ? v.currentTime.toFixed(1) : '0'
+            reportLoungeVideoDebugEvent(feedAutoplayClientId, 'play', `ok rs=${rs} ct=${ct}`)
+          }
         }).catch((err) => {
           finishPlayAttempt()
           reportPlayError(err)
@@ -1221,9 +1231,15 @@ export default function LoungePostStreamVideo({
     }
   }, [feedAutoplayEnabled])
 
-  const bumpStreamAttach = useCallback(() => {
-    setStreamAttachKey((k) => k + 1)
-  }, [])
+  const bumpStreamAttach = useCallback(
+    (reason = 'hls-recovery') => {
+      if (videoDebugEnabled && feedAutoplayClientId) {
+        reportLoungeVideoDebugEvent(feedAutoplayClientId, 'attach', reason)
+      }
+      setStreamAttachKey((k) => k + 1)
+    },
+    [feedAutoplayClientId, videoDebugEnabled],
+  )
 
   const lastSoftResetEpochRef = useRef(0)
   useEffect(() => {
@@ -1232,8 +1248,11 @@ export default function LoungePostStreamVideo({
     lastSoftResetEpochRef.current = softResetEpoch
     if (!attachStream && !mountStreamVideo) return
     recoveryBurstRef.current = 0
+    if (videoDebugEnabled && feedAutoplayClientId) {
+      reportLoungeVideoDebugEvent(feedAutoplayClientId, 'attach', `softReset epoch=${softResetEpoch}`)
+    }
     setStreamAttachKey((k) => k + 1)
-  }, [softResetEpoch, coordinatorActive, attachStream, mountStreamVideo])
+  }, [softResetEpoch, coordinatorActive, attachStream, mountStreamVideo, feedAutoplayClientId, videoDebugEnabled])
 
   useStreamHlsAttachment(videoRef, src, streamAttachKey, {
     enabled: attachStream,
@@ -1244,6 +1263,10 @@ export default function LoungePostStreamVideo({
     onDebugHlsError:
       videoDebugEnabled && feedAutoplayClientId
         ? (detail) => reportLoungeVideoDebugEvent(feedAutoplayClientId, 'hls', detail)
+        : null,
+    onDebugLifecycle:
+      videoDebugEnabled && feedAutoplayClientId
+        ? (detail) => reportLoungeVideoDebugEvent(feedAutoplayClientId, 'attach', detail)
         : null,
   })
 
@@ -1263,6 +1286,7 @@ export default function LoungePostStreamVideo({
       coordinatorActive,
       feedAutoplayEnabled,
       streamAttachKey,
+      streamFadeShowVideo,
       showStreamRetry,
       recoveryBurst: recoveryBurstRef.current,
       lastPlayError: lastPlayErrorRef.current,
@@ -1289,6 +1313,7 @@ export default function LoungePostStreamVideo({
       ringWarmPrefetch,
       showStreamRetry,
       streamAttachKey,
+      streamFadeShowVideo,
       tileRatio,
       variant,
     ],
@@ -1298,6 +1323,48 @@ export default function LoungePostStreamVideo({
     if (!videoDebugEnabled || !feedAutoplayClientId) return undefined
     return registerLoungeVideoDebugTile(feedAutoplayClientId, getVideoDebugSnapshot)
   }, [videoDebugEnabled, feedAutoplayClientId, getVideoDebugSnapshot])
+
+  const prevIsActiveDebugRef = useRef(isActive)
+  useEffect(() => {
+    if (!videoDebugEnabled || !feedAutoplayClientId) return
+    if (prevIsActiveDebugRef.current === isActive) return
+    prevIsActiveDebugRef.current = isActive
+    const v = videoRef.current
+    const rs = v?.readyState ?? '—'
+    reportLoungeVideoDebugEvent(
+      feedAutoplayClientId,
+      'active',
+      `${isActive ? 'on' : 'off'} rs=${rs} ring=${inRing ? 1 : 0} attach=${attachStream ? 1 : 0} ratio=${tileRatio.toFixed(2)}`,
+    )
+  }, [isActive, inRing, attachStream, tileRatio, videoDebugEnabled, feedAutoplayClientId])
+
+  const prevFadeDebugRef = useRef(streamFadeShowVideo)
+  useEffect(() => {
+    if (!videoDebugEnabled || !feedAutoplayClientId) return
+    if (prevFadeDebugRef.current === streamFadeShowVideo) return
+    prevFadeDebugRef.current = streamFadeShowVideo
+    const v = videoRef.current
+    const rs = v?.readyState ?? '—'
+    const ct = v && Number.isFinite(v.currentTime) ? v.currentTime.toFixed(1) : '—'
+    reportLoungeVideoDebugEvent(
+      feedAutoplayClientId,
+      'fade',
+      `${streamFadeShowVideo ? 'video' : 'poster'} rs=${rs} ct=${ct} key=${streamAttachKey}`,
+    )
+  }, [streamFadeShowVideo, streamAttachKey, videoDebugEnabled, feedAutoplayClientId])
+
+  const prevRoleDebugRef = useRef('')
+  useEffect(() => {
+    if (!videoDebugEnabled || !feedAutoplayClientId) return
+    const roleKey = `${inRing ? 1 : 0}|${inDomBudget ? 1 : 0}|${attachStream ? 1 : 0}|${ringWarmPrefetch ? 1 : 0}`
+    if (prevRoleDebugRef.current === roleKey) return
+    prevRoleDebugRef.current = roleKey
+    reportLoungeVideoDebugEvent(
+      feedAutoplayClientId,
+      'role',
+      `ring=${inRing ? 1 : 0} dom=${inDomBudget ? 1 : 0} attach=${attachStream ? 1 : 0} prefetch=${ringWarmPrefetch ? 1 : 0}`,
+    )
+  }, [inRing, inDomBudget, attachStream, ringWarmPrefetch, videoDebugEnabled, feedAutoplayClientId])
 
   /** Fade HLS over CF thumbnail once playing (all variants with poster frame; when not `attachStream`, keep video hidden). */
   useEffect(() => {
@@ -2089,11 +2156,11 @@ export default function LoungePostStreamVideo({
     if (recoveryBurstRef.current < 2) {
       recoveryBurstRef.current += 1
       setShowStreamRetry(false)
-      setStreamAttachKey((k) => k + 1)
+      bumpStreamAttach('media-error')
       return
     }
     setShowStreamRetry(true)
-  }, [feedAutoplayClientId, videoDebugEnabled])
+  }, [bumpStreamAttach, feedAutoplayClientId, videoDebugEnabled])
 
   if (!id) return null
 
@@ -2308,7 +2375,7 @@ export default function LoungePostStreamVideo({
                   e.stopPropagation()
                   recoveryBurstRef.current = 0
                   setShowStreamRetry(false)
-                  setStreamAttachKey((k) => k + 1)
+                  bumpStreamAttach('retry')
                 }}
               >
                 Retry

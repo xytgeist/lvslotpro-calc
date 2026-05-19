@@ -1,3 +1,19 @@
+import { reportLoungeVideoDebugEvent } from './loungeFeedVideoDebugRegistry.js'
+import { readLoungeFeedVideoDebugEnabled } from '../../utils/loungeFeedVideoDebugPref.js'
+
+/** @param {string | null | undefined} id */
+function shortCoordId(id) {
+  if (!id) return '—'
+  const s = String(id)
+  return s.length <= 8 ? s : s.slice(0, 8)
+}
+
+/** @param {string} detail */
+function reportCoordDebug(detail) {
+  if (!readLoungeFeedVideoDebugEnabled()) return
+  reportLoungeVideoDebugEvent(null, 'coord', detail)
+}
+
 /** Option A: fraction of tile visible inside the scroll root (intersectionRatio). */
 export const LOUNGE_VIDEO_SOUND_ON_RATIO = 0.6
 export const LOUNGE_VIDEO_SOUND_OFF_RATIO = 0.4
@@ -492,6 +508,27 @@ export function createAutoplayStore() {
     const prevActiveId = activeId
     activeId = nextActive
 
+    const prevRingKey = snapshot.ringIds.join(',')
+    const nextRingKey = ringIds.join(',')
+    const prevDomKey = snapshot.domBudgetIds.join(',')
+    const nextDomKey = domBudgetIds.join(',')
+
+    if (prevActiveId !== nextActive) {
+      const prevR = prevActiveId ? (ratios[prevActiveId] ?? 0).toFixed(2) : '—'
+      const nextR = nextActive ? (ratios[nextActive] ?? 0).toFixed(2) : '—'
+      reportCoordDebug(
+        `active ${shortCoordId(prevActiveId)}→${shortCoordId(nextActive)} r=${prevR}→${nextR} fl=${flingerMode ? 1 : 0}`,
+      )
+    } else if (prevRingKey !== nextRingKey) {
+      reportCoordDebug(
+        `ring [${ringIds.map(shortCoordId).join(',')}] active=${shortCoordId(nextActive)}`,
+      )
+    } else if (prevDomKey !== nextDomKey) {
+      reportCoordDebug(
+        `dom [${domBudgetIds.map(shortCoordId).join(',')}] active=${shortCoordId(nextActive)}`,
+      )
+    }
+
     if (
       prevActiveId &&
       nextActive &&
@@ -502,9 +539,12 @@ export function createAutoplayStore() {
       handoffCount += 1
       if (handoffCount % LOUNGE_VIDEO_SOFT_RESET_HANDOFF_EVERY === 0) {
         softResetEpoch += 1
+        const resetEpoch = softResetEpoch
+        reportCoordDebug(`softReset epoch=${resetEpoch} handoff#=${handoffCount} → clear active`)
         queueMicrotask(() => {
           if (heroLocked || coordinatorSuspended) return
           activeId = null
+          reportCoordDebug(`softReset epoch=${resetEpoch} active cleared`)
           schedule()
         })
       }

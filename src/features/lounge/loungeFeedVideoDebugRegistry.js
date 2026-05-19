@@ -4,7 +4,7 @@
 const tileGetters = new Map()
 /** @type {LoungeVideoDebugEvent[]} */
 const events = []
-const MAX_EVENTS = 48
+const MAX_EVENTS = 64
 
 /** @type {Set<() => void>} */
 const listeners = new Set()

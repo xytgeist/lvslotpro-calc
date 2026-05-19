@@ -31,6 +31,27 @@ function formatTime(ts) {
   }
 }
 
+function eventKindClass(kind) {
+  switch (kind) {
+    case 'coord':
+      return 'text-cyan-300'
+    case 'active':
+      return 'text-emerald-300'
+    case 'fade':
+      return 'text-violet-300'
+    case 'attach':
+      return 'text-orange-300'
+    case 'play':
+      return 'text-lime-300'
+    case 'hls':
+      return 'text-rose-300'
+    case 'hero':
+      return 'text-amber-200'
+    default:
+      return 'text-amber-200'
+  }
+}
+
 /**
  * On-device autoplay coordinator HUD — enable with `?loungeVideoDebug=1` (persists in localStorage).
  * @param {{ store: import('./loungeFeedVideoAutoplayStore.js').createAutoplayStore extends () => infer S ? S : never, scrollRootRef: import('react').RefObject<HTMLElement | null> }} props
@@ -259,6 +280,7 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
               if (row.inDomBudget) flags.push('dom')
               if (row.registered) flags.push('reg')
               if (row.snap?.attachStream) flags.push('attach')
+              if (row.snap?.streamFadeShowVideo) flags.push('fade')
               if (v.present && !v.paused) flags.push('playing')
               return (
                 <div key={row.id} className="rounded border border-zinc-700/80 bg-zinc-900/70 px-1.5 py-1">
@@ -286,10 +308,10 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
           {debugEvents.length === 0 ? (
             <div className="text-zinc-500">No events yet</div>
           ) : (
-            debugEvents.slice(0, 12).map((ev, i) => (
+            debugEvents.slice(0, 20).map((ev, i) => (
               <div key={`${ev.ts}-${i}`} className="rounded bg-zinc-900/60 px-1.5 py-0.5 text-zinc-300">
                 <span className="text-zinc-500">{formatTime(ev.ts)}</span>{' '}
-                <span className="text-amber-200">{ev.kind}</span>
+                <span className={eventKindClass(ev.kind)}>{ev.kind}</span>
                 {ev.clientId ? ` · ${shortId(ev.clientId)}` : ''}
                 {ev.detail ? `: ${ev.detail}` : ''}
               </div>
