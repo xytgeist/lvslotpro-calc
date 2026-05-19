@@ -167,6 +167,27 @@ function clearInlinePosterHeroStyles(slot) {
 }
 
 const HERO_FLYOUT_POSTER_SEL = '[data-lounge-hero-flyout-poster]'
+const HERO_FLYOUT_POSTER_SHIELD_SEL = '[data-lounge-flyout-poster-shield]'
+
+/** Preloaded shield (opacity-0 while inline video plays) — flip visible before any reparent. */
+function showFlyoutPosterShield(flyout, posterSrc) {
+  if (!flyout) return
+  const shield = flyout.querySelector(HERO_FLYOUT_POSTER_SHIELD_SEL)
+  if (shield instanceof HTMLImageElement) {
+    shield.style.transition = 'none'
+    shield.style.opacity = '1'
+    return
+  }
+  ensureFlyoutPosterCover(flyout, posterSrc)
+}
+
+function clearFlyoutPosterShield(flyout) {
+  if (!flyout) return
+  const shield = flyout.querySelector(HERO_FLYOUT_POSTER_SHIELD_SEL)
+  if (!(shield instanceof HTMLImageElement)) return
+  shield.style.transition = ''
+  shield.style.opacity = ''
+}
 
 /** Covers the flyout while `<video>` reparents — tile-sized fixed layer matches what the user sees on frame 1. */
 function ensureFlyoutPosterCover(flyout, src) {
@@ -411,6 +432,7 @@ export default function LoungePostStreamVideo({
   const inlineFeedSoundSnapshotRef = useRef(
     /** @type {{ unmuted: boolean, explicitlyMuted: boolean, coordinated: boolean } | null} */ (null),
   )
+  const heroOpenDeferRafRef = useRef(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   /** @type {'idle' | 'opening' | 'open' | 'closing'} */
   const [heroPhase, setHeroPhase] = useState('idle')
@@ -622,6 +644,16 @@ export default function LoungePostStreamVideo({
 
   useEffect(() => () => releaseHeroBodyHost(), [releaseHeroBodyHost])
 
+  useEffect(
+    () => () => {
+      if (heroOpenDeferRafRef.current) {
+        cancelAnimationFrame(heroOpenDeferRafRef.current)
+        heroOpenDeferRafRef.current = 0
+      }
+    },
+    [],
+  )
+
   useEffect(() => {
     isWinnerRef.current = feedAutoplayEnabled && (!coordinatorActive || isWinner)
   }, [coordinatorActive, isWinner, feedAutoplayEnabled])
@@ -776,7 +808,12 @@ export default function LoungePostStreamVideo({
   }, [attachStream, poster, id, streamAttachKey])
 
   const finalizeHeroClose = useCallback(() => {
+    if (heroOpenDeferRafRef.current) {
+      cancelAnimationFrame(heroOpenDeferRafRef.current)
+      heroOpenDeferRafRef.current = 0
+    }
     clearFlyoutPosterCover(videoFlyoutRef.current)
+    clearFlyoutPosterShield(videoFlyoutRef.current)
     setHeroFlyoutPosterVisible(false)
     setLightboxOpen(false)
     setHeroPhase('idle')
@@ -837,12 +874,20 @@ export default function LoungePostStreamVideo({
   )
 
   const openLightbox = useCallback(() => {
+    if (lightboxOpenRef.current) return
     const slot = heroInlineSlotRef.current
     const wrap = containerRef.current
+    const flyout = videoFlyoutRef.current
     const v = videoRef.current
     if (!wrap) return
-    const from = readElementViewportRect(slot || videoFlyoutRef.current || wrap)
+    const from = readElementViewportRect(slot || flyout || wrap)
     heroFromRectRef.current = from
+    const posterSrc = visiblePosterSrcRef.current || poster
+
+    /** Cover playing inline video before sound/reparent — in-card poster must win over HLS black flash. */
+    showFlyoutPosterShield(flyout, posterSrc)
+    revealInlinePosterForHero(slot)
+
     if (feedAutoplayEnabled && v) {
       const explicitlyMuted = coordinatedInlineSound
         ? feedInlineSoundExplicitlyMuted
@@ -886,19 +931,22 @@ export default function LoungePostStreamVideo({
         }
       }
     }
-    revealInlinePosterForHero(slot)
-    const posterSrc = visiblePosterSrcRef.current || poster
-    ensureFlyoutPosterCover(videoFlyoutRef.current, posterSrc)
-    setHeroFlyoutPosterVisible(true)
-    const host = ensureHeroBodyHost()
-    const flyout = videoFlyoutRef.current
-    snapFlyoutToHeroRect(flyout, host, from)
-    setHeroLayout(from)
-    setHeroPhase('opening')
-    setHeroChromeVisible(false)
-    setHeroTransitionArmed(false)
-    setHeroBackdropArmed(false)
-    setLightboxOpen(true)
+
+    if (heroOpenDeferRafRef.current) cancelAnimationFrame(heroOpenDeferRafRef.current)
+    heroOpenDeferRafRef.current = requestAnimationFrame(() => {
+      heroOpenDeferRafRef.current = 0
+      if (lightboxOpenRef.current) return
+      ensureFlyoutPosterCover(flyout, posterSrc)
+      setHeroFlyoutPosterVisible(true)
+      const host = ensureHeroBodyHost()
+      snapFlyoutToHeroRect(flyout, host, from)
+      setHeroLayout(from)
+      setHeroPhase('opening')
+      setHeroChromeVisible(false)
+      setHeroTransitionArmed(false)
+      setHeroBackdropArmed(false)
+      setLightboxOpen(true)
+    })
   }, [
     feedAutoplayEnabled,
     attachStream,
@@ -1542,6 +1590,17 @@ export default function LoungePostStreamVideo({
               className={heroFlyoutShellClass}
               {...heroFlyoutPointerProps}
             >
+              {usePosterFrame && attachStream && streamFadeShowVideo && !heroExpanded ? (
+                <img
+                  data-lounge-flyout-poster-shield
+                  src={visiblePosterSrc}
+                  alt=""
+                  decoding="sync"
+                  draggable={false}
+                  className="pointer-events-none absolute inset-0 z-[2] h-full w-full object-contain opacity-0"
+                  aria-hidden
+                />
+              ) : null}
               {streamVideoEl}
             </div>
           </div>
