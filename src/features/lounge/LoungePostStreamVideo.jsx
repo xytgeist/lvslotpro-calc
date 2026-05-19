@@ -149,6 +149,23 @@ function clearFlyoutHeroInlineStyles(flyout) {
   flyout.style.borderRadius = ''
 }
 
+/** X-style: poster fills the in-card hole while the flyout grows on body (avoids black first frame). */
+function revealInlinePosterForHero(slot) {
+  if (!slot) return
+  const img = slot.querySelector('img')
+  if (!(img instanceof HTMLImageElement)) return
+  img.style.transition = 'none'
+  img.style.opacity = '1'
+}
+
+function clearInlinePosterHeroStyles(slot) {
+  if (!slot) return
+  const img = slot.querySelector('img')
+  if (!(img instanceof HTMLImageElement)) return
+  img.style.transition = ''
+  img.style.opacity = ''
+}
+
 /**
  * @param {React.RefObject<HTMLVideoElement | null>} videoRef
  * @param {string} src manifest URL
@@ -568,6 +585,7 @@ export default function LoungePostStreamVideo({
     }
     if (flyout.parentElement !== slot) slot.appendChild(flyout)
     clearFlyoutHeroInlineStyles(flyout)
+    clearInlinePosterHeroStyles(slot)
     releaseHeroBodyHost()
   }, [heroExpanded, ensureHeroBodyHost, releaseHeroBodyHost])
 
@@ -834,6 +852,7 @@ export default function LoungePostStreamVideo({
         }
       }
     }
+    revealInlinePosterForHero(slot)
     const host = ensureHeroBodyHost()
     const flyout = videoFlyoutRef.current
     snapFlyoutToHeroRect(flyout, host, from)
@@ -1295,14 +1314,11 @@ export default function LoungePostStreamVideo({
     : {}
   const inlineVideoOpacityClass =
     heroExpanded || (attachStream && streamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
-  const inlinePosterOpacityClass = heroExpanded
-    ? 'opacity-0'
-    : attachStream && streamFadeShowVideo
-      ? 'opacity-0'
-      : 'opacity-100'
+  const inlinePosterOpacityClass =
+    heroExpanded || !(attachStream && streamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
   /** Poster stays above the flyout while HLS loads so a transparent/black video plane never flashes over it. */
   const inlinePosterZClass =
-    !heroExpanded && attachStream && !streamFadeShowVideo ? 'z-[2]' : 'relative z-0'
+    heroExpanded || (attachStream && !streamFadeShowVideo) ? 'z-[2]' : 'relative z-0'
   const streamVideoClass = heroExpanded
     ? 'pointer-events-auto h-full w-full max-h-full max-w-full object-contain'
     : 'pointer-events-none h-full w-full object-contain'
@@ -1411,8 +1427,8 @@ export default function LoungePostStreamVideo({
                   decoding="async"
                   draggable={false}
                   loading="eager"
-                  className={`pointer-events-none select-none transition-opacity ease-out ${inlinePosterZClass} ${videoClass} ${inlinePosterOpacityClass}`}
-                  style={streamFadeTransitionStyle}
+                  className={`pointer-events-none select-none ${heroExpanded ? '' : 'transition-opacity ease-out'} ${inlinePosterZClass} ${videoClass} ${inlinePosterOpacityClass}`}
+                  style={heroExpanded ? { transition: 'none' } : streamFadeTransitionStyle}
                   aria-hidden
                   onLoad={() => setPosterDecodeOk(true)}
                   onError={onPosterImgError}
