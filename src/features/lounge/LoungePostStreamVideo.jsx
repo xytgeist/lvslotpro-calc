@@ -85,8 +85,10 @@ const HERO_MOTION_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const HERO_MOTION_TRANSITION = `${HERO_EXPAND_MS}ms ${HERO_MOTION_CURVE}`
 /** Lightbox chrome fades in only after the flyout lands. */
 const HERO_CHROME_FADE_MS = 220
-/** Flyout video sits below the portaled scrim + gesture layer so swipes are not stolen by iOS `<video>`. */
-const HERO_FLYOUT_Z_INDEX = 99
+/** Hero stack (bottom → top): scrim 100, flyout 101, transparent gesture 102, chrome 103. */
+const HERO_SCRIM_Z_INDEX = 100
+const HERO_FLYOUT_Z_INDEX = 101
+const HERO_OVERLAY_Z_INDEX = 102
 
 /** @returns {{ top: number, left: number, width: number, height: number }} */
 function readElementViewportRect(el) {
@@ -701,6 +703,11 @@ export default function LoungePostStreamVideo({
     variant === 'feed' || variant === 'embed' ? 'the feed' : 'this screen'
   const feedStyleAbr =
     variant === 'feed' || variant === 'embed' || variant === 'composer' || variant === 'commentInline'
+  const heroOverlayZIndex = useMemo(() => {
+    const m = String(lightboxPortalClass || '').match(/z-\[(\d+)\]/)
+    const n = m ? Number(m[1]) : HERO_OVERLAY_Z_INDEX
+    return Number.isFinite(n) ? Math.max(n, HERO_OVERLAY_Z_INDEX) : HERO_OVERLAY_Z_INDEX
+  }, [lightboxPortalClass])
   const attachStream = heroExpanded
     ? Boolean(id)
     : lazyStream
@@ -1784,60 +1791,68 @@ export default function LoungePostStreamVideo({
         </div>
       {heroExpanded
         ? createPortal(
-            <div
-              className={`fixed inset-0 ${lightboxPortalClass}`}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Full screen video"
-            >
+            <>
               <div
-                className={`absolute inset-0 z-0 bg-black ${heroBackdropOpacityClass} pointer-events-none`}
-                style={{ transition: heroBackdropTransitionCss }}
+                className="pointer-events-none fixed inset-0"
+                style={{ zIndex: HERO_SCRIM_Z_INDEX }}
                 aria-hidden
-              />
-              {heroBackdropInteractive ? (
+              >
                 <div
-                  className={`absolute inset-0 z-[1] ${heroSwipeTouchClass || 'touch-none'}`.trim()}
-                  aria-hidden
-                  onPointerDown={heroSwipePointerDown}
-                  onPointerMove={heroSwipePointerMove}
-                  onPointerUp={heroSwipePointerUp}
-                  onPointerCancel={heroSwipePointerCancel}
+                  className={`absolute inset-0 bg-black ${heroBackdropOpacityClass}`}
+                  style={{ transition: heroBackdropTransitionCss }}
                 />
-              ) : null}
-              <div className="pointer-events-none absolute inset-0 z-[2] flex flex-col">
-                <div
-                  className={`flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
-                    heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
-                  }`}
-                  style={heroChromeFadeStyle}
-                  data-lounge-lightbox-no-swipe
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      closeLightbox()
-                    }}
-                    className="touch-manipulation rounded-lg border border-zinc-600/80 bg-zinc-900/80 px-3 py-1.5 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-800 [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50"
-                  >
-                    Close
-                  </button>
-                </div>
-                {mediaLightboxFooterMerged ? (
+              </div>
+              <div
+                className="fixed inset-0"
+                style={{ zIndex: heroOverlayZIndex }}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Full screen video"
+              >
+                {heroBackdropInteractive ? (
                   <div
-                    className={`mt-auto shrink-0 border-t border-zinc-700/50 bg-black px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 ${
+                    className={`absolute inset-0 ${heroSwipeTouchClass || 'touch-none'}`.trim()}
+                    aria-hidden
+                    onPointerDown={heroSwipePointerDown}
+                    onPointerMove={heroSwipePointerMove}
+                    onPointerUp={heroSwipePointerUp}
+                    onPointerCancel={heroSwipePointerCancel}
+                  />
+                ) : null}
+                <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col">
+                  <div
+                    className={`flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
                       heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                     }`}
                     style={heroChromeFadeStyle}
                     data-lounge-lightbox-no-swipe
-                    onClick={(e) => e.stopPropagation()}
                   >
-                    {heroChromeVisible ? mediaLightboxFooterMerged : null}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        closeLightbox()
+                      }}
+                      className="touch-manipulation rounded-lg border border-zinc-600/80 bg-zinc-900/80 px-3 py-1.5 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-800 [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50"
+                    >
+                      Close
+                    </button>
                   </div>
-                ) : null}
+                  {mediaLightboxFooterMerged ? (
+                    <div
+                      className={`mt-auto shrink-0 border-t border-zinc-700/50 bg-black px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 ${
+                        heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+                      }`}
+                      style={heroChromeFadeStyle}
+                      data-lounge-lightbox-no-swipe
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {heroChromeVisible ? mediaLightboxFooterMerged : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>,
+            </>,
             document.body,
           )
         : null}
