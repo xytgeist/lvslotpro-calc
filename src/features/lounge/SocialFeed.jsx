@@ -95,6 +95,7 @@ import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
 import {
   LoungeFeedAutoplayPostsKick,
   LoungeFeedInlineSoundResetBinder,
+  LoungeFeedCoordinatorSuspendBinder,
   LoungeFeedVideoAutoplayProvider,
 } from './LoungeFeedVideoAutoplayContext.jsx'
 import {
@@ -7334,6 +7335,7 @@ export default function SocialFeed({
         <LoungeFeedVideoAutoplayProvider scrollRootRef={loungeFeedScrollRef}>
         <LoungeFeedAutoplayPostsKick postCount={communityPosts.length} />
         <LoungeFeedInlineSoundResetBinder resetRef={resetFeedInlineSoundRef} />
+        <LoungeFeedCoordinatorSuspendBinder suspended={Boolean(loungePostDetail?.id)} />
         <div
           aria-hidden
           className="shrink-0"

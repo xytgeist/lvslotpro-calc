@@ -236,6 +236,10 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Test validation: back-to-back two videos (**Post 1 of 2** → **Post 2 of 2**, both land); mixed stack video → text/image/GIF (fast lane immediate); DevTools — two **`lounge-cf-stream-tus-create`** + two tus lanes while job 1 active; profile Likes → open post → like without duplicate-key error.
   - Production replay: apply rate-limit migration if not on prod; N/A client-only otherwise.
 
+- [ ] Lounge **visibility-band feed video autoplay** (test — hero-first resource budget)
+  - Change: **`loungeFeedVideoAutoplayStore.js`** — `{prev, active, next}` ring (max **3** HLS decoders), **centerline handoff** (challenger midpoint crosses scroll-column center) + clip fallbacks, flinger idle **200ms**, **`enterHeroLock`** / **`exitHeroLock`**, **`setCoordinatorSuspended`** when post detail open. **`LoungeFeedVideoAutoplayContext.jsx`** — feed-wide sound mode + visibility 60%/40% bands. **`LoungePostStreamVideo.jsx`** — ring attach/play FSM, hero opens with lock + sound on. **`SocialFeed.jsx`** — **`LoungeFeedCoordinatorSuspendBinder`**.
+  - Test validation: scroll — first-pixel muted play; handoff pauses (holds time); sound only after Tap for sound + 60% visible; hero expand → only hero decoder, flyout smooth; close hero → feed resumes; open post detail → feed ring suspended. Ryan sign-off **pending**.
+
 - [ ] Lounge **feed video perf diet** (test — after **`7dbbec7`** hero/staging work)
   - Change: **`loungeFeedVideoAutoplayStore.js`** — **winner-only** HLS (removed multi-tile staging band / play-pause prime on up to 24 neighbors). **`LoungePostStreamVideo.jsx`** — **`pinInlinePosterBehindFlyout`** on hero tap so poster stays **behind** flyout (not z-[2] above video). **`AppShell.jsx`** — **`COMMUNITY_FEED_PAGE_SIZE = 28`** (was 40).
   - Test validation: scroll feed 30s on phone — no stutter/heat vs prior deploy; one autoplay winner; tap playing tile → hero grow without poster-on-top flash; load-more adds **28** rows. Ryan sign-off **pending**.
@@ -298,6 +302,10 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ---
 
 ## Update log
+
+- 2026-05-18: **Centerline handoff (test):** primary active swap when next/prev Stream tile **midpoint crosses scroll-column center**; clip thresholds remain fallback. **`loungeFeedVideoAutoplayStore.js`**.
+
+- 2026-05-18: **Visibility-band feed video autoplay (test, Ryan sign-off pending):** **`loungeFeedVideoAutoplayStore.js`** — `{prev, active, next}` ring (max 3 decoders), visibility handoff thresholds, flinger idle 200ms, **hero lock** (ring → hero tile only), coordinator suspend when post detail open. **`LoungePostStreamVideo.jsx`** + **`LoungeFeedVideoAutoplayContext.jsx`** — feed-wide Tap for sound + 60%/40% audio bands; hero-first resource budget on expand.
 
 - 2026-05-18: **Plain repost interaction hydration (test, Ryan sign-off):** Feed/profile interaction refresh now includes **embedded original post IDs** for plain repost cards — fixes “You reposted” header with **inactive repost glyph** and duplicate plain-repost error. **`collectLoungePostInteractionHydrateIds`** in **`communityFeedPost.js`**; **`SocialFeed.jsx`** + **`LoungeProfileFullScreen.jsx`** (Likes/Bookmarks tab refresh).
 

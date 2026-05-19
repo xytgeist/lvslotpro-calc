@@ -1,25 +1,64 @@
-/** Match `LAZY_ATTACH_ROOT_MARGIN` in `LoungePostStreamVideo.jsx` (expanded intersection for prefetch). */
-const SCROLL_ROOT_PAD_TOP = 180
-const SCROLL_ROOT_PAD_BOTTOM = 240
-/** Ignore sliver tiles (e.g. previous page peeking at top) so load-more rows can win mid-scroll. */
-const MIN_CANDIDATE_VISIBLE_PX = 48
+/** Option A: fraction of tile visible inside the scroll root (intersectionRatio). */
+export const LOUNGE_VIDEO_SOUND_ON_RATIO = 0.6
+export const LOUNGE_VIDEO_SOUND_OFF_RATIO = 0.4
+/** Strong handoff (fallback): outgoing ≥20% clipped, incoming ≥95% visible. */
+export const LOUNGE_VIDEO_STRONG_OUT_MAX = 0.8
+export const LOUNGE_VIDEO_STRONG_IN_MIN = 0.95
+/** Contested handoff (fallback): outgoing ≥50% clipped, incoming ≥50% visible. */
+export const LOUNGE_VIDEO_CONTEST_OUT_MAX = 0.5
+export const LOUNGE_VIDEO_CONTEST_IN_MIN = 0.5
+/** Primary handoff: challenger tile midpoint vs scroll-column centerline (see pickCenterCrossTakeover). */
+/** #fuckflingers — resume normal rules after scroll idle. */
+export const LOUNGE_VIDEO_FLINGER_IDLE_MS = 200
 
-const EMPTY_STAGE_IDS = Object.freeze([])
+const EMPTY_RING = Object.freeze([])
+const EMPTY_RATIOS = Object.freeze({})
 
-/** @type {{ winnerId: string | null, stageIds: readonly string[] }} */
-const INITIAL_SNAPSHOT = Object.freeze({ winnerId: null, stageIds: EMPTY_STAGE_IDS })
+/** @type {import('./loungeFeedVideoAutoplayStore.js').LoungeFeedAutoplaySnapshot} */
+const INITIAL_SNAPSHOT = Object.freeze({
+  activeId: null,
+  prefetchPrevId: null,
+  prefetchNextId: null,
+  ringIds: EMPTY_RING,
+  flingerMode: false,
+  heroLocked: false,
+  heroClientId: null,
+  coordinatorSuspended: false,
+  tileRatios: EMPTY_RATIOS,
+})
 
-function candidateVisiblePx(rect, rootTop, rootBottom, vh) {
-  const visTop = Math.max(rect.top, rootTop, 0)
-  const visBottom = Math.min(rect.bottom, rootBottom, vh)
-  return Math.max(0, visBottom - visTop)
+/**
+ * @typedef {Object} LoungeFeedAutoplaySnapshot
+ * @property {string | null} activeId — sole inline `play()` target (when not hero/flinger/suspended).
+ * @property {string | null} prefetchPrevId — feed-order predecessor in `{prev, active, next}` ring.
+ * @property {string | null} prefetchNextId — feed-order successor in ring.
+ * @property {readonly string[]} ringIds — up to three client ids allowed HLS attach (paused warm outside active).
+ * @property {boolean} flingerMode — fast scroll: poster only, no new play/handoff.
+ * @property {boolean} heroLocked — hero flyout owns resources; ring collapses to hero tile only.
+ * @property {string | null} heroClientId
+ * @property {boolean} coordinatorSuspended — overlay/detail: freeze feed coordinator.
+ * @property {Readonly<Record<string, number>>} tileRatios — clientId → Option A visible fraction.
+ */
+
+function tileVisibleRatio(el, rootEl) {
+  if (!el || !rootEl) return 0
+  const tileRect = el.getBoundingClientRect()
+  const rootRect = rootEl.getBoundingClientRect()
+  if (tileRect.width < 2 || tileRect.height < 2) return 0
+  const overlapTop = Math.max(tileRect.top, rootRect.top)
+  const overlapBottom = Math.min(tileRect.bottom, rootRect.bottom)
+  const overlapLeft = Math.max(tileRect.left, rootRect.left)
+  const overlapRight = Math.min(tileRect.right, rootRect.right)
+  if (overlapBottom <= overlapTop || overlapRight <= overlapLeft) return 0
+  const overlapArea = (overlapBottom - overlapTop) * (overlapRight - overlapLeft)
+  const tileArea = tileRect.width * tileRect.height
+  if (tileArea < 1) return 0
+  return overlapArea / tileArea
 }
 
 /**
- * External store for mid-scroll Stream winner (no React state inside recompute).
- * Scroll root is wired later via `setScrollRootRef` so the factory needs no ref during React render.
- *
- * Perf: one HLS attach on the winner only — no multi-tile staging band (was up to 24 paused decoders).
+ * Scroll-surface coordinator: visibility-band autoplay, `{prev, active, next}` HLS ring,
+ * centerline handoff (primary) + clip thresholds (fallback), hero-first resource lock.
  */
 export function createAutoplayStore() {
   /** @type {Map<string, () => HTMLElement | null>} */
@@ -29,8 +68,21 @@ export function createAutoplayStore() {
   let scheduled = false
   /** @type {React.RefObject<HTMLElement | null> | null} */
   let rootRef = null
-  /** @type {{ winnerId: string | null, stageIds: readonly string[] }} */
+  /** @type {LoungeFeedAutoplaySnapshot} */
   let snapshot = INITIAL_SNAPSHOT
+
+  /** @type {string | null} */
+  let activeId = null
+  let heroLocked = false
+  /** @type {string | null} */
+  let heroClientId = null
+  let coordinatorSuspended = false
+  let flingerMode = false
+  let lastScrollTop = 0
+  /** @type {1 | -1 | 0} */
+  let scrollDirection = 0
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let flingerIdleTimer = null
 
   const emit = () => {
     listeners.forEach((l) => {
@@ -42,107 +94,280 @@ export function createAutoplayStore() {
     })
   }
 
-  const recompute = () => {
-    scheduled = false
-    const rootEl = rootRef?.current ?? null
-    const rootRect = rootEl ? rootEl.getBoundingClientRect() : null
-    const midY = rootRect ? rootRect.top + rootRect.height / 2 : typeof window !== 'undefined' ? window.innerHeight / 2 : 400
-    const rootTop = rootRect?.top ?? 0
-    const rootBottom = rootRect ? rootRect.bottom : typeof window !== 'undefined' ? window.innerHeight : 800
-    const vh = typeof window !== 'undefined' ? window.innerHeight : rootBottom
-
-    /** @type {{ id: string, centerY: number, top: number, bottom: number, visiblePx: number }[]} */
-    const candidates = []
-
+  const buildOrderedIds = (rootEl) => {
+    /** @type {{ id: string, top: number, left: number }[]} */
+    const rows = []
     for (const [id, getEl] of entries) {
       const el = getEl()
       if (!el) continue
       const rect = el.getBoundingClientRect()
-      if (rect.width < 2 || rect.height < 2) continue
-
-      const intersectsRootLoose =
-        rect.bottom > rootTop - SCROLL_ROOT_PAD_TOP && rect.top < rootBottom + SCROLL_ROOT_PAD_BOTTOM
-      const intersectsRootStrict = rect.bottom > rootTop && rect.top < rootBottom
-      const intersectsViewport = rect.bottom > 0 && rect.top < vh
-      if (!intersectsViewport || (!intersectsRootLoose && !intersectsRootStrict)) continue
-      const visiblePx = candidateVisiblePx(rect, rootTop, rootBottom, vh)
-      if (visiblePx < MIN_CANDIDATE_VISIBLE_PX) continue
-      const centerY = (rect.top + rect.bottom) / 2
-      candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom, visiblePx })
+      rows.push({ id, top: rect.top, left: rect.left })
     }
+    rows.sort((a, b) => a.top - b.top || a.left - b.left)
+    return rows.map((r) => r.id)
+  }
 
-    /** @type {string | null} */
-    let nextWinner = null
-    if (candidates.length === 0) {
-      /** Last resort: registered tiles with layout but strict root missed (e.g. first paint timing). */
-      for (const [id, getEl] of entries) {
-        const el = getEl()
-        if (!el) continue
-        const rect = el.getBoundingClientRect()
-        if (rect.width < 2 || rect.height < 2) continue
-        if (rect.bottom <= 0 || rect.top >= vh) continue
-        const visiblePx = candidateVisiblePx(rect, rootTop, rootBottom, vh)
-        if (visiblePx < MIN_CANDIDATE_VISIBLE_PX) continue
-        const centerY = (rect.top + rect.bottom) / 2
-        candidates.push({ id, centerY, top: rect.top, bottom: rect.bottom, visiblePx })
+  const computeTileMetrics = (rootEl) => {
+    /** @type {Record<string, number>} */
+    const ratios = {}
+    /** @type {Record<string, number>} */
+    const centerYs = {}
+    for (const [id, getEl] of entries) {
+      const el = getEl()
+      if (!el || !rootEl) {
+        ratios[id] = 0
+        centerYs[id] = 0
+        continue
       }
+      const rect = el.getBoundingClientRect()
+      ratios[id] = tileVisibleRatio(el, rootEl)
+      centerYs[id] = (rect.top + rect.bottom) / 2
+    }
+    return { ratios, centerYs }
+  }
+
+  const scrollPortMidY = (rootEl) => {
+    if (!rootEl) {
+      return typeof window !== 'undefined' ? window.innerHeight / 2 : 400
+    }
+    const rootRect = rootEl.getBoundingClientRect()
+    return rootRect.top + rootRect.height / 2
+  }
+
+  /**
+   * Primary handoff: next/prev Stream tile midpoint crosses the scroll-column centerline.
+   * Scroll down → feed successor with centerY ≤ midY; scroll up → predecessor with centerY ≥ midY.
+   */
+  const pickCenterCrossTakeover = (incumbent, orderedIds, ratios, centerYs, midY, direction) => {
+    const idx = orderedIds.indexOf(incumbent)
+    if (idx < 0) return null
+
+    const visible = (id) => (ratios[id] ?? 0) > 0
+
+    if (direction > 0) {
+      for (let i = idx + 1; i < orderedIds.length; i += 1) {
+        const id = orderedIds[i]
+        if (!visible(id)) continue
+        if ((centerYs[id] ?? 0) <= midY) return id
+      }
+      return null
     }
 
-    if (candidates.length === 0) {
-      nextWinner = null
-    } else if (candidates.length === 1) {
-      nextWinner = candidates[0].id
+    if (direction < 0) {
+      for (let i = idx - 1; i >= 0; i -= 1) {
+        const id = orderedIds[i]
+        if (!visible(id)) continue
+        if ((centerYs[id] ?? 0) >= midY) return id
+      }
+      return null
+    }
+
+    for (let i = idx + 1; i < orderedIds.length; i += 1) {
+      const id = orderedIds[i]
+      if (!visible(id)) continue
+      if ((centerYs[id] ?? 0) <= midY) return id
+    }
+    for (let i = idx - 1; i >= 0; i -= 1) {
+      const id = orderedIds[i]
+      if (!visible(id)) continue
+      if ((centerYs[id] ?? 0) >= midY) return id
+    }
+    return null
+  }
+
+  /**
+   * Fallback handoff when center cross has not fired (clip thresholds).
+   * @param {string | null} incumbent
+   * @param {readonly string[]} orderedIds
+   * @param {Record<string, number>} ratios
+   */
+  const pickClipTakeover = (incumbent, orderedIds, ratios) => {
+    if (!incumbent) return null
+    const incRatio = ratios[incumbent] ?? 0
+    const idx = orderedIds.indexOf(incumbent)
+    if (idx < 0) return null
+
+    /** @type {string[]} */
+    const searchOrder = []
+    if (scrollDirection >= 0) {
+      for (let i = idx + 1; i < orderedIds.length; i += 1) searchOrder.push(orderedIds[i])
+      for (let i = idx - 1; i >= 0; i -= 1) searchOrder.push(orderedIds[i])
+    } else if (scrollDirection < 0) {
+      for (let i = idx - 1; i >= 0; i -= 1) searchOrder.push(orderedIds[i])
+      for (let i = idx + 1; i < orderedIds.length; i += 1) searchOrder.push(orderedIds[i])
     } else {
-      const containing = candidates.filter((c) => c.top <= midY && c.bottom >= midY)
-      if (containing.length === 1) {
-        nextWinner = containing[0].id
-      } else if (containing.length > 1) {
-        nextWinner = containing.reduce((a, b) => (a.top <= b.top ? a : b)).id
-      } else {
-        const above = candidates.filter((c) => c.centerY < midY)
-        if (above.length > 0) {
-          nextWinner = above.reduce((a, b) => (a.centerY >= b.centerY ? a : b)).id
-        } else {
-          nextWinner = candidates.reduce((a, b) => (a.centerY <= b.centerY ? a : b)).id
+      for (let i = idx + 1; i < orderedIds.length; i += 1) searchOrder.push(orderedIds[i])
+      for (let i = idx - 1; i >= 0; i -= 1) searchOrder.push(orderedIds[i])
+    }
+
+    /** @type {{ id: string, ratio: number, strong: boolean, contested: boolean }[]} */
+    const qualified = []
+    for (const id of searchOrder) {
+      if (id === incumbent) continue
+      const ratio = ratios[id] ?? 0
+      const strong = incRatio <= LOUNGE_VIDEO_STRONG_OUT_MAX && ratio >= LOUNGE_VIDEO_STRONG_IN_MIN
+      const contested = incRatio <= LOUNGE_VIDEO_CONTEST_OUT_MAX && ratio >= LOUNGE_VIDEO_CONTEST_IN_MIN
+      if (strong || contested) qualified.push({ id, ratio, strong, contested })
+    }
+    if (qualified.length === 0) return null
+
+    qualified.sort((a, b) => {
+      if (a.strong !== b.strong) return a.strong ? -1 : 1
+      if (b.ratio !== a.ratio) return b.ratio - a.ratio
+      return orderedIds.indexOf(a.id) - orderedIds.indexOf(b.id)
+    })
+    return qualified[0].id
+  }
+
+  const publish = (orderedIds, ratios, centerYs, rootEl) => {
+    const midY = scrollPortMidY(rootEl)
+    let nextActive = activeId
+    let prefetchPrevId = null
+    let prefetchNextId = null
+    /** @type {string[]} */
+    let ringIds = []
+
+    if (heroLocked && heroClientId) {
+      ringIds = [heroClientId]
+      prefetchPrevId = null
+      prefetchNextId = null
+    } else if (!coordinatorSuspended && !flingerMode) {
+      if (!nextActive) {
+        const firstVisible = orderedIds.find((id) => (ratios[id] ?? 0) > 0)
+        if (firstVisible) nextActive = firstVisible
+      }
+
+      if (nextActive) {
+        const centerTakeover = pickCenterCrossTakeover(
+          nextActive,
+          orderedIds,
+          ratios,
+          centerYs,
+          midY,
+          scrollDirection,
+        )
+        const clipTakeover = centerTakeover
+          ? null
+          : pickClipTakeover(nextActive, orderedIds, ratios)
+        const takeover = centerTakeover ?? clipTakeover
+        if (takeover) nextActive = takeover
+
+        const incRatio = ratios[nextActive] ?? 0
+        if (incRatio <= 0) {
+          const replacement = orderedIds.find((id) => (ratios[id] ?? 0) > 0 && id !== nextActive)
+          nextActive = replacement ?? null
+        }
+      }
+
+      if (nextActive) {
+        const idx = orderedIds.indexOf(nextActive)
+        if (idx >= 0) {
+          prefetchPrevId = idx > 0 ? orderedIds[idx - 1] : null
+          prefetchNextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null
+          ringIds = [prefetchPrevId, nextActive, prefetchNextId].filter(Boolean)
+        }
+      }
+    } else if (coordinatorSuspended || flingerMode) {
+      /** Keep activeId for resume; ring collapses so decoders detach during fling/overlay. */
+      ringIds = nextActive ? [nextActive] : []
+      if (nextActive) {
+        const idx = orderedIds.indexOf(nextActive)
+        if (idx >= 0) {
+          prefetchPrevId = idx > 0 ? orderedIds[idx - 1] : null
+          prefetchNextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null
         }
       }
     }
 
-    const candidateIds = new Set(candidates.map((c) => c.id))
+    const prevActiveId = activeId
+    activeId = nextActive
 
-    /** Adjacent tiles with similar visibility: keep incumbent to avoid dual-play handoff glitches. */
-    if (
-      snapshot.winnerId &&
-      nextWinner &&
-      nextWinner !== snapshot.winnerId &&
-      candidateIds.has(snapshot.winnerId)
-    ) {
-      const prevC = candidates.find((c) => c.id === snapshot.winnerId)
-      const nextC = candidates.find((c) => c.id === nextWinner)
-      if (prevC && nextC) {
-        const minVis = Math.min(prevC.visiblePx, nextC.visiblePx)
-        if (minVis > 0 && Math.abs(prevC.visiblePx - nextC.visiblePx) / minVis < 0.2) {
-          nextWinner = snapshot.winnerId
+    if (prevActiveId && prevActiveId !== nextActive) {
+      try {
+        const prevGetEl = entries.get(prevActiveId)
+        const prevEl = prevGetEl?.()
+        const video = prevEl?.querySelector?.('video')
+        if (video) {
+          video.pause()
+          video.muted = true
         }
+      } catch {
+        // ignore
       }
     }
 
-    const prevWinnerStale = Boolean(snapshot.winnerId && !candidateIds.has(snapshot.winnerId))
-    const winnerChanged = nextWinner !== snapshot.winnerId
+    const nextSnapshot = Object.freeze({
+      activeId: nextActive,
+      prefetchPrevId,
+      prefetchNextId,
+      ringIds: Object.freeze(ringIds),
+      flingerMode,
+      heroLocked,
+      heroClientId,
+      coordinatorSuspended,
+      tileRatios: Object.freeze({ ...ratios }),
+    })
 
-    if (winnerChanged || prevWinnerStale) {
-      snapshot = Object.freeze({
-        winnerId: nextWinner,
-        stageIds: EMPTY_STAGE_IDS,
-      })
+    const structuralChange =
+      nextSnapshot.activeId !== snapshot.activeId ||
+      nextSnapshot.prefetchPrevId !== snapshot.prefetchPrevId ||
+      nextSnapshot.prefetchNextId !== snapshot.prefetchNextId ||
+      nextSnapshot.flingerMode !== snapshot.flingerMode ||
+      nextSnapshot.heroLocked !== snapshot.heroLocked ||
+      nextSnapshot.heroClientId !== snapshot.heroClientId ||
+      nextSnapshot.coordinatorSuspended !== snapshot.coordinatorSuspended ||
+      nextSnapshot.ringIds.length !== snapshot.ringIds.length ||
+      nextSnapshot.ringIds.some((id, i) => id !== snapshot.ringIds[i])
+
+    const ratioIds = new Set([...Object.keys(snapshot.tileRatios), ...Object.keys(ratios)])
+    let ratiosChanged = false
+    for (const id of ratioIds) {
+      const prev = snapshot.tileRatios[id] ?? 0
+      const next = ratios[id] ?? 0
+      if (Math.abs(prev - next) > 0.008) {
+        ratiosChanged = true
+        break
+      }
+    }
+
+    if (structuralChange || ratiosChanged) {
+      snapshot = nextSnapshot
       emit()
     }
+  }
+
+  const recompute = () => {
+    scheduled = false
+    const rootEl = rootRef?.current ?? null
+    const orderedIds = buildOrderedIds(rootEl)
+    const { ratios, centerYs } = computeTileMetrics(rootEl)
+    publish(orderedIds, ratios, centerYs, rootEl)
   }
 
   const schedule = () => {
     if (scheduled) return
     scheduled = true
     requestAnimationFrame(recompute)
+  }
+
+  const markScroll = () => {
+    const rootEl = rootRef?.current
+    if (rootEl) {
+      const st = rootEl.scrollTop
+      if (st > lastScrollTop) scrollDirection = 1
+      else if (st < lastScrollTop) scrollDirection = -1
+      lastScrollTop = st
+    }
+    if (!heroLocked && !coordinatorSuspended) {
+      flingerMode = true
+      if (flingerIdleTimer) window.clearTimeout(flingerIdleTimer)
+      flingerIdleTimer = window.setTimeout(() => {
+        flingerIdleTimer = null
+        flingerMode = false
+        schedule()
+      }, LOUNGE_VIDEO_FLINGER_IDLE_MS)
+    }
+    schedule()
   }
 
   return {
@@ -153,14 +378,15 @@ export function createAutoplayStore() {
     /** @returns {() => void} */
     register(id, getEl) {
       entries.set(id, getEl)
-      queueMicrotask(() => {
-        schedule()
-      })
+      queueMicrotask(schedule)
       return () => {
         entries.delete(id)
-        queueMicrotask(() => {
-          schedule()
-        })
+        if (activeId === id) activeId = null
+        if (heroClientId === id && heroLocked) {
+          heroLocked = false
+          heroClientId = null
+        }
+        queueMicrotask(schedule)
       }
     },
     subscribe(listener) {
@@ -171,14 +397,37 @@ export function createAutoplayStore() {
       return snapshot
     },
     schedule,
-    /** User tapped a specific tile for sound or hero — take winner immediately (skip hysteresis). */
-    forceWinner(id) {
-      if (!id || snapshot.winnerId === id) return
-      snapshot = Object.freeze({
-        winnerId: id,
-        stageIds: EMPTY_STAGE_IDS,
-      })
-      emit()
+    markScroll,
+    /** Promote a tile to active (tap for sound / hero intent). */
+    forceActive(id) {
+      if (!id || activeId === id) return
+      activeId = id
+      schedule()
+    },
+    /** Hero flyout: collapse ring to hero tile only — max one decoder for flyout perf. */
+    enterHeroLock(id) {
+      if (!id) return
+      heroLocked = true
+      heroClientId = id
+      flingerMode = false
+      if (flingerIdleTimer) {
+        window.clearTimeout(flingerIdleTimer)
+        flingerIdleTimer = null
+      }
+      schedule()
+    },
+    exitHeroLock() {
+      if (!heroLocked) return
+      heroLocked = false
+      heroClientId = null
+      schedule()
+    },
+    /** Post detail / overlay: freeze handoff and shrink ring (feed stays mounted). */
+    setCoordinatorSuspended(suspended) {
+      const next = Boolean(suspended)
+      if (coordinatorSuspended === next) return
+      coordinatorSuspended = next
+      schedule()
     },
   }
 }

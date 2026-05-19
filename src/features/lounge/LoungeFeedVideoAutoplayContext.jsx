@@ -17,7 +17,7 @@ import {
 const LoungeFeedVideoAutoplayContext = createContext(null)
 
 /**
- * Wrap the main lounge scroll area (children of the `overflow-y-auto` feed column).
+ * Wrap a lounge scroll column (feed, post detail, search panel).
  * @param {{ scrollRootRef: React.RefObject<HTMLElement | null>, children: React.React.ReactNode }} props
  */
 export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
@@ -28,7 +28,10 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
     () => true,
   )
 
-  /** Shared across feed/embed Stream tiles: “Tap for sound” unmutes the tile the user tapped (winner handoff when needed). */
+  /**
+   * Feed-wide sound mode: default muted until user taps “Tap for sound” on any tile.
+   * While enabled, visibility bands (60% / 40%) govern mute on the active clip.
+   */
   const [feedInlineSoundUnmuted, setFeedInlineSoundUnmuted] = useState(false)
   const [feedInlineSoundExplicitlyMuted, setFeedInlineSoundExplicitlyMuted] = useState(false)
   const toggleFeedInlineSound = useCallback(() => {
@@ -42,12 +45,21 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
     setFeedInlineSoundUnmuted(Boolean(unmuted))
     setFeedInlineSoundExplicitlyMuted(Boolean(explicitlyMuted))
   }, [])
-  const forceFeedAutoplayWinner = useCallback(
+  const forceFeedAutoplayActive = useCallback(
     (clientId) => {
-      if (clientId) store.forceWinner(clientId)
+      if (clientId) store.forceActive(clientId)
     },
     [store],
   )
+  const enterFeedHeroLock = useCallback(
+    (clientId) => {
+      if (clientId) store.enterHeroLock(clientId)
+    },
+    [store],
+  )
+  const exitFeedHeroLock = useCallback(() => {
+    store.exitHeroLock()
+  }, [store])
 
   useEffect(() => {
     if (!feedAutoplayEnabled) {
@@ -61,7 +73,7 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
   }, [store, scrollRootRef])
 
   useEffect(() => {
-    const onScrollOrResize = () => store.schedule()
+    const onScrollOrResize = () => store.markScroll()
     const el = scrollRootRef?.current
     if (el) {
       el.addEventListener('scroll', onScrollOrResize, { passive: true })
@@ -100,7 +112,9 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
       toggleFeedInlineSound,
       restoreFeedInlineSound,
       resetFeedInlineSound,
-      forceFeedAutoplayWinner,
+      forceFeedAutoplayActive,
+      enterFeedHeroLock,
+      exitFeedHeroLock,
     }),
     [
       store,
@@ -109,14 +123,16 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children }) {
       toggleFeedInlineSound,
       restoreFeedInlineSound,
       resetFeedInlineSound,
-      forceFeedAutoplayWinner,
+      forceFeedAutoplayActive,
+      enterFeedHeroLock,
+      exitFeedHeroLock,
     ],
   )
 
   return <LoungeFeedVideoAutoplayContext.Provider value={value}>{children}</LoungeFeedVideoAutoplayContext.Provider>
 }
 
-/** Schedule a mid-scroll autoplay winner recompute (e.g. after feed pagination appends rows). */
+/** Schedule coordinator recompute (pagination append, layout). */
 // eslint-disable-next-line react-refresh/only-export-components -- colocated store hook for this context module
 export function useLoungeFeedVideoAutoplaySchedule() {
   const ctx = useContext(LoungeFeedVideoAutoplayContext)
@@ -124,7 +140,7 @@ export function useLoungeFeedVideoAutoplaySchedule() {
 }
 
 /**
- * Re-run autoplay winner pick after feed length changes (infinite scroll append).
+ * Re-run coordinator after feed length changes (infinite scroll append).
  * @param {{ postCount: number }} props
  */
 export function LoungeFeedAutoplayPostsKick({ postCount }) {
@@ -160,11 +176,37 @@ export function LoungeFeedInlineSoundResetBinder({ resetRef }) {
   return null
 }
 
-const EMPTY_AUTOPLAY_SNAPSHOT = Object.freeze({ winnerId: null, stageIds: Object.freeze([]) })
+/**
+ * Suspend coordinator handoff/ring expansion (e.g. feed hidden under post detail overlay).
+ * @param {{ suspended: boolean }} props
+ */
+export function LoungeFeedCoordinatorSuspendBinder({ suspended }) {
+  const ctx = useContext(LoungeFeedVideoAutoplayContext)
+  useLayoutEffect(() => {
+    ctx?.store?.setCoordinatorSuspended(Boolean(suspended))
+    return () => {
+      ctx?.store?.setCoordinatorSuspended(false)
+    }
+  }, [ctx, suspended])
+  return null
+}
+
+/** @type {import('./loungeFeedVideoAutoplayStore.js').LoungeFeedAutoplaySnapshot} */
+const EMPTY_AUTOPLAY_SNAPSHOT = Object.freeze({
+  activeId: null,
+  prefetchPrevId: null,
+  prefetchNextId: null,
+  ringIds: Object.freeze([]),
+  flingerMode: false,
+  heroLocked: false,
+  heroClientId: null,
+  coordinatorSuspended: false,
+  tileRatios: Object.freeze({}),
+})
 
 /**
- * Single-feed autoplay: mid-scroll winner plays inline HLS (one decoder; IO prefetch margin only).
- * @param {string | null | undefined} clientId stable id per feed row surface + asset (e.g. `${rowId}:${streamUid}`, `${rowId}:embed:${streamUid}`)
+ * Visibility-band autoplay: `{prev, active, next}` HLS ring + hero resource lock.
+ * @param {string | null | undefined} clientId stable id per feed row surface + asset
  * @param {() => HTMLElement | null} getContainerEl
  */
 // eslint-disable-next-line react-refresh/only-export-components -- colocated store hook for this context module
@@ -189,20 +231,23 @@ export function useLoungeFeedVideoAutoplay(clientId, getContainerEl) {
   )
 
   const coordinatorActive = Boolean(ctx && clientId && feedAutoplayEnabled)
-  const isWinner = Boolean(
-    ctx && clientId && autoplaySnapshot.winnerId === clientId && feedAutoplayEnabled,
+  const isActive = Boolean(
+    ctx && clientId && autoplaySnapshot.activeId === clientId && feedAutoplayEnabled,
   )
-  const isStaged = Boolean(
-    ctx &&
-      clientId &&
-      feedAutoplayEnabled &&
-      autoplaySnapshot.stageIds.includes(clientId),
+  const inRing = Boolean(
+    ctx && clientId && feedAutoplayEnabled && autoplaySnapshot.ringIds.includes(clientId),
   )
+  const tileRatio =
+    clientId && feedAutoplayEnabled ? Number(autoplaySnapshot.tileRatios[clientId] ?? 0) : 0
 
   return {
     coordinatorActive,
-    isWinner,
-    isStaged,
+    isActive,
+    inRing,
+    tileRatio,
+    flingerMode: autoplaySnapshot.flingerMode,
+    heroLocked: autoplaySnapshot.heroLocked,
+    coordinatorSuspended: autoplaySnapshot.coordinatorSuspended,
     feedAutoplayEnabled,
     scheduleRecompute: ctx?.store?.schedule ?? (() => {}),
     feedSoundFromProvider: Boolean(ctx),
@@ -210,6 +255,14 @@ export function useLoungeFeedVideoAutoplay(clientId, getContainerEl) {
     feedInlineSoundExplicitlyMuted: ctx?.feedInlineSoundExplicitlyMuted ?? false,
     toggleFeedInlineSound: ctx?.toggleFeedInlineSound ?? (() => {}),
     restoreFeedInlineSound: ctx?.restoreFeedInlineSound ?? (() => {}),
-    forceFeedAutoplayWinner: ctx?.forceFeedAutoplayWinner ?? (() => {}),
+    forceFeedAutoplayActive: ctx?.forceFeedAutoplayActive ?? (() => {}),
+    enterFeedHeroLock: ctx?.enterFeedHeroLock ?? (() => {}),
+    exitFeedHeroLock: ctx?.exitFeedHeroLock ?? (() => {}),
+    /** @deprecated use isActive */
+    isWinner: isActive,
+    /** @deprecated unused */
+    isStaged: inRing && !isActive,
+    /** @deprecated use forceFeedAutoplayActive */
+    forceFeedAutoplayWinner: ctx?.forceFeedAutoplayActive ?? (() => {}),
   }
 }

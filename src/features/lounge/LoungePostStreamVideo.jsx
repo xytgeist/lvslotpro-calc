@@ -2,6 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { createPortal, flushSync } from 'react-dom'
 import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoUpload'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
+import {
+  LOUNGE_VIDEO_SOUND_OFF_RATIO,
+  LOUNGE_VIDEO_SOUND_ON_RATIO,
+} from './loungeFeedVideoAutoplayStore.js'
 import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
 import { releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 import {
@@ -496,7 +500,7 @@ function SoundOnGlyph({ className = 'h-4 w-4' }) {
  *
  * @param {import('react').RefObject<HTMLElement | null>} [visibilityResetRootRef] — Optional scroll root for in-view
  *   checks; when omitted, intersection uses the viewport (still correct when the feed scrolls inside the window).
- * @param {string} [feedAutoplayClientId] — When inside `LoungeFeedVideoAutoplayProvider`, only the mid-scroll winner attaches/plays.
+ * @param {string} [feedAutoplayClientId] — When inside `LoungeFeedVideoAutoplayProvider`, ring/active coordinator id.
  * @param {string} [sessionPosterUrl] — Optional `blob:` JPEG from composer; shown until CF `thumbnail.jpg` loads (same-tab session pin).
  * @param {string} [persistedStreamPosterUrl] — Public `lounge-feed` poster URL from DB (cross-device stable tile).
  * @param {number} [streamVideoDisplayWidth] — Display width from DB for CSS `aspect-ratio` when set with height.
@@ -545,7 +549,9 @@ export default function LoungePostStreamVideo({
   const heroPhaseRef = useRef('idle')
   const inViewRef = useRef(false)
   const lightboxOpenRef = useRef(false)
-  const isWinnerRef = useRef(false)
+  const isActiveRef = useRef(false)
+  /** Hysteresis for feed-wide sound mode visibility bands (60% on / 40% off). */
+  const feedSoundAudibleRef = useRef(false)
   /** Hero session wants audible playback (restored from inline snapshot on open). */
   const heroWantsSoundRef = useRef(true)
   const recoveryBurstRef = useRef(0)
@@ -705,23 +711,29 @@ export default function LoungePostStreamVideo({
   const getVideoContainer = useCallback(() => containerRef.current, [])
   const {
     coordinatorActive,
-    isWinner,
+    isActive,
+    inRing,
+    tileRatio,
+    flingerMode,
+    heroLocked,
     feedAutoplayEnabled,
     scheduleRecompute,
     feedInlineSoundUnmuted,
     feedInlineSoundExplicitlyMuted,
     toggleFeedInlineSound,
     restoreFeedInlineSound,
-    forceFeedAutoplayWinner,
+    forceFeedAutoplayActive,
+    enterFeedHeroLock,
+    exitFeedHeroLock,
   } = useLoungeFeedVideoAutoplay(feedAutoplayClientId, getVideoContainer)
   const anyStreamLightboxOpen = useSyncExternalStore(
     subscribeLoungeStreamLightboxOpen,
     getLoungeStreamLightboxOpen,
     () => false,
   )
-  /** Inside `LoungeFeedVideoAutoplayProvider` with a client id: one shared “Tap for sound” for the scroll surface. */
+  /** Inside `LoungeFeedVideoAutoplayProvider` with a client id: feed-wide “Tap for sound” + visibility bands. */
   const coordinatedInlineSound = coordinatorActive
-  isWinnerRef.current = feedAutoplayEnabled && (!coordinatorActive || isWinner)
+  isActiveRef.current = feedAutoplayEnabled && (!coordinatorActive || isActive)
   const [localStripSoundUnmuted, setLocalStripSoundUnmuted] = useState(false)
   const [localStripSoundExplicitlyMuted, setLocalStripSoundExplicitlyMuted] = useState(false)
   const stripSoundUnmuted = coordinatedInlineSound ? feedInlineSoundUnmuted : localStripSoundUnmuted
@@ -737,8 +749,21 @@ export default function LoungePostStreamVideo({
   const attachStream = heroExpanded
     ? Boolean(id)
     : lazyStream
-      ? feedAutoplayEnabled && (coordinatorActive ? isWinner : streamInView)
+      ? feedAutoplayEnabled && (coordinatorActive ? inRing : streamInView)
       : true
+
+  const computeCoordinatedSoundMuted = useCallback(() => {
+    if (feedInlineSoundExplicitlyMuted || !feedInlineSoundUnmuted) return true
+    if (!isActive) return true
+    if (tileRatio >= LOUNGE_VIDEO_SOUND_ON_RATIO) feedSoundAudibleRef.current = true
+    else if (tileRatio <= LOUNGE_VIDEO_SOUND_OFF_RATIO) feedSoundAudibleRef.current = false
+    return !feedSoundAudibleRef.current
+  }, [
+    feedInlineSoundExplicitlyMuted,
+    feedInlineSoundUnmuted,
+    isActive,
+    tileRatio,
+  ])
 
   useEffect(() => {
     heroPhaseRef.current = heroPhase
@@ -780,13 +805,16 @@ export default function LoungePostStreamVideo({
 
   useEffect(() => () => releaseHeroBodyHost(), [releaseHeroBodyHost])
 
-  /** Pause inline feed tiles while another Stream hero is open; keep losers muted when sound is on. */
+  /** Coordinator + hero resource budget: one `play()`, `{prev,active,next}` ring attach, hero lock collapses ring. */
   useLayoutEffect(() => {
     if (!showOpen) return
     const v = videoRef.current
     if (!v) return
     const isHeroTile = lightboxOpenRef.current
-    if (anyStreamLightboxOpen && !isHeroTile) {
+
+    if (isHeroTile) return
+
+    if (anyStreamLightboxOpen) {
       try {
         v.pause()
         v.muted = true
@@ -795,55 +823,80 @@ export default function LoungePostStreamVideo({
       }
       return
     }
+
     if (!coordinatorActive || !lazyStream) return
-    if (isHeroTile) return
-    if (isWinner) return
-    try {
-      v.pause()
-      if (coordinatedInlineSound) v.muted = true
-    } catch {
-      // ignore
+
+    if (heroLocked) {
+      try {
+        v.pause()
+        v.muted = true
+      } catch {
+        // ignore
+      }
+      return
+    }
+
+    if (flingerMode) {
+      try {
+        if (!isActive) v.pause()
+      } catch {
+        // ignore
+      }
+      return
+    }
+
+    if (!isActive) {
+      try {
+        v.pause()
+        v.muted = true
+      } catch {
+        // ignore
+      }
+      if (inRing) return
+      if (tileRatio <= 0) {
+        try {
+          v.currentTime = 0
+        } catch {
+          // ignore
+        }
+      }
+      return
+    }
+
+    if (isActive) {
+      if (tileRatio > 0) {
+        try {
+          v.muted = coordinatedInlineSound ? computeCoordinatedSoundMuted() : !localStripSoundUnmuted
+          const p = v.play()
+          if (p && typeof p.catch === 'function') p.catch(() => {})
+        } catch {
+          // ignore
+        }
+      } else {
+        try {
+          v.pause()
+          v.currentTime = 0
+          v.muted = true
+        } catch {
+          // ignore
+        }
+      }
+      return
     }
   }, [
     anyStreamLightboxOpen,
     coordinatorActive,
     coordinatedInlineSound,
-    isWinner,
+    computeCoordinatedSoundMuted,
+    flingerMode,
+    heroLocked,
+    inRing,
+    isActive,
     lazyStream,
+    localStripSoundUnmuted,
     showOpen,
+    tileRatio,
     lightboxOpen,
-  ])
-
-  /** Keep inline `<video>` muted in sync with shared provider sound (winner only when coordinated). */
-  useEffect(() => {
-    if (!coordinatedInlineSound) return
-    const v = videoRef.current
-    if (!v || lightboxOpenRef.current) return
-    if (anyStreamLightboxOpen && !lightboxOpenRef.current) {
-      try {
-        v.pause()
-        v.muted = true
-      } catch {
-        // ignore
-      }
-      return
-    }
-    try {
-      v.muted = !feedInlineSoundUnmuted
-      if (feedInlineSoundUnmuted && attachStream && isWinner) {
-        const p = v.play()
-        if (p && typeof p.catch === 'function') p.catch(() => {})
-      }
-    } catch {
-      // ignore
-    }
-  }, [
-    coordinatedInlineSound,
-    attachStream,
-    feedInlineSoundUnmuted,
-    streamAttachKey,
-    isWinner,
-    anyStreamLightboxOpen,
   ])
 
   useEffect(() => {
@@ -987,6 +1040,7 @@ export default function LoungePostStreamVideo({
     heroTapSnapshotRef.current = null
     heroWantsSoundRef.current = true
     lightboxOpenRef.current = false
+    exitFeedHeroLock()
     setLightboxOpen(false)
     setHeroPhase('idle')
     setHeroLayout(null)
@@ -995,7 +1049,7 @@ export default function LoungePostStreamVideo({
     setHeroBackdropArmed(false)
     heroFromRectRef.current = null
     heroTargetRectRef.current = null
-  }, [])
+  }, [exitFeedHeroLock])
 
   const closeLightbox = useCallback(() => {
     if (!lightboxOpenRef.current) return
@@ -1103,13 +1157,13 @@ export default function LoungePostStreamVideo({
     if (!wrap) return
 
     lightboxOpenRef.current = true
+    if (coordinatedInlineSound && feedAutoplayClientId) {
+      enterFeedHeroLock(feedAutoplayClientId)
+      forceFeedAutoplayActive(feedAutoplayClientId)
+    }
     notifyLoungeStreamLightboxOpen(true)
     flushSync(() => setLightboxOpen(true))
     pauseOtherLoungeStreamVideos(v)
-
-    if (coordinatedInlineSound && feedAutoplayClientId) {
-      forceFeedAutoplayWinner(feedAutoplayClientId)
-    }
 
     const from = readHeroMediaViewportRect(slot, flyout, wrap, displayW, displayH)
     const target = computeHeroTargetRect(from)
@@ -1149,38 +1203,35 @@ export default function LoungePostStreamVideo({
     setHeroBackdropArmed(false)
 
     if (feedAutoplayEnabled && v) {
-      const explicitlyMuted = coordinatedInlineSound
-        ? feedInlineSoundExplicitlyMuted
-        : localStripSoundExplicitlyMuted
-      heroWantsSoundRef.current = !explicitlyMuted
+      heroWantsSoundRef.current = true
       inlineFeedSoundSnapshotRef.current = {
         unmuted: stripSoundUnmuted,
-        explicitlyMuted,
+        explicitlyMuted: coordinatedInlineSound
+          ? feedInlineSoundExplicitlyMuted
+          : localStripSoundExplicitlyMuted,
         coordinated: coordinatedInlineSound,
       }
       if (coordinatedInlineSound) {
-        restoreFeedInlineSound(false, explicitlyMuted)
+        restoreFeedInlineSound(false, feedInlineSoundExplicitlyMuted)
       }
-      if (!explicitlyMuted) {
-        try {
-          if (!coordinatedInlineSound) {
-            setLocalStripSoundUnmuted(true)
-            setLocalStripSoundExplicitlyMuted(false)
-          }
-          v.muted = false
-          const p = v.play()
-          if (p && typeof p.catch === 'function') {
-            p.catch(() => {
-              try {
-                v.muted = true
-              } catch {
-                // ignore
-              }
-            })
-          }
-        } catch {
-          // ignore
+      try {
+        if (!coordinatedInlineSound) {
+          setLocalStripSoundUnmuted(true)
+          setLocalStripSoundExplicitlyMuted(false)
         }
+        v.muted = false
+        const p = v.play()
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {
+            try {
+              v.muted = true
+            } catch {
+              // ignore
+            }
+          })
+        }
+      } catch {
+        // ignore
       }
     } else {
       heroWantsSoundRef.current = false
@@ -1206,7 +1257,8 @@ export default function LoungePostStreamVideo({
     displayW,
     displayH,
     streamFadeShowVideo,
-    forceFeedAutoplayWinner,
+    forceFeedAutoplayActive,
+    enterFeedHeroLock,
     restoreFeedInlineSound,
   ])
 
@@ -1214,8 +1266,8 @@ export default function LoungePostStreamVideo({
   const onSoundStripPress = useCallback(() => {
     if (coordinatedInlineSound) {
       const turningOn = !feedInlineSoundUnmuted
-      if (turningOn && feedAutoplayClientId && !isWinner) {
-        forceFeedAutoplayWinner(feedAutoplayClientId)
+      if (turningOn && feedAutoplayClientId && !isActive) {
+        forceFeedAutoplayActive(feedAutoplayClientId)
       }
       toggleFeedInlineSound()
       if (turningOn && attachStream) {
@@ -1289,8 +1341,8 @@ export default function LoungePostStreamVideo({
     openLightbox,
     toggleFeedInlineSound,
     feedAutoplayClientId,
-    isWinner,
-    forceFeedAutoplayWinner,
+    isActive,
+    forceFeedAutoplayActive,
   ])
 
   useEffect(() => {
@@ -1299,8 +1351,11 @@ export default function LoungePostStreamVideo({
 
   useEffect(() => {
     if (!lightboxOpen || !enableLightbox) return undefined
-    return () => notifyLoungeStreamLightboxOpen(false)
-  }, [lightboxOpen, enableLightbox])
+    return () => {
+      notifyLoungeStreamLightboxOpen(false)
+      exitFeedHeroLock()
+    }
+  }, [lightboxOpen, enableLightbox, exitFeedHeroLock])
 
   useEffect(() => {
     if (!lightboxOpen) return undefined
@@ -1421,42 +1476,32 @@ export default function LoungePostStreamVideo({
     finalizeHeroClose,
   ])
 
-  /** Muted autoplay while sufficiently visible (X-style feed). Feed/embed: defer HLS until in view. */
+  /** Non-coordinated surfaces: IO attach/play. Coordinated tiles rely on store ratios + layout effect above. */
   useEffect(() => {
     const wrap = containerRef.current
     const v = videoRef.current
     if (!wrap || !v || !showOpen || !id) return undefined
+    if (coordinatorActive && lazyStream) {
+      inViewRef.current = tileRatio > 0
+      return undefined
+    }
 
     const applyIo = (entries) => {
       const e = entries[0]
       const ratio = typeof e?.intersectionRatio === 'number' ? e.intersectionRatio : 0
       const attachOk = Boolean(e?.isIntersecting && (ratio >= LAZY_ATTACH_IO_THRESHOLD || ratio === 1))
       inViewRef.current = attachOk
-      if (lazyStream && !coordinatorActive) setStreamInView(attachOk)
-      const won = isWinnerRef.current
-      if (lightboxOpenRef.current) {
-        queueMicrotask(() => scheduleRecompute())
+      setStreamInView(attachOk)
+      if (lightboxOpenRef.current) return
+      if (!feedAutoplayEnabled) return
+      if (!attachOk) {
+        try {
+          v.pause()
+        } catch {
+          // ignore
+        }
         return
       }
-      if (!won) {
-        try {
-          v.pause()
-        } catch {
-          // ignore
-        }
-      } else if (!attachOk && !coordinatorActive) {
-        try {
-          v.pause()
-        } catch {
-          // ignore
-        }
-      }
-      /** Scroll root already schedules winner picks; IO per tile was redundant and costly on mobile. */
-      if (!coordinatorActive) queueMicrotask(() => scheduleRecompute())
-      if (!feedAutoplayEnabled) return
-      if (!attachOk || !won) return
-      if (lightboxOpenRef.current) return
-      if (lazyStream) return
       try {
         v.muted = !localStripSoundUnmuted
         const p = v.play()
@@ -1471,13 +1516,13 @@ export default function LoungePostStreamVideo({
     try {
       io = new IntersectionObserver(applyIo, {
         root,
-        rootMargin: lazyStream ? LAZY_ATTACH_ROOT_MARGIN : '0px',
+        rootMargin: '0px',
         threshold: [0, 0.02, 0.04, 0.08, 0.12, 0.18, 0.25, 0.35, 0.5, 0.65, 0.8, 1],
       })
     } catch {
       io = new IntersectionObserver(applyIo, {
         root: null,
-        rootMargin: lazyStream ? LAZY_ATTACH_ROOT_MARGIN : '0px',
+        rootMargin: '0px',
         threshold: [0, 0.02, 0.04, 0.08, 0.12, 0.18, 0.25, 0.35, 0.5, 0.65, 0.8, 1],
       })
     }
@@ -1487,33 +1532,41 @@ export default function LoungePostStreamVideo({
     id,
     showOpen,
     lazyStream,
+    coordinatorActive,
+    tileRatio,
     visibilityResetRootRef,
     streamAttachKey,
-    scheduleRecompute,
     localStripSoundUnmuted,
-    coordinatorActive,
     feedAutoplayEnabled,
   ])
 
-  /** After lazy HLS attach (feed/embed), start muted autoplay once media is ready. */
+  /** After lazy HLS attach, start playback once media is ready — active tile only (never prefetch ring). */
   useEffect(() => {
     if (!lazyStream || !attachStream) return undefined
     if (!showOpen) return undefined
     const heroTile = lightboxOpenRef.current
-    if (!inViewRef.current && !(coordinatorActive && isWinner) && !heroTile) return undefined
-    if (coordinatorActive && !isWinnerRef.current && !heroTile) return undefined
+    if (coordinatorActive && !isActive && !heroTile) return undefined
+    if (!coordinatorActive && !inViewRef.current && !heroTile) return undefined
     const v = videoRef.current
     if (!v) return undefined
     let cleaned = false
     const go = () => {
+      if (cleaned) return
       if (anyStreamLightboxOpen && !lightboxOpenRef.current) return
-      if (coordinatorActive && !isWinnerRef.current && !lightboxOpenRef.current) return
+      if (heroLocked && !lightboxOpenRef.current) return
+      if (flingerMode && !lightboxOpenRef.current) return
+      if (coordinatorActive && !isActiveRef.current && !lightboxOpenRef.current) return
       try {
         if (lightboxOpenRef.current) {
           if (heroWantsSoundRef.current) v.muted = false
+        } else if (coordinatedInlineSound && isActiveRef.current) {
+          v.muted = computeCoordinatedSoundMuted()
+        } else if (!coordinatedInlineSound) {
+          v.muted = !localStripSoundUnmuted
         } else {
-          v.muted = coordinatedInlineSound ? !feedInlineSoundUnmuted : true
+          v.muted = true
         }
+        if (coordinatorActive && !isActiveRef.current && !lightboxOpenRef.current) return
         const p = v.play()
         if (p && typeof p.catch === 'function') p.catch(() => {})
       } catch {
@@ -1545,9 +1598,12 @@ export default function LoungePostStreamVideo({
     streamAttachKey,
     lightboxOpen,
     coordinatorActive,
-    isWinner,
+    isActive,
     coordinatedInlineSound,
-    feedInlineSoundUnmuted,
+    computeCoordinatedSoundMuted,
+    localStripSoundUnmuted,
+    flingerMode,
+    heroLocked,
     anyStreamLightboxOpen,
   ])
 
@@ -1580,8 +1636,13 @@ export default function LoungePostStreamVideo({
     if (inlineFeedSoundSnapshotRef.current) return
     const v = videoRef.current
     if (!v || !showOpen) return
-    if (!inViewRef.current && !(coordinatorActive && isWinner)) return
-    if (coordinatorActive && !isWinner) {
+    if (coordinatorActive) {
+      if (!isActive && !inRing) return
+      if (flingerMode) return
+    } else if (!inViewRef.current) {
+      return
+    }
+    if (coordinatorActive && !isActive) {
       try {
         v.pause()
       } catch {
@@ -1590,7 +1651,7 @@ export default function LoungePostStreamVideo({
       return
     }
     try {
-      v.muted = coordinatedInlineSound ? !feedInlineSoundUnmuted : !localStripSoundUnmuted
+      v.muted = coordinatedInlineSound ? computeCoordinatedSoundMuted() : !localStripSoundUnmuted
       const p = v.play()
       if (p && typeof p.catch === 'function') p.catch(() => {})
     } catch {
@@ -1600,9 +1661,11 @@ export default function LoungePostStreamVideo({
     lightboxOpen,
     showOpen,
     coordinatorActive,
-    isWinner,
+    isActive,
+    inRing,
+    flingerMode,
     coordinatedInlineSound,
-    feedInlineSoundUnmuted,
+    computeCoordinatedSoundMuted,
     localStripSoundUnmuted,
     feedAutoplayEnabled,
     anyStreamLightboxOpen,
