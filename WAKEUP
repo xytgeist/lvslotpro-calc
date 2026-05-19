@@ -43,7 +43,7 @@ The agent should treat the following as **standing instructions for this session
   `supabase functions deploy lounge-cf-stream-delete-video --project-ref jtjgtucumuoswnbauxry`,  
   `supabase functions deploy lounge-cf-stream-delete-orphan --project-ref jtjgtucumuoswnbauxry`, and  
   `supabase functions deploy lounge-cf-stream-purge-pending-uploads --project-ref jtjgtucumuoswnbauxry`
-- **Lounge Stream (feed):** autoplay coordinator + shared **Tap for sound** live in **`LoungePostStreamVideo.jsx`** + **`LoungeFeedVideoAutoplayContext.jsx`**; quote repost **`z-[100]`** vs post detail **`z-[98]`** (profile sheet **`z-[97]`**) — see **`AGENTS.md`** quick anchors and **`docs/test-buildout-backlog.md`** smoke 11.
+- **Lounge Stream (feed):** autoplay coordinator + **prefetch-band staging** + **hero expand** in **`LoungePostStreamVideo.jsx`** + **`LoungeFeedVideoAutoplayContext.jsx`** / **`loungeFeedVideoAutoplayStore.js`**; feed **40** posts/page in **`AppShell.jsx`**; quote repost **`z-[100]`** vs post detail **`z-[98]`** (profile sheet **`z-[97]`**) — see **`AGENTS.md`** quick anchors and **`docs/test-buildout-backlog.md`** smoke 11 / 14.
 - **Lounge FAB wheel (nav):** primary nav = **`LoungeDockArcCarouselPrototype`**; **`LoungeDockFooterBar`** disabled; long-press reposition + **1s** click-through guard; chip-heart likes + share in **⋯** menu — **`AGENTS.md`** anchors, roadmap Phase B FAB table, backlog smoke **§14** (test through commit **`2231883`**).
 - No prod writes / no commits / PR only: _[say which]_
 - Context: _[link, path, or "decision already in backlog heading …"]_
@@ -74,19 +74,18 @@ The agent should treat the following as **standing instructions for this session
 
 ## Last session recap (May 18 2026, branch `test`)
 
-Knocked out a pile of Lounge polish and bug fixes — all committed and pushed:
+**Stream hero expand + feed video staging** — all committed and pushed through **`7dbbec7`**:
 
 | Commit | What |
 |---|---|
-| `1206f0a` | Upload toast z-index (`z-[107]` when detail above profile), FAB flicker on upload bar fixed (effect-1 pre-checks obstacles), following filter flash + white-bg |
-| `35974bc` | Following filter flash was invisible (menu closes before flash fires) — moved flash to dock layer as standalone `fixed` element using saved button coords |
-| `8f7a0df` | More breathing room around detail comment activation pill (`pt-1` → `pt-2.5`, slight bottom bump) |
+| `4cba1e5` → `b16d35d` | X-style **hero expand**: same `<video>`, GPU FLIP, body reparent, portrait media rect |
+| `2c0cfd9` | **Prefetch-band staging** — winner plays; neighbors attach HLS paused (cap 24) |
+| `1286cc0` | Hero **hardening**: tap snapshot, canvas frame shield, deferred scrim; feed page **40** |
+| `7dbbec7` | Restore **swipe-to-dismiss** on hero video (`touch-none`, flyout shell handles gestures) |
 
-Previous session fixes (still in scope):
-- `@handle` taps open profile, `#hashtag` taps open search with 3-tier hashtag ordering
-- FAB hidden on non-Lounge screens (calculators, offers, etc.) via `isActivePage` prop
-- Comment media lightbox z-index when detail opened from profile tab
-- Focused comment scroll padding + gap tuning (GAP_PX = 8)
-- Reply composer no longer scrolls away the focused comment (`skipScrollToTop`)
-- Discard prompt visible when detail is above profile (`z-[106]`)
-- Nested `<button>` HTML error in comment hierarchy → `div[role=button]`
+**Still open:** Ryan sign-off on hero expand / staging smoke on test deploy (backlog row marked pending).
+
+**Previous session (still in scope):**
+- Video submit queue + fast lane + parallel prep (`57eaca2`, Ryan **PASSED**)
+- Upload toast z-index, FAB flicker, following filter flash (`1206f0a`, `35974bc`)
+- `@handle` / `#hashtag` taps, comment-only post detail mode, nested `<button>` fix
