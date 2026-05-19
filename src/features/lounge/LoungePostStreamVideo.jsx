@@ -228,6 +228,74 @@ function clearInlinePosterHeroStyles(slot) {
   img.style.opacity = ''
 }
 
+/** object-contain draw for canvas frame shield (matches flyout `<video>`). */
+function drawVideoContainOnCanvas(ctx, video, canvasW, canvasH) {
+  const vw = video.videoWidth || canvasW
+  const vh = video.videoHeight || canvasH
+  let dw = canvasW
+  let dh = (dw * vh) / Math.max(vw, 1)
+  if (dh > canvasH) {
+    dh = canvasH
+    dw = (dh * vw) / Math.max(vh, 1)
+  }
+  const dx = (canvasW - dw) / 2
+  const dy = (canvasH - dh) / 2
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, canvasW, canvasH)
+  ctx.drawImage(video, dx, dy, dw, dh)
+}
+
+/** Frame 0 shield after reparent — removed once `<video>` paints post-move (rVFC). */
+function mountHeroFrameShield(flyout, video, width, height) {
+  if (!flyout || !video) return null
+  clearHeroFrameShield(flyout)
+  try {
+    const w = Math.max(1, Math.round(width))
+    const h = Math.max(1, Math.round(height))
+    const canvas = document.createElement('canvas')
+    canvas.dataset.loungeHeroFrameShield = '1'
+    canvas.setAttribute('aria-hidden', 'true')
+    canvas.style.cssText =
+      'pointer-events:none;position:absolute;inset:0;z-index:2;width:100%;height:100%;object-fit:contain'
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    drawVideoContainOnCanvas(ctx, video, w, h)
+    flyout.appendChild(canvas)
+    return canvas
+  } catch {
+    return null
+  }
+}
+
+function clearHeroFrameShield(flyout) {
+  if (!flyout) return
+  flyout.querySelector('[data-lounge-hero-frame-shield]')?.remove()
+}
+
+/** Wait until flyout `<video>` (or shield removal) has painted before arming scrim. */
+function afterHeroFlyoutPainted(video, onPainted) {
+  const run = () => {
+    try {
+      onPainted()
+    } catch {
+      // ignore
+    }
+  }
+  if (video && typeof video.requestVideoFrameCallback === 'function') {
+    try {
+      video.requestVideoFrameCallback(() => run())
+      return
+    } catch {
+      // fall through
+    }
+  }
+  requestAnimationFrame(() => {
+    requestAnimationFrame(run)
+  })
+}
+
 /**
  * @param {React.RefObject<HTMLVideoElement | null>} videoRef
  * @param {string} src manifest URL
@@ -452,6 +520,13 @@ export default function LoungePostStreamVideo({
   const inlineFeedSoundSnapshotRef = useRef(
     /** @type {{ unmuted: boolean, explicitlyMuted: boolean, coordinated: boolean } | null} */ (null),
   )
+  /** Tile media state at hero tap — freeze poster/video fade for the expand. */
+  const heroTapSnapshotRef = useRef(
+    /** @type {{ showVideo: boolean, readyState: number, fromRect: { top: number, left: number, width: number, height: number } } | null} */ (
+      null
+    ),
+  )
+  const heroFrameShieldRef = useRef(/** @type {HTMLCanvasElement | null} */ (null))
   const [lightboxOpen, setLightboxOpen] = useState(false)
   /** @type {'idle' | 'opening' | 'open' | 'closing'} */
   const [heroPhase, setHeroPhase] = useState('idle')
@@ -654,6 +729,7 @@ export default function LoungePostStreamVideo({
     }
     if (flyout.parentElement !== slot) slot.appendChild(flyout)
     clearFlyoutHeroInlineStyles(flyout)
+    clearHeroFrameShield(flyout)
     clearInlinePosterHeroStyles(slot)
     releaseHeroBodyHost()
   }, [heroExpanded, ensureHeroBodyHost, releaseHeroBodyHost])
@@ -715,10 +791,12 @@ export default function LoungePostStreamVideo({
 
     queueMicrotask(() => {
       if (cleaned) return
+      if (lightboxOpenRef.current) return
       if (!attachStream) {
         setStreamFadeShowVideo(false)
         return
       }
+      if (streamFadeShowVideo && attachStream) return
       setStreamFadeShowVideo(false)
 
       const arm = () => {
@@ -814,6 +892,10 @@ export default function LoungePostStreamVideo({
   }, [attachStream, poster, id, streamAttachKey])
 
   const finalizeHeroClose = useCallback(() => {
+    clearHeroFrameShield(videoFlyoutRef.current)
+    heroFrameShieldRef.current = null
+    heroTapSnapshotRef.current = null
+    lightboxOpenRef.current = false
     setLightboxOpen(false)
     setHeroPhase('idle')
     setHeroLayout(null)
@@ -883,20 +965,45 @@ export default function LoungePostStreamVideo({
 
   const openLightbox = useCallback(() => {
     if (lightboxOpenRef.current) return
+    lightboxOpenRef.current = true
     const slot = heroInlineSlotRef.current
     const wrap = containerRef.current
     const flyout = videoFlyoutRef.current
     const v = videoRef.current
-    if (!wrap) return
+    if (!wrap) {
+      lightboxOpenRef.current = false
+      return
+    }
     const from = readHeroMediaViewportRect(slot, flyout, wrap, displayW, displayH)
     const target = computeHeroTargetRect(from)
     heroFromRectRef.current = from
     heroTargetRectRef.current = target
 
-    /** Card-hole poster only — flyout (same `<video>`) snaps + grows immediately like X. */
-    revealInlinePosterForHero(slot)
+    const hadDecodedVideo = Boolean(
+      v &&
+        (streamFadeShowVideo ||
+          v.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ||
+          (v.readyState >= HTMLMediaElement.HAVE_METADATA && v.currentTime > 0)),
+    )
+    const tapShowVideo = streamFadeShowVideo || hadDecodedVideo
+    heroTapSnapshotRef.current = {
+      showVideo: tapShowVideo,
+      readyState: v?.readyState ?? 0,
+      fromRect: from,
+    }
+    if (tapShowVideo) setStreamFadeShowVideo(true)
+
+    /** Card-hole poster only when inline was still on poster — flyout grows immediately like X. */
+    if (!tapShowVideo) revealInlinePosterForHero(slot)
+
     const host = ensureHeroBodyHost()
     snapFlyoutToHeroTile(flyout, host, from)
+
+    heroFrameShieldRef.current = null
+    if (tapShowVideo && v && v.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      heroFrameShieldRef.current = mountHeroFrameShield(flyout, v, from.width, from.height)
+    }
+
     setHeroLayout(from)
     setHeroPhase('opening')
     setHeroChromeVisible(false)
@@ -959,6 +1066,7 @@ export default function LoungePostStreamVideo({
     ensureHeroBodyHost,
     displayW,
     displayH,
+    streamFadeShowVideo,
   ])
 
   /** Bottom strip: coordinated tiles share provider mute; others toggle this tile only. */
@@ -1068,21 +1176,39 @@ export default function LoungePostStreamVideo({
     if (heroPhase !== 'opening' && heroPhase !== 'closing') return undefined
 
     setHeroTransitionArmed(false)
-    setHeroBackdropArmed(false)
+    if (heroPhase === 'opening') setHeroBackdropArmed(false)
 
-    let rafBackdrop = 0
+    let cancelled = false
+
+    const armBackdrop = () => {
+      if (!cancelled && heroPhaseRef.current === 'opening') setHeroBackdropArmed(true)
+    }
+
+    const armBackdropAfterFlyoutPaint = () => {
+      if (cancelled || heroPhaseRef.current !== 'opening') return
+      const v = videoRef.current
+      const flyout = videoFlyoutRef.current
+      const onPainted = () => {
+        if (cancelled) return
+        clearHeroFrameShield(flyout)
+        heroFrameShieldRef.current = null
+        armBackdrop()
+      }
+      afterHeroFlyoutPainted(v, onPainted)
+    }
+
     const raf = requestAnimationFrame(() => {
-      if (heroPhaseRef.current !== 'opening' && heroPhaseRef.current !== 'closing') return
+      if (cancelled || (heroPhaseRef.current !== 'opening' && heroPhaseRef.current !== 'closing')) return
       setHeroTransitionArmed(true)
       if (heroPhaseRef.current === 'opening') {
-        rafBackdrop = requestAnimationFrame(() => {
-          if (heroPhaseRef.current === 'opening') setHeroBackdropArmed(true)
+        requestAnimationFrame(() => {
+          if (!cancelled) armBackdropAfterFlyoutPaint()
         })
       }
     })
     return () => {
+      cancelled = true
       cancelAnimationFrame(raf)
-      if (rafBackdrop) cancelAnimationFrame(rafBackdrop)
     }
   }, [lightboxOpen, heroPhase])
 
@@ -1091,6 +1217,8 @@ export default function LoungePostStreamVideo({
     if (heroPhase !== 'opening' || heroChromeVisible) return undefined
     const tid = window.setTimeout(() => {
       if (heroPhaseRef.current !== 'opening') return
+      clearHeroFrameShield(videoFlyoutRef.current)
+      heroFrameShieldRef.current = null
       if (heroTargetRectRef.current) setHeroLayout(heroTargetRectRef.current)
       setHeroPhase('open')
       setHeroChromeVisible(true)
@@ -1105,6 +1233,8 @@ export default function LoungePostStreamVideo({
       if (e.target !== flyout || e.propertyName !== 'transform') return
       const phase = heroPhaseRef.current
       if (phase === 'opening') {
+        clearHeroFrameShield(videoFlyoutRef.current)
+        heroFrameShieldRef.current = null
         if (heroTargetRectRef.current) setHeroLayout(heroTargetRectRef.current)
         setHeroPhase('open')
         requestAnimationFrame(() => setHeroChromeVisible(true))
@@ -1424,13 +1554,17 @@ export default function LoungePostStreamVideo({
       : undefined
   const posterShellMinHClass =
     posterDecodeOk ? 'min-h-0' : hasDisplayDims ? 'min-h-0' : posterFrameMinH
+  const heroTapShowVideo = heroTapSnapshotRef.current?.showVideo
+  const effectiveStreamFadeShowVideo =
+    heroExpanded && heroTapSnapshotRef.current ? heroTapShowVideo : streamFadeShowVideo
   /** Same delay on poster + video keeps poster visible through transparent video until fade starts (reduces black flash). */
-  const streamFadeTransitionStyle = attachStream
-    ? {
-        transitionDuration: `${STREAM_ATTACH_FADE_MS}ms`,
-        transitionDelay: streamFadeShowVideo ? `${STREAM_POSTER_FADE_DELAY_MS}ms` : '0ms',
-      }
-    : undefined
+  const streamFadeTransitionStyle =
+    attachStream && !heroExpanded
+      ? {
+          transitionDuration: `${STREAM_ATTACH_FADE_MS}ms`,
+          transitionDelay: streamFadeShowVideo ? `${STREAM_POSTER_FADE_DELAY_MS}ms` : '0ms',
+        }
+      : undefined
   const heroAnimating =
     heroTransitionArmed && (heroPhase === 'opening' || heroPhase === 'closing')
   const heroTransformTransition = heroAnimating
@@ -1473,12 +1607,12 @@ export default function LoungePostStreamVideo({
       }
     : {}
   const inlineVideoOpacityClass =
-    heroExpanded || (attachStream && streamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
+    heroExpanded || (attachStream && effectiveStreamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
   const inlinePosterOpacityClass =
-    heroExpanded || !(attachStream && streamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
+    heroExpanded || !(attachStream && effectiveStreamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
   /** During HLS load poster sits above the flyout; during hero it stays behind (fills the card hole only). */
   const inlinePosterZClass =
-    !heroExpanded && attachStream && !streamFadeShowVideo ? 'z-[2]' : 'relative z-0'
+    !heroExpanded && attachStream && !effectiveStreamFadeShowVideo ? 'z-[2]' : 'relative z-0'
   const streamVideoClass = heroExpanded
     ? 'pointer-events-auto h-full w-full max-h-full max-w-full object-contain'
     : 'pointer-events-none h-full w-full object-contain'
