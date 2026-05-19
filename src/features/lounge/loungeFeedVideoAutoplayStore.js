@@ -109,6 +109,24 @@ export function createAutoplayStore() {
     }
 
     const candidateIds = new Set(candidates.map((c) => c.id))
+
+    /** Adjacent tiles with similar visibility: keep incumbent to avoid dual-play handoff glitches. */
+    if (
+      snapshot.winnerId &&
+      nextWinner &&
+      nextWinner !== snapshot.winnerId &&
+      candidateIds.has(snapshot.winnerId)
+    ) {
+      const prevC = candidates.find((c) => c.id === snapshot.winnerId)
+      const nextC = candidates.find((c) => c.id === nextWinner)
+      if (prevC && nextC) {
+        const minVis = Math.min(prevC.visiblePx, nextC.visiblePx)
+        if (minVis > 0 && Math.abs(prevC.visiblePx - nextC.visiblePx) / minVis < 0.2) {
+          nextWinner = snapshot.winnerId
+        }
+      }
+    }
+
     const prevWinnerStale = Boolean(snapshot.winnerId && !candidateIds.has(snapshot.winnerId))
     const winnerChanged = nextWinner !== snapshot.winnerId
 

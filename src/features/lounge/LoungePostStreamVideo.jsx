@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal, flushSync } from 'react-dom'
 import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoUpload'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
 import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
 import { releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
-import { notifyLoungeStreamLightboxOpen } from './loungeStreamLightboxRegistry.js'
+import {
+  getLoungeStreamLightboxOpen,
+  notifyLoungeStreamLightboxOpen,
+  subscribeLoungeStreamLightboxOpen,
+} from './loungeStreamLightboxRegistry.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 
 /** Keep in sync with `imgClassByVariant` in `LoungePostFeedMedia.jsx` (same caps; media sets frame width via w-auto). */
@@ -694,8 +698,14 @@ export default function LoungePostStreamVideo({
     toggleFeedInlineSound,
     restoreFeedInlineSound,
   } = useLoungeFeedVideoAutoplay(feedAutoplayClientId, getVideoContainer)
+  const anyStreamLightboxOpen = useSyncExternalStore(
+    subscribeLoungeStreamLightboxOpen,
+    getLoungeStreamLightboxOpen,
+    () => false,
+  )
   /** Inside `LoungeFeedVideoAutoplayProvider` with a client id: one shared “Tap for sound” for the scroll surface. */
   const coordinatedInlineSound = coordinatorActive
+  isWinnerRef.current = feedAutoplayEnabled && (!coordinatorActive || isWinner)
   const [localStripSoundUnmuted, setLocalStripSoundUnmuted] = useState(false)
   const [localStripSoundExplicitlyMuted, setLocalStripSoundExplicitlyMuted] = useState(false)
   const stripSoundUnmuted = coordinatedInlineSound ? feedInlineSoundUnmuted : localStripSoundUnmuted
@@ -754,15 +764,54 @@ export default function LoungePostStreamVideo({
 
   useEffect(() => () => releaseHeroBodyHost(), [releaseHeroBodyHost])
 
-  useEffect(() => {
-    isWinnerRef.current = feedAutoplayEnabled && (!coordinatorActive || isWinner)
-  }, [coordinatorActive, isWinner, feedAutoplayEnabled])
+  /** Pause inline feed tiles while another Stream hero is open; keep losers muted when sound is on. */
+  useLayoutEffect(() => {
+    if (!showOpen) return
+    const v = videoRef.current
+    if (!v) return
+    const isHeroTile = lightboxOpenRef.current
+    if (anyStreamLightboxOpen && !isHeroTile) {
+      try {
+        v.pause()
+        v.muted = true
+      } catch {
+        // ignore
+      }
+      return
+    }
+    if (!coordinatorActive || !lazyStream) return
+    if (isHeroTile) return
+    if (isWinner) return
+    try {
+      v.pause()
+      if (coordinatedInlineSound) v.muted = true
+    } catch {
+      // ignore
+    }
+  }, [
+    anyStreamLightboxOpen,
+    coordinatorActive,
+    coordinatedInlineSound,
+    isWinner,
+    lazyStream,
+    showOpen,
+    lightboxOpen,
+  ])
 
   /** Keep inline `<video>` muted in sync with shared provider sound (winner only when coordinated). */
   useEffect(() => {
     if (!coordinatedInlineSound) return
     const v = videoRef.current
     if (!v || lightboxOpenRef.current) return
+    if (anyStreamLightboxOpen && !lightboxOpenRef.current) {
+      try {
+        v.pause()
+        v.muted = true
+      } catch {
+        // ignore
+      }
+      return
+    }
     try {
       v.muted = !feedInlineSoundUnmuted
       if (feedInlineSoundUnmuted && attachStream && isWinner) {
@@ -772,7 +821,14 @@ export default function LoungePostStreamVideo({
     } catch {
       // ignore
     }
-  }, [coordinatedInlineSound, attachStream, feedInlineSoundUnmuted, streamAttachKey, isWinner])
+  }, [
+    coordinatedInlineSound,
+    attachStream,
+    feedInlineSoundUnmuted,
+    streamAttachKey,
+    isWinner,
+    anyStreamLightboxOpen,
+  ])
 
   useEffect(() => {
     if (!streamInView && lazyStream) recoveryBurstRef.current = 0
@@ -1068,7 +1124,8 @@ export default function LoungePostStreamVideo({
     setHeroChromeVisible(false)
     setHeroTransitionArmed(false)
     setHeroBackdropArmed(false)
-    setLightboxOpen(true)
+    notifyLoungeStreamLightboxOpen(true)
+    flushSync(() => setLightboxOpen(true))
 
     if (feedAutoplayEnabled && v) {
       const explicitlyMuted = coordinatedInlineSound
@@ -1081,9 +1138,7 @@ export default function LoungePostStreamVideo({
       }
       if (!explicitlyMuted) {
         try {
-          if (coordinatedInlineSound) {
-            if (!feedInlineSoundUnmuted) toggleFeedInlineSound()
-          } else {
+          if (!coordinatedInlineSound) {
             setLocalStripSoundUnmuted(true)
             setLocalStripSoundExplicitlyMuted(false)
           }
@@ -1120,8 +1175,6 @@ export default function LoungePostStreamVideo({
     feedInlineSoundExplicitlyMuted,
     localStripSoundExplicitlyMuted,
     stripSoundUnmuted,
-    feedInlineSoundUnmuted,
-    toggleFeedInlineSound,
     ensureHeroBodyHost,
     displayW,
     displayH,
@@ -1211,7 +1264,6 @@ export default function LoungePostStreamVideo({
 
   useEffect(() => {
     if (!lightboxOpen || !enableLightbox) return undefined
-    notifyLoungeStreamLightboxOpen(true)
     return () => notifyLoungeStreamLightboxOpen(false)
   }, [lightboxOpen, enableLightbox])
 
@@ -1419,7 +1471,8 @@ export default function LoungePostStreamVideo({
     if (!v) return undefined
     let cleaned = false
     const go = () => {
-      if (lightboxOpenRef.current) return
+      if (anyStreamLightboxOpen && !lightboxOpenRef.current) return
+      if (coordinatorActive && !isWinnerRef.current) return
       try {
         v.muted = coordinatedInlineSound ? !feedInlineSoundUnmuted : true
         const p = v.play()
@@ -1456,6 +1509,7 @@ export default function LoungePostStreamVideo({
     isWinner,
     coordinatedInlineSound,
     feedInlineSoundUnmuted,
+    anyStreamLightboxOpen,
   ])
 
   /** Hero / lightbox open: ensure the same inline `<video>` keeps playing once HLS attaches (autoplay-off path). */
@@ -1511,21 +1565,8 @@ export default function LoungePostStreamVideo({
     feedInlineSoundUnmuted,
     localStripSoundUnmuted,
     feedAutoplayEnabled,
+    anyStreamLightboxOpen,
   ])
-
-  /** Coordinator handoff: pause immediately when another tile wins mid-scroll. */
-  useEffect(() => {
-    if (!coordinatorActive || !lazyStream) return
-    if (lightboxOpenRef.current) return
-    const v = videoRef.current
-    if (!v) return
-    if (isWinner) return
-    try {
-      v.pause()
-    } catch {
-      // ignore
-    }
-  }, [coordinatorActive, lazyStream, isWinner, lightboxOpen])
 
   const onInlineStreamError = useCallback(() => {
     if (recoveryBurstRef.current < 2) {
