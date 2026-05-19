@@ -91,10 +91,9 @@ const STREAM_POSTER_FADE_DELAY_MS = 72
 /** If decode signals never fire, still unstick poster→video crossfade (rare HLS/Safari quirks). Intentionally long so we do not beat real decode and flash black. */
 const STREAM_FADE_LAST_RESORT_MS = 6500
 
-/** Feed tile → hero full-screen grow (same `<video>`, no second HLS attach). */
-const HERO_EXPAND_MS = 380
-/** Hero → feed tile shrink (reverse flyout); slightly slower so dismiss reads clearly. */
-const HERO_SHRINK_MS = 560
+/** Feed tile ↔ hero full-screen FLIP (same `<video>`, no second HLS attach). */
+const HERO_EXPAND_MS = 750
+const HERO_SHRINK_MS = 750
 /** GPU transform FLIP — gentler start than width/top tweens on mobile. */
 const HERO_MOTION_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const HERO_MOTION_TRANSITION = `${HERO_EXPAND_MS}ms ${HERO_MOTION_CURVE}`
