@@ -104,7 +104,8 @@ export function useLoungeLightboxSwipeDismiss({
         }
       : undefined
 
-  const touchClass = dragging ? 'touch-none' : 'touch-pan-y'
+  /** Video lightbox: keep touch-action none so vertical dismiss is not eaten by pan-y. */
+  const touchClass = dragging || allowSwipeOnVideo ? 'touch-none' : 'touch-pan-y'
   const mergedClass = [className, touchClass].filter(Boolean).join(' ')
 
   return {

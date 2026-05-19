@@ -963,6 +963,21 @@ export default function LoungePostStreamVideo({
     [mediaLightboxFooter, closeLightbox],
   )
 
+  const toggleHeroVideoPlayPause = useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    try {
+      if (v.paused) {
+        const p = v.play()
+        if (p && typeof p.catch === 'function') p.catch(() => {})
+      } else {
+        v.pause()
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const openLightbox = useCallback(() => {
     if (lightboxOpenRef.current) return
     lightboxOpenRef.current = true
@@ -1596,7 +1611,7 @@ export default function LoungePostStreamVideo({
         }
       : undefined
   const heroFlyoutShellClass = heroExpanded
-    ? `overflow-hidden touch-manipulation ${heroPhase === 'opening' ? 'bg-transparent' : 'bg-black'} ${heroSwipeTouchClass || ''}`.trim()
+    ? `overflow-hidden ${heroPhase === 'opening' ? 'bg-transparent' : 'bg-black'} ${heroSwipeTouchClass || 'touch-none'}`.trim()
     : 'absolute inset-0 z-[1] h-full w-full overflow-hidden bg-transparent'
   const heroFlyoutPointerProps = heroExpanded
     ? {
@@ -1604,6 +1619,11 @@ export default function LoungePostStreamVideo({
         onPointerMove: heroSwipePointerMove,
         onPointerUp: heroSwipePointerUp,
         onPointerCancel: heroSwipePointerCancel,
+        onClick: (e) => {
+          if (heroPhase !== 'open') return
+          e.stopPropagation()
+          toggleHeroVideoPlayPause()
+        },
       }
     : {}
   const inlineVideoOpacityClass =
@@ -1613,8 +1633,9 @@ export default function LoungePostStreamVideo({
   /** During HLS load poster sits above the flyout; during hero it stays behind (fills the card hole only). */
   const inlinePosterZClass =
     !heroExpanded && attachStream && !effectiveStreamFadeShowVideo ? 'z-[2]' : 'relative z-0'
+  /** Hero: touches on the flyout shell (swipe dismiss); video stays paint-only so iOS does not steal gestures. */
   const streamVideoClass = heroExpanded
-    ? 'pointer-events-auto h-full w-full max-h-full max-w-full object-contain'
+    ? 'pointer-events-none h-full w-full max-h-full max-w-full object-contain'
     : 'pointer-events-none h-full w-full object-contain'
 
   const heroBackdropAnimating =
@@ -1644,22 +1665,6 @@ export default function LoungePostStreamVideo({
       poster={visiblePosterSrc || poster}
       aria-label={heroExpanded ? 'Post video (full screen)' : undefined}
       aria-hidden={!heroExpanded}
-      onClick={(e) => {
-        if (!heroExpanded) return
-        e.stopPropagation()
-        const v = videoRef.current
-        if (!v) return
-        try {
-          if (v.paused) {
-            const p = v.play()
-            if (p && typeof p.catch === 'function') p.catch(() => {})
-          } else {
-            v.pause()
-          }
-        } catch {
-          // ignore
-        }
-      }}
       onError={onInlineStreamError}
     />
   )
