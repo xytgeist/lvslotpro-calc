@@ -240,9 +240,9 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Change: **`loungeFeedVideoAutoplayStore.js`** — `{prev, active, next}` ring (max **3** HLS decoders), **centerline handoff** (challenger midpoint crosses scroll-column center) + clip fallbacks, flinger idle **200ms**, **`enterHeroLock`** / **`exitHeroLock`**, **`setCoordinatorSuspended`** when post detail open. **`LoungeFeedVideoAutoplayContext.jsx`** — feed-wide sound mode + visibility 60%/40% bands. **`LoungePostStreamVideo.jsx`** — ring attach/play FSM, hero opens with lock + sound on. **`SocialFeed.jsx`** — **`LoungeFeedCoordinatorSuspendBinder`**.
   - Test validation: scroll — first-pixel muted play; handoff pauses (holds time); sound only after Tap for sound + 60% visible; hero expand → only hero decoder, flyout smooth; close hero → feed resumes; open post detail → feed ring suspended. Ryan sign-off **good enough for now** on **test** @ **`dbd4fa1`** (2026-05-18).
 
-- [ ] Lounge **feed video perf diet** (test — after **`7dbbec7`** hero/staging work)
+- [x] Lounge **feed video perf diet** (test — after **`7dbbec7`** hero/staging work)
   - Change: **`loungeFeedVideoAutoplayStore.js`** — **winner-only** HLS (removed multi-tile staging band / play-pause prime on up to 24 neighbors). **`LoungePostStreamVideo.jsx`** — **`pinInlinePosterBehindFlyout`** on hero tap so poster stays **behind** flyout (not z-[2] above video). **`AppShell.jsx`** — **`COMMUNITY_FEED_PAGE_SIZE = 28`** (was 40).
-  - Test validation: scroll feed 30s on phone — no stutter/heat vs prior deploy; one autoplay winner; tap playing tile → hero grow without poster-on-top flash; load-more adds **28** rows. Ryan sign-off **pending**.
+  - Test validation: scroll feed 30s on phone — no stutter/heat vs prior deploy; one autoplay winner; tap playing tile → hero grow without poster-on-top flash; load-more adds **28** rows. Ryan sign-off **PASSED** on **test** @ **`dbd4fa1`** (2026-05-18).
 
 - [x] Lounge **Stream hero expand + prefetch staging** (test / branch `test`, commits **`4cba1e5`** → **`7dbbec7`**)
   - Change: **`LoungePostStreamVideo.jsx`** — X-style **hero expand**: same `<video>` reparents to `body`, **GPU transform FLIP** from **`readHeroMediaViewportRect`**; tap snapshot freezes poster→video fade; **canvas frame shield** + **rVFC** before scrim arms; card-hole poster behind flyout; vertical **swipe dismiss** restored on flyout shell (`loungeLightboxSwipeDismiss.js` **`touch-none`** when **`allowSwipeOnVideo`**). **`loungeFeedVideoAutoplayStore.js`** — **prefetch-band staging** (winner plays; up to **24** neighbors attach HLS paused). **`AppShell.jsx`** — **`COMMUNITY_FEED_PAGE_SIZE = 40`**.
@@ -294,6 +294,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - **Sign-off (video submit queue + parallel prep, 2026-05-18, Ryan):** Smoke **§15** **PASSED** on **test** (`57eaca2`); async two-video test + DevTools two-mint/two-tus lanes; fast-lane mixed stack; profile likes re-like.
   - **Sign-off (Stream poster + dims, 2026-05-17, Ryan):** Extended checklist (session items **2–13**): all **PASSED** on **test**; SQL **`lounge_feed_post_stream_video.sql`** (including **`stream_poster_url`**, **`stream_video_width`**, **`stream_video_height`**) applied on the test Supabase project.
   - **Sign-off (Lounge Stream autoplay + detail overlay, 2026-05-18, Ryan):** Feed handoff pause frame, profile Posts autoplay, comment/detail HLS + lightbox, background audio stop on post/comment detail open — **good enough for now** on **test** @ **`dbd4fa1`** (iPhone PWA).
+  - **Sign-off (feed video perf diet, 2026-05-18, Ryan):** 30s feed scroll (smooth, one winner), hero tap without poster-on-top flash, load-more **28** rows — **PASSED** on **test** @ **`dbd4fa1`**.
   - Production replay: same ordered pass on production after deploy.
 
 - [ ] Final pre-prod gate
@@ -303,6 +304,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ---
 
 ## Update log
+
+- 2026-05-18: **Lounge Stream autoplay hardening (test sign-off, Ryan — good enough for now @ `dbd4fa1`):** Comment/detail black lightbox + iOS HLS decoder budget (`hlsAttachEnabled`); feed handoff pause-frame regression fix; profile Posts/Likes/Bookmarks **`LoungeFeedVideoAutoplayProvider`**; **`pauseAllLoungeStreamInlineVideos`** + **`coordinatorSuspended`** pause/mute on post/comment detail open; Settings **Video debug HUD** toggle. Commits **`718d014`** → **`dbd4fa1`**.
 
 - 2026-05-18: **Centerline handoff (test):** primary active swap when next/prev Stream tile **midpoint crosses scroll-column center**; clip thresholds remain fallback. **`loungeFeedVideoAutoplayStore.js`**.
 
