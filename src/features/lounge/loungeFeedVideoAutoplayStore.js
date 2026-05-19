@@ -267,41 +267,76 @@ export function createAutoplayStore() {
     return null
   }
 
-  const resolveActiveId = (orderedIds, ratios, centerYs, midY, incumbent) => {
-    const bestCenter = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY)
-    let next = incumbent
+  const pickFirstVisible = (orderedIds, ratios) =>
+    orderedIds.find((id) => (ratios[id] ?? 0) > 0) ?? null
 
-    if (!next) {
-      return bestCenter ?? orderedIds.find((id) => (ratios[id] ?? 0) > 0) ?? null
+  /**
+   * Up to three ids allowed HLS attach: active + visible tiles nearest center (+ feed neighbors when room).
+   * Avoids deep-feed stalls where active stays on a clipped predecessor and later visible tiles miss the ring.
+   */
+  const buildRingIds = (orderedIds, ratios, centerYs, midY, active, maxCount) => {
+    if (!active) return []
+    /** @type {Set<string>} */
+    const pickSet = new Set([active])
+
+    const visible = orderedIds.filter((id) => (ratios[id] ?? 0) > 0)
+    const byNearCenter = visible
+      .map((id) => ({
+        id,
+        dist: Math.abs((centerYs[id] ?? 0) - midY),
+        idx: orderedIds.indexOf(id),
+      }))
+      .sort((a, b) => a.dist - b.dist || a.idx - b.idx)
+
+    for (const row of byNearCenter) {
+      if (pickSet.size >= maxCount) break
+      pickSet.add(row.id)
     }
 
+    const idx = orderedIds.indexOf(active)
+    if (idx >= 0) {
+      if (pickSet.size < maxCount && idx > 0) pickSet.add(orderedIds[idx - 1])
+      if (pickSet.size < maxCount && idx < orderedIds.length - 1) pickSet.add(orderedIds[idx + 1])
+    }
+
+    return orderedIds.filter((id) => pickSet.has(id))
+  }
+
+  const resolveActiveId = (orderedIds, ratios, centerYs, midY, incumbent, { flinger }) => {
+    const bestCenter = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY)
+    const pickVisibleFallback = () => bestCenter ?? pickFirstVisible(orderedIds, ratios)
+
+    let next = incumbent
+    if (next && !orderedIds.includes(next)) next = null
+
+    if (!next) return pickVisibleFallback()
+
+    const incRatio = ratios[next] ?? 0
+    if (incRatio <= 0) return pickVisibleFallback()
+    if (incRatio <= LOUNGE_VIDEO_ACTIVE_RELEASE_RATIO) return pickVisibleFallback()
+
     if (bestCenter && bestCenter !== next) {
-      const incRatio = ratios[next] ?? 0
       const incIdx = orderedIds.indexOf(next)
       const bestIdx = orderedIds.indexOf(bestCenter)
-
-      if (incRatio <= LOUNGE_VIDEO_ACTIVE_RELEASE_RATIO) {
-        return bestCenter
-      }
+      const incDist = Math.abs((centerYs[next] ?? 0) - midY)
+      const bestDist = Math.abs((centerYs[bestCenter] ?? 0) - midY)
 
       const centerTakeover = pickCenterCrossTakeover(next, orderedIds, ratios, centerYs, midY, scrollDirection)
       const clipTakeover = centerTakeover ? null : pickClipTakeover(next, orderedIds, ratios)
       const thresholdTakeover = centerTakeover ?? clipTakeover
       if (thresholdTakeover) return thresholdTakeover
 
-      if (incRatio <= LOUNGE_VIDEO_ACTIVE_SCROLL_CONTEST_MAX && incIdx >= 0 && bestIdx >= 0) {
-        const scrollingToNext = scrollDirection > 0 && bestIdx > incIdx
-        const scrollingToPrev = scrollDirection < 0 && bestIdx < incIdx
-        const scrollIdlePick =
-          scrollDirection === 0 &&
-          Math.abs((centerYs[bestCenter] ?? 0) - midY) <
-            Math.abs((centerYs[next] ?? 0) - midY) - 10
-        if (scrollingToNext || scrollingToPrev || scrollIdlePick) return bestCenter
+      if (flinger || scrollDirection !== 0) {
+        if (incRatio <= LOUNGE_VIDEO_ACTIVE_SCROLL_CONTEST_MAX && incIdx >= 0 && bestIdx >= 0) {
+          const scrollingToNext = scrollDirection > 0 && bestIdx > incIdx
+          const scrollingToPrev = scrollDirection < 0 && bestIdx < incIdx
+          if (scrollingToNext || scrollingToPrev) return bestCenter
+        }
+        if (bestDist + 12 < incDist) return bestCenter
+        return next
       }
-    }
 
-    if ((ratios[next] ?? 0) <= 0) {
-      return bestCenter ?? null
+      if (bestDist + 4 < incDist) return bestCenter
     }
 
     return next
@@ -320,7 +355,7 @@ export function createAutoplayStore() {
       prefetchPrevId = null
       prefetchNextId = null
     } else if (!coordinatorSuspended) {
-      nextActive = resolveActiveId(orderedIds, ratios, centerYs, midY, nextActive)
+      nextActive = resolveActiveId(orderedIds, ratios, centerYs, midY, nextActive, { flinger: flingerMode })
 
       if (nextActive) {
         const idx = orderedIds.indexOf(nextActive)
@@ -328,12 +363,16 @@ export function createAutoplayStore() {
           prefetchPrevId = idx > 0 ? orderedIds[idx - 1] : null
           prefetchNextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null
           if (flingerMode) {
-            /** Fling: active + one leading visible successor/predecessor — warm HLS before handoff. */
+            /** Fling: active + visible/center neighbors (max 2) — warm HLS before handoff. */
             const lead = pickLeadingVisibleInFeed(orderedIds, ratios, idx, scrollDirection)
-            ringIds =
-              lead && lead !== nextActive ? [nextActive, lead] : [nextActive]
+            const flingerRing = buildRingIds(orderedIds, ratios, centerYs, midY, nextActive, 2)
+            if (lead && lead !== nextActive && !flingerRing.includes(lead)) {
+              ringIds = [nextActive, lead]
+            } else {
+              ringIds = flingerRing
+            }
           } else {
-            ringIds = [prefetchPrevId, nextActive, prefetchNextId].filter(Boolean)
+            ringIds = buildRingIds(orderedIds, ratios, centerYs, midY, nextActive, 3)
           }
         }
       }
