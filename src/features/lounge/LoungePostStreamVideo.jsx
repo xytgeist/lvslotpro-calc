@@ -80,6 +80,11 @@ const STREAM_FADE_LAST_RESORT_MS = 6500
 
 /** Feed tile → hero full-screen grow (same `<video>`, no second HLS attach). */
 const HERO_EXPAND_MS = 300
+/** Shared easing for flyout geometry + scrim opacity (match X: one motion). */
+const HERO_MOTION_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+const HERO_MOTION_TRANSITION = `${HERO_EXPAND_MS}ms ${HERO_MOTION_CURVE}`
+/** Lightbox chrome fades in only after the flyout lands. */
+const HERO_CHROME_FADE_MS = 220
 
 /** @returns {{ top: number, left: number, width: number, height: number }} */
 function readElementViewportRect(el) {
@@ -958,27 +963,28 @@ export default function LoungePostStreamVideo({
     setHeroTransitionArmed(false)
     setHeroLayout(from)
     let raf2 = 0
-    let raf3 = 0
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
+        if (heroPhaseRef.current !== 'opening') return
+        /** One commit: scrim opacity + flyout geometry start the same frame. */
         setHeroTransitionArmed(true)
-        raf3 = requestAnimationFrame(() => {
-          if (heroPhaseRef.current !== 'opening') return
-          setHeroLayout(computeHeroTargetRect(from))
-          setHeroPhase('open')
-        })
+        setHeroLayout(computeHeroTargetRect(from))
       })
     })
     return () => {
       cancelAnimationFrame(raf1)
       if (raf2) cancelAnimationFrame(raf2)
-      if (raf3) cancelAnimationFrame(raf3)
     }
   }, [lightboxOpen, heroPhase])
 
+  /** iOS sometimes skips `transitionend` on width — ensure chrome still appears after land. */
   useEffect(() => {
-    if (heroPhase !== 'open' || heroChromeVisible) return undefined
-    const tid = window.setTimeout(() => setHeroChromeVisible(true), HERO_EXPAND_MS + 48)
+    if (heroPhase !== 'opening' || heroChromeVisible) return undefined
+    const tid = window.setTimeout(() => {
+      if (heroPhaseRef.current !== 'opening') return
+      setHeroPhase('open')
+      setHeroChromeVisible(true)
+    }, HERO_EXPAND_MS + 96)
     return () => window.clearTimeout(tid)
   }, [heroPhase, heroChromeVisible])
 
@@ -988,8 +994,9 @@ export default function LoungePostStreamVideo({
     const onTransitionEnd = (e) => {
       if (e.target !== flyout || e.propertyName !== 'width') return
       const phase = heroPhaseRef.current
-      if (phase === 'open') {
-        setHeroChromeVisible(true)
+      if (phase === 'opening') {
+        setHeroPhase('open')
+        requestAnimationFrame(() => setHeroChromeVisible(true))
       }
       if (phase === 'closing') {
         const snap = inlineFeedSoundSnapshotRef.current
@@ -1256,10 +1263,11 @@ export default function LoungePostStreamVideo({
         transitionDelay: streamFadeShowVideo ? `${STREAM_POSTER_FADE_DELAY_MS}ms` : '0ms',
       }
     : undefined
-  const heroTransitionCss =
-    heroTransitionArmed && (heroPhase === 'open' || heroPhase === 'closing')
-      ? `top ${HERO_EXPAND_MS}ms cubic-bezier(0.22, 1, 0.36, 1), left ${HERO_EXPAND_MS}ms cubic-bezier(0.22, 1, 0.36, 1), width ${HERO_EXPAND_MS}ms cubic-bezier(0.22, 1, 0.36, 1), height ${HERO_EXPAND_MS}ms cubic-bezier(0.22, 1, 0.36, 1), border-radius ${HERO_EXPAND_MS}ms ease-out`
-      : 'none'
+  const heroAnimating =
+    heroTransitionArmed && (heroPhase === 'opening' || heroPhase === 'closing')
+  const heroTransitionCss = heroAnimating
+    ? `top ${HERO_MOTION_TRANSITION}, left ${HERO_MOTION_TRANSITION}, width ${HERO_MOTION_TRANSITION}, height ${HERO_MOTION_TRANSITION}, border-radius ${HERO_MOTION_TRANSITION}`
+    : 'none'
   const heroFlyoutStyle =
     heroExpanded && heroLayout
       ? {
@@ -1299,17 +1307,17 @@ export default function LoungePostStreamVideo({
     ? 'pointer-events-auto h-full w-full max-h-full max-w-full object-contain'
     : 'pointer-events-none h-full w-full object-contain'
 
-  const heroBackdropTransitionCss =
-    heroTransitionArmed || heroPhase === 'closing'
-      ? `opacity ${HERO_EXPAND_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
-      : 'none'
+  const heroBackdropTransitionCss = heroAnimating ? `opacity ${HERO_MOTION_TRANSITION}` : 'none'
   const heroBackdropOpacityClass =
     heroPhase === 'closing'
       ? 'opacity-0'
-      : heroTransitionArmed && (heroPhase === 'opening' || heroPhase === 'open')
+      : heroAnimating || heroPhase === 'open'
         ? 'opacity-100'
         : 'opacity-0'
   const heroBackdropInteractive = heroPhase === 'open' || heroPhase === 'closing'
+  const heroChromeFadeStyle = {
+    transition: `opacity ${HERO_CHROME_FADE_MS}ms ease-out`,
+  }
   const streamVideoEl = (
     <video
       ref={videoRef}
@@ -1512,9 +1520,10 @@ export default function LoungePostStreamVideo({
               />
               <div className="pointer-events-none fixed inset-0 flex flex-col">
                 <div
-                  className={`pointer-events-auto flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))] transition-opacity duration-200 ${
-                    heroChromeVisible ? 'opacity-100' : 'opacity-0'
+                  className={`flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
+                    heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                   }`}
+                  style={heroChromeFadeStyle}
                   data-lounge-lightbox-no-swipe
                 >
                   <button
@@ -1528,12 +1537,15 @@ export default function LoungePostStreamVideo({
                     Close
                   </button>
                 </div>
-                {mediaLightboxFooterMerged && heroChromeVisible ? (
+                {mediaLightboxFooterMerged ? (
                   <div
-                    className="pointer-events-auto mt-auto shrink-0 border-t border-zinc-700/50 bg-black px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
+                    className={`mt-auto shrink-0 border-t border-zinc-700/50 bg-black px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 ${
+                      heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+                    }`}
+                    style={heroChromeFadeStyle}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {mediaLightboxFooterMerged}
+                    {heroChromeVisible ? mediaLightboxFooterMerged : null}
                   </div>
                 ) : null}
               </div>
