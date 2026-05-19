@@ -149,7 +149,7 @@ function clearFlyoutHeroInlineStyles(flyout) {
   flyout.style.borderRadius = ''
 }
 
-/** X-style: poster fills the in-card hole while the flyout grows on body (avoids black first frame). */
+/** X-style: in-card poster fills the feed hole while the flyout grows on body. */
 function revealInlinePosterForHero(slot) {
   if (!slot) return
   const img = slot.querySelector('img')
@@ -164,52 +164,6 @@ function clearInlinePosterHeroStyles(slot) {
   if (!(img instanceof HTMLImageElement)) return
   img.style.transition = ''
   img.style.opacity = ''
-}
-
-const HERO_FLYOUT_POSTER_SEL = '[data-lounge-hero-flyout-poster]'
-const HERO_FLYOUT_POSTER_SHIELD_SEL = '[data-lounge-flyout-poster-shield]'
-
-/** Preloaded shield (opacity-0 while inline video plays) — flip visible before any reparent. */
-function showFlyoutPosterShield(flyout, posterSrc) {
-  if (!flyout) return
-  const shield = flyout.querySelector(HERO_FLYOUT_POSTER_SHIELD_SEL)
-  if (shield instanceof HTMLImageElement) {
-    shield.style.transition = 'none'
-    shield.style.opacity = '1'
-    return
-  }
-  ensureFlyoutPosterCover(flyout, posterSrc)
-}
-
-function clearFlyoutPosterShield(flyout) {
-  if (!flyout) return
-  const shield = flyout.querySelector(HERO_FLYOUT_POSTER_SHIELD_SEL)
-  if (!(shield instanceof HTMLImageElement)) return
-  shield.style.transition = ''
-  shield.style.opacity = ''
-}
-
-/** Covers the flyout while `<video>` reparents — tile-sized fixed layer matches what the user sees on frame 1. */
-function ensureFlyoutPosterCover(flyout, src) {
-  if (!flyout || !src) return
-  let img = flyout.querySelector(HERO_FLYOUT_POSTER_SEL)
-  if (!img) {
-    img = document.createElement('img')
-    img.dataset.loungeHeroFlyoutPoster = '1'
-    img.alt = ''
-    img.draggable = false
-    img.decoding = 'sync'
-    img.className = 'pointer-events-none absolute inset-0 z-[2] h-full w-full object-contain'
-    flyout.insertBefore(img, flyout.firstChild)
-  }
-  if (img.getAttribute('src') !== src) img.setAttribute('src', src)
-  img.style.transition = 'none'
-  img.style.opacity = '1'
-}
-
-function clearFlyoutPosterCover(flyout) {
-  if (!flyout) return
-  flyout.querySelector(HERO_FLYOUT_POSTER_SEL)?.remove()
 }
 
 /**
@@ -432,7 +386,6 @@ export default function LoungePostStreamVideo({
   const inlineFeedSoundSnapshotRef = useRef(
     /** @type {{ unmuted: boolean, explicitlyMuted: boolean, coordinated: boolean } | null} */ (null),
   )
-  const heroOpenDeferRafRef = useRef(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   /** @type {'idle' | 'opening' | 'open' | 'closing'} */
   const [heroPhase, setHeroPhase] = useState('idle')
@@ -444,8 +397,6 @@ export default function LoungePostStreamVideo({
   const [heroTransitionArmed, setHeroTransitionArmed] = useState(false)
   /** Scrim opacity starts one frame after flyout motion on open (feed stays crisp on frame 1). */
   const [heroBackdropArmed, setHeroBackdropArmed] = useState(false)
-  /** Poster over flyout `<video>` during opening — Safari can flash black when the node reparents to body. */
-  const [heroFlyoutPosterVisible, setHeroFlyoutPosterVisible] = useState(false)
   const [streamAttachKey, setStreamAttachKey] = useState(0)
   const [showStreamRetry, setShowStreamRetry] = useState(false)
   const [streamInView, setStreamInView] = useState(false)
@@ -479,8 +430,6 @@ export default function LoungePostStreamVideo({
     if (!cfPosterActive && sessionPosterUrl) return sessionPosterUrl
     return posterDisplayUrl
   }, [hasPersistedPoster, persistedPosterTrim, cfPosterActive, sessionPosterUrl, posterDisplayUrl])
-  const visiblePosterSrcRef = useRef(visiblePosterSrc)
-  visiblePosterSrcRef.current = visiblePosterSrc
 
   const showOpen = enableLightbox && variant !== 'composer'
   const heroExpanded = lightboxOpen && heroPhase !== 'idle'
@@ -644,16 +593,6 @@ export default function LoungePostStreamVideo({
 
   useEffect(() => () => releaseHeroBodyHost(), [releaseHeroBodyHost])
 
-  useEffect(
-    () => () => {
-      if (heroOpenDeferRafRef.current) {
-        cancelAnimationFrame(heroOpenDeferRafRef.current)
-        heroOpenDeferRafRef.current = 0
-      }
-    },
-    [],
-  )
-
   useEffect(() => {
     isWinnerRef.current = feedAutoplayEnabled && (!coordinatorActive || isWinner)
   }, [coordinatorActive, isWinner, feedAutoplayEnabled])
@@ -808,13 +747,6 @@ export default function LoungePostStreamVideo({
   }, [attachStream, poster, id, streamAttachKey])
 
   const finalizeHeroClose = useCallback(() => {
-    if (heroOpenDeferRafRef.current) {
-      cancelAnimationFrame(heroOpenDeferRafRef.current)
-      heroOpenDeferRafRef.current = 0
-    }
-    clearFlyoutPosterCover(videoFlyoutRef.current)
-    clearFlyoutPosterShield(videoFlyoutRef.current)
-    setHeroFlyoutPosterVisible(false)
     setLightboxOpen(false)
     setHeroPhase('idle')
     setHeroLayout(null)
@@ -882,11 +814,17 @@ export default function LoungePostStreamVideo({
     if (!wrap) return
     const from = readElementViewportRect(slot || flyout || wrap)
     heroFromRectRef.current = from
-    const posterSrc = visiblePosterSrcRef.current || poster
 
-    /** Cover playing inline video before sound/reparent — in-card poster must win over HLS black flash. */
-    showFlyoutPosterShield(flyout, posterSrc)
+    /** Card-hole poster only — flyout (same `<video>`) snaps + grows immediately like X. */
     revealInlinePosterForHero(slot)
+    const host = ensureHeroBodyHost()
+    snapFlyoutToHeroRect(flyout, host, from)
+    setHeroLayout(from)
+    setHeroPhase('opening')
+    setHeroChromeVisible(false)
+    setHeroTransitionArmed(false)
+    setHeroBackdropArmed(false)
+    setLightboxOpen(true)
 
     if (feedAutoplayEnabled && v) {
       const explicitlyMuted = coordinatedInlineSound
@@ -931,22 +869,6 @@ export default function LoungePostStreamVideo({
         }
       }
     }
-
-    if (heroOpenDeferRafRef.current) cancelAnimationFrame(heroOpenDeferRafRef.current)
-    heroOpenDeferRafRef.current = requestAnimationFrame(() => {
-      heroOpenDeferRafRef.current = 0
-      if (lightboxOpenRef.current) return
-      ensureFlyoutPosterCover(flyout, posterSrc)
-      setHeroFlyoutPosterVisible(true)
-      const host = ensureHeroBodyHost()
-      snapFlyoutToHeroRect(flyout, host, from)
-      setHeroLayout(from)
-      setHeroPhase('opening')
-      setHeroChromeVisible(false)
-      setHeroTransitionArmed(false)
-      setHeroBackdropArmed(false)
-      setLightboxOpen(true)
-    })
   }, [
     feedAutoplayEnabled,
     attachStream,
@@ -957,7 +879,6 @@ export default function LoungePostStreamVideo({
     feedInlineSoundUnmuted,
     toggleFeedInlineSound,
     ensureHeroBodyHost,
-    poster,
   ])
 
   /** Bottom strip: coordinated tiles share provider mute; others toggle this tile only. */
@@ -1063,19 +984,6 @@ export default function LoungePostStreamVideo({
 
   /** Hero open: snap to tile rect (no transition), then grow to target on `document.body`. */
   useLayoutEffect(() => {
-    if (!lightboxOpen || heroPhase === 'idle') {
-      clearFlyoutPosterCover(videoFlyoutRef.current)
-      return undefined
-    }
-    if (heroPhase === 'opening' || (heroPhase === 'open' && heroFlyoutPosterVisible)) {
-      ensureFlyoutPosterCover(videoFlyoutRef.current, visiblePosterSrcRef.current || poster)
-    } else {
-      clearFlyoutPosterCover(videoFlyoutRef.current)
-    }
-    return undefined
-  }, [lightboxOpen, heroPhase, heroFlyoutPosterVisible, poster])
-
-  useLayoutEffect(() => {
     if (!lightboxOpen || heroPhase !== 'opening') return undefined
     const from = heroFromRectRef.current
     if (!from) return undefined
@@ -1101,47 +1009,6 @@ export default function LoungePostStreamVideo({
       if (raf3) cancelAnimationFrame(raf3)
     }
   }, [lightboxOpen, heroPhase])
-
-  /** Drop flyout poster once hero lands and the reparented `<video>` is painting again. */
-  useEffect(() => {
-    if (heroPhase !== 'open' || !heroFlyoutPosterVisible) return undefined
-    const flyout = videoFlyoutRef.current
-    const v = videoRef.current
-    let tid = 0
-    let cleaned = false
-    const finish = () => {
-      if (cleaned) return
-      clearFlyoutPosterCover(flyout)
-      setHeroFlyoutPosterVisible(false)
-    }
-    const fadeOut = () => {
-      const img = flyout?.querySelector(HERO_FLYOUT_POSTER_SEL)
-      if (!(img instanceof HTMLImageElement)) {
-        finish()
-        return
-      }
-      img.style.transition = 'opacity 120ms ease-out'
-      img.style.opacity = '0'
-      tid = window.setTimeout(finish, 160)
-    }
-    const run = () => {
-      if (cleaned) return
-      if (v && typeof v.requestVideoFrameCallback === 'function') {
-        try {
-          v.requestVideoFrameCallback(() => fadeOut())
-          return
-        } catch {
-          // fall through
-        }
-      }
-      fadeOut()
-    }
-    run()
-    return () => {
-      cleaned = true
-      window.clearTimeout(tid)
-    }
-  }, [heroPhase, heroFlyoutPosterVisible])
 
   /** iOS sometimes skips `transitionend` on width — ensure chrome still appears after land. */
   useEffect(() => {
@@ -1590,17 +1457,6 @@ export default function LoungePostStreamVideo({
               className={heroFlyoutShellClass}
               {...heroFlyoutPointerProps}
             >
-              {usePosterFrame && attachStream && streamFadeShowVideo && !heroExpanded ? (
-                <img
-                  data-lounge-flyout-poster-shield
-                  src={visiblePosterSrc}
-                  alt=""
-                  decoding="sync"
-                  draggable={false}
-                  className="pointer-events-none absolute inset-0 z-[2] h-full w-full object-contain opacity-0"
-                  aria-hidden
-                />
-              ) : null}
               {streamVideoEl}
             </div>
           </div>
