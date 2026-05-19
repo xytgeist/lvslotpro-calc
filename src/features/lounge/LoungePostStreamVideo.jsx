@@ -754,7 +754,10 @@ export default function LoungePostStreamVideo({
 
   const computeCoordinatedSoundMuted = useCallback(() => {
     if (feedInlineSoundExplicitlyMuted || !feedInlineSoundUnmuted) return true
-    if (!isActive) return true
+    if (!isActive || tileRatio <= 0) {
+      feedSoundAudibleRef.current = false
+      return true
+    }
     if (tileRatio >= LOUNGE_VIDEO_SOUND_ON_RATIO) feedSoundAudibleRef.current = true
     else if (tileRatio <= LOUNGE_VIDEO_SOUND_OFF_RATIO) feedSoundAudibleRef.current = false
     return !feedSoundAudibleRef.current
@@ -768,6 +771,19 @@ export default function LoungePostStreamVideo({
   useEffect(() => {
     heroPhaseRef.current = heroPhase
   }, [heroPhase])
+
+  useEffect(() => {
+    if (!coordinatedInlineSound) return
+    if (isActive && tileRatio > LOUNGE_VIDEO_SOUND_OFF_RATIO) return
+    feedSoundAudibleRef.current = false
+    const v = videoRef.current
+    if (!v) return
+    try {
+      v.muted = true
+    } catch {
+      // ignore
+    }
+  }, [coordinatedInlineSound, isActive, tileRatio])
 
   /** Body mount for hero expand only — created lazily on open, removed on close (not one per feed tile). */
   const ensureHeroBodyHost = useCallback(() => {
@@ -837,10 +853,13 @@ export default function LoungePostStreamVideo({
     }
 
     if (flingerMode) {
-      try {
-        if (!isActive) v.pause()
-      } catch {
-        // ignore
+      if (!isActive || tileRatio <= 0) {
+        try {
+          v.pause()
+          v.muted = true
+        } catch {
+          // ignore
+        }
       }
       return
     }

@@ -8,8 +8,8 @@ export const LOUNGE_VIDEO_STRONG_IN_MIN = 0.95
 export const LOUNGE_VIDEO_CONTEST_OUT_MAX = 0.5
 export const LOUNGE_VIDEO_CONTEST_IN_MIN = 0.5
 /** Primary handoff: challenger tile midpoint vs scroll-column centerline (see pickCenterCrossTakeover). */
-/** #fuckflingers — resume normal rules after scroll idle. */
-export const LOUNGE_VIDEO_FLINGER_IDLE_MS = 200
+/** #fuckflingers — only defer cold-start on new tiles; handoff + mute still run while scrolling. */
+export const LOUNGE_VIDEO_FLINGER_IDLE_MS = 120
 
 const EMPTY_RING = Object.freeze([])
 const EMPTY_RATIOS = Object.freeze({})
@@ -219,6 +219,22 @@ export function createAutoplayStore() {
     return qualified[0].id
   }
 
+  const pickBestVisibleNearCenter = (orderedIds, ratios, centerYs, midY, exceptId = null) => {
+    /** @type {string | null} */
+    let best = null
+    let bestDist = Infinity
+    for (const id of orderedIds) {
+      if (id === exceptId) continue
+      if ((ratios[id] ?? 0) <= 0) continue
+      const dist = Math.abs((centerYs[id] ?? 0) - midY)
+      if (dist < bestDist) {
+        bestDist = dist
+        best = id
+      }
+    }
+    return best
+  }
+
   const publish = (orderedIds, ratios, centerYs, rootEl) => {
     const midY = scrollPortMidY(rootEl)
     let nextActive = activeId
@@ -231,7 +247,7 @@ export function createAutoplayStore() {
       ringIds = [heroClientId]
       prefetchPrevId = null
       prefetchNextId = null
-    } else if (!coordinatorSuspended && !flingerMode) {
+    } else if (!coordinatorSuspended) {
       if (!nextActive) {
         const firstVisible = orderedIds.find((id) => (ratios[id] ?? 0) > 0)
         if (firstVisible) nextActive = firstVisible
@@ -254,9 +270,10 @@ export function createAutoplayStore() {
 
         const incRatio = ratios[nextActive] ?? 0
         if (incRatio <= 0) {
-          const replacement = orderedIds.find((id) => (ratios[id] ?? 0) > 0 && id !== nextActive)
-          nextActive = replacement ?? null
+          nextActive = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY, nextActive)
         }
+      } else {
+        nextActive = pickBestVisibleNearCenter(orderedIds, ratios, centerYs, midY)
       }
 
       if (nextActive) {
@@ -264,11 +281,15 @@ export function createAutoplayStore() {
         if (idx >= 0) {
           prefetchPrevId = idx > 0 ? orderedIds[idx - 1] : null
           prefetchNextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null
-          ringIds = [prefetchPrevId, nextActive, prefetchNextId].filter(Boolean)
+          if (flingerMode) {
+            /** Fling: keep one decoder on active only — no ring expansion until scroll settles. */
+            ringIds = [nextActive]
+          } else {
+            ringIds = [prefetchPrevId, nextActive, prefetchNextId].filter(Boolean)
+          }
         }
       }
-    } else if (coordinatorSuspended || flingerMode) {
-      /** Keep activeId for resume; ring collapses so decoders detach during fling/overlay. */
+    } else if (coordinatorSuspended) {
       ringIds = nextActive ? [nextActive] : []
       if (nextActive) {
         const idx = orderedIds.indexOf(nextActive)
@@ -321,16 +342,22 @@ export function createAutoplayStore() {
 
     const ratioIds = new Set([...Object.keys(snapshot.tileRatios), ...Object.keys(ratios)])
     let ratiosChanged = false
+    let soundBandCrossed = false
+    const activeForSound = nextActive ?? snapshot.activeId
     for (const id of ratioIds) {
       const prev = snapshot.tileRatios[id] ?? 0
       const next = ratios[id] ?? 0
-      if (Math.abs(prev - next) > 0.008) {
-        ratiosChanged = true
-        break
+      if (Math.abs(prev - next) > 0.004) ratiosChanged = true
+      if (id === activeForSound) {
+        const wasOn = prev >= LOUNGE_VIDEO_SOUND_ON_RATIO
+        const wasOff = prev <= LOUNGE_VIDEO_SOUND_OFF_RATIO
+        const nowOn = next >= LOUNGE_VIDEO_SOUND_ON_RATIO
+        const nowOff = next <= LOUNGE_VIDEO_SOUND_OFF_RATIO
+        if (wasOn !== nowOn || wasOff !== nowOff) soundBandCrossed = true
       }
     }
 
-    if (structuralChange || ratiosChanged) {
+    if (structuralChange || ratiosChanged || soundBandCrossed) {
       snapshot = nextSnapshot
       emit()
     }
@@ -350,6 +377,7 @@ export function createAutoplayStore() {
     requestAnimationFrame(recompute)
   }
 
+  /** Scroll tick: always recompute handoff; flinger only shrinks prefetch ring. */
   const markScroll = () => {
     const rootEl = rootRef?.current
     if (rootEl) {
