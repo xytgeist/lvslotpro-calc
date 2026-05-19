@@ -92,6 +92,44 @@ function readElementViewportRect(el) {
   return { top: r.top, left: r.left, width: r.width, height: r.height }
 }
 
+/**
+ * Visible media bounds for hero FLIP — not the full poster shell when portrait letterboxes.
+ * Prefer decoded in-flow poster pixels; else object-contain fit from stream display dims.
+ */
+function readHeroMediaViewportRect(slot, flyout, wrap, displayW, displayH) {
+  const shell = slot || flyout || wrap
+  if (!shell) return { top: 0, left: 0, width: 0, height: 0 }
+
+  const posterImg = slot?.querySelector('img')
+  if (posterImg instanceof HTMLImageElement) {
+    const ir = posterImg.getBoundingClientRect()
+    if (ir.width >= 8 && ir.height >= 8) {
+      return { top: ir.top, left: ir.left, width: ir.width, height: ir.height }
+    }
+  }
+
+  const shellRect = readElementViewportRect(shell)
+  const dw = Number(displayW)
+  const dh = Number(displayH)
+  if (Number.isFinite(dw) && Number.isFinite(dh) && dw >= 2 && dh >= 2) {
+    const aspect = dw / dh
+    let w = shellRect.width
+    let h = w / aspect
+    if (h > shellRect.height) {
+      h = shellRect.height
+      w = h * aspect
+    }
+    return {
+      top: shellRect.top + (shellRect.height - h) / 2,
+      left: shellRect.left + (shellRect.width - w) / 2,
+      width: w,
+      height: h,
+    }
+  }
+
+  return shellRect
+}
+
 /** @returns {boolean} */
 function heroRectUsableForShrinkBack(rect) {
   if (!rect) return false
@@ -788,7 +826,15 @@ export default function LoungePostStreamVideo({
   const closeLightbox = useCallback(() => {
     if (!lightboxOpenRef.current) return
     const slot = heroInlineSlotRef.current
-    const back = slot ? readElementViewportRect(slot) : null
+    const back = slot
+      ? readHeroMediaViewportRect(
+          slot,
+          videoFlyoutRef.current,
+          containerRef.current,
+          displayW,
+          displayH,
+        )
+      : null
     if (heroRectUsableForShrinkBack(back)) {
       setHeroTransitionArmed(false)
       setHeroPhase('closing')
@@ -813,7 +859,7 @@ export default function LoungePostStreamVideo({
       }
     }
     finalizeHeroClose()
-  }, [feedAutoplayEnabled, restoreFeedInlineSound, finalizeHeroClose])
+  }, [feedAutoplayEnabled, restoreFeedInlineSound, finalizeHeroClose, displayW, displayH])
 
   const { swipeSurfaceProps: heroSwipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
     onClose: closeLightbox,
@@ -841,7 +887,7 @@ export default function LoungePostStreamVideo({
     const flyout = videoFlyoutRef.current
     const v = videoRef.current
     if (!wrap) return
-    const from = readElementViewportRect(slot || flyout || wrap)
+    const from = readHeroMediaViewportRect(slot, flyout, wrap, displayW, displayH)
     const target = computeHeroTargetRect(from)
     heroFromRectRef.current = from
     heroTargetRectRef.current = target
@@ -910,6 +956,8 @@ export default function LoungePostStreamVideo({
     feedInlineSoundUnmuted,
     toggleFeedInlineSound,
     ensureHeroBodyHost,
+    displayW,
+    displayH,
   ])
 
   /** Bottom strip: coordinated tiles share provider mute; others toggle this tile only. */
