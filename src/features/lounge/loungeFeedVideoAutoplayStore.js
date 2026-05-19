@@ -480,28 +480,8 @@ export function createAutoplayStore() {
         if (idx >= 0) {
           prefetchPrevId = idx > 0 ? orderedIds[idx - 1] : null
           prefetchNextId = idx < orderedIds.length - 1 ? orderedIds[idx + 1] : null
-          if (flingerMode) {
-            /** Fling: active + outgoing handoff tile or incoming feed neighbor on scroll axis. */
-            const outgoingId = activeId && activeId !== nextActive ? activeId : null
-            ringIds = [nextActive]
-            const scrollMate =
-              scrollDirection > 0
-                ? prefetchNextId
-                : scrollDirection < 0
-                  ? prefetchPrevId
-                  : prefetchNextId || prefetchPrevId
-            const ringMate =
-              outgoingId ||
-              (scrollMate && scrollMate !== nextActive ? scrollMate : null)
-            if (ringMate && ringMate !== nextActive) {
-              ringIds.push(ringMate)
-            } else {
-              const lead = pickLeadingVisibleInFeed(orderedIds, ratios, idx, scrollDirection)
-              if (lead && lead !== nextActive) ringIds.push(lead)
-            }
-          } else {
-            ringIds = buildRingIds(orderedIds, ratios, centerYs, midY, nextActive, 3)
-          }
+          /** Always {prev,active,next} ring (≤3 HLS) — flinger only affects handoff timing, not ring size. */
+          ringIds = buildRingIds(orderedIds, ratios, centerYs, midY, nextActive, 3)
         }
       }
       domBudgetIds = buildDomBudgetIds(orderedIds, ringIds, nextActive, scrollDirection)

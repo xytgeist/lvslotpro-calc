@@ -79,6 +79,8 @@ const posterFallbackFrameClassByVariant = {
 /** CF `thumbnail.jpg` is often 404 until processing finishes — retry with cache-bust before giving up. */
 const CF_POSTER_RETRY_MAX = 32
 
+/** Hold HLS attach briefly after ring exit so flinger ring flicker does not reload media. */
+const RING_HLS_DETACH_HOLD_MS = 700
 /** Feed/embed: attach HLS when a small fraction is visible (was 0.32 — felt slow). */
 const LAZY_ATTACH_IO_THRESHOLD = 0.04
 /** Prefetch into the scroll root so the winner can start loading before fully on screen. */
@@ -897,10 +899,23 @@ export default function LoungePostStreamVideo({
     const n = m ? Number(m[1]) : HERO_OVERLAY_Z_INDEX
     return Number.isFinite(n) ? Math.max(n, HERO_OVERLAY_Z_INDEX) : HERO_OVERLAY_Z_INDEX
   }, [lightboxPortalClass])
+  const [ringHlsHeld, setRingHlsHeld] = useState(false)
+  useEffect(() => {
+    if (!coordinatorActive || !lazyStream) {
+      setRingHlsHeld(false)
+      return undefined
+    }
+    if (inRing) {
+      setRingHlsHeld(true)
+      return undefined
+    }
+    const tid = window.setTimeout(() => setRingHlsHeld(false), RING_HLS_DETACH_HOLD_MS)
+    return () => window.clearTimeout(tid)
+  }, [inRing, coordinatorActive, lazyStream])
   const attachStream = heroExpanded
     ? Boolean(id)
     : lazyStream
-      ? feedAutoplayEnabled && (coordinatorActive ? inRing : streamInView)
+      ? feedAutoplayEnabled && (coordinatorActive ? inRing || ringHlsHeld : streamInView)
       : true
   /** iOS: ≤5 inline `<video>` nodes (ring + lookahead); HLS only on ring (≤3). */
   const mountStreamVideo = Boolean(id) && (
@@ -998,6 +1013,18 @@ export default function LoungePostStreamVideo({
     }
     try {
       // iOS blocks unmuted programmatic play(); start muted, unmute only after play resolves.
+      if (
+        savedStreamTimeRef.current > 0.05 &&
+        v.readyState >= HTMLMediaElement.HAVE_METADATA
+      ) {
+        try {
+          if (Math.abs(v.currentTime - savedStreamTimeRef.current) > 0.35) {
+            v.currentTime = savedStreamTimeRef.current
+          }
+        } catch {
+          // ignore
+        }
+      }
       v.muted = true
       inlinePlayInFlightRef.current = true
       const finishPlayAttempt = () => {
@@ -1326,6 +1353,7 @@ export default function LoungePostStreamVideo({
       mountStreamVideo,
       tileRatio,
       attachStream,
+      ringHlsHeld,
       ringWarmPrefetch,
       flingerMode,
       heroLocked,
@@ -1357,6 +1385,7 @@ export default function LoungePostStreamVideo({
       isActive,
       lightboxOpen,
       mountStreamVideo,
+      ringHlsHeld,
       ringWarmPrefetch,
       showStreamRetry,
       streamAttachKey,
