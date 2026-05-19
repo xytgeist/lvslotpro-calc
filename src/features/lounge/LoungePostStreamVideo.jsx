@@ -402,10 +402,10 @@ function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
         if (cancelled || !videoRef.current || videoRef.current !== video) return
         if (Hls.isSupported()) {
           const hls = new Hls({
-            maxBufferLength: feedStyleAbr ? 12 : 45,
-            maxMaxBufferLength: feedStyleAbr ? 24 : 120,
+            maxBufferLength: feedStyleAbr ? 18 : 45,
+            maxMaxBufferLength: feedStyleAbr ? 36 : 120,
             lowLatencyMode: false,
-            ...(feedStyleAbr ? { startLevel: 0, capLevelToPlayerSize: true } : {}),
+            ...(feedStyleAbr ? { startLevel: -1, capLevelToPlayerSize: true } : {}),
           })
           hlsInstance = hls
           let didMediaRecover = false
@@ -576,6 +576,9 @@ export default function LoungePostStreamVideo({
   /** Prevent stacked play() calls on iOS (AbortError / NotAllowedError storms). */
   const inlinePlayInFlightRef = useRef(false)
   const lastInlinePlayAttemptMsRef = useRef(0)
+  /** After iOS NotAllowedError, back off before the next programmatic play(). */
+  const inlinePlayBackoffUntilMsRef = useRef(0)
+  const lastPlayErrorLogMsRef = useRef(0)
   /** Feed sound snapshot when hero opens (restored on close; same `<video>` keeps time). */
   const inlineFeedSoundSnapshotRef = useRef(
     /** @type {{ unmuted: boolean, explicitlyMuted: boolean, coordinated: boolean } | null} */ (null),
@@ -917,6 +920,7 @@ export default function LoungePostStreamVideo({
     if (lazyStream && v.readyState < HTMLMediaElement.HAVE_METADATA) return false
     if (inlinePlayInFlightRef.current) return false
     const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    if (nowMs < inlinePlayBackoffUntilMsRef.current) return false
     if (nowMs - lastInlinePlayAttemptMsRef.current < 380) return false
     lastInlinePlayAttemptMsRef.current = nowMs
     const reportPlayError = (err) => {
@@ -927,9 +931,11 @@ export default function LoungePostStreamVideo({
           ? `${err.name}: ${err.message || 'play failed'}`.trim()
           : String(err || 'play failed')
       lastPlayErrorRef.current = msg
-      if (videoDebugEnabled && feedAutoplayClientId) {
-        reportLoungeVideoDebugEvent(feedAutoplayClientId, 'play', msg)
-      }
+      if (!videoDebugEnabled || !feedAutoplayClientId) return
+      const isNotAllowed = msg.includes('NotAllowedError')
+      if (isNotAllowed && nowMs - lastPlayErrorLogMsRef.current < 2500) return
+      lastPlayErrorLogMsRef.current = nowMs
+      reportLoungeVideoDebugEvent(feedAutoplayClientId, 'play', msg)
     }
     const applyAudibleAfterPlay = () => {
       if (!v || v.paused || coordinatedInlineSound) return
@@ -950,6 +956,7 @@ export default function LoungePostStreamVideo({
       if (p && typeof p.then === 'function') {
         p.then(() => {
           finishPlayAttempt()
+          inlinePlayBackoffUntilMsRef.current = 0
           lastPlayErrorRef.current = ''
           if (coordinatedInlineSound) syncCoordinatedSoundMuted()
           else applyAudibleAfterPlay()
@@ -957,12 +964,9 @@ export default function LoungePostStreamVideo({
           finishPlayAttempt()
           reportPlayError(err)
           if (err instanceof Error && err.name === 'NotAllowedError') {
-            lastInlinePlayAttemptMsRef.current = 0
-            window.setTimeout(() => {
-              if (isActiveRef.current && videoRef.current?.paused) {
-                tryCoordinatedInlinePlay()
-              }
-            }, 650)
+            const backoffMs = typeof performance !== 'undefined' ? performance.now() : Date.now()
+            inlinePlayBackoffUntilMsRef.current = backoffMs + 2400
+            lastInlinePlayAttemptMsRef.current = backoffMs
           }
           scheduleRecompute()
         })
@@ -1030,9 +1034,9 @@ export default function LoungePostStreamVideo({
     }
 
     if (flingerMode) {
-      if (isActive && tileRatio > 0) {
+      if (isActive && tileRatio > 0 && v.paused) {
         tryCoordinatedInlinePlay()
-      } else {
+      } else if (!isActive || tileRatio <= 0) {
         try {
           v.pause()
           v.muted = true
@@ -1062,9 +1066,9 @@ export default function LoungePostStreamVideo({
     }
 
     if (isActive) {
-      if (tileRatio > 0) {
+      if (tileRatio > 0 && v.paused) {
         tryCoordinatedInlinePlay()
-      } else {
+      } else if (tileRatio <= 0) {
         try {
           v.pause()
           v.currentTime = 0
@@ -1107,14 +1111,11 @@ export default function LoungePostStreamVideo({
       tryCoordinatedInlinePlay()
     }
 
-    v.addEventListener('loadeddata', nudge)
-    v.addEventListener('canplay', nudge)
-    const tid = window.setTimeout(nudge, 900)
-    queueMicrotask(nudge)
+    v.addEventListener('canplay', nudge, { once: true })
+    const tid = window.setTimeout(nudge, 1200)
     return () => {
       cancelled = true
       window.clearTimeout(tid)
-      v.removeEventListener('loadeddata', nudge)
       v.removeEventListener('canplay', nudge)
     }
   }, [
@@ -1144,6 +1145,8 @@ export default function LoungePostStreamVideo({
         return
       }
       if (inlinePlayInFlightRef.current) return
+      const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now()
+      if (nowMs < inlinePlayBackoffUntilMsRef.current) return
       if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
       ticks += 1
       if (ticks > 10) return
@@ -2129,7 +2132,13 @@ export default function LoungePostStreamVideo({
       muted={inlineVideoMuted}
       loop
       playsInline
-      preload={variant === 'composer' ? 'auto' : 'metadata'}
+      preload={
+        variant === 'composer'
+          ? 'auto'
+          : coordinatorActive && isActive && attachStream
+            ? 'auto'
+            : 'metadata'
+      }
       poster={visiblePosterSrc || poster}
       aria-label={heroExpanded ? 'Post video (full screen)' : undefined}
       aria-hidden={!heroExpanded}
