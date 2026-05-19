@@ -171,16 +171,8 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 ## Phase C - Profiles + first-interaction gating
 
-- **Shipped (test, partial):** Full-screen **profile editor** in Lounge. **Handle changes:** at most **once per rolling 7 days** (DB trigger + confirm/cooldown modals). **Handle conflict** dialog for taken/reserved handles. **`/u/:handle` permalink** via **`api/lounge-profile-og.js`**.
-- `/u/:handle` profile page (remaining polish):
-  - profile data
-  - authored posts
-- Gate first write interaction (post/comment/like):
-  - if profile incomplete, show completion modal
-  - defaults from email local-part + placeholder avatar
-- Handle collision strategy:
-  - suffix fallback (auto on `ensureDefaultProfileRow` only)
-  - reserved handle list — **conflict dialog** with suggested `@handle_1` on explicit save (profile gate + profile editor)
+- **Shipped + signed off on test (Ryan, 2026-05-18 @ `7ce7b44`):** Full-screen **profile editor**; **7-day handle change** (DB trigger + confirm/cooldown modals); **`/u/:handle`** permalink + OG + in-app deep link (profile sheet with posts); **handle conflict** dialog for taken/reserved handles (`RESERVED_HANDLES` + DB unique index); profile completion gate before first post (Lounge + Guides).
+- *Deferred (not blocking Phase C close):* standalone marketing profile page beyond the in-app sheet; extra server-side reserved-handle policy beyond client preflight + Postgres constraints.
 
 ---
 

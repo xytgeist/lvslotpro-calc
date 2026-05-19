@@ -102,7 +102,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ### Phases C-L
 
 - [ ] Phases **D–L** not complete end-to-end; **E/F first slice validated on test** (likes, reposts, bookmarks, flat + threaded comments + comment interactions — see checked SQL/FE rows). Threaded **ranking**, server **search**, **notifications**, etc. still roadmap scope.
-- [ ] **Phase C (remaining):** reserved-handle policy polish (server-side). **Shipped on test (partial):** profile completion gate for first post (Lounge + Guides); **full-screen profile editor** in Lounge; **handle change** (no cooldown; conflict dialog); iOS-focused profile-save mitigations; **`/u/:handle`** profile permalink + OG; **handle conflict dialog** with suggested alternative — see **`docs/social-feed-roadmap.md`** Phase C.
+- [x] **Phase C (profiles + identity, test):** profile gate (Lounge + Guides); full-screen profile editor; 7-day handle change (DB + modals); **`/u/:handle`** permalink + OG + deep link; **handle conflict** dialog (taken/reserved + suggested `@handle_1`). Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18). *Deferred (not blocking):* dedicated server-side reserved-handle SQL beyond client `RESERVED_HANDLES` + unique index; standalone marketing profile page beyond in-app sheet.
 - [ ] **Freemium / subscriptions:** anonymous read-only where required; free-account vs subscriber entitlements (DB + **RLS** + Stripe webhooks); extend shell gating beyond today’s **`browseMode`**. Product spec: fill **`docs/access-tiers.md`**; roadmap: **`docs/social-feed-roadmap.md`** → *Freemium & subscriptions*.
 
 ---
@@ -218,6 +218,16 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Test validation: normal user save; mod/admin save; handle modal paths; iOS Safari spot-check after save.
   - Production replay: run **`profile_handle_changed_at.sql`** (or full **`profile_lounge_fullscreen.sql`**) on prod before relying on column/trigger.
 
+- [x] Lounge profile permalink **`/u/:handle`** (test)
+  - Change: Share URL **`/u/:handle`**; Vercel **`api/lounge-profile-og.js`** OG + redirect; **`SocialFeed.jsx`** deep link (`?u=`, path, legacy `?profile=`); anon **`fromPublicLink`** opens profile sheet.
+  - Source: `src/utils/loungeSharePost.js`, `vercel.json`, `AppShell.jsx`, `SocialFeed.jsx`.
+  - Test validation: share profile → `/u/<handle>`; fresh tab / iMessage preview → profile sheet; bad handle → flash + URL cleaned. Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18).
+
+- [x] Lounge profile handle conflict UX (test)
+  - Change: **`ProfileHandleConflictDialog.jsx`** + **`checkProfileHandleAvailability`** — taken/reserved handle popup with suggested alternative; **`strictHandle`** on explicit save (profile gate + profile editor).
+  - Source: `src/features/profiles/profileGate.js`, `LoungeProfileFullScreen.jsx`, `SocialFeed.jsx`, `GuidesScreen.jsx`.
+  - Test validation: pick taken handle → dialog + **Use @…_1**; reserved handle (e.g. `@admin`) → reserved copy + suggestion. Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18).
+
 - [x] Lounge feed media + repost UX (test)
   - Change: Feed/detail carousels reset to **first slide** when post **re-enters viewport** (`LoungePostFeedMedia.jsx`); **repost** uses **anchored popover** above the control including reposted-state actions (`LoungePostArticle.jsx`, `SocialFeed.jsx`); quote composer textarea sizing aligned with main composer; image-cap modal from picker/quote flows.
   - Source: files above.
@@ -297,6 +307,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - **Sign-off (feed video perf diet, 2026-05-18, Ryan):** 30s feed scroll (smooth, one winner), hero tap without poster-on-top flash, load-more **28** rows — **PASSED** on **test** @ **`dbd4fa1`**.
   - **Sign-off (feed interactions Phase E/F, 2026-05-18, Ryan):** Likes, reposts, bookmarks, post + comment threads on feed/post detail/profile — counts and toggles **PASSED** on **test** @ **`b8d55d3`** (SQL applied on test project).
   - **Sign-off (Lounge chat MVP, 2026-05-18, Ryan):** Smoke **§13** **PASSED** on **test** @ **`aa222ec`** — Chat panel, topic join (subscriber/staff), profile **Message** → DM, send/receive, Realtime without refresh.
+  - **Sign-off (Phase C profiles + identity, 2026-05-18, Ryan):** **`/u/:handle`** share/deep link + handle conflict dialog (taken/reserved) — **PASSED** on **test** @ **`7ce7b44`**; smoke **§6** profile bullets.
   - Production replay: same ordered pass on production after deploy.
 
 - [ ] Final pre-prod gate
@@ -307,6 +318,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-18: **Phase C sign-off (Ryan):** **`/u/:handle`** permalink + OG + deep link; handle conflict dialog (taken/reserved). Phase C backlog row + FE rows checked; smoke **§6**. **PASSED** on **test** @ **`7ce7b44`**.
+
 - 2026-05-18: **Lounge chat MVP (test sign-off, Ryan):** Smoke **§13** **PASSED** on **test** @ **`aa222ec`** — dock Chat, topic join, profile Message → DM, send/receive, Realtime live updates. Backlog chat SQL/Edge/client/Realtime rows checked.
 
 - 2026-05-18: **Feed interactions Phase E/F (test sign-off, Ryan):** `feed_interactions_phase_ef.sql` + comment interaction migration on test; Lounge like/repost/bookmark + post/comment threads **PASSED** on **test** @ **`b8d55d3`**.
@@ -315,15 +328,13 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 - 2026-05-18: **Centerline handoff (test):** primary active swap when next/prev Stream tile **midpoint crosses scroll-column center**; clip thresholds remain fallback. **`loungeFeedVideoAutoplayStore.js`**.
 
-- 2026-05-18: **Restore 7-day handle change cooldown (test):** migration **`20260518150000_restore_profile_handle_change_cooldown.sql`**; client confirm/cooldown modals back in **`LoungeProfileFullScreen.jsx`** (with handle conflict dialog). **Apply migration on Supabase test.** Ryan sign-off **pending**.
+- 2026-05-18: **Restore 7-day handle change cooldown (test):** migration **`20260518150000_restore_profile_handle_change_cooldown.sql`**; client confirm/cooldown modals back in **`LoungeProfileFullScreen.jsx`**. **Apply migration on Supabase test.**
 
-- 2026-05-18: **Remove 7-day handle change cooldown (test):** migration **`20260518143000_remove_profile_handle_change_cooldown.sql`**; client cooldown/confirm modals removed from **`LoungeProfileFullScreen.jsx`**. **Apply migration on Supabase test** (and prod on promote). Ryan sign-off **pending**.
+- 2026-05-18: **Handle conflict dialog (test):** **`ProfileHandleConflictDialog.jsx`** + **`checkProfileHandleAvailability`**. Ryan sign-off **PASSED** @ **`7ce7b44`** (Phase C sign-off).
 
-- 2026-05-18: **Handle conflict dialog (test):** **`ProfileHandleConflictDialog.jsx`** + **`checkProfileHandleAvailability`** — taken/reserved handle shows popup with suggested `@handle_1`; explicit saves use **`strictHandle`** (no silent suffix). Profile gate (Lounge + Guides) + **`LoungeProfileFullScreen`**. Ryan sign-off **pending**.
+- 2026-05-18: **Profile permalink `/u/:handle` (test):** **`loungeSharePost.js`**, **`api/lounge-profile-og.js`**, **`SocialFeed.jsx`** deep link. Ryan sign-off **PASSED** @ **`7ce7b44`** (Phase C sign-off).
 
-- 2026-05-18: **Title bar build badge (test):** **`TitleBarStatusLine.jsx`** shows short git SHA in Lounge + shell title bars when **`import.meta.env.DEV`** or **`VITE_SHOW_BUILD_BADGE=true`** (set on test Vercel). SHA from **`vite.config.js`** → **`APP_BUILD_SHA`**.
-
-- 2026-05-18: **Profile permalink `/u/:handle` (test):** **`src/utils/loungeSharePost.js`** — canonical share URL + path/query parsers; **`api/lounge-profile-og.js`** + **`vercel.json`** rewrite (OG + redirect to `/?tab=home&u=`); **`SocialFeed.jsx`** deep link opens profile sheet (`fromPublicLink`, anon OK); legacy `?profile=<uuid>` wired. Smoke **§6** profile share bullet added. Ryan sign-off **pending**.
+- 2026-05-18: **Title bar build badge (test):** **`TitleBarStatusLine.jsx`** — git SHA when **`import.meta.env.DEV`** or **`VITE_SHOW_BUILD_BADGE=true`**.
 
 - 2026-05-19: **Per-tile inline sound (test):** removed feed-wide `feedInlineSoundUnmuted` from **`LoungeFeedVideoAutoplayContext.jsx`**; **`LoungePostStreamVideo.jsx`** Tap for sound unmutes **this clip only** (autoplay handoffs stay muted; sound resets when tile loses active). Removed **`LoungeFeedInlineSoundResetBinder`** from **`SocialFeed.jsx`**. Ryan sign-off **pending**. **`loungeFeedVideoAutoplayStore.js`** — `{prev, active, next}` ring (max 3 decoders), visibility handoff thresholds, flinger idle 200ms, **hero lock** (ring → hero tile only), coordinator suspend when post detail open. **`LoungePostStreamVideo.jsx`** + **`LoungeFeedVideoAutoplayContext.jsx`** — feed-wide Tap for sound + 60%/40% audio bands; hero-first resource budget on expand.
 
