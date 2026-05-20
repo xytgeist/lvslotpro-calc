@@ -752,6 +752,8 @@ export default function LoungePostStreamVideo({
   const isActiveRef = useRef(false)
   /** Hysteresis for feed-wide sound mode visibility bands (60% on / 40% off). */
   const feedSoundAudibleRef = useRef(false)
+  /** One unmute attempt per active handoff — prevents playing-event / play() feedback loops. */
+  const audibleHandoffUnlockTriedRef = useRef(false)
   /** Hero session wants audible playback (restored from inline snapshot on open). */
   const heroWantsSoundRef = useRef(true)
   const recoveryBurstRef = useRef(0)
@@ -1130,7 +1132,7 @@ export default function LoungePostStreamVideo({
     }
   }, [coordinatedInlineSound, computeCoordinatedSoundMuted])
 
-  /** Feed-wide sound: unmute after muted autoplay play() (iOS-safe — resume muted if unmute stalls). */
+  /** Feed-wide sound: one DOM unmute after muted play() — never call play() here (iOS loop/crash). */
   const applyCoordinatedAudibleAfterPlay = useCallback(
     (video) => {
       if (!video || video.paused || !coordinatedInlineSound || !isActiveRef.current) return
@@ -1144,32 +1146,16 @@ export default function LoungePostStreamVideo({
         }
         return
       }
+      if (audibleHandoffUnlockTriedRef.current) return
+      audibleHandoffUnlockTriedRef.current = true
       feedSoundAudibleRef.current = true
       try {
         video.muted = false
       } catch {
         // ignore
       }
-      if (!appleWebKitInlineStreamRef.current) return
-      requestAnimationFrame(() => {
-        if (!video || !isActiveRef.current || !video.paused) return
-        try {
-          video.muted = true
-          const p = video.play()
-          if (p && typeof p.catch === 'function') p.catch(() => {})
-        } catch {
-          // ignore
-        }
-        if (videoDebugEnabled && feedAutoplayClientId) {
-          reportLoungeVideoDebugEvent(
-            feedAutoplayClientId,
-            'sound',
-            'ios-unmute-stall→muted-play',
-          )
-        }
-      })
     },
-    [coordinatedInlineSound, feedAutoplayClientId, videoDebugEnabled],
+    [coordinatedInlineSound],
   )
 
   useEffect(() => {
@@ -1190,7 +1176,11 @@ export default function LoungePostStreamVideo({
   useEffect(() => {
     if (!coordinatedInlineSound) {
       prevCoordinatedActiveRef.current = false
+      audibleHandoffUnlockTriedRef.current = false
       return
+    }
+    if (!isActive) {
+      audibleHandoffUnlockTriedRef.current = false
     }
     if (isActive && !prevCoordinatedActiveRef.current) {
       if (
@@ -1206,7 +1196,7 @@ export default function LoungePostStreamVideo({
     prevCoordinatedActiveRef.current = Boolean(isActive)
   }, [coordinatedInlineSound, isActive, feedInlineSoundUnmuted, feedInlineSoundExplicitlyMuted, tileRatio])
 
-  /** Feed-wide sound bands while playing — also on `playing` after muted handoff play() resolves. */
+  /** Feed-wide sound bands while playing — mute when ratio drops; unmute only via applyCoordinatedAudibleAfterPlay. */
   useEffect(() => {
     if (!coordinatedInlineSound || !isActive || lightboxOpen) return undefined
     const v = videoRef.current
@@ -1214,18 +1204,6 @@ export default function LoungePostStreamVideo({
 
     syncCoordinatedSoundMuted()
     const onPlayingSound = () => {
-      if (appleWebKitInlineStreamRef.current) {
-        if (
-          feedInlineSoundUnmutedRef.current &&
-          !feedInlineSoundExplicitlyMutedRef.current &&
-          tileRatioRef.current >= LOUNGE_VIDEO_SOUND_ON_RATIO
-        ) {
-          applyCoordinatedAudibleAfterPlay(v)
-        } else {
-          syncCoordinatedSoundMuted()
-        }
-        return
-      }
       syncCoordinatedSoundMuted()
     }
     v.addEventListener('playing', onPlayingSound)
@@ -1238,27 +1216,8 @@ export default function LoungePostStreamVideo({
     tileRatio,
     lightboxOpen,
     syncCoordinatedSoundMuted,
-    applyCoordinatedAudibleAfterPlay,
     feedInlineSoundUnmuted,
     feedInlineSoundExplicitlyMuted,
-  ])
-
-  /** When the active tile crosses the 60% sound band while playing muted, retry audible unlock. */
-  useEffect(() => {
-    if (!coordinatedInlineSound || !isActive || lightboxOpen) return
-    const v = videoRef.current
-    if (!v || v.paused || !v.muted) return
-    if (!feedInlineSoundUnmuted || feedInlineSoundExplicitlyMuted) return
-    if (tileRatio < LOUNGE_VIDEO_SOUND_ON_RATIO) return
-    applyCoordinatedAudibleAfterPlay(v)
-  }, [
-    applyCoordinatedAudibleAfterPlay,
-    coordinatedInlineSound,
-    feedInlineSoundExplicitlyMuted,
-    feedInlineSoundUnmuted,
-    isActive,
-    lightboxOpen,
-    tileRatio,
   ])
 
   useEffect(() => {
@@ -2439,37 +2398,37 @@ export default function LoungePostStreamVideo({
       if (turningOn && attachStream) {
         const v = videoRef.current
         if (!v) return
-        const failSoundToggle = () => {
-          try {
-            v.muted = true
-          } catch {
-            // ignore
-          }
-          toggleFeedInlineSound()
-          openLightbox()
-        }
         try {
           v.muted = true
           const p = v.play()
-          const unlockAudible = () => {
-            if (!v) return
+          if (p && typeof p.then === 'function') {
+            p.then(() => {
+              try {
+                v.muted = false
+              } catch {
+                // ignore
+              }
+              audibleHandoffUnlockTriedRef.current = true
+            }).catch(() => {
+              try {
+                v.muted = true
+              } catch {
+                // ignore
+              }
+              toggleFeedInlineSound()
+              openLightbox()
+            })
+          } else {
             try {
               v.muted = false
-              const p2 = v.play()
-              if (p2 && typeof p2.catch === 'function') {
-                p2.catch(failSoundToggle)
-              }
             } catch {
-              failSoundToggle()
+              // ignore
             }
-          }
-          if (p && typeof p.then === 'function') {
-            p.then(unlockAudible).catch(failSoundToggle)
-          } else {
-            unlockAudible()
+            audibleHandoffUnlockTriedRef.current = true
           }
         } catch {
-          failSoundToggle()
+          toggleFeedInlineSound()
+          openLightbox()
         }
       }
       return

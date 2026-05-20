@@ -386,6 +386,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-20: **Feed-wide sound iOS crash (test):** `4bc9660` rAF `play()` after unmute + `playing` listener re-entry caused infinite loop (feed cards vanish / WebKit crash). Fix: **one DOM unmute per handoff**, **never `play()` from sound sync**, playing listener **mute-only**. Ryan sign-off **pending**.
+
 - 2026-05-20: **Feed-wide sound + iOS autoplay handoff (test):** feed-wide unmute on scroll was DOM-unmuting during band sync on Apple MSE, stalling playback after ~4 handoffs. Fix: **`applyCoordinatedAudibleAfterPlay`** — always **muted `play()`** first; unmute once after play; if iOS stalls, **resume muted** (autoplay keeps going). Tap-for-sound uses muted-then-unmute within gesture. Ryan sign-off **pending**.
 
 - 2026-05-20: **Feed-wide inline sound restored (test):** re-enabled **`feedInlineSoundUnmuted`** in **`LoungeFeedVideoAutoplayContext.jsx`** — Tap for sound on any feed tile unmutes the scroll column; 60%/40% visibility bands on active clip; **`LoungeFeedInlineSoundResetBinder`** resets on post detail open. Reverts 2026-05-19 per-tile-only experiment.
