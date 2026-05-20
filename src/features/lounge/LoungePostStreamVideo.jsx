@@ -125,6 +125,16 @@ function detectAppleWebKitNativeHls() {
   return false
 }
 
+/** Native `<video poster>` on iOS can stick over playing frames after HLS attach. */
+function stripWebKitVideoPoster(video) {
+  if (!video) return
+  try {
+    video.removeAttribute('poster')
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Hero stack must sit above the parent shell (`lightboxPortalClass`, e.g. post detail z-[98]/z-[102]).
  * @returns {{ scrim: number, flyout: number, overlay: number }}
@@ -1652,6 +1662,45 @@ export default function LoungePostStreamVideo({
         setStreamFadeShowVideo(false)
         return
       }
+
+      /** Apple inline: no opacity crossfade — poster `<img>` covers until `playing`, then instant swap. */
+      if (appleWebKitNativeHlsRef.current) {
+        setStreamFadeShowVideo(false)
+        const vWebKit = videoRef.current
+        if (!vWebKit) return
+        const revealWebKit = () => {
+          if (cleaned || lightboxOpenRef.current) return
+          stripWebKitVideoPoster(vWebKit)
+          const posterImg = heroInlineSlotRef.current?.querySelector('img')
+          if (posterImg instanceof HTMLImageElement) {
+            posterImg.classList.add('hidden')
+          }
+          requestAnimationFrame(() => {
+            if (!cleaned) setStreamFadeShowVideo(true)
+          })
+        }
+        if (
+          !vWebKit.paused &&
+          vWebKit.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+        ) {
+          revealWebKit()
+          return
+        }
+        const onWebKitPlaying = () => revealWebKit()
+        const onWebKitTime = () => {
+          if (cleaned || !vWebKit || vWebKit.currentTime <= 0) return
+          vWebKit.removeEventListener('timeupdate', onWebKitTime)
+          revealWebKit()
+        }
+        vWebKit.addEventListener('playing', onWebKitPlaying, { once: true })
+        vWebKit.addEventListener('timeupdate', onWebKitTime)
+        disarm = () => {
+          vWebKit.removeEventListener('playing', onWebKitPlaying)
+          vWebKit.removeEventListener('timeupdate', onWebKitTime)
+        }
+        return
+      }
+
       const attachKeyBumped = prevFadeAttachKeyRef.current !== streamAttachKey
       prevFadeAttachKeyRef.current = streamAttachKey
       if (streamFadeShowVideo && attachStream && !attachKeyBumped) return
@@ -1774,9 +1823,16 @@ export default function LoungePostStreamVideo({
       (v.readyState >= HTMLMediaElement.HAVE_METADATA &&
         ((Number.isFinite(v.currentTime) && v.currentTime > 0) || saved > 0.05))
     ) {
+      if (appleWebKitNativeHlsRef.current) stripWebKitVideoPoster(v)
       setStreamFadeShowVideo(true)
     }
   }, [isActive, inRing, attachStream])
+
+  /** Apple: drop native `<video poster>` on HLS attach so it cannot stick over playing frames. */
+  useLayoutEffect(() => {
+    if (!appleWebKitNativeHlsRef.current || !attachStream || lightboxOpenRef.current) return
+    stripWebKitVideoPoster(videoRef.current)
+  }, [attachStream, streamAttachKey, lightboxOpen])
 
   const attachStreamRef = useRef(attachStream)
   attachStreamRef.current = attachStream
@@ -2664,9 +2720,11 @@ export default function LoungePostStreamVideo({
     heroExpanded && heroTapSnapshotRef.current
       ? heroTapShowVideo || streamFadeShowVideo
       : streamFadeShowVideo || pausedInlineFrameVisible
+  const webKitInlineVideoPaint =
+    appleWebKitNativeHlsRef.current && attachStream && !heroExpanded
   /** Same delay on poster + video keeps poster visible through transparent video until fade starts (reduces black flash). */
   const streamFadeTransitionStyle =
-    attachStream && !heroExpanded
+    attachStream && !heroExpanded && !webKitInlineVideoPaint
       ? {
           transitionDuration: `${STREAM_ATTACH_FADE_MS}ms`,
           transitionDelay: streamFadeShowVideo ? `${STREAM_POSTER_FADE_DELAY_MS}ms` : '0ms',
@@ -2711,14 +2769,24 @@ export default function LoungePostStreamVideo({
       ? effectiveStreamFadeShowVideo
         ? 'opacity-100'
         : 'opacity-0'
-      : attachStream && effectiveStreamFadeShowVideo
+      : webKitInlineVideoPaint || (attachStream && effectiveStreamFadeShowVideo)
         ? 'opacity-100'
         : 'opacity-0'
-  const inlinePosterOpacityClass =
-    heroExpanded || !(attachStream && effectiveStreamFadeShowVideo) ? 'opacity-100' : 'opacity-0'
+  const inlinePosterCoveringVideo = webKitInlineVideoPaint && !streamFadeShowVideo
+  const inlinePosterOpacityClass = inlinePosterCoveringVideo
+    ? 'opacity-100'
+    : heroExpanded || !(attachStream && effectiveStreamFadeShowVideo)
+      ? 'opacity-100'
+      : 'opacity-0'
   /** During HLS load poster sits above the flyout; during hero it stays behind (fills the card hole only). */
   const inlinePosterZClass =
-    !heroExpanded && attachStream && !effectiveStreamFadeShowVideo ? 'z-[2]' : 'relative z-0'
+    inlinePosterCoveringVideo
+      ? 'z-[2]'
+      : !heroExpanded && attachStream && !effectiveStreamFadeShowVideo
+        ? 'z-[2]'
+        : 'relative z-0'
+  const inlinePosterVisibilityClass =
+    webKitInlineVideoPaint && streamFadeShowVideo ? 'hidden' : ''
   /** Hero: touches on the flyout shell (swipe dismiss); video stays paint-only so iOS does not steal gestures. */
   const streamVideoClass = heroExpanded
     ? 'pointer-events-none h-full w-full max-h-full max-w-full object-contain'
@@ -2744,8 +2812,14 @@ export default function LoungePostStreamVideo({
   const streamVideoEl = mountStreamVideo ? (
     <video
       ref={videoRef}
-      className={`${streamVideoClass} ${heroExpanded ? '' : 'transition-opacity ease-out'} ${inlineVideoOpacityClass}`}
-      style={heroExpanded ? undefined : streamFadeTransitionStyle}
+      className={`${streamVideoClass} ${heroExpanded || webKitInlineVideoPaint ? '' : 'transition-opacity ease-out'} ${inlineVideoOpacityClass}`}
+      style={
+        heroExpanded || webKitInlineVideoPaint
+          ? webKitInlineVideoPaint
+            ? { transform: 'translateZ(0)' }
+            : undefined
+          : streamFadeTransitionStyle
+      }
       controls={false}
       controlsList="nodownload"
       {...streamVideoMutedProps}
@@ -2758,7 +2832,7 @@ export default function LoungePostStreamVideo({
             ? 'auto'
             : 'metadata'
       }
-      poster={visiblePosterSrc || poster}
+      poster={webKitInlineVideoPaint ? undefined : visiblePosterSrc || poster}
       aria-label={heroExpanded ? 'Post video (full screen)' : undefined}
       aria-hidden={!heroExpanded}
       onError={onInlineStreamError}
@@ -2827,8 +2901,12 @@ export default function LoungePostStreamVideo({
                   decoding="async"
                   draggable={false}
                   loading="eager"
-                  className={`pointer-events-none select-none ${heroExpanded ? '' : 'transition-opacity ease-out'} ${inlinePosterZClass} ${videoClass} ${inlinePosterOpacityClass}`}
-                  style={heroExpanded ? { transition: 'none' } : streamFadeTransitionStyle}
+                  className={`pointer-events-none select-none ${heroExpanded || webKitInlineVideoPaint ? '' : 'transition-opacity ease-out'} ${inlinePosterZClass} ${videoClass} ${inlinePosterOpacityClass} ${inlinePosterVisibilityClass}`}
+                  style={
+                    heroExpanded || inlinePosterCoveringVideo
+                      ? { transition: 'none' }
+                      : streamFadeTransitionStyle
+                  }
                   aria-hidden
                   onLoad={() => setPosterDecodeOk(true)}
                   onError={onPosterImgError}

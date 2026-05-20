@@ -386,6 +386,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-20: **Lounge Stream ~frame-5 freeze on Apple WebKit (client, unverified on test):** **`webKitHlsSlot`** (single native HLS decode) did not fix stall — added **`webKitInlineVideoPaint`**: no inline video opacity crossfade on Apple; in-flow poster covers until `playing` then instant swap; strip native `<video poster>`. Smoke: cold open + scroll-back to first clip past ~frame 6; tap full-screen normal.
+
 - 2026-05-20: **Lounge Stream ~frame-5 freeze on Apple WebKit (client, unverified on test):** isolated experiment — **`webKitHlsSlot`** in **`LoungePostStreamVideo.jsx`**: on iPhone/iPad native HLS, attach only on **active** tile (+ **`ringHlsCacheHeld`** handoff hold); ring prefetch neighbors skip HLS cold-load. No hero/play-gating/poster changes. Smoke: cold open first clip past ~frame 6 without picture stall; scroll away and back to first; tap full-screen still normal.
 
 - 2026-05-20: **Lounge cold-boot splash timing:** member splash **2s min / 3s max** (feed-ready dismiss between those bounds).
