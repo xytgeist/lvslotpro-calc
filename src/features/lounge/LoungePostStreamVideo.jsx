@@ -2790,6 +2790,10 @@ export default function LoungePostStreamVideo({
   const posterFrameMinH = posterFrameMinHByVariant[variant] || posterFrameMinHByVariant.feed
   const posterFallbackFrameClass =
     posterFallbackFrameClassByVariant[variant] || posterFallbackFrameClassByVariant.feed
+  const webKitInlineVideoPaint =
+    appleWebKitNativeHlsRef.current && attachStream && !heroExpanded
+  const webKitInFlowVideo = webKitInlineVideoPaint && mountStreamVideo
+  const webKitPosterOverlay = webKitInFlowVideo
   /** Until the in-flow poster decodes, optional aspect-ratio reserves footprint; after decode the `<img>` is the only size authority (avoids letterbox gap under object-contain). */
   const posterFrameAspectStyle =
     hasDisplayDims && !posterLayoutFailed && (!posterDecodeOk || webKitInFlowVideo)
@@ -2815,10 +2819,6 @@ export default function LoungePostStreamVideo({
     heroExpanded && heroTapSnapshotRef.current
       ? heroTapShowVideo || streamFadeShowVideo
       : streamFadeShowVideo || pausedInlineFrameVisible
-  const webKitInlineVideoPaint =
-    appleWebKitNativeHlsRef.current && attachStream && !heroExpanded
-  const webKitInFlowVideo = webKitInlineVideoPaint && mountStreamVideo
-  const webKitPosterOverlay = webKitInFlowVideo
   /** Same delay on poster + video keeps poster visible through transparent video until fade starts (reduces black flash). */
   const streamFadeTransitionStyle =
     attachStream && !heroExpanded && !webKitInlineVideoPaint
