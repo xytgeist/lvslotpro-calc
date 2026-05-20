@@ -6,6 +6,9 @@ import { renderRichCaption } from './loungeCaption'
 export const LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS =
   'flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-[2px] hover:bg-black/55 active:bg-black/60 [-webkit-tap-highlight-color:transparent]'
 
+/** Horizontal inset for hero / image lightbox chrome (10% side margins in landscape). */
+export const LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD = 'px-3 landscape:px-[10vw]'
+
 /** Top-bar Follow pill — same height as mute / ⋯ controls. */
 export const LOUNGE_HERO_LIGHTBOX_TOP_FOLLOW_BTN_CLASS =
   'flex h-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-zinc-500/80 bg-black/40 px-3.5 text-[13px] font-bold text-white backdrop-blur-[2px] hover:bg-black/55 active:bg-black/60 [-webkit-tap-highlight-color:transparent]'

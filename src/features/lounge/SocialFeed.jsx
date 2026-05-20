@@ -4402,94 +4402,6 @@ export default function SocialFeed({
     [quoteRepostScrollRef],
   )
 
-  const renderDetailMediaLightboxFooter = useCallback(
-    (mediaPost) => (
-      <LoungePostInteractionBar
-        post={mediaPost}
-        variant="sheet"
-        rootClassName="w-full"
-        loungeReadOnly={loungeReadOnly}
-        interactionStateFor={interactionStateFor}
-        toggleInteraction={toggleInteraction}
-        onPlainRepost={handlePlainRepost}
-        onUndoPlainRepost={(p) => void undoPlainRepostForOriginal(p.id)}
-        onRemoveQuoteRepost={openRemoveQuoteRepostForPost}
-        onQuoteRepost={openQuoteRepostComposer}
-        toggleBookmark={toggleBookmark}
-        bookmarkedByPost={bookmarkedByPost}
-        onOpenComments={openLoungePostDetail}
-        requireLoungeAuth={requireLoungeAuth}
-        openProfileGateIfNeeded={openProfileGateIfNeeded}
-        repostMenuScrollRootRef={loungePostDetailScrollRef}
-        onCommentClick={() => {
-          if (openProfileGateIfNeeded()) return
-          const elId =
-            loungeCommentDetailPathIds.length > 0
-              ? 'lounge-detail-comments-thread'
-              : 'lounge-detail-comments'
-          document.getElementById(elId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }}
-        repostActionBusy={repostManageBusy}
-      />
-    ),
-    [
-      loungeReadOnly,
-      interactionStateFor,
-      toggleInteraction,
-      handlePlainRepost,
-      undoPlainRepostForOriginal,
-      openRemoveQuoteRepostForPost,
-      openQuoteRepostComposer,
-      toggleBookmark,
-      bookmarkedByPost,
-      openLoungePostDetail,
-      requireLoungeAuth,
-      openProfileGateIfNeeded,
-      loungePostDetailScrollRef,
-      loungeCommentDetailPathIds.length,
-      repostManageBusy,
-    ],
-  )
-
-  const renderQuoteModalMediaLightboxFooter = useCallback(
-    (mediaPost) => (
-      <LoungePostInteractionBar
-        post={mediaPost}
-        variant="feed"
-        rootClassName="w-full"
-        repostMenuPortalClass="z-[110]"
-        loungeReadOnly={loungeReadOnly}
-        interactionStateFor={interactionStateFor}
-        toggleInteraction={toggleInteraction}
-        onPlainRepost={handlePlainRepost}
-        onUndoPlainRepost={(p) => void undoPlainRepostForOriginal(p.id)}
-        onRemoveQuoteRepost={openRemoveQuoteRepostForPost}
-        onQuoteRepost={openQuoteRepostComposer}
-        toggleBookmark={toggleBookmark}
-        bookmarkedByPost={bookmarkedByPost}
-        onOpenComments={openLoungePostDetail}
-        requireLoungeAuth={requireLoungeAuth}
-        openProfileGateIfNeeded={openProfileGateIfNeeded}
-        repostMenuScrollRootRef={quoteRepostScrollRef}
-      />
-    ),
-    [
-      loungeReadOnly,
-      interactionStateFor,
-      toggleInteraction,
-      handlePlainRepost,
-      undoPlainRepostForOriginal,
-      openRemoveQuoteRepostForPost,
-      openQuoteRepostComposer,
-      toggleBookmark,
-      bookmarkedByPost,
-      openLoungePostDetail,
-      requireLoungeAuth,
-      openProfileGateIfNeeded,
-      quoteRepostScrollRef,
-    ],
-  )
-
   const onLoungePostDetailPanelTransitionEnd = useCallback(
     (e) => {
       if (e.propertyName !== 'transform') return
@@ -8716,7 +8628,6 @@ export default function SocialFeed({
                       }
                       visibilityResetRootRef={loungePostDetailScrollRef}
                       lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
-                      renderMediaLightboxFooter={renderDetailMediaLightboxFooter}
                       streamLightboxHost={loungePostDetail}
                       streamLightboxSurface={loungeDetailStreamLightboxSurface}
                     />
@@ -8759,7 +8670,6 @@ export default function SocialFeed({
                       firstMarginTopClass="mt-2"
                       visibilityResetRootRef={loungePostDetailScrollRef}
                       lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
-                      renderMediaLightboxFooter={renderDetailMediaLightboxFooter}
                       streamLightboxHost={loungePostDetail}
                       streamLightboxSurface={loungeDetailStreamLightboxSurface}
                     />
@@ -8795,7 +8705,6 @@ export default function SocialFeed({
                       }
                       visibilityResetRootRef={loungePostDetailScrollRef}
                       lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
-                      renderMediaLightboxFooter={renderDetailMediaLightboxFooter}
                       streamLightboxHost={loungePostDetail}
                       streamLightboxSurface={loungeDetailStreamLightboxSurface}
                     />
@@ -10511,7 +10420,6 @@ export default function SocialFeed({
                                   firstMarginTopClass="mt-2"
                                   lightboxPortalClass="z-[110]"
                                   visibilityResetRootRef={quoteRepostScrollRef}
-                                  renderMediaLightboxFooter={renderQuoteModalMediaLightboxFooter}
                                   streamLightboxHost={orig}
                                   streamLightboxSurface={quoteRepostStreamLightboxSurface}
                                 />

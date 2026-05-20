@@ -123,74 +123,6 @@ export function LoungeCommentCard({
     onCommentReplyInteraction?.(comment)
   }, [comment, onCommentReplyInteraction, openProfileGateIfNeeded])
 
-  const renderCommentMediaLightboxFooter = useCallback(
-    (mediaComment) => {
-      if (hideInteractionBar || typeof interactionStateFor !== 'function' || !mediaComment?.id) return null
-      return (
-        <LoungePostInteractionBar
-          post={{
-            id: mediaComment.id,
-            comment_count: feedCommentSubtreeReplyCount(mediaComment, descendantFallback),
-            like_count: typeof mediaComment.like_count === 'number' ? mediaComment.like_count : 0,
-            repost_count: typeof mediaComment.repost_count === 'number' ? mediaComment.repost_count : 0,
-          }}
-          variant="sheet"
-          rootClassName="w-full"
-          repostMenuPortalClass={repostMenuPortalClass}
-          loungeReadOnly={loungeReadOnly}
-          interactionStateFor={interactionStateFor}
-          toggleInteraction={toggleInteraction}
-          onPlainRepost={onPlainRepost}
-          onUndoPlainRepost={onUndoPlainRepost}
-          onRemoveQuoteRepost={onRemoveQuoteRepost}
-          onQuoteRepost={onQuoteRepost}
-          toggleBookmark={toggleBookmark}
-          bookmarkedByPost={bookmarkedByPost}
-          onToggleLike={onToggleCommentLike}
-          onToggleBookmark={onToggleCommentBookmark}
-          getBookmarked={getCommentBookmarked}
-          requireLoungeAuth={requireLoungeAuth}
-          openProfileGateIfNeeded={openProfileGateIfNeeded}
-          repostMenuScrollRootRef={positionScrollRootRef}
-          onCommentClick={() => {
-            if (openProfileGateIfNeeded?.()) return
-            onCommentReplyInteraction?.(mediaComment)
-          }}
-          pillOverlay
-          repostActionBusy={repostActionBusy}
-          onShare={
-            typeof onSharePost === 'function' && mediaComment?.post_id
-              ? () => onSharePost({ id: mediaComment.post_id })
-              : undefined
-          }
-        />
-      )
-    },
-    [
-      hideInteractionBar,
-      interactionStateFor,
-      descendantFallback,
-      repostMenuPortalClass,
-      loungeReadOnly,
-      toggleInteraction,
-      onPlainRepost,
-      onUndoPlainRepost,
-      onRemoveQuoteRepost,
-      onQuoteRepost,
-      toggleBookmark,
-      bookmarkedByPost,
-      onToggleCommentLike,
-      onToggleCommentBookmark,
-      getCommentBookmarked,
-      requireLoungeAuth,
-      openProfileGateIfNeeded,
-      positionScrollRootRef,
-      onCommentReplyInteraction,
-      repostActionBusy,
-      onSharePost,
-    ],
-  )
-
   const streamLightboxSurface = useMemo(
     () => ({
       repostMenuPortalClass,
@@ -281,9 +213,11 @@ export function LoungeCommentCard({
         }
         visibilityResetRootRef={positionScrollRootRef}
         lightboxPortalClass={lightboxPortalClass}
-        renderMediaLightboxFooter={renderCommentMediaLightboxFooter}
         streamLightboxHost={comment}
-        streamLightboxTileCtx={{ commentDescendantFallback: descendantFallback }}
+        streamLightboxTileCtx={{
+          commentDescendantFallback: descendantFallback,
+          hideLightboxInteractionBar: hideInteractionBar,
+        }}
         streamLightboxSurface={streamLightboxSurface}
       />
     ) : null

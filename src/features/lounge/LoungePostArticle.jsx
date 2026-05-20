@@ -132,47 +132,6 @@ export default function LoungePostArticle({
           (loungeViewerIsStaff && !menuIsOwn && !isPlainPostRepost && !isCommentRepost && typeof onStaffPostDelete === 'function')))
   )
 
-  const renderMediaLightboxFooter = useCallback(
-    (mediaPost) => (
-      <LoungePostInteractionBar
-        post={mediaPost}
-        variant="feed"
-        rootClassName="w-full"
-        repostMenuPortalClass={repostMenuPortalClass === 'z-[48]' ? 'z-[101]' : repostMenuPortalClass}
-        loungeReadOnly={loungeReadOnly}
-        interactionStateFor={interactionStateFor}
-        toggleInteraction={toggleInteraction}
-        onPlainRepost={onPlainRepost}
-        onUndoPlainRepost={onUndoPlainRepost}
-        onRemoveQuoteRepost={onRemoveQuoteRepost}
-        onQuoteRepost={onQuoteRepost}
-        toggleBookmark={toggleBookmark}
-        bookmarkedByPost={bookmarkedByPost}
-        onOpenComments={onOpenComments}
-        requireLoungeAuth={requireLoungeAuth}
-        openProfileGateIfNeeded={openProfileGateIfNeeded}
-        repostMenuScrollRootRef={repostMenuScrollRootRef}
-      />
-    ),
-    [
-      loungeReadOnly,
-      interactionStateFor,
-      toggleInteraction,
-      onPlainRepost,
-      onUndoPlainRepost,
-      onRemoveQuoteRepost,
-      onQuoteRepost,
-      toggleBookmark,
-      bookmarkedByPost,
-      onOpenComments,
-      onStreamLightboxOpenDetail,
-      requireLoungeAuth,
-      openProfileGateIfNeeded,
-      repostMenuScrollRootRef,
-      repostMenuPortalClass,
-    ],
-  )
-
   const streamLightboxSurface = useMemo(
     () => ({
       repostMenuPortalClass: repostMenuPortalClass === 'z-[48]' ? 'z-[101]' : repostMenuPortalClass,
@@ -184,7 +143,6 @@ export default function LoungePostArticle({
   const mediaLightboxProps = {
     lightboxPortalClass: mediaLightboxPortalClass,
     visibilityResetRootRef: repostMenuScrollRootRef,
-    renderMediaLightboxFooter,
     streamLightboxHost: post,
     streamLightboxSurface,
   }

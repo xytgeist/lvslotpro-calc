@@ -3,7 +3,6 @@ import { feedPostImageUrls, feedPostStreamPosterUrl, feedPostStreamVideoDisplayD
 import { LoungePostMediaPair, LoungeImageLightbox } from './LoungeInlineMediaUrl.jsx'
 import LoungePostStreamVideo from './LoungePostStreamVideo.jsx'
 import { useLoungeStreamLightbox } from './LoungeStreamLightboxContext.jsx'
-import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
 import { peekLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 
 /** Match `LoungeInlineMediaUrl`: border wraps intrinsic image size (`w-auto`), not a fixed slide width. */
@@ -31,9 +30,10 @@ export function LoungeImageCarousel({
   removeLabelForIndex,
   /** Tap image to open fullscreen (disabled in composer). */
   enableLightbox = true,
-  /** Shown under fullscreen image(s) (e.g. post interactions). */
-  lightboxFooter,
   lightboxPortalClass = 'z-[100]',
+  renderMediaLightboxMenu,
+  renderMediaLightboxTopBarExtra,
+  renderMediaLightboxInteractionBar,
   /**
    * When set (feed/detail scroll container), carousel snaps back to slide 1 when this block
    * re-enters that scrollport after leaving — fixes nested scroll + `content-visibility` with `root: null`.
@@ -42,10 +42,6 @@ export function LoungeImageCarousel({
 }) {
   const list = Array.isArray(urls) ? urls.map((u) => String(u || '').trim()).filter(Boolean) : []
   const [lightbox, setLightbox] = useState(null)
-  const lightboxFooterMerged = useMemo(
-    () => mergeLightboxDismissOnQuoteRepost(lightboxFooter, () => setLightbox(null)),
-    [lightboxFooter, setLightbox],
-  )
   const carouselScrollRef = useRef(null)
   const urlsKey = list.join('\0')
   useLayoutEffect(() => {
@@ -258,8 +254,10 @@ export function LoungeImageCarousel({
           urls={lightbox.urls}
           initialIndex={lightbox.index}
           onClose={() => setLightbox(null)}
-          footer={lightboxFooterMerged}
           lightboxPortalClass={lightboxPortalClass}
+          renderMediaLightboxMenu={renderMediaLightboxMenu}
+          renderMediaLightboxTopBarExtra={renderMediaLightboxTopBarExtra}
+          renderMediaLightboxInteractionBar={renderMediaLightboxInteractionBar}
         />
       ) : null}
     </div>
@@ -323,8 +321,6 @@ export function LoungePostFeedImagesAndGif({
   streamLightboxTileCtx,
   /** Surface overrides: repost menu portal z-index + scroll root for this strip. */
   streamLightboxSurface,
-  /** `(post) => ReactNode` — image/GIF lightbox footer only (not Stream video). */
-  renderMediaLightboxFooter,
   /** Feed/detail row id when media `post` is not the host card (plain/quote/comment reposts). */
   feedAutoplayRowId,
   /** Optional slot when one row has multiple Stream tiles (e.g. quote caption + embed). */
@@ -334,8 +330,27 @@ export function LoungePostFeedImagesAndGif({
 }) {
   const streamLightbox = useLoungeStreamLightbox()
   const lightboxHost = streamLightboxHost ?? post
-  const mediaLightboxFooter =
-    typeof renderMediaLightboxFooter === 'function' ? renderMediaLightboxFooter(post) : null
+  const imageLightboxMenuRenderer =
+    streamLightbox && lightboxHost
+      ? () => streamLightbox.buildImageMenu(lightboxHost, streamLightboxTileCtx, streamLightboxSurface)
+      : null
+  const imageLightboxTopBarExtraRenderer =
+    streamLightbox && lightboxHost
+      ? () => streamLightbox.buildImageTopBarExtra(lightboxHost, post, streamLightboxTileCtx, streamLightboxSurface)
+      : null
+  const imageLightboxInteractionBarRenderer =
+    streamLightbox &&
+    lightboxHost &&
+    !streamLightboxTileCtx?.hideLightboxInteractionBar
+      ? (dismissLightbox) =>
+          streamLightbox.buildImageInteractionBar(
+            lightboxHost,
+            post,
+            dismissLightbox,
+            streamLightboxTileCtx,
+            streamLightboxSurface,
+          )
+      : null
   const chromeRenderer =
     streamLightbox && lightboxHost
       ? (dismissLightbox) =>
@@ -382,13 +397,18 @@ export function LoungePostFeedImagesAndGif({
         persistedStreamPosterUrl={persistedStreamPoster || undefined}
         streamVideoDisplayWidth={streamDims?.width}
         streamVideoDisplayHeight={streamDims?.height}
-        mediaLightboxFooter={mediaLightboxFooter}
         renderMediaLightboxChrome={chromeRenderer}
         renderMediaLightboxMenu={menuRenderer}
         renderMediaLightboxTopBarExtra={topBarExtraRenderer}
         lightboxPortalClass={lightboxPortalClass}
       />
     )
+  }
+  const imageLightboxProps = {
+    lightboxPortalClass,
+    renderMediaLightboxMenu: imageLightboxMenuRenderer,
+    renderMediaLightboxTopBarExtra: imageLightboxTopBarExtraRenderer,
+    renderMediaLightboxInteractionBar: imageLightboxInteractionBarRenderer,
   }
   const imgs = feedPostImageUrls(post)
   const gif = String(post?.gif_url || '').trim()
@@ -402,8 +422,7 @@ export function LoungePostFeedImagesAndGif({
         regionAriaLabel={gif ? 'Post images and GIF' : 'Post images'}
         enableLightbox={enableLightbox}
         visibilityResetRootRef={visibilityResetRootRef}
-        lightboxFooter={mediaLightboxFooter}
-        lightboxPortalClass={lightboxPortalClass}
+        {...imageLightboxProps}
       />
     )
   }
@@ -414,8 +433,7 @@ export function LoungePostFeedImagesAndGif({
       variant={variant}
       firstMarginTopClass={firstMarginTopClass}
       enableLightbox={enableLightbox}
-      lightboxFooter={mediaLightboxFooter}
-      lightboxPortalClass={lightboxPortalClass}
+      {...imageLightboxProps}
     />
   )
 }

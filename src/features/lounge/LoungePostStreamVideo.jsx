@@ -15,7 +15,7 @@ import {
 } from '../../utils/loungeStreamInlineVideoControl.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 import LoungeStreamVideoPlaybackControls from './LoungeStreamVideoPlaybackControls.jsx'
-import { LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS } from './LoungeStreamVideoLightboxChrome.jsx'
+import { LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS, LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD } from './LoungeStreamVideoLightboxChrome.jsx'
 import {
   readLoungeFeedVideoDebugEnabled,
   subscribeLoungeFeedVideoDebugEnabled,
@@ -110,7 +110,6 @@ const HERO_SHRINK_TRANSITION = `${HERO_SHRINK_MS}ms ${HERO_MOTION_CURVE}`
 const HERO_CHROME_FADE_MS = 220
 const HERO_CHROME_AUTO_HIDE_MS = 3000
 /** Landscape hero chrome: inset controls 10% from each viewport edge. */
-const LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD = 'px-3 landscape:px-[10vw]'
 /** Default hero stack when no parent `lightboxPortalClass` is passed. */
 const HERO_STACK_BASE_Z_INDEX = 102
 

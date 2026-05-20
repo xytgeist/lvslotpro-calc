@@ -242,26 +242,38 @@ export function buildLoungeStreamLightboxChrome(hostEntity, mediaPost, dismissLi
 }
 
 /**
- * Top-bar Follow control (landscape only — portrait uses author row in chrome).
+ * Top-bar Follow — `landscapeOnly` hides in portrait (Stream video uses author row there).
  */
-export function buildLoungeStreamLightboxTopBarExtra(hostEntity, mediaPost, ctx) {
+function buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, { landscapeOnly = false } = {}) {
   const host = hostEntity ?? mediaPost
   const media = mediaPost ?? host
   const { displayEntity } = loungeStreamLightboxMediaSource(host, media)
-  return (
-    <div className="hidden landscape:block">
-      <LoungeStreamLightboxFollowButton
-        author={displayEntity}
-        viewerUserId={ctx.viewerUserId}
-        viewerFollowingUserIds={ctx.viewerFollowingUserIds}
-        onFollowUser={ctx.onFollowUser}
-        placement="topBar"
-      />
-    </div>
+  const follow = (
+    <LoungeStreamLightboxFollowButton
+      author={displayEntity}
+      viewerUserId={ctx.viewerUserId}
+      viewerFollowingUserIds={ctx.viewerFollowingUserIds}
+      onFollowUser={ctx.onFollowUser}
+      placement="topBar"
+    />
   )
+  if (landscapeOnly) {
+    return <div className="hidden landscape:block">{follow}</div>
+  }
+  return follow
 }
 
-function loungeStreamLightboxCommentMenuState(hostComment, ctx) {
+/** Stream video top bar — landscape only (portrait uses author row). */
+export function buildLoungeStreamLightboxTopBarExtra(hostEntity, mediaPost, ctx) {
+  return buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, { landscapeOnly: true })
+}
+
+/** Image/GIF lightbox top bar — always beside ⋯. */
+export function buildLoungeImageLightboxTopBarExtra(hostEntity, mediaPost, ctx) {
+  return buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, { landscapeOnly: false })
+}
+
+function loungeStreamLightboxCommentMenuState(hostComment, ctx, { countAutoplayForVisibility = true } = {}) {
   const menuIsOwn = Boolean(ctx.viewerUserId && hostComment?.user_id === ctx.viewerUserId)
   const showCommentMenu = Boolean(
     !ctx.loungeReadOnly &&
@@ -273,22 +285,27 @@ function loungeStreamLightboxCommentMenuState(hostComment, ctx) {
   )
   const showLightboxMenu =
     showCommentMenu ||
-    typeof ctx.onFeedVideoAutoplayChange === 'function' ||
+    (countAutoplayForVisibility && typeof ctx.onFeedVideoAutoplayChange === 'function') ||
     typeof ctx.onSharePost === 'function'
   return { menuIsOwn, showCommentMenu, showLightboxMenu }
 }
 
 /**
- * Stream hero top-right ⋯ menu (+ autoplay toggle, share on comments).
+ * Stream hero top-right ⋯ menu (+ optional autoplay toggle on video).
  * @param {object} hostEntity
  * @param {object} ctx
+ * @param {{ showAutoplayToggle?: boolean }} [options]
  */
-export function buildLoungeStreamLightboxMenu(hostEntity, ctx) {
+export function buildLoungeStreamLightboxMenu(hostEntity, ctx, options = {}) {
+  const showAutoplayToggle =
+    options.showAutoplayToggle !== false && typeof ctx.onFeedVideoAutoplayChange === 'function'
   const host = hostEntity
   if (!host) return null
 
   if (isFeedCommentEntity(host)) {
-    const { menuIsOwn, showLightboxMenu } = loungeStreamLightboxCommentMenuState(host, ctx)
+    const { menuIsOwn, showLightboxMenu } = loungeStreamLightboxCommentMenuState(host, ctx, {
+      countAutoplayForVisibility: showAutoplayToggle,
+    })
     if (!showLightboxMenu) return null
     return (
       <LoungePostRowMenu
@@ -306,7 +323,7 @@ export function buildLoungeStreamLightboxMenu(hostEntity, ctx) {
             : undefined
         }
         positionScrollRootRef={ctx.repostMenuScrollRootRef}
-        showAutoplayToggle={typeof ctx.onFeedVideoAutoplayChange === 'function'}
+        showAutoplayToggle={showAutoplayToggle}
         feedVideoAutoplayEnabled={ctx.feedVideoAutoplayEnabled}
         onFeedVideoAutoplayChange={ctx.onFeedVideoAutoplayChange}
         menuButtonClassName={LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS}
@@ -346,12 +363,29 @@ export function buildLoungeStreamLightboxMenu(hostEntity, ctx) {
       pinBusy={ctx.loungePinBusy}
       onPinToggle={() => void ctx.setLoungePostPinned?.(host.id, !host.pinned)}
       positionScrollRootRef={ctx.repostMenuScrollRootRef}
-      showAutoplayToggle={typeof ctx.onFeedVideoAutoplayChange === 'function'}
+      showAutoplayToggle={showAutoplayToggle}
       feedVideoAutoplayEnabled={ctx.feedVideoAutoplayEnabled}
       onFeedVideoAutoplayChange={ctx.onFeedVideoAutoplayChange}
       menuButtonClassName={LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS}
     />
   )
+}
+
+/** Image/GIF lightbox ⋯ menu — same as Stream minus autoplay toggle. */
+export function buildLoungeImageLightboxMenu(hostEntity, ctx) {
+  return buildLoungeStreamLightboxMenu(hostEntity, ctx, { showAutoplayToggle: false })
+}
+
+/**
+ * Pill interaction row for image/GIF or Stream hero lightbox footers.
+ */
+export function buildLoungeMediaLightboxInteractionBar(hostEntity, mediaPost, dismissLightbox, ctx) {
+  const host = hostEntity ?? mediaPost
+  const media = mediaPost ?? host
+  const menuState = isFeedCommentEntity(host)
+    ? { isPlainPostRepost: false, isCommentRepost: false }
+    : loungeStreamLightboxMenuState(host, ctx)
+  return buildStreamLightboxInteractionBar(host, media, menuState, ctx, dismissLightbox)
 }
 
 /** @deprecated Use {@link LoungeStreamLightboxProvider} + {@link buildLoungeStreamLightboxChrome}. */

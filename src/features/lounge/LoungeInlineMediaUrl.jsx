@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
-import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 import { createPortal } from 'react-dom'
+import {
+  LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD,
+  LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS,
+} from './LoungeStreamVideoLightboxChrome.jsx'
+import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 
 function normalizeUrlList(urls) {
   if (!Array.isArray(urls)) return []
@@ -9,18 +12,22 @@ function normalizeUrlList(urls) {
 }
 
 /**
- * Full-screen image viewer (feed / detail). Portals to `document.body` above sheets and feed rows.
+ * Full-screen image/GIF viewer — Stream-style chrome: back + ⋯ top bar, pill interactions on bottom gradient.
  * Pass `urls` + `initialIndex` for multi-image navigation; or legacy single `url`.
- * @param {import('react').ReactNode} [footer] — e.g. post interaction bar; clicks do not close the lightbox.
  */
 export function LoungeImageLightbox({
   url,
   urls,
   initialIndex = 0,
   onClose,
-  footer,
   /** Tailwind z-index on the portaled shell (default below profile sheet `z-[101]`). */
   lightboxPortalClass = 'z-[100]',
+  /** `() => ReactNode` — top-right ⋯ menu (no autoplay toggle for images). */
+  renderMediaLightboxMenu,
+  /** `() => ReactNode` — Follow pill left of ⋯ in the top bar. */
+  renderMediaLightboxTopBarExtra,
+  /** `(dismissLightbox) => ReactNode` — pill interaction row on bottom gradient. */
+  renderMediaLightboxInteractionBar,
 }) {
   const list = useMemo(() => {
     const fromArr = normalizeUrlList(urls)
@@ -62,8 +69,26 @@ export function LoungeImageLightbox({
   const { swipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
     onClose,
     onSwipeHorizontal: multi ? onSwipeHorizontal : undefined,
+    allowSwipeOnVideo: true,
     className: 'relative flex min-h-0 flex-1 flex-col',
   })
+
+  const lightboxMenuContent = useMemo(() => {
+    if (typeof renderMediaLightboxMenu === 'function') return renderMediaLightboxMenu()
+    return null
+  }, [renderMediaLightboxMenu])
+
+  const lightboxTopBarExtraContent = useMemo(() => {
+    if (typeof renderMediaLightboxTopBarExtra === 'function') return renderMediaLightboxTopBarExtra()
+    return null
+  }, [renderMediaLightboxTopBarExtra])
+
+  const lightboxInteractionBarContent = useMemo(() => {
+    if (typeof renderMediaLightboxInteractionBar === 'function') {
+      return renderMediaLightboxInteractionBar(onClose)
+    }
+    return null
+  }, [renderMediaLightboxInteractionBar, onClose])
 
   useEffect(() => {
     if (!current) return
@@ -93,79 +118,95 @@ export function LoungeImageLightbox({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${lightboxPortalClass} flex flex-col bg-black/75 backdrop-blur-[2px] p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]`}
+      className={`fixed inset-0 ${lightboxPortalClass} flex flex-col bg-black`}
       role="dialog"
       aria-modal="true"
       aria-label={multi ? `Image ${idx + 1} of ${list.length}` : 'Full image'}
-      onClick={onClose}
     >
-      <div className="flex shrink-0 justify-end" data-lounge-lightbox-no-swipe>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onClose()
-          }}
-          className="touch-manipulation rounded-lg border border-zinc-600/80 bg-zinc-900/80 px-3 py-1.5 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-800 [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50"
-        >
-          Close
-        </button>
-      </div>
-      <div onClick={(e) => e.stopPropagation()} {...swipeSurfaceProps}>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center p-2">
-        {multi ? (
-          <>
-            <button
-              type="button"
-              aria-label="Previous image"
-              onClick={(e) => {
-                e.stopPropagation()
-                goPrev()
-              }}
-              className="absolute left-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-950/75 text-zinc-100 shadow-lg backdrop-blur-sm hover:bg-zinc-800/90 sm:left-2 sm:h-12 sm:w-12 [-webkit-tap-highlight-color:transparent]"
-            >
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              aria-label="Next image"
-              onClick={(e) => {
-                e.stopPropagation()
-                goNext()
-              }}
-              className="absolute right-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-950/75 text-zinc-100 shadow-lg backdrop-blur-sm hover:bg-zinc-800/90 sm:right-2 sm:h-12 sm:w-12 [-webkit-tap-highlight-color:transparent]"
-            >
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] font-medium tabular-nums text-zinc-200">
-              {idx + 1} / {list.length}
-            </div>
-          </>
-        ) : null}
-        <img
-          key={current}
-          src={current}
-          alt=""
-          className="max-h-full max-w-full object-contain"
-          loading="eager"
-          decoding="async"
-        />
-      </div>
-      {footer ? (
+      <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col justify-between">
         <div
-          className="shrink-0 border-t border-zinc-700/50 bg-black/40 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
-          onClick={(e) => e.stopPropagation()}
+          className={`pointer-events-auto flex shrink-0 items-center justify-between gap-2 ${LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD} pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]`}
+          data-lounge-lightbox-no-swipe
         >
-          {footer}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }}
+            aria-label="Back"
+            className={LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS}
+          >
+            <span className="text-[22px] leading-none" aria-hidden>
+              ←
+            </span>
+          </button>
+          <div className="ml-auto flex items-center gap-1" data-lounge-lightbox-no-swipe>
+            {lightboxTopBarExtraContent ? <div>{lightboxTopBarExtraContent}</div> : null}
+            {lightboxMenuContent ? <div>{lightboxMenuContent}</div> : null}
+          </div>
         </div>
-      ) : null}
+        {lightboxInteractionBarContent ? (
+          <div
+            className={`pointer-events-auto w-full bg-gradient-to-t from-black/85 via-black/45 to-transparent ${LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD} pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8`}
+            data-lounge-lightbox-no-swipe
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="[&_[data-lounge-post-interaction-bar]]:landscape:w-auto [&_[data-lounge-post-interaction-bar]]:landscape:justify-end [&_[data-lounge-post-interaction-bar]]:landscape:gap-1.5">
+              {lightboxInteractionBarContent}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      <div className="relative z-0 flex min-h-0 flex-1 flex-col" onClick={(e) => e.stopPropagation()} {...swipeSurfaceProps}>
+        <div className="relative flex min-h-0 flex-1 items-center justify-center p-2">
+          {multi ? (
+            <>
+              <button
+                type="button"
+                aria-label="Previous image"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  goPrev()
+                }}
+                className="absolute left-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-zinc-600/80 bg-black/40 text-zinc-100 shadow-lg backdrop-blur-[2px] hover:bg-black/55 sm:left-2 sm:h-12 sm:w-12 [-webkit-tap-highlight-color:transparent]"
+                data-lounge-lightbox-no-swipe
+              >
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Next image"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  goNext()
+                }}
+                className="absolute right-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-zinc-600/80 bg-black/40 text-zinc-100 shadow-lg backdrop-blur-[2px] hover:bg-black/55 sm:right-2 sm:h-12 sm:w-12 [-webkit-tap-highlight-color:transparent]"
+                data-lounge-lightbox-no-swipe
+              >
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] font-medium tabular-nums text-zinc-200 backdrop-blur-[2px]">
+                {idx + 1} / {list.length}
+              </div>
+            </>
+          ) : null}
+          <img
+            key={current}
+            src={current}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }
 
@@ -173,21 +214,18 @@ export function LoungeImageLightbox({
  * GIF/photo URL shown below the post caption (always under the final line of text).
  * @param {string} [marginTopClass] — Tailwind margin-top on the wrapper (default `mt-2` after caption).
  * @param {boolean} [enableLightbox] — Tap to open fullscreen (feed/detail); set false for non-interactive embeds if needed.
- * @param {import('react').ReactNode} [lightboxFooter] — Shown below the image in fullscreen (e.g. interactions).
  */
 export function LoungeInlineMediaUrl({
   url,
   variant = 'feed',
   marginTopClass = 'mt-2',
   enableLightbox = true,
-  lightboxFooter,
   lightboxPortalClass = 'z-[100]',
+  renderMediaLightboxMenu,
+  renderMediaLightboxTopBarExtra,
+  renderMediaLightboxInteractionBar,
 }) {
   const [lightbox, setLightbox] = useState(null)
-  const lightboxFooterMerged = useMemo(
-    () => mergeLightboxDismissOnQuoteRepost(lightboxFooter, () => setLightbox(null)),
-    [lightboxFooter, setLightbox],
-  )
   if (!url) return null
   const isEmbed = variant === 'embed'
   const isDetail = variant === 'detail'
@@ -240,8 +278,10 @@ export function LoungeInlineMediaUrl({
           urls={lightbox.urls}
           initialIndex={lightbox.index}
           onClose={() => setLightbox(null)}
-          footer={lightboxFooterMerged}
           lightboxPortalClass={lightboxPortalClass}
+          renderMediaLightboxMenu={renderMediaLightboxMenu}
+          renderMediaLightboxTopBarExtra={renderMediaLightboxTopBarExtra}
+          renderMediaLightboxInteractionBar={renderMediaLightboxInteractionBar}
         />
       ) : null}
     </div>
@@ -258,8 +298,10 @@ export function LoungePostMediaPair({
   variant = 'feed',
   firstMarginTopClass = 'mt-2',
   enableLightbox = true,
-  lightboxFooter,
   lightboxPortalClass = 'z-[100]',
+  renderMediaLightboxMenu,
+  renderMediaLightboxTopBarExtra,
+  renderMediaLightboxInteractionBar,
 }) {
   const m = mediaUrl != null ? String(mediaUrl).trim() : ''
   const g = gifUrl != null ? String(gifUrl).trim() : ''
@@ -272,16 +314,20 @@ export function LoungePostMediaPair({
           variant={variant}
           marginTopClass={firstMarginTopClass}
           enableLightbox={enableLightbox}
-          lightboxFooter={lightboxFooter}
           lightboxPortalClass={lightboxPortalClass}
+          renderMediaLightboxMenu={renderMediaLightboxMenu}
+          renderMediaLightboxTopBarExtra={renderMediaLightboxTopBarExtra}
+          renderMediaLightboxInteractionBar={renderMediaLightboxInteractionBar}
         />
         <LoungeInlineMediaUrl
           url={g}
           variant={variant}
           marginTopClass="mt-2"
           enableLightbox={enableLightbox}
-          lightboxFooter={lightboxFooter}
           lightboxPortalClass={lightboxPortalClass}
+          renderMediaLightboxMenu={renderMediaLightboxMenu}
+          renderMediaLightboxTopBarExtra={renderMediaLightboxTopBarExtra}
+          renderMediaLightboxInteractionBar={renderMediaLightboxInteractionBar}
         />
       </>
     )
@@ -293,8 +339,10 @@ export function LoungePostMediaPair({
       variant={variant}
       marginTopClass={firstMarginTopClass}
       enableLightbox={enableLightbox}
-      lightboxFooter={lightboxFooter}
       lightboxPortalClass={lightboxPortalClass}
+      renderMediaLightboxMenu={renderMediaLightboxMenu}
+      renderMediaLightboxTopBarExtra={renderMediaLightboxTopBarExtra}
+      renderMediaLightboxInteractionBar={renderMediaLightboxInteractionBar}
     />
   )
 }
