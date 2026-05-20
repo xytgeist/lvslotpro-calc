@@ -121,17 +121,19 @@ export default function LoungeStreamVideoLightboxChrome({
         </button>
         <div className="min-w-0 flex-1 pt-0.5">
           <button type="button" onClick={openProfile} className="block max-w-full text-left touch-manipulation">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-              <LoungeFeedAuthorMetaBadges
-                role={profile?.role}
-                isOg={profile?.is_og === true}
-                displayName={displayName}
-                displayNameClassName="truncate text-[15px] font-bold leading-tight text-white"
-              />
+            <div className="flex min-w-0 flex-col gap-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0">
+                <LoungeFeedAuthorMetaBadges
+                  role={profile?.role}
+                  isOg={profile?.is_og === true}
+                  displayName={displayName}
+                  displayNameClassName="truncate text-[15px] font-bold leading-none text-white"
+                />
+              </div>
+              {handle ? (
+                <span className="-mt-1 block truncate text-[13px] leading-tight text-zinc-300/90">{handle}</span>
+              ) : null}
             </div>
-            {handle ? (
-              <span className="mt-0.5 block truncate text-[13px] text-zinc-300/90">{handle}</span>
-            ) : null}
           </button>
           {caption ? (
             typeof onCaptionClick === 'function' ? (
@@ -142,12 +144,12 @@ export default function LoungeStreamVideoLightboxChrome({
                   if (openProfileGateIfNeeded?.()) return
                   onCaptionClick()
                 }}
-                className="mt-1 line-clamp-2 w-full text-left text-[14px] leading-snug text-zinc-100/95 touch-manipulation hover:text-white landscape:line-clamp-3 [-webkit-tap-highlight-color:transparent]"
+                className="mt-1 line-clamp-2 w-full text-left text-[14px] leading-snug text-zinc-100/95 touch-manipulation hover:text-white [-webkit-tap-highlight-color:transparent]"
               >
                 {renderRichCaption(caption, { onMentionClick, onHashtagClick })}
               </button>
             ) : (
-              <div className="mt-1 line-clamp-2 text-left text-[14px] leading-snug text-zinc-100/95 landscape:line-clamp-3">
+              <div className="mt-1 line-clamp-2 text-left text-[14px] leading-snug text-zinc-100/95">
                 {renderRichCaption(caption, { onMentionClick, onHashtagClick })}
               </div>
             )
