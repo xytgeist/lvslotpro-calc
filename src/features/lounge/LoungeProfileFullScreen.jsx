@@ -474,6 +474,8 @@ export default function LoungeProfileFullScreen({
   onNavigateToProfile = null,
   /** Stacked profile opened from a parent sheet (follow list); uses absolute overlay. */
   stackedOverlay = false,
+  /** Root profile opened while Stream video lightbox is up — paint above hero stack before close. */
+  stackAboveStreamLightbox = false,
   /** Pause profile scroll-root autoplay when post detail (or other overlay) owns video budget. */
   suspendVideoCoordinator = false,
   /** Settings → Video debug HUD while this profile sheet is the active surface. */
@@ -1627,7 +1629,9 @@ export default function LoungeProfileFullScreen({
 
   const rootShellClass = stackedOverlay
     ? 'absolute inset-0 z-40 bg-zinc-950'
-    : 'fixed inset-0 z-[101] sm:bg-black/85'
+    : stackAboveStreamLightbox
+      ? 'fixed inset-0 z-[110] sm:bg-black/85'
+      : 'fixed inset-0 z-[101] sm:bg-black/85'
 
   return (
     <div className={rootShellClass} role="dialog" aria-modal="true" aria-label="Profile">

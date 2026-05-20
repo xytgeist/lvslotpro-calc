@@ -14,6 +14,8 @@ import {
   subscribeLoungeStreamBackgroundPause,
 } from '../../utils/loungeStreamInlineVideoControl.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
+import LoungeStreamVideoPlaybackControls from './LoungeStreamVideoPlaybackControls.jsx'
+import { LOUNGE_FEED_TITLE_BAR_SIDE_SLOT_CLASS } from './loungeFeedAvatar.js'
 import {
   readLoungeFeedVideoDebugEnabled,
   subscribeLoungeFeedVideoDebugEnabled,
@@ -106,6 +108,7 @@ const HERO_MOTION_TRANSITION = `${HERO_EXPAND_MS}ms ${HERO_MOTION_CURVE}`
 const HERO_SHRINK_TRANSITION = `${HERO_SHRINK_MS}ms ${HERO_MOTION_CURVE}`
 /** Lightbox chrome fades in only after the flyout lands. */
 const HERO_CHROME_FADE_MS = 220
+const HERO_CHROME_AUTO_HIDE_MS = 3000
 /** Default hero stack when no parent `lightboxPortalClass` is passed. */
 const HERO_STACK_BASE_Z_INDEX = 102
 
@@ -180,13 +183,12 @@ function heroRectUsableForShrinkBack(rect) {
   return bottom > 0 && rect.top < window.innerHeight
 }
 
-/** Target hero frame: centered, object-contain aspect from source tile or stream display dims. */
+/** Target hero frame: centered object-contain video filling the viewport (chrome overlays on top). */
 function computeHeroTargetRect(fromRect, opts = {}) {
-  const { hasFooter = false, displayW, displayH } = opts
+  const { displayW, displayH } = opts
   const vv = typeof window !== 'undefined' ? window.visualViewport : null
   const vw = vv?.width ?? (typeof window !== 'undefined' ? window.innerWidth : 390)
   const vh = vv?.height ?? (typeof window !== 'undefined' ? window.innerHeight : 800)
-  const landscape = vw > vh
 
   let aspect = fromRect.width / Math.max(fromRect.height, 1)
   const dw = Number(displayW)
@@ -195,40 +197,20 @@ function computeHeroTargetRect(fromRect, opts = {}) {
     aspect = dw / dh
   }
 
-  if (landscape) {
-    // Landscape: fill viewport; close/footer chrome overlays (not reserved in layout).
-    const maxW = Math.max(120, vw)
-    const maxH = Math.max(120, vh)
-    let w = maxW
-    let h = w / aspect
-    if (h > maxH) {
-      h = maxH
-      w = h * aspect
-    }
-    return {
-      top: (vh - h) / 2 + (vv?.offsetTop ?? 0),
-      left: (vw - w) / 2 + (vv?.offsetLeft ?? 0),
-      width: w,
-      height: h,
-    }
-  }
-
-  const topInset = 12
-  const bottomInset = 12
-  const headerH = 44
-  const footerReserve = hasFooter ? 56 : 12
-  const side = 8
-  const maxW = Math.max(120, vw - side * 2)
-  const maxH = Math.max(120, vh - topInset - bottomInset - headerH - footerReserve)
+  const maxW = Math.max(120, vw)
+  const maxH = Math.max(120, vh)
   let w = maxW
   let h = w / aspect
   if (h > maxH) {
     h = maxH
     w = h * aspect
   }
-  const left = (vw - w) / 2 + (vv?.offsetLeft ?? 0)
-  const top = topInset + headerH + Math.max(0, (maxH - h) / 2) + (vv?.offsetTop ?? 0)
-  return { top, left, width: w, height: h }
+  return {
+    top: (vh - h) / 2 + (vv?.offsetTop ?? 0),
+    left: (vw - w) / 2 + (vv?.offsetLeft ?? 0),
+    width: w,
+    height: h,
+  }
 }
 
 /** Opening FLIP: laid out at tile `fromRect`, transform grows toward hero `toRect`. */
@@ -679,7 +661,8 @@ function SoundOnGlyph({ className = 'h-4 w-4' }) {
  * @param {string} [persistedStreamPosterUrl] — Public `lounge-feed` poster URL from DB (cross-device stable tile).
  * @param {number} [streamVideoDisplayWidth] — Display width from DB for CSS `aspect-ratio` when set with height.
  * @param {number} [streamVideoDisplayHeight] — Display height from DB for CSS `aspect-ratio` when set with width.
- * @param {import('react').ReactNode} [mediaLightboxFooter] — Interaction bar etc. below full-screen video.
+ * @param {import('react').ReactNode} [mediaLightboxFooter] — Deprecated: image lightbox footer only.
+ * @param {(dismissLightbox: () => void) => import('react').ReactNode} [renderMediaLightboxChrome]
  */
 export default function LoungePostStreamVideo({
   uid,
@@ -693,6 +676,8 @@ export default function LoungePostStreamVideo({
   streamVideoDisplayWidth: streamDisplayWProp,
   streamVideoDisplayHeight: streamDisplayHProp,
   mediaLightboxFooter,
+  renderMediaLightboxChrome,
+  renderMediaLightboxMenu,
   lightboxPortalClass = 'z-[100]',
 }) {
   const sessionPosterUrl = String(sessionPosterUrlProp || '').trim()
@@ -765,6 +750,9 @@ export default function LoungePostStreamVideo({
     /** @type {{ top: number, left: number, width: number, height: number } | null} */ (null),
   )
   const [heroChromeVisible, setHeroChromeVisible] = useState(false)
+  const heroChromeVisibleRef = useRef(false)
+  const heroChromeHideTimerRef = useRef(0)
+  const heroChromeScrubbingRef = useRef(false)
   /** After FLIP “from” paint, width/height/top/left may animate (not during initial opening snap). */
   const [heroTransitionArmed, setHeroTransitionArmed] = useState(false)
   /** Scrim opacity starts one frame after flyout motion on open (feed stays crisp on frame 1). */
@@ -1030,7 +1018,7 @@ export default function LoungePostStreamVideo({
     })
   }, [])
 
-  const inlineVideoMuted = !stripSoundUnmuted
+  const inlineVideoMuted = heroExpanded ? false : !stripSoundUnmuted
   const streamVideoMutedProps = { muted: inlineVideoMuted }
 
   useEffect(() => {
@@ -1748,6 +1736,9 @@ export default function LoungePostStreamVideo({
     heroHlsKickRef.current = false
     heroWantsSoundRef.current = true
     lightboxOpenRef.current = false
+    window.clearTimeout(heroChromeHideTimerRef.current)
+    heroChromeHideTimerRef.current = 0
+    heroChromeScrubbingRef.current = false
     exitFeedHeroLock()
     setLightboxOpen(false)
     setHeroPhase('idle')
@@ -1820,6 +1811,8 @@ export default function LoungePostStreamVideo({
 
     heroShrinkInFlightRef.current = true
     heroShrinkTileRectRef.current = back
+    window.clearTimeout(heroChromeHideTimerRef.current)
+    heroChromeHideTimerRef.current = 0
     heroPhaseRef.current = 'closing'
     heroShrinkFlyoutStyleRef.current = {
       position: 'fixed',
@@ -1885,9 +1878,46 @@ export default function LoungePostStreamVideo({
     }
   }, [])
 
+  useEffect(() => {
+    heroChromeVisibleRef.current = heroChromeVisible
+  }, [heroChromeVisible])
+
+  const clearHeroChromeHideTimer = useCallback(() => {
+    window.clearTimeout(heroChromeHideTimerRef.current)
+    heroChromeHideTimerRef.current = 0
+  }, [])
+
+  const bumpHeroChrome = useCallback(() => {
+    setHeroChromeVisible(true)
+    clearHeroChromeHideTimer()
+    if (!lightboxOpenRef.current) return
+    heroChromeHideTimerRef.current = window.setTimeout(() => {
+      if (!lightboxOpenRef.current) return
+      if (heroChromeScrubbingRef.current) return
+      setHeroChromeVisible(false)
+    }, HERO_CHROME_AUTO_HIDE_MS)
+  }, [clearHeroChromeHideTimer])
+
+  const onHeroChromeScrubbingChange = useCallback(
+    (scrubbing) => {
+      heroChromeScrubbingRef.current = scrubbing
+      if (scrubbing) {
+        clearHeroChromeHideTimer()
+        setHeroChromeVisible(true)
+        return
+      }
+      bumpHeroChrome()
+    },
+    [bumpHeroChrome, clearHeroChromeHideTimer],
+  )
+
   const onHeroGestureTap = useCallback(
     (e) => {
       if (heroPhaseRef.current !== 'open') return
+      if (!heroChromeVisibleRef.current) {
+        bumpHeroChrome()
+        return
+      }
       const layout = heroTargetRectRef.current || heroLayout
       const cx = e?.clientX
       const cy = e?.clientY
@@ -1899,14 +1929,16 @@ export default function LoungePostStreamVideo({
           cy <= layout.top + layout.height
         if (inside) {
           toggleHeroVideoPlayPause()
+          bumpHeroChrome()
           return
         }
         closeLightbox()
         return
       }
       toggleHeroVideoPlayPause()
+      bumpHeroChrome()
     },
-    [closeLightbox, heroLayout, toggleHeroVideoPlayPause],
+    [bumpHeroChrome, closeLightbox, heroLayout, toggleHeroVideoPlayPause],
   )
 
   const { swipeSurfaceProps: heroSwipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
@@ -1929,6 +1961,20 @@ export default function LoungePostStreamVideo({
     [mediaLightboxFooter, closeLightbox],
   )
 
+  const lightboxMenuContent = useMemo(() => {
+    if (typeof renderMediaLightboxMenu === 'function') {
+      return renderMediaLightboxMenu()
+    }
+    return null
+  }, [renderMediaLightboxMenu])
+
+  const lightboxChromeContent = useMemo(() => {
+    if (typeof renderMediaLightboxChrome === 'function') {
+      return renderMediaLightboxChrome(closeLightbox)
+    }
+    return mediaLightboxFooterMerged
+  }, [renderMediaLightboxChrome, closeLightbox, mediaLightboxFooterMerged])
+
   const openLightbox = useCallback(() => {
     if (lightboxOpenRef.current) return
     const slot = heroInlineSlotRef.current
@@ -1948,7 +1994,6 @@ export default function LoungePostStreamVideo({
 
     const from = readHeroMediaViewportRect(slot, flyout, wrap, displayW, displayH)
     const target = computeHeroTargetRect(from, {
-      hasFooter: Boolean(mediaLightboxFooter),
       displayW,
       displayH,
     })
@@ -1989,8 +2034,8 @@ export default function LoungePostStreamVideo({
     setHeroTransitionArmed(false)
     setHeroBackdropArmed(false)
 
-    if (feedAutoplayEnabled && v) {
-      heroWantsSoundRef.current = true
+    heroWantsSoundRef.current = true
+    if (feedAutoplayEnabled) {
       inlineFeedSoundSnapshotRef.current = {
         unmuted: stripSoundUnmuted,
         explicitlyMuted: localStripSoundExplicitlyMuted,
@@ -1998,6 +2043,14 @@ export default function LoungePostStreamVideo({
       try {
         setLocalStripSoundUnmuted(true)
         setLocalStripSoundExplicitlyMuted(false)
+      } catch {
+        // ignore
+      }
+    } else {
+      inlineFeedSoundSnapshotRef.current = null
+    }
+    if (v) {
+      try {
         v.muted = false
         const p = v.play()
         if (p && typeof p.catch === 'function') {
@@ -2011,17 +2064,6 @@ export default function LoungePostStreamVideo({
         }
       } catch {
         // ignore
-      }
-    } else {
-      heroWantsSoundRef.current = false
-      inlineFeedSoundSnapshotRef.current = null
-      if (v && attachStream) {
-        try {
-          const p = v.play()
-          if (p && typeof p.catch === 'function') p.catch(() => {})
-        } catch {
-          // ignore
-        }
       }
     }
   }, [
@@ -2050,7 +2092,6 @@ export default function LoungePostStreamVideo({
       const from = heroFromRectRef.current
       if (!from || heroPhaseRef.current !== 'open') return
       const target = computeHeroTargetRect(from, {
-        hasFooter: Boolean(mediaLightboxFooter),
         displayW,
         displayH,
       })
@@ -2079,7 +2120,7 @@ export default function LoungePostStreamVideo({
       window.visualViewport?.removeEventListener('resize', schedule)
       window.visualViewport?.removeEventListener('scroll', schedule)
     }
-  }, [lightboxOpen, heroPhase, displayW, displayH, mediaLightboxFooter])
+  }, [lightboxOpen, heroPhase, displayW, displayH])
 
   /** Bottom strip: per-tile mute toggle (user gesture unmutes this clip only). */
   const onSoundStripPress = useCallback(() => {
@@ -2209,11 +2250,12 @@ export default function LoungePostStreamVideo({
       heroFrameShieldRef.current = null
       if (heroTargetRectRef.current) setHeroLayout(heroTargetRectRef.current)
       setHeroTransitionArmed(false)
+      heroPhaseRef.current = 'open'
       setHeroPhase('open')
-      setHeroChromeVisible(true)
+      bumpHeroChrome()
     }, HERO_EXPAND_MS + 96)
     return () => window.clearTimeout(tid)
-  }, [heroPhase, heroChromeVisible])
+  }, [heroPhase, heroChromeVisible, bumpHeroChrome])
 
   useEffect(() => {
     const flyout = videoFlyoutRef.current
@@ -2226,13 +2268,14 @@ export default function LoungePostStreamVideo({
         heroFrameShieldRef.current = null
         if (heroTargetRectRef.current) setHeroLayout(heroTargetRectRef.current)
         setHeroTransitionArmed(false)
+        heroPhaseRef.current = 'open'
         setHeroPhase('open')
-        requestAnimationFrame(() => setHeroChromeVisible(true))
+        requestAnimationFrame(() => bumpHeroChrome())
       }
     }
     flyout.addEventListener('transitionend', onTransitionEnd)
     return () => flyout.removeEventListener('transitionend', onTransitionEnd)
-  }, [])
+  }, [bumpHeroChrome])
 
   /** Coordinated: track in-view locally. Scroll root drives coordinator recompute (avoid per-tile IO storms). */
   useEffect(() => {
@@ -2835,13 +2878,14 @@ export default function LoungePostStreamVideo({
                     onPointerCancel={heroSwipePointerCancel}
                   />
                 ) : null}
-                <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col">
+                <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col justify-between">
                   <div
-                    className={`flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
+                    className={`flex shrink-0 items-center justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
                       heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                     }`}
                     style={heroChromeFadeStyle}
                     data-lounge-lightbox-no-swipe
+                    onPointerDownCapture={() => bumpHeroChrome()}
                   >
                     <button
                       type="button"
@@ -2849,23 +2893,54 @@ export default function LoungePostStreamVideo({
                         e.stopPropagation()
                         closeLightbox()
                       }}
-                      className="touch-manipulation rounded-lg border border-zinc-600/80 bg-zinc-900/80 px-3 py-1.5 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-800 [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50"
+                      aria-label="Back"
+                      className={`flex ${LOUNGE_FEED_TITLE_BAR_SIDE_SLOT_CLASS} touch-manipulation items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white [-webkit-tap-highlight-color:transparent]`}
                     >
-                      Close
+                      <span className="text-[22px] leading-none" aria-hidden>
+                        ←
+                      </span>
                     </button>
+                    {lightboxMenuContent ? (
+                      <div data-lounge-lightbox-no-swipe onPointerDownCapture={() => bumpHeroChrome()}>
+                        {lightboxMenuContent}
+                      </div>
+                    ) : null}
                   </div>
-                  {mediaLightboxFooterMerged ? (
+                  {lightboxChromeContent ? (
                     <div
-                      className={`mt-auto shrink-0 border-t border-zinc-700/50 bg-black px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 ${
-                        heroChromeVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+                      className={`pointer-events-none w-full bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-8 ${
+                        heroChromeVisible ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      style={heroChromeFadeStyle}
+                      onPointerDownCapture={() => bumpHeroChrome()}
+                    >
+                      <div className={heroChromeVisible ? 'pointer-events-auto' : 'pointer-events-none'}>
+                        {lightboxChromeContent}
+                      </div>
+                      <LoungeStreamVideoPlaybackControls
+                        videoRef={videoRef}
+                        visible={heroChromeVisible}
+                        onUserActivity={bumpHeroChrome}
+                        onScrubbingChange={onHeroChromeScrubbingChange}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className={`pointer-events-auto w-full px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${
+                        heroChromeVisible ? 'opacity-100' : 'opacity-0'
                       }`}
                       style={heroChromeFadeStyle}
                       data-lounge-lightbox-no-swipe
-                      onClick={(e) => e.stopPropagation()}
+                      onPointerDownCapture={() => bumpHeroChrome()}
                     >
-                      {heroChromeVisible ? mediaLightboxFooterMerged : null}
+                      <LoungeStreamVideoPlaybackControls
+                        videoRef={videoRef}
+                        visible={heroChromeVisible}
+                        onUserActivity={bumpHeroChrome}
+                        onScrubbingChange={onHeroChromeScrubbingChange}
+                      />
                     </div>
-                  ) : null}
+                  )}
                 </div>
               </div>
             </>,

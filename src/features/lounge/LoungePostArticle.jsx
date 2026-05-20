@@ -1,12 +1,13 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
 import { renderRichCaption } from './loungeCaption'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
-import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
+import LoungePostRowMenu from './LoungePostRowMenu.jsx'
+import { createLoungeStreamLightboxRenderers } from './loungeStreamLightboxRenderers.jsx'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
   LOUNGE_FEED_AVATAR_CLASS,
@@ -98,6 +99,11 @@ export default function LoungePostArticle({
   viewerFollowingUserIds,
   /** Follow the given user ID. Called with the author's user_id on pill tap. */
   onFollowUser,
+  /** Matches Settings → Feed playback (Stream lightbox ⋯ menu). */
+  feedVideoAutoplayEnabled = true,
+  onFeedVideoAutoplayChange,
+  /** Stream hero: caption / comment → post or comment detail (`hostPost`, `mediaPost`, `{ focusComposer }`). */
+  onStreamLightboxOpenDetail,
 }) {
   const ro = loungeReadOnly
   // ── Plain repost type detection ──────────────────────────────────────────
@@ -160,6 +166,7 @@ export default function LoungePostArticle({
       toggleBookmark,
       bookmarkedByPost,
       onOpenComments,
+      onStreamLightboxOpenDetail,
       requireLoungeAuth,
       openProfileGateIfNeeded,
       repostMenuScrollRootRef,
@@ -167,10 +174,101 @@ export default function LoungePostArticle({
     ],
   )
 
+  const streamLightboxRenderers = useMemo(
+    () =>
+      createLoungeStreamLightboxRenderers(post, {
+        loungeReadOnly,
+        viewerUserId,
+        onPostMenuEdit,
+        captionEditableInMenu,
+        loungeViewerIsStaff,
+        setLoungePostPinned,
+        onPostMenuDelete,
+        onStaffPostDelete,
+        onPostMenuBlock,
+        onPostMenuReport,
+        onSharePost,
+        repostMenuPortalClass,
+        interactionBarVariant: 'sheet',
+        interactionStateFor,
+        toggleInteraction,
+        onPlainRepost,
+        onUndoPlainRepost,
+        onRemoveQuoteRepost,
+        onQuoteRepost,
+        toggleBookmark,
+        bookmarkedByPost,
+        onOpenComments,
+        onLightboxOpenDetail: onStreamLightboxOpenDetail,
+        requireLoungeAuth,
+        openProfileGateIfNeeded,
+        repostMenuScrollRootRef,
+        displayNameFor,
+        handleFor,
+        avatarText,
+        avatarToneClass,
+        onAvatarClick,
+        viewerFollowingUserIds,
+        onFollowUser,
+        onMentionClick,
+        onHashtagClick,
+        busyDeletingPostId,
+        loungePinBusy,
+        feedVideoAutoplayEnabled,
+        onFeedVideoAutoplayChange,
+      }),
+    [
+      post,
+      loungeReadOnly,
+      viewerUserId,
+      onPostMenuEdit,
+      captionEditableInMenu,
+      loungeViewerIsStaff,
+      setLoungePostPinned,
+      onPostMenuDelete,
+      onStaffPostDelete,
+      onPostMenuBlock,
+      onPostMenuReport,
+      onSharePost,
+      repostMenuPortalClass,
+      interactionStateFor,
+      toggleInteraction,
+      onPlainRepost,
+      onUndoPlainRepost,
+      onRemoveQuoteRepost,
+      onQuoteRepost,
+      toggleBookmark,
+      bookmarkedByPost,
+      onOpenComments,
+      onStreamLightboxOpenDetail,
+      requireLoungeAuth,
+      openProfileGateIfNeeded,
+      repostMenuScrollRootRef,
+      displayNameFor,
+      handleFor,
+      avatarText,
+      avatarToneClass,
+      onAvatarClick,
+      viewerFollowingUserIds,
+      onFollowUser,
+      onMentionClick,
+      onHashtagClick,
+      busyDeletingPostId,
+      loungePinBusy,
+      feedVideoAutoplayEnabled,
+      onFeedVideoAutoplayChange,
+    ],
+  )
+
+  const renderMediaLightboxChrome = streamLightboxRenderers.renderMediaLightboxChrome
+  const renderMediaLightboxMenu = streamLightboxRenderers.renderMediaLightboxMenu
+
   const mediaLightboxProps = {
     lightboxPortalClass: mediaLightboxPortalClass,
     visibilityResetRootRef: repostMenuScrollRootRef,
     renderMediaLightboxFooter,
+    renderMediaLightboxChrome,
+    renderMediaLightboxMenu,
   }
 
   const onAvatar = (e) => {
@@ -511,7 +609,14 @@ export default function LoungePostArticle({
             onToggleLike={onToggleCommentLike ? () => onToggleCommentLike(rc?.id) : undefined}
             onToggleBookmark={onToggleCommentBookmark ? () => onToggleCommentBookmark(rc?.id) : undefined}
             getBookmarked={getCommentBookmarked}
-            onCommentClick={onOpenCommentDetail ? () => onOpenCommentDetail(rc) : undefined}
+            onCommentClick={
+              onOpenCommentDetail
+                ? () => {
+                    if (openProfileGateIfNeeded?.()) return
+                    onOpenCommentDetail(rc, { focusComposer: true })
+                  }
+                : undefined
+            }
             requireLoungeAuth={requireLoungeAuth}
             openProfileGateIfNeeded={openProfileGateIfNeeded}
             repostMenuScrollRootRef={repostMenuScrollRootRef}
@@ -533,6 +638,10 @@ export default function LoungePostArticle({
             toggleBookmark={toggleBookmark}
             bookmarkedByPost={bookmarkedByPost}
             onOpenComments={onOpenComments}
+            onCommentClick={() => {
+              if (openProfileGateIfNeeded?.()) return
+              onOpenComments?.(displayPost, { focusCommentComposer: true })
+            }}
             requireLoungeAuth={requireLoungeAuth}
             openProfileGateIfNeeded={openProfileGateIfNeeded}
             repostMenuScrollRootRef={repostMenuScrollRootRef}

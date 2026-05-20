@@ -28,6 +28,11 @@ export default function LoungePostRowMenu({
   positionScrollRootRef,
   /** Accessible name for the ⋯ control (e.g. "Comment options"). */
   menuAriaLabel = 'Post options',
+  /** When set, prepends autoplay toggle (Stream video lightbox). */
+  showAutoplayToggle = false,
+  feedVideoAutoplayEnabled = false,
+  onFeedVideoAutoplayChange,
+  menuButtonClassName = 'flex h-6 w-6 touch-manipulation items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-800/90 hover:text-zinc-100 [-webkit-tap-highlight-color:transparent]',
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
@@ -95,6 +100,35 @@ export default function LoungePostRowMenu({
       className="fixed z-[200] min-w-[10.5rem] rounded-xl border border-zinc-700 bg-zinc-900 py-0.5 shadow-xl"
       style={{ top: fixedStyle.top, right: fixedStyle.right }}
     >
+          {showAutoplayToggle && typeof onFeedVideoAutoplayChange === 'function' ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-[15px] font-medium text-zinc-100 hover:bg-zinc-800 touch-manipulation"
+              onClick={(e) => {
+                e.stopPropagation()
+                close()
+                onFeedVideoAutoplayChange(!feedVideoAutoplayEnabled)
+              }}
+            >
+              <span>Autoplay while scrolling</span>
+              <span
+                aria-hidden
+                className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
+                  feedVideoAutoplayEnabled ? 'bg-cyan-500' : 'bg-zinc-600'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    feedVideoAutoplayEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+            </button>
+          ) : null}
+          {showAutoplayToggle && typeof onFeedVideoAutoplayChange === 'function' ? (
+            <div className="my-0.5 border-t border-zinc-700/80" role="separator" />
+          ) : null}
           {typeof onShare === 'function' ? (
             <button
               type="button"
@@ -212,7 +246,7 @@ export default function LoungePostRowMenu({
           e.stopPropagation()
           setOpen((o) => !o)
         }}
-        className="flex h-6 w-6 touch-manipulation items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-800/90 hover:text-zinc-100 [-webkit-tap-highlight-color:transparent]"
+        className={menuButtonClassName}
       >
         <svg className="h-[14px] w-[14px]" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
           <circle cx="4" cy="10" r="1.35" />

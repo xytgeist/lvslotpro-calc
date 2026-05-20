@@ -7,6 +7,7 @@ import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
+import { createLoungeCommentStreamLightboxRenderers } from './loungeStreamLightboxRenderers.jsx'
 import {
   feedCommentDescendantCountById,
   feedCommentRowHasMedia,
@@ -92,6 +93,13 @@ export function LoungeCommentCard({
   repostMenuPortalClass = 'z-[48]',
   onMentionClick,
   onHashtagClick,
+  avatarText,
+  avatarToneClass,
+  viewerFollowingUserIds,
+  onFollowUser,
+  feedVideoAutoplayEnabled = true,
+  onFeedVideoAutoplayChange,
+  onStreamLightboxOpenDetail,
 }) {
   const mediaFeedVariant =
     typeof resolveMediaFeedVariant === 'function'
@@ -173,6 +181,59 @@ export function LoungeCommentCard({
       positionScrollRootRef,
       onCommentReplyInteraction,
       repostActionBusy,
+    ],
+  )
+
+  const commentStreamLightboxRenderers = useMemo(
+    () =>
+      createLoungeCommentStreamLightboxRenderers(comment, {
+        buildInteractionBar: renderCommentMediaLightboxFooter,
+        displayNameFor,
+        handleFor,
+        avatarText,
+        avatarToneClass,
+        onAvatarClick: onAvatarClickProfile,
+        openProfileGateIfNeeded,
+        viewerUserId,
+        viewerFollowingUserIds,
+        onFollowUser,
+        onMentionClick,
+        onHashtagClick,
+        loungeReadOnly,
+        onCommentMenuEdit,
+        onCommentMenuDelete,
+        onCommentMenuBlock,
+        onCommentMenuReport,
+        busyDeletingCommentId,
+        repostMenuScrollRootRef: positionScrollRootRef,
+        feedVideoAutoplayEnabled,
+        onFeedVideoAutoplayChange,
+        onLightboxOpenDetail: onStreamLightboxOpenDetail,
+      }),
+    [
+      comment,
+      renderCommentMediaLightboxFooter,
+      displayNameFor,
+      handleFor,
+      avatarText,
+      avatarToneClass,
+      onAvatarClickProfile,
+      openProfileGateIfNeeded,
+      viewerUserId,
+      viewerFollowingUserIds,
+      onFollowUser,
+      onMentionClick,
+      onHashtagClick,
+      loungeReadOnly,
+      onCommentMenuEdit,
+      onCommentMenuDelete,
+      onCommentMenuBlock,
+      onCommentMenuReport,
+      busyDeletingCommentId,
+      positionScrollRootRef,
+      feedVideoAutoplayEnabled,
+      onFeedVideoAutoplayChange,
+      onStreamLightboxOpenDetail,
     ],
   )
 
@@ -259,6 +320,8 @@ export function LoungeCommentCard({
         visibilityResetRootRef={positionScrollRootRef}
         lightboxPortalClass={lightboxPortalClass}
         renderMediaLightboxFooter={renderCommentMediaLightboxFooter}
+        renderMediaLightboxChrome={commentStreamLightboxRenderers.renderMediaLightboxChrome}
+        renderMediaLightboxMenu={commentStreamLightboxRenderers.renderMediaLightboxMenu}
       />
     ) : null
 
@@ -456,6 +519,13 @@ export default function LoungePostCommentThread({
   followingUserIds = [],
   onMentionClick,
   onHashtagClick,
+  avatarText,
+  avatarToneClass,
+  viewerFollowingUserIds,
+  onFollowUser,
+  feedVideoAutoplayEnabled = true,
+  onFeedVideoAutoplayChange,
+  onStreamLightboxOpenDetail,
   /** Tailwind z-index for image/video lightboxes (must exceed the detail shell's z-index). */
   lightboxPortalClass = 'z-[100]',
 }) {
@@ -565,6 +635,13 @@ export default function LoungePostCommentThread({
     commentEditBusy,
     commentEditHasRemoteMedia,
     lightboxPortalClass,
+    avatarText,
+    avatarToneClass,
+    viewerFollowingUserIds,
+    onFollowUser,
+    feedVideoAutoplayEnabled,
+    onFeedVideoAutoplayChange,
+    onStreamLightboxOpenDetail,
   }
 
   if (variant === 'commentDetailReplies') {

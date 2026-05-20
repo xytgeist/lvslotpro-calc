@@ -318,6 +318,10 @@ export function LoungePostFeedImagesAndGif({
   lightboxPortalClass = 'z-[100]',
   /** `(post) => ReactNode` — e.g. interaction bar for the same post as this media strip. */
   renderMediaLightboxFooter,
+  /** `(post, dismissLightbox) => ReactNode` — Stream hero overlay (author, interactions). */
+  renderMediaLightboxChrome,
+  /** `() => ReactNode` — Stream hero top-right ⋯ menu (+ autoplay toggle). */
+  renderMediaLightboxMenu,
   /** Feed/detail row id when media `post` is not the host card (plain/quote/comment reposts). */
   feedAutoplayRowId,
   /** Optional slot when one row has multiple Stream tiles (e.g. quote caption + embed). */
@@ -327,6 +331,10 @@ export function LoungePostFeedImagesAndGif({
 }) {
   const mediaLightboxFooter =
     typeof renderMediaLightboxFooter === 'function' ? renderMediaLightboxFooter(post) : null
+  const chromeRenderer = renderMediaLightboxChrome
+    ? (dismissLightbox) => renderMediaLightboxChrome(post, dismissLightbox)
+    : null
+  const menuRenderer = renderMediaLightboxMenu || null
   const streamUid = feedPostStreamVideoUid(post)
   const persistedStreamPoster = streamUid ? feedPostStreamPosterUrl(post) : ''
   const streamDims = streamUid ? feedPostStreamVideoDisplayDimensions(post) : null
@@ -355,6 +363,8 @@ export function LoungePostFeedImagesAndGif({
         streamVideoDisplayWidth={streamDims?.width}
         streamVideoDisplayHeight={streamDims?.height}
         mediaLightboxFooter={mediaLightboxFooter}
+        renderMediaLightboxChrome={chromeRenderer}
+        renderMediaLightboxMenu={menuRenderer}
         lightboxPortalClass={lightboxPortalClass}
       />
     )

@@ -98,6 +98,7 @@ import LoungeMentionDropdown from './LoungeMentionDropdown'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
+import { createLoungeStreamLightboxRenderers, isFeedCommentEntity, loungeStreamLightboxMediaSource } from './loungeStreamLightboxRenderers.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
@@ -413,6 +414,8 @@ export default function SocialFeed({
   const [profileModalPosts, setProfileModalPosts] = useState([])
   /** Profiles opened from feed/detail/profile without replacing the root sheet (back pops one layer). */
   const [profileOverlayStack, setProfileOverlayStack] = useState([])
+  /** Root profile sits above Stream hero lightbox (z ~103+) while closing video behind the sheet. */
+  const [profileStackAboveStreamLightbox, setProfileStackAboveStreamLightbox] = useState(false)
   /** Scroll-linked FAB reveal while profile sheet is open. */
   const [loungeProfileDockReveal, setLoungeProfileDockReveal] = useState(1)
   const [interactionByPost, setInteractionByPost] = useState({})
@@ -4152,7 +4155,7 @@ export default function SocialFeed({
    * Looks up the post in the current feed first; falls back to a DB fetch.
    */
   const openCommentRepostDetail = useCallback(
-    async (repostedComment) => {
+    async (repostedComment, { focusComposer = false } = {}) => {
       if (!repostedComment?.post_id || !repostedComment?.id) return
       let parentPost = communityPosts.find((p) => String(p.id) === String(repostedComment.post_id))
       if (!parentPost) {
@@ -4171,7 +4174,10 @@ export default function SocialFeed({
           parentPost = { id: repostedComment.post_id }
         }
       }
-      openLoungePostDetail(parentPost, { focusCommentId: repostedComment.id })
+      openLoungePostDetail(parentPost, {
+        focusCommentId: repostedComment.id,
+        focusCommentComposer: focusComposer,
+      })
     },
     [communityPosts, hydrateCommunityPosts, openLoungePostDetail, supabaseClient],
   )
@@ -4568,6 +4574,49 @@ export default function SocialFeed({
     [openLoungeCommentDetail],
   )
 
+  const openLoungeStreamLightboxDetail = useCallback(
+    (hostPost, mediaPost, { focusComposer = false } = {}) => {
+      if (openProfileGateIfNeeded()) return
+      const { displayEntity } = loungeStreamLightboxMediaSource(hostPost, mediaPost)
+      if (isFeedCommentEntity(displayEntity)) {
+        if (loungePostDetail?.id && String(loungePostDetail.id) === String(displayEntity.post_id)) {
+          openLoungeCommentDetail(displayEntity, { focusComposer })
+          return
+        }
+        void openCommentRepostDetail(displayEntity, { focusComposer })
+        return
+      }
+      const targetPost = displayEntity || mediaPost || hostPost
+      if (!targetPost?.id) return
+      if (loungePostDetail?.id && String(loungePostDetail.id) === String(targetPost.id)) {
+        if (focusComposer) expandAndFocusLoungeDetailCommentComposer()
+        return
+      }
+      openLoungePostDetail(
+        targetPost,
+        focusComposer ? { focusCommentComposer: true } : {},
+      )
+    },
+    [
+      openProfileGateIfNeeded,
+      loungePostDetail?.id,
+      openLoungeCommentDetail,
+      openCommentRepostDetail,
+      expandAndFocusLoungeDetailCommentComposer,
+      openLoungePostDetail,
+    ],
+  )
+
+  const openLoungeCommentStreamLightboxDetail = useCallback(
+    (comment, _media, { focusComposer = false } = {}) => {
+      if (!comment?.id) return
+      if (openProfileGateIfNeeded()) return
+      if (focusComposer) onLoungeCommentReplyInteraction(comment)
+      else openLoungeCommentDetail(comment, { focusComposer: false })
+    },
+    [openProfileGateIfNeeded, onLoungeCommentReplyInteraction, openLoungeCommentDetail],
+  )
+
   useEffect(() => {
     if (loungeCommentDetailPathIds.length === 0 || loungeDetailCommentsLoading) return
     const id = requestAnimationFrame(() => {
@@ -4579,6 +4628,17 @@ export default function SocialFeed({
     loungeDetailCommentsLoading,
     scrollLoungePostDetailToFocusedComment,
   ])
+
+  /** Post detail opened from feed/lightbox with composer focus (no comment drill). */
+  useEffect(() => {
+    if (!loungePostDetail?.id) return
+    if (loungePostDetailPendingCommentIdRef.current) return
+    if (!loungePostDetailPendingCommentComposerRef.current) return
+    loungePostDetailPendingCommentComposerRef.current = false
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => expandAndFocusLoungeDetailCommentComposer())
+    })
+  }, [loungePostDetail?.id, expandAndFocusLoungeDetailCommentComposer])
 
   /** Profile Replies tab: open post detail first, then drill to the reply once comments are loaded. */
   useEffect(() => {
@@ -6744,6 +6804,7 @@ export default function SocialFeed({
     setProfileModalLoading(false)
     setProfileModalVisible(true)
     setLoungeProfileDockReveal(1)
+    setProfileStackAboveStreamLightbox(false)
   }, [])
 
   const closeProfileModal = useCallback(() => {
@@ -6805,6 +6866,7 @@ export default function SocialFeed({
       if (!userId) return
       const profileStub = profileStubFromOpenArg(post)
       const loadGen = ++profileModalLoadGenRef.current
+      setProfileStackAboveStreamLightbox(getLoungeStreamLightboxOpen())
       setLoungePostDetailAboveProfile(false)
       setProfileOverlayStack([])
       const prevTid = profileModalCloseFallbackTimerRef.current
@@ -7115,6 +7177,95 @@ export default function SocialFeed({
     [loungeFeedBrowseMode, loungeReadOnly, onRequireAuth],
   )
 
+  const loungeDetailStreamLightboxRenderers = useMemo(() => {
+    if (!loungePostDetail?.id) return null
+    return createLoungeStreamLightboxRenderers(loungePostDetail, {
+      loungeReadOnly,
+      viewerUserId: composerUserId,
+      onPostMenuEdit: (p) => openLoungePostDetail(p, { startEditing: true }),
+      captionEditableInMenu: (p) =>
+        Boolean(
+          composerUserId &&
+            p?.user_id === composerUserId &&
+            isLoungePostWithinAuthorEditWindow(p?.created_at),
+        ),
+      loungeViewerIsStaff,
+      setLoungePostPinned,
+      onPostMenuDelete: deleteLoungePostFromFeed,
+      onStaffPostDelete: deleteStaffLoungePostFromFeed,
+      onPostMenuBlock: onPostMenuBlockFromFeed,
+      onPostMenuReport: onPostMenuReportFromFeed,
+      onSharePost: handleShareLoungePost,
+      repostMenuPortalClass: loungeDetailMediaLightboxPortalClass === 'z-[103]' ? 'z-[106]' : 'z-[105]',
+      interactionStateFor,
+      toggleInteraction,
+      onPlainRepost: handlePlainRepost,
+      onUndoPlainRepost: (p) => void undoPlainRepostForOriginal(p.id),
+      onRemoveQuoteRepost: openRemoveQuoteRepostForPost,
+      onQuoteRepost: openQuoteRepostComposer,
+      toggleBookmark,
+      bookmarkedByPost,
+      onOpenComments: openLoungePostDetail,
+      requireLoungeAuth,
+      openProfileGateIfNeeded,
+      repostMenuScrollRootRef: loungePostDetailScrollRef,
+      onLightboxOpenDetail: openLoungeStreamLightboxDetail,
+      repostActionBusy: repostManageBusy,
+      displayNameFor,
+      handleFor,
+      avatarText,
+      avatarToneClass,
+      onAvatarClick: openAuthorProfile,
+      viewerFollowingUserIds: loungeReadOnly ? null : loungeFollowingUserIds,
+      onFollowUser: loungeReadOnly ? undefined : handleLoungeFollowUser,
+      onMentionClick: openProfileByHandle,
+      onHashtagClick: openSearchByHashtag,
+      busyDeletingPostId: loungeFeedDeleteBusyPostId,
+      loungePinBusy,
+      feedVideoAutoplayEnabled: loungeFeedVideoAutoplayEnabled,
+      onFeedVideoAutoplayChange: onLoungeFeedVideoAutoplayChange,
+    })
+  }, [
+    loungePostDetail,
+    loungeReadOnly,
+    composerUserId,
+    loungeViewerIsStaff,
+    setLoungePostPinned,
+    deleteLoungePostFromFeed,
+    deleteStaffLoungePostFromFeed,
+    onPostMenuBlockFromFeed,
+    onPostMenuReportFromFeed,
+    handleShareLoungePost,
+    loungeDetailMediaLightboxPortalClass,
+    interactionStateFor,
+    toggleInteraction,
+    handlePlainRepost,
+    undoPlainRepostForOriginal,
+    openRemoveQuoteRepostForPost,
+    openQuoteRepostComposer,
+    toggleBookmark,
+    bookmarkedByPost,
+    openLoungePostDetail,
+    requireLoungeAuth,
+    openProfileGateIfNeeded,
+    loungePostDetailScrollRef,
+    openLoungeStreamLightboxDetail,
+    repostManageBusy,
+    displayNameFor,
+    handleFor,
+    avatarText,
+    avatarToneClass,
+    openAuthorProfile,
+    loungeFollowingUserIds,
+    handleLoungeFollowUser,
+    openProfileByHandle,
+    openSearchByHashtag,
+    loungeFeedDeleteBusyPostId,
+    loungePinBusy,
+    loungeFeedVideoAutoplayEnabled,
+    onLoungeFeedVideoAutoplayChange,
+  ])
+
   const onLoungeDockOpenOwnProfile = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
       onRequireAuth?.()
@@ -7241,6 +7392,7 @@ export default function SocialFeed({
       avatarToneClass,
       avatarText,
       onPostBodyClick: openLoungePostDetail,
+      onStreamLightboxOpenDetail: openLoungeStreamLightboxDetail,
       onOpenCommentRepost: openCommentRepostDetail,
       onOpenProfileReply: (comment, post, opts) => {
         if (!post?.id || !comment?.id) return
@@ -7290,6 +7442,8 @@ export default function SocialFeed({
       onHashtagClick: openSearchByHashtag,
       viewerFollowingUserIds: loungeReadOnly ? null : loungeFollowingUserIds,
       onFollowUser: loungeReadOnly ? undefined : handleLoungeFollowUser,
+      feedVideoAutoplayEnabled: loungeFeedVideoAutoplayEnabled,
+      onFeedVideoAutoplayChange: onLoungeFeedVideoAutoplayChange,
     }),
     [
       loungeReadOnly,
@@ -7306,6 +7460,7 @@ export default function SocialFeed({
       openProfileGateIfNeeded,
       openLoungePostDetail,
       openCommentRepostDetail,
+      openLoungeStreamLightboxDetail,
       openAuthorProfile,
       openProfileModal,
       handleShareLoungePost,
@@ -7341,6 +7496,8 @@ export default function SocialFeed({
       openSearchByHashtag,
       loungeFollowingUserIds,
       handleLoungeFollowUser,
+      loungeFeedVideoAutoplayEnabled,
+      onLoungeFeedVideoAutoplayChange,
     ]
   )
 
@@ -8197,11 +8354,14 @@ export default function SocialFeed({
                   onToggleCommentLike={toggleLoungeDetailCommentLike}
                   onToggleCommentBookmark={toggleLoungeDetailCommentBookmark}
                   getCommentBookmarked={getLoungeDetailCommentBookmarked}
-                  onOpenCommentDetail={(rc) => void openCommentRepostDetail(rc)}
+                  onOpenCommentDetail={(rc, opts) => void openCommentRepostDetail(rc, opts)}
+                  onStreamLightboxOpenDetail={openLoungeStreamLightboxDetail}
                   onMentionClick={openProfileByHandle}
                   onHashtagClick={openSearchByHashtag}
                   viewerFollowingUserIds={loungeReadOnly ? null : loungeFollowingUserIds}
                   onFollowUser={loungeReadOnly ? undefined : handleLoungeFollowUser}
+                  feedVideoAutoplayEnabled={loungeFeedVideoAutoplayEnabled}
+                  onFeedVideoAutoplayChange={onLoungeFeedVideoAutoplayChange}
                 />
               </article>
             ))}
@@ -8605,6 +8765,8 @@ export default function SocialFeed({
                       visibilityResetRootRef={loungePostDetailScrollRef}
                       lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
                       renderMediaLightboxFooter={renderDetailMediaLightboxFooter}
+                      renderMediaLightboxChrome={loungeDetailStreamLightboxRenderers?.renderMediaLightboxChrome}
+                      renderMediaLightboxMenu={loungeDetailStreamLightboxRenderers?.renderMediaLightboxMenu}
                     />
                   </div>
                   <button
@@ -8646,6 +8808,8 @@ export default function SocialFeed({
                       visibilityResetRootRef={loungePostDetailScrollRef}
                       lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
                       renderMediaLightboxFooter={renderDetailMediaLightboxFooter}
+                      renderMediaLightboxChrome={loungeDetailStreamLightboxRenderers?.renderMediaLightboxChrome}
+                      renderMediaLightboxMenu={loungeDetailStreamLightboxRenderers?.renderMediaLightboxMenu}
                     />
                   </button>
                 </>
@@ -8680,6 +8844,8 @@ export default function SocialFeed({
                       visibilityResetRootRef={loungePostDetailScrollRef}
                       lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
                       renderMediaLightboxFooter={renderDetailMediaLightboxFooter}
+                      renderMediaLightboxChrome={loungeDetailStreamLightboxRenderers?.renderMediaLightboxChrome}
+                      renderMediaLightboxMenu={loungeDetailStreamLightboxRenderers?.renderMediaLightboxMenu}
                     />
                   </div>
                 </>
@@ -9186,6 +9352,16 @@ export default function SocialFeed({
                       ),
                     resolveMediaFeedVariant: (c) =>
                       c?.id === loungeDetailCommentHierarchyFocusId ? 'detail' : 'commentInline',
+                    onMentionClick: openProfileByHandle,
+                    onHashtagClick: openSearchByHashtag,
+                    lightboxPortalClass: loungeDetailMediaLightboxPortalClass,
+                    avatarText,
+                    avatarToneClass,
+                    viewerFollowingUserIds: loungeReadOnly ? null : loungeFollowingUserIds,
+                    onFollowUser: loungeReadOnly ? undefined : handleLoungeFollowUser,
+                    feedVideoAutoplayEnabled: loungeFeedVideoAutoplayEnabled,
+                    onFeedVideoAutoplayChange: onLoungeFeedVideoAutoplayChange,
+                    onStreamLightboxOpenDetail: openLoungeCommentStreamLightboxDetail,
                   }}
                 />
               ) : null}
@@ -9287,6 +9463,13 @@ export default function SocialFeed({
                           onMentionClick={openProfileByHandle}
                           onHashtagClick={openSearchByHashtag}
                           lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
+                          avatarText={avatarText}
+                          avatarToneClass={avatarToneClass}
+                          viewerFollowingUserIds={loungeReadOnly ? null : loungeFollowingUserIds}
+                          onFollowUser={loungeReadOnly ? undefined : handleLoungeFollowUser}
+                          feedVideoAutoplayEnabled={loungeFeedVideoAutoplayEnabled}
+                          onFeedVideoAutoplayChange={onLoungeFeedVideoAutoplayChange}
+                          onStreamLightboxOpenDetail={openLoungeCommentStreamLightboxDetail}
                         />
                       </>
                     )}
@@ -9823,6 +10006,7 @@ export default function SocialFeed({
           showVideoDebugHud={loungeProfileVideoDebugHud}
           viewerIsAdmin={loungeViewerIsAdmin}
           onAdminSetProfileRole={handleAdminSetProfileRole}
+          stackAboveStreamLightbox={profileStackAboveStreamLightbox}
         />
       ) : null}
 
