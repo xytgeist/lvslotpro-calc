@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD,
   LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS,
 } from './LoungeStreamVideoLightboxChrome.jsx'
+import { useLoungeLightboxImageZoom } from './loungeLightboxImageZoom.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 
 function normalizeUrlList(urls) {
@@ -58,20 +59,79 @@ export function LoungeImageLightbox({
 
   const multi = list.length > 1
 
+  const mediaContainerRef = useRef(null)
+  const mediaImageRef = useRef(null)
+
+  const { isZoomed, isPinching, zoomPointerHandlers, mediaTransformStyle } = useLoungeLightboxImageZoom({
+    containerRef: mediaContainerRef,
+    imageRef: mediaImageRef,
+    resetKey: current,
+  })
+
   const onSwipeHorizontal = useCallback(
     (dir) => {
+      if (isZoomed || isPinching) return
       if (dir > 0) goNext()
       else goPrev()
     },
-    [goNext, goPrev],
+    [goNext, goPrev, isPinching, isZoomed],
   )
 
   const { swipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
     onClose,
     onSwipeHorizontal: multi ? onSwipeHorizontal : undefined,
     allowSwipeOnVideo: true,
+    enabled: !isZoomed && !isPinching,
     className: 'relative flex min-h-0 flex-1 flex-col',
   })
+
+  const {
+    onPointerDown: swipePointerDown,
+    onPointerMove: swipePointerMove,
+    onPointerUp: swipePointerUp,
+    onPointerCancel: swipePointerCancel,
+    style: swipeDragStyle,
+    className: swipeClassName,
+  } = swipeSurfaceProps
+
+  const {
+    onPointerDown: zoomPointerDown,
+    onPointerMove: zoomPointerMove,
+    onPointerUp: zoomPointerUp,
+    onPointerCancel: zoomPointerCancel,
+  } = zoomPointerHandlers
+
+  const onMediaPointerDown = useCallback(
+    (e) => {
+      if (zoomPointerDown(e)) return
+      swipePointerDown?.(e)
+    },
+    [zoomPointerDown, swipePointerDown],
+  )
+
+  const onMediaPointerMove = useCallback(
+    (e) => {
+      zoomPointerMove(e)
+      swipePointerMove?.(e)
+    },
+    [zoomPointerMove, swipePointerMove],
+  )
+
+  const onMediaPointerUp = useCallback(
+    (e) => {
+      zoomPointerUp(e)
+      swipePointerUp?.(e)
+    },
+    [zoomPointerUp, swipePointerUp],
+  )
+
+  const onMediaPointerCancel = useCallback(
+    (e) => {
+      zoomPointerCancel(e)
+      swipePointerCancel?.(e)
+    },
+    [zoomPointerCancel, swipePointerCancel],
+  )
 
   const lightboxMenuContent = useMemo(() => {
     if (typeof renderMediaLightboxMenu === 'function') return renderMediaLightboxMenu()
@@ -158,8 +218,21 @@ export function LoungeImageLightbox({
           </div>
         ) : null}
       </div>
-      <div className="relative z-0 flex min-h-0 flex-1 flex-col" onClick={(e) => e.stopPropagation()} {...swipeSurfaceProps}>
-        <div className="relative flex min-h-0 flex-1 items-center justify-center p-2">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={onMediaPointerDown}
+        onPointerMove={onMediaPointerMove}
+        onPointerUp={onMediaPointerUp}
+        onPointerCancel={onMediaPointerCancel}
+        style={swipeDragStyle}
+        className={['relative z-0 flex min-h-0 flex-1 flex-col', swipeClassName, isZoomed || isPinching ? 'touch-none' : '']
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <div
+          ref={mediaContainerRef}
+          className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2"
+        >
           {multi ? (
             <>
               <button
@@ -195,14 +268,18 @@ export function LoungeImageLightbox({
               </div>
             </>
           ) : null}
-          <img
-            key={current}
-            src={current}
-            alt=""
-            className="max-h-full max-w-full object-contain"
-            loading="eager"
-            decoding="async"
-          />
+          <div className="inline-flex max-h-full max-w-full origin-center" style={mediaTransformStyle}>
+            <img
+              ref={mediaImageRef}
+              key={current}
+              src={current}
+              alt=""
+              className="max-h-full max-w-full select-none object-contain"
+              loading="eager"
+              decoding="async"
+              draggable={false}
+            />
+          </div>
         </div>
       </div>
     </div>,

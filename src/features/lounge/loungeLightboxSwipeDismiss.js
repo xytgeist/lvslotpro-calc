@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const DISMISS_DRAG_PX = 72
 const TAP_SLOP_PX = 12
@@ -22,6 +22,8 @@ export function useLoungeLightboxSwipeDismiss({
   onTap,
   className = '',
   allowSwipeOnVideo = false,
+  /** When false, pointer handlers no-op (e.g. image lightbox while pinch-zoomed). */
+  enabled = true,
 }) {
   const dragRef = useRef(null)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -33,7 +35,12 @@ export function useLoungeLightboxSwipeDismiss({
     setOffset({ x: 0, y: 0 })
   }, [])
 
+  useEffect(() => {
+    if (!enabled) resetDrag()
+  }, [enabled, resetDrag])
+
   const onPointerDown = useCallback((e) => {
+    if (!enabled) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     if (shouldIgnoreSwipeTarget(e.target, { allowSwipeOnVideo })) return
     dragRef.current = {
@@ -44,9 +51,10 @@ export function useLoungeLightboxSwipeDismiss({
     setDragging(true)
     setOffset({ x: 0, y: 0 })
     e.currentTarget.setPointerCapture(e.pointerId)
-  }, [allowSwipeOnVideo])
+  }, [allowSwipeOnVideo, enabled])
 
   const onPointerMove = useCallback((e) => {
+    if (!enabled) return
     const drag = dragRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
     const dx = e.clientX - drag.startX
@@ -58,10 +66,11 @@ export function useLoungeLightboxSwipeDismiss({
     } else {
       setOffset({ x: 0, y: dy })
     }
-  }, [onSwipeHorizontal])
+  }, [onSwipeHorizontal, enabled])
 
   const finishDrag = useCallback(
     (e) => {
+      if (!enabled) return
       const drag = dragRef.current
       if (!drag || drag.pointerId !== e.pointerId) return
       try {
@@ -86,7 +95,7 @@ export function useLoungeLightboxSwipeDismiss({
         onTap(e)
       }
     },
-    [onClose, onSwipeHorizontal, onTap, resetDrag],
+    [onClose, onSwipeHorizontal, onTap, resetDrag, enabled],
   )
 
   const onPointerUp = useCallback(
