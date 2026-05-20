@@ -27,10 +27,28 @@ function oneLine(s) {
     .trim()
 }
 
+function loungeOgImageDeliveryUrl(storedUrl) {
+  const url = String(storedUrl || '').trim()
+  if (!url) return ''
+  const base = String(process.env.LOUNGE_CF_R2_PUBLIC_BASE_URL || process.env.VITE_LOUNGE_CF_MEDIA_PUBLIC_BASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '')
+  if (!base) return url
+  try {
+    if (new URL(url).origin !== new URL(base).origin) return url
+    const parsed = new URL(url)
+    const path = parsed.pathname.replace(/^\//, '')
+    if (!path || path.startsWith('cdn-cgi/image/')) return url
+    return `${parsed.origin}/cdn-cgi/image/width=1200,quality=85,format=auto/${path}`
+  } catch {
+    return url
+  }
+}
+
 function pickOgImage(post, origin) {
   for (const key of ['stream_poster_url', 'media_url', 'gif_url']) {
     const u = String(post[key] || '').trim()
-    if (/^https?:\/\//i.test(u)) return u
+    if (/^https?:\/\//i.test(u)) return loungeOgImageDeliveryUrl(u)
   }
   let urls = post.image_urls
   if (typeof urls === 'string') {
@@ -43,7 +61,7 @@ function pickOgImage(post, origin) {
   if (Array.isArray(urls)) {
     for (const item of urls) {
       const u = String(item || '').trim()
-      if (/^https?:\/\//i.test(u)) return u
+      if (/^https?:\/\//i.test(u)) return loungeOgImageDeliveryUrl(u)
     }
   }
   return `${origin}/apple-touch-icon.png`

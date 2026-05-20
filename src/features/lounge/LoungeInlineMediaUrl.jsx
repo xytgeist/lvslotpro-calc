@@ -6,6 +6,7 @@ import {
 } from './LoungeStreamVideoLightboxChrome.jsx'
 import { useLoungeLightboxImageZoom } from './loungeLightboxImageZoom.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
+import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 
 function normalizeUrlList(urls) {
   if (!Array.isArray(urls)) return []
@@ -48,6 +49,7 @@ export function LoungeImageLightbox({
   }
 
   const current = list[idx] || ''
+  const currentDisplaySrc = loungeFeedImageDeliveryUrl(current, 'lightbox')
 
   const goPrev = useCallback(() => {
     setIdx((i) => (list.length <= 1 ? i : i <= 0 ? list.length - 1 : i - 1))
@@ -272,7 +274,7 @@ export function LoungeImageLightbox({
             <img
               ref={mediaImageRef}
               key={current}
-              src={current}
+              src={currentDisplaySrc}
               alt=""
               className="max-h-full max-w-full select-none object-contain"
               loading="eager"
@@ -317,9 +319,11 @@ export function LoungeInlineMediaUrl({
   const rounding = isEmbed ? 'rounded-lg' : 'rounded-xl'
   const border = isEmbed ? 'border-zinc-600/40' : 'border-zinc-700/60'
 
+  const displayUrl = loungeFeedImageDeliveryUrl(url, variant === 'detail' ? 'detail' : variant === 'commentInline' ? 'commentInline' : variant === 'embed' ? 'embed' : 'feed')
+
   const framed = (
     <div className={`inline-block max-w-full overflow-hidden ${rounding} border ${border} bg-zinc-950/40`}>
-      <img src={url} alt="" className={imgClass} loading="lazy" decoding="async" />
+      <img src={displayUrl} alt="" className={imgClass} loading="lazy" decoding="async" />
     </div>
   )
 

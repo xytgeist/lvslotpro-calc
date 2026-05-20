@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoUpload'
+import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
 import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
 import { releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
@@ -688,6 +689,10 @@ export default function LoungePostStreamVideo({
     () => String(persistedStreamPosterUrlProp || '').trim(),
     [persistedStreamPosterUrlProp],
   )
+  const persistedPosterDisplay = useMemo(
+    () => loungeFeedImageDeliveryUrl(persistedPosterTrim, 'poster'),
+    [persistedPosterTrim],
+  )
   const hasPersistedPoster = /^https?:\/\//i.test(persistedPosterTrim)
 
   const displayW = Number(streamDisplayWProp)
@@ -796,10 +801,10 @@ export default function LoungePostStreamVideo({
   }, [poster, posterBust])
 
   const visiblePosterSrc = useMemo(() => {
-    if (hasPersistedPoster) return persistedPosterTrim
+    if (hasPersistedPoster) return persistedPosterDisplay
     if (!cfPosterActive && sessionPosterUrl) return sessionPosterUrl
     return posterDisplayUrl
-  }, [hasPersistedPoster, persistedPosterTrim, cfPosterActive, sessionPosterUrl, posterDisplayUrl])
+  }, [hasPersistedPoster, persistedPosterDisplay, cfPosterActive, sessionPosterUrl, posterDisplayUrl])
 
   const showOpen = enableLightbox && variant !== 'composer'
   const heroExpanded = lightboxOpen && heroPhase !== 'idle'

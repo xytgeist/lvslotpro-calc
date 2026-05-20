@@ -3,6 +3,16 @@
  * Quote reposts set `repost_of_post_id` and a non-empty `caption`. Plain reposts use `is_plain_repost` and empty caption.
  */
 
+import {
+  deleteCfR2ObjectByPublicUrl,
+  isLoungeCfR2MediaUrl,
+  isLoungeHostedFeedMediaUrl,
+  isLoungeSupabaseFeedMediaUrl,
+  uploadLoungeFeedPostImageToCfR2,
+} from './loungeCfImageMedia.js'
+
+export { isLoungeCfR2MediaUrl, isLoungeHostedFeedMediaUrl, isLoungeSupabaseFeedMediaUrl } from './loungeCfImageMedia.js'
+
 /** Trimmed caption string (empty if missing). */
 export function feedPostDisplayCaption(row) {
   const v = (row || {}).caption
@@ -75,9 +85,7 @@ export function feedPostStreamVideoDisplayDimensions(row) {
 }
 
 function isProbablyLoungeStoredImageUrl(u) {
-  const s = String(u || '').toLowerCase()
-  if (!s) return false
-  return s.includes('/storage/v1/object/public/lounge-feed/') || s.includes('/lounge-feed/')
+  return isLoungeHostedFeedMediaUrl(u)
 }
 
 /**
@@ -283,16 +291,28 @@ export function communityFeedCommentRepostInsertPayload({ originalCommentId }) {
 
 const LOUNGE_FEED_MEDIA_BUCKET = 'lounge-feed'
 
-/**
- * Best-effort remove of a `lounge-feed` object given its public URL. Ignores failures (delete row should still proceed).
- * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
- * @param {string} publicUrl
- */
-export async function deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, publicUrl) {
+/** Collect hosted image URLs on a feed post or comment row (for delete). */
+export function collectLoungeFeedStoredMediaUrls(row) {
+  /** @type {string[]} */
+  const out = []
+  const seen = new Set()
+  const add = (u) => {
+    const s = String(u || '').trim()
+    if (!s || !isLoungeHostedFeedMediaUrl(s) || seen.has(s)) return
+    seen.add(s)
+    out.push(s)
+  }
+  for (const u of feedPostImageUrls(row)) add(u)
+  add(feedPostStreamPosterUrl(row))
+  const mu = String(row?.media_url ?? '').trim()
+  if (mu && isLoungeHostedFeedMediaUrl(mu)) add(mu)
+  return out
+}
+
+async function deleteLoungeFeedSupabaseObjectFromPublicUrl(supabaseClient, publicUrl) {
   const u = String(publicUrl || '').trim()
-  if (!u || !supabaseClient) return
+  if (!u || !supabaseClient || !isLoungeSupabaseFeedMediaUrl(u)) return
   const lower = u.toLowerCase()
-  if (!lower.includes('lounge-feed')) return
   let path = ''
   const m = u.match(/\/object\/public\/lounge-feed\/(.+)$/i)
   if (m?.[1]) {
@@ -311,8 +331,31 @@ export async function deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, 
   }
 }
 
-/** Upload a single image for a feed post; path prefix must be `user.id/`. */
-export async function uploadLoungeFeedPostImage({ supabaseClient, user, file }) {
+/**
+ * Best-effort remove of a hosted Lounge image (R2 or legacy `lounge-feed`) by public URL.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} publicUrl
+ */
+export async function deleteLoungeFeedMediaFromPublicUrl(supabaseClient, publicUrl) {
+  const u = String(publicUrl || '').trim()
+  if (!u || !supabaseClient) return
+  if (isLoungeCfR2MediaUrl(u)) {
+    try {
+      await deleteCfR2ObjectByPublicUrl(supabaseClient, u)
+    } catch {
+      // ignore — row delete should still proceed
+    }
+    return
+  }
+  await deleteLoungeFeedSupabaseObjectFromPublicUrl(supabaseClient, u)
+}
+
+/** @deprecated Use {@link deleteLoungeFeedMediaFromPublicUrl} */
+export async function deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, publicUrl) {
+  return deleteLoungeFeedMediaFromPublicUrl(supabaseClient, publicUrl)
+}
+
+async function uploadLoungeFeedPostImageToSupabase({ supabaseClient, user, file }) {
   const mime = String(file?.type || '').toLowerCase()
   if (!mime.startsWith('image/')) {
     return { data: null, error: new Error('Please choose an image file.') }
@@ -348,4 +391,12 @@ export async function uploadLoungeFeedPostImage({ supabaseClient, user, file }) 
 
   const { data } = supabaseClient.storage.from(LOUNGE_FEED_MEDIA_BUCKET).getPublicUrl(path)
   return { data: data?.publicUrl || null, error: null }
+}
+
+/** Upload a single image — Cloudflare R2 when configured, else legacy Supabase `lounge-feed`. */
+export async function uploadLoungeFeedPostImage({ supabaseClient, user, file, signal }) {
+  const r2 = await uploadLoungeFeedPostImageToCfR2(supabaseClient, user, file, { signal })
+  if (r2.error) return { data: null, error: r2.error }
+  if (r2.data) return { data: r2.data, error: null }
+  return uploadLoungeFeedPostImageToSupabase({ supabaseClient, user, file })
 }

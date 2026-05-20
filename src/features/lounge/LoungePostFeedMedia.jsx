@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { feedPostImageUrls, feedPostStreamPosterUrl, feedPostStreamVideoDisplayDimensions, feedPostStreamVideoUid } from '../../utils/communityFeedPost'
+import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 import { LoungePostMediaPair, LoungeImageLightbox } from './LoungeInlineMediaUrl.jsx'
 import LoungePostStreamVideo from './LoungePostStreamVideo.jsx'
 import { useLoungeStreamLightbox } from './LoungeStreamLightboxContext.jsx'
@@ -41,6 +42,7 @@ export function LoungeImageCarousel({
   visibilityResetRootRef,
 }) {
   const list = Array.isArray(urls) ? urls.map((u) => String(u || '').trim()).filter(Boolean) : []
+  const deliveryVariant = variant === 'composer' ? 'composer' : variant
   const [lightbox, setLightbox] = useState(null)
   const carouselScrollRef = useRef(null)
   const urlsKey = list.join('\0')
@@ -180,7 +182,9 @@ export function LoungeImageCarousel({
         role="region"
         aria-label={regionAriaLabel}
       >
-        {list.map((url, i) => (
+        {list.map((url, i) => {
+          const displaySrc = loungeFeedImageDeliveryUrl(url, deliveryVariant)
+          return (
           <div
             key={`${url}-${i}`}
             className={`relative w-auto shrink-0 snap-start ${!isComposer ? 'min-w-[3rem]' : ''} ${slideMaxW}`}
@@ -207,7 +211,7 @@ export function LoungeImageCarousel({
               >
                 <div className={`inline-block max-w-full overflow-hidden ${rounding} border ${border} bg-zinc-950/40`}>
                   <img
-                    src={url}
+                    src={displaySrc}
                     alt=""
                     className={imgClass}
                     loading={i === 0 ? 'eager' : 'lazy'}
@@ -220,7 +224,7 @@ export function LoungeImageCarousel({
             ) : (
               <div className={`inline-block max-w-full overflow-hidden ${rounding} border ${border} bg-zinc-950/40`}>
                 <img
-                  src={url}
+                  src={displaySrc}
                   alt=""
                   className={imgClass}
                   loading={i === 0 ? 'eager' : 'lazy'}
@@ -247,7 +251,8 @@ export function LoungeImageCarousel({
               </button>
             ) : null}
           </div>
-        ))}
+          )
+        })}
       </div>
       {lightbox ? (
         <LoungeImageLightbox

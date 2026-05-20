@@ -20,11 +20,11 @@ import {
   collectLoungePostInteractionHydrateIds,
   communityFeedPlainRepostInsertPayload,
   communityFeedCommentRepostInsertPayload,
-  deleteLoungeFeedStreamPosterFromPublicUrl,
+  deleteLoungeFeedMediaFromPublicUrl,
+  collectLoungeFeedStoredMediaUrls,
   feedPostAuthorEditMediaSeed,
   feedPostDisplayCaption,
   feedPostMediaUpdatePayload,
-  feedPostStreamPosterUrl,
   feedPostStreamVideoUid,
   normalizeFeedCaption,
 } from '../../utils/communityFeedPost'
@@ -3846,8 +3846,9 @@ export default function SocialFeed({
           if (!removeIds.has(row.id)) continue
           const suid = feedCommentStreamVideoUid(row)
           if (suid) await deleteCfStreamOrphanAsset(supabaseClient, suid)
-          const poster = feedPostStreamPosterUrl(row)
-          if (poster) await deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, poster)
+          for (const mediaUrl of collectLoungeFeedStoredMediaUrls(row)) {
+            await deleteLoungeFeedMediaFromPublicUrl(supabaseClient, mediaUrl)
+          }
         }
         const { error } = await supabaseClient
           .from('feed_comments')
@@ -4994,7 +4995,9 @@ export default function SocialFeed({
           return
         }
       }
-      await deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, feedPostStreamPosterUrl(loungePostDetail))
+      for (const mediaUrl of collectLoungeFeedStoredMediaUrls(loungePostDetail)) {
+        await deleteLoungeFeedMediaFromPublicUrl(supabaseClient, mediaUrl)
+      }
       const { error } = await supabaseClient.from('community_feed_posts').delete().eq('id', postId)
       if (error) {
         const msg = String(error.message || '')
@@ -5035,7 +5038,9 @@ export default function SocialFeed({
           return
         }
       }
-      await deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, feedPostStreamPosterUrl(loungePostDetail))
+      for (const mediaUrl of collectLoungeFeedStoredMediaUrls(loungePostDetail)) {
+        await deleteLoungeFeedMediaFromPublicUrl(supabaseClient, mediaUrl)
+      }
       const { error } = await supabaseClient.from('community_feed_posts').delete().eq('id', postId)
       if (error) {
         const msg = String(error.message || '')
@@ -5075,7 +5080,9 @@ export default function SocialFeed({
             return
           }
         }
-        await deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, feedPostStreamPosterUrl(post))
+        for (const mediaUrl of collectLoungeFeedStoredMediaUrls(post)) {
+          await deleteLoungeFeedMediaFromPublicUrl(supabaseClient, mediaUrl)
+        }
         const { error } = await supabaseClient.from('community_feed_posts').delete().eq('id', post.id)
         if (error) {
           const msg = String(error.message || '')
@@ -5121,7 +5128,9 @@ export default function SocialFeed({
             return
           }
         }
-        await deleteLoungeFeedStreamPosterFromPublicUrl(supabaseClient, feedPostStreamPosterUrl(post))
+        for (const mediaUrl of collectLoungeFeedStoredMediaUrls(post)) {
+          await deleteLoungeFeedMediaFromPublicUrl(supabaseClient, mediaUrl)
+        }
         const { error } = await supabaseClient.from('community_feed_posts').delete().eq('id', post.id)
         if (error) {
           const msg = String(error.message || '')

@@ -88,6 +88,9 @@ supabase functions deploy lounge-cf-stream-direct-upload
 supabase functions deploy lounge-cf-stream-delete-video
 supabase functions deploy lounge-cf-stream-delete-orphan
 supabase functions deploy lounge-cf-stream-purge-pending-uploads
+supabase functions deploy lounge-cf-r2-direct-upload
+supabase functions deploy lounge-cf-r2-delete-object
+supabase functions deploy lounge-cf-r2-delete-orphan
 ```
 
 Deploy **`lounge-cf-stream-purge-pending-uploads`** from a repo copy that includes **`supabase/config.toml`** (`verify_jwt = false` for that function) so **`sb_*`** gateway keys work when used from Vault.
@@ -97,6 +100,15 @@ Set **production** Edge secrets for Stream (same **names** as test; rotate value
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_STREAM_API_TOKEN`
 - `LOUNGE_CF_STREAM_PURGE_SECRET` (required for **`lounge-cf-stream-purge-pending-uploads`** only; must match Vault **`lounge_cf_stream_purge_http_secret`** if you use the pg_cron job). **`lounge-cf-stream-delete-orphan`** uses the **caller's Supabase JWT** (same pattern as **`lounge-cf-stream-direct-upload`**), not this secret.
+
+**R2 image secrets** (feed images + Stream tile posters — see **`supabase/functions/lounge-cf-r2-direct-upload/README.md`**):
+
+- `LOUNGE_CF_R2_ACCESS_KEY_ID`
+- `LOUNGE_CF_R2_SECRET_ACCESS_KEY`
+- `LOUNGE_CF_R2_BUCKET`
+- `LOUNGE_CF_R2_PUBLIC_BASE_URL`
+
+**Vercel / Vite client env:** `VITE_LOUNGE_CF_MEDIA_PUBLIC_BASE_URL` (same origin as **`LOUNGE_CF_R2_PUBLIC_BASE_URL`**); optional **`LOUNGE_CF_R2_PUBLIC_BASE_URL`** on Vercel for **`api/lounge-post-og.js`** resize.
 
 Cross-check dashboards: **Production** function list versus **test** (names active, versions reasonable).
 

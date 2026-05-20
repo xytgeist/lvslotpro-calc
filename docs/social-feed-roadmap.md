@@ -180,9 +180,9 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 ### D1. Images (up to 12)
 
-- Upload to Storage.
-- Persist media rows (`post_id`, `sort`, `type=image`, `path`, optional dimensions).
-- Consider resumable upload flow for larger images.
+- **Shipped (test, client):** Multi-image carousel + composer; uploads via **`uploadLoungeFeedPostImage`** (`communityFeedPost.js`). **New path (deploy pending):** **Cloudflare R2** presigned PUT (**`lounge-cf-r2-direct-upload`**) + **`/cdn-cgi/image/`** delivery (`loungeCfImageMedia.js`) for feed, lightbox, Stream posters, OG. Legacy **`lounge-feed`** Supabase Storage URLs remain readable; client falls back to Supabase upload when R2 Edge returns **503**.
+- **Edge secrets (names only):** `LOUNGE_CF_R2_*` — see **`supabase/functions/lounge-cf-r2-direct-upload/README.md`**.
+- **Deferred:** normalized media rows table (`post_id`, `sort`, `type`, `path`); resumable upload for very large stills.
 
 ### D2. Video (1 per post today, max **60s** on Lounge)
 
