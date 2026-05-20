@@ -110,6 +110,7 @@ import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
 import {
   LoungeFeedAutoplayPostsKick,
+  LoungeFeedInlineSoundResetBinder,
   LoungeFeedCoordinatorSuspendBinder,
   LoungeFeedVideoAutoplayProvider,
 } from './LoungeFeedVideoAutoplayContext.jsx'
@@ -662,6 +663,9 @@ export default function SocialFeed({
   const loungeDetailEditMediaInputRef = useRef(null)
   const loungeFeedScrollRef = useRef(null)
   /** Bound inside feed `LoungeFeedVideoAutoplayProvider` — reset feed inline sound when opening post detail. */
+  const resetFeedInlineSoundRef = useRef(() => {})
+  /** Bound inside post-detail `LoungeFeedVideoAutoplayProvider` — reset comment-thread inline sound on close. */
+  const resetPostDetailInlineSoundRef = useRef(() => {})
   const loungeTitleBarRef = useRef(null)
   const loungeScrollPrevTopRef = useRef(0)
   const loungeTitleRevealRef = useRef(1)
@@ -4356,6 +4360,11 @@ export default function SocialFeed({
     loungeDetailCommentsLoadedPostIdRef.current = null
     loungeTitleRevealRef.current = 1
     setLoungeTitleReveal(1)
+    try {
+      resetPostDetailInlineSoundRef.current?.()
+    } catch {
+      // ignore
+    }
   }, [clearLoungeDetailCommentComposerMedia, loungeDetailCommentBackgroundUploadInFlight])
 
   const closeLoungePostDetail = useCallback(() => {
@@ -4385,6 +4394,16 @@ export default function SocialFeed({
       if (loungeReadOnly && !opts?.fromPublicLink) {
         onRequireAuth?.()
         return
+      }
+      try {
+        resetFeedInlineSoundRef.current?.()
+      } catch {
+        /* ignore */
+      }
+      try {
+        resetPostDetailInlineSoundRef.current?.()
+      } catch {
+        /* ignore */
       }
       const wantEdit = opts?.startEditing === true
       const tid = loungePostDetailCloseFallbackTimerRef.current
@@ -4888,6 +4907,14 @@ export default function SocialFeed({
     scrollLoungePostDetailToTopInstant,
   ])
 
+  const resetPostDetailInlineSound = useCallback(() => {
+    try {
+      resetPostDetailInlineSoundRef.current?.()
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const buildLoungeCommentDrillPath = useCallback(
     (commentId) => buildFeedCommentDrillPath(commentId, loungeDetailComments),
     [loungeDetailComments],
@@ -4909,6 +4936,7 @@ export default function SocialFeed({
       cancelLoungeDetailCommentEdit()
       if (!focusComposer) collapseLoungeDetailCommentComposer()
       else loungePostDetailPendingCommentComposerRef.current = true
+      resetPostDetailInlineSound()
       setLoungeCommentDetailPathIds(chain)
     },
     [
@@ -4919,6 +4947,7 @@ export default function SocialFeed({
       loungeReadOnly,
       openProfileGateIfNeeded,
       requireLoungeAuth,
+      resetPostDetailInlineSound,
     ],
   )
 
@@ -4940,8 +4969,9 @@ export default function SocialFeed({
         return prev.slice(0, pathIndex + 1)
       })
       cancelLoungeDetailCommentEdit()
+      resetPostDetailInlineSound()
     },
-    [cancelLoungeDetailCommentEdit],
+    [cancelLoungeDetailCommentEdit, resetPostDetailInlineSound],
   )
 
   const exitLoungeCommentDetailToPostView = useCallback(() => {
@@ -5003,6 +5033,7 @@ export default function SocialFeed({
   useEffect(() => {
     if (loungeCommentDetailPathIds.length === 0 || loungeDetailCommentsLoading) return
     if (!loungePostDetailPanelEntered) return
+    resetPostDetailInlineSound()
     const animate = loungeCommentDetailDirectEntryAnimateRef.current
     if (animate) loungeCommentDetailDirectEntryAnimateRef.current = false
     const run = () => scheduleLoungePostDetailFocusScroll({ animate })
@@ -5023,6 +5054,7 @@ export default function SocialFeed({
     loungeCommentDetailPathIds,
     loungeDetailCommentsLoading,
     loungePostDetailPanelEntered,
+    resetPostDetailInlineSound,
     scheduleLoungePostDetailFocusScroll,
   ])
 
@@ -8011,6 +8043,7 @@ export default function SocialFeed({
       >
         <LoungeFeedVideoAutoplayProvider scrollRootRef={loungeFeedScrollRef} showDebugHud={loungeFeedVideoDebugHudOnFeed}>
         <LoungeFeedAutoplayPostsKick postCount={communityPosts.length} />
+        <LoungeFeedInlineSoundResetBinder resetRef={resetFeedInlineSoundRef} />
         <LoungeFeedCoordinatorSuspendBinder
           suspended={Boolean(
             loungePostDetail?.id || profileModalOpen || profileOverlayStack.length > 0,
@@ -8897,6 +8930,7 @@ export default function SocialFeed({
                 scrollRootRef={loungePostDetailScrollRef}
                 showDebugHud={loungeFeedVideoDebugEnabled && Boolean(loungePostDetail?.id)}
               >
+              <LoungeFeedInlineSoundResetBinder resetRef={resetPostDetailInlineSoundRef} />
               <div
                 aria-hidden
                 className="shrink-0"
