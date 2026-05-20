@@ -1671,10 +1671,6 @@ export default function LoungePostStreamVideo({
         const revealWebKit = () => {
           if (cleaned || lightboxOpenRef.current) return
           stripWebKitVideoPoster(vWebKit)
-          const posterImg = heroInlineSlotRef.current?.querySelector('img')
-          if (posterImg instanceof HTMLImageElement) {
-            posterImg.classList.add('hidden')
-          }
           requestAnimationFrame(() => {
             if (!cleaned) setStreamFadeShowVideo(true)
           })
@@ -2775,9 +2771,11 @@ export default function LoungePostStreamVideo({
   const inlinePosterCoveringVideo = webKitInlineVideoPaint && !streamFadeShowVideo
   const inlinePosterOpacityClass = inlinePosterCoveringVideo
     ? 'opacity-100'
-    : heroExpanded || !(attachStream && effectiveStreamFadeShowVideo)
-      ? 'opacity-100'
-      : 'opacity-0'
+    : webKitInlineVideoPaint && streamFadeShowVideo
+      ? 'opacity-0'
+      : heroExpanded || !(attachStream && effectiveStreamFadeShowVideo)
+        ? 'opacity-100'
+        : 'opacity-0'
   /** During HLS load poster sits above the flyout; during hero it stays behind (fills the card hole only). */
   const inlinePosterZClass =
     inlinePosterCoveringVideo
@@ -2785,8 +2783,6 @@ export default function LoungePostStreamVideo({
       : !heroExpanded && attachStream && !effectiveStreamFadeShowVideo
         ? 'z-[2]'
         : 'relative z-0'
-  const inlinePosterVisibilityClass =
-    webKitInlineVideoPaint && streamFadeShowVideo ? 'hidden' : ''
   /** Hero: touches on the flyout shell (swipe dismiss); video stays paint-only so iOS does not steal gestures. */
   const streamVideoClass = heroExpanded
     ? 'pointer-events-none h-full w-full max-h-full max-w-full object-contain'
@@ -2901,7 +2897,7 @@ export default function LoungePostStreamVideo({
                   decoding="async"
                   draggable={false}
                   loading="eager"
-                  className={`pointer-events-none select-none ${heroExpanded || webKitInlineVideoPaint ? '' : 'transition-opacity ease-out'} ${inlinePosterZClass} ${videoClass} ${inlinePosterOpacityClass} ${inlinePosterVisibilityClass}`}
+                  className={`pointer-events-none select-none ${heroExpanded || webKitInlineVideoPaint ? '' : 'transition-opacity ease-out'} ${inlinePosterZClass} ${videoClass} ${inlinePosterOpacityClass}`}
                   style={
                     heroExpanded || inlinePosterCoveringVideo
                       ? { transition: 'none' }
