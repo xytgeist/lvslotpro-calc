@@ -961,13 +961,11 @@ export default function LoungePostStreamVideo({
     const tid = window.setTimeout(() => setRingHlsHeld(false), RING_HLS_DETACH_HOLD_MS)
     return () => window.clearTimeout(tid)
   }, [inRing, coordinatorActive, lazyStream])
-  const tapToPlayHeroOpen = lazyStream && !feedAutoplayEnabled && (lightboxOpen || heroExpanded)
-  const attachStream =
-    heroExpanded || tapToPlayHeroOpen
-      ? Boolean(id)
-      : lazyStream
-        ? feedAutoplayEnabled && (coordinatorActive ? inRing || ringHlsHeld : streamInView)
-        : true
+  const attachStream = heroExpanded
+    ? Boolean(id)
+    : lazyStream
+      ? feedAutoplayEnabled && (coordinatorActive ? inRing || ringHlsHeld : streamInView)
+      : true
   /** iOS: ≤5 inline `<video>` nodes (ring + lookahead); HLS only on ring (≤3). */
   const mountStreamVideo = Boolean(id) && (
     (coordinatorActive && inDomBudget) ||
@@ -1731,11 +1729,6 @@ export default function LoungePostStreamVideo({
     }
   }, [isActive, inRing, attachStream])
 
-  const attachStreamRef = useRef(attachStream)
-  attachStreamRef.current = attachStream
-  const feedAutoplayEnabledRef = useRef(feedAutoplayEnabled)
-  feedAutoplayEnabledRef.current = feedAutoplayEnabled
-
   const finalizeHeroClose = useCallback(() => {
     heroShrinkInFlightRef.current = false
     heroShrinkFlyoutStyleRef.current = null
@@ -1772,14 +1765,14 @@ export default function LoungePostStreamVideo({
   const finishHeroCloseAnimation = useCallback(() => {
     const snap = inlineFeedSoundSnapshotRef.current
     inlineFeedSoundSnapshotRef.current = null
-    if (snap && feedAutoplayEnabledRef.current) {
+    if (snap && feedAutoplayEnabled) {
       try {
         setLocalStripSoundUnmuted(snap.unmuted)
         setLocalStripSoundExplicitlyMuted(snap.explicitlyMuted)
         const v = videoRef.current
         if (v) {
           v.muted = !snap.unmuted
-          if (attachStreamRef.current || lazyStream) {
+          if (attachStream || lazyStream) {
             const p = v.play()
             if (p && typeof p.catch === 'function') p.catch(() => {})
           }
@@ -1789,7 +1782,7 @@ export default function LoungePostStreamVideo({
       }
     }
     finalizeHeroClose()
-  }, [finalizeHeroClose, lazyStream])
+  }, [attachStream, feedAutoplayEnabled, finalizeHeroClose, lazyStream])
 
   const reportHeroShrinkDebug = useCallback(
     (detail) => {
@@ -1880,9 +1873,6 @@ export default function LoungePostStreamVideo({
       })
     })
   }, [displayW, displayH, finishHeroCloseAnimation, reportHeroShrinkDebug, heroFlyoutZIndex])
-
-  const closeLightboxRef = useRef(closeLightbox)
-  closeLightboxRef.current = closeLightbox
 
   const toggleHeroVideoPlayPause = useCallback(() => {
     const v = videoRef.current
@@ -1992,17 +1982,12 @@ export default function LoungePostStreamVideo({
     if (!wrap) return
 
     lightboxOpenRef.current = true
-    if (feedAutoplayClientId) {
+    if (feedAutoplayClientId && coordinatorActive) {
       enterFeedHeroLock(feedAutoplayClientId)
-      if (feedAutoplayEnabled && coordinatorActive) {
-        forceFeedAutoplayActive(feedAutoplayClientId)
-      }
+      forceFeedAutoplayActive(feedAutoplayClientId)
     }
     notifyLoungeStreamLightboxOpen(true)
-    flushSync(() => {
-      setLightboxOpen(true)
-      setHeroPhase('opening')
-    })
+    flushSync(() => setLightboxOpen(true))
     pauseOtherLoungeStreamVideos(v)
 
     const from = readHeroMediaViewportRect(slot, flyout, wrap, displayW, displayH)
@@ -2042,6 +2027,7 @@ export default function LoungePostStreamVideo({
     }
 
     setHeroLayout(from)
+    setHeroPhase('opening')
     setHeroChromeVisible(false)
     setHeroTransitionArmed(false)
     setHeroBackdropArmed(false)
@@ -2215,8 +2201,8 @@ export default function LoungePostStreamVideo({
 
   useEffect(() => {
     if (!lightboxOpen || !enableLightbox) return undefined
-    return bindLoungeLightboxHistory(() => closeLightboxRef.current())
-  }, [lightboxOpen, enableLightbox])
+    return bindLoungeLightboxHistory(closeLightbox)
+  }, [lightboxOpen, enableLightbox, closeLightbox])
 
   useEffect(() => {
     if (!lightboxOpen || !enableLightbox) return undefined
