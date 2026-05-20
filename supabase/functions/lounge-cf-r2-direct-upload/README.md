@@ -2,7 +2,7 @@
 
 Feed post images, comment images, and **Stream tile posters** upload to **Cloudflare R2** via presigned PUT URLs. Delivery uses your **public custom domain** with optional **`/cdn-cgi/image/`** transforms (WebP/AVIF, width, quality).
 
-Video bytes stay on **Cloudflare Stream** — only the JPEG poster is stored here.
+Video bytes stay on **Cloudflare Stream** — only the tile poster (WebP on R2, same prep as feed images) is stored here.
 
 ## Deploy (Supabase test / prod)
 
@@ -53,7 +53,7 @@ Legacy **`lounge-feed`** Supabase Storage URLs remain readable; new uploads pref
 
 ## Delivery URL shape
 
-Stored in DB: `https://media.yourdomain.com/{userId}/{timestamp}-{rand}.jpg`
+Stored in DB: `https://media.yourdomain.com/{userId}/{timestamp}-{rand}.webp` (feed images + Stream posters)
 
 Feed tile (client): `https://media.yourdomain.com/cdn-cgi/image/width=960,quality=80,format=auto/{userId}/…`
 

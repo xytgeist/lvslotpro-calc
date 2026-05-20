@@ -212,10 +212,12 @@ export async function executeLoungeCommunityPostSubmission({
       if (posterFile) {
         throwIfAborted()
         report(0.82, 'Uploading preview', 'Poster image')
+        const { file: readyPoster, error: posterPrepErr } = await prepareLoungeFeedImageForUpload(posterFile)
+        if (posterPrepErr) throw new Error(posterPrepErr.message)
         const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
           supabaseClient,
           user: session.user,
-          file: posterFile,
+          file: readyPoster,
         })
         if (upErr) throw new Error(upErr.message || 'Could not upload video preview image.')
         if (!upUrl) throw new Error('Could not upload video preview image.')

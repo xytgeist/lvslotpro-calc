@@ -174,7 +174,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 - [x] **`lounge-cf-r2-direct-upload`** + **`lounge-cf-r2-delete-object`** + **`lounge-cf-r2-delete-orphan`** (Lounge feed images + Stream tile posters → **Cloudflare R2**; delivery via **`/cdn-cgi/image/`** when Image Resizing enabled on zone). Client: **`src/utils/loungeCfImageMedia.js`**, **`uploadLoungeFeedPostImage`** in **`communityFeedPost.js`** (R2 when Edge secrets set, else legacy **`lounge-feed`** Supabase Storage). Deployed + secrets on **test** (`jtjgtucumuoswnbauxry`); custom domain **`https://media-test.lvslotpro.com`**; Vercel **`VITE_LOUNGE_CF_IMAGE_RESIZE=false`** (Free zone — client-side WebP prep only until Pro).
   - **Secrets (names only):** `LOUNGE_CF_R2_ACCESS_KEY_ID`, `LOUNGE_CF_R2_SECRET_ACCESS_KEY`, `LOUNGE_CF_R2_BUCKET`, `LOUNGE_CF_R2_PUBLIC_BASE_URL` (+ shared **`CLOUDFLARE_ACCOUNT_ID`**). Client/Vercel: **`VITE_LOUNGE_CF_MEDIA_PUBLIC_BASE_URL`** (match public base).
   - **Source:** `supabase/functions/lounge-cf-r2-direct-upload/README.md`, `LoungePostFeedMedia.jsx`, `LoungeInlineMediaUrl.jsx`, `loungePostSubmitJob.js`, `SocialFeed.jsx` delete paths, `api/lounge-post-og.js`.
-  - **Test validation:** Ryan **PASSED** on **test** (2026-05-19): image post + delete on **`media-test.lvslotpro.com`**; CORS includes **`Cache-Control`**. **Legacy migration PASSED:** **68** objects → R2 (**27** posts, **12** comments). **Cache-Control backfill PASSED:** **69** objects **`public, max-age=31536000, immutable`**. External Klipy **`gif_url`** unchanged. **Open:** video poster on R2 for new uploads, **`/cdn-cgi/image/`** after Pro on **`lvslotpro.com`**.
+  - **Test validation:** Ryan **PASSED** on **test** (2026-05-19): image post + delete on **`media-test.lvslotpro.com`**; CORS includes **`Cache-Control`**. **Legacy migration PASSED:** **68** objects → R2 (**27** posts, **12** comments). **Cache-Control backfill PASSED:** **69** objects **`public, max-age=31536000, immutable`**. External Klipy **`gif_url`** unchanged. **Open:** video poster on R2 for **new** uploads (WebP via **`prepareLoungeFeedImageForUpload`** in submit jobs — Ryan smoke pending); **`/cdn-cgi/image/`** after Pro on **`lvslotpro.com`**.
   - Production replay: `production-rollout-checklist.md` §2 + §4; add **`media.lvslotpro.com`** (or prod media subdomain) + prod secrets when promoting.
 
 - [ ] Function-by-function smoke notes captured  
@@ -346,6 +346,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ---
 
 ## Update log
+
+- 2026-05-19: **Stream tile posters → WebP on R2:** **`loungePostSubmitJob.js`** + **`loungeCommentSubmitJob.js`** run captured JPEG frames through **`prepareLoungeFeedImageForUpload`** before **`uploadLoungeFeedPostImage`** (parity with feed stills). Legacy **`.jpg`** poster URLs unchanged.
 
 - 2026-05-19: **Continuity docs (full May 18–19):** backlog FE rows for unified **`LoungeStreamLightboxContext`** lightbox, **`loungeLightboxImageZoom.js`** pinch/pan, comment-repost fix (**`b782e69`**); smoke **§17**; R2 sign-off line; **`WAKEUP`** + prod checklist §2 search/cooldown/rate-limit migrations; **`AGENTS.md`** / **`frontend-architecture.md`** lightbox anchors.
 
