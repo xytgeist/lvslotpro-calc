@@ -38,6 +38,7 @@ The agent should treat the following as **standing instructions for this session
 
 **Optional add-ons** (delete if not needed)
 
+- **Lounge images (Cloudflare R2):** **`lvslotpro.com`** zone on Cloudflare; bucket **`lounge-media`** + test subdomain **`media-test.lvslotpro.com`**; Edge secrets **`LOUNGE_CF_R2_*`** on test; deploy **`lounge-cf-r2-direct-upload`**, **`lounge-cf-r2-delete-object`**, **`lounge-cf-r2-delete-orphan`**; Vercel **`VITE_LOUNGE_CF_MEDIA_PUBLIC_BASE_URL`** + **`VITE_LOUNGE_CF_IMAGE_RESIZE=false`** (Free zone). Legacy migrate: **`scripts/migrate-lounge-feed-to-r2.mjs`**. Cache backfill: **`scripts/backfill-r2-cache-control.mjs`**. See **`docs/test-buildout-backlog.md`** Edge row + **`supabase/functions/lounge-cf-r2-direct-upload/README.md`**.
 - **Lounge video (Cloudflare Stream):** run **`supabase/lounge_feed_post_stream_video.sql`** on the Supabase project; set Edge secrets **`CLOUDFLARE_ACCOUNT_ID`** and **`CLOUDFLARE_STREAM_API_TOKEN`**; deploy to **test** (`--project-ref jtjgtucumuoswnbauxry`) with  
   `supabase functions deploy lounge-cf-stream-direct-upload --project-ref jtjgtucumuoswnbauxry`,  
   `supabase functions deploy lounge-cf-stream-delete-video --project-ref jtjgtucumuoswnbauxry`,  
@@ -64,28 +65,30 @@ The agent should treat the following as **standing instructions for this session
 
 **Branch:** `test`
 
-**Supabase:** **test** (project ref: jtjgtucumuoswnbauxry)
+**Supabase:** **test** (project ref: `jtjgtucumuoswnbauxry`)
 
 **Goal:** _[one line: what you want done this session]_
 
-**Start by reading:** `AGENTS.md`, `docs/social-feed-roadmap.md`, `docs/test-buildout-backlog.md`, `docs/frontend-architecture.md`, then propose a plan.
+**Start by reading:** `AGENTS.md`, `docs/test-buildout-backlog.md`, `docs/production-rollout-checklist.md` (§3.5 R2), then propose a plan.
 
 ---
 
-## Last session recap (May 18 2026, branch `test`)
+## Last session recap (May 19 2026, branch `test`)
 
-**Stream hero expand + feed video staging** — all committed and pushed through **`7dbbec7`**:
+**Lounge feed images → Cloudflare R2 (test fully wired):**
 
-| Commit | What |
-|---|---|
-| `4cba1e5` → `b16d35d` | X-style **hero expand**: same `<video>`, GPU FLIP, body reparent, portrait media rect |
-| `2c0cfd9` | **Prefetch-band staging** — winner plays; neighbors attach HLS paused (cap 24) |
-| `1286cc0` | Hero **hardening**: tap snapshot, canvas frame shield, deferred scrim; feed page **40** |
-| `7dbbec7` | Restore **swipe-to-dismiss** on hero video (`touch-none`, flyout shell handles gestures) |
+| Area | Status |
+|------|--------|
+| **Cloudflare** | **`lvslotpro.com`** zone; bucket **`lounge-media`**; **`media-test.lvslotpro.com`**; CORS includes **`Cache-Control`** |
+| **Supabase Edge** | **`lounge-cf-r2-direct-upload`**, **delete-object**, **delete-orphan**, **migrate-lounge-feed**, **backfill-cache-control** on **`jtjgtucumuoswnbauxry`** |
+| **Migration** | **68** legacy **`lounge-feed`** objects → R2; **0** remaining Supabase URLs |
+| **Cache headers** | **`public, max-age=31536000, immutable`** on upload + backfill (**69** objects) |
+| **Smoke** | Ryan **PASSED** upload, delete, post-migration feed, CORS upload |
 
-**Still open:** Ryan sign-off on hero expand / staging smoke on test deploy (backlog row marked pending).
+**Commits through **`0978782`**. Prod replay: **`docs/production-rollout-checklist.md`** §3.5 + §4 + §5.
 
-**Previous session (still in scope):**
-- Video submit queue + fast lane + parallel prep (`57eaca2`, Ryan **PASSED**)
-- Upload toast z-index, FAB flicker, following filter flash (`1206f0a`, `35974bc`)
-- `@handle` / `#hashtag` taps, comment-only post detail mode, nested `<button>` fix
+**Still open (non-blocking):** Cloudflare **Pro** for **`/cdn-cgi/image/`** edge resize; **`media.lvslotpro.com`** when prod R2 ships; video **poster** uploads to R2 on new video posts.
+
+**Previous session (May 18):** Stream hero expand + prefetch-band staging through **`7dbbec7`** — see backlog smoke rows.
+
+
