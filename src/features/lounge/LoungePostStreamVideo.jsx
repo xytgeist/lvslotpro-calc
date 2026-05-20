@@ -180,26 +180,54 @@ function heroRectUsableForShrinkBack(rect) {
   return bottom > 0 && rect.top < window.innerHeight
 }
 
-/** Target hero frame: centered, object-contain aspect from source tile. */
-function computeHeroTargetRect(fromRect) {
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 390
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+/** Target hero frame: centered, object-contain aspect from source tile or stream display dims. */
+function computeHeroTargetRect(fromRect, opts = {}) {
+  const { hasFooter = false, displayW, displayH } = opts
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null
+  const vw = vv?.width ?? (typeof window !== 'undefined' ? window.innerWidth : 390)
+  const vh = vv?.height ?? (typeof window !== 'undefined' ? window.innerHeight : 800)
+  const landscape = vw > vh
+
+  let aspect = fromRect.width / Math.max(fromRect.height, 1)
+  const dw = Number(displayW)
+  const dh = Number(displayH)
+  if (Number.isFinite(dw) && Number.isFinite(dh) && dw >= 2 && dh >= 2) {
+    aspect = dw / dh
+  }
+
+  if (landscape) {
+    // Landscape: fill viewport; close/footer chrome overlays (not reserved in layout).
+    const maxW = Math.max(120, vw)
+    const maxH = Math.max(120, vh)
+    let w = maxW
+    let h = w / aspect
+    if (h > maxH) {
+      h = maxH
+      w = h * aspect
+    }
+    return {
+      top: (vh - h) / 2 + (vv?.offsetTop ?? 0),
+      left: (vw - w) / 2 + (vv?.offsetLeft ?? 0),
+      width: w,
+      height: h,
+    }
+  }
+
   const topInset = 12
   const bottomInset = 12
   const headerH = 44
-  const footerReserve = 56
+  const footerReserve = hasFooter ? 56 : 12
   const side = 8
   const maxW = Math.max(120, vw - side * 2)
   const maxH = Math.max(120, vh - topInset - bottomInset - headerH - footerReserve)
-  const aspect = fromRect.width / Math.max(fromRect.height, 1)
   let w = maxW
   let h = w / aspect
   if (h > maxH) {
     h = maxH
     w = h * aspect
   }
-  const left = (vw - w) / 2
-  const top = topInset + headerH + Math.max(0, (maxH - h) / 2)
+  const left = (vw - w) / 2 + (vv?.offsetLeft ?? 0)
+  const top = topInset + headerH + Math.max(0, (maxH - h) / 2) + (vv?.offsetTop ?? 0)
   return { top, left, width: w, height: h }
 }
 
@@ -1919,7 +1947,11 @@ export default function LoungePostStreamVideo({
     pauseOtherLoungeStreamVideos(v)
 
     const from = readHeroMediaViewportRect(slot, flyout, wrap, displayW, displayH)
-    const target = computeHeroTargetRect(from)
+    const target = computeHeroTargetRect(from, {
+      hasFooter: Boolean(mediaLightboxFooter),
+      displayW,
+      displayH,
+    })
     heroFromRectRef.current = from
     heroTargetRectRef.current = target
 
@@ -2006,7 +2038,48 @@ export default function LoungePostStreamVideo({
     forceFeedAutoplayActive,
     enterFeedHeroLock,
     heroFlyoutZIndex,
+    mediaLightboxFooter,
   ])
+
+  /** Re-layout hero video when the device rotates or the viewport resizes while full-screen. */
+  useEffect(() => {
+    if (!lightboxOpen || heroPhase !== 'open') return undefined
+    let raf = 0
+    let tid = 0
+    const applyHeroViewportLayout = () => {
+      const from = heroFromRectRef.current
+      if (!from || heroPhaseRef.current !== 'open') return
+      const target = computeHeroTargetRect(from, {
+        hasFooter: Boolean(mediaLightboxFooter),
+        displayW,
+        displayH,
+      })
+      heroTargetRectRef.current = target
+      setHeroLayout(target)
+    }
+    const schedule = () => {
+      if (raf) cancelAnimationFrame(raf)
+      if (tid) window.clearTimeout(tid)
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        applyHeroViewportLayout()
+      })
+      tid = window.setTimeout(applyHeroViewportLayout, 120)
+    }
+    schedule()
+    window.addEventListener('resize', schedule)
+    window.addEventListener('orientationchange', schedule)
+    window.visualViewport?.addEventListener('resize', schedule)
+    window.visualViewport?.addEventListener('scroll', schedule)
+    return () => {
+      if (raf) cancelAnimationFrame(raf)
+      if (tid) window.clearTimeout(tid)
+      window.removeEventListener('resize', schedule)
+      window.removeEventListener('orientationchange', schedule)
+      window.visualViewport?.removeEventListener('resize', schedule)
+      window.visualViewport?.removeEventListener('scroll', schedule)
+    }
+  }, [lightboxOpen, heroPhase, displayW, displayH, mediaLightboxFooter])
 
   /** Bottom strip: per-tile mute toggle (user gesture unmutes this clip only). */
   const onSoundStripPress = useCallback(() => {

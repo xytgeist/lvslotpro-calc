@@ -4203,8 +4203,12 @@ export default function SocialFeed({
   }, [profileModalOpen, loungePostDetail, closeLoungePostDetail, scrollLoungeFeedToTop])
 
   const onLoungeDockSearch = useCallback(() => {
+    if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
+      onRequireAuth?.()
+      return
+    }
     setLoungeDockPanel((p) => (p === 'search' ? null : 'search'))
-  }, [])
+  }, [loungeFeedBrowseMode, loungeReadOnly, onRequireAuth])
   const onLoungeDockNotifications = useCallback(() => {
     setLoungeDockPanel((p) => (p === 'notifications' ? null : 'notifications'))
   }, [])
@@ -7011,6 +7015,15 @@ export default function SocialFeed({
     [openProfileGateIfNeeded, openProfileModal, profileEntityStub, profileModalOpen, pushProfileOverlay],
   )
 
+  const onLoungeDockOpenProfileFromSearch = useCallback(
+    (entity) => {
+      if (!entity?.user_id) return
+      setLoungeDockPanel(null)
+      openAuthorProfile(entity)
+    },
+    [openAuthorProfile],
+  )
+
   /** Open a profile by handle string — used when a viewer taps an @mention in a caption or comment. */
   const openProfileByHandle = useCallback(
     async (handle) => {
@@ -7090,12 +7103,16 @@ export default function SocialFeed({
   /** Open the search panel pre-filtered by a tapped #hashtag. */
   const openSearchByHashtag = useCallback(
     (tag) => {
+      if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
+        onRequireAuth?.()
+        return
+      }
       const q = tag.startsWith('#') ? tag.slice(1) : tag
       setLoungeDockSearchQuery(q)
       setLoungeDockSearchQueryVersion((v) => v + 1)
       setLoungeDockPanel('search')
     },
-    [],
+    [loungeFeedBrowseMode, loungeReadOnly, onRequireAuth],
   )
 
   const onLoungeDockOpenOwnProfile = useCallback(() => {
@@ -9748,6 +9765,9 @@ export default function SocialFeed({
           activePanel={loungeDockPanel}
           postCardProps={profilePostCardProps}
           onOpenPostFromSearch={onLoungeDockOpenPostFromSearch}
+          searchSupabaseClient={supabaseClient}
+          hydrateSearchPosts={hydrateCommunityPosts}
+          onOpenProfileFromSearch={onLoungeDockOpenProfileFromSearch}
           chatSupabaseClient={supabaseClient}
           chatViewerUserId={composerUserId || ''}
           chatHasActiveSubscription={hasActiveSubscription}

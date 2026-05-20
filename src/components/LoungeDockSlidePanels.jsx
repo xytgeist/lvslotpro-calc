@@ -1,9 +1,24 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { feedPostDisplayCaption, loungePostInteractionScore } from '../utils/communityFeedPost'
+import { loungePostInteractionScore } from '../utils/communityFeedPost'
 import EdgeLogoWithEasterEgg from './EdgeLogoWithEasterEgg.jsx'
 import TitleBarStatusLine from './TitleBarStatusLine.jsx'
 import LoungePostArticle from '../features/lounge/LoungePostArticle.jsx'
-import { LOUNGE_FEED_POST_ROW_CLASS } from '../features/lounge/loungeFeedAvatar.js'
+import LoungeOgBadge from '../features/lounge/LoungeOgBadge.jsx'
+import {
+  LOUNGE_FEED_AVATAR_CLASS,
+  LOUNGE_FEED_META_ROW_CLASS,
+  LOUNGE_FEED_POST_ROW_CLASS,
+} from '../features/lounge/loungeFeedAvatar.js'
+import {
+  profileAvatarInitials,
+  profileAvatarToneClass,
+} from '../features/profiles/profileGate.js'
+import {
+  LOUNGE_SEARCH_MIN_CHARS,
+  SEARCH_DEBOUNCE_MS,
+  loungeSearchPosts,
+  loungeSearchProfiles,
+} from '../features/lounge/loungeSearchApi.js'
 import {
   LoungeFeedCoordinatorSuspendBinder,
   LoungeFeedVideoAutoplayProvider,
@@ -54,6 +69,12 @@ export default function LoungeDockSlidePanels({
   activePanel = null,
   /** Open a post from search (full row); closes the panel and opens post detail like the main feed. */
   onOpenPostFromSearch,
+  /** Signed-in Supabase client for Phase G server search RPCs. */
+  searchSupabaseClient = null,
+  /** Same as `AppShell` `hydrateCommunityPosts` — attaches author profiles + repost embeds. */
+  hydrateSearchPosts = null,
+  /** Open a profile row from search (`user_id` + optional `author_profile`). */
+  onOpenProfileFromSearch,
   chatSupabaseClient = null,
   chatViewerUserId = '',
   chatHasActiveSubscription = false,
@@ -101,51 +122,79 @@ export default function LoungeDockSlidePanels({
   const panelScrollVisualRafRef = useRef(0)
 
   const [q, setQ] = useState(() => initialSearchQuery || '')
+  const [searchPosts, setSearchPosts] = useState([])
+  const [searchProfiles, setSearchProfiles] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState(null)
 
-  const filteredSearchPosts = useMemo(() => {
-    const s = q.trim().toLowerCase()
+  const trimmedQuery = q.trim()
+  const queryReady = trimmedQuery.length >= LOUNGE_SEARCH_MIN_CHARS
+
+  const localTrendingPosts = useMemo(() => {
     const base = communityPosts || []
-    if (!s) {
-      const all = base.slice()
-      all.sort((a, b) => {
-        const d = loungePostInteractionScore(b) - loungePostInteractionScore(a)
-        if (d !== 0) return d
-        return new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime()
-      })
-      return all
+    const all = base.slice()
+    all.sort((a, b) => {
+      const d = loungePostInteractionScore(b) - loungePostInteractionScore(a)
+      if (d !== 0) return d
+      return new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime()
+    })
+    return all
+  }, [communityPosts])
+
+  const displayPosts = queryReady ? searchPosts : localTrendingPosts
+
+  useEffect(() => {
+    if (openPanel !== 'search') return
+    if (!searchSupabaseClient || !hydrateSearchPosts) return
+
+    if (!queryReady) {
+      setSearchPosts([])
+      setSearchProfiles([])
+      setSearchError(null)
+      setSearchLoading(false)
+      return
     }
 
-    // Strip leading # so "#lasvegas" and "lasvegas" search identically.
-    const hashBase = s.startsWith('#') ? s.slice(1) : s
-    // Only apply hashtag-bucket logic when the term is a single word (no spaces).
-    const isWordQuery = hashBase.length > 0 && !hashBase.includes(' ')
-    // Escape special regex chars in the term.
-    const esc = hashBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const exactRe = isWordQuery ? new RegExp(`#${esc}(?![\\w-])`, 'i') : null
-    const prefixRe = isWordQuery ? new RegExp(`#${esc}[\\w-]`, 'i') : null
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setSearchLoading(true)
+        setSearchError(null)
+        try {
+          const [postRows, profileRows] = await Promise.all([
+            loungeSearchPosts(searchSupabaseClient, trimmedQuery),
+            loungeSearchProfiles(searchSupabaseClient, trimmedQuery),
+          ])
+          if (cancelled) return
+          const hydrated = postRows.length ? await hydrateSearchPosts(postRows) : []
+          if (cancelled) return
+          const ids = hydrated.map((p) => p.id).filter(Boolean)
+          postCardProps?.refreshPostInteractions?.(ids)
+          setSearchPosts(hydrated)
+          setSearchProfiles(profileRows || [])
+        } catch (err) {
+          if (cancelled) return
+          setSearchPosts([])
+          setSearchProfiles([])
+          setSearchError(err?.message || 'Search failed.')
+        } finally {
+          if (!cancelled) setSearchLoading(false)
+        }
+      })()
+    }, SEARCH_DEBOUNCE_MS)
 
-    const tsMs = (p) => new Date(p?.created_at || 0).getTime()
-
-    const buckets = [[], [], []] // 0=exact hashtag, 1=prefix hashtag, 2=text match
-    for (const p of base) {
-      const cap = feedPostDisplayCaption(p).toLowerCase()
-      const game = String(p?.game_title || '').toLowerCase()
-      if (exactRe?.test(cap)) {
-        buckets[0].push(p)
-      } else if (prefixRe?.test(cap)) {
-        buckets[1].push(p)
-      } else if (cap.includes(s) || game.includes(s)) {
-        buckets[2].push(p)
-      }
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
     }
-
-    // Within each bucket: most recent first.
-    for (const bucket of buckets) {
-      bucket.sort((a, b) => tsMs(b) - tsMs(a))
-    }
-
-    return [...buckets[0], ...buckets[1], ...buckets[2]]
-  }, [communityPosts, q])
+  }, [
+    openPanel,
+    trimmedQuery,
+    queryReady,
+    searchSupabaseClient,
+    hydrateSearchPosts,
+    postCardProps,
+  ])
 
   const panelTitleBarChromePx = panelTitleBarHeight > 0 ? panelTitleBarHeight : 56
   const scrollBottomInsetPx = loungeDockFabScrollBottomInsetPx()
@@ -433,21 +482,95 @@ export default function LoungeDockSlidePanels({
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search captions & games…"
+              placeholder="Search posts, games, hashtags, profiles…"
               autoComplete="off"
-              className="mb-3 w-full rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-2.5 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-cyan-500/45 focus:ring-1 focus:ring-cyan-500/25"
+              className="mb-2 w-full rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-2.5 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-cyan-500/45 focus:ring-1 focus:ring-cyan-500/25"
             />
+            {!queryReady ? (
+              <p className="mb-3 text-[13px] leading-relaxed text-zinc-500">
+                Type at least {LOUNGE_SEARCH_MIN_CHARS} characters to search all Lounge posts and profiles. Below:
+                top posts from your loaded feed.
+              </p>
+            ) : null}
+            {searchLoading ? (
+              <p className="mb-3 text-[14px] leading-relaxed text-zinc-500">Searching…</p>
+            ) : null}
+            {searchError ? (
+              <p className="mb-3 text-[14px] leading-relaxed text-red-400">{searchError}</p>
+            ) : null}
             {!postCardProps ? (
               <p className="text-[14px] leading-relaxed text-zinc-500">Search is not available.</p>
-            ) : filteredSearchPosts.length === 0 ? (
-              <p className="text-[14px] leading-relaxed text-zinc-500">No posts match.</p>
+            ) : queryReady &&
+              !searchLoading &&
+              !searchError &&
+              displayPosts.length === 0 &&
+              searchProfiles.length === 0 ? (
+              <p className="text-[14px] leading-relaxed text-zinc-500">No results.</p>
+            ) : !queryReady && localTrendingPosts.length === 0 ? (
+              <p className="text-[14px] leading-relaxed text-zinc-500">No posts loaded yet.</p>
             ) : (
               <LoungeFeedVideoAutoplayProvider
                 scrollRootRef={panelScrollRef}
                 showDebugHud={feedVideoDebugEnabled && openPanel === 'search'}
               >
                 <LoungeFeedCoordinatorSuspendBinder suspended={videoCoordinatorSuspended} />
-                {filteredSearchPosts.map((post) => (
+                {queryReady && searchProfiles.length > 0 ? (
+                  <section className="mb-3">
+                    <h3 className="mb-1 px-0.5 text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
+                      Profiles
+                    </h3>
+                    <ul className="list-none p-0">
+                      {searchProfiles.map((profile) => {
+                        const displayName = String(profile.display_name || profile.handle || 'Member').trim()
+                        const handle = String(profile.handle || '').trim()
+                        const seed = profile.user_id || handle || displayName
+                        return (
+                          <li key={profile.user_id}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onOpenProfileFromSearch?.({
+                                  user_id: profile.user_id,
+                                  author_profile: profile,
+                                })
+                              }
+                              className="flex w-full items-center gap-3 border-t border-zinc-800/70 bg-zinc-950/35 px-0.5 py-2.5 text-left touch-manipulation active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                            >
+                              {profile.avatar_url ? (
+                                <img
+                                  src={profile.avatar_url}
+                                  alt=""
+                                  className={`${LOUNGE_FEED_AVATAR_CLASS} object-cover`}
+                                />
+                              ) : (
+                                <div
+                                  className={`${LOUNGE_FEED_AVATAR_CLASS} grid place-items-center ${profileAvatarToneClass(seed)}`}
+                                >
+                                  {profileAvatarInitials(displayName, handle)}
+                                </div>
+                              )}
+                              <span className="min-w-0 flex-1">
+                                <span className={LOUNGE_FEED_META_ROW_CLASS}>
+                                  <span className="truncate font-semibold text-zinc-100">{displayName}</span>
+                                  <LoungeOgBadge isOg={profile.is_og === true} size="feed" />
+                                </span>
+                                {handle ? (
+                                  <span className="mt-0.5 block truncate text-[14px] text-zinc-500">@{handle}</span>
+                                ) : null}
+                              </span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </section>
+                ) : null}
+                {queryReady && displayPosts.length > 0 ? (
+                  <h3 className="mb-1 px-0.5 text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Posts
+                  </h3>
+                ) : null}
+                {displayPosts.map((post) => (
                   <article
                     key={post.id}
                     style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}

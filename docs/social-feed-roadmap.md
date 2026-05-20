@@ -229,9 +229,13 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 ## Phase G - Search (signed-in only)
 
-- Postgres `ILIKE`/trgm for posts + game tags.
+**Shipped on test (2026-05-18):** Postgres **`pg_trgm`** indexes + auth-gated RPCs **`lounge_search_posts`** / **`lounge_search_profiles`** (`supabase/lounge_search_phase_g.sql`, migration **`20260518160000_lounge_search_phase_g.sql`**). Client: **`src/features/lounge/loungeSearchApi.js`**, dock search panel in **`LoungeDockSlidePanels.jsx`** (server search at 2+ chars; profile rows; empty query = top posts from loaded feed). Anon blocked at **`SocialFeed.jsx`** (dock + hashtag tap).
+
+- Postgres `ILIKE`/trgm for posts + game tags + hashtag bucketing in RPC.
 - Profile search on handle + display name.
-- Auth-gated RPC for search endpoints.
+- Auth-gated RPC for search endpoints (`authenticated` role only; `auth.uid()` required).
+
+**Pending:** Ryan smoke on test after SQL apply (see **`docs/test-buildout-backlog.md`** smoke §16).
 
 ---
 

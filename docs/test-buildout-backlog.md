@@ -97,12 +97,13 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 - [x] Cursor pagination on `(created_at, id)` is implemented with load-more pagination (infinite auto-load polish still optional).
 - [x] Pinned row: head load fetches at most one pinned row plus first unpinned page; pinned prepended; load-more uses unpinned-only cursor (matches roadmap “prepend one pinned” shape). RLS hides `hidden_at` rows.
 - [ ] **Staff pin/unpin (and broader Lounge moderation UI):** **Admin → profile ⋯ → Promote to moderator / Remove moderator role** shipped on **test** (requires **`admin_set_profile_role.sql`** on Supabase). Pin/unpin + staff delete exist in post detail for staff; no dedicated mod queue yet. **Database is ready:** `profiles.role in ('moderator','admin')` may `UPDATE` any feed row (`community_feed_posts_update_moderator` in `supabase/feed_phase_a_profiles_public_read.sql`), and `community_feed_posts_author_guard` lets staff change `pinned` / hide fields without hitting the author-only restriction. Until an in-app mod surface exists, **test pinned ordering** by rerunning the pin block at the end of `supabase/seed/lounge_fake_posts.sql` (clears pins, pins one visible row) or with a one-off `UPDATE` in the Supabase SQL editor (respect the partial unique index: at most one `pinned = true` among non-hidden rows).
-- [x] Logged-out Lounge: composer hidden; like/comment/repost/bookmark are read-only (server counts only, no local mutation UI). Feed search is not a Lounge surface yet (Phase G). Guides search remains on Guides tab.
+- [x] Logged-out Lounge: composer hidden; like/comment/repost/bookmark are read-only (server counts only, no local mutation UI). **Lounge search** (dock) requires sign-in — **Phase G** server RPCs (`lounge_search_posts` / `lounge_search_profiles`); anon tap → create-account modal. Guides search remains on Guides tab.
 
 ### Phases C-L
 
-- [ ] Phases **D–L** not complete end-to-end; **E/F first slice validated on test** (likes, reposts, bookmarks, flat + threaded comments + comment interactions — see checked SQL/FE rows). Threaded **ranking**, server **search**, **notifications**, etc. still roadmap scope.
+- [ ] Phases **D–L** not complete end-to-end; **E/F first slice validated on test** (likes, reposts, bookmarks, flat + threaded comments + comment interactions — see checked SQL/FE rows). **Phase G search** shipped on **test** (pending Ryan smoke). Threaded **ranking**, **notifications**, etc. still roadmap scope.
 - [x] **Phase C (profiles + identity, test):** profile gate (Lounge + Guides); full-screen profile editor; 7-day handle change (DB + modals); **`/u/:handle`** permalink + OG + deep link; **handle conflict** dialog (taken/reserved + suggested `@handle_1`). Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18). *Deferred (not blocking):* dedicated server-side reserved-handle SQL beyond client `RESERVED_HANDLES` + unique index; standalone marketing profile page beyond in-app sheet.
+- [ ] **Phase G (search, test):** **`supabase/lounge_search_phase_g.sql`** + migration **`20260518160000_lounge_search_phase_g.sql`** — auth-gated RPCs (`pg_trgm` indexes; posts by caption/game/hashtag; profiles by handle/display name). Client: **`loungeSearchApi.js`**, **`LoungeDockSlidePanels.jsx`** (debounced server search + profile rows); **`SocialFeed.jsx`** auth-gates dock search + hashtag tap. **Apply SQL on test** before smoke.
 - [ ] **Freemium / subscriptions:** anonymous read-only where required; free-account vs subscriber entitlements (DB + **RLS** + Stripe webhooks); extend shell gating beyond today’s **`browseMode`**. Product spec: fill **`docs/access-tiers.md`**; roadmap: **`docs/social-feed-roadmap.md`** → *Freemium & subscriptions*.
 
 ---
@@ -125,6 +126,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Change: Tables + RLS + triggers for Lounge engagement; `repost_count` on posts; client wiring in `SocialFeed.jsx` / `LoungePostArticle.jsx` / `AppShell.jsx`. Comment-row interactions via **`20260515190000_feed_comment_interactions.sql`** (§5b in canonical SQL).
   - Source: `supabase/feed_interactions_phase_ef.sql`
   - Test validation: Run SQL on test project; signed-in user can like/repost/bookmark and post top-level comments; counts update; anon still read-only on actions. Ryan sign-off **PASSED** on **test** @ **`b8d55d3`** (2026-05-18) — feed, post detail, profile tabs, quote repost; comment like/repost/bookmark on post detail.
+  - Production replay: `production-rollout-checklist.md` §2
+
+- [ ] Lounge search Phase G (posts + profiles RPCs) on test  
+  - Change: `pg_trgm` indexes + **`lounge_search_posts`** / **`lounge_search_profiles`** (auth-gated); dock search client in **`LoungeDockSlidePanels.jsx`**.
+  - Source: `supabase/lounge_search_phase_g.sql`, migration **`20260518160000_lounge_search_phase_g.sql`**
+  - Test validation: Smoke **§16** after SQL apply on test.
   - Production replay: `production-rollout-checklist.md` §2
 
 - [ ] Additional SQL parity audit against test history  
@@ -299,6 +306,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
         - [x] **Fast lane:** while video 1 uploading, post text-only, image-only, and GIF-only — each lands **without** waiting for the video queue to drain. *(2026-05-18 **PASSED**.)*
         - [x] **Parallel prep:** DevTools **Network** while **Post 1 of 2** active — **two** **`lounge-cf-stream-tus-create`** (201) and **two** tus upload ids (`?tusv2=true`) before job 2's bar turn; red **`video.m3u8`** poll noise OK if posts succeed. *(2026-05-18 **PASSED**.)*
         - [x] **Profile Likes hydration:** Likes tab → open liked post → like toggle does not **`post_likes_pk`** duplicate error. *(2026-05-18 **PASSED**.)*
+    16. **Lounge search (Phase G):** after **`20260518160000_lounge_search_phase_g.sql`** on test — **logged out:** dock **Search** or **#hashtag** tap → create-account modal (no panel). **Logged in:** search **2+ chars** finds posts **not** in loaded feed (caption / game / hashtag); **Profiles** section matches handle or display name; tap profile row → profile sheet; tap post → detail. Empty query shows **top posts from loaded feed** only.
   - **Sign-off:** Manual steps above passed on **test** (operator confirmation after latest `test` deploy).
   - **Sign-off (composer + quote media + badge tips, 2026-05-18, Ryan):** Smoke **§12** items **PASSED** on **test**; badge tip stickiness addressed with document **pointerdown** + **Escape** dismiss on open tip.
   - **Sign-off (video submit queue + parallel prep, 2026-05-18, Ryan):** Smoke **§15** **PASSED** on **test** (`57eaca2`); async two-video test + DevTools two-mint/two-tus lanes; fast-lane mixed stack; profile likes re-like.
@@ -317,6 +325,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ---
 
 ## Update log
+
+- 2026-05-18: **Phase G — Lounge server search (test build):** **`supabase/lounge_search_phase_g.sql`** + migration **`20260518160000_lounge_search_phase_g.sql`** (`lounge_search_posts`, `lounge_search_profiles`, `pg_trgm` indexes; auth-only). Client: **`loungeSearchApi.js`**, **`LoungeDockSlidePanels.jsx`** (debounced RPC + profile rows + local trending when query &lt; 2 chars), **`SocialFeed.jsx`** auth-gates dock search + hashtag tap. Smoke **§16**; apply SQL on test before validation.
 
 - 2026-05-18: **Phase C sign-off (Ryan):** **`/u/:handle`** permalink + OG + deep link; handle conflict dialog (taken/reserved). Phase C backlog row + FE rows checked; smoke **§6**. **PASSED** on **test** @ **`7ce7b44`**.
 
