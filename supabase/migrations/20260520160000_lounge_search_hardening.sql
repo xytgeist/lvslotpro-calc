@@ -1,24 +1,5 @@
--- Phase G — Lounge server search (authenticated only): posts + profiles + comments.
--- Apply on test after feed + profiles foundation (`feed_phase_a_profiles_public_read.sql`).
--- Client: `src/features/lounge/loungeSearchApi.js`, `LoungeDockSlidePanels.jsx`.
-
-create extension if not exists pg_trgm with schema extensions;
-
--- Trgm indexes for ILIKE / similarity on captions, game titles, and profile fields.
-create index if not exists community_feed_posts_search_caption_trgm_idx
-  on public.community_feed_posts using gin (lower(caption) extensions.gin_trgm_ops);
-
-create index if not exists community_feed_posts_search_game_trgm_idx
-  on public.community_feed_posts using gin (lower(game_title) extensions.gin_trgm_ops);
-
-create index if not exists profiles_search_handle_trgm_idx
-  on public.profiles using gin (lower(handle) extensions.gin_trgm_ops);
-
-create index if not exists profiles_search_display_name_trgm_idx
-  on public.profiles using gin (lower(display_name) extensions.gin_trgm_ops);
-
-create index if not exists feed_comments_search_body_trgm_idx
-  on public.feed_comments using gin (lower(body) extensions.gin_trgm_ops);
+-- Search hardening: 128-char cap, strpos (no LIKE wildcards), 5s statement_timeout per RPC.
+-- See supabase/lounge_search_phase_g.sql.
 
 create or replace function public.lounge_normalize_search_term(p_query text)
 returns text
@@ -30,96 +11,6 @@ $$;
 
 comment on function public.lounge_normalize_search_term(text) is
   'Trim, lower-case, and cap Lounge search input at 128 chars.';
-
-create or replace function public.lounge_escape_like_pattern(p text)
-returns text
-language sql
-immutable
-as $$
-  select replace(replace(replace(coalesce(p, ''), E'\\', E'\\\\'), '%', E'\\%'), '_', E'\\_');
-$$;
-
-comment on function public.lounge_escape_like_pattern(text) is
-  'Escape %, _, and \\ for LIKE ... ESCAPE ''\\'' (safe substring patterns).';
-
-create or replace function public.lounge_search_text_matches(haystack text, needle text)
-returns boolean
-language sql
-stable
-as $$
-  select
-    coalesce(needle, '') <> ''
-    and (
-      lower(coalesce(haystack, '')) like '%' || public.lounge_escape_like_pattern(needle) || '%' escape '\'
-      or (
-        char_length(needle) >= 3
-        and extensions.similarity(lower(coalesce(haystack, '')), needle) > 0.15
-      )
-    );
-$$;
-
-comment on function public.lounge_search_text_matches(text, text) is
-  'Escaped LIKE substring (GIN trgm-friendly) OR pg_trgm similarity when needle length >= 3.';
-
--- Shared rate limit for lounge_search_* RPCs (~30 logical searches / 5 min; staff exempt).
-create or replace function public.lounge_search_enforce_rate_limit()
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_uid uuid;
-  v_kind text := 'lounge_search';
-  v_window interval := interval '5 minutes';
-  v_limit integer := 30;
-  v_window_start timestamptz;
-  v_count integer;
-  v_oldest_in_window timestamptz;
-  v_retry_seconds integer;
-  v_role text;
-begin
-  v_uid := auth.uid();
-  if v_uid is null then
-    raise exception 'LOUNGE_SEARCH_AUTH_REQUIRED'
-      using message = 'Sign in to search the Lounge.';
-  end if;
-
-  select role into v_role from public.profiles where user_id = v_uid;
-  if v_role in ('admin', 'moderator') then
-    return;
-  end if;
-
-  v_window_start := now() - v_window;
-
-  select count(*)
-  into v_count
-  from public.rate_limit_events e
-  where e.user_id = v_uid
-    and e.kind = v_kind
-    and e.created_at >= v_window_start;
-
-  if v_count >= v_limit then
-    select min(e.created_at)
-    into v_oldest_in_window
-    from public.rate_limit_events e
-    where e.user_id = v_uid
-      and e.kind = v_kind
-      and e.created_at >= v_window_start;
-
-    v_retry_seconds := greatest(
-      1,
-      ceil(extract(epoch from ((coalesce(v_oldest_in_window, now()) + v_window) - now())))::int
-    );
-
-    raise exception 'Rate limit exceeded: retry_in_seconds=% (max % searches per % minutes)', v_retry_seconds, v_limit, extract(epoch from v_window) / 60
-      using errcode = 'P0001';
-  end if;
-
-  insert into public.rate_limit_events (user_id, kind, window_start)
-  values (v_uid, v_kind, date_trunc('minute', now()));
-end;
-$$;
 
 create or replace function public.lounge_search_posts(
   p_query text,
@@ -479,14 +370,3 @@ begin
   offset off;
 end;
 $$;
-
-revoke all on function public.lounge_search_posts(text, integer, integer, text) from public;
-revoke all on function public.lounge_search_profiles(text, integer, text) from public;
-revoke all on function public.lounge_search_comments(text, integer, integer, text) from public;
-grant execute on function public.lounge_search_posts(text, integer, integer, text) to authenticated;
-grant execute on function public.lounge_search_profiles(text, integer, text) to authenticated;
-grant execute on function public.lounge_search_comments(text, integer, integer, text) to authenticated;
-
--- Bundled RPC + analytics + index-aware helpers: migration 20260520170000_lounge_search_bundled.sql
--- @handle + keyword ("@selena buffalo"): migration 20260520180000_lounge_search_handle_keyword.sql
--- Client calls public.lounge_search() only; split RPC execute revoked from authenticated there.

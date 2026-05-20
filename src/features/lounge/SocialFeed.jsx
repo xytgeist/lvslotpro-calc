@@ -4701,14 +4701,13 @@ export default function SocialFeed({
   const onLoungeDockOpenPostFromSearch = useCallback(
     (post) => {
       if (!post?.id) return
-      setLoungeDockPanel(null)
       openLoungePostDetail(post, {})
     },
     [openLoungePostDetail]
   )
 
   useEffect(() => {
-    if (loungePostDetail && loungeDockPanel) {
+    if (loungePostDetail && loungeDockPanel && loungeDockPanel !== 'search') {
       setChatDockInitialPeerUserId(null)
       setLoungeDockPanel(null)
     }
@@ -4762,7 +4761,20 @@ export default function SocialFeed({
     }
   }, [communityPosts, hydrateCommunityPosts, openLoungePostDetail, setCommunityPosts, supabaseClient])
 
-  const loungeDetailMediaLightboxPortalClass = loungePostDetailAboveProfile ? 'z-[103]' : 'z-[100]'
+  const loungePostDetailOpenedOverSearch = Boolean(
+    loungePostDetail?.id && loungeDockPanel === 'search' && !loungePostDetailAboveProfile,
+  )
+  const loungePostDetailShellZClass = loungePostDetailAboveProfile
+    ? 'z-[102]'
+    : loungePostDetailOpenedOverSearch
+      ? 'z-[100]'
+      : 'z-[98]'
+
+  const loungeDetailMediaLightboxPortalClass = loungePostDetailAboveProfile
+    ? 'z-[103]'
+    : loungePostDetailOpenedOverSearch
+      ? 'z-[101]'
+      : 'z-[100]'
 
   const loungeDetailStreamLightboxSurface = useMemo(
     () => ({
@@ -7468,7 +7480,6 @@ export default function SocialFeed({
   const onLoungeDockOpenProfileFromSearch = useCallback(
     (entity) => {
       if (!entity?.user_id) return
-      setLoungeDockPanel(null)
       openAuthorProfile(entity)
     },
     [openAuthorProfile],
@@ -8702,9 +8713,7 @@ export default function SocialFeed({
 
       {loungePostDetail ? (
         <div
-          className={`fixed inset-0 sm:bg-black/55 sm:backdrop-blur-[2px] ${
-            loungePostDetailAboveProfile ? 'z-[102]' : 'z-[98]'
-          }`}
+          className={`fixed inset-0 sm:bg-black/55 sm:backdrop-blur-[2px] ${loungePostDetailShellZClass}`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="lounge-post-detail-title"
@@ -10213,7 +10222,9 @@ export default function SocialFeed({
 
       {loungeDetailCommentDiscardPromptOpen ? (
         <div
-          className={`fixed inset-0 flex items-end justify-center bg-black/45 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-8 backdrop-blur-[3px] sm:items-center sm:p-6 ${loungePostDetailAboveProfile ? 'z-[106]' : 'z-[99]'}`}
+          className={`fixed inset-0 flex items-end justify-center bg-black/45 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-8 backdrop-blur-[3px] sm:items-center sm:p-6 ${
+            loungePostDetailAboveProfile ? 'z-[106]' : loungePostDetailOpenedOverSearch ? 'z-[101]' : 'z-[99]'
+          }`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="lounge-detail-comment-discard-title"

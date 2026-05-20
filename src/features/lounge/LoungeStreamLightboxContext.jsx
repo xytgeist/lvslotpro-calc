@@ -141,7 +141,8 @@ export function buildLoungeStreamLightboxCtxFromPostCardProps(pp, extras = {}) {
     toggleBookmark: pp.toggleBookmark,
     bookmarkedByPost: pp.bookmarkedByPost,
     onOpenComments: pp.onOpenComments,
-    onLightboxOpenDetail: extras.onLightboxOpenDetail ?? pp.onStreamLightboxOpenDetail,
+    onLightboxOpenDetail:
+      'onLightboxOpenDetail' in extras ? extras.onLightboxOpenDetail : pp.onStreamLightboxOpenDetail,
     requireLoungeAuth: pp.requireLoungeAuth,
     openProfileGateIfNeeded: pp.openProfileGateIfNeeded,
     onToggleCommentLike: pp.onToggleCommentLike,

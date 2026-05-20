@@ -45,6 +45,12 @@ Track **everything else** already used on test that production must also have ap
 - [ ] **`supabase/migrations/20260518103000_fix_rate_limit_profiles_user_id.sql`** — rate-limit guard uses **`profiles.user_id`** (not stale column name); required for Lounge post rate limiting on current schema.
 - [ ] **`supabase/migrations/20260518150000_restore_profile_handle_change_cooldown.sql`** — restore **7-day** handle change cooldown trigger + **`handle_changed_at`** guard after any interim removal migration.
 - [ ] **`supabase/migrations/20260518160000_lounge_search_phase_g.sql`** — Phase G **`pg_trgm`** indexes + auth-gated **`lounge_search_posts`** / **`lounge_search_profiles`** (requires **`pg_trgm`** extension; run before dock search smoke).
+- [ ] **`supabase/migrations/20260519120000_lounge_search_comments.sql`** — **`lounge_search_comments`** RPC + trgm index on **`feed_comments.body`** (comment search in unified post+comment feed).
+- [ ] **`supabase/migrations/20260520120000_lounge_search_profiles_about_me.sql`** — **`lounge_search_profiles`** returns **`about_me`** for dock profile result rows.
+- [ ] **`supabase/migrations/20260520150000_lounge_search_ranking_rate_limit.sql`** — **`pg_trgm` `similarity()` ranking**, **`@handle`** profile/post bias, **`p_sort`** (`engagement` / `recent`), shared **`lounge_search`** rate limit (~30 searches / 5 min).
+- [ ] **`supabase/migrations/20260520160000_lounge_search_hardening.sql`** — 128-char query cap, **`strpos`/`starts_with`** (no LIKE wildcards), **5s `statement_timeout`** per search RPC.
+- [ ] **`supabase/migrations/20260520170000_lounge_search_bundled.sql`** — **`lounge_search()`** bundled RPC (posts + profiles + comments + pagination meta), **`lounge_search_text_matches`** (escaped LIKE + trgm), profile **`about_me`** search, **`lounge_search_analytics`**, rate limit **30 / 5 min** per call; revoke split RPC **`authenticated`** execute.
+- [ ] **`supabase/migrations/20260520180000_lounge_search_handle_keyword.sql`** — **`@handle keyword`** compound queries (e.g. **`@selena buffalo`**).
 - [ ] Any earlier schema you rely on: **`offers`** / **`offer_events`**, **`push_subscriptions`**, notification SQL, etc. — mirror **test** `supabase/` files that are not yet on prod
 
 **After deploy — quick smoke SQL (production):**

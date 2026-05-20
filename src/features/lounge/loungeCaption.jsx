@@ -1,3 +1,5 @@
+import { appendHighlightedPlainText, loungeSearchHighlightTerms } from '../../utils/loungeSearchHighlight.jsx'
+
 /** Strip trailing punctuation often pasted after URLs in prose. */
 export function trimUrlTrail(url) {
   let u = String(url)
@@ -17,7 +19,7 @@ export function hrefForUrlDisplay(display) {
 
 /**
  * Lounge caption: `http(s)://…` and `www.…` links (opens new tab), Unicode `#tags`, and `@handles`.
- * @param {{ hashtagClassName?: string, linkClassName?: string, mentionClassName?: string, onMentionClick?: (handle: string, e: MouseEvent) => void, onHashtagClick?: (tag: string, e: MouseEvent) => void }} [opts]
+ * @param {{ hashtagClassName?: string, linkClassName?: string, mentionClassName?: string, highlightQuery?: string, highlightClassName?: string, onMentionClick?: (handle: string, e: MouseEvent) => void, onHashtagClick?: (tag: string, e: MouseEvent) => void }} [opts]
  */
 export function renderRichCaption(
   text,
@@ -25,6 +27,8 @@ export function renderRichCaption(
     hashtagClassName = 'font-semibold text-cyan-400',
     linkClassName = 'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
     mentionClassName = 'font-medium text-orange-400',
+    highlightQuery = '',
+    highlightClassName,
     onMentionClick = null,
     onHashtagClick = null,
   } = {}
@@ -32,7 +36,20 @@ export function renderRichCaption(
   const s = String(text ?? '')
   if (!s) return null
   const out = []
-  let rk = 0
+  const rkRef = { current: 0 }
+  const highlightTerms = loungeSearchHighlightTerms(highlightQuery)
+
+  const pushPlain = (fragment) => {
+    if (!fragment) return
+    if (highlightTerms.length) {
+      appendHighlightedPlainText(out, rkRef, fragment, highlightTerms, {
+        keyPrefix: 'rk-p',
+        highlightClassName,
+      })
+    } else {
+      out.push(fragment)
+    }
+  }
 
   const pushMentionParsed = (fragment) => {
     if (!fragment) return
@@ -40,12 +57,12 @@ export function renderRichCaption(
     const re = /@([\w]+)/g
     let m
     while ((m = re.exec(fragment)) !== null) {
-      if (m.index > last) out.push(fragment.slice(last, m.index))
+      if (m.index > last) pushPlain(fragment.slice(last, m.index))
       const handle = m[1]
       if (onMentionClick) {
         out.push(
           <button
-            key={`rk-m-${rk++}`}
+            key={`rk-m-${rkRef.current++}`}
             type="button"
             onClick={(e) => onMentionClick(handle, e)}
             className={`${mentionClassName} touch-manipulation [-webkit-tap-highlight-color:transparent]`}
@@ -55,14 +72,14 @@ export function renderRichCaption(
         )
       } else {
         out.push(
-          <span key={`rk-m-${rk++}`} className={mentionClassName}>
+          <span key={`rk-m-${rkRef.current++}`} className={mentionClassName}>
             @{handle}
           </span>
         )
       }
       last = m.index + m[0].length
     }
-    if (last < fragment.length) out.push(fragment.slice(last))
+    if (last < fragment.length) pushPlain(fragment.slice(last))
   }
 
   const pushHashtagParsed = (fragment) => {
@@ -76,7 +93,7 @@ export function renderRichCaption(
       if (onHashtagClick) {
         out.push(
           <button
-            key={`rk-h-${rk++}`}
+            key={`rk-h-${rkRef.current++}`}
             type="button"
             onClick={(e) => onHashtagClick(tag, e)}
             className={`${hashtagClassName} touch-manipulation [-webkit-tap-highlight-color:transparent]`}
@@ -86,7 +103,7 @@ export function renderRichCaption(
         )
       } else {
         out.push(
-          <span key={`rk-h-${rk++}`} className={hashtagClassName}>
+          <span key={`rk-h-${rkRef.current++}`} className={hashtagClassName}>
             {tag}
           </span>
         )
@@ -109,7 +126,7 @@ export function renderRichCaption(
     if (href) {
       out.push(
         <a
-          key={`rk-u-${rk++}`}
+          key={`rk-u-${rkRef.current++}`}
           href={href}
           target="_blank"
           rel="noopener noreferrer"

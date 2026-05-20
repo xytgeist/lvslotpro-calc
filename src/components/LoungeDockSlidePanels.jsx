@@ -14,21 +14,39 @@ import {
   profileAvatarToneClass,
 } from '../features/profiles/profileGate.js'
 import {
+  formatLoungeSearchError,
   LOUNGE_SEARCH_MIN_CHARS,
+  LOUNGE_SEARCH_MAX_CHARS,
+  LOUNGE_SEARCH_SORT,
   SEARCH_DEBOUNCE_MS,
-  loungeSearchPosts,
-  loungeSearchProfiles,
+  hydrateLoungeSearchCommentResults,
+  loungeSearch,
 } from '../features/lounge/loungeSearchApi.js'
+import LoungeSearchCommentResultRow from '../features/lounge/LoungeSearchCommentResultRow.jsx'
 import {
   LoungeFeedCoordinatorSuspendBinder,
   LoungeFeedVideoAutoplayProvider,
 } from '../features/lounge/LoungeFeedVideoAutoplayContext.jsx'
+import {
+  buildLoungeStreamLightboxCtxFromPostCardProps,
+  LoungeStreamLightboxProvider,
+} from '../features/lounge/LoungeStreamLightboxContext.jsx'
 import LoungeChatPanel from '../features/lounge/LoungeChatPanel.jsx'
 import { loungeDockFabScrollBottomInsetPx } from '../utils/loungeDockFabPosition.js'
 import {
   loungeTitleRevealAfterScrollStep,
   loungeTitleRevealClampScrollDelta,
 } from '../utils/loungeTitleRevealScroll.js'
+import { renderPlainTextWithSearchHighlight } from '../utils/loungeSearchHighlight.jsx'
+import {
+  forgetLoungeSearchQuery,
+  readLoungeSearchRecent,
+  rememberLoungeSearchQuery,
+} from '../utils/loungeSearchRecentPref.js'
+import {
+  readLoungeSearchSort,
+  writeLoungeSearchSort,
+} from '../utils/loungeSearchSortPref.js'
 
 const OPEN_MS = 300
 const DISMISS_FRACTION = 0.22
@@ -124,11 +142,137 @@ export default function LoungeDockSlidePanels({
   const [q, setQ] = useState(() => initialSearchQuery || '')
   const [searchPosts, setSearchPosts] = useState([])
   const [searchProfiles, setSearchProfiles] = useState([])
+  const [searchComments, setSearchComments] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState(null)
+  /** Last query we finished fetching (success or error) — avoids "No results" during debounce. */
+  const [searchSettledQuery, setSearchSettledQuery] = useState('')
+  const [searchRecent, setSearchRecent] = useState(() => readLoungeSearchRecent())
+  const [searchSort, setSearchSort] = useState(() => readLoungeSearchSort())
+  const [searchPagination, setSearchPagination] = useState({
+    postsHasMore: false,
+    profilesHasMore: false,
+    commentsHasMore: false,
+  })
+  const [searchLoadingMore, setSearchLoadingMore] = useState(false)
+  const searchPostsRef = useRef([])
+  const searchProfilesRef = useRef([])
+  const searchCommentsRef = useRef([])
+  const searchFetchSeqRef = useRef(0)
+  searchPostsRef.current = searchPosts
+  searchProfilesRef.current = searchProfiles
+  searchCommentsRef.current = searchComments
+  const refreshSearchInteractionsRef = useRef(postCardProps?.refreshPostInteractions)
+  refreshSearchInteractionsRef.current = postCardProps?.refreshPostInteractions
 
   const trimmedQuery = q.trim()
   const queryReady = trimmedQuery.length >= LOUNGE_SEARCH_MIN_CHARS
+  const searchHasResults =
+    searchPosts.length > 0 || searchProfiles.length > 0 || searchComments.length > 0
+  /** Full "Searching…" row only when there is nothing to show yet — refetches keep stale results. */
+  const showSearchInitialLoading = searchLoading && !searchHasResults
+  const showSearchRefetchIndicator = searchLoading && searchHasResults
+  const showSearchLoadMore =
+    queryReady &&
+    !searchLoading &&
+    !searchError &&
+    searchSettledQuery === trimmedQuery &&
+    (searchPagination.postsHasMore ||
+      searchPagination.commentsHasMore ||
+      searchPagination.profilesHasMore)
+
+  const runSearchFetch = useCallback(
+    async ({ append = false, query = trimmedQuery, sort = searchSort } = {}) => {
+      if (!searchSupabaseClient || !hydrateSearchPosts || query.length < LOUNGE_SEARCH_MIN_CHARS) return
+
+      const seq = ++searchFetchSeqRef.current
+      const postsOffset = append ? searchPostsRef.current.length : 0
+      const profilesOffset = append ? searchProfilesRef.current.length : 0
+      const commentsOffset = append ? searchCommentsRef.current.length : 0
+
+      if (append) setSearchLoadingMore(true)
+      else {
+        setSearchLoading(true)
+        setSearchError(null)
+      }
+
+      try {
+        const result = await loungeSearch(searchSupabaseClient, query, {
+          sort,
+          postsOffset,
+          profilesOffset,
+          commentsOffset,
+        })
+
+        const [hydrated, hydratedComments] = await Promise.all([
+          result.posts.length ? hydrateSearchPosts(result.posts) : Promise.resolve([]),
+          result.comments.length
+            ? hydrateLoungeSearchCommentResults(searchSupabaseClient, hydrateSearchPosts, result.comments)
+            : Promise.resolve([]),
+        ])
+
+        if (seq !== searchFetchSeqRef.current) return
+
+        const ids = hydrated.map((p) => p.id).filter(Boolean)
+        refreshSearchInteractionsRef.current?.(ids)
+
+        if (append) {
+          setSearchPosts((prev) => {
+            const seen = new Set(prev.map((p) => String(p.id)))
+            return [...prev, ...hydrated.filter((p) => p?.id && !seen.has(String(p.id)))]
+          })
+          setSearchProfiles((prev) => {
+            const seen = new Set(prev.map((p) => String(p.user_id)))
+            return [...prev, ...(result.profiles || []).filter((p) => p?.user_id && !seen.has(String(p.user_id)))]
+          })
+          setSearchComments((prev) => {
+            const seen = new Set(prev.map(({ comment }) => String(comment?.id)))
+            return [
+              ...prev,
+              ...hydratedComments.filter(({ comment }) => comment?.id && !seen.has(String(comment.id))),
+            ]
+          })
+        } else {
+          setSearchPosts(hydrated)
+          setSearchProfiles(result.profiles || [])
+          setSearchComments(hydratedComments)
+        }
+
+        setSearchPagination(result.pagination)
+        setSearchSettledQuery(query)
+      } catch (err) {
+        if (!append) {
+          setSearchPosts([])
+          setSearchProfiles([])
+          setSearchComments([])
+          setSearchPagination({
+            postsHasMore: false,
+            profilesHasMore: false,
+            commentsHasMore: false,
+          })
+        }
+        setSearchError(formatLoungeSearchError(err))
+        setSearchSettledQuery(query)
+      } finally {
+        if (seq !== searchFetchSeqRef.current) return
+        if (append) setSearchLoadingMore(false)
+        else setSearchLoading(false)
+      }
+    },
+    [searchSupabaseClient, hydrateSearchPosts, trimmedQuery, searchSort],
+  )
+
+  const onSearchLoadMore = useCallback(() => {
+    if (searchLoading || searchLoadingMore || !showSearchLoadMore) return
+    void runSearchFetch({ append: true })
+  }, [searchLoading, searchLoadingMore, showSearchLoadMore, runSearchFetch])
+
+  const showSearchNoResults =
+    queryReady &&
+    !searchLoading &&
+    !searchError &&
+    searchSettledQuery === trimmedQuery &&
+    !searchHasResults
 
   const localTrendingPosts = useMemo(() => {
     const base = communityPosts || []
@@ -141,7 +285,71 @@ export default function LoungeDockSlidePanels({
     return all
   }, [communityPosts])
 
-  const displayPosts = queryReady ? searchPosts : localTrendingPosts
+  const displaySearchFeedItems = useMemo(() => {
+    if (!queryReady) {
+      return localTrendingPosts.map((post) => ({ kind: 'post', post }))
+    }
+    const items = [
+      ...searchPosts.map((post) => ({
+        kind: 'post',
+        post,
+        score: loungePostInteractionScore(post),
+        createdAt: post?.created_at,
+      })),
+      ...searchComments.map(({ comment, post }) => ({
+        kind: 'comment',
+        comment,
+        post,
+        score: loungePostInteractionScore(comment),
+        createdAt: comment?.created_at,
+      })),
+    ]
+    items.sort((a, b) => {
+      if (searchSort === LOUNGE_SEARCH_SORT.RECENT) {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      }
+      const d = b.score - a.score
+      if (d !== 0) return d
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    })
+    return items
+  }, [queryReady, localTrendingPosts, searchPosts, searchComments, searchSort])
+
+  /** Search-only lightbox ctx — media fullscreen stays on search; no caption/comment chrome → post detail. */
+  const searchPostCardProps = useMemo(() => {
+    if (!postCardProps) return null
+    return {
+      ...postCardProps,
+      loungeSearchHighlightQuery: queryReady ? trimmedQuery : '',
+    }
+  }, [postCardProps, queryReady, trimmedQuery])
+
+  const searchLightboxCtx = useMemo(() => {
+    if (!searchPostCardProps || openPanel !== 'search') return null
+    return buildLoungeStreamLightboxCtxFromPostCardProps(searchPostCardProps, {
+      onLightboxOpenDetail: null,
+      onOpenComments: () => {},
+    })
+  }, [searchPostCardProps, openPanel])
+
+  useEffect(() => {
+    if (openPanel === 'search') setSearchRecent(readLoungeSearchRecent())
+  }, [openPanel])
+
+  useEffect(() => {
+    if (openPanel !== 'search') return
+    if (!queryReady || searchLoading || searchError) return
+    if (searchSettledQuery !== trimmedQuery) return
+    rememberLoungeSearchQuery(trimmedQuery)
+    setSearchRecent(readLoungeSearchRecent())
+  }, [
+    openPanel,
+    queryReady,
+    searchLoading,
+    searchError,
+    searchSettledQuery,
+    trimmedQuery,
+  ])
 
   useEffect(() => {
     if (openPanel !== 'search') return
@@ -150,36 +358,26 @@ export default function LoungeDockSlidePanels({
     if (!queryReady) {
       setSearchPosts([])
       setSearchProfiles([])
+      setSearchComments([])
       setSearchError(null)
       setSearchLoading(false)
+      setSearchLoadingMore(false)
+      setSearchSettledQuery('')
+      setSearchPagination({
+        postsHasMore: false,
+        profilesHasMore: false,
+        commentsHasMore: false,
+      })
       return
     }
+
+    setSearchSettledQuery((prev) => (prev === trimmedQuery ? prev : ''))
 
     let cancelled = false
     const timer = window.setTimeout(() => {
       void (async () => {
-        setSearchLoading(true)
-        setSearchError(null)
-        try {
-          const [postRows, profileRows] = await Promise.all([
-            loungeSearchPosts(searchSupabaseClient, trimmedQuery),
-            loungeSearchProfiles(searchSupabaseClient, trimmedQuery),
-          ])
-          if (cancelled) return
-          const hydrated = postRows.length ? await hydrateSearchPosts(postRows) : []
-          if (cancelled) return
-          const ids = hydrated.map((p) => p.id).filter(Boolean)
-          postCardProps?.refreshPostInteractions?.(ids)
-          setSearchPosts(hydrated)
-          setSearchProfiles(profileRows || [])
-        } catch (err) {
-          if (cancelled) return
-          setSearchPosts([])
-          setSearchProfiles([])
-          setSearchError(err?.message || 'Search failed.')
-        } finally {
-          if (!cancelled) setSearchLoading(false)
-        }
+        if (cancelled) return
+        await runSearchFetch({ append: false, query: trimmedQuery, sort: searchSort })
       })()
     }, SEARCH_DEBOUNCE_MS)
 
@@ -191,9 +389,8 @@ export default function LoungeDockSlidePanels({
     openPanel,
     trimmedQuery,
     queryReady,
-    searchSupabaseClient,
-    hydrateSearchPosts,
-    postCardProps,
+    searchSort,
+    runSearchFetch,
   ])
 
   const panelTitleBarChromePx = panelTitleBarHeight > 0 ? panelTitleBarHeight : 56
@@ -478,21 +675,99 @@ export default function LoungeDockSlidePanels({
       >
         {openPanel === 'search' ? (
           <div className="px-3 pt-3">
-            <input
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search posts, games, hashtags, profiles…"
-              autoComplete="off"
-              className="mb-2 w-full rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-2.5 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-cyan-500/45 focus:ring-1 focus:ring-cyan-500/25"
-            />
-            {!queryReady ? (
-              <p className="mb-3 text-[13px] leading-relaxed text-zinc-500">
-                Type at least {LOUNGE_SEARCH_MIN_CHARS} characters to search all Lounge posts and profiles. Below:
-                top posts from your loaded feed.
-              </p>
+            <div className="relative mb-2 flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900/90 py-1 pl-3 pr-1.5 focus-within:border-cyan-500/45 focus-within:ring-1 focus-within:ring-cyan-500/25">
+              <input
+                type="text"
+                role="searchbox"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search posts, profiles, hashtags, games…"
+                autoComplete="off"
+                maxLength={LOUNGE_SEARCH_MAX_CHARS}
+                aria-busy={searchLoading}
+                className="min-w-0 flex-1 border-0 bg-transparent py-1.5 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none"
+              />
+              {queryReady ? (
+                <div
+                  role="group"
+                  aria-label="Search sort"
+                  className="flex shrink-0 items-center overflow-hidden rounded-md border border-zinc-700/90"
+                >
+                  {[
+                    { value: LOUNGE_SEARCH_SORT.ENGAGEMENT, label: 'Top' },
+                    { value: LOUNGE_SEARCH_SORT.RECENT, label: 'Latest' },
+                  ].map((opt, idx) => {
+                    const active = searchSort === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          writeLoungeSearchSort(opt.value)
+                          setSearchSort(opt.value)
+                        }}
+                        className={`px-2 py-0.5 text-[12px] font-medium leading-tight touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                          idx === 0 ? '' : 'border-l border-zinc-700/90'
+                        } ${
+                          active
+                            ? 'bg-cyan-500/15 text-cyan-100'
+                            : 'bg-zinc-900/70 text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+              {showSearchRefetchIndicator ? (
+                <span className="flex shrink-0 items-center px-0.5 text-zinc-500" aria-hidden>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400" />
+                </span>
+              ) : trimmedQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setQ('')}
+                  aria-label="Clear search"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center text-[20px] leading-none text-zinc-500 touch-manipulation hover:text-zinc-300 [-webkit-tap-highlight-color:transparent]"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+            {!queryReady && searchRecent.length > 0 ? (
+              <section className="mb-3">
+                <h3 className="mb-1.5 px-0.5 text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Recent
+                </h3>
+                <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto overscroll-x-contain px-3 pb-0.5 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch] touch-pan-x">
+                  {searchRecent.map((term) => (
+                    <span
+                      key={term}
+                      className="inline-flex max-w-[min(100%,14rem)] shrink-0 items-center rounded-full border border-zinc-700/90 bg-zinc-900/70 text-[14px] text-zinc-200"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setQ(term)}
+                        className="min-w-0 truncate py-1 pl-3 pr-1 touch-manipulation hover:text-zinc-100 active:text-zinc-100 [-webkit-tap-highlight-color:transparent]"
+                      >
+                        {term}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${term} from recent searches`}
+                        onClick={() => setSearchRecent(forgetLoungeSearchQuery(term))}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center text-[16px] leading-none text-zinc-500 touch-manipulation hover:text-zinc-300 active:text-zinc-200 [-webkit-tap-highlight-color:transparent]"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </section>
             ) : null}
-            {searchLoading ? (
+            {showSearchInitialLoading ? (
               <p className="mb-3 text-[14px] leading-relaxed text-zinc-500">Searching…</p>
             ) : null}
             {searchError ? (
@@ -500,13 +775,9 @@ export default function LoungeDockSlidePanels({
             ) : null}
             {!postCardProps ? (
               <p className="text-[14px] leading-relaxed text-zinc-500">Search is not available.</p>
-            ) : queryReady &&
-              !searchLoading &&
-              !searchError &&
-              displayPosts.length === 0 &&
-              searchProfiles.length === 0 ? (
+            ) : showSearchNoResults ? (
               <p className="text-[14px] leading-relaxed text-zinc-500">No results.</p>
-            ) : !queryReady && localTrendingPosts.length === 0 ? (
+            ) : queryReady && showSearchInitialLoading ? null : !queryReady && localTrendingPosts.length === 0 ? (
               <p className="text-[14px] leading-relaxed text-zinc-500">No posts loaded yet.</p>
             ) : (
               <LoungeFeedVideoAutoplayProvider
@@ -514,6 +785,7 @@ export default function LoungeDockSlidePanels({
                 showDebugHud={feedVideoDebugEnabled && openPanel === 'search'}
               >
                 <LoungeFeedCoordinatorSuspendBinder suspended={videoCoordinatorSuspended} />
+                <LoungeStreamLightboxProvider ctx={searchLightboxCtx}>
                 {queryReady && searchProfiles.length > 0 ? (
                   <section className="mb-3">
                     <h3 className="mb-1 px-0.5 text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
@@ -524,6 +796,7 @@ export default function LoungeDockSlidePanels({
                         const displayName = String(profile.display_name || profile.handle || 'Member').trim()
                         const handle = String(profile.handle || '').trim()
                         const seed = profile.user_id || handle || displayName
+                        const aboutMe = String(profile.about_me || '').trim()
                         return (
                           <li key={profile.user_id}>
                             <button
@@ -557,6 +830,11 @@ export default function LoungeDockSlidePanels({
                                 {handle ? (
                                   <span className="mt-0.5 block truncate text-[14px] text-zinc-500">@{handle}</span>
                                 ) : null}
+                                {aboutMe ? (
+                                  <span className="mt-1 block line-clamp-2 text-[13px] leading-snug text-zinc-400">
+                                    {renderPlainTextWithSearchHighlight(aboutMe, trimmedQuery)}
+                                  </span>
+                                ) : null}
                               </span>
                             </button>
                           </li>
@@ -565,40 +843,69 @@ export default function LoungeDockSlidePanels({
                     </ul>
                   </section>
                 ) : null}
-                {queryReady && displayPosts.length > 0 ? (
+                {!queryReady && localTrendingPosts.length > 0 ? (
+                  <h3 className="mb-1 px-0.5 text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Trending in your feed
+                  </h3>
+                ) : null}
+                {queryReady && displaySearchFeedItems.length > 0 && searchProfiles.length > 0 ? (
                   <h3 className="mb-1 px-0.5 text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
                     Posts
                   </h3>
                 ) : null}
-                {displayPosts.map((post) => (
-                  <article
-                    key={post.id}
-                    style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
-                    className={LOUNGE_FEED_POST_ROW_CLASS}
-                    onClick={(e) => {
-                      const t = e.target
-                      if (!(t instanceof Element)) return
-                      const origHost = t.closest('[data-lounge-original-embed]')
-                      if (origHost && post.reposted_post?.id) {
-                        onOpenPostFromSearch?.(post.reposted_post)
-                        return
-                      }
-                      if (
-                        t.closest(
-                          'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
-                        )
-                      )
-                        return
-                      onOpenPostFromSearch?.(post)
-                    }}
-                  >
-                    <LoungePostArticle
-                      post={post}
-                      {...postCardProps}
-                      repostMenuScrollRootRef={panelScrollRef}
+                {displaySearchFeedItems.map((item) =>
+                  item.kind === 'comment' ? (
+                    <LoungeSearchCommentResultRow
+                      key={`comment:${item.comment.id}`}
+                      comment={item.comment}
+                      post={item.post}
+                      postCardProps={searchPostCardProps}
+                      scrollRootRef={panelScrollRef}
+                      searchHighlightQuery={trimmedQuery}
                     />
-                  </article>
-                ))}
+                  ) : (
+                    <article
+                      key={`post:${item.post.id}`}
+                      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
+                      className={LOUNGE_FEED_POST_ROW_CLASS}
+                      onClick={(e) => {
+                        const t = e.target
+                        if (!(t instanceof Element)) return
+                        const origHost = t.closest('[data-lounge-original-embed]')
+                        if (origHost && item.post.reposted_post?.id) {
+                          onOpenPostFromSearch?.(item.post.reposted_post)
+                          return
+                        }
+                        if (
+                          t.closest(
+                            'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
+                          )
+                        )
+                          return
+                        onOpenPostFromSearch?.(item.post)
+                      }}
+                    >
+                      <LoungePostArticle
+                        post={item.post}
+                        {...searchPostCardProps}
+                        repostMenuScrollRootRef={panelScrollRef}
+                      />
+                    </article>
+                  ),
+                )}
+                {showSearchLoadMore ? (
+                  <div className="py-4">
+                    <button
+                      type="button"
+                      onClick={onSearchLoadMore}
+                      disabled={searchLoadingMore}
+                      className="mx-auto flex min-h-10 items-center justify-center rounded-xl border border-zinc-700/90 bg-zinc-900/70 px-5 text-[14px] font-medium text-zinc-200 touch-manipulation hover:border-zinc-600 hover:bg-zinc-800/80 disabled:opacity-60 [-webkit-tap-highlight-color:transparent]"
+                    >
+                      {searchLoadingMore ? 'Loading…' : 'Load more'}
+                    </button>
+                  </div>
+                ) : null}
+                </LoungeStreamLightboxProvider>
               </LoungeFeedVideoAutoplayProvider>
             )}
           </div>

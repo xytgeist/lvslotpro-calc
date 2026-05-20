@@ -189,7 +189,7 @@ function patchProfileReplyItemsCount(items, commentId, field, delta) {
   }))
 }
 
-function ProfileReplyRow({ item, postCardProps, onOpenProfileReply, profileBodyScrollRef, onNavigateToProfile }) {
+export function ProfileReplyRow({ item, postCardProps, onOpenProfileReply, profileBodyScrollRef, onNavigateToProfile }) {
   const { comment, post, pathIds = [], threadComments = [] } = item || {}
   const displayNameFor = postCardProps?.displayNameFor
   const handleFor = postCardProps?.handleFor

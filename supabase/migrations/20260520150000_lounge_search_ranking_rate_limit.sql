@@ -1,67 +1,6 @@
--- Phase G — Lounge server search (authenticated only): posts + profiles + comments.
--- Apply on test after feed + profiles foundation (`feed_phase_a_profiles_public_read.sql`).
--- Client: `src/features/lounge/loungeSearchApi.js`, `LoungeDockSlidePanels.jsx`.
+-- Phase G search polish: @handle bias, pg_trgm similarity ranking, sort mode, shared rate limit.
+-- See supabase/lounge_search_phase_g.sql.
 
-create extension if not exists pg_trgm with schema extensions;
-
--- Trgm indexes for ILIKE / similarity on captions, game titles, and profile fields.
-create index if not exists community_feed_posts_search_caption_trgm_idx
-  on public.community_feed_posts using gin (lower(caption) extensions.gin_trgm_ops);
-
-create index if not exists community_feed_posts_search_game_trgm_idx
-  on public.community_feed_posts using gin (lower(game_title) extensions.gin_trgm_ops);
-
-create index if not exists profiles_search_handle_trgm_idx
-  on public.profiles using gin (lower(handle) extensions.gin_trgm_ops);
-
-create index if not exists profiles_search_display_name_trgm_idx
-  on public.profiles using gin (lower(display_name) extensions.gin_trgm_ops);
-
-create index if not exists feed_comments_search_body_trgm_idx
-  on public.feed_comments using gin (lower(body) extensions.gin_trgm_ops);
-
-create or replace function public.lounge_normalize_search_term(p_query text)
-returns text
-language sql
-immutable
-as $$
-  select left(lower(trim(both from coalesce(p_query, ''))), 128);
-$$;
-
-comment on function public.lounge_normalize_search_term(text) is
-  'Trim, lower-case, and cap Lounge search input at 128 chars.';
-
-create or replace function public.lounge_escape_like_pattern(p text)
-returns text
-language sql
-immutable
-as $$
-  select replace(replace(replace(coalesce(p, ''), E'\\', E'\\\\'), '%', E'\\%'), '_', E'\\_');
-$$;
-
-comment on function public.lounge_escape_like_pattern(text) is
-  'Escape %, _, and \\ for LIKE ... ESCAPE ''\\'' (safe substring patterns).';
-
-create or replace function public.lounge_search_text_matches(haystack text, needle text)
-returns boolean
-language sql
-stable
-as $$
-  select
-    coalesce(needle, '') <> ''
-    and (
-      lower(coalesce(haystack, '')) like '%' || public.lounge_escape_like_pattern(needle) || '%' escape '\'
-      or (
-        char_length(needle) >= 3
-        and extensions.similarity(lower(coalesce(haystack, '')), needle) > 0.15
-      )
-    );
-$$;
-
-comment on function public.lounge_search_text_matches(text, text) is
-  'Escaped LIKE substring (GIN trgm-friendly) OR pg_trgm similarity when needle length >= 3.';
-
--- Shared rate limit for lounge_search_* RPCs (~30 logical searches / 5 min; staff exempt).
 create or replace function public.lounge_search_enforce_rate_limit()
 returns void
 language plpgsql
@@ -72,7 +11,8 @@ declare
   v_uid uuid;
   v_kind text := 'lounge_search';
   v_window interval := interval '5 minutes';
-  v_limit integer := 30;
+  -- Each logical search issues 3 RPCs (posts + profiles + comments).
+  v_limit integer := 90;
   v_window_start timestamptz;
   v_count integer;
   v_oldest_in_window timestamptz;
@@ -112,7 +52,7 @@ begin
       ceil(extract(epoch from ((coalesce(v_oldest_in_window, now()) + v_window) - now())))::int
     );
 
-    raise exception 'Rate limit exceeded: retry_in_seconds=% (max % searches per % minutes)', v_retry_seconds, v_limit, extract(epoch from v_window) / 60
+    raise exception 'Rate limit exceeded: retry_in_seconds=% (max % searches per % minutes)', v_retry_seconds, v_limit / 3, extract(epoch from v_window) / 60
       using errcode = 'P0001';
   end if;
 
@@ -120,6 +60,10 @@ begin
   values (v_uid, v_kind, date_trunc('minute', now()));
 end;
 $$;
+
+drop function if exists public.lounge_search_posts(text, integer, integer);
+drop function if exists public.lounge_search_profiles(text, integer);
+drop function if exists public.lounge_search_comments(text, integer, integer);
 
 create or replace function public.lounge_search_posts(
   p_query text,
@@ -166,7 +110,6 @@ declare
   sort_recent boolean;
 begin
   perform public.lounge_search_enforce_rate_limit();
-  perform set_config('statement_timeout', '5000', true);
 
   term := public.lounge_normalize_search_term(p_query);
   if char_length(term) < 2 then
@@ -237,7 +180,7 @@ begin
               where ap.user_id = c.user_id
                 and ap.banned_at is null
                 and (
-                  strpos(lower(ap.handle), handle_term) > 0
+                  lower(ap.handle) like '%' || handle_term || '%'
                   or extensions.similarity(lower(ap.handle), handle_term) > 0.15
                 )
             )
@@ -248,11 +191,11 @@ begin
             )
           )
           else (
-            strpos(lower(coalesce(c.caption, '')), term) > 0
-            or strpos(lower(coalesce(c.game_title, '')), term) > 0
+            lower(c.caption) like '%' || term || '%'
+            or lower(c.game_title) like '%' || term || '%'
             or extensions.similarity(lower(coalesce(c.caption, '')), term) > 0.15
             or extensions.similarity(lower(coalesce(c.game_title, '')), term) > 0.15
-            or (is_word and strpos(lower(coalesce(c.caption, '')), '#' || hash_term) > 0)
+            or (is_word and lower(c.caption) like '%#' || hash_term || '%')
           )
         end
       )
@@ -318,7 +261,6 @@ declare
   is_handle_query boolean;
 begin
   perform public.lounge_search_enforce_rate_limit();
-  perform set_config('statement_timeout', '5000', true);
 
   term := public.lounge_normalize_search_term(p_query);
   if char_length(term) < 2 then
@@ -350,12 +292,12 @@ begin
     and (
       case
         when is_handle_query then (
-          strpos(lower(p.handle), handle_term) > 0
+          lower(p.handle) like '%' || handle_term || '%'
           or extensions.similarity(lower(p.handle), handle_term) > 0.15
         )
         else (
-          strpos(lower(p.handle), handle_term) > 0
-          or strpos(lower(coalesce(p.display_name, '')), term) > 0
+          lower(p.handle) like '%' || handle_term || '%'
+          or lower(p.display_name) like '%' || term || '%'
           or extensions.similarity(lower(p.handle), handle_term) > 0.15
           or extensions.similarity(lower(coalesce(p.display_name, '')), term) > 0.15
         )
@@ -364,10 +306,10 @@ begin
   order by
     case
       when is_handle_query and lower(p.handle) = handle_term then 0
-      when is_handle_query and starts_with(lower(p.handle), handle_term) then 1
+      when is_handle_query and lower(p.handle) like handle_term || '%' then 1
       when not is_handle_query and lower(p.handle) = handle_term then 0
-      when not is_handle_query and starts_with(lower(p.handle), handle_term) then 1
-      when not is_handle_query and starts_with(lower(coalesce(p.display_name, '')), term) then 2
+      when not is_handle_query and lower(p.handle) like handle_term || '%' then 1
+      when not is_handle_query and lower(p.display_name) like term || '%' then 2
       else 3
     end,
     extensions.similarity(lower(p.handle), handle_term) desc,
@@ -415,7 +357,6 @@ declare
   sort_recent boolean;
 begin
   perform public.lounge_search_enforce_rate_limit();
-  perform set_config('statement_timeout', '5000', true);
 
   term := public.lounge_normalize_search_term(p_query);
   if char_length(term) < 2 then
@@ -445,7 +386,7 @@ begin
       and (pr.user_id is null or pr.banned_at is null)
       and (post_pr.user_id is null or post_pr.banned_at is null)
       and (
-        strpos(lower(coalesce(fc.body, '')), term) > 0
+        lower(fc.body) like '%' || term || '%'
         or extensions.similarity(lower(coalesce(fc.body, '')), term) > 0.15
       )
   )
@@ -486,7 +427,3 @@ revoke all on function public.lounge_search_comments(text, integer, integer, tex
 grant execute on function public.lounge_search_posts(text, integer, integer, text) to authenticated;
 grant execute on function public.lounge_search_profiles(text, integer, text) to authenticated;
 grant execute on function public.lounge_search_comments(text, integer, integer, text) to authenticated;
-
--- Bundled RPC + analytics + index-aware helpers: migration 20260520170000_lounge_search_bundled.sql
--- @handle + keyword ("@selena buffalo"): migration 20260520180000_lounge_search_handle_keyword.sql
--- Client calls public.lounge_search() only; split RPC execute revoked from authenticated there.

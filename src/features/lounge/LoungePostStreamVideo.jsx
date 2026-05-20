@@ -3,6 +3,7 @@ import { createPortal, flushSync } from 'react-dom'
 import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoUpload'
 import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
+import { bindLoungeLightboxHistory } from './loungeLightboxHistory.js'
 import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
 import { releaseLoungeStreamSessionPoster } from './loungeStreamSessionPoster.js'
 import {
@@ -2197,6 +2198,11 @@ export default function LoungePostStreamVideo({
   useEffect(() => {
     lightboxOpenRef.current = lightboxOpen
   }, [lightboxOpen])
+
+  useEffect(() => {
+    if (!lightboxOpen || !enableLightbox) return undefined
+    return bindLoungeLightboxHistory(closeLightbox)
+  }, [lightboxOpen, enableLightbox, closeLightbox])
 
   useEffect(() => {
     if (!lightboxOpen || !enableLightbox) return undefined

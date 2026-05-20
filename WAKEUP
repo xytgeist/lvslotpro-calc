@@ -105,13 +105,21 @@ Ryan sign-off **PASSED** smoke **§17** + comment-repost (2026-05-19).
 
 - **`93dcc3f`** — new video posters → **WebP** on **`media-test.lvslotpro.com`**. Ryan **PASSED** (2026-05-19).
 
+### Lounge UX polish (May 19 — latest on `test`)
+
+| Commit | Area | Ryan |
+|--------|------|------|
+| **`f6a975e`** | FAB hides during image/GIF lightbox (not only Stream hero) | **PASSED** |
+| **`59a26bd`** | Direct comment entry: prefetch + panel enter + smooth scroll; title bar locked | **PASSED** |
+| **`dd02294`** | Profile unfollow syncs feed follow pills + Following filter same session | **PASSED** |
+
 ### Other May 18 (already on `test`)
 
 - **Phase C:** **`/u/:handle`** permalink + OG — Ryan **PASSED** @ **`7ce7b44`**
 - **Handle cooldown restored:** **`20260518150000_restore_profile_handle_change_cooldown.sql`**
 - **Rate limit fix:** **`20260518103000_fix_rate_limit_profiles_user_id.sql`**
 
-**Commits through **`93dcc3f`**. Prod replay: **`docs/production-rollout-checklist.md`** §2 + §3.5 + §4 + §5.
+**Commits through **`dd02294`**. Prod replay: **`docs/production-rollout-checklist.md`** §2 + §3.5 + §4 + §5.
 
 **Still open (non-blocking):** Cloudflare **Pro** for **`/cdn-cgi/image/`**; **`media.lvslotpro.com`** when prod R2 ships; per-tile sound sign-off; final pre-prod gate.
 

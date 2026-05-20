@@ -7,6 +7,7 @@ import {
 import { useLoungeLightboxImageZoom } from './loungeLightboxImageZoom.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 import { notifyLoungeStreamLightboxOpen } from './loungeStreamLightboxRegistry.js'
+import { bindLoungeLightboxHistory } from './loungeLightboxHistory.js'
 import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 
 function normalizeUrlList(urls) {
@@ -153,10 +154,15 @@ export function LoungeImageLightbox({
     return null
   }, [renderMediaLightboxInteractionBar, onClose])
 
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     notifyLoungeStreamLightboxOpen(true)
+    const unbindHistory = bindLoungeLightboxHistory(() => onCloseRef.current())
     return () => {
       notifyLoungeStreamLightboxOpen(false)
+      unbindHistory()
     }
   }, [])
 

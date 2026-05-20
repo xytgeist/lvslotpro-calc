@@ -103,6 +103,8 @@ export default function LoungePostArticle({
   onFeedVideoAutoplayChange,
   /** Stream hero: caption / comment → post or comment detail (`hostPost`, `mediaPost`, `{ focusComposer }`). */
   onStreamLightboxOpenDetail,
+  /** Active Lounge search query — highlights matching terms in captions (search panel only). */
+  loungeSearchHighlightQuery = '',
 }) {
   const ro = loungeReadOnly
   // ── Plain repost type detection ──────────────────────────────────────────
@@ -203,6 +205,13 @@ export default function LoungePostArticle({
   )
   const reposterLabel =
     viewerUserId && post.user_id === viewerUserId ? 'You reposted' : `${displayNameFor(post)} reposted`
+
+  const richCaptionOpts = useMemo(() => {
+    const base = { onMentionClick, onHashtagClick }
+    const hq = String(loungeSearchHighlightQuery || '').trim()
+    if (hq.length >= 2) return { ...base, highlightQuery: hq }
+    return base
+  }, [onMentionClick, onHashtagClick, loungeSearchHighlightQuery])
 
   return (
     <div className={`flex items-start gap-3 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
@@ -342,7 +351,7 @@ export default function LoungePostArticle({
             ) : null}
             {rc?.body ? (
               <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}>
-                {renderRichCaption(rc.body, { onMentionClick, onHashtagClick })}
+                {renderRichCaption(rc.body, richCaptionOpts)}
               </div>
             ) : null}
             <LoungePostFeedImagesAndGif
@@ -359,7 +368,7 @@ export default function LoungePostArticle({
           <>
             {feedPostDisplayCaption(displayPost) ? (
               <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}>
-                {renderRichCaption(feedPostDisplayCaption(displayPost), { onMentionClick, onHashtagClick })}
+                {renderRichCaption(feedPostDisplayCaption(displayPost), richCaptionOpts)}
               </div>
             ) : null}
             <LoungePostFeedImagesAndGif
@@ -379,7 +388,7 @@ export default function LoungePostArticle({
           <>
             {feedPostDisplayCaption(post) ? (
               <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}>
-                {renderRichCaption(feedPostDisplayCaption(post), { onMentionClick, onHashtagClick })}
+                {renderRichCaption(feedPostDisplayCaption(post), richCaptionOpts)}
               </div>
             ) : null}
             <LoungePostFeedImagesAndGif
@@ -427,7 +436,7 @@ export default function LoungePostArticle({
                 ) : null}
               </div>
               <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
-                {renderRichCaption(feedPostDisplayCaption(post.reposted_post), { onMentionClick, onHashtagClick })}
+                {renderRichCaption(feedPostDisplayCaption(post.reposted_post), richCaptionOpts)}
               </div>
               <LoungePostFeedImagesAndGif
                 post={post.reposted_post}
@@ -443,7 +452,7 @@ export default function LoungePostArticle({
           <>
             {feedPostDisplayCaption(post) ? (
               <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}>
-                {renderRichCaption(feedPostDisplayCaption(post), { onMentionClick, onHashtagClick })}
+                {renderRichCaption(feedPostDisplayCaption(post), richCaptionOpts)}
               </div>
             ) : null}
             <LoungePostFeedImagesAndGif

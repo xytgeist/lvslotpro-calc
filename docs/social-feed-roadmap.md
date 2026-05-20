@@ -232,7 +232,16 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 **Shipped on test (2026-05-18):** Postgres **`pg_trgm`** indexes + auth-gated RPCs **`lounge_search_posts`** / **`lounge_search_profiles`** (`supabase/lounge_search_phase_g.sql`, migration **`20260518160000_lounge_search_phase_g.sql`**). Client: **`src/features/lounge/loungeSearchApi.js`**, dock search panel in **`LoungeDockSlidePanels.jsx`** (server search at 2+ chars; profile rows; empty query = top posts from loaded feed). Anon blocked at **`SocialFeed.jsx`** (dock + hashtag tap).
 
+**Comment search (2026-05-19):** **`lounge_search_comments`** RPC + trgm index on **`feed_comments.body`**; posts + comments in one engagement-sorted list (**`LoungeSearchCommentResultRow`** — comment-repost-style, *…in reply to @handle*) — migration **`20260519120000_lounge_search_comments.sql`**. Tap row → post detail over search with direct comment drill (same as profile Replies tab).
+
+**Search UX polish (2026-05-20):** Query-term **highlight** in captions, comment bodies, and profile **about_me** (**`loungeSearchHighlight.jsx`**); **Recent** searches when query &lt; 2 chars (**`loungeSearchRecentPref.js`**); profile result rows show **2-line truncated about_me**; **`lounge_search_profiles`** returns **`about_me`** — migration **`20260520120000_lounge_search_profiles_about_me.sql`**.
+
+**Search ranking + limits (2026-05-20):** **`@handle`** prefix biases profiles (handle-only) and posts (author handle + caption `@mention`); **`pg_trgm` `similarity()`** tie-break ranking; **`p_sort`** **`engagement`** (default) vs **`recent`**; shared **`lounge_search`** rate limit (~30 searches / 5 min); dock **Top / Latest** toggle (**`loungeSearchSortPref.js`**); empty query label **Trending in your feed** — migration **`20260520150000_lounge_search_ranking_rate_limit.sql`**.
+
+**Search bundled + analytics (2026-05-20):** Single **`lounge_search()`** RPC (pagination **`has_more`**, profile **`about_me`** match, **`lounge_search_text_matches`** escaped LIKE + trgm **`%`**, **`lounge_search_analytics`** table); client **`loungeSearch()`** + **Load more** — migration **`20260520170000_lounge_search_bundled.sql`**.
+
 - Postgres `ILIKE`/trgm for posts + game tags + hashtag bucketing in RPC.
+- Comment body search (visible comments on visible posts; banned authors excluded).
 - Profile search on handle + display name.
 - Auth-gated RPC for search endpoints (`authenticated` role only; `auth.uid()` required).
 
