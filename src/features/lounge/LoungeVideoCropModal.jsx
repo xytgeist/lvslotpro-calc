@@ -230,7 +230,14 @@ function cropOverlayPercents(layout, cropPx) {
  * @param {{ file: File, knownDurationSec?: number, intent?: 'composer' | 'detail', onCancel: () => void, onConfirm: (result: File | { type: 'composerTrimJob', sourceFile: File, startSec: number, endSec: number, cropPx: { x: number, y: number, w: number, h: number } | null, intrinsicWidth: number, intrinsicHeight: number, posterUrl: string }) => void }} props
  * `intent` — `composer` returns a trim payload for background encode/upload; `detail` keeps synchronous encode and passes a `File`.
  */
-export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 'composer', onCancel, onConfirm }) {
+export default function LoungeVideoCropModal({
+  file,
+  knownDurationSec,
+  intent = 'composer',
+  shellClassName = 'z-[105]',
+  onCancel,
+  onConfirm,
+}) {
   const videoRef = useRef(null)
   /** Hidden clone: poster frame is captured here so the visible preview is never seek-snapped for posters. */
   const posterVideoRef = useRef(null)
@@ -866,7 +873,7 @@ export default function LoungeVideoCropModal({ file, knownDurationSec, intent = 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[105] flex items-end justify-center overscroll-none bg-black/55 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-10 backdrop-blur-[2px] sm:items-center sm:p-6"
+      className={`fixed inset-0 ${shellClassName} flex items-end justify-center overscroll-none bg-black/55 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-10 backdrop-blur-[2px] sm:items-center sm:p-6`}
       role="dialog"
       aria-modal="true"
       aria-label="Trim and crop video"

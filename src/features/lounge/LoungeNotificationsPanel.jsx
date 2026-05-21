@@ -223,65 +223,65 @@ export default function LoungeNotificationsPanel({
                     isNew ? 'bg-cyan-950/20 active:bg-cyan-950/35' : ''
                   }`}
                 >
-                  <LoungeNotificationActionBadge eventType={event.event_type} slot="lead" />
-                  <span className={`min-w-0 flex-1 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
-                    <div className="flex min-w-0 items-start gap-2">
+                  <span
+                    className={`${LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS} flex items-center justify-center overflow-hidden`}
+                    aria-hidden
+                  >
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
                       <span
-                        className={`${LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS} flex items-center justify-center overflow-hidden`}
-                        aria-hidden
+                        className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarTone}`}
                       >
-                        {avatarUrl ? (
-                          <img
-                            src={avatarUrl}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                            decoding="async"
-                          />
+                        {avatarText}
+                      </span>
+                    )}
+                  </span>
+                  <span className={`min-w-0 flex-1 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
+                    <div className={LOUNGE_FEED_META_TEXT_COLUMN_CLASS}>
+                      <div className={LOUNGE_FEED_META_ROW_CLASS}>
+                        <LoungeFeedAuthorMetaBadges
+                          role={actorProfile.role}
+                          isOg={event.actor_is_og === true}
+                          displayName={displayName}
+                          displayNameClassName={LOUNGE_FEED_DISPLAY_NAME_CLASS}
+                        />
+                        {when ? (
+                          <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
+                            <span className="min-w-0 truncate">{handleLabel}</span>
+                            <span className="shrink-0 text-zinc-600">·</span>
+                            <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">
+                              {when}
+                            </span>
+                          </span>
                         ) : (
-                          <span
-                            className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarTone}`}
-                          >
-                            {avatarText}
+                          <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
+                            <span className="min-w-0 truncate">{handleLabel}</span>
                           </span>
                         )}
-                      </span>
-                      <div className={LOUNGE_FEED_META_TEXT_COLUMN_CLASS}>
-                        <div className={LOUNGE_FEED_META_ROW_CLASS}>
-                          <LoungeFeedAuthorMetaBadges
-                            role={actorProfile.role}
-                            isOg={event.actor_is_og === true}
-                            displayName={displayName}
-                            displayNameClassName={LOUNGE_FEED_DISPLAY_NAME_CLASS}
-                          />
-                          {when ? (
-                            <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
-                              <span className="min-w-0 truncate">{handleLabel}</span>
-                              <span className="shrink-0 text-zinc-600">·</span>
-                              <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">
-                                {when}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
-                              <span className="min-w-0 truncate">{handleLabel}</span>
-                            </span>
-                          )}
-                        </div>
-                        <span className="mt-0.5 block text-[15px] leading-snug text-zinc-400">{actionPhrase}</span>
-                        {previewText ? (
-                          <p
-                            className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 line-clamp-3 text-zinc-300`}
-                          >
-                            {previewText}
-                          </p>
-                        ) : null}
                       </div>
+                      <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[15px] leading-snug text-zinc-400">
+                        <LoungeNotificationActionBadge eventType={event.event_type} slot="inline" />
+                        <span className="min-w-0">{actionPhrase}</span>
+                      </span>
+                      {previewText ? (
+                        <p
+                          className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 line-clamp-3 text-zinc-300`}
+                        >
+                          {previewText}
+                        </p>
+                      ) : null}
                     </div>
                   </span>
                   {previewPosterUrl ? (
                     <span
-                      className="pointer-events-none mt-0.5 h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-900"
+                      className="pointer-events-none h-14 w-14 shrink-0 self-center overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-900"
                       aria-hidden
                     >
                       <img

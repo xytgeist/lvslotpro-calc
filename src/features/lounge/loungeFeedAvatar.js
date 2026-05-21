@@ -2,11 +2,11 @@
 export const LOUNGE_FEED_AVATAR_CLASS =
   'h-12 w-12 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 font-bold text-zinc-200 text-[18px] sm:h-[3.3rem] sm:w-[3.3rem] sm:text-[19px]'
 
-/** Notifications panel — actor avatar beside display name (not left column). */
+/** Notifications panel — actor avatar in the left column. */
 export const LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS =
-  'h-9 w-9 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 font-bold text-zinc-200 text-[14px] sm:h-10 sm:w-10 sm:text-[15px]'
+  'h-10 w-10 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 font-bold text-zinc-200 text-[15px] sm:h-11 sm:w-11 sm:text-[16px]'
 
-/** Notifications panel — left column action glyph (same footprint as feed avatar). */
+/** @deprecated Lead slot — unused in notification rows. */
 export const LOUNGE_NOTIFICATION_ACTION_SLOT_CLASS =
   'flex h-12 w-12 shrink-0 items-center justify-center sm:h-[3.3rem] sm:w-[3.3rem]'
 

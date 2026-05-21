@@ -4882,6 +4882,13 @@ export default function SocialFeed({
       ? 'z-[101]'
       : 'z-[100]'
 
+  const loungeProfileScreenOpen = profileModalOpen || profileOverlayStack.length > 0
+  const loungeQuoteRepostShellZClass = loungePostDetailAboveProfile
+    ? 'z-[107]'
+    : loungeProfileScreenOpen
+      ? 'z-[111]'
+      : 'z-[100]'
+
   const loungeDetailStreamLightboxSurface = useMemo(
     () => ({
       repostMenuPortalClass:
@@ -10515,7 +10522,7 @@ export default function SocialFeed({
 
       {quoteRepostModal?.mode === 'remove' ? (
         <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 px-3 pb-0 backdrop-blur-[3px]"
+          className={`fixed inset-0 ${loungeQuoteRepostShellZClass} flex items-end justify-center bg-black/45 px-3 pb-0 backdrop-blur-[3px]`}
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="quote-remove-confirm-title"
@@ -10568,7 +10575,7 @@ export default function SocialFeed({
         </div>
       ) : quoteRepostModal ? (
         <div
-          className="fixed inset-0 z-[100] flex bg-black/45 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[3px]"
+          className={`fixed inset-0 ${loungeQuoteRepostShellZClass} flex bg-black/45 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[3px]`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="quote-repost-sheet-title"
@@ -11311,6 +11318,17 @@ export default function SocialFeed({
           file={loungeVideoCrop.file}
           knownDurationSec={loungeVideoCrop.knownDurationSec}
           intent={loungeVideoCrop.mode === 'detail' ? 'detail' : 'composer'}
+          shellClassName={
+            loungeVideoCrop.mode === 'quote'
+              ? loungePostDetailAboveProfile
+                ? 'z-[108]'
+                : loungeProfileScreenOpen
+                  ? 'z-[112]'
+                  : 'z-[105]'
+              : loungePostDetailAboveProfile
+                ? 'z-[106]'
+                : 'z-[105]'
+          }
           onCancel={() => {
             if (loungeVideoCrop.mode === 'detail') {
               setLoungeDetailEditMediaFile(null)
