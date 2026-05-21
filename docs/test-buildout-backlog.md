@@ -101,7 +101,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ### Phases C-L
 
-- [ ] Phases **D–L** not complete end-to-end; **E/F first slice**, **Phase G search stack**, and **Phase E Relevant comment ranking** validated on **test** (Ryan smoke **§16** / **§19** **PASSED** 2026-05-21 @ **`f40ff0e`**). **Phase J Popular feed** client + SQL shipped — smoke **§20** pending. **Notifications**, **freemium**, etc. still roadmap scope.
+- [ ] Phases **D–L** not complete end-to-end; **E/F first slice**, **Phase G search stack**, and **Phase E Relevant comment ranking** validated on **test** (Ryan smoke **§16** / **§19** **PASSED** 2026-05-21 @ **`f40ff0e`**). **Phase J Popular feed** client + SQL shipped — smoke **§20** pending. **Phase H1 in-app notifications** client + SQL shipped — smoke **§21** pending. **Freemium**, etc. still roadmap scope.
+- [ ] **Phase H1 notifications (test build):** **`activity_events`** + emit triggers + dock **`LoungeNotificationsPanel`** + bell unread badge — migration **`20260522120000_lounge_activity_events_phase_h1.sql`**. Apply on test Supabase; smoke **§21** pending Ryan sign-off. Push / prefs / batched likes still open.
 - [ ] **Phase J Popular feed (test build):** **`lounge_feed_posts_page`** + **`lounge_feed_popular_score()`** — home feed **Latest | Popular** (`LoungeFeedSortSwitch`, `AppShell` RPC load). Migration **`20260521120000_lounge_feed_popular_sort.sql`**. Apply on test Supabase; smoke **§20** pending Ryan sign-off. Block/mute still open.
 - [x] **Phase C (profiles + identity, test):** profile gate (Lounge + Guides); full-screen profile editor; 7-day handle change (DB + modals); **`/u/:handle`** permalink + OG + deep link; **handle conflict** dialog (taken/reserved + suggested `@handle_1`). Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18). *Deferred (not blocking):* dedicated server-side reserved-handle SQL beyond client `RESERVED_HANDLES` + unique index; standalone marketing profile page beyond in-app sheet.
 - [x] **Phase G (search, test):** Auth-gated **`lounge_search()`** stack — posts, profiles, comments, highlight/recent/about, Top/Latest, rate limit, bundled pagination, hardening, **`@handle` keyword**, relevance ranking, volatile helpers. Migrations **`20260518160000`** through **`20260520190000`**. Client: **`loungeSearchApi.js`**, **`LoungeDockSlidePanels.jsx`**. Ryan sign-off **PASSED** on **test** (smoke **§16**, 2026-05-21).
@@ -174,6 +175,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Source: SQL update on `public.profiles`
   - Test validation: Admin-capable account flow proven on test.
   - Production replay: `production-rollout-checklist.md` §3
+
+- [ ] Lounge activity notifications Phase H1 on test  
+  - Change: **`activity_events`** outbox + safe AFTER INSERT triggers (comment on post, reply, @mention in post/comment, follow); read RPCs **`lounge_activity_events_page`**, **`lounge_activity_unread_count`**, **`lounge_activity_mark_all_read`**. Client: **`LoungeNotificationsPanel.jsx`**, dock bell unread badge.
+  - Source: `supabase/lounge_activity_events_phase_h.sql`, migration **`20260522120000_lounge_activity_events_phase_h1.sql`**
+  - Test validation: Apply SQL on test; smoke **§21** (badge, panel list, tap → post/profile; confirm likes/comments still write). Ryan sign-off pending.
+  - Production replay: `production-rollout-checklist.md` §2
 
 - [ ] Staff bootstrap runbook hardening  
   - Change: Add exact operator sequence for moderator creation + audit note.
@@ -373,6 +380,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
     18. **Direct comment entry + profile unfollow sync** (after **`59a26bd`** + **`dd02294`** on test): **Profile Replies** or **comment-repost** card → post detail opens, sheet lands, **smooth scroll** to focused comment (title bar stays put); in-feed comment drill still **instant**. **Unfollow** from profile or follow list → close sheet → feed **Follow** pill returns; **Following** filter drops them without refresh. *(Ryan, 2026-05-19, **PASSED** on test.)*
     19. **Comment sort — Relevant (Phase E):** open a busy post detail → default **Relevant** puts freshly posted comment at top (viewer pin); older low-engagement roots sink below higher-engagement / recent activity; switch **Popular** / **Most liked** / **Oldest first** and back — order changes predictably; **like/unlike** does not jump row order or stick liked after unlike. Drill into a thread → sibling replies read **oldest-first** in Relevant mode. *(Ryan, 2026-05-21, **PASSED** on test @ **`f40ff0e`**.)*
     20. **Home feed Popular (Phase J):** apply migration **`20260521120000_lounge_feed_popular_sort.sql`** on test — **Latest | Popular** toggle above feed; **Popular** floats engaged recent posts (not pure recency); **Latest** unchanged; **Following** filter works in both modes; load-more does not duplicate rows. *(Ryan smoke pending.)*
+    21. **Lounge notifications (Phase H1):** apply migration **`20260522120000_lounge_activity_events_phase_h1.sql`** on test — second account **comments** on your post → bell badge; open **Alerts** → row appears, badge clears; tap → post detail (comment focus when reply); **@mention** in post/comment; **follow** → tap opens profile; feed like/comment/post still work (triggers must not block writes). *(Ryan smoke pending.)*
   - **Sign-off:** Manual steps above passed on **test** (operator confirmation after latest `test` deploy).
   - **Sign-off (Phase G search full stack, 2026-05-21, Ryan):** Migrations **`20260518160000`**–**`20260520190000`** applied on test; smoke **§16** **PASSED** (comments, highlight/recent/about, Top/Latest, **`@handle` keyword**, relevance ranking).
   - **Sign-off (Phase E Relevant comment ranking + post-detail comment UX, 2026-05-21, Ryan):** Smoke **§19** **PASSED** on **test** @ **`f40ff0e`** — score + decay **Relevant** sort; stable list order on like/unlike; comment unlike glyph hydration fix.
@@ -397,6 +405,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ---
 
 ## Update log
+
+- 2026-05-22: **Phase H1 in-app notifications (client + SQL build):** **`activity_events`** outbox + safe emit triggers (comment/reply/mention/follow); read RPCs + **`LoungeNotificationsPanel.jsx`** + dock bell unread badge — migration **`20260522120000_lounge_activity_events_phase_h1.sql`**. Smoke **§21** pending apply + Ryan sign-off on **test**. Push / prefs / batched likes deferred.
 
 - 2026-05-21: **Phase J Popular home feed (client + SQL build):** **`lounge_feed_popular_score()`** + **`lounge_feed_posts_page`** RPC; **Latest | Popular** toggle (`LoungeFeedSortSwitch`, `loungeFeedSortPref.js`); frozen **`p_as_of`** pagination for Popular — migration **`20260521120000_lounge_feed_popular_sort.sql`**. Smoke **§20** pending apply + Ryan sign-off on **test**.
 

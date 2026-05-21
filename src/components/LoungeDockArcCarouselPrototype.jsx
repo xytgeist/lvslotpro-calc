@@ -1472,7 +1472,7 @@ export default function LoungeDockArcCarouselPrototype({
       }}
     >
       <span
-        className={`flex items-center justify-center rounded-full backdrop-blur-sm ${chromeBorder} ${
+        className={`relative flex items-center justify-center rounded-full backdrop-blur-sm ${chromeBorder} ${
           useLitChrome
             ? `${glow.bgLit} ${glow.ringLit} ${glow.shadowLit}`
             : `${glow.bgIdle} ${glow.shadowIdle}`
@@ -1492,6 +1492,14 @@ export default function LoungeDockArcCarouselPrototype({
         >
           {item.icon}
         </span>
+        {item.badgeCount > 0 ? (
+          <span
+            className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#fd262d] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-zinc-950"
+            aria-hidden
+          >
+            {item.badgeCount > 99 ? '99+' : item.badgeCount}
+          </span>
+        ) : null}
       </span>
     </button>
     )

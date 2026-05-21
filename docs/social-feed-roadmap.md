@@ -251,8 +251,8 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 ## Phase H - Activity + notification preferences + push
 
+- **Shipped (H1 in-app slice, test build 2026-05-22):** `activity_events` outbox + safe AFTER INSERT triggers (comment on post, reply, @mention in post/comment, follow); read RPCs **`lounge_activity_events_page`**, **`lounge_activity_unread_count`**, **`lounge_activity_mark_all_read`** — migration **`20260522120000_lounge_activity_events_phase_h1.sql`**. Client: **`LoungeNotificationsPanel.jsx`**, dock bell **unread badge**, tap → post detail / profile. Ryan smoke **§21** pending after SQL apply. Push / prefs / batched likes still open (H2/H3).
 - `notification_preferences` per user (or short-term metadata fallback).
-- `activity_events` outbox model.
 - Push hooks for mentions/replies/comments/batched likes.
 - Cron/edge schedule for batching.
 

@@ -145,6 +145,7 @@ export function buildLoungeDockArcCarouselItems({
   onChat,
   onSettings,
   activePanel,
+  notificationsUnreadCount = 0,
 }) {
   const onFeedHome = !activePanel
 
@@ -201,6 +202,7 @@ export function buildLoungeDockArcCarouselItems({
     iconScale: 1.2,
     onSelect: onNotifications,
     active: activePanel === 'notifications',
+    badgeCount: notificationsUnreadCount,
   }
 
   /**

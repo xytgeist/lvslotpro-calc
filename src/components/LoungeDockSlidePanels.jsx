@@ -32,6 +32,7 @@ import {
   LoungeStreamLightboxProvider,
 } from '../features/lounge/LoungeStreamLightboxContext.jsx'
 import LoungeChatPanel from '../features/lounge/LoungeChatPanel.jsx'
+import LoungeNotificationsPanel from '../features/lounge/LoungeNotificationsPanel.jsx'
 import { loungeDockFabScrollBottomInsetPx } from '../utils/loungeDockFabPosition.js'
 import {
   loungeTitleRevealAfterScrollStep,
@@ -99,6 +100,11 @@ export default function LoungeDockSlidePanels({
   chatIsStaff = false,
   chatInitialPeerUserId = null,
   onChatInitialPeerCleared,
+  notificationsSupabaseClient = null,
+  notificationsViewerUserId = '',
+  onOpenPostFromNotifications,
+  onOpenProfileFromNotifications,
+  onNotificationsUnreadChange,
   /** `'wheel'` | `'cornerL'` — persisted in `loungeDockMenuLayout:v1`. */
   dockMenuLayout = 'wheel',
   onDockMenuLayoutChange,
@@ -937,6 +943,16 @@ export default function LoungeDockSlidePanels({
               onClearInitialPeer={onChatInitialPeerCleared}
             />
           </div>
+        ) : openPanel === 'notifications' ? (
+          <div className="px-0 pt-2">
+            <LoungeNotificationsPanel
+              supabaseClient={notificationsSupabaseClient}
+              viewerUserId={notificationsViewerUserId}
+              onOpenPost={onOpenPostFromNotifications}
+              onOpenProfile={onOpenProfileFromNotifications}
+              onUnreadChange={onNotificationsUnreadChange}
+            />
+          </div>
         ) : openPanel === 'settings' ? (
           <div className="px-3 py-4">
             <h2 className="text-[17px] font-semibold text-zinc-100">Settings</h2>
@@ -1057,9 +1073,7 @@ export default function LoungeDockSlidePanels({
         ) : (
           <div className="px-3 py-4">
             <p className="text-[15px] leading-relaxed text-zinc-400">
-              {openPanel === 'notifications'
-                ? 'Notification center is coming soon. Push and offer alerts continue to work from their tabs.'
-                : 'Chat panel is unavailable.'}
+              Chat panel is unavailable.
             </p>
           </div>
         )}

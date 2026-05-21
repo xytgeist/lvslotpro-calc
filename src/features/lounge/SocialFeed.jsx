@@ -61,6 +61,10 @@ import {
   stripLoungeProfileShareFromUrl,
 } from '../../utils/loungeSharePost'
 import {
+  isLoungeActivitySchemaMissingError,
+  loungeActivityUnreadCount,
+} from '../../utils/loungeActivityApi.js'
+import {
   readLoungeProfileCache,
   writeLoungeProfileCache,
   readLoungeComposerDraft,
@@ -636,6 +640,7 @@ export default function SocialFeed({
   const [loungePanelTitleReveal, setLoungePanelTitleReveal] = useState(1)
   /** When set, Chat panel opens a DM with this user (cleared after `open_dm` runs). */
   const [chatDockInitialPeerUserId, setChatDockInitialPeerUserId] = useState(null)
+  const [loungeNotificationsUnread, setLoungeNotificationsUnread] = useState(0)
   const [loungeDockFooterHeight, setLoungeDockFooterHeight] = useState(0)
   const [loungePostDetail, setLoungePostDetail] = useState(null)
   /** When true, post detail was opened from profile (likes/bookmarks/posts) and must sit above z-[101] profile chrome. */
@@ -4678,6 +4683,58 @@ export default function SocialFeed({
   const onLoungeDockNotifications = useCallback(() => {
     setLoungeDockPanel((p) => (p === 'notifications' ? null : 'notifications'))
   }, [])
+
+  const refreshLoungeNotificationsUnread = useCallback(async () => {
+    if (!composerUserId || loungeFeedBrowseMode === 'anonymous') {
+      setLoungeNotificationsUnread(0)
+      return
+    }
+    try {
+      const n = await loungeActivityUnreadCount(supabaseClient)
+      setLoungeNotificationsUnread(n)
+    } catch (e) {
+      if (!isLoungeActivitySchemaMissingError(e)) {
+        /* ignore transient unread errors */
+      }
+      setLoungeNotificationsUnread(0)
+    }
+  }, [composerUserId, loungeFeedBrowseMode, supabaseClient])
+
+  useEffect(() => {
+    void refreshLoungeNotificationsUnread()
+    if (typeof window === 'undefined' || !composerUserId || loungeFeedBrowseMode === 'anonymous') return undefined
+    const id = window.setInterval(() => void refreshLoungeNotificationsUnread(), 60_000)
+    return () => window.clearInterval(id)
+  }, [composerUserId, loungeFeedBrowseMode, refreshLoungeNotificationsUnread])
+
+  const onLoungeNotificationsUnreadChange = useCallback((n) => {
+    setLoungeNotificationsUnread(Number.isFinite(n) && n > 0 ? Math.floor(n) : 0)
+  }, [])
+
+  const onLoungeOpenPostFromNotifications = useCallback(
+    async ({ postId, commentId }) => {
+      if (!postId) return
+      let postRow = communityPosts.find((p) => p.id === postId)
+      if (!postRow) {
+        const { data, error } = await supabaseClient
+          .from('community_feed_posts')
+          .select(LOUNGE_SINGLE_POST_SELECT)
+          .eq('id', postId)
+          .is('hidden_at', null)
+          .maybeSingle()
+        if (error || !data) return
+        const hydrated = await hydrateCommunityPosts([data])
+        postRow = hydrated?.[0] || null
+        if (postRow) {
+          setCommunityPosts((prev) => (prev.some((p) => p.id === postRow.id) ? prev : [postRow, ...prev]))
+        }
+      }
+      if (!postRow) return
+      setLoungeDockPanel(null)
+      openLoungePostDetail(postRow, commentId ? { focusCommentId: commentId } : {})
+    },
+    [communityPosts, hydrateCommunityPosts, openLoungePostDetail, setCommunityPosts, supabaseClient],
+  )
   const onLoungeDockChat = useCallback(() => {
     setLoungeDockPanel((p) => {
       if (p === 'chat') {
@@ -7575,6 +7632,15 @@ export default function SocialFeed({
     [openAuthorProfile],
   )
 
+  const onLoungeOpenProfileFromNotifications = useCallback(
+    (entity) => {
+      if (!entity?.user_id) return
+      setLoungeDockPanel(null)
+      openAuthorProfile(entity)
+    },
+    [openAuthorProfile],
+  )
+
   /** Open a profile by handle string — used when a viewer taps an @mention in a caption or comment. */
   const openProfileByHandle = useCallback(
     async (handle) => {
@@ -7948,6 +8014,7 @@ export default function SocialFeed({
         onChat: onLoungeDockChat,
         onSettings: onLoungeDockSettings,
         activePanel: loungeDockPanel,
+        notificationsUnreadCount: loungeNotificationsUnread,
       }),
     [
       onLoungeDockCompose,
@@ -7962,6 +8029,7 @@ export default function SocialFeed({
       onLoungeDockChat,
       onLoungeDockSettings,
       loungeDockPanel,
+      loungeNotificationsUnread,
     ],
   )
 
@@ -10406,6 +10474,11 @@ export default function SocialFeed({
           chatIsStaff={chatDockIsStaff}
           chatInitialPeerUserId={chatDockInitialPeerUserId}
           onChatInitialPeerCleared={clearChatDockInitialPeer}
+          notificationsSupabaseClient={supabaseClient}
+          notificationsViewerUserId={composerUserId || ''}
+          onOpenPostFromNotifications={onLoungeOpenPostFromNotifications}
+          onOpenProfileFromNotifications={onLoungeOpenProfileFromNotifications}
+          onNotificationsUnreadChange={onLoungeNotificationsUnreadChange}
           blockUnderlyingPointer={loungeFabPointerBlocked}
           dockMenuLayout={loungeDockMenuLayout}
           onDockMenuLayoutChange={writeLoungeDockMenuLayout}
