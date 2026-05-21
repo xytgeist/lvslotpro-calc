@@ -89,7 +89,8 @@ export function loungeActivityOpenPostTarget(event) {
   const drillComment =
     type === LOUNGE_ACTIVITY_EVENT_TYPES.COMMENT_ON_POST ||
     type === LOUNGE_ACTIVITY_EVENT_TYPES.REPLY_TO_COMMENT ||
-    type === LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_COMMENT
+    type === LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_COMMENT ||
+    (type === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK && event.comment_id)
   return {
     postId: event.post_id,
     commentId: drillComment && event.comment_id ? event.comment_id : null,
@@ -115,6 +116,10 @@ export function loungeActivitySummary(event) {
         : `${who} reposted your post`
     case LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST:
       return `${who} quote reposted your post`
+    case LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK:
+      return event?.comment_id
+        ? `${who} bookmarked your comment`
+        : `${who} bookmarked your post`
     default:
       return `${who} interacted with you`
   }
