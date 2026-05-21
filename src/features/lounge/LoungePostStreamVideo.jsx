@@ -1239,12 +1239,17 @@ export default function LoungePostStreamVideo({
         !feedInlineSoundExplicitlyMuted &&
         tileRatio >= LOUNGE_VIDEO_SOUND_ON_RATIO
       ) {
-        handoffUnmuteTid = window.setTimeout(() => {
+        const tryHandoffUnmute = (attempt = 0) => {
           const el = videoRef.current
-          if (el && !el.paused && isActiveRef.current) {
+          if (!el || !isActiveRef.current) return
+          if (!el.paused) {
             tryCoordinatedDomUnmute(el)
+            return
           }
-        }, 150)
+          if (attempt >= 8) return
+          handoffUnmuteTid = window.setTimeout(() => tryHandoffUnmute(attempt + 1), 120)
+        }
+        handoffUnmuteTid = window.setTimeout(() => tryHandoffUnmute(0), 120)
       }
     }
     prevCoordinatedActiveRef.current = Boolean(isActive)
@@ -1260,7 +1265,7 @@ export default function LoungePostStreamVideo({
     tryCoordinatedDomUnmute,
   ])
 
-  /** Feed-wide sound: mute-only on playing (HLS segments fire playing often — no unmute here on iOS). */
+  /** Feed-wide sound: iOS playing fires often — mute-only sync + one DOM unmute when playback starts in ON band. */
   useEffect(() => {
     if (!coordinatedInlineSound || !isActive || lightboxOpen) return undefined
     const v = videoRef.current
@@ -1269,6 +1274,13 @@ export default function LoungePostStreamVideo({
     const onPlayingSound = () => {
       if (appleWebKitInlineStreamRef.current) {
         syncCoordinatedSoundMuteOnly()
+        if (
+          feedInlineSoundUnmutedRef.current &&
+          !feedInlineSoundExplicitlyMutedRef.current &&
+          tileRatioRef.current >= LOUNGE_VIDEO_SOUND_ON_RATIO
+        ) {
+          tryCoordinatedDomUnmute(v)
+        }
         return
       }
       syncCoordinatedSoundMuted()
@@ -1283,6 +1295,7 @@ export default function LoungePostStreamVideo({
     lightboxOpen,
     syncCoordinatedSoundMuted,
     syncCoordinatedSoundMuteOnly,
+    tryCoordinatedDomUnmute,
   ])
 
   /** Apple: one DOM unmute when tile crosses 60% ON band — not on every ratio tick or early handoff. */
@@ -1388,9 +1401,7 @@ export default function LoungePostStreamVideo({
     const applyAudibleAfterPlay = () => {
       if (!v || v.paused) return
       if (coordinatedInlineSound && isActiveRef.current) {
-        if (!appleWebKitInlineStreamRef.current) {
-          tryCoordinatedDomUnmute(v)
-        }
+        tryCoordinatedDomUnmute(v)
         return
       }
       if (localStripSoundUnmutedRef.current && isActiveRef.current) {
