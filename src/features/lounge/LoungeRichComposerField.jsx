@@ -42,11 +42,19 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
 
   useImperativeHandle(ref, () => rootRef.current, [])
 
-  /** Defer mention/caret sync so Android commits selection after input + HTML sync. */
-  const notifyComposerInput = useCallback((el, text, caret) => {
+  /** Notify mention layer — sync first (pre-DOM rewrite), rAF backup for late Android selection. */
+  const notifyComposerInput = useCallback((el, text, caret, { sync = false } = {}) => {
+    const payload = { target: el, text, caret }
+    if (sync) onInputRef.current?.(payload)
     requestAnimationFrame(() => {
+      onInputRef.current?.(payload)
       requestAnimationFrame(() => {
-        onInputRef.current?.({ target: el, text, caret })
+        if (!el?.isConnected) return
+        onInputRef.current?.({
+          target: el,
+          text: plainTextFromComposerRoot(el),
+          caret: getCaretTextOffset(el),
+        })
       })
     })
   }, [])
@@ -61,9 +69,9 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     const nextCaret =
       maxLength != null ? Math.min(caret, capped.length) : caret
     lastValueRef.current = capped
+    notifyComposerInput(el, capped, nextCaret, { sync: true })
     syncComposerHtml(el, capped, nextCaret)
     if (capped !== value) onChange?.(capped)
-    notifyComposerInput(el, capped, nextCaret)
   }, [maxLength, notifyComposerInput, onChange, value])
 
   useLayoutEffect(() => {
@@ -110,6 +118,11 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     document.addEventListener('selectionchange', onSelectionChange)
     return () => document.removeEventListener('selectionchange', onSelectionChange)
   }, [disabled, notifyComposerInput])
+
+  const handleBeforeInput = useCallback(() => {
+    // Android defers selection updates; a follow-up read after the edit lands helps mentions.
+    requestAnimationFrame(() => readAndEmit())
+  }, [readAndEmit])
 
   const handleInput = useCallback(() => {
     readAndEmit()
@@ -159,6 +172,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
         suppressContentEditableWarning
         spellCheck
         onInput={handleInput}
+        onBeforeInput={handleBeforeInput}
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         onKeyUp={onKeyUp}

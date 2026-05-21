@@ -70,6 +70,22 @@ export function buildRichComposerHtml(text) {
   return out.join('')
 }
 
+/** Normalize plain text read from a composer root (Android block/div quirks). */
+export function normalizeComposerPlainText(text, root) {
+  let t = String(text ?? '')
+  if (!root) return t
+  // Lone <br> placeholder reads as "\n" via the walker.
+  if (t === '\n' && /^<br\s*\/?>$/i.test(String(root.innerHTML || '').trim())) return ''
+  // Sole inner block wrapper: walker may append one trailing newline between blocks.
+  if (t.endsWith('\n') && root.childElementCount === 1) {
+    const only = root.children[0]
+    if (only && (only.tagName === 'DIV' || only.tagName === 'P')) {
+      t = t.replace(/\n$/, '')
+    }
+  }
+  return t
+}
+
 /** Plain text (+ `\n`) from a composer contenteditable root. */
 export function plainTextFromComposerRoot(root) {
   if (!root) return ''
@@ -88,7 +104,12 @@ export function plainTextFromComposerRoot(root) {
     if (tag === 'DIV' || tag === 'P') {
       const beforeLen = parts.length
       for (const child of node.childNodes) walk(child)
-      if (beforeLen > 0 && parts.length > 0 && node !== root && !parts[parts.length - 1]?.endsWith('\n')) {
+      if (
+        beforeLen > 0 &&
+        parts.length > 0 &&
+        node !== root &&
+        !parts[parts.length - 1]?.endsWith('\n')
+      ) {
         parts.push('\n')
       }
       return
@@ -96,7 +117,24 @@ export function plainTextFromComposerRoot(root) {
     for (const child of node.childNodes) walk(child)
   }
   for (const child of root.childNodes) walk(child)
-  return parts.join('')
+  return normalizeComposerPlainText(parts.join(''), root)
+}
+
+function textLengthOfComposerNode(node, root) {
+  if (!node) return 0
+  if (node.nodeType === Node.TEXT_NODE) return node.nodeValue?.length ?? 0
+  if (node.nodeType !== Node.ELEMENT_NODE) return 0
+  const tag = node.tagName
+  if (tag === 'BR') return 1
+  if (tag === 'DIV' || tag === 'P') {
+    let len = 0
+    for (const child of node.childNodes) len += textLengthOfComposerNode(child, root)
+    if (node !== root && len > 0) len += 1
+    return len
+  }
+  let len = 0
+  for (const child of node.childNodes) len += textLengthOfComposerNode(child, root)
+  return len
 }
 
 /** Character offset of the selection anchor within `root`. */
@@ -107,10 +145,20 @@ export function getCaretTextOffset(root) {
     return plainTextFromComposerRoot(root).length
   }
 
-  let offset = 0
-  let found = false
   const anchorNode = sel.anchorNode
   const anchorOffset = sel.anchorOffset
+
+  // Android Chrome often anchors selection on the contenteditable root by child index.
+  if (anchorNode === root) {
+    let offset = 0
+    for (let i = 0; i < anchorOffset && i < root.childNodes.length; i += 1) {
+      offset += textLengthOfComposerNode(root.childNodes[i], root)
+    }
+    return Math.min(offset, plainTextFromComposerRoot(root).length)
+  }
+
+  let offset = 0
+  let found = false
 
   function walkTextOnly(node) {
     if (found) return
