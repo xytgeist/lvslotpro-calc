@@ -19,7 +19,6 @@ import {
   syncLoungeFeedVideoDebugFromUrl,
 } from '../../utils/loungeFeedVideoDebugPref.js'
 import LoungeFeedVideoAutoplayDebugHud from './LoungeFeedVideoAutoplayDebugHud.jsx'
-import LoungeFeedIosSharedStreamHost from './LoungeFeedIosSharedStreamHost.jsx'
 import { detectAppleWebKitInlineStream } from '../../utils/loungeAppleWebKit.js'
 
 const LoungeFeedVideoAutoplayContext = createContext(null)
@@ -101,7 +100,7 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
   useEffect(() => {
     const wanted = feedInlineSoundUnmuted && !feedInlineSoundExplicitlyMuted
     store.setFeedSoundWanted(wanted)
-    if (!wanted || iosSharedFeedSoundMode) {
+    if (!wanted) {
       store.setFeedSoundTouchActive(false)
       return undefined
     }
@@ -125,7 +124,7 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
       el.removeEventListener('touchend', onTouchEnd, { capture: true })
       el.removeEventListener('touchcancel', onTouchEnd, { capture: true })
     }
-  }, [feedInlineSoundExplicitlyMuted, feedInlineSoundUnmuted, iosSharedFeedSoundMode, scrollRootRef, store])
+  }, [feedInlineSoundExplicitlyMuted, feedInlineSoundUnmuted, scrollRootRef, store])
 
   useEffect(() => {
     const onScrollOrResize = () => store.markScroll()
@@ -194,11 +193,6 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
 
   return (
     <LoungeFeedVideoAutoplayContext.Provider value={value}>
-      <LoungeFeedIosSharedStreamHost
-        store={store}
-        feedInlineSoundUnmuted={feedInlineSoundUnmuted}
-        feedInlineSoundExplicitlyMuted={feedInlineSoundExplicitlyMuted}
-      />
       {children}
       {showDebugHud && videoDebugEnabled ? (
         <LoungeFeedVideoAutoplayDebugHud store={store} scrollRootRef={scrollRootRef} />

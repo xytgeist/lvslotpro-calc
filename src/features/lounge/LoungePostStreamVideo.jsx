@@ -4,7 +4,6 @@ import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoU
 import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
 import { useLoungeStreamHlsAttachment } from './useLoungeStreamHlsAttachment.js'
-import { registerIosSharedStreamHost } from './loungeFeedIosSharedStreamRegistry.js'
 import { detectAppleWebKitInlineStream } from '../../utils/loungeAppleWebKit.js'
 import {
   LOUNGE_VIDEO_SOUND_OFF_RATIO,
@@ -766,8 +765,6 @@ export default function LoungePostStreamVideo({
     exitFeedHeroLock,
     registerFeedSoundGesture,
     isFeedSoundTouchActive,
-    iosSharedFeedSoundMode,
-    unmuteIosSharedStreamInGesture,
   } = useLoungeFeedVideoAutoplay(feedAutoplayClientId, getVideoContainer)
   const videoDebugEnabled = useSyncExternalStore(
     subscribeLoungeFeedVideoDebugEnabled,
@@ -782,11 +779,6 @@ export default function LoungePostStreamVideo({
   isActiveRef.current =
     feedAutoplayEnabled && !coordinatorSuspended && (!coordinatorActive || isActive)
   const coordinatedInlineSound = coordinatorActive
-  const iosSharedSoundEligible =
-    iosSharedFeedSoundMode &&
-    coordinatedInlineSound &&
-    (variant === 'feed' || variant === 'embed')
-  const useIosSharedForPlayback = iosSharedSoundEligible && isActive && !heroExpanded
   const [localStripSoundUnmuted, setLocalStripSoundUnmuted] = useState(false)
   const [localStripSoundExplicitlyMuted, setLocalStripSoundExplicitlyMuted] = useState(false)
   const localStripSoundUnmutedRef = useRef(false)
@@ -838,7 +830,7 @@ export default function LoungePostStreamVideo({
     heroExpanded ||
     lightboxOpen ||
     (!coordinatorActive && lazyStream && streamInView)
-  ) && !useIosSharedForPlayback
+  )
   const ringWarmPrefetch = coordinatorActive && inRing && !isActive && attachStream
   const hasDecodedStreamMetadata = Boolean(
     videoRef.current && videoRef.current.readyState >= HTMLMediaElement.HAVE_METADATA,
@@ -1053,26 +1045,11 @@ export default function LoungePostStreamVideo({
   }, [isFeedSoundTouchActive])
 
   useLayoutEffect(() => {
-    if (!iosSharedSoundEligible || !isActive || !feedAutoplayClientId || !id) return undefined
-    return registerIosSharedStreamHost(feedAutoplayClientId, {
-      getSlotEl: () => videoFlyoutRef.current,
-      streamUid: id,
-    })
-  }, [feedAutoplayClientId, id, iosSharedSoundEligible, isActive])
-
-  useEffect(() => {
-    if (!useIosSharedForPlayback) return undefined
-    const tid = window.setTimeout(() => setStreamFadeShowVideo(true), 180)
-    return () => window.clearTimeout(tid)
-  }, [useIosSharedForPlayback, id])
-
-  useLayoutEffect(() => {
-    if (iosSharedSoundEligible || !coordinatedInlineSound || !feedAutoplayClientId) return undefined
+    if (!coordinatedInlineSound || !feedAutoplayClientId) return undefined
     return registerFeedSoundGesture(feedAutoplayClientId, tryCoordinatedGestureUnmute)
   }, [
     coordinatedInlineSound,
     feedAutoplayClientId,
-    iosSharedSoundEligible,
     registerFeedSoundGesture,
     tryCoordinatedGestureUnmute,
   ])
@@ -1288,7 +1265,6 @@ export default function LoungePostStreamVideo({
   const tryCoordinatedInlinePlay = useCallback(() => {
     const v = videoRef.current
     if (!v || !showOpen || lightboxOpenRef.current) return false
-    if (iosSharedSoundEligible && isActiveRef.current && !lightboxOpenRef.current) return false
     if (anyStreamLightboxOpen && !lightboxOpenRef.current) return false
     if (heroLocked && !lightboxOpenRef.current) return false
     if (coordinatorActive && !isActiveRef.current) return false
@@ -1388,7 +1364,6 @@ export default function LoungePostStreamVideo({
     coordinatorActive,
     feedAutoplayClientId,
     heroLocked,
-    iosSharedSoundEligible,
     lazyStream,
     scheduleRecompute,
     showOpen,
@@ -2425,46 +2400,21 @@ export default function LoungePostStreamVideo({
       }
       toggleFeedInlineSound()
       if (turningOn && attachStream) {
-        if (appleWebKitInlineStreamRef.current && coordinatedInlineSound) {
-          feedSoundAudibleRef.current = true
-          iosFeedSoundGestureUnlockedRef.current = true
-          const v = videoRef.current
-          if (v) {
-            try {
-              v.muted = true
-              const p = v.play()
-              if (p && typeof p.then === 'function') {
-                p.then(() => {
-                  try {
-                    v.muted = false
-                  } catch {
-                    // ignore
-                  }
-                  requestAnimationFrame(() => unmuteIosSharedStreamInGesture())
-                }).catch(() => {
-                  toggleFeedInlineSound()
-                  openLightbox()
-                })
-              } else {
-                try {
-                  v.muted = false
-                } catch {
-                  // ignore
-                }
-                requestAnimationFrame(() => unmuteIosSharedStreamInGesture())
-              }
-            } catch {
-              toggleFeedInlineSound()
-              openLightbox()
-            }
-          } else {
-            unmuteIosSharedStreamInGesture()
-          }
-          return
-        }
+        feedSoundAudibleRef.current = true
+        iosFeedSoundGestureUnlockedRef.current = true
         const v = videoRef.current
         if (!v) return
         try {
+          if (!v.paused && appleWebKitInlineStreamRef.current) {
+            try {
+              v.muted = false
+            } catch {
+              // ignore
+            }
+            lastCoordinatedDomUnmuteMsRef.current = 0
+            iosFeedSoundHandoffDomUnmuteUsedRef.current = true
+            return
+          }
           v.muted = true
           const p = v.play()
           if (p && typeof p.then === 'function') {
@@ -2474,10 +2424,8 @@ export default function LoungePostStreamVideo({
               } catch {
                 // ignore
               }
-              feedSoundAudibleRef.current = true
               lastCoordinatedDomUnmuteMsRef.current = 0
               iosFeedSoundHandoffDomUnmuteUsedRef.current = true
-              iosFeedSoundGestureUnlockedRef.current = true
             }).catch(() => {
               try {
                 v.muted = true
@@ -2493,10 +2441,8 @@ export default function LoungePostStreamVideo({
             } catch {
               // ignore
             }
-            feedSoundAudibleRef.current = true
             lastCoordinatedDomUnmuteMsRef.current = 0
             iosFeedSoundHandoffDomUnmuteUsedRef.current = true
-            iosFeedSoundGestureUnlockedRef.current = true
           }
         } catch {
           toggleFeedInlineSound()
@@ -2558,7 +2504,6 @@ export default function LoungePostStreamVideo({
     coordinatorActive,
     isActive,
     forceFeedAutoplayActive,
-    unmuteIosSharedStreamInGesture,
   ])
 
   useEffect(() => {
