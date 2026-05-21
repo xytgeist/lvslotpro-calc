@@ -386,6 +386,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-21: **Feed-wide sound iOS swipe-only audio (test):** @ **`0a1ef08`** Ryan — sound only while finger down swiping; debug shows handoffs at **ratio 0.06** (gesture unmute skipped) + **`playing`** sync re-muting on **≤40% OFF band** after finger up / momentum. Fix: **`iosFeedSoundGestureUnlockedRef`** — once gesture-unmuted, skip OFF-band auto-mute until handoff away; allow unmute during active touch even below OFF band; **touchend** unmute before clearing touch flag. Ryan sign-off **pending**.
+
 - 2026-05-20: **Feed-wide sound iOS gesture play-storm (test):** @ **`566dee6`** Ryan — better than prior but audio sketchy ~video 3, gone ~video 6. Root cause: gesture path always **`muted play()` then unmute** on already-playing clips → MSE segment restarts stack over handoffs; async handoff retries outside gesture window. Fix: **DOM unmute only** when already playing in gesture; **`notifySoundGesture`** on sync **scroll ticks** + active handoff while finger down; remove async handoff **`play()`** retries and iOS **`playing`** programmatic unmute. Ryan sign-off **pending**.
 
 - 2026-05-20: **Feed-wide sound iOS gesture chain (test):** @ **`95aa15e`** Ryan — autoplay smooth, sound still video 1 only. Root cause: iOS **blocks programmatic DOM unmute** on handoff tiles (no user gesture); prior fixes ran outside gesture stack. Fix: scroll-root **`touchstart`/`touchend`** → **`notifySoundGesture`** on active tile; **`tryCoordinatedGestureUnmute`** (muted `play()` then unmute, same as Tap for sound); mid-scroll handoff while finger down inherits gesture. Superseded by play-storm fix above. Ryan sign-off **pending**.

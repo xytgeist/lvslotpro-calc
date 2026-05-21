@@ -103,8 +103,8 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
       store.notifySoundGesture()
     }
     const onTouchEnd = () => {
-      store.setFeedSoundTouchActive(false)
       store.notifySoundGesture()
+      store.setFeedSoundTouchActive(false)
     }
     el.addEventListener('touchstart', onTouchStart, { capture: true, passive: true })
     el.addEventListener('touchend', onTouchEnd, { capture: true, passive: true })

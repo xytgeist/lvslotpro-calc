@@ -758,6 +758,8 @@ export default function LoungePostStreamVideo({
   const iosFeedSoundHandoffDomUnmuteUsedRef = useRef(false)
   /** iOS gesture play-then-unmute in flight — never stack on scroll ticks. */
   const iosGestureUnmuteInFlightRef = useRef(false)
+  /** iOS: tile was gesture-unmuted — do not re-mute on OFF band / playing sync until handoff away. */
+  const iosFeedSoundGestureUnlockedRef = useRef(false)
   const prevCoordinatedTileRatioRef = useRef(0)
   /** Hero session wants audible playback (restored from inline snapshot on open). */
   const heroWantsSoundRef = useRef(true)
@@ -959,6 +961,7 @@ export default function LoungePostStreamVideo({
     enterFeedHeroLock,
     exitFeedHeroLock,
     registerFeedSoundGesture,
+    isFeedSoundTouchActive,
   } = useLoungeFeedVideoAutoplay(feedAutoplayClientId, getVideoContainer)
   const videoDebugEnabled = useSyncExternalStore(
     subscribeLoungeFeedVideoDebugEnabled,
@@ -1158,16 +1161,27 @@ export default function LoungePostStreamVideo({
     if (!v || !coordinatedInlineSound || !isActiveRef.current) return
     if (!feedInlineSoundUnmutedRef.current || feedInlineSoundExplicitlyMutedRef.current) return
     const ratio = tileRatioRef.current
-    if (ratio <= LOUNGE_VIDEO_SOUND_OFF_RATIO) return
+    const touchActive = isFeedSoundTouchActive()
+    if (ratio <= LOUNGE_VIDEO_SOUND_OFF_RATIO && !touchActive) return
     if (ratio >= LOUNGE_VIDEO_SOUND_ON_RATIO) {
       feedSoundAudibleRef.current = true
-    } else if (!feedSoundAudibleRef.current) {
+    } else if (!feedSoundAudibleRef.current && !touchActive) {
+      return
+    } else if (touchActive) {
+      feedSoundAudibleRef.current = true
+    }
+    if (!v.muted) {
+      if (appleWebKitInlineStreamRef.current && !v.paused) {
+        iosFeedSoundGestureUnlockedRef.current = true
+      }
       return
     }
-    if (!v.muted) return
 
     const markAudibleIfUnmuted = () => {
-      if (!v.muted) feedSoundAudibleRef.current = true
+      if (!v.muted) {
+        feedSoundAudibleRef.current = true
+        iosFeedSoundGestureUnlockedRef.current = true
+      }
     }
 
     if (appleWebKitInlineStreamRef.current) {
@@ -1215,7 +1229,17 @@ export default function LoungePostStreamVideo({
       return
     }
     tryCoordinatedDomUnmute(v, { fromUserGesture: true })
-  }, [coordinatedInlineSound, tryCoordinatedDomUnmute])
+    markAudibleIfUnmuted()
+  }, [coordinatedInlineSound, isFeedSoundTouchActive, tryCoordinatedDomUnmute])
+
+  const shouldSkipIosFeedAutoMute = useCallback(() => {
+    if (!appleWebKitInlineStreamRef.current) return false
+    if (!feedInlineSoundUnmutedRef.current || feedInlineSoundExplicitlyMutedRef.current) return false
+    if (isFeedSoundTouchActive()) return true
+    if (iosFeedSoundGestureUnlockedRef.current) return true
+    if (tileRatioRef.current >= LOUNGE_VIDEO_SOUND_ON_RATIO) return true
+    return false
+  }, [isFeedSoundTouchActive])
 
   useLayoutEffect(() => {
     if (!coordinatedInlineSound || !feedAutoplayClientId) return undefined
@@ -1232,6 +1256,7 @@ export default function LoungePostStreamVideo({
     if (!v || !coordinatedInlineSound || !isActiveRef.current || v.paused) return
     if (!feedInlineSoundUnmutedRef.current || feedInlineSoundExplicitlyMutedRef.current) {
       feedSoundAudibleRef.current = false
+      iosFeedSoundGestureUnlockedRef.current = false
       try {
         v.muted = true
       } catch {
@@ -1239,15 +1264,17 @@ export default function LoungePostStreamVideo({
       }
       return
     }
+    if (shouldSkipIosFeedAutoMute()) return
     if (tileRatioRef.current <= LOUNGE_VIDEO_SOUND_OFF_RATIO) {
       feedSoundAudibleRef.current = false
+      iosFeedSoundGestureUnlockedRef.current = false
       try {
         v.muted = true
       } catch {
         // ignore
       }
     }
-  }, [coordinatedInlineSound])
+  }, [coordinatedInlineSound, shouldSkipIosFeedAutoMute])
 
   const syncCoordinatedSoundMuted = useCallback(() => {
     const v = videoRef.current
@@ -1282,8 +1309,10 @@ export default function LoungePostStreamVideo({
   useEffect(() => {
     if (!coordinatedInlineSound) return
     if (isActive && tileRatio > LOUNGE_VIDEO_SOUND_OFF_RATIO) return
+    if (isActive && shouldSkipIosFeedAutoMute()) return
     if (!isActive) return
     feedSoundAudibleRef.current = false
+    iosFeedSoundGestureUnlockedRef.current = false
     const v = videoRef.current
     if (!v) return
     try {
@@ -1291,7 +1320,7 @@ export default function LoungePostStreamVideo({
     } catch {
       // ignore
     }
-  }, [coordinatedInlineSound, isActive, tileRatio])
+  }, [coordinatedInlineSound, isActive, shouldSkipIosFeedAutoMute, tileRatio])
 
   /** Fresh active handoff: inherit feed-wide sound intent (gesture unmute via scroll/touch notify). */
   const prevCoordinatedActiveRef = useRef(false)
@@ -1306,6 +1335,7 @@ export default function LoungePostStreamVideo({
     if (!isActive) {
       iosFeedSoundHandoffDomUnmuteUsedRef.current = false
       iosGestureUnmuteInFlightRef.current = false
+      iosFeedSoundGestureUnlockedRef.current = false
       prevCoordinatedTileRatioRef.current = 0
     }
     if (isActive && !prevCoordinatedActiveRef.current) {
@@ -1315,6 +1345,7 @@ export default function LoungePostStreamVideo({
       lastCoordinatedDomUnmuteMsRef.current = 0
       iosFeedSoundHandoffDomUnmuteUsedRef.current = false
       iosGestureUnmuteInFlightRef.current = false
+      iosFeedSoundGestureUnlockedRef.current = false
       prevCoordinatedTileRatioRef.current = tileRatio
     }
     prevCoordinatedActiveRef.current = Boolean(isActive)
@@ -2583,6 +2614,7 @@ export default function LoungePostStreamVideo({
               feedSoundAudibleRef.current = true
               lastCoordinatedDomUnmuteMsRef.current = 0
               iosFeedSoundHandoffDomUnmuteUsedRef.current = true
+              iosFeedSoundGestureUnlockedRef.current = true
             }).catch(() => {
               try {
                 v.muted = true
@@ -2601,6 +2633,7 @@ export default function LoungePostStreamVideo({
             feedSoundAudibleRef.current = true
             lastCoordinatedDomUnmuteMsRef.current = 0
             iosFeedSoundHandoffDomUnmuteUsedRef.current = true
+            iosFeedSoundGestureUnlockedRef.current = true
           }
         } catch {
           toggleFeedInlineSound()
