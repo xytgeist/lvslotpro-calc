@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LoungeOgBadge from './LoungeOgBadge.jsx'
+import LoungeNotificationActionBadge from './LoungeNotificationActionBadge.jsx'
 import {
   LOUNGE_FEED_AVATAR_CLASS,
   LOUNGE_FEED_META_ROW_CLASS,
@@ -201,25 +202,28 @@ export default function LoungeNotificationsPanel({
                       : 'border-zinc-800/90 bg-zinc-950/40 hover:bg-zinc-900/60'
                   }`}
                 >
-                  <span
-                    className={`${LOUNGE_FEED_AVATAR_CLASS} flex shrink-0 items-center justify-center overflow-hidden`}
-                    aria-hidden
-                  >
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <span
-                        className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarTone}`}
-                      >
-                        {avatarText}
-                      </span>
-                    )}
+                  <span className="relative shrink-0">
+                    <span
+                      className={`${LOUNGE_FEED_AVATAR_CLASS} flex items-center justify-center overflow-hidden`}
+                      aria-hidden
+                    >
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <span
+                          className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarTone}`}
+                        >
+                          {avatarText}
+                        </span>
+                      )}
+                    </span>
+                    <LoungeNotificationActionBadge eventType={event.event_type} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className={`${LOUNGE_FEED_META_ROW_CLASS} flex-wrap gap-x-1.5 gap-y-0.5`}>

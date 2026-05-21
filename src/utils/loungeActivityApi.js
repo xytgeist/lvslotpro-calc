@@ -8,6 +8,36 @@ export const LOUNGE_ACTIVITY_EVENT_TYPES = {
   MENTION_IN_POST: 'mention_in_post',
   MENTION_IN_COMMENT: 'mention_in_comment',
   FOLLOW: 'follow',
+  /** Reserved for H2+ notification slices. */
+  LIKE: 'like',
+  REPOST: 'repost',
+  QUOTE_REPOST: 'quote_repost',
+  BOOKMARK: 'bookmark',
+}
+
+/** Maps `activity_events.event_type` → notification avatar badge kind (null = no badge). */
+export function loungeActivityNotificationBadgeKind(eventType) {
+  switch (eventType) {
+    case LOUNGE_ACTIVITY_EVENT_TYPES.COMMENT_ON_POST:
+      return 'comment'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.REPLY_TO_COMMENT:
+      return 'reply'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_POST:
+    case LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_COMMENT:
+      return 'mention'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW:
+      return 'follow'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.LIKE:
+      return 'like'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.REPOST:
+      return 'repost'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST:
+      return 'quote_repost'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK:
+      return 'bookmark'
+    default:
+      return null
+  }
 }
 
 /** True when PostgREST reports the RPC/table is not deployed yet. */
