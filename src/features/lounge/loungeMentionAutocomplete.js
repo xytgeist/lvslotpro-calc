@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  getCaretTextOffset,
+  isRichComposerElement,
+  setCaretTextOffset,
+  syncComposerHtml,
+} from './loungeRichComposerDom.js'
 
 const DEBOUNCE_MS = 180
 const MIN_QUERY_LEN = 1
@@ -123,17 +129,25 @@ export function useMentionState(value, supabaseClient, enabled = true) {
     setActiveIndex(0)
   }, [suggestions.length])
 
-  // After a mention is applied, restore cursor position in the textarea
-  const applyCursor = useCallback((textareaEl) => {
+  const applyCursor = useCallback((editorEl) => {
     const pos = pendingCursorRef.current
-    if (pos == null || !textareaEl) return
+    if (pos == null || !editorEl) return
     pendingCursorRef.current = null
-    textareaEl.selectionStart = textareaEl.selectionEnd = pos
+    if (isRichComposerElement(editorEl)) {
+      setCaretTextOffset(editorEl, pos)
+      return
+    }
+    editorEl.selectionStart = editorEl.selectionEnd = pos
   }, [])
 
-  // Call from textarea onChange AFTER updating value state
   const onCursorMove = useCallback((e) => {
-    setCursorPos(e.target.selectionStart ?? null)
+    const el = e?.target
+    if (!el) return
+    if (isRichComposerElement(el)) {
+      setCursorPos(getCaretTextOffset(el))
+      return
+    }
+    setCursorPos(el.selectionStart ?? null)
   }, [])
 
   // Returns true if the event was consumed (caller should skip default onKeyDown handling)
@@ -157,9 +171,11 @@ export function useMentionState(value, supabaseClient, enabled = true) {
         const result = applyMentionSuggestion(value, mention, profile.handle)
         pendingCursorRef.current = result.cursorPos
         setCursorPos(result.cursorPos)
+        if (isRichComposerElement(textareaEl)) {
+          syncComposerHtml(textareaEl, result.value, result.cursorPos)
+        }
         setValue(result.value)
         clearMention()
-        // Restore cursor on next frame after React re-renders the textarea
         requestAnimationFrame(() => applyCursor(textareaEl))
         return true
       }
@@ -179,6 +195,9 @@ export function useMentionState(value, supabaseClient, enabled = true) {
       const result = applyMentionSuggestion(value, mention, profile.handle)
       pendingCursorRef.current = result.cursorPos
       setCursorPos(result.cursorPos)
+      if (isRichComposerElement(textareaEl)) {
+        syncComposerHtml(textareaEl, result.value, result.cursorPos)
+      }
       setValue(result.value)
       clearMention()
       requestAnimationFrame(() => {

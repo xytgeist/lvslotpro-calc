@@ -1,10 +1,16 @@
+import {
+  isRichComposerElement,
+  plainTextFromComposerRoot,
+  setCaretTextOffset,
+} from './loungeRichComposerDom.js'
+
 /**
  * Focus caption and place caret at end. Call synchronously from a click/pointer handler when
  * possible so mobile Safari keeps the tap “user activation” and shows the keyboard.
  *
  * @param {() => HTMLElement | null} getTextarea
  * @param {{ scrollFeedToTop?: () => void }} [opts]
- * @returns {boolean} whether the textarea was found and focus was attempted
+ * @returns {boolean} whether the field was found and focus was attempted
  */
 export function focusLoungeComposerCaption(getTextarea, opts = {}) {
   opts.scrollFeedToTop?.()
@@ -18,6 +24,10 @@ export function focusLoungeComposerCaption(getTextarea, opts = {}) {
     } catch {
       return false
     }
+  }
+  if (isRichComposerElement(el)) {
+    setCaretTextOffset(el, plainTextFromComposerRoot(el).length)
+    return true
   }
   const len = typeof el.value === 'string' ? el.value.length : 0
   try {
@@ -40,12 +50,6 @@ export function invokeLoungeComposerCaptionKeyboard(getTextarea, opts = {}) {
   const el = getTextarea?.()
   if (!el) return false
   try {
-    el.readOnly = true
-    el.readOnly = false
-  } catch {
-    // ignore
-  }
-  try {
     el.focus({ preventScroll: true })
   } catch {
     try {
@@ -54,10 +58,22 @@ export function invokeLoungeComposerCaptionKeyboard(getTextarea, opts = {}) {
       return false
     }
   }
+  if (!isRichComposerElement(el)) {
+    try {
+      el.readOnly = true
+      el.readOnly = false
+    } catch {
+      // ignore
+    }
+  }
   try {
     el.click()
   } catch {
     // ignore
+  }
+  if (isRichComposerElement(el)) {
+    setCaretTextOffset(el, plainTextFromComposerRoot(el).length)
+    return document.activeElement === el
   }
   const len = typeof el.value === 'string' ? el.value.length : 0
   try {

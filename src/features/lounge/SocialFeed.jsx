@@ -98,6 +98,7 @@ import {
   loungeInteractionStatCountCellClass,
 } from '../../utils/formatCompactStatCount.js'
 import { composerStableInitialsFromUid, formatLoungePostDetailWhen } from './loungeFormat'
+import LoungeRichComposerField from './LoungeRichComposerField.jsx'
 import { renderRichCaption } from './loungeCaption'
 import { useMentionState } from './loungeMentionAutocomplete'
 import LoungeMentionDropdown from './LoungeMentionDropdown'
@@ -672,8 +673,7 @@ export default function SocialFeed({
   const pullStartYRef = useRef(null)
   const pullTriggeredRef = useRef(false)
   const composerMediaInputRef = useRef(null)
-  const composerTextareaRef = useRef(null)
-  const composerMirrorRef = useRef(null)
+  const composerFieldRef = useRef(null)
   const mentionComposerAnchorRef = useRef(null)
   const mentionDetailCommentAnchorRef = useRef(null)
   const mentionQuoteRepostAnchorRef = useRef(null)
@@ -968,7 +968,7 @@ export default function SocialFeed({
       const getTextarea = () => {
         if (target === 'detailComment') return loungeDetailCommentTextareaRef.current
         if (target === 'quote') return quoteRepostTextareaRef.current
-        return composerTextareaRef.current
+        return composerFieldRef.current
       }
       const isBlocked = () => {
         if (target === 'detailComment') return !loungePostDetail
@@ -1083,7 +1083,7 @@ export default function SocialFeed({
     const getTextarea = () => {
       if (target === 'detailComment') return loungeDetailCommentTextareaRef.current
       if (target === 'quote') return quoteRepostTextareaRef.current
-      return composerTextareaRef.current
+      return composerFieldRef.current
     }
     blurLoungeComposerCaption(getTextarea)
     if (target === 'detailComment') setLoungeDetailCommentKbOverlapPx(0)
@@ -1172,17 +1172,10 @@ export default function SocialFeed({
   useEffect(() => {
     if (!composerExpanded || composerFoldReveal < 0.88 || loungeDockPanel) return undefined
     return scheduleLoungeComposerTextareaFocus({
-      getTextarea: () => composerTextareaRef.current,
+      getTextarea: () => composerFieldRef.current,
       scrollFeedToTop: scrollLoungeFeedToTopInstant,
     })
   }, [composerExpanded, composerFoldReveal, loungeDockPanel, composerFocusToken, scrollLoungeFeedToTopInstant])
-
-  useLayoutEffect(() => {
-    const ta = composerTextareaRef.current
-    const m = composerMirrorRef.current
-    if (!ta || !m) return
-    m.scrollTop = ta.scrollTop
-  }, [postText])
 
   useLayoutEffect(() => {
     if (!loungeDetailEditing) return
@@ -4776,11 +4769,11 @@ export default function SocialFeed({
     })
 
     scrollLoungeFeedToTopInstant()
-    focusLoungeComposerCaption(() => composerTextareaRef.current, {
+    focusLoungeComposerCaption(() => composerFieldRef.current, {
       scrollFeedToTop: scrollLoungeFeedToTopInstant,
     })
     scheduleLoungeComposerTextareaFocus({
-      getTextarea: () => composerTextareaRef.current,
+      getTextarea: () => composerFieldRef.current,
       scrollFeedToTop: scrollLoungeFeedToTopInstant,
     })
   }, [
@@ -8299,46 +8292,32 @@ export default function SocialFeed({
               >
                 <div className="mt-0.5 flex min-h-[6.5rem] flex-col pr-8">
                   <div ref={mentionComposerAnchorRef}>
-                  <div className="grid min-h-[2.75rem] max-h-[min(50vh,22rem)] shrink-0 grid-cols-1 grid-rows-1 [&>*]:col-start-1 [&>*]:row-start-1 sm:min-h-[3rem]">
-                    <div
-                      ref={composerMirrorRef}
-                      aria-hidden
-                      className="pointer-events-none min-h-[2.75rem] max-h-[min(50vh,22rem)] w-full overflow-y-auto whitespace-pre-wrap break-words px-0 py-0 pt-[10px] text-left text-[17px] leading-[1.25] text-zinc-100 [scrollbar-width:none] [-ms-overflow-style:none] sm:min-h-[3rem] sm:pt-[13px] [&::-webkit-scrollbar]:hidden"
-                    >
-                      {postText ? (
-                        renderRichCaption(postText, {
-                          linkClassName:
-                            'pointer-events-none font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
-                        })
-                      ) : (
-                        <span className="text-zinc-500">Are ya winning, son?</span>
-                      )}
-                    </div>
-                    <textarea
-                      ref={composerTextareaRef}
+                    <LoungeRichComposerField
+                      ref={composerFieldRef}
                       value={postText}
-                      onChange={(e) => { setPostText(e.target.value); mentionComposer.onCursorMove(e) }}
+                      onChange={setPostText}
+                      maxLength={280}
+                      placeholder="Are ya winning, son?"
+                      ariaLabel="Lounge post caption"
+                      onKeyDown={(e) => {
+                        mentionComposer.onMentionKeyDown(e, setPostText, composerFieldRef.current)
+                      }}
                       onKeyUp={mentionComposer.onCursorMove}
                       onMouseUp={mentionComposer.onCursorMove}
-                      onKeyDown={(e) => mentionComposer.onMentionKeyDown(e, setPostText, composerTextareaRef.current)}
-                      onBlur={() => window.setTimeout(() => mentionComposer.clearMention(), 150)}
-                      onScroll={(e) => {
-                        const m = composerMirrorRef.current
-                        if (m) m.scrollTop = e.currentTarget.scrollTop
+                      onInput={() => {
+                        if (composerFieldRef.current) {
+                          mentionComposer.onCursorMove({ target: composerFieldRef.current })
+                        }
                       }}
-                      className="z-10 min-h-[2.75rem] max-h-[min(50vh,22rem)] w-full resize-none touch-manipulation overflow-y-auto bg-transparent px-0 py-0 pt-[10px] text-[17px] leading-[1.25] text-transparent caret-white outline-none selection:bg-cyan-500/25 sm:min-h-[3rem] sm:pt-[13px]"
-                      placeholder=""
-                      aria-label="Lounge post caption"
-                      maxLength={280}
+                      onBlur={() => window.setTimeout(() => mentionComposer.clearMention(), 150)}
                     />
-                  </div>
-                  <LoungeMentionDropdown
-                    suggestions={mentionComposer.suggestions}
-                    activeIndex={mentionComposer.activeIndex}
-                    loading={mentionComposer.loading}
-                    onSelect={(p) => mentionComposer.onMentionSelect(p, setPostText, composerTextareaRef.current)}
-                    anchorRef={mentionComposerAnchorRef}
-                  />
+                    <LoungeMentionDropdown
+                      suggestions={mentionComposer.suggestions}
+                      activeIndex={mentionComposer.activeIndex}
+                      loading={mentionComposer.loading}
+                      onSelect={(p) => mentionComposer.onMentionSelect(p, setPostText, composerFieldRef.current)}
+                      anchorRef={mentionComposerAnchorRef}
+                    />
                   </div>
                   {(() => {
                     const gifUrl = String(composerMediaUrl || '').trim()
@@ -8420,11 +8399,11 @@ export default function SocialFeed({
                     setComposerExpanded(true)
                     setComposerFocusToken((t) => t + 1)
                   })
-                  focusLoungeComposerCaption(() => composerTextareaRef.current, {
+                  focusLoungeComposerCaption(() => composerFieldRef.current, {
                     scrollFeedToTop: scrollLoungeFeedToTopInstant,
                   })
                   scheduleLoungeComposerTextareaFocus({
-                    getTextarea: () => composerTextareaRef.current,
+                    getTextarea: () => composerFieldRef.current,
                     scrollFeedToTop: scrollLoungeFeedToTopInstant,
                   })
                 }}
