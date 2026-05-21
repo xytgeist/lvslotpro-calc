@@ -131,6 +131,8 @@ export function createAutoplayStore() {
   let feedSoundTouchActive = false
   let feedSoundWanted = false
   let lastSoundGestureNotifyMs = 0
+  /** @type {{ unmuteInGesture?: () => void, getVideo?: () => HTMLVideoElement | null } | null} */
+  let iosSharedStreamController = null
 
   const emit = () => {
     listeners.forEach((l) => {
@@ -695,6 +697,14 @@ export function createAutoplayStore() {
   }
 
   const notifySoundGesture = () => {
+    if (iosSharedStreamController?.unmuteInGesture) {
+      try {
+        iosSharedStreamController.unmuteInGesture()
+      } catch {
+        // ignore
+      }
+      return
+    }
     if (!activeId) return
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
     if (now - lastSoundGestureNotifyMs < 90) return
@@ -806,5 +816,15 @@ export function createAutoplayStore() {
     },
     /** Scroll-root touch — invoke active tile unmute inside user-gesture stack. */
     notifySoundGesture,
+    /** iOS shared inline player — Tap for sound targets one persistent `<video>`. */
+    registerIosSharedStreamController(controller) {
+      iosSharedStreamController = controller
+      return () => {
+        if (iosSharedStreamController === controller) iosSharedStreamController = null
+      }
+    },
+    getIosSharedStreamController() {
+      return iosSharedStreamController
+    },
   }
 }

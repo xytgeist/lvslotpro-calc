@@ -19,6 +19,8 @@ import {
   syncLoungeFeedVideoDebugFromUrl,
 } from '../../utils/loungeFeedVideoDebugPref.js'
 import LoungeFeedVideoAutoplayDebugHud from './LoungeFeedVideoAutoplayDebugHud.jsx'
+import LoungeFeedIosSharedStreamHost from './LoungeFeedIosSharedStreamHost.jsx'
+import { detectAppleWebKitInlineStream } from '../../utils/loungeAppleWebKit.js'
 
 const LoungeFeedVideoAutoplayContext = createContext(null)
 
@@ -87,11 +89,19 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
     store.setScrollRootRef(scrollRootRef)
   }, [store, scrollRootRef])
 
+  const iosSharedFeedSoundMode = useMemo(
+    () =>
+      detectAppleWebKitInlineStream() &&
+      feedInlineSoundUnmuted &&
+      !feedInlineSoundExplicitlyMuted,
+    [feedInlineSoundUnmuted, feedInlineSoundExplicitlyMuted],
+  )
+
   /** iOS feed-wide sound: chain unmute to scroll touches (programmatic handoff unmute is blocked). */
   useEffect(() => {
     const wanted = feedInlineSoundUnmuted && !feedInlineSoundExplicitlyMuted
     store.setFeedSoundWanted(wanted)
-    if (!wanted) {
+    if (!wanted || iosSharedFeedSoundMode) {
       store.setFeedSoundTouchActive(false)
       return undefined
     }
@@ -115,7 +125,7 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
       el.removeEventListener('touchend', onTouchEnd, { capture: true })
       el.removeEventListener('touchcancel', onTouchEnd, { capture: true })
     }
-  }, [feedInlineSoundExplicitlyMuted, feedInlineSoundUnmuted, scrollRootRef, store])
+  }, [feedInlineSoundExplicitlyMuted, feedInlineSoundUnmuted, iosSharedFeedSoundMode, scrollRootRef, store])
 
   useEffect(() => {
     const onScrollOrResize = () => store.markScroll()
@@ -149,33 +159,46 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
     setFeedInlineSoundExplicitlyMuted(false)
   }, [])
 
+  const unmuteIosSharedStreamInGesture = useCallback(() => {
+    store.getIosSharedStreamController()?.unmuteInGesture?.()
+  }, [store])
+
   const value = useMemo(
     () => ({
       store,
       feedInlineSoundUnmuted,
       feedInlineSoundExplicitlyMuted,
+      iosSharedFeedSoundMode,
       toggleFeedInlineSound,
       restoreFeedInlineSound,
       resetFeedInlineSound,
       forceFeedAutoplayActive,
       enterFeedHeroLock,
       exitFeedHeroLock,
+      unmuteIosSharedStreamInGesture,
     }),
     [
       store,
       feedInlineSoundUnmuted,
       feedInlineSoundExplicitlyMuted,
+      iosSharedFeedSoundMode,
       toggleFeedInlineSound,
       restoreFeedInlineSound,
       resetFeedInlineSound,
       forceFeedAutoplayActive,
       enterFeedHeroLock,
       exitFeedHeroLock,
+      unmuteIosSharedStreamInGesture,
     ],
   )
 
   return (
     <LoungeFeedVideoAutoplayContext.Provider value={value}>
+      <LoungeFeedIosSharedStreamHost
+        store={store}
+        feedInlineSoundUnmuted={feedInlineSoundUnmuted}
+        feedInlineSoundExplicitlyMuted={feedInlineSoundExplicitlyMuted}
+      />
       {children}
       {showDebugHud && videoDebugEnabled ? (
         <LoungeFeedVideoAutoplayDebugHud store={store} scrollRootRef={scrollRootRef} />
@@ -313,8 +336,10 @@ export function useLoungeFeedVideoAutoplay(clientId, getContainerEl) {
     feedSoundFromProvider: Boolean(ctx),
     feedInlineSoundUnmuted: ctx?.feedInlineSoundUnmuted ?? false,
     feedInlineSoundExplicitlyMuted: ctx?.feedInlineSoundExplicitlyMuted ?? false,
+    iosSharedFeedSoundMode: ctx?.iosSharedFeedSoundMode ?? false,
     toggleFeedInlineSound: ctx?.toggleFeedInlineSound ?? (() => {}),
     restoreFeedInlineSound: ctx?.restoreFeedInlineSound ?? (() => {}),
+    unmuteIosSharedStreamInGesture: ctx?.unmuteIosSharedStreamInGesture ?? (() => {}),
     forceFeedAutoplayActive: ctx?.forceFeedAutoplayActive ?? (() => {}),
     enterFeedHeroLock: ctx?.enterFeedHeroLock ?? (() => {}),
     exitFeedHeroLock: ctx?.exitFeedHeroLock ?? (() => {}),

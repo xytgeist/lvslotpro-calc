@@ -3,6 +3,9 @@ import { createPortal, flushSync } from 'react-dom'
 import { cfStreamManifestUrl, cfStreamPosterUrl } from '../../utils/loungeVideoUpload'
 import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 import { useLoungeFeedVideoAutoplay } from './LoungeFeedVideoAutoplayContext.jsx'
+import { useLoungeStreamHlsAttachment } from './useLoungeStreamHlsAttachment.js'
+import { registerIosSharedStreamHost } from './loungeFeedIosSharedStreamRegistry.js'
+import { detectAppleWebKitInlineStream } from '../../utils/loungeAppleWebKit.js'
 import {
   LOUNGE_VIDEO_SOUND_OFF_RATIO,
   LOUNGE_VIDEO_SOUND_ON_RATIO,
@@ -118,15 +121,6 @@ const HERO_CHROME_AUTO_HIDE_MS = 3000
 /** Landscape hero chrome: inset controls 10% from each viewport edge. */
 /** Default hero stack when no parent `lightboxPortalClass` is passed. */
 const HERO_STACK_BASE_Z_INDEX = 102
-
-/** iPhone/iPad — inline feed uses native HLS by default; MSE via hls.js is an alternate pipeline. */
-function detectAppleWebKitInlineStream() {
-  if (typeof navigator === 'undefined') return false
-  const ua = navigator.userAgent || ''
-  if (/iPhone|iPad|iPod/i.test(ua)) return true
-  if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true
-  return false
-}
 
 /**
  * Hero stack must sit above the parent shell (`lightboxPortalClass`, e.g. post detail z-[98]/z-[102]).
@@ -462,196 +456,6 @@ function pauseOtherLoungeStreamVideos(exceptVideo) {
   pauseLoungeStreamInlineVideos(exceptVideo)
 }
 
-/**
- * @param {React.RefObject<HTMLVideoElement | null>} videoRef
- * @param {string} src manifest URL
- * @param {number} [attachKey] bump to force re-attach after a recoverable failure
- * @param {object} [opts]
- * @param {boolean} [opts.enabled=true] when false, detach (feed: off-screen)
- * @param {boolean} [opts.feedStyleAbr=false] conservative ABR for small tiles / composer
- * @param {boolean} [opts.preferMseHls=false] skip native HLS attach; try hls.js MSE first (Apple inline experiment)
- * @param {React.MutableRefObject<number> | null} [opts.recoveryBurstRef] auto-reattach budget (shared with `<video onError>`)
- * @param {(() => void) | null} [opts.onAutoReattach] bump attachKey after built-in Hls recovery fails
- * @param {((detail: string) => void) | null} [opts.onDebugHlsError] dev HUD: fatal HLS error detail
- * @param {((detail: string) => void) | null} [opts.onDebugLifecycle] dev HUD: attach/detach lifecycle
- * @param {import('react').MutableRefObject<number> | null} [opts.savedTimeRef] restore currentTime after HLS reattach
- */
-function useStreamHlsAttachment(videoRef, src, attachKey = 0, opts = {}) {
-  const {
-    enabled = true,
-    feedStyleAbr = false,
-    ringWarmPrefetch = false,
-    preferMseHls = false,
-    recoveryBurstRef = null,
-    onAutoReattach = null,
-    onDebugHlsError = null,
-    onDebugLifecycle = null,
-    savedTimeRef = null,
-  } = opts
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video || !src) return undefined
-
-    const cleanupVideo = () => {
-      try {
-        video.removeAttribute('src')
-        video.load()
-      } catch {
-        // ignore
-      }
-    }
-
-    const savePlaybackTime = () => {
-      if (!savedTimeRef) return
-      if (!Number.isFinite(video.currentTime) || video.currentTime <= 0.05) return
-      savedTimeRef.current = video.currentTime
-    }
-
-    const restoreSavedTime = () => {
-      if (!savedTimeRef) return
-      const t = savedTimeRef.current
-      if (!Number.isFinite(t) || t <= 0.05) return
-      try {
-        if (Math.abs(video.currentTime - t) > 0.35) video.currentTime = t
-      } catch {
-        // ignore
-      }
-    }
-
-    if (!enabled) {
-      savePlaybackTime()
-      cleanupVideo()
-      return undefined
-    }
-
-    if (onDebugLifecycle) onDebugLifecycle(`attach key=${attachKey}`)
-
-    let cancelled = false
-    let hlsInstance = null
-    /** @type {((event: string, data: unknown) => void) | null} */
-    let hlsErrorHandler = null
-
-    const onRecovered = () => {
-      if (recoveryBurstRef) recoveryBurstRef.current = 0
-    }
-    video.addEventListener('canplay', onRecovered, { once: true })
-    video.addEventListener('loadedmetadata', restoreSavedTime, { once: true })
-
-    const canNativeHls = Boolean(video.canPlayType('application/vnd.apple.mpegurl'))
-    const attachNativeHls = () => {
-      if (onDebugLifecycle) onDebugLifecycle(`attach key=${attachKey} native`)
-      video.src = src
-      return () => {
-        cancelled = true
-        savePlaybackTime()
-        video.removeEventListener('canplay', onRecovered)
-        video.removeEventListener('loadedmetadata', restoreSavedTime)
-        cleanupVideo()
-      }
-    }
-
-    if (canNativeHls && !preferMseHls) {
-      return attachNativeHls()
-    }
-
-    import('hls.js')
-      .then(({ default: Hls }) => {
-        if (cancelled || !videoRef.current || videoRef.current !== video) return
-        if (Hls.isSupported()) {
-          if (onDebugLifecycle) onDebugLifecycle(`attach key=${attachKey} mse`)
-          const maxBufferLength = feedStyleAbr ? (ringWarmPrefetch ? 6 : 18) : 45
-          const maxMaxBufferLength = feedStyleAbr ? (ringWarmPrefetch ? 12 : 36) : 120
-          const hls = new Hls({
-            maxBufferLength,
-            maxMaxBufferLength,
-            lowLatencyMode: false,
-            ...(feedStyleAbr ? { startLevel: 0, capLevelToPlayerSize: true } : {}),
-          })
-          hlsInstance = hls
-          let didMediaRecover = false
-          let didNetRestart = false
-          hlsErrorHandler = (_event, data) => {
-            if (!data?.fatal || cancelled) return
-            try {
-              if (data.type === 'networkError' && !didNetRestart) {
-                didNetRestart = true
-                hls.startLoad()
-                return
-              }
-              if (data.type === 'mediaError' && !didMediaRecover) {
-                didMediaRecover = true
-                hls.recoverMediaError()
-                return
-              }
-              const ref = recoveryBurstRef
-              if (ref && ref.current < 2 && onAutoReattach) {
-                ref.current += 1
-                queueMicrotask(() => onAutoReattach())
-                return
-              }
-              if (onDebugHlsError) {
-                const detail = [data.type, data.details, data.response?.code]
-                  .filter((x) => x != null && x !== '')
-                  .join(' ')
-                onDebugHlsError(detail || 'fatal')
-              }
-            } catch {
-              // ignore
-            }
-          }
-          hls.on(Hls.Events.ERROR, hlsErrorHandler)
-          if (feedStyleAbr) {
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              if (cancelled || !hls.levels?.length) return
-              let cap = hls.levels.length - 1
-              for (let i = hls.levels.length - 1; i >= 0; i -= 1) {
-                const h = hls.levels[i]?.height
-                if (h && h <= 720) {
-                  cap = i
-                  break
-                }
-              }
-              try {
-                hls.autoLevelCapping = cap
-              } catch {
-                // ignore
-              }
-            })
-          }
-          hls.loadSource(src)
-          hls.attachMedia(video)
-        } else if (canNativeHls) {
-          if (onDebugLifecycle) onDebugLifecycle(`attach key=${attachKey} native-fallback`)
-          video.src = src
-        }
-      })
-      .catch(() => {
-        if (!cancelled && videoRef.current === video) {
-          video.src = src
-        }
-      })
-
-    return () => {
-      cancelled = true
-      savePlaybackTime()
-      if (onDebugLifecycle) onDebugLifecycle(`detach key=${attachKey}`)
-      video.removeEventListener('canplay', onRecovered)
-      video.removeEventListener('loadedmetadata', restoreSavedTime)
-      if (hlsInstance) {
-        try {
-          hlsInstance.destroy()
-        } catch {
-          // ignore
-        }
-        hlsInstance = null
-      }
-      cleanupVideo()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omit videoRef; opts refs stable
-  }, [src, attachKey, enabled, feedStyleAbr, preferMseHls, onAutoReattach, recoveryBurstRef])
-}
-
 function MutedGlyph({ className = 'h-4 w-4' }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -962,6 +766,8 @@ export default function LoungePostStreamVideo({
     exitFeedHeroLock,
     registerFeedSoundGesture,
     isFeedSoundTouchActive,
+    iosSharedFeedSoundMode,
+    unmuteIosSharedStreamInGesture,
   } = useLoungeFeedVideoAutoplay(feedAutoplayClientId, getVideoContainer)
   const videoDebugEnabled = useSyncExternalStore(
     subscribeLoungeFeedVideoDebugEnabled,
@@ -976,6 +782,11 @@ export default function LoungePostStreamVideo({
   isActiveRef.current =
     feedAutoplayEnabled && !coordinatorSuspended && (!coordinatorActive || isActive)
   const coordinatedInlineSound = coordinatorActive
+  const iosSharedSoundEligible =
+    iosSharedFeedSoundMode &&
+    coordinatedInlineSound &&
+    (variant === 'feed' || variant === 'embed')
+  const useIosSharedForPlayback = iosSharedSoundEligible && isActive && !heroExpanded
   const [localStripSoundUnmuted, setLocalStripSoundUnmuted] = useState(false)
   const [localStripSoundExplicitlyMuted, setLocalStripSoundExplicitlyMuted] = useState(false)
   const localStripSoundUnmutedRef = useRef(false)
@@ -1027,7 +838,7 @@ export default function LoungePostStreamVideo({
     heroExpanded ||
     lightboxOpen ||
     (!coordinatorActive && lazyStream && streamInView)
-  )
+  ) && !useIosSharedForPlayback
   const ringWarmPrefetch = coordinatorActive && inRing && !isActive && attachStream
   const hasDecodedStreamMetadata = Boolean(
     videoRef.current && videoRef.current.readyState >= HTMLMediaElement.HAVE_METADATA,
@@ -1242,11 +1053,26 @@ export default function LoungePostStreamVideo({
   }, [isFeedSoundTouchActive])
 
   useLayoutEffect(() => {
-    if (!coordinatedInlineSound || !feedAutoplayClientId) return undefined
+    if (!iosSharedSoundEligible || !isActive || !feedAutoplayClientId || !id) return undefined
+    return registerIosSharedStreamHost(feedAutoplayClientId, {
+      getSlotEl: () => videoFlyoutRef.current,
+      streamUid: id,
+    })
+  }, [feedAutoplayClientId, id, iosSharedSoundEligible, isActive])
+
+  useEffect(() => {
+    if (!useIosSharedForPlayback) return undefined
+    const tid = window.setTimeout(() => setStreamFadeShowVideo(true), 180)
+    return () => window.clearTimeout(tid)
+  }, [useIosSharedForPlayback, id])
+
+  useLayoutEffect(() => {
+    if (iosSharedSoundEligible || !coordinatedInlineSound || !feedAutoplayClientId) return undefined
     return registerFeedSoundGesture(feedAutoplayClientId, tryCoordinatedGestureUnmute)
   }, [
     coordinatedInlineSound,
     feedAutoplayClientId,
+    iosSharedSoundEligible,
     registerFeedSoundGesture,
     tryCoordinatedGestureUnmute,
   ])
@@ -1462,6 +1288,7 @@ export default function LoungePostStreamVideo({
   const tryCoordinatedInlinePlay = useCallback(() => {
     const v = videoRef.current
     if (!v || !showOpen || lightboxOpenRef.current) return false
+    if (iosSharedSoundEligible && isActiveRef.current && !lightboxOpenRef.current) return false
     if (anyStreamLightboxOpen && !lightboxOpenRef.current) return false
     if (heroLocked && !lightboxOpenRef.current) return false
     if (coordinatorActive && !isActiveRef.current) return false
@@ -1561,12 +1388,11 @@ export default function LoungePostStreamVideo({
     coordinatorActive,
     feedAutoplayClientId,
     heroLocked,
+    iosSharedSoundEligible,
     lazyStream,
     scheduleRecompute,
     showOpen,
     tryCoordinatedDomUnmute,
-    scheduleRecompute,
-    showOpen,
     tileRatio,
     videoDebugEnabled,
   ])
@@ -1893,7 +1719,7 @@ export default function LoungePostStreamVideo({
     }
   }, [attachStream])
 
-  useStreamHlsAttachment(videoRef, src, streamAttachKey, {
+  useLoungeStreamHlsAttachment(videoRef, src, streamAttachKey, {
     enabled: hlsAttachEnabled,
     feedStyleAbr: feedStyleAbr,
     preferMseHls: appleWebKitInlineStreamRef.current,
@@ -2599,6 +2425,43 @@ export default function LoungePostStreamVideo({
       }
       toggleFeedInlineSound()
       if (turningOn && attachStream) {
+        if (appleWebKitInlineStreamRef.current && coordinatedInlineSound) {
+          feedSoundAudibleRef.current = true
+          iosFeedSoundGestureUnlockedRef.current = true
+          const v = videoRef.current
+          if (v) {
+            try {
+              v.muted = true
+              const p = v.play()
+              if (p && typeof p.then === 'function') {
+                p.then(() => {
+                  try {
+                    v.muted = false
+                  } catch {
+                    // ignore
+                  }
+                  requestAnimationFrame(() => unmuteIosSharedStreamInGesture())
+                }).catch(() => {
+                  toggleFeedInlineSound()
+                  openLightbox()
+                })
+              } else {
+                try {
+                  v.muted = false
+                } catch {
+                  // ignore
+                }
+                requestAnimationFrame(() => unmuteIosSharedStreamInGesture())
+              }
+            } catch {
+              toggleFeedInlineSound()
+              openLightbox()
+            }
+          } else {
+            unmuteIosSharedStreamInGesture()
+          }
+          return
+        }
         const v = videoRef.current
         if (!v) return
         try {
@@ -2695,6 +2558,7 @@ export default function LoungePostStreamVideo({
     coordinatorActive,
     isActive,
     forceFeedAutoplayActive,
+    unmuteIosSharedStreamInGesture,
   ])
 
   useEffect(() => {
