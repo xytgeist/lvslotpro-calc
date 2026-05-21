@@ -8,10 +8,10 @@ export const LOUNGE_ACTIVITY_EVENT_TYPES = {
   MENTION_IN_POST: 'mention_in_post',
   MENTION_IN_COMMENT: 'mention_in_comment',
   FOLLOW: 'follow',
-  /** Reserved for H2+ notification slices. */
-  LIKE: 'like',
   REPOST: 'repost',
   QUOTE_REPOST: 'quote_repost',
+  /** Reserved for H2+ notification slices. */
+  LIKE: 'like',
   BOOKMARK: 'bookmark',
 }
 
@@ -82,6 +82,20 @@ export function loungeActivityActorLabel(event) {
   return 'Someone'
 }
 
+/** Post detail deep link from a notification row (`post_id` always set when returned). */
+export function loungeActivityOpenPostTarget(event) {
+  if (!event?.post_id) return null
+  const type = event.event_type
+  const drillComment =
+    type === LOUNGE_ACTIVITY_EVENT_TYPES.COMMENT_ON_POST ||
+    type === LOUNGE_ACTIVITY_EVENT_TYPES.REPLY_TO_COMMENT ||
+    type === LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_COMMENT
+  return {
+    postId: event.post_id,
+    commentId: drillComment && event.comment_id ? event.comment_id : null,
+  }
+}
+
 export function loungeActivitySummary(event) {
   const who = loungeActivityActorLabel(event)
   switch (event?.event_type) {
@@ -95,6 +109,12 @@ export function loungeActivitySummary(event) {
       return `${who} mentioned you in a comment`
     case LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW:
       return `${who} followed you`
+    case LOUNGE_ACTIVITY_EVENT_TYPES.REPOST:
+      return event?.comment_id
+        ? `${who} reposted your comment`
+        : `${who} reposted your post`
+    case LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST:
+      return `${who} quote reposted your post`
     default:
       return `${who} interacted with you`
   }

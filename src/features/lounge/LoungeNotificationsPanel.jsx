@@ -14,6 +14,7 @@ import {
   isLoungeActivitySchemaMissingError,
   loungeActivityEventsPage,
   loungeActivityMarkAllRead,
+  loungeActivityOpenPostTarget,
   loungeActivitySummary,
   LOUNGE_ACTIVITY_EVENT_TYPES,
   LOUNGE_ACTIVITY_PAGE_SIZE,
@@ -143,10 +144,8 @@ export default function LoungeNotificationsPanel({
         return
       }
       if (event.post_id) {
-        onOpenPost?.({
-          postId: event.post_id,
-          commentId: event.comment_id || null,
-        })
+        const target = loungeActivityOpenPostTarget(event)
+        if (target) onOpenPost?.(target)
       }
     },
     [onOpenPost, onOpenProfile],
