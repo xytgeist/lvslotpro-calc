@@ -6,6 +6,14 @@ export const LOUNGE_FEED_AVATAR_CLASS =
 export const LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS =
   'h-10 w-10 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 font-bold text-zinc-200 text-[15px] sm:h-11 sm:w-11 sm:text-[16px]'
 
+/** Notifications panel — stacked avatars on grouped like/bookmark meta rows. */
+export const LOUNGE_NOTIFICATION_STACK_AVATAR_CLASS =
+  'h-7 w-7 shrink-0 overflow-hidden rounded-full border-2 border-zinc-950 bg-zinc-900 font-bold text-zinc-200 text-[11px] sm:h-8 sm:w-8 sm:text-[12px]'
+
+/** Notifications panel — left-column action icon (grouped like/bookmark). */
+export const LOUNGE_NOTIFICATION_ACTION_AVATAR_SLOT_CLASS =
+  'flex h-10 w-10 shrink-0 items-center justify-center sm:h-11 sm:w-11'
+
 /** @deprecated Lead slot — unused in notification rows. */
 export const LOUNGE_NOTIFICATION_ACTION_SLOT_CLASS =
   'flex h-12 w-12 shrink-0 items-center justify-center sm:h-[3.3rem] sm:w-[3.3rem]'

@@ -6,7 +6,7 @@ const POST_PREVIEW_COLS =
   'id,caption,image_urls,media_url,gif_url,stream_poster_url'
 
 const COMMENT_PREVIEW_COLS =
-  'id,body,image_urls,media_url,gif_url,stream_poster_url'
+  'id,body,parent_id,image_urls,media_url,gif_url,stream_poster_url'
 
 /** Event types that show actor text snippet + optional media poster. */
 export function loungeActivityShowsContextPreview(eventType) {
@@ -16,6 +16,8 @@ export function loungeActivityShowsContextPreview(eventType) {
     case LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_POST:
     case LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_COMMENT:
     case LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST:
+    case LOUNGE_ACTIVITY_EVENT_TYPES.LIKE:
+    case LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK:
       return true
     default:
       return false
@@ -43,6 +45,13 @@ function previewTextFromRow(eventType, postRow, commentRow) {
   ) {
     return feedPostDisplayCaption(postRow)
   }
+  if (
+    eventType === LOUNGE_ACTIVITY_EVENT_TYPES.LIKE ||
+    eventType === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK
+  ) {
+    if (commentRow?.body) return normalizeFeedCommentBody(commentRow.body)
+    return feedPostDisplayCaption(postRow)
+  }
   if (commentRow?.body) {
     return normalizeFeedCommentBody(commentRow.body)
   }
@@ -62,15 +71,8 @@ export async function hydrateLoungeActivityEventPreviews(supabaseClient, events)
 
   for (const event of events) {
     if (!loungeActivityShowsContextPreview(event?.event_type)) continue
-    if (
-      event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_POST ||
-      event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST
-    ) {
-      if (event.post_id) postIds.add(String(event.post_id))
-    }
-    if (event.comment_id) {
-      commentIds.add(String(event.comment_id))
-    }
+    if (event.post_id) postIds.add(String(event.post_id))
+    if (event.comment_id) commentIds.add(String(event.comment_id))
   }
 
   const postsById = new Map()
@@ -109,17 +111,21 @@ export async function hydrateLoungeActivityEventPreviews(supabaseClient, events)
         ? commentsById.get(String(event.comment_id))
         : null
     const sourceRow =
-      event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_POST ||
-      event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST
-        ? postRow
-        : commentRow || postRow
+      event.comment_id && commentRow
+        ? commentRow
+        : postRow
     const previewText = previewTextFromRow(event.event_type, postRow, commentRow)
     const previewPosterUrl = loungeActivityPreviewPosterUrl(sourceRow)
-    if (!previewText && !previewPosterUrl) return event
+    const previewIsReply = Boolean(commentRow?.parent_id)
+    if (!previewText && !previewPosterUrl) {
+      if (!previewIsReply) return event
+      return { ...event, preview_is_reply: true }
+    }
     return {
       ...event,
       preview_text: previewText || '',
       preview_poster_url: previewPosterUrl || null,
+      preview_is_reply: previewIsReply,
     }
   })
 }

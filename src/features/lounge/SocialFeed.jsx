@@ -112,6 +112,10 @@ import {
 } from './LoungeStreamLightboxContext.jsx'
 import { isFeedCommentEntity, loungeStreamLightboxMediaSource } from './loungeStreamLightboxRenderers.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
+import {
+  LOUNGE_COMMENT_BUBBLE_D,
+  LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS,
+} from './loungeCommentGlyph.js'
 import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
 import {
@@ -476,6 +480,8 @@ export default function SocialFeed({
   const closeProfileModalRef = useRef(() => {})
   /** `finalizeProfileModalClose` is defined later; dock compose dismisses profile without animation wait. */
   const finalizeProfileModalCloseRef = useRef(() => {})
+  /** When profile opens from dock search/notifications, back restores that panel. */
+  const profileReturnDockPanelRef = useRef(null)
   const [profileModalLoading, setProfileModalLoading] = useState(false)
   const [profileModalErr, setProfileModalErr] = useState('')
   const [profileModalData, setProfileModalData] = useState(null)
@@ -7331,6 +7337,11 @@ export default function SocialFeed({
     setProfileModalVisible(true)
     setLoungeProfileDockReveal(1)
     setProfileStackAboveStreamLightbox(false)
+    const returnPanel = profileReturnDockPanelRef.current
+    profileReturnDockPanelRef.current = null
+    if (returnPanel === 'notifications' || returnPanel === 'search') {
+      setLoungeDockPanel(returnPanel)
+    }
   }, [])
 
   const closeProfileModal = useCallback(() => {
@@ -7390,6 +7401,7 @@ export default function SocialFeed({
       }
       const userId = post?.user_id
       if (!userId) return
+      profileReturnDockPanelRef.current = opts?.returnDockPanel ?? null
       const profileStub = profileStubFromOpenArg(post)
       const loadGen = ++profileModalLoadGenRef.current
       setProfileStackAboveStreamLightbox(getLoungeStreamLightboxOpen())
@@ -7587,7 +7599,7 @@ export default function SocialFeed({
 
   /** Open another member's profile from a post/comment row (`user_id` + optional `author_profile`). */
   const openAuthorProfile = useCallback(
-    (entity) => {
+    (entity, opts) => {
       const stub = profileEntityStub(entity)
       if (!stub?.user_id) return
       if (openProfileGateIfNeeded()) return
@@ -7595,10 +7607,13 @@ export default function SocialFeed({
         pushProfileOverlay(entity)
         return
       }
-      void openProfileModal({
-        user_id: stub.user_id,
-        ...stub,
-      })
+      void openProfileModal(
+        {
+          user_id: stub.user_id,
+          ...stub,
+        },
+        { returnDockPanel: opts?.returnDockPanel ?? null },
+      )
     },
     [openProfileGateIfNeeded, openProfileModal, profileEntityStub, profileModalOpen, pushProfileOverlay],
   )
@@ -7606,16 +7621,17 @@ export default function SocialFeed({
   const onLoungeDockOpenProfileFromSearch = useCallback(
     (entity) => {
       if (!entity?.user_id) return
-      openAuthorProfile(entity)
+      openAuthorProfile(entity, {
+        returnDockPanel: loungeDockPanel === 'search' ? 'search' : null,
+      })
     },
-    [openAuthorProfile],
+    [loungeDockPanel, openAuthorProfile],
   )
 
   const onLoungeOpenProfileFromNotifications = useCallback(
     (entity) => {
       if (!entity?.user_id) return
-      setLoungeDockPanel(null)
-      openAuthorProfile(entity)
+      openAuthorProfile(entity, { returnDockPanel: 'notifications' })
     },
     [openAuthorProfile],
   )
@@ -9326,8 +9342,7 @@ export default function SocialFeed({
                 const likeClass = loungeReadOnly ? 'text-zinc-500' : ui.liked ? 'text-lv-red' : 'text-zinc-500'
                 const bookmarkClass = loungeReadOnly ? 'text-zinc-600' : isBookmarked ? 'text-lv-yellow' : 'text-zinc-500'
                 const ro = loungeReadOnly
-                const commentBubbleD =
-                  'M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z'
+                const commentBubbleD = LOUNGE_COMMENT_BUBBLE_D
                 const bookmarkRibbonD =
                   'M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z'
                 const commentGlyphFilled = !ro && ui.commented
@@ -9464,7 +9479,7 @@ export default function SocialFeed({
                         statClass="inline-flex w-full max-w-full shrink-0 items-center gap-0 rounded-lg px-0 py-0.5 hover:bg-zinc-900/80 touch-manipulation [-webkit-tap-highlight-color:transparent]"
                         glyph={
                           <svg
-                            className={`block shrink-0 h-[24px] w-[24px] origin-center scale-y-[1.1] ${commentClass}`}
+                            className={`block shrink-0 h-[24px] w-[24px] ${LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS} ${commentClass}`}
                             viewBox="0 0 20 20"
                             fill="none"
                             aria-hidden

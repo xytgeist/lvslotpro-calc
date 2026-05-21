@@ -1,9 +1,13 @@
 import LoungeFlameIcon from './LoungeFlameIcon.jsx'
-import { LOUNGE_NOTIFICATION_ACTION_SLOT_CLASS } from './loungeFeedAvatar.js'
+import {
+  LOUNGE_NOTIFICATION_ACTION_AVATAR_SLOT_CLASS,
+  LOUNGE_NOTIFICATION_ACTION_SLOT_CLASS,
+} from './loungeFeedAvatar.js'
+import {
+  LOUNGE_COMMENT_BUBBLE_D,
+  LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS,
+} from './loungeCommentGlyph.js'
 import { loungeActivityNotificationBadgeKind } from '../../utils/loungeActivityApi.js'
-
-const COMMENT_BUBBLE_D =
-  'M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z'
 
 const BOOKMARK_RIBBON_D = 'M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z'
 
@@ -11,10 +15,23 @@ const REPOST_ARROWS_D =
   'M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2'
 
 function glyphClass(slot) {
+  if (slot === 'avatar') {
+    return 'h-8 w-8'
+  }
   return slot === 'lead' ? 'h-7 w-7' : 'h-[18px] w-[18px]'
 }
 
 function IconShell({ slot = 'inline', children }) {
+  if (slot === 'avatar') {
+    return (
+      <span
+        className={`${LOUNGE_NOTIFICATION_ACTION_AVATAR_SLOT_CLASS} pointer-events-none`}
+        aria-hidden
+      >
+        {children}
+      </span>
+    )
+  }
   if (slot === 'lead') {
     return (
       <span className={`${LOUNGE_NOTIFICATION_ACTION_SLOT_CLASS} pointer-events-none`} aria-hidden>
@@ -33,8 +50,13 @@ function IconComment({ slot }) {
   const cls = glyphClass(slot)
   return (
     <IconShell slot={slot}>
-      <svg className={`${cls} text-zinc-200`} viewBox="0 0 20 20" fill="none" aria-hidden>
-        <path d={COMMENT_BUBBLE_D} fill="currentColor" />
+      <svg
+        className={`${cls} text-zinc-200 ${LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS}`}
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden
+      >
+        <path d={LOUNGE_COMMENT_BUBBLE_D} fill="currentColor" />
       </svg>
     </IconShell>
   )
@@ -81,19 +103,20 @@ function IconMention({ slot }) {
 }
 
 function IconFollow({ slot }) {
-  const cls = glyphClass(slot)
+  const cls = slot === 'lead' ? 'h-8 w-8' : 'h-[22px] w-[22px]'
   return (
     <IconShell slot={slot}>
       <svg className={`${cls} text-cyan-400`} viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-        <circle cx="10" cy="7.25" r="2.75" />
-        <path d="M5.25 15.5v-.75c0-2.07 1.68-3.75 3.75-3.75h1.5c2.07 0 3.75 1.68 3.75 3.75v.75H5.25z" />
+        <circle cx="10" cy="6.65" r="3.15" />
+        <path d="M4.5 16v-.75c0-2.35 1.9-4.25 4.25-4.25h3.5c2.35 0 4.25 1.9 4.25 4.25V16H4.5z" />
       </svg>
     </IconShell>
   )
 }
 
 function IconLike({ slot }) {
-  const cls = glyphClass(slot)
+  const cls =
+    slot === 'avatar' ? 'h-9 w-9' : glyphClass(slot)
   return (
     <IconShell slot={slot}>
       <LoungeFlameIcon className={`${cls} text-zinc-200`} liked readOnly={false} />
@@ -138,7 +161,8 @@ function IconQuoteRepost({ slot }) {
 }
 
 function IconBookmark({ slot }) {
-  const cls = glyphClass(slot)
+  const cls =
+    slot === 'avatar' ? 'h-9 w-9' : slot === 'lead' ? 'h-8 w-8' : 'h-[22px] w-[22px]'
   return (
     <IconShell slot={slot}>
       <svg className={`${cls} text-lv-yellow`} viewBox="0 0 20 20" fill="none" aria-hidden>
@@ -161,7 +185,7 @@ const ICON_BY_KIND = {
 
 /**
  * Interaction glyph for notification rows.
- * @param {{ eventType?: string, kind?: string|null, slot?: 'inline'|'lead' }} props
+ * @param {{ eventType?: string, kind?: string|null, slot?: 'inline'|'lead'|'avatar' }} props
  */
 export default function LoungeNotificationActionBadge({ eventType, kind: kindProp, slot = 'inline' }) {
   const kind = kindProp ?? loungeActivityNotificationBadgeKind(eventType)

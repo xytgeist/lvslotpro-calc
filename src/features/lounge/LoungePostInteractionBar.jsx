@@ -2,6 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
+import {
+  LOUNGE_COMMENT_BUBBLE_D,
+  LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS,
+} from './loungeCommentGlyph.js'
 
 /**
  * Comment / repost / like / bookmark row — same behavior as the feed post row or post-detail sheet.
@@ -109,8 +113,7 @@ export default function LoungePostInteractionBar({
   const shareClass = overlayIdle ? 'text-zinc-200' : ro ? 'text-zinc-500' : 'text-zinc-200'
   const plainId = ui.plainRepostChildId
   const quoteId = ui.quoteRepostChildId
-  const commentBubbleD =
-    'M4.75 5.75h10.5a1.5 1.5 0 011.5 1.5v5a1.5 1.5 0 01-1.5 1.5H9l-3.25 2v-2H4.75a1.5 1.5 0 01-1.5-1.5v-5a1.5 1.5 0 011.5-1.5z'
+  const commentBubbleD = LOUNGE_COMMENT_BUBBLE_D
   const bookmarkRibbonD =
     'M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1 1 0 011-1z'
   /** Filled only when the viewer has that interaction; idle + read-only stay outline like repost. */
@@ -130,10 +133,10 @@ export default function LoungePostInteractionBar({
   const iconSz = isComment ? 'h-[20px] w-[20px]' : isFeed ? 'h-[22px] w-[22px]' : 'h-[24px] w-[24px]'
   /** Bubble glyph sits low in the 20 viewBox — slight Y stretch so it matches the chip visually */
   const iconSzComment = isComment
-    ? 'h-[20px] w-[20px] origin-center scale-y-[1.1]'
+    ? `h-[20px] w-[20px] ${LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS}`
     : isFeed
-      ? 'h-[22px] w-[22px] origin-center scale-y-[1.1]'
-      : 'h-[24px] w-[24px] origin-center scale-y-[1.1]'
+      ? `h-[22px] w-[22px] ${LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS}`
+      : `h-[24px] w-[24px] ${LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS}`
   /** Bookmark path is inset in the 20 viewBox — slightly larger box than other stats for visual parity with the chip */
   const iconSzBookmark = isComment ? 'h-[22px] w-[22px]' : isFeed ? 'h-[24px] w-[24px]' : 'h-[26px] w-[26px]'
   /** Stat hit targets (padding); inner layout is glyph rail + absolutely positioned count. */

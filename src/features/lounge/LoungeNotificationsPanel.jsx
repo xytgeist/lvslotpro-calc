@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungeNotificationActionBadge from './LoungeNotificationActionBadge.jsx'
+import LoungeNotificationActorStack from './LoungeNotificationActorStack.jsx'
 import {
   LOUNGE_FEED_CAPTION_TEXT_CLASS,
   LOUNGE_FEED_DISPLAY_NAME_CLASS,
@@ -30,6 +31,12 @@ import {
   hydrateLoungeActivityEventPreviews,
   loungeActivityShowsContextPreview,
 } from '../../utils/loungeActivityPreview.js'
+import {
+  buildLoungeActivityDisplayRows,
+  loungeActivityEventToActorProfile,
+  loungeActivityGroupedActionPhrase,
+} from '../../utils/loungeActivityGroup.js'
+import { renderRichCaption } from './loungeCaption'
 
 /**
  * Lounge dock **Notifications** panel — in-app activity feed (Phase H1).
@@ -163,6 +170,239 @@ export default function LoungeNotificationsPanel({
     [onOpenPost, onOpenProfile],
   )
 
+  const displayRows = useMemo(() => buildLoungeActivityDisplayRows(items), [items])
+
+  const previewClampClass = (eventType) => {
+    if (
+      eventType === LOUNGE_ACTIVITY_EVENT_TYPES.LIKE ||
+      eventType === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK
+    ) {
+      return 'line-clamp-2'
+    }
+    return 'line-clamp-3'
+  }
+
+  const openActorProfile = useCallback(
+    (actorProfile) => {
+      if (!actorProfile?.user_id) return
+      onOpenProfile?.({
+        user_id: actorProfile.user_id,
+        author_profile: actorProfile,
+      })
+    },
+    [onOpenProfile],
+  )
+
+  const renderGroupedRow = (row) => {
+    const { event, actors, firstActor, othersCount, eventIds, groupKey } = row
+    const isNew = eventIds.some((id) => sessionNewIds.has(id))
+    const when = formatLoungeActivityWhen(event.created_at)
+    const actionPhrase = loungeActivityGroupedActionPhrase(event, firstActor, othersCount, event)
+    const showContext = loungeActivityShowsContextPreview(event.event_type)
+    const previewText = showContext ? String(event.preview_text || '').trim() : ''
+    const previewPosterUrl = showContext ? String(event.preview_poster_url || '').trim() : ''
+
+    return (
+      <li key={groupKey}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onRowActivate(event)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onRowActivate(event)
+            }
+          }}
+          aria-label={actionPhrase}
+          className={`${LOUNGE_FEED_POST_ROW_CLASS} flex w-full cursor-pointer items-start gap-3 text-left touch-manipulation ${
+            isNew ? 'bg-cyan-950/20 active:bg-cyan-950/35' : ''
+          }`}
+        >
+          <LoungeNotificationActionBadge eventType={event.event_type} slot="avatar" />
+          <span className={`min-w-0 flex-1 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
+            <div className={LOUNGE_FEED_META_TEXT_COLUMN_CLASS}>
+              <div className={`${LOUNGE_FEED_META_ROW_CLASS} gap-2`}>
+                <LoungeNotificationActorStack
+                  actors={actors}
+                  onOpenProfile={(actor) =>
+                    openActorProfile({
+                      user_id: actor.user_id,
+                      handle: actor.handle,
+                      display_name: actor.display_name,
+                      avatar_url: actor.avatar_url,
+                      role: actor.role,
+                      is_og: actor.is_og,
+                    })
+                  }
+                />
+                {when ? (
+                  <span className={`${LOUNGE_FEED_META_HANDLE_TIME_CLASS} min-w-0`}>
+                    <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">{when}</span>
+                  </span>
+                ) : null}
+              </div>
+              <span className="mt-0.5 block min-w-0 text-[15px] leading-snug text-zinc-400">
+                {actionPhrase}
+              </span>
+              {previewText ? (
+                <p
+                  className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 line-clamp-2 text-zinc-300`}
+                  onClick={(e) => {
+                    if (e.target instanceof Element && e.target.closest('a, button')) {
+                      e.stopPropagation()
+                    }
+                  }}
+                >
+                  {renderRichCaption(previewText)}
+                </p>
+              ) : null}
+            </div>
+          </span>
+          {previewPosterUrl ? (
+            <span
+              className="pointer-events-none h-14 w-14 shrink-0 self-center overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-900"
+              aria-hidden
+            >
+              <img
+                src={previewPosterUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+              />
+            </span>
+          ) : null}
+        </div>
+      </li>
+    )
+  }
+
+  const renderSingleRow = (row) => {
+    const event = row.event
+    const isNew = sessionNewIds.has(event.id)
+    const actorProfile = loungeActivityEventToActorProfile(event)
+    const avatarUrl = String(actorProfile.avatar_url || '').trim()
+    const avatarTone = profileAvatarToneClass(actorProfile.user_id)
+    const avatarText = profileAvatarInitials(actorProfile.display_name, actorProfile.handle)
+    const displayName =
+      String(actorProfile.display_name || '').trim() ||
+      (actorProfile.handle ? `@${String(actorProfile.handle).trim()}` : 'Member')
+    const handleLabel = (() => {
+      const h = actorProfile.handle != null ? String(actorProfile.handle).trim() : ''
+      return h ? `@${h}` : '@member'
+    })()
+    const when = formatLoungeActivityWhen(event.created_at)
+    const actionPhrase = loungeActivityActionPhrase(event)
+    const summary = loungeActivitySummary(event)
+    const showContext = loungeActivityShowsContextPreview(event.event_type)
+    const previewText = showContext ? String(event.preview_text || '').trim() : ''
+    const previewPosterUrl = showContext ? String(event.preview_poster_url || '').trim() : ''
+    const clampClass = previewClampClass(event.event_type)
+
+    return (
+      <li key={event.id}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onRowActivate(event)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onRowActivate(event)
+            }
+          }}
+          aria-label={summary}
+          className={`${LOUNGE_FEED_POST_ROW_CLASS} flex w-full cursor-pointer items-start gap-3 text-left touch-manipulation ${
+            isNew ? 'bg-cyan-950/20 active:bg-cyan-950/35' : ''
+          }`}
+        >
+          <button
+            type="button"
+            title="View profile"
+            aria-label={`View ${displayName}'s profile`}
+            onClick={(e) => {
+              e.stopPropagation()
+              openActorProfile(actorProfile)
+            }}
+            className={`${LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS} flex items-center justify-center overflow-hidden touch-manipulation hover:border-zinc-600 [-webkit-tap-highlight-color:transparent]`}
+          >
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <span
+                className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarTone}`}
+              >
+                {avatarText}
+              </span>
+            )}
+          </button>
+          <span className={`min-w-0 flex-1 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
+            <div className={LOUNGE_FEED_META_TEXT_COLUMN_CLASS}>
+              <div className={LOUNGE_FEED_META_ROW_CLASS}>
+                <LoungeFeedAuthorMetaBadges
+                  role={actorProfile.role}
+                  isOg={event.actor_is_og === true}
+                  displayName={displayName}
+                  displayNameClassName={LOUNGE_FEED_DISPLAY_NAME_CLASS}
+                />
+                {when ? (
+                  <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
+                    <span className="min-w-0 truncate">{handleLabel}</span>
+                    <span className="shrink-0 text-zinc-600">·</span>
+                    <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">{when}</span>
+                  </span>
+                ) : (
+                  <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
+                    <span className="min-w-0 truncate">{handleLabel}</span>
+                  </span>
+                )}
+              </div>
+              <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[15px] leading-snug text-zinc-400">
+                <LoungeNotificationActionBadge eventType={event.event_type} slot="inline" />
+                <span className="min-w-0">{actionPhrase}</span>
+              </span>
+              {previewText ? (
+                <p
+                  className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 ${clampClass} text-zinc-300`}
+                  onClick={(e) => {
+                    if (e.target instanceof Element && e.target.closest('a, button')) {
+                      e.stopPropagation()
+                    }
+                  }}
+                >
+                  {renderRichCaption(previewText)}
+                </p>
+              ) : null}
+            </div>
+          </span>
+          {previewPosterUrl ? (
+            <span
+              className="pointer-events-none h-14 w-14 shrink-0 self-center overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-900"
+              aria-hidden
+            >
+              <img
+                src={previewPosterUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+              />
+            </span>
+          ) : null}
+        </div>
+      </li>
+    )
+  }
+
   if (!viewerUserId) {
     return (
       <div className="px-3 py-4">
@@ -186,118 +426,9 @@ export default function LoungeNotificationsPanel({
         <p className="mt-6 text-[14px] leading-relaxed text-zinc-400">{emptyCopy}</p>
       ) : (
         <ul className="mt-4 -mx-3 list-none p-0">
-          {items.map((event) => {
-            const isNew = sessionNewIds.has(event.id)
-            const actorProfile = {
-              user_id: event.actor_user_id,
-              handle: event.actor_handle,
-              display_name: event.actor_display_name,
-              avatar_url: event.actor_avatar_url,
-              role: event.actor_role,
-              is_og: event.actor_is_og,
-            }
-            const avatarUrl = String(actorProfile.avatar_url || '').trim()
-            const avatarTone = profileAvatarToneClass(actorProfile.user_id)
-            const avatarText = profileAvatarInitials(actorProfile.display_name, actorProfile.handle)
-            const displayName =
-              String(actorProfile.display_name || '').trim() ||
-              (actorProfile.handle ? `@${String(actorProfile.handle).trim()}` : 'Member')
-            const handleLabel = (() => {
-              const h = actorProfile.handle != null ? String(actorProfile.handle).trim() : ''
-              return h ? `@${h}` : '@member'
-            })()
-            const when = formatLoungeActivityWhen(event.created_at)
-            const actionPhrase = loungeActivityActionPhrase(event)
-            const summary = loungeActivitySummary(event)
-            const showContext = loungeActivityShowsContextPreview(event.event_type)
-            const previewText = showContext ? String(event.preview_text || '').trim() : ''
-            const previewPosterUrl = showContext ? String(event.preview_poster_url || '').trim() : ''
-
-            return (
-              <li key={event.id}>
-                <button
-                  type="button"
-                  onClick={() => onRowActivate(event)}
-                  aria-label={summary}
-                  className={`${LOUNGE_FEED_POST_ROW_CLASS} flex w-full items-start gap-3 text-left touch-manipulation ${
-                    isNew ? 'bg-cyan-950/20 active:bg-cyan-950/35' : ''
-                  }`}
-                >
-                  <span
-                    className={`${LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS} flex items-center justify-center overflow-hidden`}
-                    aria-hidden
-                  >
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <span
-                        className={`flex h-full w-full items-center justify-center font-bold text-white ${avatarTone}`}
-                      >
-                        {avatarText}
-                      </span>
-                    )}
-                  </span>
-                  <span className={`min-w-0 flex-1 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
-                    <div className={LOUNGE_FEED_META_TEXT_COLUMN_CLASS}>
-                      <div className={LOUNGE_FEED_META_ROW_CLASS}>
-                        <LoungeFeedAuthorMetaBadges
-                          role={actorProfile.role}
-                          isOg={event.actor_is_og === true}
-                          displayName={displayName}
-                          displayNameClassName={LOUNGE_FEED_DISPLAY_NAME_CLASS}
-                        />
-                        {when ? (
-                          <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
-                            <span className="min-w-0 truncate">{handleLabel}</span>
-                            <span className="shrink-0 text-zinc-600">·</span>
-                            <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">
-                              {when}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
-                            <span className="min-w-0 truncate">{handleLabel}</span>
-                          </span>
-                        )}
-                      </div>
-                      <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[15px] leading-snug text-zinc-400">
-                        <LoungeNotificationActionBadge eventType={event.event_type} slot="inline" />
-                        <span className="min-w-0">{actionPhrase}</span>
-                      </span>
-                      {previewText ? (
-                        <p
-                          className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 line-clamp-3 text-zinc-300`}
-                        >
-                          {previewText}
-                        </p>
-                      ) : null}
-                    </div>
-                  </span>
-                  {previewPosterUrl ? (
-                    <span
-                      className="pointer-events-none h-14 w-14 shrink-0 self-center overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-900"
-                      aria-hidden
-                    >
-                      <img
-                        src={previewPosterUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                        draggable={false}
-                      />
-                    </span>
-                  ) : null}
-                </button>
-              </li>
-            )
-          })}
+          {displayRows.map((row) =>
+            row.type === 'grouped' ? renderGroupedRow(row) : renderSingleRow(row),
+          )}
         </ul>
       )}
 

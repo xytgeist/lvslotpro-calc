@@ -98,6 +98,7 @@ export function loungeActivityOpenPostTarget(event) {
 }
 
 export function loungeActivityActionPhrase(event) {
+  const isReply = event?.preview_is_reply === true
   switch (event?.event_type) {
     case LOUNGE_ACTIVITY_EVENT_TYPES.COMMENT_ON_POST:
       return 'commented on your post'
@@ -114,9 +115,11 @@ export function loungeActivityActionPhrase(event) {
     case LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST:
       return 'quote reposted your post'
     case LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK:
-      return event?.comment_id ? 'bookmarked your comment' : 'bookmarked your post'
+      if (!event?.comment_id) return 'bookmarked your post'
+      return isReply ? 'bookmarked your reply' : 'bookmarked your comment'
     case LOUNGE_ACTIVITY_EVENT_TYPES.LIKE:
-      return event?.comment_id ? 'liked your comment' : 'liked your post'
+      if (!event?.comment_id) return 'liked your post'
+      return isReply ? 'liked your reply' : 'liked your comment'
     default:
       return 'interacted with you'
   }
