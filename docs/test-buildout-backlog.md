@@ -406,6 +406,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
+- 2026-05-22: **Lounge main composer contenteditable (test, Ryan):** **`LoungeRichComposerField`** + **`loungeRichComposerDom.js`** replace textarea+mirror on home composer — real **`@mention`** / **`#hashtag`** styling with aligned caret; mention autocomplete smoke **PASSED** @ **`f764ae8`**. Quote repost / post-detail edit / comment composers still textarea (extend next).
+
 - 2026-05-22: **Phase H1 in-app notifications (client + SQL build):** **`activity_events`** outbox + safe emit triggers (comment/reply/mention/follow); read RPCs + **`LoungeNotificationsPanel.jsx`** + dock bell unread badge — migration **`20260522120000_lounge_activity_events_phase_h1.sql`**. Smoke **§21** pending apply + Ryan sign-off on **test**. Push / prefs / batched likes deferred.
 
 - 2026-05-21: **Phase J Popular home feed (client + SQL build):** **`lounge_feed_popular_score()`** + **`lounge_feed_posts_page`** RPC; **Latest | Popular** toggle (`LoungeFeedSortSwitch`, `loungeFeedSortPref.js`); frozen **`p_as_of`** pagination for Popular — migration **`20260521120000_lounge_feed_popular_sort.sql`**. Smoke **§20** pending apply + Ryan sign-off on **test**.
