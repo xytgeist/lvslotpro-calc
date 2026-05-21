@@ -4684,9 +4684,20 @@ export default function SocialFeed({
       }
       if (!postRow) return
       setLoungeDockPanel(null)
-      openLoungePostDetail(postRow, commentId ? { focusCommentId: commentId } : {})
+      if (commentId) {
+        await openDirectCommentPostDetail(postRow, commentId)
+      } else {
+        openLoungePostDetail(postRow)
+      }
     },
-    [communityPosts, hydrateCommunityPosts, openLoungePostDetail, setCommunityPosts, supabaseClient],
+    [
+      communityPosts,
+      hydrateCommunityPosts,
+      openDirectCommentPostDetail,
+      openLoungePostDetail,
+      setCommunityPosts,
+      supabaseClient,
+    ],
   )
   const onLoungeDockChat = useCallback(() => {
     setLoungeDockPanel((p) => {
