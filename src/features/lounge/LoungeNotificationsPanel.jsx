@@ -35,6 +35,8 @@ export default function LoungeNotificationsPanel({
   const [schemaMissing, setSchemaMissing] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const markedReadRef = useRef(false)
+  /** Unread at fetch time — stays "new" for this panel visit even after mark-all-read clears the badge. */
+  const [sessionNewIds, setSessionNewIds] = useState(() => new Set())
 
   const loadPage = useCallback(
     async ({ append = false, cursor = null } = {}) => {
@@ -56,6 +58,23 @@ export default function LoungeNotificationsPanel({
         setSchemaMissing(false)
         setHasMore(rows.length >= LOUNGE_ACTIVITY_PAGE_SIZE)
         setItems((prev) => (append ? [...prev, ...rows] : rows))
+        if (append) {
+          if (rows.some((row) => !row.read_at)) {
+            setSessionNewIds((prev) => {
+              const next = new Set(prev)
+              for (const row of rows) {
+                if (!row.read_at) next.add(row.id)
+              }
+              return next
+            })
+          }
+        } else {
+          const newIds = new Set()
+          for (const row of rows) {
+            if (!row.read_at) newIds.add(row.id)
+          }
+          setSessionNewIds(newIds)
+        }
       } catch (e) {
         if (isLoungeActivitySchemaMissingError(e)) {
           setSchemaMissing(true)
@@ -85,7 +104,6 @@ export default function LoungeNotificationsPanel({
     void (async () => {
       try {
         await loungeActivityMarkAllRead(supabaseClient)
-        setItems((prev) => prev.map((row) => (row.read_at ? row : { ...row, read_at: new Date().toISOString() })))
         onUnreadChange?.(0)
       } catch {
         markedReadRef.current = false
@@ -98,6 +116,8 @@ export default function LoungeNotificationsPanel({
     const last = items[items.length - 1]
     void loadPage({ append: true, cursor: { created_at: last.created_at, id: last.id } })
   }, [hasMore, items, loadPage, loadingMore])
+
+  const sessionNewCount = sessionNewIds.size
 
   const emptyCopy = useMemo(() => {
     if (schemaMissing) {
@@ -145,7 +165,9 @@ export default function LoungeNotificationsPanel({
     <div className="px-3 py-3">
       <h2 className="text-[17px] font-semibold text-zinc-100">Notifications</h2>
       <p className="mt-1 text-[13px] leading-relaxed text-zinc-500">
-        Replies, comments on your posts, @mentions, and new followers.
+        {sessionNewCount > 0
+          ? `${sessionNewCount} new · Replies, comments on your posts, @mentions, and new followers.`
+          : 'Replies, comments on your posts, @mentions, and new followers.'}
       </p>
 
       {loading ? (
@@ -157,7 +179,7 @@ export default function LoungeNotificationsPanel({
       ) : (
         <ul className="mt-4 flex flex-col gap-1">
           {items.map((event) => {
-            const unread = !event.read_at
+            const isNew = sessionNewIds.has(event.id)
             const actorProfile = {
               user_id: event.actor_user_id,
               handle: event.actor_handle,
@@ -176,27 +198,51 @@ export default function LoungeNotificationsPanel({
                 <button
                   type="button"
                   onClick={() => onRowActivate(event)}
-                  className={`flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] ${
-                    unread
-                      ? 'border-cyan-500/35 bg-cyan-950/20 hover:bg-cyan-950/30'
-                      : 'border-zinc-800/90 bg-zinc-950/40 hover:bg-zinc-900/60'
+                  aria-label={isNew ? `${summary} — new notification` : `${summary} — seen`}
+                  className={`relative flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                    isNew
+                      ? 'border-cyan-500/40 bg-cyan-950/25 hover:bg-cyan-950/35'
+                      : 'border-zinc-800/70 bg-zinc-950/30 hover:bg-zinc-900/55'
                   }`}
                 >
+                  {isNew ? (
+                    <span
+                      className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full bg-cyan-400"
+                      aria-hidden
+                    />
+                  ) : null}
                   <span
-                    className={`${LOUNGE_FEED_AVATAR_CLASS} ${avatarTone} shrink-0`}
+                    className={`${LOUNGE_FEED_AVATAR_CLASS} ${avatarTone} shrink-0 ${isNew ? '' : 'opacity-80'}`}
                     aria-hidden
                   >
                     {avatarText}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className={`${LOUNGE_FEED_META_ROW_CLASS} flex-wrap gap-x-1.5 gap-y-0.5`}>
-                      <span className="text-[15px] font-semibold text-zinc-100">{summary}</span>
+                      <span
+                        className={`text-[15px] ${isNew ? 'font-semibold text-zinc-50' : 'font-medium text-zinc-400'}`}
+                      >
+                        {summary}
+                      </span>
                       {event.actor_is_og ? <LoungeOgBadge /> : null}
                     </span>
-                    {when ? (
-                      <span className="mt-0.5 block text-[13px] text-zinc-500">{when}</span>
-                    ) : null}
+                    <span className="mt-0.5 flex items-center gap-2">
+                      {when ? <span className="text-[13px] text-zinc-500">{when}</span> : null}
+                      {isNew ? (
+                        <span className="rounded-full bg-cyan-500/15 px-1.5 py-px text-[11px] font-semibold uppercase tracking-wide text-cyan-300">
+                          New
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-600">Seen</span>
+                      )}
+                    </span>
                   </span>
+                  {isNew ? (
+                    <span
+                      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.55)]"
+                      aria-hidden
+                    />
+                  ) : null}
                 </button>
               </li>
             )
