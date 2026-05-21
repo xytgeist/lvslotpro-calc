@@ -778,7 +778,9 @@ export default function LoungePostStreamVideo({
   )
   isActiveRef.current =
     feedAutoplayEnabled && !coordinatorSuspended && (!coordinatorActive || isActive)
-  const coordinatedInlineSound = coordinatorActive
+  /** Feed-wide Tap for sound on Android/desktop; per-tile only on Apple WebKit (iOS blocks handoff unmute). */
+  const coordinatedInlineSound =
+    coordinatorActive && !appleWebKitInlineStreamRef.current
   const [localStripSoundUnmuted, setLocalStripSoundUnmuted] = useState(false)
   const [localStripSoundExplicitlyMuted, setLocalStripSoundExplicitlyMuted] = useState(false)
   const localStripSoundUnmutedRef = useRef(false)

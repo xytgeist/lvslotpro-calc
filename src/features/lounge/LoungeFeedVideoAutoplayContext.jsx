@@ -96,11 +96,15 @@ export function LoungeFeedVideoAutoplayProvider({ scrollRootRef, children, showD
     [feedInlineSoundUnmuted, feedInlineSoundExplicitlyMuted],
   )
 
-  /** iOS feed-wide sound: chain unmute to scroll touches (programmatic handoff unmute is blocked). */
+  /**
+   * Feed-wide sound gesture chain (Android/desktop only).
+   * Apple WebKit uses per-tile unmute in LoungePostStreamVideo — handoff unmute is blocked there.
+   */
   useEffect(() => {
     const wanted = feedInlineSoundUnmuted && !feedInlineSoundExplicitlyMuted
-    store.setFeedSoundWanted(wanted)
-    if (!wanted) {
+    const appleWebKit = detectAppleWebKitInlineStream()
+    store.setFeedSoundWanted(wanted && !appleWebKit)
+    if (!wanted || appleWebKit) {
       store.setFeedSoundTouchActive(false)
       return undefined
     }
