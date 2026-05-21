@@ -268,16 +268,16 @@ export default function LoungeNotificationsPanel({
                             </span>
                           )}
                         </div>
+                        <span className="mt-0.5 block text-[15px] leading-snug text-zinc-400">{actionPhrase}</span>
+                        {previewText ? (
+                          <p
+                            className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 line-clamp-3 text-zinc-300`}
+                          >
+                            {previewText}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
-                    <span className="mt-0.5 block text-[15px] leading-snug text-zinc-400">{actionPhrase}</span>
-                    {previewText ? (
-                      <p
-                        className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 line-clamp-3 text-zinc-300`}
-                      >
-                        {previewText}
-                      </p>
-                    ) : null}
                   </span>
                   {previewPosterUrl ? (
                     <span
