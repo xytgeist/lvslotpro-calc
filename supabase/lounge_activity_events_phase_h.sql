@@ -345,15 +345,21 @@ $$;
 create or replace function public.lounge_activity_mark_all_read()
 returns bigint
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
 declare
   v_count bigint;
+  v_uid uuid;
 begin
+  v_uid := auth.uid();
+  if v_uid is null then
+    return 0;
+  end if;
+
   update public.activity_events
   set read_at = now()
-  where recipient_user_id = auth.uid()
+  where recipient_user_id = v_uid
     and read_at is null;
 
   get diagnostics v_count = row_count;
@@ -364,3 +370,6 @@ $$;
 grant execute on function public.lounge_activity_unread_count() to authenticated;
 grant execute on function public.lounge_activity_events_page(integer, timestamptz, uuid) to authenticated;
 grant execute on function public.lounge_activity_mark_all_read() to authenticated;
+
+-- Realtime (live badge while app is open): also run if H1 was applied before Realtime was added.
+-- See migration `20260522140000_lounge_activity_events_realtime.sql`.
