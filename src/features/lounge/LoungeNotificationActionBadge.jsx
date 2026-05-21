@@ -9,32 +9,36 @@ const BOOKMARK_RIBBON_D = 'M6.5 4.75h7a1 1 0 011 1v9.5L10 12.75 5.5 15.25v-9.5a1
 const REPOST_ARROWS_D =
   'M6 6h8l-1.75-1.75M14 14H6l1.75 1.75M14 6l2 2-2 2M6 14l-2-2 2-2'
 
-/** Fixed right-rail slot — every notification action glyph uses the same box + 24px art. */
-const RAIL_CLASS =
-  'pointer-events-none flex h-10 w-10 shrink-0 items-center justify-center self-center'
-const GLYPH_CLASS = 'h-6 w-6'
+const GLYPH_CLASS = 'h-[18px] w-[18px]'
 
-function IconRail({ children }) {
+function IconShell({ children, inline = true }) {
   return (
-    <span className={RAIL_CLASS} aria-hidden>
+    <span
+      className={
+        inline
+          ? 'inline-flex shrink-0 items-center justify-center self-center'
+          : 'pointer-events-none flex h-10 w-10 shrink-0 items-center justify-center self-center'
+      }
+      aria-hidden
+    >
       {children}
     </span>
   )
 }
 
-function IconComment() {
+function IconComment({ inline }) {
   return (
-    <IconRail>
+    <IconShell inline={inline}>
       <svg className={`${GLYPH_CLASS} text-zinc-200`} viewBox="0 0 20 20" fill="none" aria-hidden>
         <path d={COMMENT_BUBBLE_D} fill="currentColor" />
       </svg>
-    </IconRail>
+    </IconShell>
   )
 }
 
-function IconReply() {
+function IconReply({ inline }) {
   return (
-    <IconRail>
+    <IconShell inline={inline}>
       <svg className={`${GLYPH_CLASS} text-cyan-300`} viewBox="0 0 20 20" fill="none" aria-hidden>
         <path
           d="M6.5 11.5L4 14v-3.25A4.25 4.25 0 014.75 6.5h10.5a4.25 4.25 0 014.25 4.25v.5"
@@ -51,40 +55,40 @@ function IconReply() {
           strokeLinejoin="round"
         />
       </svg>
-    </IconRail>
+    </IconShell>
   )
 }
 
-function IconMention() {
+function IconMention({ inline }) {
   return (
-    <IconRail>
-      <span className="text-[24px] font-bold leading-none text-orange-400">@</span>
-    </IconRail>
+    <IconShell inline={inline}>
+      <span className="text-[17px] font-bold leading-none text-orange-400">@</span>
+    </IconShell>
   )
 }
 
-function IconFollow() {
+function IconFollow({ inline }) {
   return (
-    <IconRail>
+    <IconShell inline={inline}>
       <svg className={`${GLYPH_CLASS} text-cyan-400`} viewBox="0 0 20 20" fill="currentColor" aria-hidden>
         <circle cx="10" cy="7.25" r="2.75" />
         <path d="M5.25 15.5v-.75c0-2.07 1.68-3.75 3.75-3.75h1.5c2.07 0 3.75 1.68 3.75 3.75v.75H5.25z" />
       </svg>
-    </IconRail>
+    </IconShell>
   )
 }
 
-function IconLike() {
+function IconLike({ inline }) {
   return (
-    <IconRail>
+    <IconShell inline={inline}>
       <LoungeFlameIcon className={`${GLYPH_CLASS} text-zinc-200`} liked readOnly={false} />
-    </IconRail>
+    </IconShell>
   )
 }
 
-function IconRepost() {
+function IconRepost({ inline }) {
   return (
-    <IconRail>
+    <IconShell inline={inline}>
       <svg className={`${GLYPH_CLASS} text-emerald-400`} viewBox="0 0 20 20" fill="none" aria-hidden>
         <path
           d={REPOST_ARROWS_D}
@@ -94,14 +98,13 @@ function IconRepost() {
           strokeLinejoin="round"
         />
       </svg>
-    </IconRail>
+    </IconShell>
   )
 }
 
-/** Quote repost — white note with writing lines + cyan repost arrows (no pencil). */
-function IconQuoteRepost() {
+function IconQuoteRepost({ inline }) {
   return (
-    <IconRail>
+    <IconShell inline={inline}>
       <svg className={GLYPH_CLASS} viewBox="0 0 20 20" fill="none" aria-hidden>
         <rect x="4.5" y="3.25" width="11" height="13.5" rx="1.35" fill="#fafafa" />
         <path d="M6.75 6.5h6.5M6.75 9.25h6.5M6.75 12h4.5" stroke="#a1a1aa" strokeWidth="0.9" strokeLinecap="round" />
@@ -113,17 +116,17 @@ function IconQuoteRepost() {
           strokeLinejoin="round"
         />
       </svg>
-    </IconRail>
+    </IconShell>
   )
 }
 
-function IconBookmark() {
+function IconBookmark({ inline }) {
   return (
-    <IconRail>
+    <IconShell inline={inline}>
       <svg className={`${GLYPH_CLASS} text-lv-yellow`} viewBox="0 0 20 20" fill="none" aria-hidden>
         <path d={BOOKMARK_RIBBON_D} fill="currentColor" />
       </svg>
-    </IconRail>
+    </IconShell>
   )
 }
 
@@ -139,12 +142,12 @@ const ICON_BY_KIND = {
 }
 
 /**
- * Interaction glyph in the notification row right rail.
- * @param {{ eventType?: string, kind?: string|null }} props
+ * Interaction glyph for notification rows (`inline` sits in the meta row before time).
+ * @param {{ eventType?: string, kind?: string|null, inline?: boolean }} props
  */
-export default function LoungeNotificationActionBadge({ eventType, kind: kindProp }) {
+export default function LoungeNotificationActionBadge({ eventType, kind: kindProp, inline = true }) {
   const kind = kindProp ?? loungeActivityNotificationBadgeKind(eventType)
   const Icon = kind ? ICON_BY_KIND[kind] : null
   if (!Icon) return null
-  return <Icon />
+  return <Icon inline={inline} />
 }

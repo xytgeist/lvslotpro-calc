@@ -3,6 +3,7 @@ import LoungeOgBadge from './LoungeOgBadge.jsx'
 import LoungeNotificationActionBadge from './LoungeNotificationActionBadge.jsx'
 import {
   LOUNGE_FEED_AVATAR_CLASS,
+  LOUNGE_FEED_CAPTION_TEXT_CLASS,
   LOUNGE_FEED_DISPLAY_NAME_CLASS,
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
   LOUNGE_FEED_META_ROW_CLASS,
@@ -24,6 +25,10 @@ import {
   LOUNGE_ACTIVITY_EVENT_TYPES,
   LOUNGE_ACTIVITY_PAGE_SIZE,
 } from '../../utils/loungeActivityApi.js'
+import {
+  hydrateLoungeActivityEventPreviews,
+  loungeActivityShowsContextPreview,
+} from '../../utils/loungeActivityPreview.js'
 
 /**
  * Lounge dock **Notifications** panel — in-app activity feed (Phase H1).
@@ -57,11 +62,12 @@ export default function LoungeNotificationsPanel({
       else setLoading(true)
       setErr('')
       try {
-        const rows = await loungeActivityEventsPage(supabaseClient, {
+        let rows = await loungeActivityEventsPage(supabaseClient, {
           limit: LOUNGE_ACTIVITY_PAGE_SIZE,
           beforeCreatedAt: cursor?.created_at ?? null,
           beforeId: cursor?.id ?? null,
         })
+        rows = await hydrateLoungeActivityEventPreviews(supabaseClient, rows)
         setSchemaMissing(false)
         setHasMore(rows.length >= LOUNGE_ACTIVITY_PAGE_SIZE)
         setItems((prev) => (append ? [...prev, ...rows] : rows))
@@ -198,6 +204,9 @@ export default function LoungeNotificationsPanel({
             const when = formatLoungeActivityWhen(event.created_at)
             const actionPhrase = loungeActivityActionPhrase(event)
             const summary = loungeActivitySummary(event)
+            const showContext = loungeActivityShowsContextPreview(event.event_type)
+            const previewText = showContext ? String(event.preview_text || '').trim() : ''
+            const previewPosterUrl = showContext ? String(event.preview_poster_url || '').trim() : ''
 
             return (
               <li key={event.id}>
@@ -230,9 +239,10 @@ export default function LoungeNotificationsPanel({
                     )}
                   </span>
                   <span className={`min-w-0 flex-1 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
-                    <span className={`${LOUNGE_FEED_META_ROW_CLASS} flex-wrap gap-x-1.5 gap-y-0.5`}>
+                    <span className={`${LOUNGE_FEED_META_ROW_CLASS} flex-wrap items-center gap-x-1.5 gap-y-0.5`}>
                       <span className={LOUNGE_FEED_DISPLAY_NAME_CLASS}>{displayName}</span>
                       {event.actor_is_og ? <LoungeOgBadge /> : null}
+                      <LoungeNotificationActionBadge eventType={event.event_type} inline />
                       {when ? (
                         <span className={LOUNGE_FEED_META_HANDLE_TIME_CLASS}>
                           <span aria-hidden>·</span>
@@ -241,8 +251,29 @@ export default function LoungeNotificationsPanel({
                       ) : null}
                     </span>
                     <span className="mt-0.5 block text-[15px] leading-snug text-zinc-400">{actionPhrase}</span>
+                    {previewText ? (
+                      <p
+                        className={`${LOUNGE_FEED_CAPTION_TEXT_CLASS} mt-1 line-clamp-3 text-zinc-300`}
+                      >
+                        {previewText}
+                      </p>
+                    ) : null}
                   </span>
-                  <LoungeNotificationActionBadge eventType={event.event_type} />
+                  {previewPosterUrl ? (
+                    <span
+                      className="pointer-events-none mt-0.5 h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-900"
+                      aria-hidden
+                    >
+                      <img
+                        src={previewPosterUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                      />
+                    </span>
+                  ) : null}
                 </button>
               </li>
             )
