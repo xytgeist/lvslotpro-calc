@@ -219,3 +219,61 @@ export function orderCommentDetailDirectReplies({
   }
   return [...list].sort((a, b) => compareFeedCommentsChronologicalAsc(a, b, viewerPinnedCommentIds))
 }
+
+/**
+ * Keep comment row order stable while counts change on the same screen session.
+ * Full reorder when `resort` is true; otherwise drop removed ids, prepend new viewer pins, append other new ids.
+ * @param {{
+ *   stableIds?: string[],
+ *   freshlySorted?: object[],
+ *   viewerPinnedCommentIds?: string[],
+ *   resort?: boolean,
+ * }} opts
+ * @returns {string[]}
+ */
+export function stabilizeCommentListOrder({
+  stableIds = [],
+  freshlySorted = [],
+  viewerPinnedCommentIds = [],
+  resort = false,
+}) {
+  const freshList = freshlySorted || []
+  const freshIds = freshList.map((c) => c.id).filter(Boolean)
+  const freshSet = new Set(freshIds)
+
+  if (!freshIds.length) return []
+  if (resort || !stableIds.length) return freshIds
+
+  const nextSet = new Set()
+  const next = (stableIds || []).filter((id) => {
+    if (!freshSet.has(id)) return false
+    nextSet.add(id)
+    return true
+  })
+
+  const pins = viewerPinnedCommentIds || []
+  for (let i = pins.length - 1; i >= 0; i -= 1) {
+    const id = pins[i]
+    if (freshSet.has(id) && !nextSet.has(id)) {
+      next.unshift(id)
+      nextSet.add(id)
+    }
+  }
+
+  for (const id of freshIds) {
+    if (!nextSet.has(id)) {
+      next.push(id)
+      nextSet.add(id)
+    }
+  }
+
+  return next
+}
+
+/**
+ * @param {string[]} orderedIds
+ * @param {Map<string, object>} byId
+ */
+export function commentsFromIdOrder(orderedIds, byId) {
+  return (orderedIds || []).map((id) => byId.get(id)).filter(Boolean)
+}

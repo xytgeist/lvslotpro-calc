@@ -9803,6 +9803,7 @@ export default function SocialFeed({
                             loungeCommentDetailPathIds.length > 0 ? 'commentDetailReplies' : 'post'
                           }
                           focusCommentId={loungeDetailCommentHierarchyFocusId}
+                          postId={loungePostDetail?.id ?? null}
                           comments={loungeDetailComments}
                         postAuthorUserId={loungePostDetail.user_id}
                         postAgeLabel={postAgeLabel}

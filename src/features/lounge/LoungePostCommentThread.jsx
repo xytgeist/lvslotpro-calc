@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useRef } from 'react'
 import {
   profileAvatarInitials,
   profileAvatarToneClass,
@@ -13,10 +13,12 @@ import {
   feedCommentSubtreeReplyCount,
 } from '../../utils/communityFeedComment.js'
 import {
+  commentsFromIdOrder,
   compareFeedCommentsChronologicalAsc,
   LOUNGE_DETAIL_COMMENT_SORT,
   orderCommentDetailDirectReplies,
   orderPostDetailRootComments,
+  stabilizeCommentListOrder,
 } from '../../utils/loungeFeedCommentSort.js'
 import { LOUNGE_COMMENT_BODY_MAX } from '../../utils/loungeCommentLimits.js'
 import { renderRichCaption } from './loungeCaption'
@@ -368,6 +370,8 @@ export function LoungeCommentCard({
  */
 export default function LoungePostCommentThread({
   comments,
+  /** Post id — resets stable sort when the detail post changes. */
+  postId = null,
   postAgeLabel,
   /** Same helpers as feed posts (`comment` has `author_profile` like a post). */
   displayNameFor,
@@ -429,6 +433,11 @@ export default function LoungePostCommentThread({
 }) {
   const byId = useMemo(() => new Map((comments || []).map((c) => [c.id, c])), [comments])
 
+  const rootOrderSessionKeyRef = useRef('')
+  const stableRootIdsRef = useRef(/** @type {string[]} */ ([]))
+  const replyOrderSessionKeyRef = useRef('')
+  const stableReplyIdsRef = useRef(/** @type {string[]} */ ([]))
+
   const descendantCountByCommentId = useMemo(
     () => feedCommentDescendantCountById(comments),
     [comments],
@@ -436,7 +445,7 @@ export default function LoungePostCommentThread({
 
   const rootsSorted = useMemo(() => {
     if (variant !== 'post') return []
-    return orderPostDetailRootComments({
+    const fresh = orderPostDetailRootComments({
       roots: comments,
       postAuthorUserId,
       viewerUserId,
@@ -444,10 +453,25 @@ export default function LoungePostCommentThread({
       viewerPinnedCommentIds,
       sortMode: rootCommentSortMode,
     })
+    const sessionKey = `${postId || ''}|${rootCommentSortMode}|post`
+    const sessionChanged = rootOrderSessionKeyRef.current !== sessionKey
+    if (sessionChanged) {
+      rootOrderSessionKeyRef.current = sessionKey
+      stableRootIdsRef.current = []
+    }
+    stableRootIdsRef.current = stabilizeCommentListOrder({
+      stableIds: stableRootIdsRef.current,
+      freshlySorted: fresh,
+      viewerPinnedCommentIds,
+      resort: sessionChanged || stableRootIdsRef.current.length === 0,
+    })
+    return commentsFromIdOrder(stableRootIdsRef.current, byId)
   }, [
+    byId,
     comments,
     followingUserIds,
     postAuthorUserId,
+    postId,
     rootCommentSortMode,
     variant,
     viewerPinnedCommentIds,
@@ -487,12 +511,25 @@ export default function LoungePostCommentThread({
   const directRepliesSorted = useMemo(() => {
     if (variant !== 'commentDetailReplies' || !focusCommentId) return []
     const direct = [...(comments || [])].filter((c) => c.parent_id === focusCommentId)
-    return orderCommentDetailDirectReplies({
+    const fresh = orderCommentDetailDirectReplies({
       replies: direct,
       viewerPinnedCommentIds,
       sortMode: rootCommentSortMode,
     })
-  }, [comments, focusCommentId, rootCommentSortMode, variant, viewerPinnedCommentIds])
+    const sessionKey = `${postId || ''}|${rootCommentSortMode}|${focusCommentId}|replies`
+    const sessionChanged = replyOrderSessionKeyRef.current !== sessionKey
+    if (sessionChanged) {
+      replyOrderSessionKeyRef.current = sessionKey
+      stableReplyIdsRef.current = []
+    }
+    stableReplyIdsRef.current = stabilizeCommentListOrder({
+      stableIds: stableReplyIdsRef.current,
+      freshlySorted: fresh,
+      viewerPinnedCommentIds,
+      resort: sessionChanged || stableReplyIdsRef.current.length === 0,
+    })
+    return commentsFromIdOrder(stableReplyIdsRef.current, byId)
+  }, [byId, comments, focusCommentId, postId, rootCommentSortMode, variant, viewerPinnedCommentIds])
 
   const cardProps = {
     postAgeLabel,
