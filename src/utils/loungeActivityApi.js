@@ -90,10 +90,14 @@ export function loungeActivityPlainPostRepostEvent(event) {
   )
 }
 
-/** Post detail deep link from a notification row (`post_id` always set when returned). */
+/** Post detail deep link from a notification row (`postId` always set when returned). */
 export function loungeActivityOpenPostTarget(event) {
+  if (loungeActivityPlainPostRepostEvent(event)) {
+    const originalId = String(event?.repost_group_target_id || '').trim()
+    if (!originalId) return null
+    return { postId: originalId, commentId: null }
+  }
   if (!event?.post_id) return null
-  if (loungeActivityPlainPostRepostEvent(event)) return null
   const type = event.event_type
   const drillComment =
     type === LOUNGE_ACTIVITY_EVENT_TYPES.COMMENT_ON_POST ||

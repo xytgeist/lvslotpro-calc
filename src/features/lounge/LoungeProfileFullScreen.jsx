@@ -467,6 +467,10 @@ export default function LoungeProfileFullScreen({
   onViewerFollowChange = null,
   /** Settings → Edit profile: open own sheet already in edit mode. */
   requestOwnProfileEditing = false,
+  /** Open follow list overlay on mount (`'following'` | `'followers'`). */
+  requestFollowListTab = null,
+  /** Follower user ids to glow briefly on the Followers tab. */
+  highlightFollowerUserIds = [],
 }) {
   const [tab, setTab] = useState('posts')
   const [adminRoleBusy, setAdminRoleBusy] = useState(false)
@@ -524,6 +528,13 @@ export default function LoungeProfileFullScreen({
   const [followListTab, setFollowListTab] = useState(null)
   /** Profiles opened from a follow list without dismissing the list (back returns to list). */
   const [nestedProfileStack, setNestedProfileStack] = useState([])
+
+  useEffect(() => {
+    if (!open || !isOwnProfile) return
+    if (requestFollowListTab === 'following' || requestFollowListTab === 'followers') {
+      setFollowListTab(requestFollowListTab)
+    }
+  }, [isOwnProfile, open, profileUserId, requestFollowListTab])
 
   const profilePostRowPerfStyle = useMemo(() => loungeFeedPostRowPerfStyle(), [])
 
@@ -2271,6 +2282,7 @@ export default function LoungeProfileFullScreen({
             supabaseClient={supabaseClient}
             onClose={() => setFollowListTab(null)}
             onViewerFollowChange={onViewerFollowChange}
+            highlightUserIds={highlightFollowerUserIds}
             onOpenProfile={(entity) => {
               const uid = String(entity?.user_id || '').trim()
               if (!uid) return

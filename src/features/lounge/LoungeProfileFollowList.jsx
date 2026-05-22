@@ -31,6 +31,7 @@ import {
  * @param {() => void} props.onClose
  * @param {(entity: { user_id: string, author_profile?: object }) => void} [props.onOpenProfile]
  * @param {(userId: string, isFollowing: boolean) => void} [props.onViewerFollowChange]
+ * @param {string[]} [props.highlightUserIds] — temporary glow on follower rows (e.g. from grouped follow notification).
  */
 export default function LoungeProfileFollowList({
   tab,
@@ -42,6 +43,7 @@ export default function LoungeProfileFollowList({
   onClose,
   onOpenProfile,
   onViewerFollowChange,
+  highlightUserIds = [],
 }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -49,6 +51,7 @@ export default function LoungeProfileFollowList({
   const [viewerFollowing, setViewerFollowing] = useState(() => new Set())
   const [followsViewer, setFollowsViewer] = useState(() => new Set())
   const [rowBusyId, setRowBusyId] = useState('')
+  const [activeHighlightIds, setActiveHighlightIds] = useState(() => new Set())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -81,6 +84,15 @@ export default function LoungeProfileFollowList({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (tab !== 'followers') return
+    const ids = [...new Set((highlightUserIds || []).map(String).filter(Boolean))]
+    if (ids.length === 0) return
+    setActiveHighlightIds(new Set(ids))
+    const timer = window.setTimeout(() => setActiveHighlightIds(new Set()), 4200)
+    return () => window.clearTimeout(timer)
+  }, [highlightUserIds, tab])
 
   const toggleRowFollow = async (targetUserId) => {
     const target = String(targetUserId || '').trim()
@@ -199,6 +211,7 @@ export default function LoungeProfileFollowList({
                 followsViewer.has(uid) &&
                 !followingThem
               const showFollow = viewerUserId && !isSelf
+              const isHighlighted = activeHighlightIds.has(String(uid))
 
               return (
                 <li key={uid}>
@@ -212,7 +225,11 @@ export default function LoungeProfileFollowList({
                         openRowProfile(row)
                       }
                     }}
-                    className="flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left touch-manipulation active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent]"
+                    className={`flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left touch-manipulation active:bg-zinc-900/55 [-webkit-tap-highlight-color:transparent] ${
+                      isHighlighted
+                        ? 'bg-cyan-950/35 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.45),0_0_18px_rgba(34,211,238,0.22)] transition-[background-color,box-shadow] duration-700'
+                        : ''
+                    }`}
                     aria-label={`Open ${displayName} profile`}
                   >
                     <div

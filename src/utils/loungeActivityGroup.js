@@ -5,8 +5,12 @@ const GROUPABLE_TYPES = new Set([
   LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK,
 ])
 
+const FOLLOW_GROUP_KEY = 'follow'
+const FOLLOW_GROUP_WINDOW_MS = 24 * 60 * 60 * 1000
+
 export function loungeActivityIsBatchGroupable(event) {
   if (GROUPABLE_TYPES.has(event?.event_type)) return true
+  if (event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) return true
   return (
     event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST &&
     !event?.comment_id &&
@@ -15,6 +19,9 @@ export function loungeActivityIsBatchGroupable(event) {
 }
 
 export function loungeActivityGroupKey(event) {
+  if (event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) {
+    return FOLLOW_GROUP_KEY
+  }
   if (
     event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST &&
     !event?.comment_id &&
@@ -60,14 +67,24 @@ function groupedTargetPhrase(targetKind) {
 }
 
 function groupedVerb(eventType) {
-  return eventType === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK ? 'bookmarked' : 'liked'
+  if (eventType === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK) return 'bookmarked'
+  if (eventType === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST) return 'reposted'
+  if (eventType === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) return 'followed'
+  return 'liked'
 }
 
 /** Split grouped copy so the lead name can wrap in UI (`max-w-[10ch]`) without ellipsis. */
 export function loungeActivityGroupedActionCopy(event, firstActor, othersCount, previewMeta = {}) {
+  const leadName = loungeActivityActorDisplayName(firstActor)
+  if (event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) {
+    if (othersCount <= 0) {
+      return { leadName, rest: 'followed you' }
+    }
+    const otherLabel = othersCount === 1 ? '1 other' : `${othersCount} others`
+    return { leadName, rest: `and ${otherLabel} followed you` }
+  }
   const targetPhrase = groupedTargetPhrase(loungeActivityGroupedTargetKind(event, previewMeta))
   const verb = groupedVerb(event.event_type)
-  const leadName = loungeActivityActorDisplayName(firstActor)
   if (othersCount <= 0) {
     return { leadName, rest: `${verb} ${targetPhrase}` }
   }
@@ -115,9 +132,25 @@ function newestEventInGroup(groupEvents) {
 
 const GROUP_MIN_ACTORS = 3
 
+function followEventsWithin24h(events) {
+  if (!Array.isArray(events) || events.length === 0) return []
+  const sorted = [...events].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime()
+    const tb = new Date(b.created_at).getTime()
+    if (ta !== tb) return tb - ta
+    return String(b.id).localeCompare(String(a.id))
+  })
+  const newestMs = new Date(sorted[0].created_at).getTime()
+  if (!Number.isFinite(newestMs)) return []
+  return sorted.filter((row) => {
+    const ms = new Date(row.created_at).getTime()
+    return Number.isFinite(ms) && newestMs - ms <= FOLLOW_GROUP_WINDOW_MS
+  })
+}
+
 /**
- * Collapse like/bookmark/repost rows that share the same target when 3+ unique actors appear
- * in the loaded page. Preserves overall newest-first order.
+ * Collapse like/bookmark/repost/follow rows when grouping rules match.
+ * Follow batches require 3+ unique actors within 24 hours. Preserves overall newest-first order.
  * @param {Array<object>} events
  * @returns {Array<{ type: 'single', event: object } | { type: 'grouped', event: object, actors: object[], firstActor: object, othersCount: number, eventIds: string[], groupKey: string }>}
  */
@@ -137,6 +170,32 @@ export function buildLoungeActivityDisplayRows(events) {
 
   for (const event of events) {
     if (consumed.has(event.id)) continue
+
+    if (event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) {
+      const bucket = buckets.get(FOLLOW_GROUP_KEY) || []
+      const available = bucket.filter((row) => !consumed.has(row.id))
+      const windowEvents = followEventsWithin24h(available)
+      const actors = uniqueActorsChronological(windowEvents)
+      if (actors.length >= GROUP_MIN_ACTORS) {
+        const representative = newestEventInGroup(windowEvents)
+        if (event.id !== representative.id) continue
+        const firstActor = actors[0]
+        const othersCount = Math.max(0, actors.length - 1)
+        for (const row of windowEvents) consumed.add(row.id)
+        rows.push({
+          type: 'grouped',
+          event: representative,
+          actors,
+          firstActor,
+          othersCount,
+          eventIds: windowEvents.map((row) => row.id),
+          groupKey: FOLLOW_GROUP_KEY,
+        })
+        continue
+      }
+      rows.push({ type: 'single', event })
+      continue
+    }
 
     const key = loungeActivityGroupKey(event)
     const bucket = key ? buckets.get(key) : null

@@ -509,6 +509,8 @@ export default function SocialFeed({
   const [profileModalData, setProfileModalData] = useState(null)
   const [profileModalPosts, setProfileModalPosts] = useState([])
   const [profileModalStartEditing, setProfileModalStartEditing] = useState(false)
+  const [profileModalFollowListTab, setProfileModalFollowListTab] = useState(null)
+  const [profileModalHighlightFollowerIds, setProfileModalHighlightFollowerIds] = useState([])
   /** Profiles opened from feed/detail/profile without replacing the root sheet (back pops one layer). */
   const [profileOverlayStack, setProfileOverlayStack] = useState([])
   /** Root profile sits above Stream hero lightbox (z ~103+) while closing video behind the sheet. */
@@ -7540,6 +7542,8 @@ export default function SocialFeed({
       setLoungeDockPanel(returnPanel)
     }
     setProfileModalStartEditing(false)
+    setProfileModalFollowListTab(null)
+    setProfileModalHighlightFollowerIds([])
   }, [])
 
   const closeProfileModal = useCallback(() => {
@@ -7601,6 +7605,16 @@ export default function SocialFeed({
       if (!userId) return
       profileReturnDockPanelRef.current = opts?.returnDockPanel ?? null
       setProfileModalStartEditing(opts?.startEditing === true)
+      setProfileModalFollowListTab(
+        opts?.openFollowListTab === 'following' || opts?.openFollowListTab === 'followers'
+          ? opts.openFollowListTab
+          : null,
+      )
+      setProfileModalHighlightFollowerIds(
+        Array.isArray(opts?.highlightFollowerUserIds)
+          ? opts.highlightFollowerUserIds.map(String).filter(Boolean)
+          : [],
+      )
       const profileStub = profileStubFromOpenArg(post)
       const loadGen = ++profileModalLoadGenRef.current
       setProfileStackAboveStreamLightbox(getLoungeStreamLightboxOpen())
@@ -7833,6 +7847,25 @@ export default function SocialFeed({
       openAuthorProfile(entity, { returnDockPanel: 'notifications' })
     },
     [openAuthorProfile],
+  )
+
+  const onLoungeOpenOwnProfileFollowers = useCallback(
+    ({ highlightUserIds = [] } = {}) => {
+      if (!composerUserId) return
+      if (openProfileGateIfNeeded()) return
+      void openProfileModal(
+        {
+          user_id: composerUserId,
+          author_profile: composerUserProfile,
+        },
+        {
+          returnDockPanel: 'notifications',
+          openFollowListTab: 'followers',
+          highlightFollowerUserIds: highlightUserIds,
+        },
+      )
+    },
+    [composerUserId, composerUserProfile, openProfileGateIfNeeded, openProfileModal],
   )
 
   const onLoungeSettingsEditProfile = useCallback(() => {
@@ -10713,6 +10746,7 @@ export default function SocialFeed({
           notificationsViewerUserId={composerUserId || ''}
           onOpenPostFromNotifications={onLoungeOpenPostFromNotifications}
           onOpenProfileFromNotifications={onLoungeOpenProfileFromNotifications}
+          onOpenOwnProfileFollowers={onLoungeOpenOwnProfileFollowers}
           onNotificationsUnreadChange={onLoungeNotificationsUnreadChange}
           notificationInteractionProps={notificationInteractionProps}
           notificationInteractionCountsRefreshKey={notificationInteractionCountsRefreshKey}
@@ -10789,6 +10823,8 @@ export default function SocialFeed({
           onViewerFollowChange={syncLoungeViewerFollowState}
           stackAboveStreamLightbox={profileStackAboveStreamLightbox}
           requestOwnProfileEditing={profileModalStartEditing}
+          requestFollowListTab={profileModalFollowListTab}
+          highlightFollowerUserIds={profileModalHighlightFollowerIds}
         />
       ) : null}
 

@@ -94,6 +94,8 @@ export default function LoungeNotificationsPanel({
   viewerUserId,
   onOpenPost,
   onOpenProfile,
+  /** Grouped follow row: open viewer's own profile on Followers tab with glow on new followers. */
+  onOpenOwnProfileFollowers,
   onUnreadChange,
   onOpenNotificationSettings,
   /** Same handlers as feed `LoungePostArticle` for inline like/repost/bookmark/comment. */
@@ -331,10 +333,21 @@ export default function LoungeNotificationsPanel({
   )
 
   const onRowActivate = useCallback(
-    (event, readEventIds = null) => {
+    (event, readEventIds = null, { groupedActors = null } = {}) => {
       if (!event) return
       markSessionNewSeen()
       void markNotificationEventsRead(readEventIds || (event.id ? [event.id] : []))
+
+      if (
+        event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW &&
+        Array.isArray(groupedActors) &&
+        groupedActors.length > 0
+      ) {
+        onOpenOwnProfileFollowers?.({
+          highlightUserIds: groupedActors.map((actor) => actor?.user_id).filter(Boolean),
+        })
+        return
+      }
 
       if (event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) {
         onOpenProfile?.({
@@ -355,7 +368,7 @@ export default function LoungeNotificationsPanel({
         if (target) onOpenPost?.(target)
       }
     },
-    [markNotificationEventsRead, markSessionNewSeen, onOpenPost, onOpenProfile],
+    [markNotificationEventsRead, markSessionNewSeen, onOpenOwnProfileFollowers, onOpenPost, onOpenProfile],
   )
 
   const patchNotificationInteractionEntity = useCallback((kind, entityId, patch) => {
@@ -448,18 +461,20 @@ export default function LoungeNotificationsPanel({
           ? 'bg-gradient-to-r from-lv-yellow/24 via-lv-yellow/10 to-transparent'
           : event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST
             ? 'bg-gradient-to-r from-lv-green/28 via-lv-green/12 to-transparent'
-            : ''
+            : event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW
+              ? 'bg-gradient-to-r from-cyan-400/28 via-cyan-400/12 to-transparent'
+              : ''
 
     return (
       <li key={groupKey}>
         <div
           role="button"
           tabIndex={0}
-          onClick={() => onRowActivate(event, eventIds)}
+          onClick={() => onRowActivate(event, eventIds, { groupedActors: actors })}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
-              onRowActivate(event, eventIds)
+              onRowActivate(event, eventIds, { groupedActors: actors })
             }
           }}
           aria-label={actionPhrase}

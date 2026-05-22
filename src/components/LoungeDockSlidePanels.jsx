@@ -115,6 +115,7 @@ export default function LoungeDockSlidePanels({
   notificationsViewerUserId = '',
   onOpenPostFromNotifications,
   onOpenProfileFromNotifications,
+  onOpenOwnProfileFollowers,
   onNotificationsUnreadChange,
   notificationInteractionProps = null,
   /** Bumped when post detail closes over notifications — refresh interaction bar counts. */
@@ -1096,6 +1097,7 @@ export default function LoungeDockSlidePanels({
               viewerUserId={notificationsViewerUserId}
               onOpenPost={onOpenPostFromNotifications}
               onOpenProfile={onOpenProfileFromNotifications}
+              onOpenOwnProfileFollowers={onOpenOwnProfileFollowers}
               onUnreadChange={onNotificationsUnreadChange}
               onOpenNotificationSettings={onOpenNotificationSettings}
               notificationPostCardProps={notificationInteractionProps}
