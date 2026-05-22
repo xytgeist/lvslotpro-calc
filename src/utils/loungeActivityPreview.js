@@ -7,7 +7,7 @@ import {
 } from './loungeActivityInteraction.js'
 
 const POST_PREVIEW_COLS =
-  'id,caption,image_urls,media_url,gif_url,stream_poster_url,like_count,comment_count,repost_count'
+  'id,caption,image_urls,media_url,gif_url,stream_poster_url,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost'
 
 const COMMENT_PREVIEW_COLS =
   'id,body,parent_id,image_urls,media_url,gif_url,stream_poster_url,like_count,repost_count,comment_count'
@@ -22,6 +22,7 @@ export function loungeActivityShowsContextPreview(eventType) {
     case LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST:
     case LOUNGE_ACTIVITY_EVENT_TYPES.LIKE:
     case LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK:
+    case LOUNGE_ACTIVITY_EVENT_TYPES.REPOST:
       return true
     default:
       return false
@@ -51,7 +52,8 @@ function previewTextFromRow(eventType, postRow, commentRow) {
   }
   if (
     eventType === LOUNGE_ACTIVITY_EVENT_TYPES.LIKE ||
-    eventType === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK
+    eventType === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK ||
+    eventType === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST
   ) {
     if (commentRow?.body) return normalizeFeedCommentBody(commentRow.body)
     return feedPostDisplayCaption(postRow)
@@ -104,6 +106,30 @@ export async function hydrateLoungeActivityEventPreviews(supabaseClient, events)
     }
   }
 
+  /** Plain repost `post_id` is the shell row — resolve original post for preview + grouping. */
+  const repostOriginalPostIds = new Set()
+  for (const event of events) {
+    if (event?.event_type !== LOUNGE_ACTIVITY_EVENT_TYPES.REPOST || event?.comment_id) continue
+    const shell =
+      event.post_id && postsById.has(String(event.post_id))
+        ? postsById.get(String(event.post_id))
+        : null
+    const originalId = shell?.repost_of_post_id != null ? String(shell.repost_of_post_id) : ''
+    if (originalId) repostOriginalPostIds.add(originalId)
+  }
+
+  const repostOriginalPostsById = new Map()
+  if (repostOriginalPostIds.size > 0) {
+    const { data } = await supabaseClient
+      .from('community_feed_posts')
+      .select(POST_PREVIEW_COLS)
+      .in('id', [...repostOriginalPostIds])
+      .is('hidden_at', null)
+    for (const row of data || []) {
+      repostOriginalPostsById.set(String(row.id), row)
+    }
+  }
+
   return events.map((event) => {
     if (!loungeActivityShowsContextPreview(event?.event_type)) return event
     const postRow =
@@ -114,11 +140,27 @@ export async function hydrateLoungeActivityEventPreviews(supabaseClient, events)
       event.comment_id && commentsById.has(String(event.comment_id))
         ? commentsById.get(String(event.comment_id))
         : null
+
+    let repostGroupTargetId = null
+    let previewPostRow = postRow
+    if (event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST && !event.comment_id) {
+      const originalId =
+        postRow?.repost_of_post_id != null ? String(postRow.repost_of_post_id) : ''
+      if (originalId) {
+        repostGroupTargetId = originalId
+        previewPostRow = repostOriginalPostsById.get(originalId) || null
+      }
+    }
+
     const sourceRow =
       event.comment_id && commentRow
         ? commentRow
-        : postRow
-    const previewText = previewTextFromRow(event.event_type, postRow, commentRow)
+        : previewPostRow
+    const previewText = previewTextFromRow(
+      event.event_type,
+      previewPostRow,
+      commentRow,
+    )
     const previewPosterUrl = loungeActivityPreviewPosterUrl(sourceRow)
     const previewIsReply = Boolean(commentRow?.parent_id)
     const barKind = loungeActivityInteractionBarKind(event.event_type)
@@ -126,13 +168,17 @@ export async function hydrateLoungeActivityEventPreviews(supabaseClient, events)
       barKind === 'comment' ? commentRow : barKind === 'post' ? postRow : null
     const interaction_bar_kind = barKind
     const interaction_bar_entity = loungeActivityInteractionEntityFromRow(barKind, barSourceRow)
+    const repostFields =
+      repostGroupTargetId != null ? { repost_group_target_id: repostGroupTargetId } : null
+
     if (!previewText && !previewPosterUrl) {
-      if (!previewIsReply && !interaction_bar_entity) return event
+      if (!previewIsReply && !interaction_bar_entity && !repostFields) return event
       return {
         ...event,
         preview_is_reply: previewIsReply,
         interaction_bar_kind,
         interaction_bar_entity,
+        ...repostFields,
       }
     }
     return {
@@ -142,6 +188,7 @@ export async function hydrateLoungeActivityEventPreviews(supabaseClient, events)
       preview_is_reply: previewIsReply,
       interaction_bar_kind,
       interaction_bar_entity,
+      ...repostFields,
     }
   })
 }

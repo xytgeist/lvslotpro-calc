@@ -6,11 +6,23 @@ const GROUPABLE_TYPES = new Set([
 ])
 
 export function loungeActivityIsBatchGroupable(event) {
-  return GROUPABLE_TYPES.has(event?.event_type)
+  if (GROUPABLE_TYPES.has(event?.event_type)) return true
+  return (
+    event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST &&
+    !event?.comment_id &&
+    Boolean(event?.repost_group_target_id)
+  )
 }
 
 export function loungeActivityGroupKey(event) {
-  if (!loungeActivityIsBatchGroupable(event)) return ''
+  if (
+    event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST &&
+    !event?.comment_id &&
+    event?.repost_group_target_id
+  ) {
+    return `repost:post:${event.repost_group_target_id}`
+  }
+  if (!GROUPABLE_TYPES.has(event?.event_type)) return ''
   return `${event.event_type}:${event.post_id || ''}:${event.comment_id || ''}`
 }
 
@@ -104,7 +116,7 @@ function newestEventInGroup(groupEvents) {
 const GROUP_MIN_ACTORS = 3
 
 /**
- * Collapse like/bookmark rows that share the same target when 3+ unique actors appear
+ * Collapse like/bookmark/repost rows that share the same target when 3+ unique actors appear
  * in the loaded page. Preserves overall newest-first order.
  * @param {Array<object>} events
  * @returns {Array<{ type: 'single', event: object } | { type: 'grouped', event: object, actors: object[], firstActor: object, othersCount: number, eventIds: string[], groupKey: string }>}

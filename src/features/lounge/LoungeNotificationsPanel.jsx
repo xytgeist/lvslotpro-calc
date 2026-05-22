@@ -414,6 +414,7 @@ export default function LoungeNotificationsPanel({
     if (
       eventType === LOUNGE_ACTIVITY_EVENT_TYPES.LIKE ||
       eventType === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK ||
+      eventType === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST ||
       eventType === LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST
     ) {
       return 'line-clamp-2'
@@ -445,7 +446,9 @@ export default function LoungeNotificationsPanel({
         ? 'bg-gradient-to-r from-lv-red/28 via-lv-red/12 to-transparent'
         : event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK
           ? 'bg-gradient-to-r from-lv-yellow/24 via-lv-yellow/10 to-transparent'
-          : ''
+          : event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST
+            ? 'bg-gradient-to-r from-lv-green/28 via-lv-green/12 to-transparent'
+            : ''
 
     return (
       <li key={groupKey}>
