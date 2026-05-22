@@ -134,7 +134,7 @@ type PushNotificationPayload = {
 }
 
 function buildTargetUrl(
-  event: Pick<ActivityEventRow, 'event_type' | 'post_id'>,
+  event: Pick<ActivityEventRow, 'event_type' | 'post_id' | 'comment_id'>,
   actor: ActorProfile | null | undefined,
   markRead?: PushMarkReadIds,
 ): string {
@@ -148,6 +148,8 @@ function buildTargetUrl(
     } else {
       params.set('lounge', 'notifications')
     }
+  } else if (event.event_type === 'repost' && !event.comment_id) {
+    params.set('lounge', 'notifications')
   } else if (event.post_id) {
     params.set('post', event.post_id)
   } else {

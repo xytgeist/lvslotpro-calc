@@ -81,9 +81,19 @@ export function loungeActivityActorLabel(event) {
   return 'Someone'
 }
 
+/** Plain post repost: `post_id` is the reposter's feed shell, not a useful deep link (often deleted with the original). */
+export function loungeActivityPlainPostRepostEvent(event) {
+  return (
+    event?.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.REPOST &&
+    !event?.comment_id &&
+    Boolean(event?.post_id)
+  )
+}
+
 /** Post detail deep link from a notification row (`post_id` always set when returned). */
 export function loungeActivityOpenPostTarget(event) {
   if (!event?.post_id) return null
+  if (loungeActivityPlainPostRepostEvent(event)) return null
   const type = event.event_type
   const drillComment =
     type === LOUNGE_ACTIVITY_EVENT_TYPES.COMMENT_ON_POST ||

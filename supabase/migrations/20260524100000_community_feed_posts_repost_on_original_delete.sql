@@ -21,7 +21,9 @@ security definer
 set search_path = public
 as $$
 begin
-  perform set_config('lounge.post_delete_in_progress', old.id::text, true);
+  if nullif(trim(current_setting('lounge.post_delete_in_progress', true)), '') is null then
+    perform set_config('lounge.post_delete_in_progress', old.id::text, true);
+  end if;
 
   -- Plain repost cards are useless without the original — remove them.
   delete from public.community_feed_posts child
@@ -37,7 +39,9 @@ begin
 
   return old;
 exception when others then
-  perform set_config('lounge.post_delete_in_progress', '', true);
+  if trim(current_setting('lounge.post_delete_in_progress', true)) = old.id::text then
+    perform set_config('lounge.post_delete_in_progress', '', true);
+  end if;
   raise;
 end;
 $$;
@@ -49,7 +53,9 @@ security definer
 set search_path = public
 as $$
 begin
-  perform set_config('lounge.post_delete_in_progress', '', true);
+  if trim(current_setting('lounge.post_delete_in_progress', true)) = old.id::text then
+    perform set_config('lounge.post_delete_in_progress', '', true);
+  end if;
   return old;
 end;
 $$;

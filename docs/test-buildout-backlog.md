@@ -271,7 +271,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Source: `src/features/profiles/profileGate.js`, `LoungeProfileFullScreen.jsx`, `SocialFeed.jsx`, `GuidesScreen.jsx`.
   - Test validation: pick taken handle → dialog + **Use @…_1**; reserved handle (e.g. `@admin`) → reserved copy + suggestion. Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18).
 
-- [ ] **Repost cleanup when original post deleted (test build):** migrations **`20260524100000_community_feed_posts_repost_on_original_delete.sql`** + **`20260524110000_community_feed_posts_repost_delete_counter_guard.sql`** (counter guard — fixes delete error when plain/quote reposts + comments exist) — **`repost_target_unavailable`** on quote reposts; **BEFORE DELETE** trigger removes plain repost feed cards and marks quote embeds unavailable; tombstone UI **`LoungePostOriginalUnavailableEmbed.jsx`**. Apply on test; smoke: create plain + quote repost → delete original → plain row gone, quote shows **This post was deleted.** Ryan sign-off pending.
+- [ ] **Repost cleanup when original post deleted (test build):** migrations **`20260524100000`** + **`20260524110000`** + **`20260524120000`** (v2 denorm guard — nested repost delete + `post_likes` CASCADE) — apply all three on test; smoke: plain + quote repost + comment → delete original succeeds. Ryan sign-off pending.
 
 - [x] Lounge feed media + repost UX (test)
   - Change: Feed/detail carousels reset to **first slide** when post **re-enters viewport** (`LoungePostFeedMedia.jsx`); **repost** uses **anchored popover** above the control including reposted-state actions (`LoungePostArticle.jsx`, `SocialFeed.jsx`); quote composer textarea sizing aligned with main composer; image-cap modal from picker/quote flows.
@@ -414,7 +414,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
-- 2026-05-24: **Repost cleanup on original delete (client + SQL build):** migration **`20260524100000_community_feed_posts_repost_on_original_delete.sql`** — plain repost cards deleted via trigger; quote reposts kept with **`repost_target_unavailable`** + **`LoungePostOriginalUnavailableEmbed`** in feed/detail. Fix delete error when reposts/comments exist: **`20260524110000_community_feed_posts_repost_delete_counter_guard.sql`**. Apply both on test; smoke pending Ryan sign-off.
+- 2026-05-24: **Post delete denorm guard v2 (SQL):** migration **`20260524120000_community_feed_posts_delete_denorm_guard_v2.sql`** — fix tuple-modified error when deleting posts with plain reposts, quote reposts, comments, and likes (nested delete flag + `post_likes` skip). Apply after **`24110000`** on test.
 
 - 2026-05-23: **Lounge in-app toast + per-tap mark read (Ryan sign-off, test):** foreground banner, push/in-app tap marks single event read, badge −1 — smoke **§21d** **PASSED** @ **`dcc3852`**.
 
