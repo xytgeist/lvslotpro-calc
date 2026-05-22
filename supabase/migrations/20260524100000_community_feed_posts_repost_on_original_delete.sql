@@ -21,19 +21,35 @@ security definer
 set search_path = public
 as $$
 begin
+  perform set_config('lounge.post_delete_in_progress', old.id::text, true);
+
   -- Plain repost cards are useless without the original — remove them.
   delete from public.community_feed_posts child
   where child.repost_of_post_id = old.id
     and coalesce(child.is_plain_repost, false) = true;
 
-  -- Quote reposts: keep the reposter''s commentary; mark embed unavailable.
+  -- Quote reposts: keep commentary; mark embed unavailable (FK ON DELETE SET NULL clears link).
   update public.community_feed_posts child
-  set repost_target_unavailable = true,
-      repost_of_post_id = null
+  set repost_target_unavailable = true
   where child.repost_of_post_id = old.id
     and coalesce(child.is_plain_repost, false) = false
     and child.repost_of_comment_id is null;
 
+  return old;
+exception when others then
+  perform set_config('lounge.post_delete_in_progress', '', true);
+  raise;
+end;
+$$;
+
+create or replace function public.community_feed_posts_after_delete_clear_post_delete_flag()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform set_config('lounge.post_delete_in_progress', '', true);
   return old;
 end;
 $$;
@@ -43,3 +59,9 @@ create trigger trg_community_feed_posts_before_delete_repost_children
   before delete on public.community_feed_posts
   for each row
   execute function public.community_feed_posts_before_delete_repost_children();
+
+drop trigger if exists trg_community_feed_posts_after_delete_clear_post_delete_flag on public.community_feed_posts;
+create trigger trg_community_feed_posts_after_delete_clear_post_delete_flag
+  after delete on public.community_feed_posts
+  for each row
+  execute function public.community_feed_posts_after_delete_clear_post_delete_flag();
