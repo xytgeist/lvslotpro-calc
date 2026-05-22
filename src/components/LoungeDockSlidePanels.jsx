@@ -1098,6 +1098,7 @@ export default function LoungeDockSlidePanels({
               onOpenNotificationSettings={onOpenNotificationSettings}
               notificationPostCardProps={notificationInteractionProps}
               repostMenuScrollRootRef={panelScrollRef}
+              listScrollRootRef={panelScrollRef}
             />
           </div>
         ) : openPanel === 'settings' ? (

@@ -93,6 +93,8 @@ export default function LoungeNotificationsPanel({
   /** Same handlers as feed `LoungePostArticle` for inline like/repost/bookmark/comment. */
   notificationPostCardProps = null,
   repostMenuScrollRootRef = null,
+  /** Panel scroller — first scroll clears "new" highlights (inbox seen). */
+  listScrollRootRef = null,
 }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -102,8 +104,19 @@ export default function LoungeNotificationsPanel({
   const [hasMore, setHasMore] = useState(false)
   const markedReadRef = useRef(false)
   const fetchSeqRef = useRef(0)
-  /** Unread at fetch time — stays "new" for this panel visit even after mark-all-read clears the badge. */
+  /** Unread at fetch time — cyan rail until inbox is seen (mark-all-read) or the row is opened. */
   const [sessionNewIds, setSessionNewIds] = useState(() => new Set())
+
+  const clearAllSessionNewIds = useCallback(() => {
+    setSessionNewIds((prev) => (prev.size === 0 ? prev : new Set()))
+  }, [])
+
+  const sessionNewSeenRef = useRef(false)
+  const markSessionNewSeen = useCallback(() => {
+    if (sessionNewSeenRef.current) return
+    sessionNewSeenRef.current = true
+    clearAllSessionNewIds()
+  }, [clearAllSessionNewIds])
 
   const loadPage = useCallback(
     async ({ append = false, cursor = null } = {}) => {
@@ -139,8 +152,7 @@ export default function LoungeNotificationsPanel({
           })
         } else {
           setSessionNewIds((prev) => {
-            if (prev.size > 0) return prev
-            const newIds = new Set()
+            const newIds = new Set(prev)
             for (const row of rows) {
               if (!row.read_at) newIds.add(String(row.id))
             }
@@ -168,6 +180,7 @@ export default function LoungeNotificationsPanel({
 
   useEffect(() => {
     markedReadRef.current = false
+    sessionNewSeenRef.current = false
     setSessionNewIds(new Set())
     void loadPage()
     return () => {
@@ -217,6 +230,16 @@ export default function LoungeNotificationsPanel({
     })()
   }, [loading, onUnreadChange, schemaMissing, supabaseClient, viewerUserId])
 
+  useEffect(() => {
+    const el = listScrollRootRef?.current
+    if (!el || loading) return undefined
+    const onScroll = () => {
+      markSessionNewSeen()
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [listScrollRootRef, loading, markSessionNewSeen])
+
   const onLoadMore = useCallback(() => {
     if (loadingMore || !hasMore || items.length === 0) return
     const last = items[items.length - 1]
@@ -233,6 +256,7 @@ export default function LoungeNotificationsPanel({
   const onRowActivate = useCallback(
     (event) => {
       if (!event) return
+      markSessionNewSeen()
       if (event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) {
         onOpenProfile?.({
           user_id: event.actor_user_id,
@@ -252,7 +276,7 @@ export default function LoungeNotificationsPanel({
         if (target) onOpenPost?.(target)
       }
     },
-    [onOpenPost, onOpenProfile],
+    [markSessionNewSeen, onOpenPost, onOpenProfile],
   )
 
   const patchNotificationInteractionEntity = useCallback((kind, entityId, patch) => {
