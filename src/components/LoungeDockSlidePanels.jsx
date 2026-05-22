@@ -48,6 +48,8 @@ import {
   readLoungeSearchSort,
   writeLoungeSearchSort,
 } from '../utils/loungeSearchSortPref.js'
+import { LOUNGE_NOTIFICATION_PREF_ROWS } from '../utils/loungeNotificationPreferencesApi.js'
+
 const OPEN_MS = 300
 const DISMISS_FRACTION = 0.22
 const DISMISS_MIN_PX = 72
@@ -131,6 +133,12 @@ export default function LoungeDockSlidePanels({
   pushNotificationsStatusHint = '',
   pushNotificationsBusy = false,
   pushNotificationsStatusMessage = '',
+  notificationPrefs = null,
+  notificationPrefsLoading = false,
+  notificationPrefsSavingKey = '',
+  notificationPrefsSchemaMissing = false,
+  notificationPrefsError = '',
+  onNotificationPrefToggle,
 }) {
   const panelRef = useRef(null)
   const panelScrollRef = useRef(null)
@@ -161,8 +169,15 @@ export default function LoungeDockSlidePanels({
     onOpenSettingsSection?.('notifications')
   }, [onOpenSettingsSection])
 
+  const [notificationsSettingsOpen, setNotificationsSettingsOpen] = useState(false)
+
+  useEffect(() => {
+    if (openPanel !== 'settings') setNotificationsSettingsOpen(false)
+  }, [openPanel])
+
   useLayoutEffect(() => {
     if (openPanel !== 'settings' || settingsFocusSection !== 'notifications') return
+    setNotificationsSettingsOpen(true)
     const scroller = panelScrollRef.current
     const section = settingsNotificationsSectionRef.current
     if (!scroller || !section) return
@@ -1007,43 +1022,126 @@ export default function LoungeDockSlidePanels({
               ref={settingsNotificationsSectionRef}
               className="mt-6 border-t border-zinc-800 pt-5"
             >
-              <h3 className="text-[15px] font-semibold text-zinc-100">Notifications</h3>
-              <p className="mt-1 text-[13px] leading-relaxed text-zinc-500">
-                Push alerts for likes, replies, and other Lounge activity on this device.
-              </p>
               <button
                 type="button"
-                role="switch"
-                aria-checked={pushNotificationsEnabled}
-                aria-busy={pushNotificationsBusy}
-                disabled={pushNotificationsBusy}
-                onClick={() => onPushNotificationsChange?.(!pushNotificationsEnabled)}
-                className="mt-3 flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-zinc-700/90 bg-zinc-950/80 px-4 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/70 disabled:opacity-70"
+                aria-expanded={notificationsSettingsOpen}
+                onClick={() => setNotificationsSettingsOpen((open) => !open)}
+                className="flex min-h-12 w-full items-start justify-between gap-3 rounded-xl px-1 py-1 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/40"
               >
                 <span className="min-w-0">
-                  <span className="block text-[15px] font-semibold text-zinc-100">Push notifications</span>
-                  <span className="mt-0.5 block text-[12px] font-normal leading-snug text-zinc-500">
-                    {pushNotificationsStatusHint || 'Lounge activity alerts on this device.'}
+                  <span className="block text-[15px] font-semibold text-zinc-100">Notifications</span>
+                  <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
+                    Push on this device and what to alert you about.
                   </span>
-                  {pushNotificationsStatusMessage ? (
-                    <span className="mt-1 block text-[11px] font-normal leading-snug text-cyan-200/85">
-                      {pushNotificationsStatusMessage}
-                    </span>
-                  ) : null}
                 </span>
                 <span
                   aria-hidden
-                  className={`relative h-7 w-11 shrink-0 overflow-hidden rounded-full transition-colors duration-200 ${
-                    pushNotificationsEnabled ? 'bg-cyan-500' : 'bg-zinc-700'
+                  className={`mt-0.5 shrink-0 text-zinc-400 transition-transform duration-200 ${
+                    notificationsSettingsOpen ? 'rotate-180' : 'rotate-0'
                   }`}
                 >
-                  <span
-                    className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${
-                      pushNotificationsEnabled ? 'translate-x-[18px]' : 'translate-x-0'
-                    }`}
-                  />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                    <path
+                      d="M6 9l6 6 6-6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </span>
               </button>
+
+              {notificationsSettingsOpen ? (
+                <div className="mt-2 space-y-2 rounded-xl border border-zinc-800/90 bg-zinc-950/40 p-2">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={pushNotificationsEnabled}
+                    aria-busy={pushNotificationsBusy}
+                    disabled={pushNotificationsBusy}
+                    onClick={() => onPushNotificationsChange?.(!pushNotificationsEnabled)}
+                    className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-zinc-700/90 bg-zinc-950/80 px-3.5 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/70 disabled:opacity-70"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-semibold text-zinc-100">Push notifications</span>
+                      <span className="mt-0.5 block text-[12px] font-normal leading-snug text-zinc-500">
+                        {pushNotificationsStatusHint || 'Lounge activity alerts on this device.'}
+                      </span>
+                      {pushNotificationsStatusMessage ? (
+                        <span className="mt-1 block text-[11px] font-normal leading-snug text-cyan-200/85">
+                          {pushNotificationsStatusMessage}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      aria-hidden
+                      className={`relative h-7 w-11 shrink-0 overflow-hidden rounded-full transition-colors duration-200 ${
+                        pushNotificationsEnabled ? 'bg-cyan-500' : 'bg-zinc-700'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${
+                          pushNotificationsEnabled ? 'translate-x-[18px]' : 'translate-x-0'
+                        }`}
+                      />
+                    </span>
+                  </button>
+
+                  {notificationPrefsSchemaMissing ? (
+                    <p className="px-1.5 text-[12px] leading-relaxed text-zinc-500">
+                      Apply migration{' '}
+                      <span className="font-mono text-zinc-400">20260523170000_lounge_activity_push_h3.sql</span> on
+                      test to save category preferences.
+                    </p>
+                  ) : null}
+                  {notificationPrefsError ? (
+                    <p className="px-1.5 text-[12px] leading-relaxed text-red-300/90">{notificationPrefsError}</p>
+                  ) : null}
+                  {LOUNGE_NOTIFICATION_PREF_ROWS.map((row) => {
+                    const checked = Boolean(notificationPrefs?.[row.key])
+                    const rowBusy = notificationPrefsSavingKey === row.key
+                    const rowDisabled =
+                      row.disabled ||
+                      notificationPrefsLoading ||
+                      notificationPrefsSchemaMissing ||
+                      rowBusy ||
+                      !onNotificationPrefToggle
+                    return (
+                      <button
+                        key={row.key}
+                        type="button"
+                        role="switch"
+                        aria-checked={checked}
+                        aria-busy={rowBusy}
+                        disabled={rowDisabled}
+                        onClick={() => {
+                          if (rowDisabled || row.disabled) return
+                          onNotificationPrefToggle?.(row.key, !checked)
+                        }}
+                        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-zinc-800/90 bg-zinc-950/50 px-3.5 py-2.5 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/60 disabled:opacity-55"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-[14px] font-medium text-zinc-200">{row.label}</span>
+                          <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500">{row.hint}</span>
+                        </span>
+                        <span
+                          aria-hidden
+                          className={`relative h-6 w-10 shrink-0 overflow-hidden rounded-full transition-colors duration-200 ${
+                            checked ? 'bg-cyan-500' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                              checked ? 'translate-x-[16px]' : 'translate-x-0'
+                            }`}
+                          />
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-6 border-t border-zinc-800 pt-5">

@@ -23,19 +23,79 @@ type ActivityEventRow = {
 }
 
 type ActorProfile = {
+  user_id: string
   handle: string | null
   display_name: string | null
 }
 
-function actorLabel(profile: ActorProfile | null): string {
+type NotificationPrefs = {
+  push_replies: boolean
+  push_mentions: boolean
+  push_follows: boolean
+  push_reposts: boolean
+  push_likes: boolean
+  push_bookmarks: boolean
+  push_messages: boolean
+}
+
+type PushBatchRow = {
+  id: string
+  recipient_user_id: string
+  event_type: string
+  post_id: string | null
+  comment_id: string | null
+  sent_at: string | null
+}
+
+function actorDisplayName(profile: ActorProfile | null | undefined): string {
+  const name = String(profile?.display_name || '').trim()
+  if (name) return name
   const handle = String(profile?.handle || '').trim()
-  if (handle) return `@${handle}`
+  if (handle) return handle.startsWith('@') ? handle : `@${handle}`
+  return 'Member'
+}
+
+function actorLabel(profile: ActorProfile | null | undefined): string {
+  const handle = String(profile?.handle || '').trim()
+  if (handle) return `@${handle.replace(/^@/, '')}`
   const name = String(profile?.display_name || '').trim()
   if (name) return name
   return 'Someone'
 }
 
-function actionPhrase(eventType: string, commentId: string | null): string {
+function prefAllows(prefs: NotificationPrefs | null, eventType: string): boolean {
+  if (!prefs) return true
+  switch (eventType) {
+    case 'comment_on_post':
+    case 'reply_to_comment':
+      return prefs.push_replies
+    case 'mention_in_post':
+    case 'mention_in_comment':
+      return prefs.push_mentions
+    case 'follow':
+      return prefs.push_follows
+    case 'repost':
+    case 'quote_repost':
+      return prefs.push_reposts
+    case 'like':
+      return prefs.push_likes
+    case 'bookmark':
+      return prefs.push_bookmarks
+    default:
+      return true
+  }
+}
+
+function groupedTargetPhrase(commentId: string | null, isReply: boolean): string {
+  if (commentId) return isReply ? 'your reply' : 'your comment'
+  return 'your post'
+}
+
+function groupedVerb(eventType: string): string {
+  return eventType === 'bookmark' ? 'bookmarked' : 'liked'
+}
+
+function actionPhrase(eventType: string, commentId: string | null, isReply = false): string {
   switch (eventType) {
     case 'comment_on_post':
       return 'commented on your post'
@@ -52,15 +112,18 @@ function actionPhrase(eventType: string, commentId: string | null): string {
     case 'quote_repost':
       return 'quote reposted your post'
     case 'bookmark':
-      return commentId ? 'bookmarked your comment' : 'bookmarked your post'
+      return commentId ? (isReply ? 'bookmarked your reply' : 'bookmarked your comment') : 'bookmarked your post'
     case 'like':
-      return commentId ? 'liked your comment' : 'liked your post'
+      return commentId ? (isReply ? 'liked your reply' : 'liked your comment') : 'liked your post'
     default:
       return 'interacted with you'
   }
 }
 
-function buildTargetUrl(event: ActivityEventRow, actor: ActorProfile | null): string {
+function buildTargetUrl(
+  event: Pick<ActivityEventRow, 'event_type' | 'post_id'>,
+  actor: ActorProfile | null | undefined,
+): string {
   if (event.event_type === 'follow') {
     const handle = String(actor?.handle || '').trim().replace(/^@/, '').toLowerCase()
     if (handle) return `/?tab=home&u=${encodeURIComponent(handle)}`
@@ -72,18 +135,297 @@ function buildTargetUrl(event: ActivityEventRow, actor: ActorProfile | null): st
   return '/?tab=home&lounge=notifications'
 }
 
-function buildNotification(event: ActivityEventRow, actor: ActorProfile | null): {
-  title: string
-  body: string
-  url: string
-} {
+function buildGroupedBody(
+  eventType: string,
+  actors: ActorProfile[],
+  commentId: string | null,
+  isReply: boolean,
+): string {
+  const targetPhrase = groupedTargetPhrase(commentId, isReply)
+  const verb = groupedVerb(eventType)
+  const leadName = actorDisplayName(actors[0])
+  const othersCount = Math.max(0, actors.length - 1)
+  if (othersCount <= 0) {
+    return `${leadName} ${verb} ${targetPhrase}`
+  }
+  const otherLabel = othersCount === 1 ? '1 other' : `${othersCount} others`
+  return `${leadName} and ${otherLabel} ${verb} ${targetPhrase}`
+}
+
+function buildSingleNotification(
+  event: ActivityEventRow,
+  actor: ActorProfile | null | undefined,
+  isReply = false,
+): { title: string; body: string; url: string } {
   const who = actorLabel(actor)
-  const phrase = actionPhrase(event.event_type, event.comment_id)
+  const phrase = actionPhrase(event.event_type, event.comment_id, isReply)
   return {
     title: 'Edge Lounge',
     body: `${who} ${phrase}`,
     url: buildTargetUrl(event, actor),
   }
+}
+
+async function loadPrefs(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<NotificationPrefs | null> {
+  const { data, error } = await admin
+    .from('notification_preferences')
+    .select('push_replies, push_mentions, push_follows, push_reposts, push_likes, push_bookmarks, push_messages')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return (data as NotificationPrefs | null) || null
+}
+
+async function markBatchSent(admin: ReturnType<typeof createClient>, batchId: string) {
+  await admin
+    .from('activity_push_batches')
+    .update({ sent_at: new Date().toISOString() })
+    .eq('id', batchId)
+    .is('sent_at', null)
+}
+
+async function sendPushToUser(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  notification: { title: string; body: string; url: string },
+  vapidPublicKey: string,
+  vapidPrivateKey: string,
+  vapidSubject: string,
+) {
+  const { data: subscriptions, error: subError } = await admin
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth')
+    .eq('user_id', userId)
+
+  if (subError) throw subError
+  if (!subscriptions || subscriptions.length === 0) {
+    return { sent: 0, failed: 0, removed: 0, message: 'No push subscriptions for recipient.' }
+  }
+
+  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
+
+  let sent = 0
+  let failed = 0
+  let removed = 0
+
+  for (const sub of subscriptions) {
+    const subscription = {
+      endpoint: sub.endpoint,
+      keys: {
+        p256dh: toBase64Url(sub.p256dh),
+        auth: toBase64Url(sub.auth),
+      },
+    }
+    try {
+      await webpush.sendNotification(
+        subscription as { endpoint: string; keys: { p256dh: string; auth: string } },
+        JSON.stringify(notification),
+      )
+      sent += 1
+    } catch (error) {
+      failed += 1
+      const statusCode = (error as { statusCode?: number })?.statusCode
+      if (statusCode === 404 || statusCode === 410) {
+        const { error: deleteError } = await admin
+          .from('push_subscriptions')
+          .delete()
+          .eq('id', sub.id)
+          .eq('user_id', userId)
+        if (!deleteError) removed += 1
+      }
+    }
+  }
+
+  return { sent, failed, removed }
+}
+
+async function handleImmediatePush(
+  admin: ReturnType<typeof createClient>,
+  activityEventId: string,
+  vapidPublicKey: string,
+  vapidPrivateKey: string,
+  vapidSubject: string,
+) {
+  const { data: eventRow, error: eventError } = await admin
+    .from('activity_events')
+    .select('id, recipient_user_id, actor_user_id, event_type, post_id, comment_id, created_at')
+    .eq('id', activityEventId)
+    .maybeSingle()
+
+  if (eventError) throw eventError
+  if (!eventRow) {
+    return new Response(JSON.stringify({ error: 'Activity event not found.' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const event = eventRow as ActivityEventRow
+  const prefs = await loadPrefs(admin, event.recipient_user_id)
+
+  if (!prefAllows(prefs, event.event_type)) {
+    return new Response(
+      JSON.stringify({ sent: 0, failed: 0, removed: 0, skipped: true, reason: 'preference_disabled' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+
+  const { data: actorProfile, error: actorError } = await admin
+    .from('profiles')
+    .select('user_id, handle, display_name')
+    .eq('user_id', event.actor_user_id)
+    .maybeSingle()
+
+  if (actorError) throw actorError
+
+  let isReply = false
+  if (event.comment_id) {
+    const { data: commentRow } = await admin
+      .from('feed_comments')
+      .select('parent_comment_id')
+      .eq('id', event.comment_id)
+      .maybeSingle()
+    isReply = Boolean(commentRow?.parent_comment_id)
+  }
+
+  const notification = buildSingleNotification(
+    event,
+    (actorProfile as ActorProfile | null) || null,
+    isReply,
+  )
+
+  const result = await sendPushToUser(
+    admin,
+    event.recipient_user_id,
+    notification,
+    vapidPublicKey,
+    vapidPrivateKey,
+    vapidSubject,
+  )
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+async function handleBatchPush(
+  admin: ReturnType<typeof createClient>,
+  batchId: string,
+  vapidPublicKey: string,
+  vapidPrivateKey: string,
+  vapidSubject: string,
+) {
+  const { data: batchRow, error: batchError } = await admin
+    .from('activity_push_batches')
+    .select('id, recipient_user_id, event_type, post_id, comment_id, sent_at')
+    .eq('id', batchId)
+    .maybeSingle()
+
+  if (batchError) throw batchError
+  if (!batchRow) {
+    return new Response(JSON.stringify({ error: 'Push batch not found.' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const batch = batchRow as PushBatchRow
+  if (batch.sent_at) {
+    return new Response(JSON.stringify({ sent: 0, failed: 0, removed: 0, skipped: true, reason: 'already_sent' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const prefs = await loadPrefs(admin, batch.recipient_user_id)
+  if (!prefAllows(prefs, batch.event_type)) {
+    await markBatchSent(admin, batchId)
+    return new Response(
+      JSON.stringify({ sent: 0, failed: 0, removed: 0, skipped: true, reason: 'preference_disabled' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+
+  const { data: links, error: linksError } = await admin
+    .from('activity_push_batch_events')
+    .select('activity_event_id')
+    .eq('batch_id', batchId)
+
+  if (linksError) throw linksError
+
+  const eventIds = (links || []).map((row) => row.activity_event_id).filter(Boolean)
+  if (eventIds.length === 0) {
+    await markBatchSent(admin, batchId)
+    return new Response(JSON.stringify({ sent: 0, failed: 0, removed: 0, skipped: true, reason: 'empty_batch' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { data: events, error: eventsError } = await admin
+    .from('activity_events')
+    .select('id, recipient_user_id, actor_user_id, event_type, post_id, comment_id, created_at')
+    .in('id', eventIds)
+    .order('created_at', { ascending: true })
+
+  if (eventsError) throw eventsError
+
+  const eventList = (events || []) as ActivityEventRow[]
+  const actorIds = [...new Set(eventList.map((row) => row.actor_user_id).filter(Boolean))]
+
+  const { data: profiles, error: profilesError } = await admin
+    .from('profiles')
+    .select('user_id, handle, display_name')
+    .in('user_id', actorIds)
+
+  if (profilesError) throw profilesError
+
+  const profileByUser = new Map<string, ActorProfile>()
+  for (const profile of (profiles || []) as ActorProfile[]) {
+    profileByUser.set(profile.user_id, profile)
+  }
+
+  const uniqueActors: ActorProfile[] = []
+  const seenActors = new Set<string>()
+  for (const row of eventList) {
+    const uid = row.actor_user_id
+    if (!uid || seenActors.has(uid)) continue
+    seenActors.add(uid)
+    uniqueActors.push(profileByUser.get(uid) || { user_id: uid, handle: null, display_name: null })
+  }
+
+  let isReply = false
+  if (batch.comment_id) {
+    const { data: commentRow } = await admin
+      .from('feed_comments')
+      .select('parent_comment_id')
+      .eq('id', batch.comment_id)
+      .maybeSingle()
+    isReply = Boolean(commentRow?.parent_comment_id)
+  }
+
+  const body = buildGroupedBody(batch.event_type, uniqueActors, batch.comment_id, isReply)
+  const notification = {
+    title: 'Edge Lounge',
+    body,
+    url: buildTargetUrl(batch, uniqueActors[0] || null),
+  }
+
+  const result = await sendPushToUser(
+    admin,
+    batch.recipient_user_id,
+    notification,
+    vapidPublicKey,
+    vapidPrivateKey,
+    vapidSubject,
+  )
+
+  await markBatchSent(admin, batchId)
+
+  return new Response(JSON.stringify({ ...result, batched: true, actorCount: uniqueActors.length }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 }
 
 Deno.serve(async (req) => {
@@ -124,8 +466,15 @@ Deno.serve(async (req) => {
         : typeof body?.activity_event_id === 'string'
           ? body.activity_event_id.trim()
           : ''
-    if (!activityEventId) {
-      return new Response(JSON.stringify({ error: 'Missing activityEventId.' }), {
+    const batchId =
+      typeof body?.batchId === 'string'
+        ? body.batchId.trim()
+        : typeof body?.batch_id === 'string'
+          ? body.batch_id.trim()
+          : ''
+
+    if (!activityEventId && !batchId) {
+      return new Response(JSON.stringify({ error: 'Missing activityEventId or batchId.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -133,87 +482,11 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceRoleKey)
 
-    const { data: eventRow, error: eventError } = await admin
-      .from('activity_events')
-      .select('id, recipient_user_id, actor_user_id, event_type, post_id, comment_id, created_at')
-      .eq('id', activityEventId)
-      .maybeSingle()
-
-    if (eventError) throw eventError
-    if (!eventRow) {
-      return new Response(JSON.stringify({ error: 'Activity event not found.' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    if (batchId) {
+      return await handleBatchPush(admin, batchId, vapidPublicKey, vapidPrivateKey, vapidSubject)
     }
 
-    const event = eventRow as ActivityEventRow
-
-    const { data: actorProfile, error: actorError } = await admin
-      .from('profiles')
-      .select('handle, display_name')
-      .eq('user_id', event.actor_user_id)
-      .maybeSingle()
-
-    if (actorError) throw actorError
-
-    const notification = buildNotification(event, (actorProfile as ActorProfile | null) || null)
-
-    const { data: subscriptions, error: subError } = await admin
-      .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth')
-      .eq('user_id', event.recipient_user_id)
-
-    if (subError) throw subError
-    if (!subscriptions || subscriptions.length === 0) {
-      return new Response(
-        JSON.stringify({
-          sent: 0,
-          failed: 0,
-          removed: 0,
-          message: 'No push subscriptions for recipient.',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-
-    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
-
-    let sent = 0
-    let failed = 0
-    let removed = 0
-
-    for (const sub of subscriptions) {
-      const subscription = {
-        endpoint: sub.endpoint,
-        keys: {
-          p256dh: toBase64Url(sub.p256dh),
-          auth: toBase64Url(sub.auth),
-        },
-      }
-      try {
-        await webpush.sendNotification(
-          subscription as { endpoint: string; keys: { p256dh: string; auth: string } },
-          JSON.stringify(notification),
-        )
-        sent += 1
-      } catch (error) {
-        failed += 1
-        const statusCode = (error as { statusCode?: number })?.statusCode
-        if (statusCode === 404 || statusCode === 410) {
-          const { error: deleteError } = await admin
-            .from('push_subscriptions')
-            .delete()
-            .eq('id', sub.id)
-            .eq('user_id', event.recipient_user_id)
-          if (!deleteError) removed += 1
-        }
-      }
-    }
-
-    return new Response(JSON.stringify({ sent, failed, removed }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return await handleImmediatePush(admin, activityEventId, vapidPublicKey, vapidPrivateKey, vapidSubject)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected error'
     return new Response(JSON.stringify({ error: message }), {

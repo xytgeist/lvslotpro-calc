@@ -23,7 +23,12 @@ supabase functions deploy lounge-send-activity-push
 
 ## Database (test)
 
-Apply migration **`20260523160000_lounge_activity_events_push.sql`**, then create Vault secrets (SQL Editor, once per project):
+Apply migrations in order:
+
+- **`20260523160000_lounge_activity_events_push.sql`** — immediate push trigger
+- **`20260523170000_lounge_activity_push_h3.sql`** — batched like/bookmark (10s debounce), `notification_preferences`, cron flush
+
+Then create Vault secrets (SQL Editor, once per project):
 
 ```sql
 select vault.create_secret('YOUR_PUSH_SECRET', 'lounge_activity_push_http_secret');
@@ -37,9 +42,14 @@ select vault.create_secret('YOUR_LEGACY_ANON_JWT', 'lounge_activity_push_supabas
 
 ## Client
 
-Lounge **Settings → Notifications → Push notifications** uses the shared **`push_subscriptions`** table (same device subscription as Offers). Toggle off unsubscribes this device.
+Lounge **Settings → Notifications**:
 
-Push tap targets:
+- **Push notifications** — device master toggle (`push_subscriptions` + localStorage)
+- **Notify me about** — per-category prefs in `notification_preferences` (account-wide)
+
+Like/bookmark pushes are **debounced 10 seconds** and **grouped** (`@a and 4 others liked your post`). Replies, mentions, follows, and reposts stay **immediate**.
+
+Tap targets:
 
 - **Follow** → `/?tab=home&u=<handle>`
 - **Post activity** → `/?tab=home&post=<uuid>`

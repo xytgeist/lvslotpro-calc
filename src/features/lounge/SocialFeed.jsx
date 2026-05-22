@@ -66,6 +66,7 @@ import {
   loungeActivityUnreadCount,
 } from '../../utils/loungeActivityApi.js'
 import useLoungePushNotifications from './hooks/useLoungePushNotifications.js'
+import useLoungeNotificationPreferences from './hooks/useLoungeNotificationPreferences.js'
 import {
   readLoungeProfileCache,
   writeLoungeProfileCache,
@@ -4697,6 +4698,18 @@ export default function SocialFeed({
     pushStatusMessage: loungePushStatusMessage,
     onPushToggle: onLoungePushToggle,
   } = useLoungePushNotifications({
+    supabaseClient,
+    viewerUserId: composerUserId || '',
+  })
+
+  const {
+    notificationPrefs: loungeNotificationPrefs,
+    notificationPrefsLoading: loungeNotificationPrefsLoading,
+    notificationPrefsSavingKey: loungeNotificationPrefsSavingKey,
+    notificationPrefsSchemaMissing: loungeNotificationPrefsSchemaMissing,
+    notificationPrefsError: loungeNotificationPrefsError,
+    onNotificationPrefToggle: onLoungeNotificationPrefToggle,
+  } = useLoungeNotificationPreferences({
     supabaseClient,
     viewerUserId: composerUserId || '',
   })
@@ -10551,6 +10564,12 @@ export default function SocialFeed({
           pushNotificationsStatusHint={loungePushStatusHint}
           pushNotificationsBusy={loungePushBusy}
           pushNotificationsStatusMessage={loungePushStatusMessage}
+          notificationPrefs={loungeNotificationPrefs}
+          notificationPrefsLoading={loungeNotificationPrefsLoading}
+          notificationPrefsSavingKey={loungeNotificationPrefsSavingKey}
+          notificationPrefsSchemaMissing={loungeNotificationPrefsSchemaMissing}
+          notificationPrefsError={loungeNotificationPrefsError}
+          onNotificationPrefToggle={onLoungeNotificationPrefToggle}
         />
       ) : null}
 
