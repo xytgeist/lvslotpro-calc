@@ -52,7 +52,7 @@ export function syncLoungeFeedVideoDebugFromUrl() {
 
 /**
  * Dev HUD for Stream autoplay coordinator + tile media state.
- * Enable via Settings → Feed playback, or `?loungeVideoDebug=1` (persists in localStorage).
+ * Enable via Settings → Feed playback (staff only), or `?loungeVideoDebug=1` (persists in localStorage).
  */
 export function readLoungeFeedVideoDebugEnabled() {
   if (typeof window === 'undefined') return false

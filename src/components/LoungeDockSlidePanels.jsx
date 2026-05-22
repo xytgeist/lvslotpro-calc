@@ -112,6 +112,10 @@ export default function LoungeDockSlidePanels({
   onFeedVideoAutoplayChange,
   feedVideoDebugEnabled = false,
   onFeedVideoDebugChange,
+  /** Staff-only (admin/moderator): Settings developer toggles. */
+  settingsViewerIsStaff = false,
+  buildBadgeEnabled = false,
+  onBuildBadgeChange,
   /** When true (e.g. FAB long-press), block scroll-region hits so gestures don’t fight the dock. */
   blockUnderlyingPointer = false,
   /** Scroll-linked 0–1 reveal for `LoungeDockArcCarouselPrototype` (same curve as panel title bar). */
@@ -694,7 +698,10 @@ export default function LoungeDockSlidePanels({
         <div className="flex items-center justify-between gap-2 px-3 py-2">
           <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
           <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
-            <TitleBarStatusLine loading={communityFeedLoading} />
+            <TitleBarStatusLine
+              loading={communityFeedLoading}
+              showBuildBadge={settingsViewerIsStaff && buildBadgeEnabled}
+            />
             {titleBarNavSlot}
             <button
               type="button"
@@ -801,7 +808,7 @@ export default function LoungeDockSlidePanels({
             ) : (
               <LoungeFeedVideoAutoplayProvider
                 scrollRootRef={panelScrollRef}
-                showDebugHud={feedVideoDebugEnabled && openPanel === 'search'}
+                showDebugHud={settingsViewerIsStaff && feedVideoDebugEnabled && openPanel === 'search'}
               >
                 <LoungeFeedCoordinatorSuspendBinder suspended={videoCoordinatorSuspended} />
                 <LoungeStreamLightboxProvider ctx={searchLightboxCtx}>
@@ -1003,6 +1010,8 @@ export default function LoungeDockSlidePanels({
                   />
                 </span>
               </button>
+              {settingsViewerIsStaff ? (
+                <>
               <button
                 type="button"
                 role="switch"
@@ -1029,6 +1038,34 @@ export default function LoungeDockSlidePanels({
                   />
                 </span>
               </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={buildBadgeEnabled}
+                onClick={() => onBuildBadgeChange?.(!buildBadgeEnabled)}
+                className="mt-2 flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-zinc-700/90 bg-zinc-950/80 px-4 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/70"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-zinc-100">Build SHA in title bar</span>
+                  <span className="mt-0.5 block text-[12px] font-normal leading-snug text-zinc-500">
+                    Shows the deployed git SHA next to the EDGE logo so you can confirm which bundle is live.
+                  </span>
+                </span>
+                <span
+                  aria-hidden
+                  className={`relative h-7 w-11 shrink-0 rounded-full transition-colors duration-200 ${
+                    buildBadgeEnabled ? 'bg-amber-500' : 'bg-zinc-700'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${
+                      buildBadgeEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                    }`}
+                  />
+                </span>
+              </button>
+                </>
+              ) : null}
             </div>
 
             <div className="mt-6 border-t border-zinc-800 pt-5">

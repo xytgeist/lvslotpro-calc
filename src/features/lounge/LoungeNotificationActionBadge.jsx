@@ -67,19 +67,17 @@ function IconReply({ slot }) {
   const cls = glyphClass(slot)
   return (
     <IconShell slot={slot}>
-      <svg className={`${cls} text-cyan-300`} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <svg
+        className={`${cls} text-cyan-400 ${LOUNGE_COMMENT_GLYPH_Y_SCALE_CLASS}`}
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden
+      >
         <path
-          d="M6.5 11.5L4 14v-3.25A4.25 4.25 0 014.75 6.5h10.5a4.25 4.25 0 014.25 4.25v.5"
+          d={LOUNGE_COMMENT_BUBBLE_D}
+          fill="#fafafa"
           stroke="currentColor"
-          strokeWidth="1.35"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M7.5 11.5H4.5l2.25-2.25"
-          stroke="currentColor"
-          strokeWidth="1.35"
-          strokeLinecap="round"
+          strokeWidth="1.25"
           strokeLinejoin="round"
         />
       </svg>

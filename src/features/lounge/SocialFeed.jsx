@@ -201,6 +201,11 @@ import {
   subscribeLoungeFeedVideoDebugEnabled,
   writeLoungeFeedVideoDebugEnabled,
 } from '../../utils/loungeFeedVideoDebugPref.js'
+import {
+  readLoungeBuildBadgeEnabled,
+  subscribeLoungeBuildBadgeEnabled,
+  writeLoungeBuildBadgeEnabled,
+} from '../../utils/loungeBuildBadgePref.js'
 import { LOUNGE_FEED_SCOPE_ALL, LOUNGE_FEED_SCOPE_FOLLOWING } from '../../utils/loungeFeedScope'
 import { LOUNGE_FEED_SORT } from '../../utils/loungeFeedSortPref'
 import LoungeFeedSortSwitch from './LoungeFeedSortSwitch.jsx'
@@ -758,22 +763,14 @@ export default function SocialFeed({
     writeLoungeFeedVideoDebugEnabled(enabled)
   }, [])
 
-  const loungeFeedVideoDebugHudOnFeed =
-    loungeFeedVideoDebugEnabled &&
-    !loungePostDetail?.id &&
-    loungeDockPanel !== 'search' &&
-    !profileModalOpen &&
-    profileOverlayStack.length === 0
-  const loungeProfileVideoDebugHud =
-    loungeFeedVideoDebugEnabled &&
-    !loungePostDetail?.id &&
-    !loungeDockPanel &&
-    (profileModalOpen || profileOverlayStack.length > 0)
-
-  // ── @mention autocomplete — one instance per composer ──────────────────────
-  const mentionComposer = useMentionState(postText, supabaseClient, !loungeReadOnly)
-  const mentionDetailComment = useMentionState(loungeDetailCommentDraft, supabaseClient, !loungeReadOnly)
-  const mentionQuoteRepost = useMentionState(quoteRepostDraft, supabaseClient, !loungeReadOnly)
+  const loungeBuildBadgeEnabled = useSyncExternalStore(
+    subscribeLoungeBuildBadgeEnabled,
+    readLoungeBuildBadgeEnabled,
+    () => false,
+  )
+  const onLoungeBuildBadgeChange = useCallback((enabled) => {
+    writeLoungeBuildBadgeEnabled(enabled)
+  }, [])
 
   const loungeViewerIsStaff = useMemo(() => {
     const r = composerUserProfile?.role
@@ -784,6 +781,29 @@ export default function SocialFeed({
     () => String(composerUserProfile?.role || '').toLowerCase() === 'admin',
     [composerUserProfile?.role],
   )
+
+  const loungeStaffToolsEnabled = Boolean(isStaff || loungeViewerIsStaff)
+
+  const loungeTitleBarShowBuildBadge = loungeStaffToolsEnabled && loungeBuildBadgeEnabled
+
+  const loungeFeedVideoDebugHudOnFeed =
+    loungeStaffToolsEnabled &&
+    loungeFeedVideoDebugEnabled &&
+    !loungePostDetail?.id &&
+    loungeDockPanel !== 'search' &&
+    !profileModalOpen &&
+    profileOverlayStack.length === 0
+  const loungeProfileVideoDebugHud =
+    loungeStaffToolsEnabled &&
+    loungeFeedVideoDebugEnabled &&
+    !loungePostDetail?.id &&
+    !loungeDockPanel &&
+    (profileModalOpen || profileOverlayStack.length > 0)
+
+  // ── @mention autocomplete — one instance per composer ──────────────────────
+  const mentionComposer = useMentionState(postText, supabaseClient, !loungeReadOnly)
+  const mentionDetailComment = useMentionState(loungeDetailCommentDraft, supabaseClient, !loungeReadOnly)
+  const mentionQuoteRepost = useMentionState(quoteRepostDraft, supabaseClient, !loungeReadOnly)
 
   const chatDockIsStaff = Boolean(isStaff || loungeViewerIsStaff)
 
@@ -8086,7 +8106,10 @@ export default function SocialFeed({
           <div className={`flex items-center justify-between gap-3 ${LOUNGE_FEED_TITLE_BAR_ROW_CLASS}`}>
             <EdgeLogoWithEasterEgg className="h-6 w-auto max-w-[min(140px,calc(100vw-9rem))] shrink-0 object-contain object-left" />
             <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
-              <TitleBarStatusLine loading={communityFeedLoading} />
+              <TitleBarStatusLine
+                loading={communityFeedLoading}
+                showBuildBadge={loungeTitleBarShowBuildBadge}
+              />
               {titleBarNavSlot}
             </div>
           </div>
@@ -9024,7 +9047,11 @@ export default function SocialFeed({
             >
               <LoungeFeedVideoAutoplayProvider
                 scrollRootRef={loungePostDetailScrollRef}
-                showDebugHud={loungeFeedVideoDebugEnabled && Boolean(loungePostDetail?.id)}
+                showDebugHud={
+                  loungeStaffToolsEnabled &&
+                  loungeFeedVideoDebugEnabled &&
+                  Boolean(loungePostDetail?.id)
+                }
               >
               <LoungeFeedInlineSoundResetBinder resetRef={resetPostDetailInlineSoundRef} />
               <div
@@ -10449,6 +10476,9 @@ export default function SocialFeed({
           onFeedVideoAutoplayChange={onLoungeFeedVideoAutoplayChange}
           feedVideoDebugEnabled={loungeFeedVideoDebugEnabled}
           onFeedVideoDebugChange={onLoungeFeedVideoDebugChange}
+          settingsViewerIsStaff={loungeStaffToolsEnabled}
+          buildBadgeEnabled={loungeBuildBadgeEnabled}
+          onBuildBadgeChange={onLoungeBuildBadgeChange}
           onTitleRevealChange={onLoungePanelTitleReveal}
           videoCoordinatorSuspended={Boolean(loungePostDetail?.id)}
         />

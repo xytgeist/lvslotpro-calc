@@ -495,7 +495,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 - 2026-05-18: **Profile permalink `/u/:handle` (test):** **`loungeSharePost.js`**, **`api/lounge-profile-og.js`**, **`SocialFeed.jsx`** deep link. Ryan sign-off **PASSED** @ **`7ce7b44`** (Phase C sign-off).
 
-- 2026-05-18: **Title bar build badge (test):** **`TitleBarStatusLine.jsx`** — git SHA when **`import.meta.env.DEV`** or **`VITE_SHOW_BUILD_BADGE=true`**.
+- 2026-05-18: **Title bar build badge (test):** **`TitleBarStatusLine.jsx`** + **`loungeBuildBadgePref.js`** — git SHA when staff (admin/moderator) enables **Settings → Build SHA in title bar** (local dev always). Persists in `localStorage` `loungeBuildBadge:v1`. **Video debug HUD** toggle is staff-only too.
 
 - 2026-05-19: **Per-tile inline sound (test):** removed feed-wide `feedInlineSoundUnmuted` from **`LoungeFeedVideoAutoplayContext.jsx`**; **`LoungePostStreamVideo.jsx`** Tap for sound unmutes **this clip only** (autoplay handoffs stay muted; sound resets when tile loses active). Removed **`LoungeFeedInlineSoundResetBinder`** from **`SocialFeed.jsx`**. Ryan sign-off **pending**. **`loungeFeedVideoAutoplayStore.js`** — `{prev, active, next}` ring (max 3 decoders), visibility handoff thresholds, flinger idle 200ms, **hero lock** (ring → hero tile only), coordinator suspend when post detail open. **`LoungePostStreamVideo.jsx`** + **`LoungeFeedVideoAutoplayContext.jsx`** — feed-wide Tap for sound + 60%/40% audio bands; hero-first resource budget on expand.
 
