@@ -4737,6 +4737,15 @@ export default function SocialFeed({
     return () => window.clearInterval(id)
   }, [composerUserId, loungeFeedBrowseMode, refreshLoungeNotificationsUnread])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onActivityArrived = () => {
+      void refreshLoungeNotificationsUnread()
+    }
+    window.addEventListener('lounge-activity-arrived', onActivityArrived)
+    return () => window.removeEventListener('lounge-activity-arrived', onActivityArrived)
+  }, [refreshLoungeNotificationsUnread])
+
   const {
     pushPrefEnabled: loungePushPrefEnabled,
     pushBusy: loungePushBusy,

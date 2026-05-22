@@ -6,14 +6,16 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
-self.addEventListener('push', (event) => {
-  let payload = {}
-  try {
-    payload = event.data ? event.data.json() : {}
-  } catch {
-    payload = { body: event.data ? event.data.text() : '' }
-  }
+function isLoungeActivityPushPayload(payload) {
+  if (!payload || payload.eventStartAt) return false
+  return Boolean(
+    payload.activityEventId ||
+      payload.activityBatchId ||
+      payload.title === 'Edge Lounge',
+  )
+}
 
+function buildPushNotificationContent(payload) {
   const title = payload.title || 'Edge'
   let body = payload.body || 'You have a new notification.'
   if (payload.eventStartAt) {
@@ -28,18 +30,73 @@ self.addEventListener('push', (event) => {
       }
     }
   }
-  const options = {
+  return {
+    title,
     body,
     icon: payload.icon || '/android-icon-192x192.png',
     badge: payload.badge || '/favicon-32x32.png',
-    data: {
-      url: payload.url || '/?tab=home',
-      activityEventId: payload.activityEventId || null,
-      activityBatchId: payload.activityBatchId || null,
-    },
+    url: payload.url || '/?tab=home',
+    activityEventId: payload.activityEventId || null,
+    activityBatchId: payload.activityBatchId || null,
+  }
+}
+
+async function deliverLoungeActivityInApp(clients, content) {
+  const message = {
+    type: 'lounge-activity-inapp',
+    title: content.title,
+    body: content.body,
+    url: content.url,
+    activityEventId: content.activityEventId,
+    activityBatchId: content.activityBatchId,
+    icon: content.icon,
+  }
+  const focused = clients.filter((client) => client.focused)
+  const targets = focused.length > 0 ? focused : clients
+  for (const client of targets) {
+    if (typeof client.postMessage === 'function') {
+      client.postMessage(message)
+    }
+  }
+}
+
+self.addEventListener('push', (event) => {
+  let payload = {}
+  try {
+    payload = event.data ? event.data.json() : {}
+  } catch {
+    payload = { body: event.data ? event.data.text() : '' }
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  const content = buildPushNotificationContent(payload)
+  const loungeActivity = isLoungeActivityPushPayload(payload)
+
+  event.waitUntil(
+    (async () => {
+      if (loungeActivity) {
+        const clients = await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true,
+        })
+        const hasFocusedClient = clients.some((client) => client.focused)
+        if (hasFocusedClient) {
+          await deliverLoungeActivityInApp(clients, content)
+          return
+        }
+      }
+
+      await self.registration.showNotification(content.title, {
+        body: content.body,
+        icon: content.icon,
+        badge: content.badge,
+        data: {
+          url: content.url,
+          activityEventId: content.activityEventId,
+          activityBatchId: content.activityBatchId,
+        },
+      })
+    })(),
+  )
 })
 
 function parseAppNavigateMessage(relativeUrl, extra = {}) {

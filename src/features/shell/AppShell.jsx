@@ -30,6 +30,13 @@ import {
 import { syncLoungeFeedVideoDebugFromUrl } from '../../utils/loungeFeedVideoDebugPref.js'
 import LoungeAppSplash from '../../components/LoungeAppSplash.jsx'
 import { useLoungeColdBootSplash } from '../lounge/useLoungeColdBootSplash.js'
+import LoungeActivityInAppToast from '../lounge/LoungeActivityInAppToast.jsx'
+import {
+  loungeActivityInAppPayloadFromMessage,
+  navigateFromLoungeActivityPayload,
+} from '../../utils/loungeActivityInAppNavigate.js'
+
+const LOUNGE_ACTIVITY_INAPP_TOAST_MS = 7000
 
 const SocialFeed = lazy(() => import('../lounge/SocialFeed.jsx'))
 const OffersCalendar = lazy(() => import('../offers/OffersCalendar.jsx'))
@@ -106,6 +113,66 @@ export default function AppShell({
   const globalConfirmResolverRef = useRef(null)
   const onRequireAuthRef = useRef(onRequireAuth)
   onRequireAuthRef.current = onRequireAuth
+  const [loungeActivityInAppToast, setLoungeActivityInAppToast] = useState(null)
+  const loungeActivityInAppToastTimerRef = useRef(0)
+
+  const dismissLoungeActivityInAppToast = useCallback(() => {
+    try {
+      window.clearTimeout(loungeActivityInAppToastTimerRef.current)
+    } catch {
+      // ignore
+    }
+    loungeActivityInAppToastTimerRef.current = 0
+    setLoungeActivityInAppToast(null)
+  }, [])
+
+  const showLoungeActivityInAppToast = useCallback(
+    (payload) => {
+      if (browseMode === 'anonymous' || !payload?.body) return
+      setLoungeActivityInAppToast(payload)
+      try {
+        window.clearTimeout(loungeActivityInAppToastTimerRef.current)
+      } catch {
+        // ignore
+      }
+      loungeActivityInAppToastTimerRef.current = window.setTimeout(() => {
+        loungeActivityInAppToastTimerRef.current = 0
+        setLoungeActivityInAppToast(null)
+      }, LOUNGE_ACTIVITY_INAPP_TOAST_MS)
+      window.dispatchEvent(new CustomEvent('lounge-activity-arrived', { detail: payload }))
+    },
+    [browseMode],
+  )
+
+  const openLoungeActivityInAppToast = useCallback(
+    (payload) => {
+      dismissLoungeActivityInAppToast()
+      const { activityEventId, activityBatchId } = navigateFromLoungeActivityPayload(payload, {
+        onTabHome: () => {
+          setTab('home')
+          setMenuOpen(false)
+        },
+      })
+      if (activityEventId || activityBatchId) {
+        window.dispatchEvent(
+          new CustomEvent('lounge-push-opened', {
+            detail: { activityEventId, activityBatchId },
+          }),
+        )
+      }
+    },
+    [dismissLoungeActivityInAppToast],
+  )
+
+  useEffect(() => {
+    return () => {
+      try {
+        window.clearTimeout(loungeActivityInAppToastTimerRef.current)
+      } catch {
+        // ignore
+      }
+    }
+  }, [])
 
   const closeGlobalConfirm = useCallback((result) => {
     const resolver = globalConfirmResolverRef.current
@@ -567,6 +634,11 @@ export default function AppShell({
         setTab('offers')
         return
       }
+      if (type === 'lounge-activity-inapp') {
+        const payload = loungeActivityInAppPayloadFromMessage(event?.data)
+        if (payload) showLoungeActivityInAppToast(payload)
+        return
+      }
       if (type !== 'app-navigate') return
       const targetTab = event?.data?.tab
       if (targetTab === 'offers') {
@@ -593,7 +665,7 @@ export default function AppShell({
     }
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
     return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
-  }, [browseMode])
+  }, [browseMode, showLoungeActivityInAppToast])
 
   const openCalculator = (key) => {
     if (browseMode === 'anonymous') {
@@ -919,6 +991,14 @@ export default function AppShell({
         </div>
       ) : null}
       {renderTabContent()}
+
+      {loungeActivityInAppToast ? (
+        <LoungeActivityInAppToast
+          toast={loungeActivityInAppToast}
+          onDismiss={dismissLoungeActivityInAppToast}
+          onOpen={openLoungeActivityInAppToast}
+        />
+      ) : null}
 
       {splashVisible ? <LoungeAppSplash dismissing={splashDismissing} /> : null}
 
