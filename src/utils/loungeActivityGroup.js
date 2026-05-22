@@ -95,8 +95,10 @@ function newestEventInGroup(groupEvents) {
   })[0]
 }
 
+const GROUP_MIN_ACTORS = 3
+
 /**
- * Collapse like/bookmark rows that share the same target when 2+ unique actors appear
+ * Collapse like/bookmark rows that share the same target when 3+ unique actors appear
  * in the loaded page. Preserves overall newest-first order.
  * @param {Array<object>} events
  * @returns {Array<{ type: 'single', event: object } | { type: 'grouped', event: object, actors: object[], firstActor: object, othersCount: number, eventIds: string[], groupKey: string }>}
@@ -121,9 +123,9 @@ export function buildLoungeActivityDisplayRows(events) {
     const key = loungeActivityGroupKey(event)
     const bucket = key ? buckets.get(key) : null
 
-    if (bucket && bucket.length >= 2) {
+    if (bucket && bucket.length >= GROUP_MIN_ACTORS) {
       const actors = uniqueActorsChronological(bucket)
-      if (actors.length < 2) {
+      if (actors.length < GROUP_MIN_ACTORS) {
         rows.push({ type: 'single', event })
         continue
       }

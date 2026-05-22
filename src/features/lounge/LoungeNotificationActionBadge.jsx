@@ -1,5 +1,6 @@
 import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import {
+  LOUNGE_NOTIFICATION_ACTION_AVATAR_GLYPH_CLASS,
   LOUNGE_NOTIFICATION_ACTION_AVATAR_SLOT_CLASS,
   LOUNGE_NOTIFICATION_ACTION_SLOT_CLASS,
 } from './loungeFeedAvatar.js'
@@ -16,7 +17,7 @@ const REPOST_ARROWS_D =
 
 function glyphClass(slot) {
   if (slot === 'avatar') {
-    return 'h-8 w-8'
+    return LOUNGE_NOTIFICATION_ACTION_AVATAR_GLYPH_CLASS
   }
   return slot === 'lead' ? 'h-7 w-7' : 'h-[18px] w-[18px]'
 }
@@ -115,8 +116,7 @@ function IconFollow({ slot }) {
 }
 
 function IconLike({ slot }) {
-  const cls =
-    slot === 'avatar' ? 'h-9 w-9' : glyphClass(slot)
+  const cls = glyphClass(slot)
   return (
     <IconShell slot={slot}>
       <LoungeFlameIcon className={`${cls} text-zinc-200`} liked readOnly={false} />
@@ -162,7 +162,11 @@ function IconQuoteRepost({ slot }) {
 
 function IconBookmark({ slot }) {
   const cls =
-    slot === 'avatar' ? 'h-9 w-9' : slot === 'lead' ? 'h-8 w-8' : 'h-[22px] w-[22px]'
+    slot === 'avatar'
+      ? LOUNGE_NOTIFICATION_ACTION_AVATAR_GLYPH_CLASS
+      : slot === 'lead'
+        ? 'h-8 w-8'
+        : 'h-[22px] w-[22px]'
   return (
     <IconShell slot={slot}>
       <svg className={`${cls} text-lv-yellow`} viewBox="0 0 20 20" fill="none" aria-hidden>

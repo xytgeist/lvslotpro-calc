@@ -215,14 +215,14 @@ export default function LoungeNotificationsPanel({
             }
           }}
           aria-label={actionPhrase}
-          className={`${LOUNGE_FEED_POST_ROW_CLASS} flex w-full cursor-pointer items-start gap-3 text-left touch-manipulation ${
+          className={`${LOUNGE_FEED_POST_ROW_CLASS} flex w-full cursor-pointer items-center gap-3 text-left touch-manipulation ${
             isNew ? 'bg-cyan-950/20 active:bg-cyan-950/35' : ''
           }`}
         >
           <LoungeNotificationActionBadge eventType={event.event_type} slot="avatar" />
           <span className={`min-w-0 flex-1 ${LOUNGE_FEED_POST_ROW_INNER_CLASS}`}>
             <div className={LOUNGE_FEED_META_TEXT_COLUMN_CLASS}>
-              <div className={`${LOUNGE_FEED_META_ROW_CLASS} gap-2`}>
+              <div className={LOUNGE_FEED_META_ROW_CLASS}>
                 <LoungeNotificationActorStack
                   actors={actors}
                   onOpenProfile={(actor) =>
@@ -236,14 +236,15 @@ export default function LoungeNotificationsPanel({
                     })
                   }
                 />
-                {when ? (
-                  <span className={`${LOUNGE_FEED_META_HANDLE_TIME_CLASS} min-w-0`}>
-                    <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">{when}</span>
-                  </span>
-                ) : null}
               </div>
-              <span className="mt-0.5 block min-w-0 text-[15px] leading-snug text-zinc-400">
-                {actionPhrase}
+              <span className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-1 text-[15px] leading-snug text-zinc-400">
+                <span className="min-w-0">{actionPhrase}</span>
+                {when ? (
+                  <>
+                    <span className="shrink-0 text-zinc-600">·</span>
+                    <span className="shrink-0 font-normal tabular-nums whitespace-nowrap">{when}</span>
+                  </>
+                ) : null}
               </span>
               {previewText ? (
                 <p
