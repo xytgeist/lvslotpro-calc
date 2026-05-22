@@ -204,9 +204,9 @@ export default function LoungeNotificationsPanel({
     const previewPosterUrl = showContext ? String(event.preview_poster_url || '').trim() : ''
     const groupedTintClass =
       event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.LIKE
-        ? 'bg-gradient-to-r from-lv-red/14 via-lv-red/6 to-transparent'
+        ? 'bg-gradient-to-r from-lv-red/28 via-lv-red/12 to-transparent'
         : event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK
-          ? 'bg-gradient-to-r from-lv-yellow/12 via-lv-yellow/5 to-transparent'
+          ? 'bg-gradient-to-r from-lv-yellow/24 via-lv-yellow/10 to-transparent'
           : ''
 
     return (
