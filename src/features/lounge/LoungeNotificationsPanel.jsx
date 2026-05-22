@@ -175,9 +175,8 @@ export default function LoungeNotificationsPanel({
     }
   }, [loadPage])
 
-  useEffect(() => {
-    const pp = notificationPostCardProps
-    if (!pp || items.length === 0) return
+  /** Stable id sets only — avoid re-hydrating when like_count patches replace `items`. */
+  const notificationInteractionIdsKey = useMemo(() => {
     const postIds = new Set()
     const commentIds = new Set()
     for (const event of items) {
@@ -188,9 +187,21 @@ export default function LoungeNotificationsPanel({
         commentIds.add(String(event.comment_id))
       }
     }
-    if (postIds.size > 0) void pp.refreshPostInteractions?.([...postIds])
-    if (commentIds.size > 0) void pp.hydrateCommentInteractionsForIds?.([...commentIds])
-  }, [items, notificationPostCardProps])
+    return `${[...postIds].sort().join(',')}|${[...commentIds].sort().join(',')}`
+  }, [items])
+
+  const notificationPostCardPropsRef = useRef(notificationPostCardProps)
+  notificationPostCardPropsRef.current = notificationPostCardProps
+
+  useEffect(() => {
+    const pp = notificationPostCardPropsRef.current
+    if (!pp || !viewerUserId || notificationInteractionIdsKey === '|') return
+    const [postPart, commentPart] = notificationInteractionIdsKey.split('|')
+    const postIds = postPart ? postPart.split(',').filter(Boolean) : []
+    const commentIds = commentPart ? commentPart.split(',').filter(Boolean) : []
+    if (postIds.length > 0) void pp.refreshPostInteractions?.(postIds)
+    if (commentIds.length > 0) void pp.hydrateCommentInteractionsForIds?.(commentIds)
+  }, [notificationInteractionIdsKey, viewerUserId])
 
   useEffect(() => {
     if (!viewerUserId || !supabaseClient || schemaMissing || markedReadRef.current) return
