@@ -271,6 +271,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - Source: `src/features/profiles/profileGate.js`, `LoungeProfileFullScreen.jsx`, `SocialFeed.jsx`, `GuidesScreen.jsx`.
   - Test validation: pick taken handle → dialog + **Use @…_1**; reserved handle (e.g. `@admin`) → reserved copy + suggestion. Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18).
 
+- [ ] **Repost cleanup when original post deleted (test build):** migration **`20260524100000_community_feed_posts_repost_on_original_delete.sql`** — **`repost_target_unavailable`** on quote reposts; **BEFORE DELETE** trigger removes plain repost feed cards and marks quote embeds unavailable; tombstone UI **`LoungePostOriginalUnavailableEmbed.jsx`**. Apply on test; smoke: create plain + quote repost → delete original → plain row gone, quote shows **This post was deleted.** Ryan sign-off pending.
+
 - [x] Lounge feed media + repost UX (test)
   - Change: Feed/detail carousels reset to **first slide** when post **re-enters viewport** (`LoungePostFeedMedia.jsx`); **repost** uses **anchored popover** above the control including reposted-state actions (`LoungePostArticle.jsx`, `SocialFeed.jsx`); quote composer textarea sizing aligned with main composer; image-cap modal from picker/quote flows.
   - Source: files above.
@@ -386,9 +388,9 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
     21. **Lounge notifications (Phase H1):** apply migrations **`20260522120000_lounge_activity_events_phase_h1.sql`** through **`20260523150000_lounge_activity_events_like.sql`** on test — comment, reply, @mention, follow, repost, quote repost, bookmark, **like** on post/comment → bell badge + Alerts row + avatar action badge; tap → post detail / profile / repost card as appropriate. *(Ryan smoke pending.)*
     21b. **Lounge web push (Phase H2):** apply **`20260523160000_lounge_activity_events_push.sql`**, **`20260523180000_lounge_activity_mark_push_opened.sql`**, deploy **`lounge-send-activity-push`**, set Edge + Vault secrets — Settings → Push notifications ON (browser allow) → second account triggers like/comment/follow → OS notification; tap opens post/profile/notifications and **FAB/Alerts badge clears immediately**. Toggle OFF unsubscribes device. *(Ryan **PASSED** on test @ **`25adae1`**.)*
     21c. **Lounge push batching + prefs (Phase H3):** apply **`20260523170000_lounge_activity_push_h3.sql`**, redeploy Edge — rapid likes on same post → **one** grouped push after ~10s; Settings category toggles (mute likes, keep replies); replies/mentions still immediate. *(Ryan smoke pending.)*
-    21d. **Lounge foreground in-app toast:** hard-refresh / update **`push-sw.js`** on device — with app tab **focused**, second account triggers like/comment → **in-app banner** (no OS notification); FAB badge bumps immediately; tap banner opens post/profile. Minimize app or switch away → OS push still fires. Offers push unchanged. Tap push or in-app toast → target opens and **badges clear**. Alerts row tap → same. *(Ryan smoke pending.)*
+    21d. **Lounge foreground in-app toast + per-tap mark read:** hard-refresh / update **`push-sw.js`** on device — with app tab **focused**, second account triggers like/comment → **in-app banner** (no OS notification); FAB badge bumps immediately; tap banner opens post/profile. Minimize app or switch away → OS push still fires. Offers push unchanged. Tap push or in-app toast → target opens and **only that notification** marks read (badge −1). Alerts row tap → same. *(Ryan **PASSED** on test @ **`dcc3852`**.)*
   - **Sign-off:** Manual steps above passed on **test** (operator confirmation after latest `test` deploy).
-  - **Sign-off (Phase G search full stack, 2026-05-21, Ryan):** Migrations **`20260518160000`**–**`20260520190000`** applied on test; smoke **§16** **PASSED** (comments, highlight/recent/about, Top/Latest, **`@handle` keyword**, relevance ranking).
+  - **Sign-off (Lounge in-app toast + per-tap mark read, 2026-05-23, Ryan):** Smoke **§21d** **PASSED** on **test** @ **`dcc3852`** — foreground banner vs OS push; push/in-app tap marks single notification read; badge decrements correctly.
   - **Sign-off (Phase E Relevant comment ranking + post-detail comment UX, 2026-05-21, Ryan):** Smoke **§19** **PASSED** on **test** @ **`f40ff0e`** — score + decay **Relevant** sort; stable list order on like/unlike; comment unlike glyph hydration fix.
   - **Sign-off (Stream lightbox author badges + feed sound platform split, 2026-05-21, Ryan):** Lightbox admin/mod/OG badges match feed meta row @ **`07676a0`**; Android feed-wide sound + iOS per-tile unmute @ **`f42f20a`** — **PASSED** on fresh test deploy.
   - **Sign-off (Phase G search + lightbox + posters + comment repost, 2026-05-19, Ryan):** Smoke **§16** + **§17**; Stream poster **WebP on R2** (new upload + delete @ **`93dcc3f`**); comment-repost / thread nav (**`b782e69`**) — **PASSED** on **test**.
@@ -412,7 +414,11 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ## Update log
 
-- 2026-05-23: **Lounge foreground in-app toast (client):** **`push-sw.js`** routes focused-tab Lounge activity pushes to **`AppShell`** banner (**`LoungeActivityInAppToast.jsx`**) instead of OS notification; **`lounge-activity-arrived`** refreshes FAB/Alerts badge. Smoke **§21d** pending (SW update on device).
+- 2026-05-24: **Repost cleanup on original delete (client + SQL build):** migration **`20260524100000_community_feed_posts_repost_on_original_delete.sql`** — plain repost cards deleted via trigger; quote reposts kept with **`repost_target_unavailable`** + **`LoungePostOriginalUnavailableEmbed`** in feed/detail. Apply on test; smoke pending Ryan sign-off.
+
+- 2026-05-23: **Lounge in-app toast + per-tap mark read (Ryan sign-off, test):** foreground banner, push/in-app tap marks single event read, badge −1 — smoke **§21d** **PASSED** @ **`dcc3852`**.
+
+- 2026-05-23: **Lounge foreground in-app toast (client):** **`push-sw.js`** routes focused-tab Lounge activity pushes to **`AppShell`** banner (**`LoungeActivityInAppToast.jsx`**) instead of OS notification; **`lounge-activity-arrived`** refreshes FAB/Alerts badge. Per-tap mark read @ **`dcc3852`**.
 
 - 2026-05-23: **Push tap clears notification badges (Ryan sign-off, test):** migration **`20260523180000`** + Edge redeploy — tap marks read; FAB/Alerts badge drops immediately. Smoke **§21b** **PASSED** @ **`25adae1`**.
 

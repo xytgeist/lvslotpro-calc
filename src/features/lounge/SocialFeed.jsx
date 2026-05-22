@@ -26,7 +26,9 @@ import {
   feedPostDisplayCaption,
   feedPostMediaUpdatePayload,
   feedPostStreamVideoUid,
+  isQuoteRepostPost,
   normalizeFeedCaption,
+  quoteRepostOriginalUnavailable,
 } from '../../utils/communityFeedPost'
 import {
   feedCommentAuthorEditMediaSeed,
@@ -115,6 +117,7 @@ import LoungeMentionDropdown from './LoungeMentionDropdown'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
+import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
 import {
   LoungeStreamLightboxProvider,
   buildLoungeStreamLightboxCtxFromPostCardProps,
@@ -4535,7 +4538,7 @@ export default function SocialFeed({
         const { data } = await supabaseClient
           .from('community_feed_posts')
           .select(
-            'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
+            'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
           )
           .eq('id', post.id)
           .is('hidden_at', null)
@@ -4592,7 +4595,7 @@ export default function SocialFeed({
         const { data } = await supabaseClient
           .from('community_feed_posts')
           .select(
-            'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
+            'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
           )
           .eq('id', repostedComment.post_id)
           .is('hidden_at', null)
@@ -9458,7 +9461,7 @@ export default function SocialFeed({
                     )
                   })()}
                 </div>
-              ) : loungePostDetail.reposted_post ? (
+              ) : isQuoteRepostPost(loungePostDetail) ? (
                 <>
                   {feedPostDisplayCaption(loungePostDetail) ? (
                     <div
@@ -9493,6 +9496,13 @@ export default function SocialFeed({
                     />
                   </div>
                   <div className={LOUNGE_COMMENT_DETAIL_THREAD_PAD}>
+                    {quoteRepostOriginalUnavailable(loungePostDetail) ? (
+                      <LoungePostOriginalUnavailableEmbed
+                        post={loungePostDetail}
+                        className="mt-3"
+                        variant="detail"
+                      />
+                    ) : loungePostDetail.reposted_post ? (
                     <button
                       type="button"
                       data-lounge-original-embed
@@ -9535,6 +9545,7 @@ export default function SocialFeed({
                       streamLightboxSurface={loungeDetailStreamLightboxSurface}
                     />
                     </button>
+                    ) : null}
                   </div>
                 </>
               ) : (

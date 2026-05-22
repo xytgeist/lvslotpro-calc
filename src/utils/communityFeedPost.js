@@ -20,6 +20,20 @@ export function feedPostDisplayCaption(row) {
   return ''
 }
 
+/** Quote repost feed row (not plain post/comment repost). */
+export function isQuoteRepostPost(post) {
+  if (!post || post.is_plain_repost === true || post.repost_of_comment_id) return false
+  return Boolean(post.repost_of_post_id || post.repost_target_unavailable === true)
+}
+
+/** Embedded original missing (deleted, hidden, or not hydrated). */
+export function quoteRepostOriginalUnavailable(post) {
+  if (!isQuoteRepostPost(post)) return false
+  if (post.repost_target_unavailable === true) return true
+  if (post.repost_of_post_id && !post.reposted_post) return true
+  return false
+}
+
 /**
  * Post IDs whose like/repost/bookmark state must be hydrated for feed/profile cards.
  * Plain repost rows show "You reposted" on the repost card but `LoungePostArticle` binds

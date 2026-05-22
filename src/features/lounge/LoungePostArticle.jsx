@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
+import { feedPostDisplayCaption, isQuoteRepostPost, quoteRepostOriginalUnavailable } from '../../utils/communityFeedPost'
 import { renderRichCaption } from './loungeCaption'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
@@ -7,6 +7,7 @@ import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
 import LoungeOgBadge from './LoungeOgBadge'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
+import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
   LOUNGE_FEED_AVATAR_CLASS,
@@ -112,6 +113,7 @@ export default function LoungePostArticle({
   // ── Plain repost type detection ──────────────────────────────────────────
   const isPlainPostRepost = post?.is_plain_repost === true && post?.reposted_post != null
   const isCommentRepost = post?.is_plain_repost === true && post?.reposted_comment != null
+  const isQuoteRepost = isQuoteRepostPost(post)
   // The "display" entity (what we show as the card's main content / author)
   const displayPost = isPlainPostRepost ? post.reposted_post : post
   const rc = isCommentRepost ? post.reposted_comment : null
@@ -430,8 +432,8 @@ export default function LoungePostArticle({
               {...mediaLightboxProps}
             />
           </>
-        ) : post.reposted_post ? (
-          // Quote repost: reposter's caption + embedded original card
+        ) : isQuoteRepost ? (
+          // Quote repost: reposter's caption + embedded original (or unavailable placeholder)
           <>
             {feedPostDisplayCaption(post) ? (
               <div
@@ -453,6 +455,9 @@ export default function LoungePostArticle({
               }
               {...mediaLightboxProps}
             />
+            {quoteRepostOriginalUnavailable(post) ? (
+              <LoungePostOriginalUnavailableEmbed post={post} />
+            ) : post.reposted_post ? (
             <div
               role="button"
               tabIndex={0}
@@ -498,6 +503,7 @@ export default function LoungePostArticle({
                 {...mediaLightboxProps}
               />
             </div>
+            ) : null}
           </>
         ) : (
           // Regular post
