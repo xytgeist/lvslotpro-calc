@@ -14,8 +14,8 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data ? event.data.text() : '' }
   }
 
-  const title = payload.title || 'Edge Reminder'
-  let body = payload.body || 'You have an upcoming event.'
+  const title = payload.title || 'Edge'
+  let body = payload.body || 'You have a new notification.'
   if (payload.eventStartAt) {
     const dt = new Date(payload.eventStartAt)
     if (!Number.isNaN(dt.getTime())) {
@@ -33,18 +33,26 @@ self.addEventListener('push', (event) => {
     icon: payload.icon || '/android-icon-192x192.png',
     badge: payload.badge || '/favicon-32x32.png',
     data: {
-      url: payload.url || '/?tab=offers',
+      url: payload.url || '/?tab=home',
     },
   }
 
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
+function parseAppNavigateMessage(relativeUrl) {
+  const fullUrl = new URL(relativeUrl, self.location.origin).href
+  const params = new URL(fullUrl).searchParams
+  const tab = params.get('tab') || 'home'
+  return { type: 'app-navigate', url: relativeUrl, tab }
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const relative = typeof event.notification?.data?.url === 'string' ? event.notification.data.url : '/?tab=offers'
+  const relative =
+    typeof event.notification?.data?.url === 'string' ? event.notification.data.url : '/?tab=home'
   const fullUrl = new URL(relative, self.location.origin).href
-  const openOffersMessage = { type: 'offers-open-tab' }
+  const navigateMessage = parseAppNavigateMessage(relative)
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
       for (const client of clients) {
@@ -52,7 +60,7 @@ self.addEventListener('notificationclick', (event) => {
         try {
           await client.focus()
           if (typeof client.postMessage === 'function') {
-            client.postMessage(openOffersMessage)
+            client.postMessage(navigateMessage)
           }
           if ('navigate' in client && typeof client.navigate === 'function') {
             try {

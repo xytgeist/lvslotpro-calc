@@ -321,6 +321,8 @@ export default function LoungeDockArcCarouselPrototype({
   menuLayout = 'wheel',
   /** Reserve bottom viewport space (e.g. Lounge upload bar) so the FAB does not cover controls. */
   bottomObstacleInsetPx = 0,
+  /** Unread in-app notifications — FAB badge clears on menu expand; Alerts item clears on panel visit. */
+  notificationsUnreadCount = 0,
 }) {
   const panelCompactChrome = panelChrome != null && PANEL_CHROME_PANELS.has(panelChrome)
   const isCornerL = menuLayout === 'cornerL'
@@ -341,6 +343,17 @@ export default function LoungeDockArcCarouselPrototype({
   const followingItemCenterRef = useRef(/** @type {{ x: number, y: number } | null} */ (null))
   /** One-time overlay after first menu open: long-press drag to move FAB. */
   const [repositionCoachOpen, setRepositionCoachOpen] = useState(false)
+  /** FAB (+) badge dismissed when menu expands; Alerts icon keeps count until notifications panel opens. */
+  const [fabNotifBadgeDismissed, setFabNotifBadgeDismissed] = useState(false)
+  const notificationsUnreadPrevRef = useRef(notificationsUnreadCount)
+
+  const expandMenu = useCallback(() => {
+    setFabNotifBadgeDismissed(true)
+    setOpen(true)
+  }, [])
+
+  const fabNotifBadgeCount =
+    !fabNotifBadgeDismissed && notificationsUnreadCount > 0 ? notificationsUnreadCount : 0
 
   const fabHostRef = useRef(null)
   const fabDragRef = useRef(null)
@@ -561,6 +574,16 @@ export default function LoungeDockArcCarouselPrototype({
   useEffect(() => {
     openRef.current = open
   }, [open])
+
+  useEffect(() => {
+    const prev = notificationsUnreadPrevRef.current
+    if (notificationsUnreadCount === 0) {
+      setFabNotifBadgeDismissed(false)
+    } else if (notificationsUnreadCount > prev && !openRef.current) {
+      setFabNotifBadgeDismissed(false)
+    }
+    notificationsUnreadPrevRef.current = notificationsUnreadCount
+  }, [notificationsUnreadCount])
 
   useEffect(() => {
     if (!open) backdropGestureRef.current = null
@@ -1047,7 +1070,7 @@ export default function LoungeDockArcCarouselPrototype({
         }
       }
       resetWheelToHomeAnchor()
-      setOpen(true)
+      expandMenu()
       if (!readLoungeDockFabRepositionCoachDismissed()) {
         setRepositionCoachOpen(true)
       }
@@ -1063,6 +1086,7 @@ export default function LoungeDockArcCarouselPrototype({
       viewport.height,
       snapFabToBottomCornerForDropSide,
       totalBottomObstaclePx,
+      expandMenu,
     ],
   )
 
@@ -1657,6 +1681,14 @@ export default function LoungeDockArcCarouselPrototype({
           >
             +
           </span>
+          {fabNotifBadgeCount > 0 ? (
+            <span
+              className="pointer-events-none absolute -right-0.5 -top-0.5 z-[2] flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#fd262d] px-1 text-[10px] font-bold leading-none text-white"
+              aria-hidden
+            >
+              {fabNotifBadgeCount > 99 ? '99+' : fabNotifBadgeCount}
+            </span>
+          ) : null}
         </button>
       </div>
 

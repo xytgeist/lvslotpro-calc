@@ -13,3 +13,7 @@ verify_jwt = false
 # Lounge chat: JWT required (default); explicit for clarity alongside purge exception above.
 [functions.lounge-chat]
 verify_jwt = true
+
+# Invoked from pg_net on activity_events INSERT; shared secret header (see migration + README).
+[functions.lounge-send-activity-push]
+verify_jwt = false

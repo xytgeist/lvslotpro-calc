@@ -13,7 +13,7 @@ function emit() {
   })
 }
 
-/** Notifications panel — Lounge push opt-in (default on until user turns off). */
+/** Lounge Settings push opt-in (default on). Device subscription lives in push_subscriptions. */
 export function readLoungePushNotificationsEnabled() {
   if (typeof window === 'undefined') return true
   try {

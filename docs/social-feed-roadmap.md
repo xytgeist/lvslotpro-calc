@@ -251,10 +251,10 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 
 ## Phase H - Activity + notification preferences + push
 
-- **Shipped (H1 in-app slice, test build 2026-05-22):** `activity_events` + emit triggers through **`20260523150000_lounge_activity_events_like.sql`** (comment, reply, mention, follow, repost, quote, bookmark, like). Client: **`LoungeNotificationsPanel.jsx`**, avatar **action badges** (bottom-right). Ryan smoke **§21** pending after SQL apply. Batched like grouping / push / prefs still open (H2/H3).
-- `notification_preferences` per user (or short-term metadata fallback).
-- Push hooks for mentions/replies/comments/batched likes.
-- Cron/edge schedule for batching.
+- **Shipped (H1 in-app slice, test build 2026-05-22):** `activity_events` + emit triggers through **`20260523150000_lounge_activity_events_like.sql`** (comment, reply, mention, follow, repost, quote, bookmark, like). Client: **`LoungeNotificationsPanel.jsx`**, avatar **action badges** (bottom-right). Ryan smoke **§21** pending after SQL apply.
+- **Shipped (H2 push slice, test build 2026-05-23):** Settings **Push notifications** toggle → shared **`useWebPushNotifications`** / **`push_subscriptions`**; Edge **`lounge-send-activity-push`** + migration **`20260523160000_lounge_activity_events_push.sql`** (pg_net on `activity_events` INSERT). Push tap → Lounge post/profile/notifications via **`push-sw.js`**. Device opt-out = unsubscribe. Ryan smoke **§21b** pending (SQL + Edge deploy + Vault secrets).
+- `notification_preferences` per user (or short-term metadata fallback) — still open for per-type mutes.
+- Batched like push grouping + cron/edge schedule for batching — still open (H3).
 
 ---
 

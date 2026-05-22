@@ -558,12 +558,29 @@ export default function AppShell({
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator?.serviceWorker) return
     const handleServiceWorkerMessage = (event) => {
-      if (event?.data?.type !== 'offers-open-tab') return
-      if (browseMode === 'anonymous') {
-        onRequireAuthRef.current?.()
+      const type = event?.data?.type
+      if (type === 'offers-open-tab') {
+        if (browseMode === 'anonymous') {
+          onRequireAuthRef.current?.()
+          return
+        }
+        setTab('offers')
         return
       }
-      setTab('offers')
+      if (type !== 'app-navigate') return
+      const targetTab = event?.data?.tab
+      if (targetTab === 'offers') {
+        if (browseMode === 'anonymous') {
+          onRequireAuthRef.current?.()
+          return
+        }
+        setTab('offers')
+        return
+      }
+      if (targetTab === 'home' || !targetTab) {
+        setTab('home')
+        setMenuOpen(false)
+      }
     }
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
     return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)

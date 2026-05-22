@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { loungePostInteractionScore } from '../utils/communityFeedPost'
 import EdgeLogoWithEasterEgg from './EdgeLogoWithEasterEgg.jsx'
 import TitleBarStatusLine from './TitleBarStatusLine.jsx'
@@ -48,12 +48,6 @@ import {
   readLoungeSearchSort,
   writeLoungeSearchSort,
 } from '../utils/loungeSearchSortPref.js'
-import {
-  readLoungePushNotificationsEnabled,
-  subscribeLoungePushNotificationsEnabled,
-  writeLoungePushNotificationsEnabled,
-} from '../utils/loungePushNotificationsPref.js'
-
 const OPEN_MS = 300
 const DISMISS_FRACTION = 0.22
 const DISMISS_MIN_PX = 72
@@ -132,6 +126,11 @@ export default function LoungeDockSlidePanels({
   initialSearchQuery = '',
   /** Freeze search scroll-root autoplay when post/comment detail is open over the panel. */
   videoCoordinatorSuspended = false,
+  pushNotificationsEnabled = true,
+  onPushNotificationsChange,
+  pushNotificationsStatusHint = '',
+  pushNotificationsBusy = false,
+  pushNotificationsStatusMessage = '',
 }) {
   const panelRef = useRef(null)
   const panelScrollRef = useRef(null)
@@ -157,15 +156,6 @@ export default function LoungeDockSlidePanels({
   const [panelTitleReveal, setPanelTitleReveal] = useState(1)
   const panelScrollPrevTopRef = useRef(0)
   const panelScrollVisualRafRef = useRef(0)
-
-  const pushNotificationsEnabled = useSyncExternalStore(
-    subscribeLoungePushNotificationsEnabled,
-    readLoungePushNotificationsEnabled,
-    () => true,
-  )
-  const onPushNotificationsChange = useCallback((enabled) => {
-    writeLoungePushNotificationsEnabled(enabled)
-  }, [])
 
   const onOpenNotificationSettings = useCallback(() => {
     onOpenSettingsSection?.('notifications')
@@ -1025,14 +1015,21 @@ export default function LoungeDockSlidePanels({
                 type="button"
                 role="switch"
                 aria-checked={pushNotificationsEnabled}
-                onClick={() => onPushNotificationsChange(!pushNotificationsEnabled)}
-                className="mt-3 flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-zinc-700/90 bg-zinc-950/80 px-4 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/70"
+                aria-busy={pushNotificationsBusy}
+                disabled={pushNotificationsBusy}
+                onClick={() => onPushNotificationsChange?.(!pushNotificationsEnabled)}
+                className="mt-3 flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-zinc-700/90 bg-zinc-950/80 px-4 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/70 disabled:opacity-70"
               >
                 <span className="min-w-0">
                   <span className="block text-[15px] font-semibold text-zinc-100">Push notifications</span>
                   <span className="mt-0.5 block text-[12px] font-normal leading-snug text-zinc-500">
-                    Off until browser permission and delivery are wired up.
+                    {pushNotificationsStatusHint || 'Lounge activity alerts on this device.'}
                   </span>
+                  {pushNotificationsStatusMessage ? (
+                    <span className="mt-1 block text-[11px] font-normal leading-snug text-cyan-200/85">
+                      {pushNotificationsStatusMessage}
+                    </span>
+                  ) : null}
                 </span>
                 <span
                   aria-hidden

@@ -59,11 +59,13 @@ import {
   shareLoungePostHybrid,
   stripLoungePostQueryParam,
   stripLoungeProfileShareFromUrl,
+  stripLoungeDockQueryParam,
 } from '../../utils/loungeSharePost'
 import {
   isLoungeActivitySchemaMissingError,
   loungeActivityUnreadCount,
 } from '../../utils/loungeActivityApi.js'
+import useLoungePushNotifications from './hooks/useLoungePushNotifications.js'
 import {
   readLoungeProfileCache,
   writeLoungeProfileCache,
@@ -4688,6 +4690,17 @@ export default function SocialFeed({
     return () => window.clearInterval(id)
   }, [composerUserId, loungeFeedBrowseMode, refreshLoungeNotificationsUnread])
 
+  const {
+    pushPrefEnabled: loungePushPrefEnabled,
+    pushBusy: loungePushBusy,
+    pushStatusHint: loungePushStatusHint,
+    pushStatusMessage: loungePushStatusMessage,
+    onPushToggle: onLoungePushToggle,
+  } = useLoungePushNotifications({
+    supabaseClient,
+    viewerUserId: composerUserId || '',
+  })
+
   const onLoungeNotificationsUnreadChange = useCallback((n) => {
     setLoungeNotificationsUnread(Number.isFinite(n) && n > 0 ? Math.floor(n) : 0)
   }, [])
@@ -4908,6 +4921,33 @@ export default function SocialFeed({
       window.removeEventListener('popstate', onPop)
     }
   }, [communityPosts, hydrateCommunityPosts, openLoungePostDetail, setCommunityPosts, supabaseClient])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let cancelled = false
+    const run = () => {
+      const params = new URLSearchParams(window.location.search || '')
+      const loungePanel = (params.get('lounge') || '').trim().toLowerCase()
+      if (loungePanel !== 'notifications') return
+      if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
+        onRequireAuth?.()
+        stripLoungeDockQueryParam()
+        return
+      }
+      window.requestAnimationFrame(() => {
+        if (cancelled) return
+        setLoungeDockPanel('notifications')
+        stripLoungeDockQueryParam()
+      })
+    }
+    run()
+    const onPop = () => run()
+    window.addEventListener('popstate', onPop)
+    return () => {
+      cancelled = true
+      window.removeEventListener('popstate', onPop)
+    }
+  }, [loungeFeedBrowseMode, loungeReadOnly, onRequireAuth])
 
   const loungePostDetailOpenedOverSearch = Boolean(
     loungePostDetail?.id &&
@@ -8168,6 +8208,7 @@ export default function SocialFeed({
           panelChrome={loungeDockPanel}
           menuLayout={loungeDockMenuLayout}
           onPointerBlockChange={setLoungeFabPointerBlocked}
+          notificationsUnreadCount={loungeNotificationsUnread}
         />
       ) : null}
 
@@ -10505,6 +10546,11 @@ export default function SocialFeed({
           onBuildBadgeChange={onLoungeBuildBadgeChange}
           onTitleRevealChange={onLoungePanelTitleReveal}
           videoCoordinatorSuspended={Boolean(loungePostDetail?.id)}
+          pushNotificationsEnabled={loungePushPrefEnabled}
+          onPushNotificationsChange={onLoungePushToggle}
+          pushNotificationsStatusHint={loungePushStatusHint}
+          pushNotificationsBusy={loungePushBusy}
+          pushNotificationsStatusMessage={loungePushStatusMessage}
         />
       ) : null}
 

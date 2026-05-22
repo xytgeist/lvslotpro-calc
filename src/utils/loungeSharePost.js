@@ -112,6 +112,17 @@ export function stripLoungeProfileShareFromUrl() {
   window.history.replaceState(window.history.state ?? {}, '', next)
 }
 
+/** Remove `lounge=` dock panel deep link after the panel opens. */
+export function stripLoungeDockQueryParam() {
+  if (typeof window === 'undefined') return
+  const u = new URL(window.location.href)
+  if (!u.searchParams.has('lounge')) return
+  u.searchParams.delete('lounge')
+  const qs = u.searchParams.toString()
+  const next = `${u.pathname}${qs ? `?${qs}` : ''}${u.hash}`
+  window.history.replaceState(window.history.state ?? {}, '', next)
+}
+
 /**
  * Prefer `navigator.share` when allowed; otherwise copy `url` to the clipboard.
  * User cancel / dismiss of the native sheet → `AbortError` → no `onCopied` / `onCopyFailed`.
