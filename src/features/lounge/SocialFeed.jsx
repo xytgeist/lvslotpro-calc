@@ -8252,19 +8252,6 @@ export default function SocialFeed({
           style={{ height: loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56 }}
         />
 
-        <div
-          className="overflow-hidden transition-[max-height,opacity] duration-200"
-          style={{ maxHeight: pullRefreshing || pullDistance > 0 ? '2.25rem' : '0rem', opacity: pullRefreshing || pullDistance > 0 ? 1 : 0 }}
-        >
-          <div className="px-3 py-1 text-center text-[13px] text-zinc-400">
-            {pullRefreshing
-              ? 'Refreshing lounge…'
-              : pullDistance >= pullRefreshThresholdPx
-                ? 'Release to refresh'
-                : 'Pull down to refresh'}
-          </div>
-        </div>
-
         {loungeReadOnly ? null : postErr ? (
           <div className="shrink-0 border-b border-rose-500/25 bg-zinc-950/90 px-3 py-2">
             <div className="rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[15px] leading-snug text-rose-200">
@@ -8725,6 +8712,19 @@ export default function SocialFeed({
         ) : null}
         </div>
         )}
+
+        <div
+          className="overflow-hidden transition-[max-height,opacity] duration-200"
+          style={{ maxHeight: pullRefreshing || pullDistance > 0 ? '2.25rem' : '0rem', opacity: pullRefreshing || pullDistance > 0 ? 1 : 0 }}
+        >
+          <div className="px-3 py-1 text-center text-[13px] text-zinc-400">
+            {pullRefreshing
+              ? 'Refreshing lounge…'
+              : pullDistance >= pullRefreshThresholdPx
+                ? 'Release to refresh'
+                : 'Pull down to refresh'}
+          </div>
+        </div>
 
         {composerDiscardPromptOpen ? (
           <div
