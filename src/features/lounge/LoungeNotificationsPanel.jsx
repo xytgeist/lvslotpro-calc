@@ -3,6 +3,8 @@ import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungeNotificationActionBadge from './LoungeNotificationActionBadge.jsx'
 import LoungeNotificationActorStack from './LoungeNotificationActorStack.jsx'
 import LoungeNotificationInteractionBar from './LoungeNotificationInteractionBar.jsx'
+import LoungePullRefreshZone from './LoungePullRefreshZone.jsx'
+import { useLoungePullToRefresh } from './useLoungePullToRefresh.js'
 import {
   LOUNGE_FEED_CAPTION_TEXT_CLASS,
   LOUNGE_FEED_DISPLAY_NAME_CLASS,
@@ -112,8 +114,16 @@ export default function LoungeNotificationsPanel({
   const [err, setErr] = useState('')
   const [schemaMissing, setSchemaMissing] = useState(false)
   const [hasMore, setHasMore] = useState(false)
+  const [pullRefreshing, setPullRefreshing] = useState(false)
   const markedReadRef = useRef(false)
   const fetchSeqRef = useRef(0)
+  const pullRefreshZoneRef = useRef(null)
+  const pullPostsWrapRef = useRef(null)
+  const pullIndicatorOverlayRef = useRef(null)
+  const pullIndicatorWrapRef = useRef(null)
+  const pullArrowRef = useRef(null)
+  const pullSpinnerRef = useRef(null)
+  const pullAriaRef = useRef(null)
   /** Unread at fetch time — cyan rail until inbox is seen (mark-all-read) or the row is opened. */
   const [sessionNewIds, setSessionNewIds] = useState(() => new Set())
 
@@ -129,16 +139,16 @@ export default function LoungeNotificationsPanel({
   }, [clearAllSessionNewIds])
 
   const loadPage = useCallback(
-    async ({ append = false, cursor = null } = {}) => {
+    async ({ append = false, cursor = null, silent = false } = {}) => {
       if (!viewerUserId || !supabaseClient) {
         setItems([])
-        setLoading(false)
+        if (!silent) setLoading(false)
         setHasMore(false)
         return
       }
       const seq = ++fetchSeqRef.current
       if (append) setLoadingMore(true)
-      else setLoading(true)
+      else if (!silent) setLoading(true)
       setErr('')
       try {
         let rows = await loungeActivityEventsPage(supabaseClient, {
@@ -181,12 +191,31 @@ export default function LoungeNotificationsPanel({
         }
       } finally {
         if (seq !== fetchSeqRef.current) return
-        setLoading(false)
-        setLoadingMore(false)
+        if (append) setLoadingMore(false)
+        else if (!silent) setLoading(false)
       }
     },
     [supabaseClient, viewerUserId],
   )
+
+  const refreshNotifications = useCallback(async () => {
+    await loadPage({ append: false, silent: true })
+  }, [loadPage])
+
+  useLoungePullToRefresh({
+    scrollRootRef: listScrollRootRef,
+    pullZoneRef: pullRefreshZoneRef,
+    pullPostsWrapRef,
+    pullIndicatorOverlayRef,
+    pullIndicatorWrapRef,
+    pullArrowRef,
+    pullSpinnerRef,
+    pullAriaRef,
+    onRefresh: refreshNotifications,
+    enabled: Boolean(viewerUserId && listScrollRootRef),
+    pullRefreshing,
+    setPullRefreshing,
+  })
 
   useEffect(() => {
     markedReadRef.current = false
@@ -703,7 +732,16 @@ export default function LoungeNotificationsPanel({
         </button>
       </div>
 
-      {loading ? (
+      <LoungePullRefreshZone
+        pullRefreshZoneRef={pullRefreshZoneRef}
+        pullIndicatorOverlayRef={pullIndicatorOverlayRef}
+        pullIndicatorWrapRef={pullIndicatorWrapRef}
+        pullArrowRef={pullArrowRef}
+        pullSpinnerRef={pullSpinnerRef}
+        pullAriaRef={pullAriaRef}
+        pullPostsWrapRef={pullPostsWrapRef}
+      >
+      {loading && !pullRefreshing ? (
         <p className="mt-4 text-[14px] text-zinc-500">Loading…</p>
       ) : err ? (
         <p className="mt-4 text-[14px] text-red-300">{err}</p>
@@ -722,13 +760,14 @@ export default function LoungeNotificationsPanel({
           <button
             type="button"
             onClick={onLoadMore}
-            disabled={loadingMore}
+            disabled={loadingMore || pullRefreshing}
             className="mx-auto flex min-h-10 items-center justify-center rounded-xl border border-zinc-700/90 bg-zinc-900/70 px-5 text-[14px] font-medium text-zinc-200 touch-manipulation hover:border-zinc-600 hover:bg-zinc-800/80 disabled:opacity-60 [-webkit-tap-highlight-color:transparent]"
           >
             {loadingMore ? 'Loading…' : 'Load more'}
           </button>
         </div>
       ) : null}
+      </LoungePullRefreshZone>
     </div>
   )
 }

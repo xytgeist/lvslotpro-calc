@@ -231,6 +231,8 @@ import { LOUNGE_FEED_SCOPE_ALL, LOUNGE_FEED_SCOPE_FOLLOWING } from '../../utils/
 import { LOUNGE_FEED_SORT } from '../../utils/loungeFeedSortPref'
 import LoungeFeedSortSwitch from './LoungeFeedSortSwitch.jsx'
 import LoungeFeedCategoryFilter from './LoungeFeedCategoryFilter.jsx'
+import LoungePullRefreshZone from './LoungePullRefreshZone.jsx'
+import { useLoungePullToRefresh } from './useLoungePullToRefresh.js'
 import LoungeFeedScopeSwitch from './LoungeFeedScopeSwitch.jsx'
 import { LOUNGE_COMMENT_BODY_MAX } from '../../utils/loungeCommentLimits.js'
 
@@ -298,14 +300,6 @@ function loungePostDetailThreadAncestorClick(e, onNavigate) {
 const LOUNGE_UPLOAD_BAR_GOBLIN_DETAIL = 'Ether goblins ate your shit...trying again...'
 
 const LOUNGE_POST_AUTHOR_EDIT_WINDOW_MS = 30 * 60 * 1000
-
-/** Sublinear pull curve — approaches cap smoothly (avoids linear layout jumps). */
-function loungePullVisualOffsetPx(rawDy, cap) {
-  if (rawDy <= 0) return 0
-  return Math.min(cap, cap * (1 - Math.exp(-rawDy / 72)))
-}
-
-const LOUNGE_PULL_SNAP_MS = '220ms cubic-bezier(0.33, 1, 0.68, 1)'
 
 function isLoungePostWithinAuthorEditWindow(createdAt) {
   if (!createdAt) return false
@@ -735,16 +729,13 @@ export default function SocialFeed({
   const loungePostDetailCloseFallbackTimerRef = useRef(0)
   const loungePostDetailMenuWrapRef = useRef(null)
   const loadMoreSentinelRef = useRef(null)
-  const pullStartYRef = useRef(null)
-  const pullDistanceRef = useRef(0)
-  const pullTriggeredRef = useRef(false)
+  const pullRefreshZoneRef = useRef(null)
   const pullPostsWrapRef = useRef(null)
   const pullIndicatorOverlayRef = useRef(null)
   const pullIndicatorWrapRef = useRef(null)
   const pullArrowRef = useRef(null)
   const pullSpinnerRef = useRef(null)
   const pullAriaRef = useRef(null)
-  const pullVisualRafRef = useRef(0)
   const composerMediaInputRef = useRef(null)
   const composerFieldRef = useRef(null)
   const mentionComposerAnchorRef = useRef(null)
@@ -753,8 +744,6 @@ export default function SocialFeed({
   const loungeDetailEditFieldRef = useRef(null)
   const loungeDetailEditMediaInputRef = useRef(null)
   const loungeFeedScrollRef = useRef(null)
-  /** Pull-to-refresh only when the gesture starts in the posts block (below Discover / Latest / Tribes). */
-  const pullRefreshZoneRef = useRef(null)
   /** Bound inside feed `LoungeFeedVideoAutoplayProvider` — reset feed inline sound when opening post detail. */
   const resetFeedInlineSoundRef = useRef(() => {})
   /** Bound inside post-detail `LoungeFeedVideoAutoplayProvider` — reset comment-thread inline sound on close. */
@@ -935,14 +924,6 @@ export default function SocialFeed({
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [])
-
-  /** Pull-to-refresh: finger travel in the feed scroller; cap avoids runaway state. */
-  const pullRefreshThresholdPx = 88
-  const pullMaxVisualPx = 300
-  const pullFingerGain = 1
-  /** Fixed label row (~2.25rem); stretch grows with pull up to 3× that height. */
-  const pullIndicatorBasePx = 36
-  const pullIndicatorMaxPx = pullIndicatorBasePx * 3
 
   const scrollLoungeFeedToTopInstant = useCallback(() => {
     const el = loungeFeedScrollRef.current
@@ -5924,150 +5905,24 @@ export default function SocialFeed({
     }
   }, [composerUserId, supabaseClient])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const zone = loungeFeedScrollRef.current
-    const pullZone = pullRefreshZoneRef.current
-    if (!zone || !pullZone) return
-    const thresholdPx = pullRefreshThresholdPx
-    const visualCapPx = pullIndicatorMaxPx
-    const refreshIndicatorPx = pullIndicatorBasePx
+  const refreshCommunityFeed = useCallback(async () => {
+    await loadCommunityFeed({ silent: true })
+  }, [loadCommunityFeed])
 
-    const applyPullVisual = (visualPx, { animate = false } = {}) => {
-      const posts = pullPostsWrapRef.current
-      const overlay = pullIndicatorOverlayRef.current
-      const transformTransition = animate ? `transform ${LOUNGE_PULL_SNAP_MS}` : 'none'
-      const overlayTransition = animate ? `height ${LOUNGE_PULL_SNAP_MS}, opacity 180ms ease` : 'none'
-      if (posts) {
-        posts.style.transition = transformTransition
-        posts.style.transform = visualPx > 0 ? `translate3d(0, ${visualPx}px, 0)` : ''
-      }
-      if (overlay) {
-        overlay.style.transition = overlayTransition
-        overlay.style.height = `${visualPx}px`
-        overlay.style.opacity = visualPx > 0 ? '1' : '0'
-      }
-    }
-
-    const setPullIndicator = (rawDistance, refreshing = false) => {
-      const wrap = pullIndicatorWrapRef.current
-      const arrow = pullArrowRef.current
-      const spinner = pullSpinnerRef.current
-      const aria = pullAriaRef.current
-      if (!wrap || !arrow || !spinner) return
-
-      if (refreshing) {
-        arrow.classList.add('hidden')
-        spinner.classList.remove('hidden')
-        wrap.setAttribute('aria-label', 'Refreshing lounge')
-        if (aria) aria.textContent = 'Refreshing lounge'
-        return
-      }
-
-      spinner.classList.add('hidden')
-      arrow.classList.remove('hidden')
-
-      if (rawDistance <= 0) {
-        arrow.style.transform = 'rotate(0deg)'
-        wrap.setAttribute('aria-label', 'Pull down to refresh')
-        if (aria) aria.textContent = 'Pull down to refresh'
-        return
-      }
-
-      if (rawDistance >= thresholdPx) {
-        arrow.style.transform = 'rotate(180deg)'
-        wrap.setAttribute('aria-label', 'Release to refresh')
-        if (aria) aria.textContent = 'Release to refresh'
-      } else {
-        arrow.style.transform = 'rotate(0deg)'
-        wrap.setAttribute('aria-label', 'Pull down to refresh')
-        if (aria) aria.textContent = 'Pull down to refresh'
-      }
-    }
-
-    const flushPullVisual = (rawDistance, { animate = false } = {}) => {
-      const visual = loungePullVisualOffsetPx(rawDistance, visualCapPx)
-      applyPullVisual(visual, { animate })
-      setPullIndicator(rawDistance, false)
-    }
-
-    const schedulePullVisual = (rawDistance) => {
-      pullDistanceRef.current = rawDistance
-      if (pullVisualRafRef.current) return
-      pullVisualRafRef.current = window.requestAnimationFrame(() => {
-        pullVisualRafRef.current = 0
-        flushPullVisual(rawDistance, { animate: false })
-      })
-    }
-
-    const onTouchStart = (e) => {
-      if (zone.scrollTop > 0) {
-        pullStartYRef.current = null
-        return
-      }
-      const touch = e.touches?.[0]
-      if (!touch) {
-        pullStartYRef.current = null
-        return
-      }
-      pullStartYRef.current = touch.clientY
-      pullTriggeredRef.current = false
-    }
-
-    const onTouchMove = (e) => {
-      if (pullRefreshing) return
-      const startY = pullStartYRef.current
-      if (startY == null) return
-      const currentY = e.touches?.[0]?.clientY ?? startY
-      const dy = currentY - startY
-      if (dy <= 0) {
-        schedulePullVisual(0)
-        return
-      }
-      e.preventDefault()
-      const raw = Math.min(pullMaxVisualPx, Math.floor(dy * pullFingerGain))
-      schedulePullVisual(raw)
-    }
-
-    const onTouchEnd = async () => {
-      const distance = pullDistanceRef.current
-      pullStartYRef.current = null
-      pullDistanceRef.current = 0
-      const shouldRefresh = distance >= thresholdPx && !pullTriggeredRef.current
-      if (!shouldRefresh) {
-        applyPullVisual(0, { animate: true })
-        setPullIndicator(0, false)
-        return
-      }
-      pullTriggeredRef.current = true
-      setPullRefreshing(true)
-      applyPullVisual(refreshIndicatorPx, { animate: true })
-      setPullIndicator(0, true)
-      try {
-        await loadCommunityFeed({ silent: true })
-      } finally {
-        setPullRefreshing(false)
-        pullTriggeredRef.current = false
-        applyPullVisual(0, { animate: true })
-        setPullIndicator(0, false)
-      }
-    }
-
-    pullZone.addEventListener('touchstart', onTouchStart, { passive: true })
-    zone.addEventListener('touchmove', onTouchMove, { passive: false, capture: true })
-    zone.addEventListener('touchend', onTouchEnd, { passive: true, capture: true })
-    zone.addEventListener('touchcancel', onTouchEnd, { passive: true, capture: true })
-    return () => {
-      if (pullVisualRafRef.current) {
-        window.cancelAnimationFrame(pullVisualRafRef.current)
-        pullVisualRafRef.current = 0
-      }
-      pullZone.removeEventListener('touchstart', onTouchStart)
-      zone.removeEventListener('touchmove', onTouchMove, { capture: true })
-      zone.removeEventListener('touchend', onTouchEnd, { capture: true })
-      zone.removeEventListener('touchcancel', onTouchEnd, { capture: true })
-    }
-  }, [loadCommunityFeed, pullRefreshing])
+  useLoungePullToRefresh({
+    scrollRootRef: loungeFeedScrollRef,
+    pullZoneRef: pullRefreshZoneRef,
+    pullPostsWrapRef,
+    pullIndicatorOverlayRef,
+    pullIndicatorWrapRef,
+    pullArrowRef,
+    pullSpinnerRef,
+    pullAriaRef,
+    onRefresh: refreshCommunityFeed,
+    enabled: true,
+    pullRefreshing,
+    setPullRefreshing,
+  })
 
   useEffect(() => {
     if (!communityFeedHasMore || communityFeedLoadingMore || communityFeedLoading || pullRefreshing) return
@@ -9165,46 +9020,15 @@ export default function SocialFeed({
           </div>
         </div>
 
-        <div ref={pullRefreshZoneRef} className="relative">
-          <div
-            ref={pullIndicatorOverlayRef}
-            className="pointer-events-none absolute inset-x-0 top-0 z-[1] flex items-end justify-center overflow-hidden text-zinc-400"
-            style={{ height: 0, opacity: 0 }}
-            aria-live="polite"
-          >
-            <div
-              ref={pullIndicatorWrapRef}
-              className="flex h-9 items-center justify-center px-3 pb-1"
-              role="status"
-              aria-label="Pull down to refresh"
-            >
-              <svg
-                ref={pullArrowRef}
-                className="h-4 w-4 transition-transform duration-200 ease-out"
-                viewBox="0 0 20 20"
-                fill="none"
-                aria-hidden
-              >
-                <path
-                  d="M5 7.5l5 5 5-5"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span
-                ref={pullSpinnerRef}
-                className="hidden h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
-                aria-hidden
-              />
-              <span ref={pullAriaRef} className="sr-only">
-                Pull down to refresh
-              </span>
-            </div>
-          </div>
-
-          <div ref={pullPostsWrapRef} className="relative z-0 will-change-transform">
+        <LoungePullRefreshZone
+          pullRefreshZoneRef={pullRefreshZoneRef}
+          pullIndicatorOverlayRef={pullIndicatorOverlayRef}
+          pullIndicatorWrapRef={pullIndicatorWrapRef}
+          pullArrowRef={pullArrowRef}
+          pullSpinnerRef={pullSpinnerRef}
+          pullAriaRef={pullAriaRef}
+          pullPostsWrapRef={pullPostsWrapRef}
+        >
         <div className="border-b border-zinc-800 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
         {loungeManageErr ? (
           <div className="px-3 pt-3">
@@ -9361,8 +9185,7 @@ export default function SocialFeed({
           </>
         )}
         </div>
-        </div>
-        </div>
+        </LoungePullRefreshZone>
         </LoungeFeedVideoAutoplayProvider>
       </div>
 
