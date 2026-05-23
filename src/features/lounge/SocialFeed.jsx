@@ -129,6 +129,7 @@ import LoungeMentionDropdown from './LoungeMentionDropdown'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
+import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
@@ -11254,6 +11255,11 @@ export default function SocialFeed({
                         Pinned
                       </span>
                     </div>
+                  ) : null}
+                  {loungeDetailDeleteBusy ||
+                  (loungeFeedDeleteBusyPostId &&
+                    loungeFeedDeleteBusyPostId === loungePostDetail.id) ? (
+                    <LoungeFeedPendingStatusRow className="mt-1">Deleting post…</LoungeFeedPendingStatusRow>
                   ) : null}
                 </div>
               </div>

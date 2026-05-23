@@ -9,6 +9,7 @@ import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
+import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
   LOUNGE_FEED_AVATAR_CLASS,
@@ -293,17 +294,10 @@ export default function LoungePostArticle({
         ) : null}
 
         {feedEditSavePending ? (
-          <div
-            className="mb-1 flex items-center gap-1.5 text-[12px] leading-snug text-zinc-500"
-            role="status"
-            aria-live="polite"
-          >
-            <span
-              className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
-              aria-hidden
-            />
-            Updating post…
-          </div>
+          <LoungeFeedPendingStatusRow>Updating post…</LoungeFeedPendingStatusRow>
+        ) : null}
+        {busyDeletingPostId && busyDeletingPostId === post.id ? (
+          <LoungeFeedPendingStatusRow>Deleting post…</LoungeFeedPendingStatusRow>
         ) : null}
 
         {/* ── Meta row ────────────────────────────────────────────────────── */}

@@ -6,6 +6,7 @@ import {
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
+import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import {
   feedCommentDescendantCountById,
@@ -146,6 +147,7 @@ export function LoungeCommentCard({
   )
 
   const menuIsOwn = Boolean(viewerUserId && comment.user_id === viewerUserId)
+  const commentDeletePending = Boolean(busyDeletingCommentId && busyDeletingCommentId === comment.id)
   const showCommentMenu = Boolean(
     !loungeReadOnly &&
       viewerUserId &&
@@ -284,6 +286,9 @@ export function LoungeCommentCard({
         )}
       </button>
       <div className="min-w-0 flex-1">
+        {commentDeletePending ? (
+          <LoungeFeedPendingStatusRow className="mb-1">Deleting reply…</LoungeFeedPendingStatusRow>
+        ) : null}
         <div className="relative min-w-0">
           <div className={`${LOUNGE_FEED_META_TEXT_COLUMN_CLASS} ${showCommentMenu ? 'pr-7' : ''}`}>
             <div className={LOUNGE_FEED_META_ROW_CLASS}>
