@@ -3399,12 +3399,6 @@ export default function SocialFeed({
     return v.prepStatus === 'failed'
   }, [loungeDetailEditVideoSlot])
 
-  const loungeDetailEditVideoPrepBusy = useMemo(() => {
-    const v = loungeDetailEditVideoSlot
-    if (!v) return false
-    return v.prepStatus === 'preparing' || v.prepStatus === 'queued'
-  }, [loungeDetailEditVideoSlot])
-
   const loungeDetailCommentEditVideoPostBlocked = useMemo(() => {
     const v = loungeDetailCommentEditVideoSlot
     if (!v) return false
@@ -6616,7 +6610,6 @@ export default function SocialFeed({
       return
     }
     if (loungeDetailEditVideoPostBlocked) return
-    if (loungeDetailEditVideoPrepBusy) return
     if (hasVideo && gifOnlyUrl) {
       setLoungeDetailEditErr('Remove the GIF before posting a video.')
       return
@@ -6692,7 +6685,6 @@ export default function SocialFeed({
     loungeDetailEditKeepStreamUid,
     loungeDetailEditMediaUrl,
     loungeDetailEditVideoPostBlocked,
-    loungeDetailEditVideoPrepBusy,
     loungePostDetail,
     shouldAssignLoungePostSnapshotRef,
   ])
@@ -11371,23 +11363,6 @@ export default function SocialFeed({
                                 aria-label="Video preview"
                               />
                             ) : null}
-                            {loungeDetailEditVideoPrepBusy ? (
-                              <div
-                                className="absolute inset-0 grid place-items-center bg-black/55 backdrop-blur-[1px]"
-                                role="status"
-                                aria-live="polite"
-                              >
-                                <div className="flex flex-col items-center gap-2 px-3 text-center">
-                                  <span
-                                    className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-zinc-500 border-t-cyan-400"
-                                    aria-hidden
-                                  />
-                                  <span className="text-[12px] font-medium text-zinc-200">
-                                    Processing video…
-                                  </span>
-                                </div>
-                              </div>
-                            ) : null}
                             <button
                               type="button"
                               onClick={() => cancelLoungeDetailEditMediaPrep()}
@@ -11723,7 +11698,6 @@ export default function SocialFeed({
                               onClick={() => void saveLoungeDetailCaption()}
                               disabled={
                                 loungeDetailEditVideoPostBlocked ||
-                                loungeDetailEditVideoPrepBusy ||
                                 (!normalizeFeedCaption(loungeDetailDraftCaption) &&
                                   loungeDetailEditImageItems.length === 0 &&
                                   loungeDetailEditImageUrls.length === 0 &&
