@@ -87,6 +87,7 @@ export function LoungeCommentCard({
   onCommentMenuBlock,
   onCommentMenuReport,
   busyDeletingCommentId,
+  commentEditSavePendingCommentId = null,
   editingCommentId,
   commentEditDraft,
   onCommentEditDraftChange,
@@ -148,6 +149,9 @@ export function LoungeCommentCard({
 
   const menuIsOwn = Boolean(viewerUserId && comment.user_id === viewerUserId)
   const commentDeletePending = Boolean(busyDeletingCommentId && busyDeletingCommentId === comment.id)
+  const commentEditSavePending = Boolean(
+    commentEditSavePendingCommentId && commentEditSavePendingCommentId === comment.id,
+  )
   const showCommentMenu = Boolean(
     !loungeReadOnly &&
       viewerUserId &&
@@ -288,6 +292,9 @@ export function LoungeCommentCard({
       <div className="min-w-0 flex-1">
         {commentDeletePending ? (
           <LoungeFeedPendingStatusRow className="mb-1">Deleting reply…</LoungeFeedPendingStatusRow>
+        ) : null}
+        {commentEditSavePending ? (
+          <LoungeFeedPendingStatusRow className="mb-1">Updating reply…</LoungeFeedPendingStatusRow>
         ) : null}
         <div className="relative min-w-0">
           <div className={`${LOUNGE_FEED_META_TEXT_COLUMN_CLASS} ${showCommentMenu ? 'pr-7' : ''}`}>
@@ -438,6 +445,7 @@ export default function LoungePostCommentThread({
   onCommentMenuBlock,
   onCommentMenuReport,
   busyDeletingCommentId,
+  commentEditSavePendingCommentId = null,
   editingCommentId,
   commentEditDraft,
   onCommentEditDraftChange,
@@ -598,6 +606,7 @@ export default function LoungePostCommentThread({
     onCommentMenuBlock,
     onCommentMenuReport,
     busyDeletingCommentId,
+    commentEditSavePendingCommentId,
     editingCommentId,
     commentEditDraft,
     onCommentEditDraftChange,

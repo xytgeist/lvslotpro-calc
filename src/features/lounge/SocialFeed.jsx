@@ -755,6 +755,7 @@ export default function SocialFeed({
   const [loungeDetailEditCategoryPills, setLoungeDetailEditCategoryPills] = useState([])
   /** Main feed row: unobtrusive spinner while a post edit with media upload finishes. */
   const [loungeFeedPostEditPendingPostId, setLoungeFeedPostEditPendingPostId] = useState(null)
+  const [loungeDetailCommentEditPendingCommentId, setLoungeDetailCommentEditPendingCommentId] = useState(null)
   const loungeDetailEditImageItemsRef = useRef(loungeDetailEditImageItems)
   const loungeDetailEditMediaUrlRef = useRef('')
   const loungeDetailEditVideoSlotRef = useRef(null)
@@ -1718,6 +1719,7 @@ export default function SocialFeed({
       setLoungeDetailCommentErr(pending.message)
     } else if (pending.kind === 'commentEdit') {
       loungeDetailCommentEditSnapshotRef.current = pending.snapshot
+      setLoungeDetailCommentEditPendingCommentId(null)
       setLoungeDetailCommentErr(pending.message)
     } else if (pending.kind === 'postEdit') {
       loungeDetailEditSnapshotRef.current = pending.snapshot
@@ -1754,6 +1756,7 @@ export default function SocialFeed({
       setLoungeDetailCommentErr(message)
     } else if (kind === 'commentEdit') {
       loungeDetailCommentEditSnapshotRef.current = snapshot
+      setLoungeDetailCommentEditPendingCommentId(null)
       setLoungeDetailCommentErr(message)
     } else if (kind === 'postEdit') {
       loungeDetailEditSnapshotRef.current = snapshot
@@ -4914,6 +4917,7 @@ export default function SocialFeed({
       preserveDetailCommentEditVideoPrep: preserveVideoPrep,
       pendingSnapshot: snapshot,
     })
+    setLoungeDetailCommentEditPendingCommentId(loungeDetailCommentEditingId)
     enqueueAndRunLoungeSubmitRef.current('commentEdit', snapshot)
     cancelLoungeDetailCommentEdit()
   }, [
@@ -4950,6 +4954,9 @@ export default function SocialFeed({
         }
       }
       setLoungeDetailCommentDeleteBusyId(c.id)
+      setLoungeDetailCommentEditPendingCommentId((prev) =>
+        prev === c.id || removeIds.has(prev) ? null : prev,
+      )
       setLoungeDetailCommentErr('')
       try {
         for (const row of loungeDetailComments) {
@@ -5270,6 +5277,7 @@ export default function SocialFeed({
     setLoungeDetailCommentEditingId(null)
     setLoungeDetailCommentEditDraft('')
     setLoungeDetailCommentEditBusy(false)
+    setLoungeDetailCommentEditPendingCommentId(null)
     setLoungeDetailCommentDeleteBusyId(null)
     setLoungeDetailCommentEditImageUrls([])
     setLoungeDetailCommentEditImageItems((prev) => {
@@ -5422,6 +5430,7 @@ export default function SocialFeed({
       setLoungeDetailCommentEditingId(null)
       setLoungeDetailCommentEditDraft('')
       setLoungeDetailCommentEditBusy(false)
+      setLoungeDetailCommentEditPendingCommentId(null)
       setLoungeDetailCommentDeleteBusyId(null)
       setLoungePostDetail(post)
       setLoungePostDetailAboveProfile(profileModalOpen || profileOverlayStack.length > 0)
@@ -7467,6 +7476,7 @@ export default function SocialFeed({
     loungeDetailEditJobRunningRef.current = false
     loungePostUploadLastPhaseRef.current = ''
     setLoungeFeedPostEditPendingPostId(null)
+    setLoungeDetailCommentEditPendingCommentId(null)
     setLoungePostUploadFailureDetails(null)
     setLoungePostUploadBar(null)
     const commentSnapForPrep = loungeDetailCommentSnapshotRef.current
@@ -8129,6 +8139,12 @@ export default function SocialFeed({
     [setCommunityPosts],
   )
 
+  const patchLoungeCommentEditResult = useCallback((data) => {
+    if (!data?.id) return
+    setLoungeDetailCommentEditPendingCommentId((prev) => (prev === data.id ? null : prev))
+    setLoungeDetailComments((prev) => prev.map((row) => (row.id === data.id ? { ...row, ...data } : row)))
+  }, [])
+
   const runBackgroundLoungePostEditSubmission = useCallback(
     async (jobOrSnapshot) => {
       const job =
@@ -8376,9 +8392,10 @@ export default function SocialFeed({
               progress: p,
               status: st,
               detail: det,
+              editSave: true,
             }
           }
-          return { mode: 'post', progress: 0, status: 'Saving edit', detail: '' }
+          return { mode: 'post', progress: 0, status: 'Saving edit', detail: '', editSave: true }
         })
       }
 
@@ -8509,9 +8526,7 @@ export default function SocialFeed({
             : undefined,
         })
         loungeDetailCommentEditSnapshotRef.current = null
-        setLoungeDetailComments((prev) =>
-          prev.map((row) => (row.id === snap.commentId ? { ...row, ...data } : row)),
-        )
+        patchLoungeCommentEditResult(data)
         setLoungePostUploadFailedOpen(false)
         setLoungePostUploadFailureDetails(null)
       } catch (e) {
@@ -8533,6 +8548,7 @@ export default function SocialFeed({
         if (String(snap.streamVideoUid || '').trim()) {
           loungeDetailCommentEditSnapshotRef.current = snap
         }
+        setLoungeDetailCommentEditPendingCommentId(null)
         const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Could not save edit.'
         setLoungeDetailCommentErr(msg)
         setLoungePostUploadFailureDetails({
@@ -8545,10 +8561,11 @@ export default function SocialFeed({
         loungeDetailCommentEditAbortRef.current = null
         loungeDetailCommentEditJobRunningRef.current = false
         bumpLoungeSubmitInFlight(-1)
+        setLoungeDetailCommentEditPendingCommentId(null)
         dismissLoungePostUploadBarIfIdle()
       }
     },
-    [bumpLoungeSubmitInFlight, dismissLoungePostUploadBarIfIdle, supabaseClient],
+    [bumpLoungeSubmitInFlight, dismissLoungePostUploadBarIfIdle, patchLoungeCommentEditResult, supabaseClient],
   )
   runBackgroundLoungeCommentEditSubmissionRef.current = runBackgroundLoungeCommentEditSubmission
 
@@ -8566,9 +8583,7 @@ export default function SocialFeed({
             signal: ac.signal,
           })
           loungeDetailCommentEditSnapshotRef.current = null
-          setLoungeDetailComments((prev) =>
-            prev.map((row) => (row.id === snapshot.commentId ? { ...row, ...data } : row)),
-          )
+          patchLoungeCommentEditResult(data)
         } else if (type === 'postEdit') {
           loungeDetailEditJobRunningRef.current = true
           loungeDetailEditAbortRef.current = ac
@@ -8677,6 +8692,9 @@ export default function SocialFeed({
           loungeDetailEditJobRunningRef.current = false
           setLoungeFeedPostEditPendingPostId(null)
         }
+        if (type === 'commentEdit') {
+          setLoungeDetailCommentEditPendingCommentId(null)
+        }
         loungeFastLaneInFlightRef.current = Math.max(0, loungeFastLaneInFlightRef.current - 1)
         bumpLoungeSubmitInFlight(-1)
         dismissLoungePostUploadBarIfIdle()
@@ -8690,6 +8708,7 @@ export default function SocialFeed({
       deferOrShowFastLaneFailure,
       dismissLoungePostUploadBarIfIdle,
       loadCommunityFeed,
+      patchLoungeCommentEditResult,
       patchLoungePostEditResult,
       patchPostAggregate,
       rateLimitMessage,
@@ -8741,6 +8760,9 @@ export default function SocialFeed({
       const editSnap = loungeDetailCommentEditSnapshotRef.current
       setLoungePostUploadFailureDetails(null)
       if (!editSnap) return
+      if (editSnap.commentId) {
+        setLoungeDetailCommentEditPendingCommentId(String(editSnap.commentId))
+      }
       void runBackgroundLoungeCommentEditSubmissionRef.current(editSnap)
       return
     }
@@ -8954,6 +8976,7 @@ export default function SocialFeed({
       }
       loungeDetailCommentEditSnapshotRef.current = null
       loungeDetailCommentEditJobRunningRef.current = false
+      setLoungeDetailCommentEditPendingCommentId(null)
       setLoungePostUploadFailedOpen(false)
       setLoungePostUploadFailureDetails(null)
       return
@@ -9028,6 +9051,14 @@ export default function SocialFeed({
 
   const onLoungePostUploadFailureCancel = useCallback(() => {
     const fail = loungePostUploadFailureDetailsRef.current
+    if (fail?.kind === 'commentEdit') {
+      loungeDetailCommentEditSnapshotRef.current = null
+      loungeDetailCommentEditJobRunningRef.current = false
+      setLoungeDetailCommentEditPendingCommentId(null)
+      setLoungePostUploadFailedOpen(false)
+      setLoungePostUploadFailureDetails(null)
+      return
+    }
     if (fail?.kind === 'postEdit') {
       loungeDetailEditSnapshotRef.current = null
       loungeDetailEditJobRunningRef.current = false
@@ -12114,6 +12145,7 @@ export default function SocialFeed({
                     onCommentMenuBlock: onCommentMenuBlockFromDetail,
                     onCommentMenuReport: onCommentMenuReportFromDetail,
                     busyDeletingCommentId: loungeDetailCommentDeleteBusyId,
+                    commentEditSavePendingCommentId: loungeDetailCommentEditPendingCommentId,
                     editingCommentId: loungeDetailCommentEditingId,
                     commentEditDraft: loungeDetailCommentEditDraft,
                     onCommentEditDraftChange: setLoungeDetailCommentEditDraft,
@@ -12209,6 +12241,7 @@ export default function SocialFeed({
                           onCommentMenuBlock={onCommentMenuBlockFromDetail}
                           onCommentMenuReport={onCommentMenuReportFromDetail}
                           busyDeletingCommentId={loungeDetailCommentDeleteBusyId}
+                          commentEditSavePendingCommentId={loungeDetailCommentEditPendingCommentId}
                           editingCommentId={loungeDetailCommentEditingId}
                           commentEditDraft={loungeDetailCommentEditDraft}
                           onCommentEditDraftChange={setLoungeDetailCommentEditDraft}
