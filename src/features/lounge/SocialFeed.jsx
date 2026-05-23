@@ -373,15 +373,6 @@ function validateAtMostOneGifUrl(urlField) {
   return { ok: true, value: t }
 }
 
-/** True when a post/comment edit job uploads media or waits on video prep (show progress UI). */
-function loungeEditSnapshotNeedsUploadProgress(snapshot) {
-  if (!snapshot) return false
-  if (loungeSubmissionSnapshotIncludesVideo(snapshot)) return true
-  const nImg = Array.isArray(snapshot.imageFiles) ? snapshot.imageFiles.length : 0
-  if (nImg > 0) return true
-  return Boolean(String(snapshot.gifOnlyUrl || '').trim())
-}
-
 export default function SocialFeed({
   supabaseClient,
   onRequireAuth,
@@ -752,8 +743,6 @@ export default function SocialFeed({
   const [loungeDetailEditVideoSlot, setLoungeDetailEditVideoSlot] = useState(null)
   const [loungeDetailEditKeepStreamUid, setLoungeDetailEditKeepStreamUid] = useState(null)
   const [loungeDetailEditCategoryPills, setLoungeDetailEditCategoryPills] = useState([])
-  /** Post detail: unobtrusive saving indicator while a post edit job finishes. */
-  const [loungeDetailEditSavePendingPostId, setLoungeDetailEditSavePendingPostId] = useState(null)
   const loungeDetailEditImageItemsRef = useRef(loungeDetailEditImageItems)
   const loungeDetailEditMediaUrlRef = useRef('')
   const loungeDetailEditVideoSlotRef = useRef(null)
@@ -1720,7 +1709,6 @@ export default function SocialFeed({
       setLoungeDetailCommentErr(pending.message)
     } else if (pending.kind === 'postEdit') {
       loungeDetailEditSnapshotRef.current = pending.snapshot
-      setLoungeDetailEditSavePendingPostId(null)
       setLoungeDetailEditErr(pending.message)
     } else {
       loungePostSnapshotRef.current = pending.snapshot
@@ -1756,7 +1744,6 @@ export default function SocialFeed({
       setLoungeDetailCommentErr(message)
     } else if (kind === 'postEdit') {
       loungeDetailEditSnapshotRef.current = snapshot
-      setLoungeDetailEditSavePendingPostId(null)
       setLoungeDetailEditErr(message)
     } else {
       loungePostSnapshotRef.current = snapshot
@@ -3410,6 +3397,12 @@ export default function SocialFeed({
     const v = loungeDetailEditVideoSlot
     if (!v) return false
     return v.prepStatus === 'failed'
+  }, [loungeDetailEditVideoSlot])
+
+  const loungeDetailEditVideoPrepBusy = useMemo(() => {
+    const v = loungeDetailEditVideoSlot
+    if (!v) return false
+    return v.prepStatus === 'preparing' || v.prepStatus === 'queued'
   }, [loungeDetailEditVideoSlot])
 
   const loungeDetailCommentEditVideoPostBlocked = useMemo(() => {
@@ -6623,6 +6616,7 @@ export default function SocialFeed({
       return
     }
     if (loungeDetailEditVideoPostBlocked) return
+    if (loungeDetailEditVideoPrepBusy) return
     if (hasVideo && gifOnlyUrl) {
       setLoungeDetailEditErr('Remove the GIF before posting a video.')
       return
@@ -6685,7 +6679,6 @@ export default function SocialFeed({
       preserveDetailEditVideoPrep: preserveVideoPrep,
       pendingSnapshot: snapshot,
     })
-    setLoungeDetailEditSavePendingPostId(loungePostDetail.id)
     enqueueAndRunLoungeSubmitRef.current('postEdit', snapshot)
     cancelLoungeDetailEdit()
   }, [
@@ -6699,6 +6692,7 @@ export default function SocialFeed({
     loungeDetailEditKeepStreamUid,
     loungeDetailEditMediaUrl,
     loungeDetailEditVideoPostBlocked,
+    loungeDetailEditVideoPrepBusy,
     loungePostDetail,
     shouldAssignLoungePostSnapshotRef,
   ])
@@ -7455,7 +7449,6 @@ export default function SocialFeed({
     loungePostJobRunningRef.current = false
     loungeDetailCommentJobRunningRef.current = false
     loungeDetailEditJobRunningRef.current = false
-    setLoungeDetailEditSavePendingPostId(null)
     loungePostUploadLastPhaseRef.current = ''
     setLoungePostUploadFailureDetails(null)
     setLoungePostUploadBar(null)
@@ -8059,7 +8052,6 @@ export default function SocialFeed({
   const patchLoungePostEditResult = useCallback(
     (data) => {
       if (!data?.id) return
-      setLoungeDetailEditSavePendingPostId(null)
       setCommunityPosts((prev) =>
         prev.map((p) =>
           p.id === data.id
@@ -8307,7 +8299,6 @@ export default function SocialFeed({
         }
         const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Could not save edit.'
         if (msg === LOUNGE_MAX_PINNED_ALERT && typeof window !== 'undefined') window.alert(LOUNGE_MAX_PINNED_ALERT)
-        setLoungeDetailEditSavePendingPostId(null)
         setLoungeDetailEditErr(msg)
         setLoungePostUploadFailureDetails({
           kind: 'postEdit',
@@ -8556,37 +8547,11 @@ export default function SocialFeed({
         } else if (type === 'postEdit') {
           loungeDetailEditJobRunningRef.current = true
           loungeDetailEditAbortRef.current = ac
-          const showEditBar = loungeEditSnapshotNeedsUploadProgress(snapshot)
-          if (showEditBar) {
-            setLoungePostUploadBar({
-              mode: 'post',
-              progress: 0.05,
-              status: 'Saving edit',
-              detail: '',
-              editSave: true,
-            })
-          }
           const data = await executeLoungeCommunityPostUpdate({
             supabaseClient,
             snapshot,
             signal: ac.signal,
             rateLimitMessage,
-            onProgress: showEditBar
-              ? (info) => {
-                  setLoungePostUploadBar((prev) => {
-                    const d = String(info.detail || '').trim()
-                    return {
-                      mode: 'post',
-                      editSave: true,
-                      progress:
-                        typeof info.progress === 'number' ? info.progress : prev?.progress ?? 0.05,
-                      status: String(info.status || 'Saving edit'),
-                      detail:
-                        d !== '' ? d : prev && typeof prev.detail === 'string' ? prev.detail : '',
-                    }
-                  })
-                }
-              : undefined,
           })
           loungeDetailEditSnapshotRef.current = null
           patchLoungePostEditResult(data)
@@ -8668,7 +8633,6 @@ export default function SocialFeed({
         }
       } catch (e) {
         if (e?.name === 'AbortError') {
-          if (type === 'postEdit') setLoungeDetailEditSavePendingPostId(null)
           return
         }
         const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Could not post right now.'
@@ -11407,6 +11371,23 @@ export default function SocialFeed({
                                 aria-label="Video preview"
                               />
                             ) : null}
+                            {loungeDetailEditVideoPrepBusy ? (
+                              <div
+                                className="absolute inset-0 grid place-items-center bg-black/55 backdrop-blur-[1px]"
+                                role="status"
+                                aria-live="polite"
+                              >
+                                <div className="flex flex-col items-center gap-2 px-3 text-center">
+                                  <span
+                                    className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-zinc-500 border-t-cyan-400"
+                                    aria-hidden
+                                  />
+                                  <span className="text-[12px] font-medium text-zinc-200">
+                                    Processing video…
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => cancelLoungeDetailEditMediaPrep()}
@@ -11542,19 +11523,6 @@ export default function SocialFeed({
                   <span className="text-zinc-600"> · Edited</span>
                 ) : null}
               </div>
-              {loungeDetailEditSavePendingPostId === loungePostDetail.id ? (
-                <div
-                  className={`mt-1.5 flex items-center gap-2 text-[13px] leading-snug text-zinc-500 ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span
-                    className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
-                    aria-hidden
-                  />
-                  <span>Saving changes…</span>
-                </div>
-              ) : null}
               </article>
 
               {(() => {
@@ -11755,6 +11723,7 @@ export default function SocialFeed({
                               onClick={() => void saveLoungeDetailCaption()}
                               disabled={
                                 loungeDetailEditVideoPostBlocked ||
+                                loungeDetailEditVideoPrepBusy ||
                                 (!normalizeFeedCaption(loungeDetailDraftCaption) &&
                                   loungeDetailEditImageItems.length === 0 &&
                                   loungeDetailEditImageUrls.length === 0 &&
