@@ -8292,6 +8292,8 @@ export default function SocialFeed({
         })
         loungeDetailEditSnapshotRef.current = null
         patchLoungePostEditResult(data)
+        setLoungePostUploadFailedOpen(false)
+        setLoungePostUploadFailureDetails(null)
       } catch (e) {
         if (e?.name === 'AbortError') return
         const failUid = String(snap.streamVideoUid || '').trim()
@@ -8322,9 +8324,10 @@ export default function SocialFeed({
         loungeDetailEditJobRunningRef.current = false
         bumpLoungeSubmitInFlight(-1)
         setLoungeFeedPostEditPendingPostId(null)
+        dismissLoungePostUploadBarIfIdle()
       }
     },
-    [bumpLoungeSubmitInFlight, patchLoungePostEditResult, rateLimitMessage, supabaseClient],
+    [bumpLoungeSubmitInFlight, dismissLoungePostUploadBarIfIdle, patchLoungePostEditResult, rateLimitMessage, supabaseClient],
   )
   runBackgroundLoungePostEditSubmissionRef.current = runBackgroundLoungePostEditSubmission
 
@@ -8502,6 +8505,8 @@ export default function SocialFeed({
         setLoungeDetailComments((prev) =>
           prev.map((row) => (row.id === snap.commentId ? { ...row, ...data } : row)),
         )
+        setLoungePostUploadFailedOpen(false)
+        setLoungePostUploadFailureDetails(null)
       } catch (e) {
         if (e?.name === 'AbortError') return
         const failUid = String(snap.streamVideoUid || '').trim()
@@ -8533,9 +8538,10 @@ export default function SocialFeed({
         loungeDetailCommentEditAbortRef.current = null
         loungeDetailCommentEditJobRunningRef.current = false
         bumpLoungeSubmitInFlight(-1)
+        dismissLoungePostUploadBarIfIdle()
       }
     },
-    [bumpLoungeSubmitInFlight, supabaseClient],
+    [bumpLoungeSubmitInFlight, dismissLoungePostUploadBarIfIdle, supabaseClient],
   )
   runBackgroundLoungeCommentEditSubmissionRef.current = runBackgroundLoungeCommentEditSubmission
 

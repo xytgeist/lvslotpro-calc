@@ -252,7 +252,10 @@ export async function uploadLoungeFeedPostImageToCfR2(supabaseClient, user, file
     if (mint.data?.publicUrl) {
       void deleteCfR2OrphanObject(supabaseClient, mint.data.publicUrl)
     }
-    const msg = e instanceof Error ? e.message : 'Could not upload image.'
+    const msg = mapGenericNetworkErrorMessage(
+      e instanceof Error ? e.message : String(e),
+      'Could not upload your image. Check your connection and try again.',
+    )
     return { data: null, error: new Error(msg), configured: true }
   }
 }
