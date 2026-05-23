@@ -350,14 +350,13 @@ export default function LoungeFeedVideoAutoplayDebugHud({ store, scrollRootRef }
               {badgeTipSnapshot.dom ? (
                 <div className="truncate text-zinc-400">
                   cls=
-                  {String(badgeTipSnapshot.dom.className || '')
-                    .includes('preroll')
-                    ? 'preroll'
+                  {String(badgeTipSnapshot.dom.className || '').includes('tip-out')
+                    ? 'out'
                     : String(badgeTipSnapshot.dom.className || '').includes('tip-in')
                       ? 'in'
-                      : String(badgeTipSnapshot.dom.className || '').includes('tip-out')
-                        ? 'out'
-                        : '?'}
+                      : '?'}
+                  {' · '}
+                  paused={String(badgeTipSnapshot.tipEnterPaused ?? false)}
                   {' · '}
                   play={String(badgeTipSnapshot.dom.animationPlayState)}
                   {' · '}

@@ -22,7 +22,7 @@ export function logLoungeBadgeTipDebug(tipLabel, kind, detail, extra = {}) {
       ? readLoungeBadgeTipDomSnapshot(extra.tipTextEl ?? null, extra.tipShellEl ?? null)
       : null
   const domSuffix = dom
-    ? ` · cls=${dom.className.includes('preroll') ? 'preroll' : dom.className.includes('tip-in') ? 'in' : dom.className.includes('tip-out') ? 'out' : '?'} play=${dom.animationPlayState} op=${dom.opacity}`
+    ? ` · cls=${dom.className.includes('tip-out') ? 'out' : dom.className.includes('tip-in') ? 'in' : '?'} play=${dom.animationPlayState} op=${dom.opacity}`
     : ''
   reportLoungeBadgeTipDebug(tipLabel, kind, `${detail}${domSuffix}`, { gen: extra.gen })
 }

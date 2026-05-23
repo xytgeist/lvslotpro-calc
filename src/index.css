@@ -464,6 +464,11 @@ input[list]::-webkit-list-button {
   animation: loungeBadgeTipIn 0.18s ease-out forwards;
 }
 
+.lounge-badge-tip-in[data-tip-enter-paused] {
+  animation-play-state: paused;
+  -webkit-animation-play-state: paused;
+}
+
 .lounge-badge-tip-out {
   animation: loungeBadgeTipOut 0.2s ease-out forwards;
 }
