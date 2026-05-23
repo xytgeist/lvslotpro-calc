@@ -740,7 +740,10 @@ export default function SocialFeed({
   const pullTriggeredRef = useRef(false)
   const pullPostsWrapRef = useRef(null)
   const pullIndicatorOverlayRef = useRef(null)
-  const pullLabelRef = useRef(null)
+  const pullIndicatorWrapRef = useRef(null)
+  const pullArrowRef = useRef(null)
+  const pullSpinnerRef = useRef(null)
+  const pullAriaRef = useRef(null)
   const pullVisualRafRef = useRef(0)
   const composerMediaInputRef = useRef(null)
   const composerFieldRef = useRef(null)
@@ -5946,20 +5949,46 @@ export default function SocialFeed({
       }
     }
 
-    const setPullLabel = (rawDistance, refreshing = false) => {
-      const label = pullLabelRef.current
-      if (!label) return
-      label.textContent = refreshing
-        ? 'Refreshing lounge…'
-        : rawDistance >= thresholdPx
-          ? 'Release to refresh'
-          : 'Pull down to refresh'
+    const setPullIndicator = (rawDistance, refreshing = false) => {
+      const wrap = pullIndicatorWrapRef.current
+      const arrow = pullArrowRef.current
+      const spinner = pullSpinnerRef.current
+      const aria = pullAriaRef.current
+      if (!wrap || !arrow || !spinner) return
+
+      if (refreshing) {
+        arrow.classList.add('hidden')
+        spinner.classList.remove('hidden')
+        wrap.setAttribute('aria-label', 'Refreshing lounge')
+        if (aria) aria.textContent = 'Refreshing lounge'
+        return
+      }
+
+      spinner.classList.add('hidden')
+      arrow.classList.remove('hidden')
+
+      if (rawDistance <= 0) {
+        arrow.style.transform = 'rotate(0deg)'
+        wrap.setAttribute('aria-label', 'Pull down to refresh')
+        if (aria) aria.textContent = 'Pull down to refresh'
+        return
+      }
+
+      if (rawDistance >= thresholdPx) {
+        arrow.style.transform = 'rotate(180deg)'
+        wrap.setAttribute('aria-label', 'Release to refresh')
+        if (aria) aria.textContent = 'Release to refresh'
+      } else {
+        arrow.style.transform = 'rotate(0deg)'
+        wrap.setAttribute('aria-label', 'Pull down to refresh')
+        if (aria) aria.textContent = 'Pull down to refresh'
+      }
     }
 
     const flushPullVisual = (rawDistance, { animate = false } = {}) => {
       const visual = loungePullVisualOffsetPx(rawDistance, visualCapPx)
       applyPullVisual(visual, { animate })
-      setPullLabel(rawDistance, false)
+      setPullIndicator(rawDistance, false)
     }
 
     const schedulePullVisual = (rawDistance) => {
@@ -6007,20 +6036,20 @@ export default function SocialFeed({
       const shouldRefresh = distance >= thresholdPx && !pullTriggeredRef.current
       if (!shouldRefresh) {
         applyPullVisual(0, { animate: true })
-        setPullLabel(0, false)
+        setPullIndicator(0, false)
         return
       }
       pullTriggeredRef.current = true
       setPullRefreshing(true)
       applyPullVisual(refreshIndicatorPx, { animate: true })
-      setPullLabel(0, true)
+      setPullIndicator(0, true)
       try {
         await loadCommunityFeed({ silent: true })
       } finally {
         setPullRefreshing(false)
         pullTriggeredRef.current = false
         applyPullVisual(0, { animate: true })
-        setPullLabel(0, false)
+        setPullIndicator(0, false)
       }
     }
 
@@ -9139,12 +9168,39 @@ export default function SocialFeed({
         <div ref={pullRefreshZoneRef} className="relative">
           <div
             ref={pullIndicatorOverlayRef}
-            className="pointer-events-none absolute inset-x-0 top-0 z-[1] flex items-end justify-center overflow-hidden text-[13px] text-zinc-400"
+            className="pointer-events-none absolute inset-x-0 top-0 z-[1] flex items-end justify-center overflow-hidden text-zinc-400"
             style={{ height: 0, opacity: 0 }}
             aria-live="polite"
           >
-            <div ref={pullLabelRef} className="px-3 py-1 text-center">
-              Pull down to refresh
+            <div
+              ref={pullIndicatorWrapRef}
+              className="flex h-9 items-center justify-center px-3 pb-1"
+              role="status"
+              aria-label="Pull down to refresh"
+            >
+              <svg
+                ref={pullArrowRef}
+                className="h-4 w-4 transition-transform duration-200 ease-out"
+                viewBox="0 0 20 20"
+                fill="none"
+                aria-hidden
+              >
+                <path
+                  d="M5 7.5l5 5 5-5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span
+                ref={pullSpinnerRef}
+                className="hidden h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
+                aria-hidden
+              />
+              <span ref={pullAriaRef} className="sr-only">
+                Pull down to refresh
+              </span>
             </div>
           </div>
 
