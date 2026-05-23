@@ -141,6 +141,17 @@ export function feedPostCategoryPills(row) {
   return normalizeLoungePostCategoryPills(row?.category_pills)
 }
 
+/** Pills to render on feed/detail cards — includes plain-repost fallback to OP when row copy is empty. */
+export function displayPostCategoryPills(post) {
+  if (!post) return []
+  const own = feedPostCategoryPills(post)
+  if (own.length > 0) return own
+  if (post.is_plain_repost === true && post.reposted_post) {
+    return feedPostCategoryPills(post.reposted_post)
+  }
+  return []
+}
+
 /** Quote repost compose: inherit pills from the original post (OP), not an intermediate quote shell. */
 export function resolveQuoteRepostSourcePost(post) {
   if (!post) return null

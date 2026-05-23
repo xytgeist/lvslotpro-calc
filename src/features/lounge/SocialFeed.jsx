@@ -32,6 +32,7 @@ import {
 } from '../../utils/communityFeedPost'
 import {
   feedPostCategoryPills,
+  displayPostCategoryPills,
   resolvePlainRepostCategoryPills,
   resolveQuoteRepostInitialCategoryPills,
 } from '../../utils/loungePostCategoryPills.js'
@@ -159,8 +160,7 @@ import {
 } from './loungeProfileScreenLoad.js'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
-import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
-import LoungeOgBadge from './LoungeOgBadge'
+import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
 import LoungeVideoCropModal from './LoungeVideoCropModal.jsx'
 import {
   loungeSubmitSnapshotBlobUrls,
@@ -4533,7 +4533,7 @@ export default function SocialFeed({
         const seed = feedPostAuthorEditMediaSeed(post)
         setLoungeDetailEditImageUrls(seed.imageUrls)
         setLoungeDetailEditGifUrl(seed.gifUrl)
-        setLoungeDetailEditCategoryPills(feedPostCategoryPills(post))
+        setLoungeDetailEditCategoryPills(displayPostCategoryPills(post))
         setLoungeDetailEditing(true)
       }
       const reduce =
@@ -4581,7 +4581,7 @@ export default function SocialFeed({
         const { data } = await supabaseClient
           .from('community_feed_posts')
           .select(
-            'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
+            'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
           )
           .eq('id', post.id)
           .is('hidden_at', null)
@@ -4638,7 +4638,7 @@ export default function SocialFeed({
         const { data } = await supabaseClient
           .from('community_feed_posts')
           .select(
-            'id,caption,game_title,game_slug,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
+            'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height',
           )
           .eq('id', repostedComment.post_id)
           .is('hidden_at', null)
@@ -9102,8 +9102,8 @@ export default function SocialFeed({
             </div>
           ) : loungeFeedCategoryExcludedSlugs?.length > 0 ? (
             <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
-              No posts match your category settings. Open Categories and check more boxes, or reset with Show all
-              categories.
+              No posts match your tribe settings. Open Tribes and tap dimmed pills to show them again, or reset with
+              Show all tribes.
             </div>
           ) : loungeFeedScope === LOUNGE_FEED_SCOPE_FOLLOWING ? (
             <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
@@ -9510,13 +9510,13 @@ export default function SocialFeed({
                 </div>
               ) : null}
 
-              {!loungeDetailEditing && feedPostCategoryPills(loungePostDetail).length > 0 ? (
+              {!loungeDetailEditing && displayPostCategoryPills(loungePostDetail).length > 0 ? (
                 <div
                   className={`flex justify-start ${
                     loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
                   } ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
                 >
-                  <LoungePostCategoryPillRow pills={feedPostCategoryPills(loungePostDetail)} />
+                  <LoungePostCategoryPillRow pills={displayPostCategoryPills(loungePostDetail)} />
                 </div>
               ) : null}
 
@@ -9637,22 +9637,12 @@ export default function SocialFeed({
                       onClick={() => void openLoungePostDetail(loungePostDetail.reposted_post)}
                       className="mt-3 w-full cursor-pointer rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/80 active:bg-zinc-800/50"
                     >
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[14px] leading-snug">
-                      <span className="min-w-0 max-w-[min(11rem,42vw)] truncate font-semibold text-zinc-200 sm:max-w-[13rem]">
-                        {displayNameFor(loungePostDetail.reposted_post)}
-                      </span>
-                      <LoungeStaffRoleBadge role={loungePostDetail.reposted_post?.author_profile?.role} size="detail" />
-                      <span className="inline-flex min-w-0 max-w-full items-center gap-x-1 text-[14px] text-zinc-500">
-                        <span className="min-w-0 max-w-[min(9rem,36vw)] truncate sm:max-w-[11rem]">
-                          {handleFor(loungePostDetail.reposted_post)}
-                        </span>
-                      </span>
-                      {loungePostDetail.reposted_post.pinned ? (
-                        <span className="shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
-                          Pinned
-                        </span>
-                      ) : null}
-                    </div>
+                    <LoungeQuoteRepostEmbedAuthorMeta
+                      post={loungePostDetail.reposted_post}
+                      displayNameFor={displayNameFor}
+                      handleFor={handleFor}
+                      postAgeLabel={postAgeLabel}
+                    />
                     <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
                       {renderRichCaption(feedPostDisplayCaption(loungePostDetail.reposted_post), {
                         hashtagClassName: 'font-semibold text-cyan-300',
@@ -11431,29 +11421,12 @@ export default function SocialFeed({
                                 aria-label="Quoted post preview"
                                 className="w-full rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit"
                               >
-                                <div className="min-w-0">
-                                  <div className="flex min-w-0 flex-nowrap items-center justify-start gap-x-1.5 text-[14px] leading-snug">
-                                    <span className="min-w-0 truncate font-semibold text-zinc-200">
-                                      {displayNameFor(orig)}
-                                    </span>
-                                    <span className="shrink-0">
-                                      <LoungeStaffRoleBadge role={orig?.author_profile?.role} size="detail" />
-                                    </span>
-                                    <span className="shrink-0">
-                                      <LoungeOgBadge isOg={orig?.author_profile?.is_og} size="detail" />
-                                    </span>
-                                    <span className="inline-flex min-w-0 max-w-[min(10rem,48vw)] shrink-[3] items-center gap-x-1 overflow-hidden text-[14px] text-zinc-500 sm:max-w-[12rem]">
-                                      <span className="min-w-0 truncate">{handleFor(orig)}</span>
-                                    </span>
-                                  </div>
-                                  {orig.pinned ? (
-                                    <div className="mt-1">
-                                      <span className="inline-flex shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
-                                        Pinned
-                                      </span>
-                                    </div>
-                                  ) : null}
-                                </div>
+                                <LoungeQuoteRepostEmbedAuthorMeta
+                                  post={orig}
+                                  displayNameFor={displayNameFor}
+                                  handleFor={handleFor}
+                                  postAgeLabel={postAgeLabel}
+                                />
                                 <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
                                   {renderRichCaption(feedPostDisplayCaption(orig))}
                                 </div>

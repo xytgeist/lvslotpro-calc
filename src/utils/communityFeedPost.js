@@ -294,14 +294,17 @@ export function communityFeedQuoteRepostInsertPayload({
 }
 
 /** Plain repost (no quote): empty caption + `is_plain_repost` (see `supabase/lounge_plain_reposts.sql`). */
-export function communityFeedPlainRepostInsertPayload({ originalPostId }) {
-  return {
-    caption: '',
-    game_title: '',
-    game_slug: null,
-    repost_of_post_id: originalPostId,
-    is_plain_repost: true,
-  }
+export function communityFeedPlainRepostInsertPayload({ originalPostId, categoryPills }) {
+  return attachCategoryPills(
+    {
+      caption: '',
+      game_title: '',
+      game_slug: null,
+      repost_of_post_id: originalPostId,
+      is_plain_repost: true,
+    },
+    categoryPills,
+  )
 }
 
 /**

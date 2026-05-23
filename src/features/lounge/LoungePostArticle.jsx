@@ -1,15 +1,14 @@
 import { useCallback, useMemo, useState } from 'react'
 import { feedPostDisplayCaption, isQuoteRepostPost, quoteRepostOriginalUnavailable } from '../../utils/communityFeedPost'
-import { feedPostCategoryPills } from '../../utils/loungePostCategoryPills.js'
+import { displayPostCategoryPills } from '../../utils/loungePostCategoryPills.js'
 import { renderRichCaption } from './loungeCaption'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
-import LoungeStaffRoleBadge from './LoungeStaffRoleBadge'
-import LoungeOgBadge from './LoungeOgBadge'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
+import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
   LOUNGE_FEED_AVATAR_CLASS,
@@ -374,9 +373,9 @@ export default function LoungePostArticle({
           </div>
         ) : null}
 
-        {feedPostCategoryPills(post).length > 0 ? (
+        {displayPostCategoryPills(post).length > 0 ? (
           <div className="mt-1.5 flex justify-start">
-            <LoungePostCategoryPillRow pills={feedPostCategoryPills(post)} />
+            <LoungePostCategoryPillRow pills={displayPostCategoryPills(post)} />
           </div>
         ) : null}
 
@@ -473,33 +472,13 @@ export default function LoungePostArticle({
               aria-label="View original post"
               className="mt-2 w-full cursor-pointer rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/80 active:bg-zinc-800/50"
             >
-              <div className="min-w-0">
-                <div className="flex min-w-0 flex-nowrap items-center justify-start gap-x-1.5 text-[14px] leading-snug">
-                  <button
-                    type="button"
-                    onClick={(e) => onEmbeddedAuthorProfile(e, post.reposted_post)}
-                    className="min-w-0 truncate font-semibold text-zinc-200 text-left touch-manipulation hover:text-cyan-300 [-webkit-tap-highlight-color:transparent]"
-                  >
-                    {displayNameFor(post.reposted_post)}
-                  </button>
-                  <span className="shrink-0">
-                    <LoungeStaffRoleBadge role={post.reposted_post?.author_profile?.role} size="detail" />
-                  </span>
-                  <span className="shrink-0">
-                    <LoungeOgBadge isOg={post.reposted_post?.author_profile?.is_og} size="detail" />
-                  </span>
-                  <span className="inline-flex min-w-0 max-w-[min(10rem,48vw)] shrink-[3] items-center gap-x-1 overflow-hidden text-[14px] text-zinc-500 sm:max-w-[12rem]">
-                    <span className="min-w-0 truncate">{handleFor(post.reposted_post)}</span>
-                  </span>
-                </div>
-                {post.reposted_post.pinned ? (
-                  <div className="mt-1">
-                    <span className="inline-flex shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
-                      Pinned
-                    </span>
-                  </div>
-                ) : null}
-              </div>
+              <LoungeQuoteRepostEmbedAuthorMeta
+                post={post.reposted_post}
+                displayNameFor={displayNameFor}
+                handleFor={handleFor}
+                postAgeLabel={postAgeLabel}
+                onDisplayNameClick={(e) => onEmbeddedAuthorProfile(e, post.reposted_post)}
+              />
               <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
                 {renderRichCaption(feedPostDisplayCaption(post.reposted_post), richCaptionOpts)}
               </div>

@@ -16,14 +16,31 @@ export default function LoungeFeedAuthorMetaBadges({
   isOg = false,
   displayName,
   displayNameClassName,
+  onDisplayNameClick,
 }) {
   const hasStaffBadge = loungeFeedAuthorHasStaffBadge(role)
   const showOgBadge = isOg === true
 
+  const displayNameNode =
+    typeof onDisplayNameClick === 'function' ? (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onDisplayNameClick(e)
+        }}
+        className={`${displayNameClassName} touch-manipulation hover:text-cyan-300 [-webkit-tap-highlight-color:transparent]`}
+      >
+        {displayName}
+      </button>
+    ) : (
+      <span className={displayNameClassName}>{displayName}</span>
+    )
+
   return (
     <>
       <span className={loungeFeedAuthorIdentityClusterClass(hasStaffBadge, showOgBadge)}>
-        <span className={displayNameClassName}>{displayName}</span>
+        {displayNameNode}
         {hasStaffBadge ? (
           <span className={LOUNGE_FEED_META_BADGE_WRAP_CLASS}>
             <LoungeStaffRoleBadge role={role} />

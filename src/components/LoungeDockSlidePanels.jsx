@@ -1076,7 +1076,7 @@ export default function LoungeDockSlidePanels({
                 {queryReady && !searchCategorySlug && categorySuggestions.length > 0 ? (
                   <section className="mb-3">
                     <h3 className="mb-1.5 px-0.5 text-[13px] font-semibold uppercase tracking-wide text-zinc-500">
-                      Categories
+                      Tribes
                     </h3>
                     <ul className="list-none p-0">
                       {categorySuggestions.map(({ slug, label }) => (

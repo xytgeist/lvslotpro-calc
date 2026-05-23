@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   loungePostCategoryPillChipClass,
-  loungePostCategoryPillLabel,
   loungePostCategoryPillOptions,
 } from '../../utils/loungePostCategoryPills.js'
 import { writeLoungeFeedCategoryFilter } from '../../utils/loungeFeedCategoryFilterPref.js'
 
-/** Home feed category visibility — all checked by default; uncheck to hide posts with that pill. */
+/** Home feed tribe visibility — all on by default; tap to dim/hide posts with that pill. */
 export default function LoungeFeedCategoryFilter({
   value = [],
   onChange,
@@ -16,6 +15,7 @@ export default function LoungeFeedCategoryFilter({
   const excluded = Array.isArray(value) ? value : []
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
+  const filterActive = excluded.length > 0
 
   useEffect(() => {
     if (!open) return
@@ -25,14 +25,6 @@ export default function LoungeFeedCategoryFilter({
     document.addEventListener('pointerdown', onDoc)
     return () => document.removeEventListener('pointerdown', onDoc)
   }, [open])
-
-  const hiddenCount = excluded.length
-  const buttonLabel =
-    hiddenCount === 0
-      ? 'Categories'
-      : hiddenCount === 1
-        ? `${loungePostCategoryPillLabel(excluded[0])} hidden`
-        : `Categories (${hiddenCount} hidden)`
 
   const toggleSlug = (slug) => {
     const set = new Set(excluded)
@@ -58,13 +50,13 @@ export default function LoungeFeedCategoryFilter({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Feed category visibility"
+        aria-label="Feed tribes"
         onClick={() => setOpen((o) => !o)}
         className={`inline-flex max-w-[min(36vw,8.5rem)] items-center gap-0.5 rounded-md py-0.5 pr-0.5 text-[13px] font-medium leading-tight touch-manipulation hover:text-zinc-300 disabled:opacity-50 [-webkit-tap-highlight-color:transparent] ${
-          hiddenCount > 0 ? 'text-cyan-300/90' : 'text-zinc-500'
+          filterActive ? 'text-cyan-300/90' : 'text-zinc-500'
         }`}
       >
-        <span className="truncate">{buttonLabel}</span>
+        <span className="truncate">Tribes</span>
         <svg className="h-3.5 w-3.5 shrink-0 opacity-80" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
           <path
             fillRule="evenodd"
@@ -77,40 +69,41 @@ export default function LoungeFeedCategoryFilter({
         <div
           role="listbox"
           aria-multiselectable="true"
-          className="absolute right-0 top-full z-30 mt-0.5 max-h-[min(60vh,18rem)] w-max min-w-[9.5rem] max-w-[min(88vw,11.5rem)] overflow-y-auto overscroll-contain rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-lg"
+          className="absolute right-0 top-full z-30 mt-0.5 w-[min(92vw,22.5rem)] rounded-lg border border-zinc-700/90 bg-zinc-900 py-1.5 shadow-lg"
         >
-          {hiddenCount > 0 ? (
+          {filterActive ? (
             <button
               type="button"
-              className="block w-full border-b border-zinc-800/90 px-2 py-1.5 text-left text-[11px] font-medium text-zinc-400 touch-manipulation hover:bg-zinc-800 hover:text-zinc-200"
+              className="mx-1.5 mb-1.5 block w-[calc(100%-0.75rem)] rounded-md border border-zinc-700/80 px-2.5 py-2 text-left text-[12px] font-medium text-zinc-400 touch-manipulation hover:bg-zinc-800 hover:text-zinc-200"
               onClick={showAll}
             >
-              Show all categories
+              Show all tribes
             </button>
           ) : null}
-          {loungePostCategoryPillOptions().map(({ slug, label }) => {
-            const checked = !excluded.includes(slug)
-            return (
-              <label
-                key={slug}
-                role="option"
-                aria-selected={checked}
-                className="flex cursor-pointer items-center gap-1.5 px-2 py-1 touch-manipulation hover:bg-zinc-800/80"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleSlug(slug)}
-                  className="h-3.5 w-3.5 shrink-0 rounded border-zinc-600 bg-zinc-950 text-cyan-500"
-                />
-                <span
-                  className={`inline-flex min-w-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none ${loungePostCategoryPillChipClass(slug, 'display')}`}
+          <div className="grid grid-cols-5 grid-rows-2 gap-1.5 px-1.5">
+            {loungePostCategoryPillOptions().map(({ slug, label }) => {
+              const visible = !excluded.includes(slug)
+              return (
+                <button
+                  key={slug}
+                  type="button"
+                  role="option"
+                  aria-selected={visible}
+                  title={label}
+                  onClick={() => toggleSlug(slug)}
+                  className="flex min-h-11 items-center justify-center rounded-lg p-1 touch-manipulation active:bg-zinc-800/60 [-webkit-tap-highlight-color:transparent]"
                 >
-                  {label}
-                </span>
-              </label>
-            )
-          })}
+                  <span
+                    className={`inline-flex max-w-full truncate rounded-full border px-2 py-1 text-[11px] font-semibold leading-tight transition-[opacity,filter] duration-150 sm:px-2.5 sm:py-1.5 sm:text-[12px] ${loungePostCategoryPillChipClass(slug, 'display')} ${
+                      visible ? 'opacity-100 saturate-100' : 'opacity-35 saturate-[0.35]'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       ) : null}
     </div>

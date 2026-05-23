@@ -25,7 +25,7 @@ function ShieldIcon({ className }) {
 /** @type {Record<'feed' | 'detail' | 'modal', { wrap: string, crown: string, shield: string, modInner: string }>} */
 const STAFF_BADGE_LAYOUT = {
   feed: {
-    wrap: 'translate-y-[0.5px]',
+    wrap: 'translate-y-[1.5px]',
     crown: 'translate-y-0',
     shield: '-translate-y-[2px]',
     modInner: 'translate-y-0',
