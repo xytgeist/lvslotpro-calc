@@ -11300,6 +11300,7 @@ export default function SocialFeed({
                     <LoungeRichComposerField
                       ref={loungeDetailEditFieldRef}
                       variant="detailEdit"
+                      autoGrow
                       value={loungeDetailDraftCaption}
                       onChange={setLoungeDetailDraftCaption}
                       maxLength={280}

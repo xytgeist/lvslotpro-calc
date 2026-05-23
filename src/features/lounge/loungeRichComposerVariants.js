@@ -13,7 +13,7 @@ export const LOUNGE_RICH_COMPOSER_VARIANTS = {
     placeholderClass: 'pt-[10px] text-[17px] leading-[1.25] sm:pt-[13px]',
   },
   detailEdit: {
-    fieldClass: `min-h-[5rem] ${LOUNGE_FEED_CAPTION_TEXT_CLASS}`,
+    fieldClass: LOUNGE_FEED_CAPTION_TEXT_CLASS,
     placeholderClass: LOUNGE_FEED_CAPTION_TEXT_CLASS,
   },
   detailComment: {
