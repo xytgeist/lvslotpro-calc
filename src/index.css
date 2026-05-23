@@ -448,10 +448,16 @@ input[list]::-webkit-list-button {
 }
 
 .lounge-badge-tip-in,
-.lounge-badge-tip-out {
+.lounge-badge-tip-out,
+.lounge-badge-tip-preroll {
   will-change: transform, opacity;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+}
+
+.lounge-badge-tip-preroll {
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
 }
 
 .lounge-badge-tip-in {
@@ -464,11 +470,13 @@ input[list]::-webkit-list-button {
 
 @media (prefers-reduced-motion: reduce) {
   .lounge-badge-tip-in,
-  .lounge-badge-tip-out {
+  .lounge-badge-tip-out,
+  .lounge-badge-tip-preroll {
     animation: none;
   }
 
-  .lounge-badge-tip-in {
+  .lounge-badge-tip-in,
+  .lounge-badge-tip-preroll {
     opacity: 1;
     transform: none;
   }
