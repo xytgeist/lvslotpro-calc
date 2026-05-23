@@ -13635,11 +13635,7 @@ export default function SocialFeed({
         <LoungeVideoCropModal
           file={loungeVideoCrop.file}
           knownDurationSec={loungeVideoCrop.knownDurationSec}
-          intent={
-            loungeVideoCrop.mode === 'detailEdit' || loungeVideoCrop.mode === 'detailCommentEdit'
-              ? 'detail'
-              : 'composer'
-          }
+          intent="composer"
           shellClassName={
             loungeVideoCrop.mode === 'quote'
               ? loungePostDetailAboveProfile
