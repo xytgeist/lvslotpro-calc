@@ -71,11 +71,14 @@ export async function upsertUserSubscriptionFromStripe(
   }
 
   const { error } = await admin.from('user_subscriptions').upsert(row, {
-    onConflict: 'stripe_subscription_id',
+    onConflict: 'user_id,product_slug',
   })
   if (error) throw new Error(`user_subscriptions upsert: ${error.message}`)
 
-  await admin.rpc('sync_profile_has_active_subscription', { p_user_id: userId })
+  const { error: syncErr } = await admin.rpc('sync_profile_has_active_subscription', {
+    p_user_id: userId,
+  })
+  if (syncErr) throw new Error(`sync_profile_has_active_subscription: ${syncErr.message}`)
 }
 
 export async function recordWebhookEvent(admin: SupabaseClient, eventId: string, eventType: string) {

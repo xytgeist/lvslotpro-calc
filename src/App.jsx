@@ -246,19 +246,29 @@ function App() {
   useEffect(() => {
     const billing = readBillingQueryParams()
     if (!billing || !user?.id) return
+
+    let cancelled = false
+
+    const pollEntitlements = async () => {
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        if (cancelled) return
+        await refreshEntitlements()
+        const { data } = await supabase
+          .from('profiles')
+          .select('has_active_subscription, stripe_customer_id')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (data) {
+          setHasActiveSubscriptionFromProfile(Boolean(data.has_active_subscription))
+          setStripeCustomerId(data.stripe_customer_id ?? null)
+          if (data.has_active_subscription) return
+        }
+        await new Promise((r) => window.setTimeout(r, 1200))
+      }
+    }
+
     if (billing.billing === 'success' || billing.billing === 'portal') {
-      void refreshEntitlements()
-      void supabase
-        .from('profiles')
-        .select('has_active_subscription, stripe_customer_id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) {
-            setHasActiveSubscriptionFromProfile(Boolean(data.has_active_subscription))
-            setStripeCustomerId(data.stripe_customer_id ?? null)
-          }
-        })
+      void pollEntitlements()
       setAccessNotice(
         billing.billing === 'success'
           ? 'Subscription updated — thanks for supporting Edge.'
@@ -266,6 +276,10 @@ function App() {
       )
     }
     clearBillingQueryParams()
+
+    return () => {
+      cancelled = true
+    }
   }, [user?.id, refreshEntitlements])
 
   const openSubscribeModal = useCallback((productSlug = PRODUCT_SLOTS_EDGE) => {

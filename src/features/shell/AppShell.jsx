@@ -1033,15 +1033,20 @@ export default function AppShell({
   return (
     <div className="min-h-dvh bg-gray-950">
       {accessNotice ? (
-        <div className="sticky top-0 z-30 flex items-start justify-between gap-3 border-b border-amber-800/50 bg-amber-950/95 px-4 py-3 backdrop-blur">
-          <p className="min-w-0 flex-1 text-left text-[13px] leading-snug text-amber-100">{accessNotice}</p>
-          <button
-            type="button"
-            onClick={() => onDismissAccessNotice?.()}
-            className="shrink-0 rounded-lg border border-amber-700/60 px-2.5 py-1 text-[12px] font-semibold text-amber-200 touch-manipulation hover:bg-amber-900/50"
-          >
-            Dismiss
-          </button>
+        <div
+          role="status"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[94] flex justify-center px-3 pt-[max(0.5rem,env(safe-area-inset-top))]"
+        >
+          <div className="pointer-events-auto flex w-full max-w-2xl items-start justify-between gap-3 rounded-2xl border border-amber-800/50 bg-amber-950/95 px-4 py-3 shadow-lg backdrop-blur">
+            <p className="min-w-0 flex-1 text-left text-[13px] leading-snug text-amber-100">{accessNotice}</p>
+            <button
+              type="button"
+              onClick={() => onDismissAccessNotice?.()}
+              className="shrink-0 rounded-lg border border-amber-700/60 px-2.5 py-1 text-[12px] font-semibold text-amber-200 touch-manipulation hover:bg-amber-900/50"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       ) : null}
       {renderTabContent()}

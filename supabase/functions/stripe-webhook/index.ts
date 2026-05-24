@@ -64,11 +64,15 @@ Deno.serve(async (req) => {
     ) {
       const subscription = event.data.object as StripeSubscriptionPayload
       const { userId, productSlug } = await resolveUserAndProduct(admin, subscription)
-      if (!userId || !productSlug) {
-        console.warn('stripe-webhook: missing user/product for subscription', subscription.id)
+      if (!userId) {
+        console.warn('stripe-webhook: missing user for subscription', subscription.id)
         return jsonResponse({ ok: true, skipped: true })
       }
-      await upsertUserSubscriptionFromStripe(admin, { userId, productSlug, subscription })
+      await upsertUserSubscriptionFromStripe(admin, {
+        userId,
+        productSlug: productSlug || 'slots-edge',
+        subscription,
+      })
     }
 
     if (event.type === 'checkout.session.completed') {
@@ -89,7 +93,7 @@ Deno.serve(async (req) => {
       const productSlug =
         session.metadata?.product_slug?.trim() ||
         subscription.metadata?.product_slug?.trim() ||
-        null
+        'slots-edge'
 
       if (userId && session.customer) {
         await admin
@@ -98,7 +102,7 @@ Deno.serve(async (req) => {
           .eq('user_id', userId)
       }
 
-      if (userId && productSlug) {
+      if (userId) {
         await upsertUserSubscriptionFromStripe(admin, { userId, productSlug, subscription })
       }
     }
