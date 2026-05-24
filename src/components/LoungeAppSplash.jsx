@@ -107,13 +107,21 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       <div className="lounge-cold-boot-splash__glow pointer-events-none absolute inset-0" aria-hidden />
       <canvas
         ref={canvasRef}
-        className="pointer-events-none relative h-[80vw] w-[80vw] max-h-[380px] max-w-[380px]"
+        // Draw phase: centered square, scaled 1.5× to zoom the logo in.
+        // Zoom phase: absolute inset-0 so the comp fills the full viewport —
+        //   no rectangular frame, no letterbox bands.
+        className={
+          isZoom
+            ? 'pointer-events-none absolute inset-0 w-full h-full'
+            : 'pointer-events-none relative h-[80vw] w-[80vw] max-h-[380px] max-w-[380px]'
+        }
         style={{
-          transform: 'scale(1.5)',
+          background: 'transparent',
+          transform: isZoom ? 'none' : 'scale(1.5)',
           transformOrigin: 'center',
           // destination-in: keeps the dark bg wherever the canvas is opaque
-          // (D letter body); punches it transparent wherever the canvas is
-          // transparent (D counter/hole) → hole shows live app beneath.
+          // (D body with even-odd fill); punches through wherever the canvas
+          // is transparent (D counter/hole) → live window into the app.
           mixBlendMode: isZoom ? 'destination-in' : 'normal',
         }}
         aria-hidden
