@@ -54,6 +54,7 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       <canvas
         ref={canvasRef}
         className="pointer-events-none h-[80vw] w-[80vw] max-h-[380px] max-w-[380px]"
+        style={{ transform: 'scale(1.5)', transformOrigin: 'center' }}
         aria-hidden
       />
     </div>
