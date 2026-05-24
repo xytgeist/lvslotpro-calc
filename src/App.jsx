@@ -6,6 +6,9 @@ import AuthModalPanel from './features/auth/AuthModalPanel'
 import AppShell from './features/shell'
 import LoungeColdBootBootstrapBackdrop from './components/LoungeColdBootBootstrapBackdrop.jsx'
 import { ensureDefaultProfileRow } from './features/profiles/profileGate'
+import SubscribeModal from './features/billing/SubscribeModal.jsx'
+import { PRODUCT_SLOTS_EDGE } from './features/billing/edgeProducts.js'
+import { useEdgeEntitlements } from './features/billing/useEdgeEntitlements.js'
 import {
   readLoungeComposerDraftPendingWork,
   shouldShowLoungeColdBootSplash,
@@ -14,6 +17,34 @@ import {
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+function readBillingQueryParams() {
+  if (typeof window === 'undefined') return null
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const billing = params.get('billing')
+    if (!billing) return null
+    return {
+      billing,
+      product: params.get('product') || PRODUCT_SLOTS_EDGE,
+    }
+  } catch {
+    return null
+  }
+}
+
+function clearBillingQueryParams() {
+  if (typeof window === 'undefined') return
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('billing')
+    url.searchParams.delete('product')
+    const next = `${url.pathname}${url.search}${url.hash}`
+    window.history.replaceState({}, document.title, next || '/')
+  } catch {
+    // ignore
+  }
+}
 
 function App() {
   const AUTH_VIEW_STORAGE_KEY = 'lvslotpro-auth-view'
@@ -30,6 +61,8 @@ function App() {
   const [isStaffRole, setIsStaffRole] = useState(false)
   /** From `profiles.has_active_subscription` when column exists (see `supabase/profiles_tier_testing.sql`). */
   const [hasActiveSubscriptionFromProfile, setHasActiveSubscriptionFromProfile] = useState(false)
+  const [stripeCustomerId, setStripeCustomerId] = useState(null)
+  const [subscribeModal, setSubscribeModal] = useState({ open: false, productSlug: PRODUCT_SLOTS_EDGE })
 
   // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -156,6 +189,7 @@ function App() {
       queueMicrotask(() => {
         setIsStaffRole(false)
         setHasActiveSubscriptionFromProfile(false)
+        setStripeCustomerId(null)
       })
       return
     }
@@ -163,7 +197,7 @@ function App() {
     const load = async () => {
       const wide = await supabase
         .from('profiles')
-        .select('role, has_active_subscription')
+        .select('role, has_active_subscription, stripe_customer_id')
         .eq('user_id', user.id)
         .maybeSingle()
       if (cancelled) return
@@ -171,11 +205,13 @@ function App() {
         const r = wide.data.role
         setIsStaffRole(r === 'moderator' || r === 'admin')
         setHasActiveSubscriptionFromProfile(Boolean(wide.data.has_active_subscription))
+        setStripeCustomerId(wide.data.stripe_customer_id ?? null)
         return
       }
       if (wide.error?.code === 'PGRST116') {
         setIsStaffRole(false)
         setHasActiveSubscriptionFromProfile(false)
+        setStripeCustomerId(null)
         return
       }
       if (wide.error) {
@@ -188,16 +224,57 @@ function App() {
           setIsStaffRole(false)
         }
         setHasActiveSubscriptionFromProfile(false)
+        setStripeCustomerId(null)
         return
       }
       setIsStaffRole(false)
       setHasActiveSubscriptionFromProfile(false)
+      setStripeCustomerId(null)
     }
     void load()
     return () => {
       cancelled = true
     }
   }, [user?.id])
+
+  const {
+    entitlements,
+    refresh: refreshEntitlements,
+    hasSlotsEdge: hasSlotsEdgeFromRpc,
+  } = useEdgeEntitlements(supabase, user?.id)
+
+  useEffect(() => {
+    const billing = readBillingQueryParams()
+    if (!billing || !user?.id) return
+    if (billing.billing === 'success' || billing.billing === 'portal') {
+      void refreshEntitlements()
+      void supabase
+        .from('profiles')
+        .select('has_active_subscription, stripe_customer_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setHasActiveSubscriptionFromProfile(Boolean(data.has_active_subscription))
+            setStripeCustomerId(data.stripe_customer_id ?? null)
+          }
+        })
+      setAccessNotice(
+        billing.billing === 'success'
+          ? 'Subscription updated — thanks for supporting Edge.'
+          : 'Billing settings saved.',
+      )
+    }
+    clearBillingQueryParams()
+  }, [user?.id, refreshEntitlements])
+
+  const openSubscribeModal = useCallback((productSlug = PRODUCT_SLOTS_EDGE) => {
+    setSubscribeModal({ open: true, productSlug })
+  }, [])
+
+  const closeSubscribeModal = useCallback(() => {
+    setSubscribeModal((s) => ({ ...s, open: false }))
+  }, [])
 
   const getFriendlyErrorMessage = (error, context = 'general') => {
     const message = error?.message || 'Unknown error'
@@ -497,7 +574,9 @@ function App() {
     )
   }
 
-  const hasActiveSubscription =
+  const hasSlotsEdgeAccess =
+    isStaffRole ||
+    hasSlotsEdgeFromRpc ||
     hasActiveSubscriptionFromProfile ||
     String(import.meta.env.VITE_HAS_ACTIVE_SUBSCRIPTION || '').toLowerCase() === 'true'
 
@@ -508,9 +587,10 @@ function App() {
         <AppShell
           browseMode={user ? 'member' : 'anonymous'}
           authSessionReady={!isChecking}
-          hasActiveSubscription={hasActiveSubscription}
+          hasActiveSubscription={hasSlotsEdgeAccess}
           isStaff={isStaffRole}
           onOpenAuth={openAuthPanel}
+          onRequireSubscribe={openSubscribeModal}
           accessNotice={accessNotice}
           onDismissAccessNotice={() => setAccessNotice('')}
           onLogout={handleLogout}
@@ -518,6 +598,13 @@ function App() {
           deleteAccountBusy={deleteAccountBusy}
           supabaseClient={supabase}
           onRequireAuth={(mode) => openAuthPanel(mode === 'login' ? 'login' : 'create')}
+        />
+        <SubscribeModal
+          open={subscribeModal.open}
+          productSlug={subscribeModal.productSlug}
+          onClose={closeSubscribeModal}
+          supabaseClient={supabase}
+          hasBillingAccount={Boolean(stripeCustomerId)}
         />
         {authPanelOpen ? (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">

@@ -17,3 +17,7 @@ verify_jwt = true
 # Invoked from pg_net on activity_events INSERT; shared secret header (see migration + README).
 [functions.lounge-send-activity-push]
 verify_jwt = false
+
+# Stripe billing webhook (signed by Stripe, not Supabase JWT).
+[functions.stripe-webhook]
+verify_jwt = false

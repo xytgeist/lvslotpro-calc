@@ -32,6 +32,8 @@ export default function OffersCalendar({
   setPendingOfferEventIds,
   offerSpotlightEventIds,
   setOfferSpotlightEventIds,
+  hasSlotsEdge = true,
+  onRequireSubscribe,
   titleBarNavSlot = null,
 }) {
   /** Gate for the large legacy push / iOS help block below (was `false &&`). */
@@ -805,7 +807,9 @@ export default function OffersCalendar({
           // Keep pending value for a future successful save attempt.
         }
       }
-    }
+    },
+    hasSlotsEdge,
+    onRequireSubscribe,
   })
 
   const activeCalendarView = useMemo(() => {
@@ -1694,6 +1698,8 @@ export default function OffersCalendar({
         fileInputRef={fileInputRef}
         handleImportPhotos={handleImportPhotos}
         uploading={uploading}
+        hasSlotsEdge={hasSlotsEdge}
+        onRequireSubscribe={onRequireSubscribe}
         reviewSourceImageLoading={reviewSourceImageLoading}
         reviewSourceImageUrl={reviewSourceImageUrl}
         draft={draft}

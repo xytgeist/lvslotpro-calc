@@ -114,7 +114,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 - [x] **Phase J Popular feed (test build):** **`lounge_feed_posts_page`** + **`lounge_feed_popular_score()`** — home feed **Latest | Popular** (`LoungeFeedSortSwitch`, `AppShell` RPC load). Migration **`20260521120000_lounge_feed_popular_sort.sql`**. Ryan sign-off **PASSED** on **test** (smoke **§20**, 2026-05-24 @ **`51b1621`**). Block/mute still open.
 - [x] **Phase C (profiles + identity, test):** profile gate (Lounge + Guides); full-screen profile editor; 7-day handle change (DB + modals); **`/u/:handle`** permalink + OG + deep link; **handle conflict** dialog (taken/reserved + suggested `@handle_1`). Ryan sign-off **PASSED** on **test** @ **`7ce7b44`** (2026-05-18). *Deferred (not blocking):* dedicated server-side reserved-handle SQL beyond client `RESERVED_HANDLES` + unique index; standalone marketing profile page beyond in-app sheet.
 - [x] **Phase G (search, test):** Auth-gated **`lounge_search()`** stack — posts, profiles, comments, highlight/recent/about, Top/Latest, rate limit, bundled pagination, hardening, **`@handle` keyword**, relevance ranking, volatile helpers. Migrations **`20260518160000`** through **`20260520190000`**. Client: **`loungeSearchApi.js`**, **`LoungeDockSlidePanels.jsx`**. Ryan sign-off **PASSED** on **test** (smoke **§16**, 2026-05-21).
-- [ ] **Freemium / subscriptions:** anonymous read-only where required; free-account vs subscriber entitlements (DB + **RLS** + Stripe webhooks); extend shell gating beyond today’s **`browseMode`**. Product spec: fill **`docs/access-tiers.md`**; roadmap: **`docs/social-feed-roadmap.md`** → *Freemium & subscriptions*.
+- [ ] **Freemium / subscriptions:** multi-product entitlements (**`slots-edge`**, **`sports-edge`**, **`crypto-edge`**) — migration **`20260526120000_edge_subscriptions.sql`**, Stripe Edge functions (**`stripe-create-checkout-session`**, **`stripe-webhook`**, **`stripe-create-portal-session`**), **`get_my_entitlements()`**, Subscribe modal + hamburger/OCR gates shipped on **test** branch; **apply migration + deploy Edge + Stripe secrets** before smoke; RLS hardening + per-calc/guide locks still open. Spec: **`docs/access-tiers.md`**; setup: **`supabase/functions/stripe-create-checkout-session/README.md`**.
 
 ---
 
@@ -420,6 +420,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ---
 
 ## Update log
+
+- 2026-05-24: **Multi-product Edge billing (scaffold):** migration **`20260526120000_edge_subscriptions.sql`** (`slots-edge` / `sports-edge` / `crypto-edge`), Stripe Edge **`stripe-create-checkout-session`**, **`stripe-webhook`**, **`stripe-create-portal-session`**, client Subscribe modal + **`get_my_entitlements()`**; OCR gated on **`slots-edge`**; Lounge + calendar + alerts remain free. **Apply migration + deploy Edge + Stripe test secrets** before checkout smoke — see **`supabase/functions/stripe-create-checkout-session/README.md`**.
 
 - 2026-05-24: **Tribe feed exclusion (any-pill rule):** migration **`20260525200000_lounge_feed_category_exclusion_any_pill.sql`** + **`loungeFeedScope.js`** pinned query — hide post only when **all** `category_pills` are excluded; mixed-pill posts stay visible if at least one pill is still on. Apply on test Supabase.
 

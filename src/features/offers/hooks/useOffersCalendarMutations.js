@@ -26,7 +26,9 @@ export default function useOffersCalendarMutations({
   supabaseClient,
   state,
   setters,
-  actions
+  actions,
+  hasSlotsEdge = true,
+  onRequireSubscribe,
 }) {
   const {
     draft,
@@ -355,6 +357,11 @@ export default function useOffersCalendarMutations({
 
   const handleImportPhotos = useCallback(
     async (ev) => {
+      if (!hasSlotsEdge) {
+        onRequireSubscribe?.()
+        ev.target.value = ''
+        return
+      }
       const files = Array.from(ev.target.files || []).filter((f) => f.type.startsWith('image/'))
       ev.target.value = ''
       if (!files.length) return
@@ -418,7 +425,7 @@ export default function useOffersCalendarMutations({
         setUploading(false)
       }
     },
-    [closeForm, refreshImportResults, setActiveImportBatchId, setError, setUploading, supabaseClient]
+    [closeForm, hasSlotsEdge, onRequireSubscribe, refreshImportResults, setActiveImportBatchId, setError, setUploading, supabaseClient]
   )
 
   return {

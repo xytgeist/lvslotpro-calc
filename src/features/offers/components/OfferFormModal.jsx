@@ -73,6 +73,8 @@ export default function OfferFormModal({
   fileInputRef,
   handleImportPhotos,
   uploading,
+  hasSlotsEdge = true,
+  onRequireSubscribe,
   reviewSourceImageLoading,
   reviewSourceImageUrl,
   draft,
@@ -522,7 +524,13 @@ export default function OfferFormModal({
               <button
                 type="button"
                 disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => {
+                  if (!hasSlotsEdge) {
+                    onRequireSubscribe?.()
+                    return
+                  }
+                  fileInputRef.current?.click()
+                }}
                 className="w-full min-h-11 touch-manipulation text-left disabled:opacity-55"
               >
                 <span className="flex items-center gap-3">
@@ -531,10 +539,12 @@ export default function OfferFormModal({
                   </span>
                   <span className="min-w-0">
                     <span className="block text-[16px] font-semibold text-cyan-100">
-                      {uploading ? 'Importing photos…' : 'Import from photo(s)'}
+                      {uploading ? 'Importing photos…' : hasSlotsEdge ? 'Import from photo(s)' : 'Import from photo(s) — Slots Edge'}
                     </span>
                     <span className="mt-0.5 block text-[13px] leading-snug text-cyan-200/75">
-                      We will auto-create offer events from your casino mailers.
+                      {hasSlotsEdge
+                        ? 'We will auto-create offer events from your casino mailers.'
+                        : 'Subscribe to Slots Edge to unlock mailer OCR.'}
                     </span>
                   </span>
                 </span>

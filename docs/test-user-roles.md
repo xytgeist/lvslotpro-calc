@@ -65,10 +65,38 @@ from auth.users u
 where p.user_id = u.id and lower(u.email) = lower('subscriber-test@example.com');
 ```
 
-## 4. Local env override
+## 4. Slots Edge via `user_subscriptions` (Stripe-shaped testing)
+
+After migration **`20260526120000_edge_subscriptions.sql`**, prefer product rows over flipping the legacy boolean alone:
+
+```sql
+-- Grant slots-edge without Stripe (test only; use service role / SQL editor)
+insert into public.user_subscriptions (
+  user_id, product_slug, stripe_subscription_id, stripe_customer_id, status
+)
+select
+  p.user_id,
+  'slots-edge',
+  'test_sub_' || p.user_id::text,
+  coalesce(p.stripe_customer_id, 'test_cus_' || p.user_id::text),
+  'active'
+from public.profiles p
+join auth.users u on u.id = p.user_id
+where lower(u.email) = lower('subscriber-test@example.com')
+on conflict (user_id, product_slug) do update set status = excluded.status;
+
+select public.sync_profile_has_active_subscription(p.user_id)
+from public.profiles p
+join auth.users u on u.id = p.user_id
+where lower(u.email) = lower('subscriber-test@example.com');
+```
+
+Client entitlements: **`get_my_entitlements()`** → `{ "slots-edge": { "active": true, … } }`.
+
+## 5. Local env override
 
 `VITE_HAS_ACTIVE_SUBSCRIPTION=true` in **`.env.local`** still forces **subscriber UI for every logged-in user** (useful for a quick check). Remove it when testing **per-row** `has_active_subscription`.
 
-## 5. No profile row yet
+## 6. No profile row yet
 
 If `profiles` has no row for the user, the app treats them as non-staff / non-subscriber until a row exists (e.g. after profile completion in Lounge/Guides). Create or complete profile, then **reload** if you just added SQL flags.

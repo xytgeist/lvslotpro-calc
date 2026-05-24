@@ -100,7 +100,7 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | --- | --- |
 | **Which calcs/guides are free vs locked** | Curated list or metadata per slug — **TBD** (product + content). |
 | **Signup / verification** | Supabase auth + email verification policy for “free” tier — **TBD** (no `allowed_emails` gate in the client). |
-| **Stripe products** | Base subscription vs add-on SKUs for new-game packs — **TBD**. |
+| **Stripe products** | **`slots-edge`**, **`sports-edge`**, **`crypto-edge`** product slugs; Price IDs in Supabase Edge secrets (`STRIPE_PRICE_SLOTS_EDGE`, …). **`user_subscriptions`** + **`get_my_entitlements()`** RPC; legacy **`has_active_subscription`** mirrors **`slots-edge`**. See **`supabase/functions/stripe-create-checkout-session/README.md`**. |
 
 ---
 
@@ -135,4 +135,4 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | 2026-05-18 | Hamburger **Offers** row renamed **Calendar** (tab id `offers` unchanged; deep links `?tab=offers` unchanged). |
 | 2026-05-10 | Hamburger: lock icons on **Calcs**, **AP Guides**, **Bankroll** for free non-subscribers; staff/subscribers see no locks; Calendar menu row unlocked (gates in-feature). |
 | 2026-05-10 | **Signup:** no client **`allowed_emails`** whitelist; free tier = signed-in user until billing flags ship. |
-| 2026-05-10 | DB: **`profiles.has_active_subscription`** + testing doc **`docs/test-user-roles.md`** for tier checks. |
+| 2026-05-24 | Multi-product Edge billing scaffold: **`slots-edge`** / **`sports-edge`** / **`crypto-edge`** slugs; Lounge free; calendar free; alerts free; OCR gated on **`slots-edge`**. |

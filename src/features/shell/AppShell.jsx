@@ -81,7 +81,8 @@ export default function AppShell({
   accessNotice = '',
   onDismissAccessNotice,
   hasActiveSubscription = false,
-  isStaff = false
+  isStaff = false,
+  onRequireSubscribe,
 }) {
   const COMMUNITY_FEED_PAGE_SIZE = 28
   const [tab, setTab] = useState('home')
@@ -698,6 +699,11 @@ export default function AppShell({
       setMenuOpen(false)
       return
     }
+    if (!isStaff && !hasActiveSubscription) {
+      onRequireSubscribe?.('slots-edge')
+      setMenuOpen(false)
+      return
+    }
     setActiveCalculator(key)
     setTab('calculators')
     setMenuOpen(false)
@@ -717,6 +723,16 @@ export default function AppShell({
   const showNavSubscriberLocks =
     browseMode === 'member' && !isStaff && !hasActiveSubscription
 
+  const SLOTS_EDGE_GATED_TABS = new Set(['calculators', 'guides', 'bankroll'])
+
+  useEffect(() => {
+    if (isStaff || hasActiveSubscription) return
+    if (!SLOTS_EDGE_GATED_TABS.has(tab)) return
+    onRequireSubscribe?.('slots-edge')
+    setTab('home')
+    setMenuOpen(false)
+  }, [tab, isStaff, hasActiveSubscription, onRequireSubscribe])
+
   const renderNavMenuItems = () =>
     navItems.map((item) => {
       const showLock = showNavSubscriberLocks && item.subscriberGated
@@ -724,10 +740,15 @@ export default function AppShell({
         <button
           key={item.id}
           type="button"
-          title={showLock ? 'Subscribe to unlock full access here' : undefined}
+          title={showLock ? 'Subscribe to unlock Slots Edge' : undefined}
           onClick={() => {
             if (browseMode === 'anonymous' && item.id !== 'home') {
               onRequireAuth?.()
+              setMenuOpen(false)
+              return
+            }
+            if (showLock) {
+              onRequireSubscribe?.('slots-edge')
               setMenuOpen(false)
               return
             }
@@ -961,6 +982,8 @@ export default function AppShell({
           setPendingOfferEventIds={setPendingOfferEventIds}
           offerSpotlightEventIds={offerSpotlightEventIds}
           setOfferSpotlightEventIds={setOfferSpotlightEventIds}
+          hasSlotsEdge={hasActiveSubscription || isStaff}
+          onRequireSubscribe={() => onRequireSubscribe?.('slots-edge')}
           titleBarNavSlot={renderTitleBarNavSlot()}
         />
       )
