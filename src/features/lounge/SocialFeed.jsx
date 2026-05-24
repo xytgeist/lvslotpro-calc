@@ -10851,8 +10851,8 @@ export default function SocialFeed({
           </div>
         ) : null}
 
-        <div className="shrink-0 px-3 pt-1">
-          <div className="flex items-center justify-between gap-3 pt-0 pb-0">
+        <div className="shrink-0 px-3 pt-2 pb-3">
+          <div className="flex min-h-11 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <LoungeFeedScopeSwitch
                 scope={loungeFeedScope}
