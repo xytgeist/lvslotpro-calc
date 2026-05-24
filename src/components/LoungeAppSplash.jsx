@@ -16,10 +16,14 @@ export default function LoungeAppSplash({ dismissing = false }) {
       if (cancelled || !containerRef.current) return
       animation = lottie.loadAnimation({
         container: containerRef.current,
-        renderer: 'svg',
+        renderer: 'canvas',
         loop: false,
         autoplay: true,
         animationData: edgeSplashData,
+        rendererSettings: {
+          preserveAspectRatio: 'xMidYMid meet',
+          clearCanvas: true,
+        },
       })
     })
 
