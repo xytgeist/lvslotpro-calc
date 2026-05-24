@@ -42,7 +42,7 @@ export default function LoungeFeedSortSwitch({
         aria-expanded={open}
         aria-label="Feed sort"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex min-h-11 items-center gap-0.5 rounded-md px-1 py-2 text-[13px] font-medium leading-tight text-zinc-500 touch-manipulation hover:text-zinc-300 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
+        className="inline-flex items-center gap-0.5 rounded-md py-0.5 pr-0.5 text-[13px] font-medium leading-tight text-zinc-500 touch-manipulation hover:text-zinc-300 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
       >
         <span>{currentLabel}</span>
         <svg className="h-3.5 w-3.5 shrink-0 opacity-80" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
