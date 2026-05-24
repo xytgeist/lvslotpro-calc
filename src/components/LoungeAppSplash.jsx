@@ -53,7 +53,7 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       <div className="lounge-cold-boot-splash__glow pointer-events-none absolute inset-0" aria-hidden />
       <canvas
         ref={canvasRef}
-        className="pointer-events-none h-56 w-56 sm:h-64 sm:w-64"
+        className="pointer-events-none h-[80vw] w-[80vw] max-h-[380px] max-w-[380px]"
         aria-hidden
       />
     </div>
