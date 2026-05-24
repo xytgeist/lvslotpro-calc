@@ -42,6 +42,10 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       className={`lounge-cold-boot-splash fixed inset-0 z-[120] flex flex-col items-center justify-center bg-zinc-950 ${
         dismissing ? 'lounge-cold-boot-splash--out' : ''
       }`}
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
       role="status"
       aria-live="polite"
       aria-label="Loading Lounge"
