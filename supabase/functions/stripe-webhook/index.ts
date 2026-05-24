@@ -49,7 +49,11 @@ Deno.serve(async (req) => {
     }
 
     const rawBody = await req.text()
-    const event = stripe.webhooks.constructEvent(rawBody, signature, requireStripeWebhookSecret())
+    const event = await stripe.webhooks.constructEventAsync(
+      rawBody,
+      signature,
+      requireStripeWebhookSecret(),
+    )
     const admin = createBillingAdmin()
 
     const isNew = await recordWebhookEvent(admin, event.id, event.type)
