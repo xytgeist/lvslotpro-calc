@@ -3,10 +3,12 @@ import edgeSplashData from '../assets/lottie/edge-splash-v1.json'
 
 /**
  * Full-screen Edge logo Lottie splash. Shown during Lounge cold boot / long resume.
- * @param {{ dismissing?: boolean }} props
+ * @param {{ dismissing?: boolean, onAnimationComplete?: () => void }} props
  */
-export default function LoungeAppSplash({ dismissing = false }) {
+export default function LoungeAppSplash({ dismissing = false, onAnimationComplete }) {
   const containerRef = useRef(null)
+  const onAnimationCompleteRef = useRef(onAnimationComplete)
+  onAnimationCompleteRef.current = onAnimationComplete
 
   useEffect(() => {
     let animation = null
@@ -24,6 +26,9 @@ export default function LoungeAppSplash({ dismissing = false }) {
           preserveAspectRatio: 'xMidYMid meet',
           clearCanvas: true,
         },
+      })
+      animation.addEventListener('complete', () => {
+        onAnimationCompleteRef.current?.()
       })
     })
 

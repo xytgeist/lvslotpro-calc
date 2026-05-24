@@ -54,6 +54,8 @@ export function useLoungeColdBootSplash({
   const shownAtRef = useRef(0)
   const dismissTimerRef = useRef(0)
   const cycleDoneRef = useRef(false)
+  /** Set to true when the Lottie animation fires complete. Members wait for this before dismissing. */
+  const animationDoneRef = useRef(false)
 
   const isMember = browseMode === 'member'
 
@@ -64,9 +66,14 @@ export function useLoungeColdBootSplash({
   const beginSplash = useCallback(() => {
     if (visible) return
     shownAtRef.current = Date.now()
+    animationDoneRef.current = false
     setDismiss(false)
     setVisible(true)
   }, [visible])
+
+  const onSplashAnimationComplete = useCallback(() => {
+    animationDoneRef.current = true
+  }, [])
 
   const finishSplash = useCallback(() => {
     if (!visible || dismissing) return
@@ -129,7 +136,7 @@ export function useLoungeColdBootSplash({
       const elapsed = Date.now() - shownAtRef.current
       if (elapsed < minMs) return false
       if (!isMember) return true
-      if (feedSettled && socialFeedMounted) return true
+      if (feedSettled && socialFeedMounted && animationDoneRef.current) return true
       if (elapsed >= maxMs) return true
       return false
     }
@@ -167,5 +174,5 @@ export function useLoungeColdBootSplash({
     [],
   )
 
-  return { splashVisible: visible, splashDismissing: dismissing }
+  return { splashVisible: visible, splashDismissing: dismissing, onSplashAnimationComplete }
 }
