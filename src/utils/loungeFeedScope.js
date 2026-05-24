@@ -28,7 +28,7 @@ export async function fetchLoungeFollowingAuthorIds(supabaseClient, viewerUserId
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {LoungeFeedScope} scope
  * @param {string[] | null} followingAuthorIds — set when `scope === 'following'`
- * @param {string[] | null | undefined} [excludedCategorySlugs] — unchecked pills; posts overlapping any are hidden
+ * @param {string[] | null | undefined} [excludedCategorySlugs] — unchecked pills; hide post only when every pill is excluded
  */
 export function loungeFeedPinnedQuery(supabaseClient, scope, followingAuthorIds, excludedCategorySlugs) {
   let q = supabaseClient
@@ -42,7 +42,8 @@ export function loungeFeedPinnedQuery(supabaseClient, scope, followingAuthorIds,
   }
   if (excludedCategorySlugs?.length) {
     const arr = `{${excludedCategorySlugs.join(',')}}`
-    q = q.or(`category_pills.is.null,not.category_pills.ov.${arr}`)
+    // Show when untagged, or at least one pill is not in the excluded set (cd = contained in).
+    q = q.or(`category_pills.is.null,category_pills.eq.{},not.category_pills.cd.${arr}`)
   }
   return q
 }

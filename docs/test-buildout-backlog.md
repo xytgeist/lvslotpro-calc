@@ -47,7 +47,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 - [x] **Post category pills (v1, test build):** Optional **0–3** audience pills at compose / quote / edit; display on feed + detail; plain repost copies OP pills; quote inherits OP then editable. Migration **`20260525120000_community_feed_posts_category_pills.sql`**. Client: **`loungePostCategoryPills.js`**, **`LoungePostCategoryPillPicker.jsx`**, **`LoungePostCategoryPillRow.jsx`**, **`SocialFeed.jsx`**, **`LoungePostArticle.jsx`**. Ryan sign-off **PASSED** on **test** @ **`51b1621`** (2026-05-24).
 
-- [x] **Tribe filter — home feed + search (v1.1, test build):** Home **Tribes** dropdown beside **Latest** — **all on by default**; **tap to dim** hides posts with that pill (exclusion, persisted **`loungeFeedCategoryFilter:v2`**). Search: client **Tribes** typeahead → chip-in-field + text AND (`**lounge_search**` `p_category_slugs`; comments hidden when tribe filter on). Migrations **`20260525140000_*`** (search) + **`20260525150000_lounge_feed_category_exclusion_filter.sql`** (feed **`p_excluded_category_slugs`**). Ryan sign-off **PASSED** on **test** @ **`51b1621`** (2026-05-24).
+- [x] **Tribe filter — home feed + search (v1.1, test build):** Home **Tribes** dropdown beside **Latest** — **all on by default**; **tap to dim** hides posts whose **every** pill is excluded (posts with mixed pills stay visible if at least one pill is still on). Search: client **Tribes** typeahead → chip-in-field + text AND (`**lounge_search**` `p_category_slugs`; comments hidden when tribe filter on). Migrations **`20260525140000_*`** (search) + **`20260525150000_lounge_feed_category_exclusion_filter.sql`** (feed **`p_excluded_category_slugs`**); exclusion fix **`20260525200000_lounge_feed_category_exclusion_any_pill.sql`**. Ryan sign-off **PASSED** on **test** @ **`51b1621`** (2026-05-24).
 
 - [x] **Profile interest tribes (client + SQL, test build):** **`profiles.category_pills text[]`** (same enum as posts; **no max on profile** — interests display only). **Edit profile:** multi-select picker in **`LoungeProfileFullScreen.jsx`**; **view:** pill row on profile. **Scope:** profile column + UI only — **no changes** to post pills, compose/quote/edit, last-post **`loungeComposerLastCategoryPills:v1`**, feed Tribes filter, or search. SQL **`20260525160000_profiles_category_pills.sql`** / **`supabase/profile_category_pills.sql`**. Ryan sign-off **PASSED** on **test** @ **`51b1621`** (2026-05-24).
 
@@ -420,6 +420,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ---
 
 ## Update log
+
+- 2026-05-24: **Tribe feed exclusion (any-pill rule):** migration **`20260525200000_lounge_feed_category_exclusion_any_pill.sql`** + **`loungeFeedScope.js`** pinned query — hide post only when **all** `category_pills` are excluded; mixed-pill posts stay visible if at least one pill is still on. Apply on test Supabase.
 
 - 2026-05-24: **Ryan sign-off (test batch @ `51b1621`):** Post category pills (v1), tribe filter (home + search), profile interest tribes, Popular feed (Phase J / smoke **§20**), in-app notifications (Phase H1 / smoke **§21**), push batching + prefs (Phase H3 / smoke **§21c**), repost cleanup on delete (migrations **`24100000`**–**`24120000`**), Stream hero expand + feed scroll polish — all **PASSED** on **test**.
 
