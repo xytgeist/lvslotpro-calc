@@ -7,9 +7,12 @@ export const LOUNGE_COLD_BOOT_BG_AT_KEY = 'loungeColdBootBgAt:v1'
 
 export const LOUNGE_COLD_BOOT_RESUME_AFTER_MS = 10 * 60 * 1000
 
-/** Member: hold splash while feed + chunk warm. Min must exceed Lottie duration (161fr / 60fps ≈ 2683ms). */
-export const LOUNGE_COLD_BOOT_MEMBER_MIN_MS = 2800
-export const LOUNGE_COLD_BOOT_MEMBER_MAX_MS = 4000
+/** Member: hold splash while feed + chunk warm.
+ *  Phase 1 draw-on (EdgeLottie1): 161fr / 60fps ≈ 2683ms
+ *  Phase 2 zoom reveal (EdgeZoomLottie): 48fr / 60fps ≈ 820ms
+ *  Total ≈ 3500ms — min gives feed time to settle after both phases. */
+export const LOUNGE_COLD_BOOT_MEMBER_MIN_MS = 4000
+export const LOUNGE_COLD_BOOT_MEMBER_MAX_MS = 7000
 
 /** Anonymous browse: short brand flash only. */
 export const LOUNGE_COLD_BOOT_ANON_MIN_MS = 380
