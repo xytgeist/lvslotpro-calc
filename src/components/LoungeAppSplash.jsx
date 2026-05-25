@@ -9,15 +9,17 @@ const EDGE_SPLASH_DATA = JSON.stringify(edgeSplashData)
 /**
  * Edge cold-boot splash.
  *
- * The Lottie is fully self-contained:
- *   – "Black Solid 1" covers the entire canvas (opaque black) frames 0–165, giving
- *     the draw-on phase its dark background.
- *   – At frame 166–172 both Black Solid 1 (full bg) AND Black Solid 2 (the D hole
- *     fill) fade opacity 100→0 together. After frame 172 the canvas has genuinely
- *     transparent pixels in the D counter and the background, so the feed beneath
- *     z-[120] naturally shows through — no blend-mode compositing required.
+ * The Lottie (edge-splash-v2.json) is fully self-contained:
+ *   – "Black Solid 1" covers the entire canvas with opaque black during frames 0–165,
+ *     providing the dark background for the draw-on phase.
+ *   – At frames 166–172, Black Solid 1 fades 100→0, handing off to the zoom structure.
+ *   – "Black Solid 2" (luma-matted to the area surrounding the D body) stays fully
+ *     opaque throughout — it is the persistent black surround, not the hole fill.
+ *   – The D shape layer uses an even-odd fill rule (two paths: outer D + inner counter),
+ *     which produces genuinely transparent canvas pixels in the D counter/hole. No
+ *     blend-mode compositing is needed from our side — the hole transparency is native.
  *   – The D then scales 100%→2146% (frames 168–194), growing the transparent hole
- *     to fill the viewport and completing the fly-through reveal.
+ *     to fill the viewport and completing the fly-through reveal into the feed.
  *
  * @param {{ dismissing?: boolean, onAnimationComplete?: () => void }} props
  */
