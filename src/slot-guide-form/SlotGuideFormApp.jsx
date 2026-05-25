@@ -193,6 +193,79 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
   )
 }
 
+/**
+ * Textarea for the Skins section with a "Insert guide link" slug-picker toolbar.
+ * Selecting a guide from the dropdown inserts `[Machine Name](guide:slug)` at cursor.
+ */
+function SkinsTextarea({ value, onChange, className, guideList = [] }) {
+  const taRef = useRef(null)
+  const [pickerSlug, setPickerSlug] = useState('')
+
+  function insertLink() {
+    if (!pickerSlug) return
+    const picked = guideList.find(
+      (g) => (g.machines?.slug || g.slug) === pickerSlug
+    )
+    const label = picked?.machines?.name || picked?.title || pickerSlug
+    const insert = `[${label}](guide:${pickerSlug})`
+
+    const ta = taRef.current
+    const pos = ta?.selectionStart ?? value.length
+    const before = value.slice(0, pos)
+    const after  = value.slice(pos)
+    const pad    = before.length > 0 && !before.endsWith('\n') ? '\n' : ''
+    const next   = before + pad + insert + after
+    onChange(next)
+
+    setTimeout(() => {
+      if (!ta) return
+      ta.focus()
+      const cur = (before + pad + insert).length
+      ta.setSelectionRange(cur, cur)
+    }, 0)
+    setPickerSlug('')
+  }
+
+  return (
+    <div>
+      {/* slug picker toolbar */}
+      <div className="flex items-center gap-2 mb-1">
+        <select
+          className="flex-1 min-h-9 text-sm text-white bg-gray-900 rounded-xl border border-gray-700 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          value={pickerSlug}
+          onChange={(e) => setPickerSlug(e.target.value)}
+        >
+          <option value="">— pick a guide to link —</option>
+          {guideList.map((g) => {
+            const slug = g.machines?.slug || g.slug
+            const name = g.machines?.name || g.title || slug
+            return (
+              <option key={g.id} value={slug}>
+                {name}{g.published ? '' : ' (unpublished)'}
+              </option>
+            )
+          })}
+        </select>
+        <button
+          type="button"
+          disabled={!pickerSlug}
+          onClick={insertLink}
+          className="shrink-0 px-3 py-1.5 rounded-xl text-sm font-semibold transition-colors
+            bg-cyan-700 hover:bg-cyan-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Insert link
+        </button>
+      </div>
+      <textarea
+        ref={taRef}
+        className={className}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
 const blankMachine = {
   slug: '', name: '', manufacturer: 'IGT', type: '', difficulty: 'Beginner',
   vegas_availability: 'Common', nerf_risk: 'auto', volatility_index: '',
@@ -731,7 +804,6 @@ export default function SlotGuideFormApp() {
               ['how_to_check',      '🔍 How to check'],
               ['risk_bankroll',     '⚠️ Risk — bankroll line (e.g. 5–40 units)'],
               ['risk_summary',      '⚠️ Risk — summary paragraph'],
-              ['skins_markdown',    '🎭 Skins (optional — use [Title](guide:other-slug))'],
               ['gameplay_mechanics','🎰 Gameplay mechanics'],
             ].map(([key, label]) => (
               <div key={key}>
@@ -750,11 +822,22 @@ export default function SlotGuideFormApp() {
                     className={`${ic} min-h-28`}
                     value={guide[key]}
                     onChange={(e) => setGuideField(key, e.target.value)}
-                    required={!isEdit && !['skins_markdown', 'risk_bankroll'].includes(key)}
+                    required={!isEdit && key !== 'risk_bankroll'}
                   />
                 )}
               </div>
             ))}
+
+            {/* Skins — separate because it needs the slug-link picker */}
+            <div>
+              <label className={lc}>🎭 Skins <span className="text-gray-500 font-normal text-xs">(optional)</span></label>
+              <SkinsTextarea
+                className={`${ic} min-h-28`}
+                value={guide.skins_markdown}
+                onChange={(val) => setGuideField('skins_markdown', val)}
+                guideList={guideList}
+              />
+            </div>
             <div>
               <label className={lc}>⚠️ Risk bullets (one per line, optional)</label>
               <textarea className={`${ic} min-h-24`} value={guide.risk_bullets} onChange={(e) => setGuideField('risk_bullets', e.target.value)} />
