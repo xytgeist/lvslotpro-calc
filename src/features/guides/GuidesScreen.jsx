@@ -1866,6 +1866,7 @@ export default function GuidesScreen({
                           )}
                         </div>
                       </div>
+                      </div>
                     </button>
 
                     <div className="px-4 pb-4 flex flex-col gap-2 border-t border-zinc-800/80 pt-3 -mt-px">
