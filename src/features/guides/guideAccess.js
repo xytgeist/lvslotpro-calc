@@ -47,7 +47,7 @@ export function guidesTabFullyGated(gatesMap = null) {
   for (const slug of FREE_GUIDE_SLUGS) {
     if (!guideRequiresSlotsEdge(slug, gatesMap)) return false
   }
-  if (gatesMap) {
+  if (gatesMap instanceof Map) {
     for (const [key, requires] of gatesMap.entries()) {
       if (key.startsWith('guide:') && requires === false) return false
     }

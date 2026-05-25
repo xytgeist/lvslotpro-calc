@@ -1081,7 +1081,7 @@ export default function AppShell({
         />
       ) : null}
 
-      {splashVisible ? (
+      {splashVisible && tab === 'home' ? (
         <LoungeAppSplash dismissing={splashDismissing} onAnimationComplete={onSplashAnimationComplete} />
       ) : null}
 

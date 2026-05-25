@@ -1686,6 +1686,10 @@ export default function GuidesScreen({
             const accent = cardAccent(slug)
             const guideLocked = showGuideLock(slug, access)
             const adminGuideLocked = guideRequiresSlotsEdge(slug, gatesMap)
+            const guideLockedCollapsed = guideLocked && !expanded
+            const lockedSectionBlurClass = guideLockedCollapsed
+              ? 'blur-[6px] brightness-[0.58] saturate-[0.85] select-none'
+              : ''
             const normalizedGuideSlug = normalizeGuideAccessSlug(slug)
             const ringFocus =
               slug === 'phoenix-link'
@@ -1781,7 +1785,7 @@ export default function GuidesScreen({
                         </div>
                       </div>
 
-                      <div className="p-4 space-y-3">
+                      <div className={`p-4 space-y-3 ${lockedSectionBlurClass}`}>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-xl bg-zinc-950/80 px-3 py-2 border border-zinc-800">
                           <div className="flex flex-nowrap items-center gap-1 whitespace-nowrap overflow-hidden">
@@ -1869,7 +1873,7 @@ export default function GuidesScreen({
                       </div>
                     </button>
 
-                    <div className="px-4 pb-4 flex flex-col gap-2 border-t border-zinc-800/80 pt-3 -mt-px">
+                    <div className={`px-4 pb-4 flex flex-col gap-2 border-t border-zinc-800/80 pt-3 -mt-px ${lockedSectionBlurClass}`}>
                       <div className="flex gap-2">
                         {calcKey ? (
                           <button
@@ -1900,13 +1904,11 @@ export default function GuidesScreen({
                       </div>
                     </div>
 
-                    {guideLocked && !expanded ? (
+                    {guideLockedCollapsed ? (
                       <div
-                        className="pointer-events-none absolute inset-x-0 bottom-0 top-[10.5rem] z-10 overflow-hidden rounded-b-3xl"
+                        className="pointer-events-none absolute inset-x-0 bottom-0 top-[10.5rem] z-10 overflow-hidden rounded-b-3xl bg-zinc-950/40"
                         aria-hidden
-                      >
-                        <div className="absolute inset-0 backdrop-blur-xl bg-zinc-950/55 supports-[backdrop-filter]:bg-zinc-950/40" />
-                      </div>
+                      />
                     ) : null}
                   </div>
 
