@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { format, parseISO } from 'date-fns'
@@ -696,9 +696,42 @@ function IconEvTrendingUp({ className }) {
 }
 
 function GuideLockedPaywallOverlay({ onUnlock }) {
+  const waveFilterId = `guide-lock-wave-${useId().replace(/:/g, '')}`
+
   return (
     <div className="guide-lock-glitch absolute inset-x-0 bottom-0 top-[10.5rem] z-10 flex items-center justify-center overflow-hidden rounded-b-3xl px-4 py-5">
+      <svg className="pointer-events-none absolute h-0 w-0 overflow-hidden" aria-hidden>
+        <defs>
+          <filter id={waveFilterId} x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.004 0.16"
+              numOctaves="2"
+              seed="4"
+              result="waveNoise"
+            >
+              <animate attributeName="seed" dur="1.4s" values="2;18;6;2" repeatCount="indefinite" />
+              <animate
+                attributeName="baseFrequency"
+                dur="2.8s"
+                values="0.004 0.16;0.006 0.22;0.0035 0.14;0.004 0.16"
+                repeatCount="indefinite"
+              />
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="waveNoise" scale="16" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
       <div className="guide-lock-glitch__veil pointer-events-none absolute inset-0" aria-hidden />
+      <div
+        className="guide-lock-glitch__waves pointer-events-none absolute inset-0"
+        style={{ filter: `url(#${waveFilterId})` }}
+        aria-hidden
+      >
+        <div className="guide-lock-glitch__wave guide-lock-glitch__wave--bright" />
+        <div className="guide-lock-glitch__wave guide-lock-glitch__wave--mid" />
+        <div className="guide-lock-glitch__wave guide-lock-glitch__wave--deep" />
+      </div>
       <div className="guide-lock-glitch__static pointer-events-none absolute inset-0" aria-hidden />
       <div className="guide-lock-glitch__static guide-lock-glitch__static--fine pointer-events-none absolute inset-0" aria-hidden />
       <div className="guide-lock-glitch__static guide-lock-glitch__static--chroma pointer-events-none absolute inset-0" aria-hidden />
