@@ -1,0 +1,35 @@
+# -- Build output & deps
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+.cache/
+.tmp/
+
+# -- Large generated files (grow unboundedly, no indexing value)
+session-chat-export.md
+*.log
+
+# -- Binary / media assets
+Slots/
+public/guides/
+public/onboarding/
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.webp
+**/*.gif
+**/*.ico
+**/*.wasm
+**/*.ttf
+**/*.woff
+**/*.woff2
+
+# -- Lottie JSON — large animation data
+src/assets/lottie/
+
+# -- Minified / bundled JS
+*.min.js
+*.bundle.js
