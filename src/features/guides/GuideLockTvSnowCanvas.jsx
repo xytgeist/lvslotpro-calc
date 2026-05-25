@@ -47,7 +47,7 @@ function paintTvSnow(imageData, width, height, frameSeed) {
   let y = 0
   while (y < height) {
     const lineSeed = hashNoise(0, y * 0.17 + frameSeed, 1.7)
-    const lineThickness = 1 + Math.floor(lineSeed * 3.8)
+    const lineThickness = 2 + Math.floor(lineSeed * 5.2)
     const scanBand = 0.78 + 0.22 * Math.sin(y * 0.07 + frameSeed * 0.11)
     const intensity = rowIntensity(y, height)
     const isHeavyLine = hashNoise(y, frameSeed, 9.4) > 0.93
@@ -60,13 +60,13 @@ function paintTvSnow(imageData, width, height, frameSeed) {
 
     for (let rowY = y; rowY < Math.min(height, y + lineThickness); rowY++) {
       const rowSeed = hashNoise(0, rowY + frameSeed, 2.1)
-      const density = 0.52 + rowIntensity(rowY, height) * 0.34
+      const density = 0.46 + rowIntensity(rowY, height) * 0.3
 
       for (let x = 0; x < width; ) {
-        const flakeSeed = hashNoise(x * 0.08 + rowSeed * 5, rowY + frameSeed, 0.4)
-        const flakeStep = 2 + Math.floor(hashNoise(x, rowY, frameSeed + 0.8) * 3)
-        const flakeW = 2 + Math.floor(hashNoise(x + 1, rowY, frameSeed + 1.1) * 2.6)
-        const flakeH = Math.min(lineThickness, 1 + Math.floor(hashNoise(x + 2, rowY, frameSeed + 1.4) * lineThickness))
+        const flakeSeed = hashNoise(x * 0.06 + rowSeed * 5, rowY + frameSeed, 0.4)
+        const flakeStep = 4 + Math.floor(hashNoise(x, rowY, frameSeed + 0.8) * 6)
+        const flakeW = 3 + Math.floor(hashNoise(x + 1, rowY, frameSeed + 1.1) * 5.2)
+        const flakeH = 2 + Math.floor(hashNoise(x + 2, rowY, frameSeed + 1.4) * 6.5)
 
         if (flakeSeed > density) {
           x += flakeStep
