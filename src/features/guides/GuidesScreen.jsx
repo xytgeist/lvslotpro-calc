@@ -697,10 +697,14 @@ function IconEvTrendingUp({ className }) {
 
 function GuideLockedPaywallOverlay({ onUnlock }) {
   return (
-    <div className="absolute inset-x-0 bottom-0 top-[10.5rem] z-10 flex items-center justify-center overflow-hidden rounded-b-3xl px-4 py-5">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-zinc-950/35 via-zinc-950/60 to-zinc-950/85" />
+    <div className="guide-lock-glitch absolute inset-x-0 bottom-0 top-[10.5rem] z-10 flex items-center justify-center overflow-hidden rounded-b-3xl px-4 py-5">
+      <div className="guide-lock-glitch__scrim pointer-events-none absolute inset-0 bg-gradient-to-b from-zinc-950/35 via-zinc-950/60 to-zinc-950/85" />
+      <div className="guide-lock-glitch__fx guide-lock-glitch__scanlines pointer-events-none absolute inset-0" aria-hidden />
+      <div className="guide-lock-glitch__fx guide-lock-glitch__sweep pointer-events-none absolute inset-0" aria-hidden />
+      <div className="guide-lock-glitch__fx guide-lock-glitch__rgb pointer-events-none absolute inset-0" aria-hidden />
+      <div className="guide-lock-glitch__fx guide-lock-glitch__slice pointer-events-none absolute inset-x-0" aria-hidden />
       <div className="relative z-10 flex max-w-[16rem] flex-col items-center gap-3 text-center">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-500/35 bg-amber-500/10">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-500/35 bg-amber-500/10 shadow-[0_0_18px_rgba(6,206,252,0.12)]">
           <NavLockGlyph className="h-4 w-4 text-amber-300" />
         </div>
         <div>
@@ -713,7 +717,7 @@ function GuideLockedPaywallOverlay({ onUnlock }) {
             event.stopPropagation()
             onUnlock?.()
           }}
-          className="min-h-11 w-full max-w-[13rem] rounded-2xl bg-amber-500 px-4 text-sm font-bold text-zinc-950 touch-manipulation hover:bg-amber-400 active:scale-[0.98]"
+          className="min-h-11 w-full max-w-[13rem] rounded-2xl bg-amber-500 px-4 text-sm font-bold text-zinc-950 touch-manipulation hover:bg-amber-400 active:scale-[0.98] shadow-[0_0_20px_rgba(255,234,0,0.15)]"
         >
           Unlock guide
         </button>

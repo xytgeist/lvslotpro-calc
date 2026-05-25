@@ -513,3 +513,160 @@ input[list]::-webkit-list-button {
     border-radius: 0.5rem;
   }
 }
+
+/* ── Locked AP guide paywall — CRT / glitch light FX ─────────────────────── */
+@keyframes guideLockScanDrift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 96px;
+  }
+}
+
+@keyframes guideLockLightSweep {
+  0%,
+  100% {
+    background-position: 130% 0;
+    opacity: 0.35;
+  }
+  45% {
+    background-position: -30% 0;
+    opacity: 0.85;
+  }
+}
+
+@keyframes guideLockGlitchBurst {
+  0%,
+  88%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  89% {
+    opacity: 0.9;
+    transform: translate3d(-3px, 1px, 0);
+  }
+  90% {
+    opacity: 0.55;
+    transform: translate3d(4px, -1px, 0);
+  }
+  91% {
+    opacity: 0.75;
+    transform: translate3d(-2px, 0, 0);
+  }
+  92% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes guideLockSliceJump {
+  0%,
+  82%,
+  100% {
+    opacity: 0;
+    transform: translateY(0) scaleY(1);
+  }
+  83% {
+    opacity: 0.85;
+    transform: translateY(18px) scaleY(1.4);
+  }
+  84% {
+    opacity: 0.5;
+    transform: translateY(-32px) scaleY(0.6);
+  }
+  85% {
+    opacity: 0;
+    transform: translateY(8px) scaleY(1);
+  }
+}
+
+@keyframes guideLockScrimPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 0.94;
+  }
+  49% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.97;
+  }
+  51% {
+    opacity: 1;
+  }
+}
+
+.guide-lock-glitch__scrim {
+  animation: guideLockScrimPulse 7s ease-in-out infinite;
+}
+
+.guide-lock-glitch__scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0%) 0,
+    rgb(0 0 0 / 0%) 2px,
+    rgb(0 0 0 / 14%) 2px,
+    rgb(0 0 0 / 14%) 3px
+  );
+  background-size: 100% 6px;
+  opacity: 0.28;
+  animation: guideLockScanDrift 10s linear infinite;
+}
+
+.guide-lock-glitch__sweep {
+  background: linear-gradient(
+    108deg,
+    transparent 38%,
+    rgb(6 206 252 / 10%) 46%,
+    rgb(255 234 0 / 8%) 50%,
+    rgb(157 0 255 / 7%) 54%,
+    transparent 62%
+  );
+  background-size: 220% 100%;
+  mix-blend-mode: screen;
+  animation: guideLockLightSweep 5.5s ease-in-out infinite;
+}
+
+.guide-lock-glitch__rgb {
+  background:
+    linear-gradient(90deg, transparent 0%, rgb(6 206 252 / 18%) 48%, transparent 52%) 0 38% / 100% 2px
+      no-repeat,
+    linear-gradient(90deg, transparent 0%, rgb(253 38 45 / 14%) 48%, transparent 52%) 0 61% / 100% 1px
+      no-repeat;
+  mix-blend-mode: screen;
+  animation: guideLockGlitchBurst 4.2s steps(1) infinite;
+}
+
+.guide-lock-glitch__slice {
+  top: 28%;
+  height: 14%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(6 206 252 / 22%),
+    rgb(255 255 255 / 10%),
+    rgb(253 38 45 / 16%),
+    transparent
+  );
+  filter: blur(0.5px);
+  animation: guideLockSliceJump 5.8s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-lock-glitch__scrim,
+  .guide-lock-glitch__scanlines,
+  .guide-lock-glitch__sweep,
+  .guide-lock-glitch__rgb,
+  .guide-lock-glitch__slice {
+    animation: none;
+  }
+
+  .guide-lock-glitch__scanlines {
+    opacity: 0.18;
+  }
+}
