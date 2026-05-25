@@ -31,6 +31,7 @@ import {
 import { syncLoungeFeedVideoDebugFromUrl } from '../../utils/loungeFeedVideoDebugPref.js'
 import LoungeAppSplash from '../../components/LoungeAppSplash.jsx'
 import { useLoungeColdBootSplash } from '../lounge/useLoungeColdBootSplash.js'
+import { shouldShowLoungeColdBootSplash } from '../../utils/loungeColdBootSplash.js'
 import LoungeActivityInAppToast from '../lounge/LoungeActivityInAppToast.jsx'
 import {
   loungeActivityInAppPayloadFromMessage,
@@ -810,16 +811,19 @@ export default function AppShell({
     setMenuOpen(false)
   }, [browseMode, tab])
 
+  useEffect(() => {
+    if (shouldShowLoungeColdBootSplash({ tab: 'home', pendingWork: false })) {
+      void import('../lounge/SocialFeed.jsx')
+    }
+  }, [])
+
   const { splashVisible, splashDismissing, onSplashAnimationComplete } = useLoungeColdBootSplash({
     tab,
     browseMode,
-    communityFeedLoading,
-    communityFeedQueryErr,
-    communityPostsCount: communityPosts.length,
   })
 
   const homeSuspenseFallback =
-    tab === 'home' && splashVisible ? null : tab === 'home' ? <TabLoadingFallback /> : null
+    tab === 'home' ? <div className="min-h-dvh w-full bg-gray-950" aria-hidden /> : null
 
   const renderTabContent = () => {
     /** Stay mounted across tabs so lounge composer / uploads are not torn down when browsing elsewhere in-app. */

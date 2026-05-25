@@ -7,10 +7,8 @@ export const LOUNGE_COLD_BOOT_BG_AT_KEY = 'loungeColdBootBgAt:v1'
 
 export const LOUNGE_COLD_BOOT_RESUME_AFTER_MS = 10 * 60 * 1000
 
-/** Member: hold splash while feed + chunk warm.
- *  Edge splash Lottie (edge-splash-v2): 219fr / 60fps ≈ 3650ms
- *  Min gives feed time to settle after the draw + zoom reveal. */
-export const LOUNGE_COLD_BOOT_MEMBER_MIN_MS = 4000
+/** Member: min covers draw phase; dismiss when Lottie completes (fly-through is the transition). */
+export const LOUNGE_COLD_BOOT_MEMBER_MIN_MS = 3000
 export const LOUNGE_COLD_BOOT_MEMBER_MAX_MS = 7000
 
 /** Anonymous browse: short brand flash only. */

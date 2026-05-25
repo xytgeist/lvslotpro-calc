@@ -4,7 +4,6 @@ import { mobileShell, inputBase, btnPrimary, linkBtn } from './features/shell/sh
 import { readAuthCallbackParams, getOAuthCallbackMessage } from './features/auth/oauthCallback'
 import AuthModalPanel from './features/auth/AuthModalPanel'
 import AppShell from './features/shell'
-import LoungeColdBootBootstrapBackdrop from './components/LoungeColdBootBootstrapBackdrop.jsx'
 import { ensureDefaultProfileRow } from './features/profiles/profileGate'
 import SubscribeModal from './features/billing/SubscribeModal.jsx'
 import { PRODUCT_SLOTS_EDGE } from './features/billing/edgeProducts.js'
@@ -550,13 +549,10 @@ function App() {
     }
   }, [authPanelOpen])
 
-  if (isChecking) {
-    const coldBootSplashPending =
-      shouldShowLoungeColdBootSplash({
-        tab: 'home',
-        pendingWork: readLoungeComposerDraftPendingWork(),
-      })
-    if (coldBootSplashPending) return <LoungeColdBootBootstrapBackdrop />
+  if (isChecking && !shouldShowLoungeColdBootSplash({
+    tab: 'home',
+    pendingWork: readLoungeComposerDraftPendingWork(),
+  })) {
     return <div className={`${mobileShell} text-white`}>Loading...</div>
   }
 

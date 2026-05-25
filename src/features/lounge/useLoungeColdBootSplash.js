@@ -10,10 +10,6 @@ import {
   shouldShowLoungeColdBootSplash,
 } from '../../utils/loungeColdBootSplash.js'
 import {
-  readLoungeColdBootFeedMounted,
-  subscribeLoungeColdBootFeedMounted,
-} from '../../utils/loungeColdBootFeedMounted.js'
-import {
   readLoungeColdBootPendingWork,
   subscribeLoungeColdBootPendingWork,
 } from '../../utils/loungeColdBootPendingWork.js'
@@ -28,31 +24,14 @@ function readInitialColdBootSplashVisible(tab) {
 }
 
 /**
- * Lounge home-tab cold boot splash: eligibility, readiness gate, long-background resume.
+ * Lounge home-tab cold boot splash: eligibility, long-background resume, Lottie dismiss.
  *
- * @param {{
- *   tab: string,
- *   browseMode: 'member' | 'anonymous',
- *   communityFeedLoading: boolean,
- *   communityFeedQueryErr: string,
- *   communityPostsCount: number,
- * }} opts
+ * @param {{ tab: string, browseMode: 'member' | 'anonymous' }} opts
  */
-export function useLoungeColdBootSplash({
-  tab,
-  browseMode,
-  communityFeedLoading,
-  communityFeedQueryErr,
-  communityPostsCount,
-}) {
+export function useLoungeColdBootSplash({ tab, browseMode }) {
   const pendingWork = useSyncExternalStore(
     subscribeLoungeColdBootPendingWork,
     readLoungeColdBootPendingWork,
-    () => false,
-  )
-  const socialFeedMounted = useSyncExternalStore(
-    subscribeLoungeColdBootFeedMounted,
-    readLoungeColdBootFeedMounted,
     () => false,
   )
 
@@ -65,10 +44,6 @@ export function useLoungeColdBootSplash({
   const animationDoneRef = useRef(false)
 
   const isMember = browseMode === 'member'
-
-  const feedSettled =
-    Boolean(communityFeedQueryErr) ||
-    (!communityFeedLoading && (communityPostsCount > 0 || socialFeedMounted))
 
   const beginSplash = useCallback(() => {
     if (visible) return
@@ -143,7 +118,7 @@ export function useLoungeColdBootSplash({
       const elapsed = Date.now() - shownAtRef.current
       if (elapsed < minMs) return false
       if (!isMember) return true
-      if (feedSettled && socialFeedMounted && animationDoneRef.current) return true
+      if (animationDoneRef.current) return true
       if (elapsed >= maxMs) return true
       return false
     }
@@ -169,8 +144,6 @@ export function useLoungeColdBootSplash({
     visible,
     dismissing,
     isMember,
-    feedSettled,
-    socialFeedMounted,
     finishSplash,
   ])
 
