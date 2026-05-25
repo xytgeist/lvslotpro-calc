@@ -307,6 +307,17 @@ export default function SlotGuideFormApp() {
   const [diagrams, setDiagrams]           = useState([])
   const [editIds, setEditIds]             = useState(null)      // {guideId, machineId} when editing
 
+  // ── Dirty / unsaved-edits tracking
+  const [isDirty, setIsDirty] = useState(false)
+
+  // Warn before closing/navigating away with unsaved edits
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
   // ── Submit
   const [busy, setBusy]     = useState(false)
   const [result, setResult] = useState(null)
@@ -341,9 +352,13 @@ export default function SlotGuideFormApp() {
       if (key === 'has_calculator' && value && !m.calculator_slug) next.calculator_slug = next.slug || slugify(next.name)
       return next
     })
+    setIsDirty(true)
   }, [])
 
-  const setGuideField = useCallback((key, value) => setGuide((g) => ({ ...g, [key]: value })), [])
+  const setGuideField = useCallback((key, value) => {
+    setGuide((g) => ({ ...g, [key]: value }))
+    setIsDirty(true)
+  }, [])
 
   // ── Load guide list from Supabase
   async function fetchGuideList() {
@@ -413,6 +428,7 @@ export default function SlotGuideFormApp() {
       // Fall back to the static public path used by GuidesScreen when no DB thumbnail is set
       setCurrentThumbnail(data.thumbnail_url || m?.thumbnail_url || `/guides/${data.slug}/hero.webp`)
       setDiagrams([])
+      setIsDirty(false)
       setMode('edit')
     } catch (e) {
       setListErr(e.message)
@@ -426,6 +442,7 @@ export default function SlotGuideFormApp() {
     setMachine(blankMachine)
     setGuide(blankGuide)
     setHeroFile(null)
+    setIsDirty(false)
     setCurrentThumbnail('')
     setDiagrams([])
     setEditIds(null)
@@ -469,6 +486,7 @@ export default function SlotGuideFormApp() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || (Array.isArray(data.errors) ? data.errors.join(' ') : res.statusText) || 'Ingest failed.')
       setResult(data)
+      setIsDirty(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -529,6 +547,7 @@ export default function SlotGuideFormApp() {
       if (gErr) throw new Error(`guides: ${gErr.message}`)
 
       setResult({ ok: true, message: newThumbnailUrl ? 'Guide and hero image updated.' : 'Guide updated successfully.' })
+      setIsDirty(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -548,6 +567,17 @@ export default function SlotGuideFormApp() {
 
       {/* ── LEFT: form ── */}
       <div className="flex-1 min-w-0 space-y-6">
+
+        {/* Unsaved-edits banner */}
+        {isDirty && (
+          <div className="flex items-center gap-3 rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-3">
+            <svg className="h-4 w-4 shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <p className="text-sm font-semibold text-amber-300 flex-1">Unsaved edits — don't forget to save before leaving.</p>
+          </div>
+        )}
 
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -774,7 +804,7 @@ export default function SlotGuideFormApp() {
                       type="file"
                       accept="image/*"
                       className="sr-only"
-                      onChange={(e) => setHeroFile(e.target.files?.[0] || null)}
+                      onChange={(e) => { setHeroFile(e.target.files?.[0] || null); setIsDirty(true) }}
                     />
                     {heroFile
                       ? <p className="text-xs text-emerald-400 mt-1.5">Replacing with: {heroFile.name} — save to apply</p>
@@ -784,12 +814,12 @@ export default function SlotGuideFormApp() {
                 ) : isEdit ? (
                   /* Edit mode, no existing image */
                   <div>
-                    <input type="file" accept="image/*" className={ic} onChange={(e) => setHeroFile(e.target.files?.[0] || null)} />
+                    <input type="file" accept="image/*" className={ic} onChange={(e) => { setHeroFile(e.target.files?.[0] || null); setIsDirty(true) }} />
                     {heroFile && <p className="text-xs text-emerald-400 mt-1">Selected: {heroFile.name}</p>}
                   </div>
                 ) : (
                   /* New guide mode */
-                  <input type="file" accept="image/*" className={ic} onChange={(e) => setHeroFile(e.target.files?.[0] || null)} required />
+                  <input type="file" accept="image/*" className={ic} onChange={(e) => { setHeroFile(e.target.files?.[0] || null); setIsDirty(true) }} required />
                 )}
               </div>
             </div>
