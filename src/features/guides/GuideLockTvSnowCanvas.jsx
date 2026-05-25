@@ -10,8 +10,10 @@ const FLAT_GRID_X = 12
 const FLAT_GRID_Y = 9
 const FLAT_SHOW = 0.6
 const SCAN_BAND_COUNT = 3
-const RISING_SCAN_SPEED = 38
-const MIN_FRAME_MS = 72
+const RISING_SCAN_SPEED = 22
+const MIN_FRAME_MS = 96
+const FRAME_SEED_RATE = 10
+const SCAN_DRIFT_RATE = 0.26
 
 function hashNoise(x, y, seed = 0) {
   const v = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.758) * 43758.5453
@@ -63,7 +65,7 @@ function fillBlock(data, width, height, x, y, blockW, blockH, r, g, b, a) {
 
 function paintScanBands(data, width, height, frameSeed) {
   for (let i = 0; i < SCAN_BAND_COUNT; i++) {
-    const drift = Math.sin(frameSeed * 0.45 + i * 1.9) * height * 0.06
+    const drift = Math.sin(frameSeed * SCAN_DRIFT_RATE + i * 1.9) * height * 0.05
     const bandY = Math.floor(height * (0.22 + i * 0.3) + drift)
     const thickness = 6 + Math.floor(hashNoise(i, frameSeed, 2.1) * 7)
     const grey = 208 + Math.floor(hashNoise(i, frameSeed, 3.4) * 32)
@@ -74,7 +76,7 @@ function paintScanBands(data, width, height, frameSeed) {
 }
 
 function paintRisingScanBand(data, width, height, frameSeed) {
-  const thickness = 14 + Math.floor(hashNoise(frameSeed * 0.22, 0, 11.2) * 8)
+  const thickness = 14 + Math.floor(hashNoise(frameSeed * 0.12, 0, 11.2) * 8)
   const travel = (frameSeed * RISING_SCAN_SPEED) % (height + thickness + 48)
   const bandY = Math.floor(height - travel + 24)
   const flicker = 0.82 + hashNoise(frameSeed, 12.4, 3.8) * 0.18
@@ -215,7 +217,7 @@ export default function GuideLockTvSnowCanvas({ className = '' }) {
       lastTs = ts
 
       if (!reducedMotion) {
-        frameSeed += dt * 18
+        frameSeed += dt * FRAME_SEED_RATE
       }
 
       const shouldPaint =
