@@ -12,11 +12,9 @@ const FLAT_SHOW = 0.5
 const MICRO_GRID_X = 7
 const MICRO_GRID_Y = 5
 const MICRO_SHOW = 0.44
-const SCAN_BAND_COUNT = 3
 const RISING_SCAN_SPEED = 22
 const MIN_FRAME_MS = 96
 const FRAME_SEED_RATE = 10
-const SCAN_DRIFT_RATE = 0.26
 
 function hashNoise(x, y, seed = 0) {
   const v = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.758) * 43758.5453
@@ -66,18 +64,6 @@ function fillBlock(data, width, height, x, y, blockW, blockH, r, g, b, a) {
       data[i + 2] = b
       data[i + 3] = alpha
     }
-  }
-}
-
-function paintScanBands(data, width, height, frameSeed) {
-  for (let i = 0; i < SCAN_BAND_COUNT; i++) {
-    const drift = Math.sin(frameSeed * SCAN_DRIFT_RATE + i * 1.9) * height * 0.05
-    const bandY = Math.floor(height * (0.22 + i * 0.3) + drift)
-    const thickness = 6 + Math.floor(hashNoise(i, frameSeed, 2.1) * 7)
-    const grey = 208 + Math.floor(hashNoise(i, frameSeed, 3.4) * 32)
-    const alpha = (0.16 + hashNoise(i, frameSeed, 4.2) * 0.1) * 255
-
-    fillBlock(data, width, height, 0, bandY, width, thickness, grey, grey + 2, grey + 3, alpha)
   }
 }
 
@@ -170,7 +156,6 @@ function paintMicroFlatSnow(data, width, height, frameSeed) {
 
 function paintTvSnow(imageData, width, height, frameSeed) {
   imageData.data.fill(0)
-  paintScanBands(imageData.data, width, height, frameSeed)
   paintRisingScanBand(imageData.data, width, height, frameSeed)
   paintMediumSnow(imageData.data, width, height, frameSeed)
   paintFineSnow(imageData.data, width, height, frameSeed)
