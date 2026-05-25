@@ -19,21 +19,21 @@ function pickSnowColor(t) {
 
 function rowIntensity(y, height) {
   const t = y / height
-  if (t < 0.08) return 0.18
-  return Math.min(0.82, 0.18 + t * 0.72)
+  if (t < 0.08) return 0.42
+  return Math.min(1, 0.42 + t * 0.58)
 }
 
-function paintTvSnow(imageData, width, height, frameSeed, reducedMotion) {
+function paintTvSnow(imageData, width, height, frameSeed) {
   const data = imageData.data
 
   for (let y = 0; y < height; y++) {
     const intensity = rowIntensity(y, height)
-    const scanBand = 0.72 + 0.28 * Math.sin(y * 0.07 + frameSeed * 0.11)
+    const scanBand = 0.78 + 0.22 * Math.sin(y * 0.07 + frameSeed * 0.11)
     const rowSeed = hashNoise(0, y + frameSeed, 1.7)
 
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4
-      const density = 0.32 + intensity * 0.58
+      const density = 0.58 + intensity * 0.38
       const grain = hashNoise(x * 0.12 + rowSeed * 6, y + frameSeed, 0.4)
 
       if (grain > density) {
@@ -43,9 +43,9 @@ function paintTvSnow(imageData, width, height, frameSeed, reducedMotion) {
 
       const colorT = hashNoise(x * 0.37 + rowSeed * 4, y * 0.23 + frameSeed, 5.6)
       const [r, g, b] = pickSnowColor(colorT)
-      const flicker = 0.5 + hashNoise(x, y + frameSeed, 7.2) * 0.5
-      const bright = hashNoise(x * 1.9 + rowShift, y * 0.6 + frameSeed, 3.1)
-      const alpha = intensity * scanBand * flicker * (bright > 0.78 ? 0.98 : 0.72)
+      const flicker = 0.58 + hashNoise(x, y + frameSeed, 7.2) * 0.42
+      const bright = hashNoise(x * 1.9, y * 0.6 + frameSeed, 3.1)
+      const alpha = intensity * scanBand * flicker * (bright > 0.78 ? 0.96 : 0.78)
 
       data[i] = r
       data[i + 1] = g
@@ -83,14 +83,15 @@ export default function GuideLockTvSnowCanvas({ className = '' }) {
       width = Math.max(1, Math.round(rect.width))
       height = Math.max(1, Math.round(rect.height))
       const dpr = Math.min(2, window.devicePixelRatio || 1)
+      const pixelWidth = Math.round(width * dpr)
+      const pixelHeight = Math.round(height * dpr)
 
-      canvas.width = Math.round(width * dpr)
-      canvas.height = Math.round(height * dpr)
+      canvas.width = pixelWidth
+      canvas.height = pixelHeight
       canvas.style.width = `${width}px`
       canvas.style.height = `${height}px`
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      imageData = ctx.createImageData(width, height)
+      imageData = ctx.createImageData(pixelWidth, pixelHeight)
     }
 
     const tick = (ts) => {
@@ -102,8 +103,8 @@ export default function GuideLockTvSnowCanvas({ className = '' }) {
         frameSeed += dt * 28
       }
 
-      if (imageData) {
-        paintTvSnow(imageData, width, height, frameSeed, reducedMotion)
+      if (imageData && imageData.width > 0 && imageData.height > 0) {
+        paintTvSnow(imageData, imageData.width, imageData.height, frameSeed)
         ctx.putImageData(imageData, 0, 0)
       }
 

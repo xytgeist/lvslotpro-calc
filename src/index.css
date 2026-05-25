@@ -515,21 +515,26 @@ input[list]::-webkit-list-button {
 }
 
 /* ── Locked AP guide paywall — transparent TV snow overlay ───────────────── */
+.guide-lock-glitch {
+  isolation: isolate;
+}
+
 .guide-lock-glitch__veil {
   background: linear-gradient(
     to bottom,
     rgb(0 0 0 / 0%) 0%,
-    rgb(0 0 0 / 6%) 22%,
-    rgb(0 0 0 / 18%) 52%,
-    rgb(0 0 0 / 34%) 100%
+    rgb(0 0 0 / 4%) 22%,
+    rgb(0 0 0 / 12%) 52%,
+    rgb(0 0 0 / 22%) 100%
   );
 }
 
 .guide-lock-glitch__tv-snow {
-  mix-blend-mode: screen;
+  z-index: 1;
 }
 
 .guide-lock-glitch__tv-snow-canvas {
   display: block;
+  opacity: 0.88;
   mix-blend-mode: screen;
 }
