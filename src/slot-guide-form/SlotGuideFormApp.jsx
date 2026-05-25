@@ -66,6 +66,19 @@ const ic = 'w-full min-h-11 text-base text-white bg-gray-900 rounded-xl border b
 const lc = 'block text-sm font-medium text-gray-300 mb-1'
 const sc = 'rounded-2xl border border-gray-800 bg-gray-900/60 p-4 space-y-4'
 
+const VEGAS_OPTIONS = [
+  'Extremely Common', 'Very Common', 'Common', 'Uncommon', 'Rare', 'Rare (nostalgia)',
+]
+const VOLATILITY_OPTIONS = [
+  'Low', 'Low-Medium', 'Medium', 'Med-High', 'High', 'High (extreme session swings)',
+]
+const CUSTOM_SENTINEL = 'Custom…'
+
+/** Returns true when a value is set but not in the canonical options list. */
+function isCustomVal(val, options) {
+  return Boolean(val && val !== CUSTOM_SENTINEL && !options.includes(val))
+}
+
 function readSettings() {
   try { return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') } catch { return null }
 }
@@ -314,9 +327,9 @@ export default function SlotGuideFormApp() {
         manufacturer: machine.manufacturer,
         type: machine.type,
         difficulty: machine.difficulty,
-        vegas_availability: machine.vegas_availability,
+        vegas_availability: machine.vegas_availability === CUSTOM_SENTINEL ? null : (machine.vegas_availability || null),
         nerf_risk: machine.nerf_risk,
-        volatility_index: machine.volatility_index || null,
+        volatility_index: (machine.volatility_index === CUSTOM_SENTINEL ? null : machine.volatility_index) || null,
         popularity_summary: machine.popularity_summary || null,
         release_year: machine.release_year ? Number(machine.release_year) : null,
         has_calculator: machine.has_calculator,
@@ -463,14 +476,25 @@ export default function SlotGuideFormApp() {
               </div>
               <div>
                 <label className={lc}>Vegas availability <span className="text-gray-500 font-normal text-xs">(🔥 rating)</span></label>
-                <select className={ic} value={machine.vegas_availability} onChange={(e) => setMachineField('vegas_availability', e.target.value)} required>
+                <select
+                  className={ic}
+                  value={isCustomVal(machine.vegas_availability, VEGAS_OPTIONS) ? CUSTOM_SENTINEL : (machine.vegas_availability || '')}
+                  onChange={(e) => setMachineField('vegas_availability', e.target.value)}
+                  required={!isCustomVal(machine.vegas_availability, VEGAS_OPTIONS) && machine.vegas_availability !== CUSTOM_SENTINEL}
+                >
                   <option value="">— select —</option>
-                  <option>Extremely Common</option>
-                  <option>Very Common</option>
-                  <option>Common</option>
-                  <option>Uncommon</option>
-                  <option>Rare</option>
+                  {VEGAS_OPTIONS.map(v => <option key={v}>{v}</option>)}
+                  <option value={CUSTOM_SENTINEL}>{CUSTOM_SENTINEL}</option>
                 </select>
+                {(isCustomVal(machine.vegas_availability, VEGAS_OPTIONS) ||
+                  machine.vegas_availability === CUSTOM_SENTINEL) && (
+                  <input
+                    className={`${ic} mt-2 text-sm`}
+                    placeholder="Type custom value…"
+                    value={machine.vegas_availability === CUSTOM_SENTINEL ? '' : machine.vegas_availability}
+                    onChange={(e) => setMachineField('vegas_availability', e.target.value || CUSTOM_SENTINEL)}
+                  />
+                )}
               </div>
               <div>
                 <label className={lc}>Nerf risk</label>
@@ -480,15 +504,24 @@ export default function SlotGuideFormApp() {
               </div>
               <div>
                 <label className={lc}>Volatility index <span className="text-gray-500 font-normal text-xs">(⚡ rating)</span></label>
-                <select className={ic} value={machine.volatility_index} onChange={(e) => setMachineField('volatility_index', e.target.value)}>
+                <select
+                  className={ic}
+                  value={isCustomVal(machine.volatility_index, VOLATILITY_OPTIONS) ? CUSTOM_SENTINEL : (machine.volatility_index || '')}
+                  onChange={(e) => setMachineField('volatility_index', e.target.value)}
+                >
                   <option value="">— select —</option>
-                  <option>Low</option>
-                  <option>Low-Medium</option>
-                  <option>Medium</option>
-                  <option>Med-High</option>
-                  <option>High</option>
-                  <option>High (extreme session swings)</option>
+                  {VOLATILITY_OPTIONS.map(v => <option key={v}>{v}</option>)}
+                  <option value={CUSTOM_SENTINEL}>{CUSTOM_SENTINEL}</option>
                 </select>
+                {(isCustomVal(machine.volatility_index, VOLATILITY_OPTIONS) ||
+                  machine.volatility_index === CUSTOM_SENTINEL) && (
+                  <input
+                    className={`${ic} mt-2 text-sm`}
+                    placeholder="Type custom value…"
+                    value={machine.volatility_index === CUSTOM_SENTINEL ? '' : machine.volatility_index}
+                    onChange={(e) => setMachineField('volatility_index', e.target.value || CUSTOM_SENTINEL)}
+                  />
+                )}
               </div>
               <div>
                 <label className={lc}>Popularity summary</label>
