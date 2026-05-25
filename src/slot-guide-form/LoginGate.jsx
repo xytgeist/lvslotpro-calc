@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-// Auth always checks against prod — admin accounts live there.
+// Auth checks against the test environment (where the app currently lives).
 // Publishable key, safe to hardcode.
 const supabase = createClient(
-  'https://wedrhwtsxifbnnbgxdkm.supabase.co',
-  'sb_publishable_jtH82joS6gk2_gfzwEgomA_AtmkXwOY',
+  'https://jtjgtucumuoswnbauxry.supabase.co',
+  'sb_publishable_u3-GQGrZ_hswapkiWiPyLA_Ah3mxU8B',
 )
 
 const ic = 'w-full min-h-11 text-base text-white bg-gray-900 rounded-xl border border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/40'
