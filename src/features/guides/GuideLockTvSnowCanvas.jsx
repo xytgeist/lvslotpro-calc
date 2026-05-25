@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react'
 
-const GRID_X = 22
-const GRID_Y = 18
-const SHOW_THRESHOLD = 0.78
+const MEDIUM_GRID_X = 16
+const MEDIUM_GRID_Y = 13
+const MEDIUM_SHOW = 0.66
+const FINE_GRID_X = 10
+const FINE_GRID_Y = 8
+const FINE_SHOW = 0.58
 const SCAN_BAND_COUNT = 3
 const MIN_FRAME_MS = 72
 
@@ -60,32 +63,63 @@ function paintScanBands(data, width, height, frameSeed) {
   }
 }
 
-function paintSparseSnow(data, width, height, frameSeed) {
-  for (let y = 0; y < height; y += GRID_Y) {
+function paintSnowLayer(
+  data,
+  width,
+  height,
+  frameSeed,
+  { gridX, gridY, showThreshold, flakeWRange, flakeHRange, alphaScale, seedOffset },
+) {
+  for (let y = 0; y < height; y += gridY) {
     const intensity = rowIntensity(y, height)
-    const rowOffset = Math.floor(hashNoise(y, frameSeed, 0.6) * GRID_X)
+    const rowOffset = Math.floor(hashNoise(y, frameSeed, seedOffset) * gridX)
 
-    for (let x = rowOffset; x < width; x += GRID_X) {
-      const show = hashNoise(x * 0.04, y + frameSeed, 7.1)
-      if (show < SHOW_THRESHOLD) continue
+    for (let x = rowOffset; x < width; x += gridX) {
+      const show = hashNoise(x * 0.04, y + frameSeed, seedOffset + 7.1)
+      if (show < showThreshold) continue
 
-      const flakeW = 7 + Math.floor(hashNoise(x, y, frameSeed + 8.2) * 10)
-      const flakeH = 6 + Math.floor(hashNoise(x + 1, y, frameSeed + 9.1) * 11)
-      const colorT = hashNoise(x * 0.15, y * 0.08 + frameSeed, 5.6)
-      const chromaBias = hashNoise(x, y + frameSeed, 6.3)
+      const flakeW = flakeWRange[0] + Math.floor(hashNoise(x, y, frameSeed + seedOffset + 8.2) * flakeWRange[1])
+      const flakeH = flakeHRange[0] + Math.floor(hashNoise(x + 1, y, frameSeed + seedOffset + 9.1) * flakeHRange[1])
+      const colorT = hashNoise(x * 0.15, y * 0.08 + frameSeed, seedOffset + 5.6)
+      const chromaBias = hashNoise(x, y + frameSeed, seedOffset + 6.3)
       const [r, g, b] = pickSnowColor(colorT, chromaBias)
-      const flicker = 0.55 + hashNoise(x, y + frameSeed, 7.2) * 0.35
-      const alpha = intensity * flicker * (show > 0.92 ? 0.72 : 0.54)
+      const flicker = 0.55 + hashNoise(x, y + frameSeed, seedOffset + 7.2) * 0.35
+      const alpha = intensity * flicker * alphaScale * (show > 0.92 ? 1.08 : 1)
 
       fillBlock(data, width, height, x, y, flakeW, flakeH, r, g, b, alpha * 255)
     }
   }
 }
 
+function paintMediumSnow(data, width, height, frameSeed) {
+  paintSnowLayer(data, width, height, frameSeed, {
+    gridX: MEDIUM_GRID_X,
+    gridY: MEDIUM_GRID_Y,
+    showThreshold: MEDIUM_SHOW,
+    flakeWRange: [4, 5],
+    flakeHRange: [3, 5],
+    alphaScale: 0.58,
+    seedOffset: 0.6,
+  })
+}
+
+function paintFineSnow(data, width, height, frameSeed) {
+  paintSnowLayer(data, width, height, frameSeed, {
+    gridX: FINE_GRID_X,
+    gridY: FINE_GRID_Y,
+    showThreshold: FINE_SHOW,
+    flakeWRange: [2, 2],
+    flakeHRange: [2, 2],
+    alphaScale: 0.34,
+    seedOffset: 14.8,
+  })
+}
+
 function paintTvSnow(imageData, width, height, frameSeed) {
   imageData.data.fill(0)
   paintScanBands(imageData.data, width, height, frameSeed)
-  paintSparseSnow(imageData.data, width, height, frameSeed)
+  paintMediumSnow(imageData.data, width, height, frameSeed)
+  paintFineSnow(imageData.data, width, height, frameSeed)
 }
 
 export default function GuideLockTvSnowCanvas({ className = '' }) {
