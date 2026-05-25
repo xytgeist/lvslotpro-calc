@@ -5,8 +5,16 @@ import { diagramFilename, slugify } from './formUtils.js'
 const STORAGE_KEY = 'slotGuideFormSettings:v3'
 
 const ENVS = [
-  { id: 'test',       label: 'test',       url: import.meta.env.VITE_SUPABASE_URL_TEST || 'https://jtjgtucumuoswnbauxry.supabase.co' },
-  { id: 'production', label: 'production', url: import.meta.env.VITE_SUPABASE_URL_PROD || import.meta.env.VITE_SUPABASE_URL },
+  {
+    id: 'test', label: 'test',
+    url:     import.meta.env.VITE_SUPABASE_URL_TEST  || 'https://jtjgtucumuoswnbauxry.supabase.co',
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY_TEST,
+  },
+  {
+    id: 'production', label: 'production',
+    url:     import.meta.env.VITE_SUPABASE_URL_PROD  || import.meta.env.VITE_SUPABASE_URL,
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY_PROD || import.meta.env.VITE_SUPABASE_ANON_KEY,
+  },
 ]
 
 const PLACEMENTS = [
@@ -87,14 +95,19 @@ export default function SlotGuideFormApp() {
   const [error, setError]   = useState('')
 
   const supaClientRef = useRef(null)
-  function getSupaClient() {
-    if (!supabaseUrl || !supabaseKey) return null
+
+  // For reads (guide list, load): use service key if entered, else fall back to anon key.
+  // For writes (save edits): caller must ensure service key is present.
+  function getSupaClient({ requireServiceKey = false } = {}) {
+    const key = supabaseKey.trim() || activeEnv.anonKey
+    if (!supabaseUrl || !key) return null
+    if (requireServiceKey && !supabaseKey.trim()) return null
     if (!supaClientRef.current ||
         supaClientRef.current._url !== supabaseUrl ||
-        supaClientRef.current._key !== supabaseKey) {
-      const c = createClient(supabaseUrl, supabaseKey)
+        supaClientRef.current._key !== key) {
+      const c = createClient(supabaseUrl, key)
       c._url = supabaseUrl
-      c._key = supabaseKey
+      c._key = key
       supaClientRef.current = c
     }
     return supaClientRef.current
@@ -260,8 +273,8 @@ export default function SlotGuideFormApp() {
     e.preventDefault()
     setError('')
     setResult(null)
-    const sb = getSupaClient()
-    if (!sb) { setError('Supabase URL and key required to save edits.'); return }
+    const sb = getSupaClient({ requireServiceKey: true })
+    if (!sb) { setError('Enter the Supabase service key to save edits (anon key is read-only).'); return }
     if (!editIds) { setError('No guide loaded for editing.'); return }
 
     setBusy(true)
