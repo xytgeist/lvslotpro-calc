@@ -423,8 +423,15 @@ export default function SlotGuideFormApp() {
                 </select>
               </div>
               <div>
-                <label className={lc}>Vegas availability</label>
-                <input className={ic} value={machine.vegas_availability} onChange={(e) => setMachineField('vegas_availability', e.target.value)} required />
+                <label className={lc}>Vegas availability <span className="text-gray-500 font-normal text-xs">(🔥 rating)</span></label>
+                <select className={ic} value={machine.vegas_availability} onChange={(e) => setMachineField('vegas_availability', e.target.value)} required>
+                  <option value="">— select —</option>
+                  <option>Extremely Common</option>
+                  <option>Very Common</option>
+                  <option>Common</option>
+                  <option>Uncommon</option>
+                  <option>Rare</option>
+                </select>
               </div>
               <div>
                 <label className={lc}>Nerf risk</label>
@@ -433,8 +440,15 @@ export default function SlotGuideFormApp() {
                 </select>
               </div>
               <div>
-                <label className={lc}>Volatility index</label>
-                <input className={ic} value={machine.volatility_index} onChange={(e) => setMachineField('volatility_index', e.target.value)} placeholder="Low-Medium" />
+                <label className={lc}>Volatility index <span className="text-gray-500 font-normal text-xs">(⚡ rating)</span></label>
+                <select className={ic} value={machine.volatility_index} onChange={(e) => setMachineField('volatility_index', e.target.value)}>
+                  <option value="">— select —</option>
+                  <option>Low</option>
+                  <option>Low-Medium</option>
+                  <option>Medium</option>
+                  <option>Med-High</option>
+                  <option>High</option>
+                </select>
               </div>
               <div>
                 <label className={lc}>Popularity summary</label>
