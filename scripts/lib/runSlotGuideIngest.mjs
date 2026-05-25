@@ -15,6 +15,57 @@ import {
   upsertSlotGuideFromManifest,
 } from "./slotGuideSupabaseUpsert.mjs";
 
+const CF_R2_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+/**
+ * Upload a guide image to Cloudflare R2 via the guide-cf-r2-upload Edge function.
+ * Uses service-role bearer auth (server-to-server).
+ * Returns the public URL, or null if R2 is not configured (503 → caller falls back to Supabase Storage).
+ *
+ * @param {{ supabaseUrl: string, serviceRoleKey: string, slug: string, filename: string, buffer: Buffer, contentType?: string }} opts
+ * @returns {Promise<string | null>}
+ */
+async function uploadGuideAssetToR2({ supabaseUrl, serviceRoleKey, slug, filename, buffer, contentType = "image/webp" }) {
+  const edgeFnUrl = `${supabaseUrl}/functions/v1/guide-cf-r2-upload`;
+  let mintRes;
+  try {
+    mintRes = await fetch(edgeFnUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({ slug, contentType, filename }),
+    });
+  } catch (err) {
+    console.warn(`[guide-cf-r2-upload] Network error — falling back to Supabase Storage: ${err.message}`);
+    return null;
+  }
+
+  if (mintRes.status === 503) {
+    // R2 not configured on this project — silently fall back
+    return null;
+  }
+  if (!mintRes.ok) {
+    const body = await mintRes.json().catch(() => ({}));
+    throw new Error(`guide-cf-r2-upload (${mintRes.status}): ${body.error || mintRes.statusText}`);
+  }
+
+  const { uploadURL, publicUrl } = await mintRes.json();
+  if (!uploadURL || !publicUrl) throw new Error("guide-cf-r2-upload: missing uploadURL or publicUrl in response.");
+
+  const putRes = await fetch(uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": contentType, "Cache-Control": CF_R2_CACHE_CONTROL },
+    body: buffer,
+  });
+  if (!putRes.ok) {
+    throw new Error(`R2 PUT failed (${putRes.status}) for ${filename}`);
+  }
+
+  return publicUrl;
+}
+
 /**
  * @param {string | null | undefined} raw
  * @returns {Buffer | null}
@@ -104,21 +155,27 @@ export async function runSlotGuideIngest({
   if (syncSupabase) {
     loadSupabaseEnv(target);
     const supabase = createSupabaseServiceClient(createClient);
-    const { url } = readSupabaseCredentials();
+    const { url, key: serviceRoleKey } = readSupabaseCredentials();
+    const supabaseUrl = url;
 
-    const heroPublicUrl = await uploadGuideAsset(supabase, {
-      slug,
-      filename: "hero.webp",
-      buffer: heroWebp,
+    // Upload hero: try R2 first, fall back to Supabase Storage
+    let heroPublicUrl = await uploadGuideAssetToR2({
+      supabaseUrl, serviceRoleKey, slug,
+      filename: "hero.webp", buffer: heroWebp, contentType: "image/webp",
     });
+    if (!heroPublicUrl) {
+      heroPublicUrl = await uploadGuideAsset(supabase, { slug, filename: "hero.webp", buffer: heroWebp });
+    }
     result.storageUrls.hero = heroPublicUrl;
 
     for (const d of diagramsWebp) {
-      const publicUrl = await uploadGuideAsset(supabase, {
-        slug,
-        filename: d.filename,
-        buffer: d.buffer,
+      let publicUrl = await uploadGuideAssetToR2({
+        supabaseUrl, serviceRoleKey, slug,
+        filename: d.filename, buffer: d.buffer, contentType: "image/webp",
       });
+      if (!publicUrl) {
+        publicUrl = await uploadGuideAsset(supabase, { slug, filename: d.filename, buffer: d.buffer });
+      }
       result.storageUrls[d.filename] = publicUrl;
     }
 

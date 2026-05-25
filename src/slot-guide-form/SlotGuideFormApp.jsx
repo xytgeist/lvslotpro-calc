@@ -2,6 +2,48 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './LoginGate.jsx'
 import { buildGuideMarkdown, diagramFilename, parseGuideMarkdown, slugify } from './formUtils.js'
 
+const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+
+/**
+ * Upload a guide image to R2 via the guide-cf-r2-upload Edge function.
+ * Falls back to Supabase Storage if R2 is not configured (503).
+ * Returns the public URL.
+ */
+async function uploadGuideImageToR2OrStorage(file, { slug, filename }) {
+  // Try R2 first
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    const { data: mintData, error: mintErr } = await supabase.functions.invoke('guide-cf-r2-upload', {
+      body: { slug, contentType: file.type || 'image/webp', filename },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const r2NotConfigured = mintErr?.context?.status === 503 ||
+      (typeof mintData?.error === 'string' && mintData.error.includes('not configured'))
+    if (!r2NotConfigured) {
+      if (mintErr) {
+        const msg = mintData?.error || mintErr.message || 'Could not start R2 upload.'
+        throw new Error(msg)
+      }
+      if (mintData?.uploadURL) {
+        const putRes = await fetch(mintData.uploadURL, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'image/webp', 'Cache-Control': CF_R2_CACHE_CONTROL },
+          body: file,
+        })
+        if (!putRes.ok) throw new Error(`R2 upload failed (${putRes.status})`)
+        return mintData.publicUrl
+      }
+    }
+  }
+  // Fallback: Supabase Storage
+  const { error: upErr } = await supabase.storage
+    .from('guide-assets')
+    .upload(`${slug}/${filename}`, file, { contentType: file.type || 'image/webp', upsert: true, cacheControl: '31536000' })
+  if (upErr) throw new Error(`Storage upload: ${upErr.message}`)
+  const { data: urlData } = supabase.storage.from('guide-assets').getPublicUrl(`${slug}/${filename}`)
+  return urlData.publicUrl
+}
+
 const STORAGE_KEY = 'slotGuideFormSettings:v4'
 
 // Ingest API targets — controls which Vercel function receives new guide ingests.
@@ -257,15 +299,11 @@ export default function SlotGuideFormApp() {
       // Upload hero image first if a new one was provided
       let newThumbnailUrl = null
       if (heroFile) {
-        const heroExt  = heroFile.name.split('.').pop().toLowerCase()
-        const heroPath = `${machine.slug}/hero.${heroExt}`
-        const heroContentType = heroFile.type || 'image/webp'
-        const { error: upErr } = await supabase.storage
-          .from('guide-assets')
-          .upload(heroPath, heroFile, { contentType: heroContentType, upsert: true, cacheControl: 'public, max-age=31536000, immutable' })
-        if (upErr) throw new Error(`hero upload: ${upErr.message}`)
-        const { data: urlData } = supabase.storage.from('guide-assets').getPublicUrl(heroPath)
-        newThumbnailUrl = urlData.publicUrl
+        const heroExt = heroFile.name.split('.').pop().toLowerCase() || 'webp'
+        newThumbnailUrl = await uploadGuideImageToR2OrStorage(heroFile, {
+          slug: machine.slug,
+          filename: `hero.${heroExt}`,
+        })
         setCurrentThumbnail(newThumbnailUrl)
         setHeroFile(null)
       }

@@ -21,3 +21,7 @@ verify_jwt = false
 # Stripe billing webhook (signed by Stripe, not Supabase JWT).
 [functions.stripe-webhook]
 verify_jwt = false
+
+# Guide image upload to R2: handles own auth (user JWT admin check OR service-role bearer).
+[functions.guide-cf-r2-upload]
+verify_jwt = false
