@@ -489,28 +489,51 @@ export default function SlotGuideFormApp() {
               </div>
               <div>
                 <label className={lc}>
-                  Hero image{isEdit ? <span className="text-gray-500 font-normal"> — optional, replaces existing</span> : <span className="text-red-400"> *</span>}
+                  Hero image{!isEdit && <span className="text-red-400"> *</span>}
                 </label>
-                {isEdit && currentThumbnail && (
-                  <div className="mb-2">
-                    <p className="text-xs text-gray-500 mb-1">Current hero:</p>
-                    <img
-                      src={currentThumbnail}
-                      alt="Current hero"
-                      className="h-24 w-auto rounded-lg object-cover border border-gray-700"
-                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                {isEdit && currentThumbnail ? (
+                  /* Edit mode: show current image with click-to-replace */
+                  <label className="block cursor-pointer group">
+                    <div className="relative w-full rounded-xl overflow-hidden border border-gray-700 bg-gray-900">
+                      <img
+                        src={heroFile ? URL.createObjectURL(heroFile) : currentThumbnail}
+                        alt="Hero"
+                        className="w-full max-h-52 object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg viewBox="0 0 24 24" className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <span className="text-white text-sm font-semibold">{heroFile ? 'Change image' : 'Replace image'}</span>
+                      </div>
+                      {heroFile && (
+                        <div className="absolute top-2 right-2 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          New
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => setHeroFile(e.target.files?.[0] || null)}
                     />
+                    {heroFile
+                      ? <p className="text-xs text-emerald-400 mt-1.5">Replacing with: {heroFile.name} — save to apply</p>
+                      : <p className="text-xs text-gray-600 mt-1.5">Click image to replace</p>
+                    }
+                  </label>
+                ) : isEdit ? (
+                  /* Edit mode, no existing image */
+                  <div>
+                    <input type="file" accept="image/*" className={ic} onChange={(e) => setHeroFile(e.target.files?.[0] || null)} />
+                    {heroFile && <p className="text-xs text-emerald-400 mt-1">Selected: {heroFile.name}</p>}
                   </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className={ic}
-                  onChange={(e) => setHeroFile(e.target.files?.[0] || null)}
-                  required={!isEdit}
-                />
-                {isEdit && heroFile && (
-                  <p className="text-xs text-emerald-400 mt-1">New image selected: {heroFile.name}</p>
+                ) : (
+                  /* New guide mode */
+                  <input type="file" accept="image/*" className={ic} onChange={(e) => setHeroFile(e.target.files?.[0] || null)} required />
                 )}
               </div>
             </div>
