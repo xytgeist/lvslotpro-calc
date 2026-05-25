@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './LoginGate.jsx'
 import { buildGuideMarkdown, diagramFilename, parseGuideMarkdown, slugify } from './formUtils.js'
+import GuideCardPreview from './GuideCardPreview.jsx'
 
 const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
@@ -106,6 +107,8 @@ const blankGuide = {
   when_to_play: '', when_to_stop: '', how_to_check: '',
   risk_bankroll: '', risk_summary: '', risk_bullets: '',
   skins_markdown: '', gameplay_mechanics: '',
+  // preview-only fields (not submitted to ingest/update)
+  _slug: '', _created_at: '', _updated_at: '',
 }
 
 export default function SlotGuideFormApp() {
@@ -200,6 +203,7 @@ export default function SlotGuideFormApp() {
     try {
       const { data, error: err } = await supabase.from('guides').select(`
         id, slug, title, content_markdown, card_ev_threshold, published, thumbnail_url,
+        created_at, updated_at,
         machines (
           id, slug, name, manufacturer, type, difficulty,
           vegas_availability, nerf_risk, volatility_index,
@@ -232,6 +236,9 @@ export default function SlotGuideFormApp() {
         title: data.title || '',
         card_ev_threshold: data.card_ev_threshold || '',
         published: data.published ?? true,
+        _slug: data.slug || '',
+        _created_at: data.created_at || '',
+        _updated_at: data.updated_at || '',
       })
       setHeroFile(null)
       // Fall back to the static public path used by GuidesScreen when no DB thumbnail is set
@@ -362,9 +369,16 @@ export default function SlotGuideFormApp() {
 
   const isEdit = mode === 'edit'
 
+  const showPreview = isEdit || !!(guide.title || machine.name)
+
   return (
     <div className="min-h-dvh bg-gray-950 text-white px-4 py-8 pb-24">
-      <div className="max-w-3xl mx-auto space-y-6">
+      {/* Two-column on large screens: form left, card preview right */}
+      <div className="max-w-7xl mx-auto">
+      <div className={`flex gap-8 items-start ${showPreview ? 'xl:grid xl:grid-cols-[1fr_360px]' : ''}`}>
+
+      {/* ── LEFT: form ── */}
+      <div className="flex-1 min-w-0 space-y-6">
 
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -688,7 +702,41 @@ export default function SlotGuideFormApp() {
             {busy ? (isEdit ? 'Saving…' : 'Ingesting…') : (isEdit ? 'Save changes' : 'Ingest guide')}
           </button>
         </form>
-      </div>
+
+      </div>{/* end form column */}
+
+      {/* ── RIGHT: sticky live card preview ── */}
+      {showPreview && (
+        <div className="hidden xl:block w-[360px] shrink-0">
+          <div className="sticky top-8 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-widest">
+              <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              Live card preview
+            </div>
+            {/* Phone-frame chrome for context */}
+            <div className="rounded-[2.5rem] border-2 border-zinc-700 bg-zinc-950 p-3 shadow-2xl shadow-black/60">
+              <div className="rounded-[2rem] overflow-hidden">
+                <GuideCardPreview
+                  guide={{
+                    slug: guide._slug || machine.slug,
+                    title: guide.title,
+                    card_ev_threshold: guide.card_ev_threshold,
+                    created_at: guide._created_at,
+                    updated_at: guide._updated_at,
+                  }}
+                  machine={machine}
+                  heroFile={heroFile}
+                  heroUrl={currentThumbnail}
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-600 text-center">Updates as you type · Collapsed view only</p>
+          </div>
+        </div>
+      )}
+
+      </div>{/* end flex/grid row */}
+      </div>{/* end max-w-7xl */}
     </div>
   )
 }
