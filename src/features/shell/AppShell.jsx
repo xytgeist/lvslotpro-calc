@@ -37,6 +37,12 @@ import {
   navigateFromLoungeActivityPayload,
 } from '../../utils/loungeActivityInAppNavigate.js'
 import { queueLoungeActivityMarkRead } from '../../utils/loungeActivityMarkReadQueue.js'
+import NavLockGlyph from '../../components/NavLockGlyph.jsx'
+import {
+  calculatorRequiresSlotsEdge,
+  canOpenCalculator,
+  calculatorsTabFullyGated,
+} from '../calculators/calculatorAccess.js'
 
 const LOUNGE_ACTIVITY_INAPP_TOAST_MS = 7000
 
@@ -52,19 +58,6 @@ function TabLoadingFallback() {
     <div className="flex min-h-[45vh] w-full items-center justify-center px-4 text-zinc-500 text-[15px]">
       Loading…
     </div>
-  )
-}
-
-/** Shown on hamburger items that need an active subscription (free-tier members). */
-function NavLockGlyph({ className }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
-      <path
-        fillRule="evenodd"
-        d="M10 1a4.5 4.5 0 00-4.5 4.5V6H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V8a2 2 0 00-2-2h-.5A4.5 4.5 0 0010 1zm3 5V5.5a3 3 0 10-6 0V6h6z"
-        clipRule="evenodd"
-      />
-    </svg>
   )
 }
 
@@ -699,7 +692,7 @@ export default function AppShell({
       setMenuOpen(false)
       return
     }
-    if (!isStaff && !hasActiveSubscription) {
+    if (!canOpenCalculator(key, { isStaff, hasSlotsEdge: hasActiveSubscription })) {
       onRequireSubscribe?.('slots-edge')
       setMenuOpen(false)
       return
@@ -712,7 +705,7 @@ export default function AppShell({
   /** `subscriberGated`: show lock in menu for logged-in users without an active subscription (see `docs/access-tiers.md`). */
   const navItems = [
     { id: 'home', label: 'Lounge', icon: '🍻', subscriberGated: false },
-    { id: 'calculators', label: 'Calcs', icon: '🧮', subscriberGated: true },
+    { id: 'calculators', label: 'Calcs', icon: '🧮', subscriberGated: calculatorsTabFullyGated() },
     { id: 'offers', label: 'Calendar', icon: '📅', subscriberGated: false },
     { id: 'bankroll', label: 'Bankroll', icon: '💰', subscriberGated: true },
     { id: 'guides', label: 'AP Guides', icon: '📗', subscriberGated: true },
@@ -723,7 +716,7 @@ export default function AppShell({
   const showNavSubscriberLocks =
     browseMode === 'member' && !isStaff && !hasActiveSubscription
 
-  const SLOTS_EDGE_GATED_TABS = new Set(['calculators', 'guides', 'bankroll'])
+  const SLOTS_EDGE_GATED_TABS = new Set(['guides', 'bankroll'])
 
   useEffect(() => {
     if (isStaff || hasActiveSubscription) return
@@ -732,6 +725,14 @@ export default function AppShell({
     setTab('home')
     setMenuOpen(false)
   }, [tab, isStaff, hasActiveSubscription, onRequireSubscribe])
+
+  useEffect(() => {
+    if (isStaff || hasActiveSubscription) return
+    if (tab !== 'calculators' || !activeCalculator) return
+    if (!calculatorRequiresSlotsEdge(activeCalculator)) return
+    onRequireSubscribe?.('slots-edge')
+    setActiveCalculator(null)
+  }, [tab, activeCalculator, isStaff, hasActiveSubscription, onRequireSubscribe])
 
   const renderNavMenuItems = () =>
     navItems.map((item) => {
@@ -863,6 +864,9 @@ export default function AppShell({
           setActiveCalculator={setActiveCalculator}
           browseMode={browseMode}
           onOpenAuth={() => onOpenAuth?.('login')}
+          hasSlotsEdge={hasActiveSubscription}
+          isStaff={isStaff}
+          onRequireSubscribe={onRequireSubscribe}
           titleBarNavSlot={renderTitleBarNavSlot()}
         />
       )
