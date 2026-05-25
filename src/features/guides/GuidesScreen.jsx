@@ -698,7 +698,7 @@ function IconEvTrendingUp({ className }) {
 function GuideLockedPaywallOverlay({ onUnlock }) {
   return (
     <div className="absolute inset-x-0 bottom-0 top-[10.5rem] z-10 flex items-center justify-center overflow-hidden rounded-b-3xl px-4 py-5">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-zinc-950/20 via-zinc-950/50 to-zinc-950/75" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-zinc-950/35 via-zinc-950/60 to-zinc-950/85" />
       <div className="relative z-10 flex max-w-[16rem] flex-col items-center gap-3 text-center">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-500/35 bg-amber-500/10">
           <NavLockGlyph className="h-4 w-4 text-amber-300" />
@@ -1716,7 +1716,7 @@ export default function GuidesScreen({
             const adminGuideLocked = guideRequiresSlotsEdge(slug, gatesMap)
             const guideLockedCollapsed = guideLocked && !expanded
             const lockedSectionBlurClass = guideLockedCollapsed
-              ? 'blur-[2px] brightness-[0.82] saturate-[0.94] select-none'
+              ? 'blur-[3px] brightness-[0.72] saturate-[0.9] select-none'
               : ''
             const normalizedGuideSlug = normalizeGuideAccessSlug(slug)
             const ringFocus =
