@@ -1,22 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from './LoginGate.jsx'
 import { buildGuideMarkdown, diagramFilename, parseGuideMarkdown, slugify } from './formUtils.js'
 
-const STORAGE_KEY = 'slotGuideFormSettings:v3'
+const STORAGE_KEY = 'slotGuideFormSettings:v4'
 
-// Publishable (non-secret) — safe to hardcode in client source.
-// Secrets (service key, ingest secret) are entered by the user at runtime.
-const ENVS = [
-  {
-    id: 'test', label: 'test',
-    url:     'https://jtjgtucumuoswnbauxry.supabase.co',
-    anonKey: 'sb_publishable_u3-GQGrZ_hswapkiWiPyLA_Ah3mxU8B',
-  },
-  {
-    id: 'production', label: 'production',
-    url:     'https://wedrhwtsxifbnnbgxdkm.supabase.co',
-    anonKey: 'sb_publishable_jtH82joS6gk2_gfzwEgomA_AtmkXwOY',
-  },
+// Ingest API targets — controls which Vercel function receives new guide ingests.
+// Reads and writes use the authenticated Supabase client from LoginGate (test env).
+const INGEST_TARGETS = [
+  { id: 'test',       label: 'test',       apiUrl: '/api/slot-guide-ingest' },
+  { id: 'production', label: 'production', apiUrl: 'https://lvslotpro-calc-tx18.vercel.app/api/slot-guide-ingest' },
 ]
 
 const PLACEMENTS = [
@@ -64,15 +56,13 @@ const blankGuide = {
 export default function SlotGuideFormApp() {
   const saved = useMemo(() => (typeof window !== 'undefined' ? readSettings() : null), [])
 
-  // ── Connection settings
-  const [apiUrl, setApiUrl]           = useState(saved?.apiUrl || '/api/slot-guide-ingest')
-  const [secret, setSecret]           = useState(saved?.secret || '')
-  const [envId, setEnvId]             = useState(saved?.envId || 'test')
-  const [supabaseKey, setSupabaseKey] = useState(saved?.supabaseKey || '')
+  // ── Connection settings (ingest only — reads/writes use LoginGate's auth client)
+  const [secret, setSecret]     = useState(saved?.secret || '')
+  const [ingestId, setIngestId] = useState(saved?.ingestId || 'test')
 
-  const activeEnv   = ENVS.find(e => e.id === envId) ?? ENVS[0]
-  const target      = activeEnv.id
-  const supabaseUrl = activeEnv.url
+  const activeIngest = INGEST_TARGETS.find(t => t.id === ingestId) ?? INGEST_TARGETS[0]
+  const apiUrl       = activeIngest.apiUrl
+  const target       = activeIngest.id
 
   // ── Mode: 'new' | 'edit'
   const [mode, setMode] = useState('new')
@@ -96,31 +86,12 @@ export default function SlotGuideFormApp() {
   const [result, setResult] = useState(null)
   const [error, setError]   = useState('')
 
-  const supaClientRef = useRef(null)
-
-  // For reads (guide list, load): use service key if entered, else fall back to anon key.
-  // For writes (save edits): caller must ensure service key is present.
-  function getSupaClient({ requireServiceKey = false } = {}) {
-    const key = supabaseKey.trim() || activeEnv.anonKey
-    if (!supabaseUrl || !key) return null
-    if (requireServiceKey && !supabaseKey.trim()) return null
-    if (!supaClientRef.current ||
-        supaClientRef.current._url !== supabaseUrl ||
-        supaClientRef.current._key !== key) {
-      const c = createClient(supabaseUrl, key)
-      c._url = supabaseUrl
-      c._key = key
-      supaClientRef.current = c
-    }
-    return supaClientRef.current
-  }
-
   // Persist settings
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ apiUrl, secret, envId, supabaseKey }))
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ secret, ingestId }))
     } catch { /* ignore */ }
-  }, [apiUrl, secret, envId, supabaseKey])
+  }, [secret, ingestId])
 
   // Auto-slug from machine name
   useEffect(() => {
@@ -150,12 +121,10 @@ export default function SlotGuideFormApp() {
 
   // ── Load guide list from Supabase
   async function fetchGuideList() {
-    const sb = getSupaClient()
-    if (!sb) { setListErr('Enter Supabase URL and key first.'); return }
     setListBusy(true)
     setListErr('')
     try {
-      const { data, error: err } = await sb.from('guides').select(
+      const { data, error: err } = await supabase.from('guides').select(
         'id, slug, title, published, machines(id, slug, name)'
       ).order('title')
       if (err) throw new Error(err.message)
@@ -170,14 +139,12 @@ export default function SlotGuideFormApp() {
 
   // ── Load a selected guide into the form
   async function loadGuide(id) {
-    const sb = getSupaClient()
-    if (!sb) { setListErr('Enter Supabase URL and key first.'); return }
     setListBusy(true)
     setListErr('')
     setError('')
     setResult(null)
     try {
-      const { data, error: err } = await sb.from('guides').select(`
+      const { data, error: err } = await supabase.from('guides').select(`
         id, slug, title, content_markdown, card_ev_threshold, published, thumbnail_url,
         machines (
           id, slug, name, manufacturer, type, difficulty,
@@ -276,13 +243,11 @@ export default function SlotGuideFormApp() {
     }
   }
 
-  // ── Submit: update existing guide via Supabase directly
+  // ── Submit: update existing guide via authenticated Supabase client
   async function handleUpdate(e) {
     e.preventDefault()
     setError('')
     setResult(null)
-    const sb = getSupaClient({ requireServiceKey: true })
-    if (!sb) { setError('Enter the Supabase service key to save edits (anon key is read-only).'); return }
     if (!editIds) { setError('No guide loaded for editing.'); return }
 
     setBusy(true)
@@ -293,11 +258,11 @@ export default function SlotGuideFormApp() {
         const heroExt  = heroFile.name.split('.').pop().toLowerCase()
         const heroPath = `${machine.slug}/hero.${heroExt}`
         const heroContentType = heroFile.type || 'image/webp'
-        const { error: upErr } = await sb.storage
+        const { error: upErr } = await supabase.storage
           .from('guide-assets')
           .upload(heroPath, heroFile, { contentType: heroContentType, upsert: true, cacheControl: 'public, max-age=31536000, immutable' })
         if (upErr) throw new Error(`hero upload: ${upErr.message}`)
-        const { data: urlData } = sb.storage.from('guide-assets').getPublicUrl(heroPath)
+        const { data: urlData } = supabase.storage.from('guide-assets').getPublicUrl(heroPath)
         newThumbnailUrl = urlData.publicUrl
         setCurrentThumbnail(newThumbnailUrl)
         setHeroFile(null)
@@ -318,7 +283,7 @@ export default function SlotGuideFormApp() {
         calculator_slug: machine.has_calculator ? machine.calculator_slug || machine.slug : null,
       }
       if (newThumbnailUrl) machinePayload.thumbnail_url = newThumbnailUrl
-      const { error: mErr } = await sb.from('machines').update(machinePayload).eq('id', editIds.machineId)
+      const { error: mErr } = await supabase.from('machines').update(machinePayload).eq('id', editIds.machineId)
       if (mErr) throw new Error(`machines: ${mErr.message}`)
 
       const compiledMarkdown = buildGuideMarkdown({ title: guide.title || machine.name, guide })
@@ -331,7 +296,7 @@ export default function SlotGuideFormApp() {
         content_markdown: compiledMarkdown,
       }
       if (newThumbnailUrl) guidePayload.thumbnail_url = newThumbnailUrl
-      const { error: gErr } = await sb.from('guides').update(guidePayload).eq('id', editIds.guideId)
+      const { error: gErr } = await supabase.from('guides').update(guidePayload).eq('id', editIds.guideId)
       if (gErr) throw new Error(`guides: ${gErr.message}`)
 
       setResult({ ok: true, message: newThumbnailUrl ? 'Guide and hero image updated.' : 'Guide updated successfully.' })
@@ -371,43 +336,31 @@ export default function SlotGuideFormApp() {
           </div>
         </header>
 
-        {/* ── Connection */}
-        <section className={sc}>
-          <h2 className="text-lg font-semibold">Connection</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Environment selector — sets both ingest target and Supabase URL */}
-            <div className="sm:col-span-2">
-              <label className={lc}>Environment</label>
-              <select className={ic} value={envId} onChange={(e) => setEnvId(e.target.value)}>
-                {ENVS.map(e => (
-                  <option key={e.id} value={e.id}>{e.label} — {e.url}</option>
-                ))}
-              </select>
+        {/* ── New-guide ingest settings (hidden in edit mode) */}
+        {!isEdit && (
+          <section className={sc}>
+            <h2 className="text-lg font-semibold">New guide — ingest settings</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={lc}>Ingest target</label>
+                <select className={ic} value={ingestId} onChange={(e) => setIngestId(e.target.value)}>
+                  {INGEST_TARGETS.map(t => (
+                    <option key={t.id} value={t.id}>{t.label} — {t.apiUrl}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={`${lc} flex items-center gap-2`}>
+                  Ingest secret
+                  {secret.trim() && <span className="text-emerald-400 text-xs font-normal">✓ saved in browser</span>}
+                </label>
+                <input type="password" className={ic} value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off"
+                  placeholder={secret.trim() ? '••••••••••••••••' : 'GUIDE_INGEST_SECRET from Vercel env vars'} />
+                <p className="text-xs text-gray-600 mt-1">Vercel → project → Settings → Environment Variables → GUIDE_INGEST_SECRET</p>
+              </div>
             </div>
-            <div>
-              <label className={`${lc} flex items-center gap-2`}>
-                Supabase service key
-                {supabaseKey.trim() && <span className="text-emerald-400 text-xs font-normal">✓ saved in browser</span>}
-              </label>
-              <input type="password" className={ic} value={supabaseKey} onChange={(e) => setSupabaseKey(e.target.value)} autoComplete="off"
-                placeholder={supabaseKey.trim() ? '••••••••••••••••' : 'service_role key — needed to save edits'} />
-              <p className="text-xs text-gray-600 mt-1">Never refreshed to a different computer. Only stored locally in this browser.</p>
-            </div>
-            <div>
-              <label className={`${lc} flex items-center gap-2`}>
-                Ingest secret
-                {secret.trim() && <span className="text-emerald-400 text-xs font-normal">✓ saved in browser</span>}
-              </label>
-              <input type="password" className={ic} value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off"
-                placeholder={secret.trim() ? '••••••••••••••••' : 'GUIDE_INGEST_SECRET from Vercel env vars'} />
-              <p className="text-xs text-gray-600 mt-1">Find it in Vercel → project → Settings → Environment Variables → GUIDE_INGEST_SECRET</p>
-            </div>
-            <div className="sm:col-span-2">
-              <label className={lc}>Ingest API URL</label>
-              <input className={ic} value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="/api/slot-guide-ingest" />
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ── Guide picker */}
         <section className={sc}>

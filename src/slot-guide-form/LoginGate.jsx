@@ -5,7 +5,9 @@ const SB_URL = 'https://jtjgtucumuoswnbauxry.supabase.co'
 const SB_ANON = 'sb_publishable_u3-GQGrZ_hswapkiWiPyLA_Ah3mxU8B'
 
 // Auth checks against the test environment (where the app currently lives).
-const supabase = createClient(SB_URL, SB_ANON)
+// Exported so SlotGuideFormApp can reuse the same authenticated client instance
+// for reads/writes — no service key needed; RLS admin policies gate access.
+export const supabase = createClient(SB_URL, SB_ANON)
 
 const ic = 'w-full min-h-11 text-base text-white bg-gray-900 rounded-xl border border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/40'
 
