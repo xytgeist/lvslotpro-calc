@@ -1978,11 +1978,7 @@ export default function GuidesScreen({
                           >
                             Open calculator
                           </button>
-                        ) : (
-                          <div className="flex-1 min-h-11 rounded-2xl bg-zinc-800 text-zinc-500 text-sm font-bold flex items-center justify-center">
-                            No calc yet
-                          </div>
-                        )}
+                        ) : null}
                         <button
                           type="button"
                           onClick={(e) => {
