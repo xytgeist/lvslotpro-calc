@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { diagramFilename, slugify } from './formUtils.js'
+import { buildGuideMarkdown, diagramFilename, parseGuideMarkdown, slugify } from './formUtils.js'
 
 const STORAGE_KEY = 'slotGuideFormSettings:v3'
 
@@ -82,12 +82,11 @@ export default function SlotGuideFormApp() {
   const [selectedId, setSelectedId] = useState('')       // guide id in picker
 
   // ── Form state
-  const [machine, setMachine]       = useState(blankMachine)
-  const [guide, setGuide]           = useState(blankGuide)
-  const [rawMarkdown, setRawMarkdown] = useState('')      // used in edit mode
-  const [heroFile, setHeroFile]     = useState(null)
-  const [diagrams, setDiagrams]     = useState([])
-  const [editIds, setEditIds]       = useState(null)      // {guideId, machineId} when editing
+  const [machine, setMachine]   = useState(blankMachine)
+  const [guide, setGuide]       = useState(blankGuide)
+  const [heroFile, setHeroFile] = useState(null)
+  const [diagrams, setDiagrams] = useState([])
+  const [editIds, setEditIds]   = useState(null)      // {guideId, machineId} when editing
 
   // ── Submit
   const [busy, setBusy]     = useState(false)
@@ -203,8 +202,13 @@ export default function SlotGuideFormApp() {
         })
         setEditIds({ guideId: data.id, machineId: m.id })
       }
-      setGuide((g) => ({ ...g, title: data.title || '', card_ev_threshold: data.card_ev_threshold || '', published: data.published ?? true }))
-      setRawMarkdown(data.content_markdown || '')
+      const parsed = parseGuideMarkdown(data.content_markdown || '')
+      setGuide({
+        ...parsed,
+        title: data.title || '',
+        card_ev_threshold: data.card_ev_threshold || '',
+        published: data.published ?? true,
+      })
       setHeroFile(null)
       setDiagrams([])
       setMode('edit')
@@ -219,7 +223,6 @@ export default function SlotGuideFormApp() {
     setMode('new')
     setMachine(blankMachine)
     setGuide(blankGuide)
-    setRawMarkdown('')
     setHeroFile(null)
     setDiagrams([])
     setEditIds(null)
@@ -295,12 +298,14 @@ export default function SlotGuideFormApp() {
       }).eq('id', editIds.machineId)
       if (mErr) throw new Error(`machines: ${mErr.message}`)
 
+      const compiledMarkdown = buildGuideMarkdown({ title: guide.title || machine.name, guide })
+
       // Update guides row
       const { error: gErr } = await sb.from('guides').update({
         title: guide.title || machine.name,
         card_ev_threshold: guide.card_ev_threshold || null,
         published: guide.published,
-        content_markdown: rawMarkdown,
+        content_markdown: compiledMarkdown,
       }).eq('id', editIds.guideId)
       if (gErr) throw new Error(`guides: ${gErr.message}`)
 
@@ -498,75 +503,61 @@ export default function SlotGuideFormApp() {
             </div>
           </section>
 
-          {/* Content: raw editor (edit) vs section-by-section (new) */}
-          {isEdit ? (
-            <section className={sc}>
-              <h2 className="text-lg font-semibold">
-                Content
-                <span className="ml-2 text-xs font-normal text-gray-500">Editing raw markdown — paste or type directly</span>
-              </h2>
-              <textarea
-                className={`${ic} font-mono text-sm min-h-[40rem]`}
-                value={rawMarkdown}
-                onChange={(e) => setRawMarkdown(e.target.value)}
-                spellCheck={false}
-              />
-            </section>
-          ) : (
-            <>
-              <section className={sc}>
-                <h2 className="text-lg font-semibold">Guide sections</h2>
-                {[
-                  ['when_to_play', 'When to play'],
-                  ['when_to_stop', 'When to stop'],
-                  ['how_to_check', 'How to check'],
-                  ['risk_bankroll', 'Risk — bankroll line (e.g. 5–40 units)'],
-                  ['risk_summary', 'Risk — summary paragraph'],
-                  ['skins_markdown', 'Skins (optional markdown; use [Title](guide:other-slug))'],
-                  ['gameplay_mechanics', 'Gameplay mechanics'],
-                ].map(([key, label]) => (
-                  <div key={key}>
-                    <label className={lc}>{label}</label>
-                    <textarea
-                      className={`${ic} min-h-28`}
-                      value={guide[key]}
-                      onChange={(e) => setGuideField(key, e.target.value)}
-                      required={!['skins_markdown', 'risk_bankroll'].includes(key)}
-                    />
-                  </div>
-                ))}
-                <div>
-                  <label className={lc}>Risk bullets (one per line, optional)</label>
-                  <textarea className={`${ic} min-h-24`} value={guide.risk_bullets} onChange={(e) => setGuideField('risk_bullets', e.target.value)} />
-                </div>
-              </section>
+          {/* Guide sections — same form for both new and edit */}
+          <section className={sc}>
+            <h2 className="text-lg font-semibold">Guide sections</h2>
+            {[
+              ['when_to_play',      '🟢 When to play'],
+              ['when_to_stop',      '🛑 When to stop'],
+              ['how_to_check',      '🔍 How to check'],
+              ['risk_bankroll',     '⚠️ Risk — bankroll line (e.g. 5–40 units)'],
+              ['risk_summary',      '⚠️ Risk — summary paragraph'],
+              ['skins_markdown',    '🎭 Skins (optional — use [Title](guide:other-slug))'],
+              ['gameplay_mechanics','🎰 Gameplay mechanics'],
+            ].map(([key, label]) => (
+              <div key={key}>
+                <label className={lc}>{label}</label>
+                <textarea
+                  className={`${ic} min-h-28`}
+                  value={guide[key]}
+                  onChange={(e) => setGuideField(key, e.target.value)}
+                  required={!isEdit && !['skins_markdown', 'risk_bankroll'].includes(key)}
+                />
+              </div>
+            ))}
+            <div>
+              <label className={lc}>⚠️ Risk bullets (one per line, optional)</label>
+              <textarea className={`${ic} min-h-24`} value={guide.risk_bullets} onChange={(e) => setGuideField('risk_bullets', e.target.value)} />
+            </div>
+          </section>
 
-              <section className={sc}>
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-lg font-semibold">Diagrams</h2>
-                  <button type="button" className="text-sm text-cyan-300 hover:underline" onClick={() => setDiagrams((d) => [...d, emptyDiagram(slug || 'guide')])}>
-                    + Add diagram
-                  </button>
-                </div>
-                {diagrams.length === 0 && (
-                  <p className="text-sm text-gray-500">Optional. Each diagram is converted to WebP and embedded in guide.md.</p>
-                )}
-                {diagrams.map((d) => (
-                  <div key={d.id} className="rounded-xl border border-gray-800 p-3 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">Diagram</span>
-                      <button type="button" className="text-xs text-red-400" onClick={() => setDiagrams((list) => list.filter((x) => x.id !== d.id))}>Remove</button>
-                    </div>
-                    <input type="file" accept="image/*" className={ic} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, file: e.target.files?.[0] || null }))} />
-                    <input className={ic} placeholder="Alt text" value={d.alt} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, alt: e.target.value }))} />
-                    <input className={ic} placeholder="Filename" value={d.filename} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, filename: e.target.value }))} />
-                    <select className={ic} value={d.placement} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, placement: e.target.value }))}>
-                      {PLACEMENTS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                    </select>
+          {/* Diagrams — new guides only (edits keep existing diagrams in DB) */}
+          {!isEdit && (
+            <section className={sc}>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold">Diagrams</h2>
+                <button type="button" className="text-sm text-cyan-300 hover:underline" onClick={() => setDiagrams((d) => [...d, emptyDiagram(slug || 'guide')])}>
+                  + Add diagram
+                </button>
+              </div>
+              {diagrams.length === 0 && (
+                <p className="text-sm text-gray-500">Optional. Each diagram is converted to WebP and embedded in guide.md.</p>
+              )}
+              {diagrams.map((d) => (
+                <div key={d.id} className="rounded-xl border border-gray-800 p-3 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Diagram</span>
+                    <button type="button" className="text-xs text-red-400" onClick={() => setDiagrams((list) => list.filter((x) => x.id !== d.id))}>Remove</button>
                   </div>
-                ))}
-              </section>
-            </>
+                  <input type="file" accept="image/*" className={ic} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, file: e.target.files?.[0] || null }))} />
+                  <input className={ic} placeholder="Alt text" value={d.alt} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, alt: e.target.value }))} />
+                  <input className={ic} placeholder="Filename" value={d.filename} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, filename: e.target.value }))} />
+                  <select className={ic} value={d.placement} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, placement: e.target.value }))}>
+                    {PLACEMENTS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  </select>
+                </div>
+              ))}
+            </section>
           )}
 
           {error  ? <p className="text-red-400 text-sm">{error}</p> : null}
