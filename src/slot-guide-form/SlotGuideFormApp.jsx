@@ -84,11 +84,12 @@ export default function SlotGuideFormApp() {
   const [selectedId, setSelectedId] = useState('')       // guide id in picker
 
   // ── Form state
-  const [machine, setMachine]   = useState(blankMachine)
-  const [guide, setGuide]       = useState(blankGuide)
-  const [heroFile, setHeroFile] = useState(null)
-  const [diagrams, setDiagrams] = useState([])
-  const [editIds, setEditIds]   = useState(null)      // {guideId, machineId} when editing
+  const [machine, setMachine]             = useState(blankMachine)
+  const [guide, setGuide]                 = useState(blankGuide)
+  const [heroFile, setHeroFile]           = useState(null)
+  const [currentThumbnail, setCurrentThumbnail] = useState('')   // existing hero URL in edit mode
+  const [diagrams, setDiagrams]           = useState([])
+  const [editIds, setEditIds]             = useState(null)      // {guideId, machineId} when editing
 
   // ── Submit
   const [busy, setBusy]     = useState(false)
@@ -177,11 +178,11 @@ export default function SlotGuideFormApp() {
     setResult(null)
     try {
       const { data, error: err } = await sb.from('guides').select(`
-        id, slug, title, content_markdown, card_ev_threshold, published,
+        id, slug, title, content_markdown, card_ev_threshold, published, thumbnail_url,
         machines (
           id, slug, name, manufacturer, type, difficulty,
           vegas_availability, nerf_risk, volatility_index,
-          popularity_summary, release_year, has_calculator, calculator_slug
+          popularity_summary, release_year, has_calculator, calculator_slug, thumbnail_url
         )
       `).eq('id', id).single()
       if (err) throw new Error(err.message)
@@ -212,6 +213,7 @@ export default function SlotGuideFormApp() {
         published: data.published ?? true,
       })
       setHeroFile(null)
+      setCurrentThumbnail(data.thumbnail_url || m?.thumbnail_url || '')
       setDiagrams([])
       setMode('edit')
     } catch (e) {
@@ -226,6 +228,7 @@ export default function SlotGuideFormApp() {
     setMachine(blankMachine)
     setGuide(blankGuide)
     setHeroFile(null)
+    setCurrentThumbnail('')
     setDiagrams([])
     setEditIds(null)
     setSelectedId('')
@@ -284,8 +287,24 @@ export default function SlotGuideFormApp() {
 
     setBusy(true)
     try {
+      // Upload hero image first if a new one was provided
+      let newThumbnailUrl = null
+      if (heroFile) {
+        const heroExt  = heroFile.name.split('.').pop().toLowerCase()
+        const heroPath = `${machine.slug}/hero.${heroExt}`
+        const heroContentType = heroFile.type || 'image/webp'
+        const { error: upErr } = await sb.storage
+          .from('guide-assets')
+          .upload(heroPath, heroFile, { contentType: heroContentType, upsert: true, cacheControl: 'public, max-age=31536000, immutable' })
+        if (upErr) throw new Error(`hero upload: ${upErr.message}`)
+        const { data: urlData } = sb.storage.from('guide-assets').getPublicUrl(heroPath)
+        newThumbnailUrl = urlData.publicUrl
+        setCurrentThumbnail(newThumbnailUrl)
+        setHeroFile(null)
+      }
+
       // Update machines row
-      const { error: mErr } = await sb.from('machines').update({
+      const machinePayload = {
         name: machine.name,
         manufacturer: machine.manufacturer,
         type: machine.type,
@@ -297,21 +316,25 @@ export default function SlotGuideFormApp() {
         release_year: machine.release_year ? Number(machine.release_year) : null,
         has_calculator: machine.has_calculator,
         calculator_slug: machine.has_calculator ? machine.calculator_slug || machine.slug : null,
-      }).eq('id', editIds.machineId)
+      }
+      if (newThumbnailUrl) machinePayload.thumbnail_url = newThumbnailUrl
+      const { error: mErr } = await sb.from('machines').update(machinePayload).eq('id', editIds.machineId)
       if (mErr) throw new Error(`machines: ${mErr.message}`)
 
       const compiledMarkdown = buildGuideMarkdown({ title: guide.title || machine.name, guide })
 
       // Update guides row
-      const { error: gErr } = await sb.from('guides').update({
+      const guidePayload = {
         title: guide.title || machine.name,
         card_ev_threshold: guide.card_ev_threshold || null,
         published: guide.published,
         content_markdown: compiledMarkdown,
-      }).eq('id', editIds.guideId)
+      }
+      if (newThumbnailUrl) guidePayload.thumbnail_url = newThumbnailUrl
+      const { error: gErr } = await sb.from('guides').update(guidePayload).eq('id', editIds.guideId)
       if (gErr) throw new Error(`guides: ${gErr.message}`)
 
-      setResult({ ok: true, message: 'Guide updated successfully.' })
+      setResult({ ok: true, message: newThumbnailUrl ? 'Guide and hero image updated.' : 'Guide updated successfully.' })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -362,12 +385,22 @@ export default function SlotGuideFormApp() {
               </select>
             </div>
             <div>
-              <label className={lc}>Supabase service key</label>
-              <input type="password" className={ic} value={supabaseKey} onChange={(e) => setSupabaseKey(e.target.value)} autoComplete="off" />
+              <label className={`${lc} flex items-center gap-2`}>
+                Supabase service key
+                {supabaseKey.trim() && <span className="text-emerald-400 text-xs font-normal">✓ saved in browser</span>}
+              </label>
+              <input type="password" className={ic} value={supabaseKey} onChange={(e) => setSupabaseKey(e.target.value)} autoComplete="off"
+                placeholder={supabaseKey.trim() ? '••••••••••••••••' : 'service_role key — needed to save edits'} />
+              <p className="text-xs text-gray-600 mt-1">Never refreshed to a different computer. Only stored locally in this browser.</p>
             </div>
             <div>
-              <label className={lc}>Ingest secret</label>
-              <input type="password" className={ic} value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off" />
+              <label className={`${lc} flex items-center gap-2`}>
+                Ingest secret
+                {secret.trim() && <span className="text-emerald-400 text-xs font-normal">✓ saved in browser</span>}
+              </label>
+              <input type="password" className={ic} value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off"
+                placeholder={secret.trim() ? '••••••••••••••••' : 'GUIDE_INGEST_SECRET from Vercel env vars'} />
+              <p className="text-xs text-gray-600 mt-1">Find it in Vercel → project → Settings → Environment Variables → GUIDE_INGEST_SECRET</p>
             </div>
             <div className="sm:col-span-2">
               <label className={lc}>Ingest API URL</label>
@@ -498,9 +531,29 @@ export default function SlotGuideFormApp() {
               </div>
               <div>
                 <label className={lc}>
-                  Hero image{isEdit ? <span className="text-gray-500 font-normal"> — leave blank to keep existing</span> : <span className="text-red-400"> *</span>}
+                  Hero image{isEdit ? <span className="text-gray-500 font-normal"> — optional, replaces existing</span> : <span className="text-red-400"> *</span>}
                 </label>
-                <input type="file" accept="image/*" className={ic} onChange={(e) => setHeroFile(e.target.files?.[0] || null)} required={!isEdit} />
+                {isEdit && currentThumbnail && (
+                  <div className="mb-2">
+                    <p className="text-xs text-gray-500 mb-1">Current hero:</p>
+                    <img
+                      src={currentThumbnail}
+                      alt="Current hero"
+                      className="h-24 w-auto rounded-lg object-cover border border-gray-700"
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className={ic}
+                  onChange={(e) => setHeroFile(e.target.files?.[0] || null)}
+                  required={!isEdit}
+                />
+                {isEdit && heroFile && (
+                  <p className="text-xs text-emerald-400 mt-1">New image selected: {heroFile.name}</p>
+                )}
               </div>
             </div>
           </section>
