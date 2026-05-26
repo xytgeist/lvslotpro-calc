@@ -605,29 +605,44 @@ html.light .text-amber-200,
 html.light .text-amber-200\/90,
 html.light .text-amber-200\/88 { color: var(--color-amber-700); }
 
+html.light .text-cyan-50   { color: var(--color-cyan-700); }
 html.light .text-cyan-100  { color: var(--color-cyan-600); }
 html.light .text-cyan-200  { color: var(--color-cyan-600); }
 
+html.light .text-sky-50    { color: var(--color-sky-700); }
 html.light .text-sky-100   { color: var(--color-sky-600); }
 html.light .text-sky-200   { color: var(--color-sky-600); }
 
+html.light .text-violet-50  { color: var(--color-violet-700); }
 html.light .text-violet-100 { color: var(--color-violet-700); }
 html.light .text-violet-200 { color: var(--color-violet-600); }
 
+html.light .text-rose-50   { color: var(--color-rose-700); }
 html.light .text-rose-100  { color: var(--color-rose-600); }
 html.light .text-rose-200  { color: var(--color-rose-600); }
 
+html.light .text-indigo-50  { color: var(--color-indigo-700); }
 html.light .text-indigo-100 { color: var(--color-indigo-600); }
 html.light .text-indigo-200 { color: var(--color-indigo-600); }
 
+html.light .text-lime-50   { color: var(--color-lime-700); }
 html.light .text-lime-100  { color: var(--color-lime-700); }
 html.light .text-lime-200  { color: var(--color-lime-700); }
 
+html.light .text-emerald-50  { color: var(--color-emerald-700); }
 html.light .text-emerald-100 { color: var(--color-emerald-700); }
 html.light .text-emerald-200 { color: var(--color-emerald-600); }
 
 html.light .text-red-50  { color: var(--color-red-700); }
 html.light .text-red-100 { color: var(--color-red-600); }
+
+/* EV Threshold panel: override the dark gradient bg + ensure text is readable */
+html.light .guide-ev-threshold-panel {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+html.light .guide-ev-threshold-text {
+  color: #27272a !important;
+}
 
 /* react-datepicker light theme */
 html.light .offer-datepicker.react-datepicker {
