@@ -515,9 +515,9 @@ function GuideSkinCard({ targetSlug, label, allGuides, onOpen }) {
             e.currentTarget.src = BUFFALO_PLACEHOLDER_SRC
           }}
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-zinc-950/10 to-transparent" />
-        <div className="absolute bottom-0 inset-x-0 px-3 pb-3 pt-10 bg-gradient-to-t from-zinc-950/90 via-zinc-950/60 to-transparent">
-          <p className="text-white font-bold text-sm leading-tight drop-shadow truncate">{name}</p>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+        <div className="absolute bottom-0 inset-x-0 px-3 pb-3 pt-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+          <p className="text-[#fff] font-bold text-sm leading-tight drop-shadow truncate">{name}</p>
           {m?.manufacturer && (
             <p className="text-zinc-400 text-[11px] font-medium mt-0.5 truncate">{m.manufacturer}</p>
           )}
@@ -1931,11 +1931,11 @@ export default function GuidesScreen({
                           }
                           onError={guideHeroImgOnError}
                         />
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950 via-zinc-950/85 to-transparent px-4 pb-3 pt-12">
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/85 to-transparent px-4 pb-3 pt-12">
                           <div className="flex items-end justify-between gap-3">
                             <div className="min-w-0 flex-1">
-                              <h2 className="text-white font-black text-xl tracking-tight drop-shadow-md leading-tight">
+                              <h2 className="text-[#fff] font-black text-xl tracking-tight drop-shadow-md leading-tight">
                                 {m?.name || row.title}
                               </h2>
                               <div className={`${accent.subtitle} text-[11px] font-semibold mt-0.5`}>

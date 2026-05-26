@@ -569,6 +569,25 @@ input[list]::-webkit-list-button {
 
 /* ── Light mode overrides ─────────────────────────────────────────────────── */
 
+/*
+ * text-white doesn't use a zinc variable so it won't auto-flip.
+ * Override globally so body/card/modal text becomes dark in light mode.
+ * Elements that MUST stay white (text over dark hero images) should use
+ * text-[#fff] (a hardcoded arbitrary value) instead of text-white.
+ */
+html.light .text-white {
+  color: #18181b;
+}
+html.light .text-white\/90,
+html.light .text-white\/80,
+html.light .text-white\/70,
+html.light .text-white\/60 {
+  color: rgb(24 24 27 / var(--tw-text-opacity, 1));
+}
+html.light .placeholder\:text-white::placeholder {
+  color: #3f3f46;
+}
+
 /* react-datepicker light theme */
 html.light .offer-datepicker.react-datepicker {
   background-color: #ffffff;

@@ -522,9 +522,9 @@ export default function LoungePostArticle({
                         onError={(ev) => { ev.currentTarget.style.display = 'none' }}
                       />
                     ) : null}
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                     <div className="absolute bottom-0 inset-x-0 px-2.5 pb-2 flex flex-col items-start gap-1">
-                      <p className="text-white font-bold text-xs leading-tight truncate w-full">{post.reposted_post.game_title}</p>
+                      <p className="text-[#fff] font-bold text-xs leading-tight truncate w-full">{post.reposted_post.game_title}</p>
                       <span className="inline-flex items-center rounded-full border border-amber-500/50 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">
                         AP Guide
                       </span>
@@ -583,9 +583,9 @@ export default function LoungePostArticle({
                   onError={(ev) => { ev.currentTarget.style.display = 'none' }}
                 />
               ) : null}
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
               <div className="absolute bottom-0 inset-x-0 px-3 pb-2.5 flex flex-col items-start gap-1">
-                <p className="text-white font-bold text-sm leading-tight truncate w-full">{post.game_title}</p>
+                <p className="text-[#fff] font-bold text-sm leading-tight truncate w-full">{post.game_title}</p>
                 <span className="inline-flex items-center rounded-full border border-amber-500/50 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
                   AP Guide
                 </span>
@@ -662,4 +662,6 @@ export default function LoungePostArticle({
     </div>
   )
 }
+
+
 
