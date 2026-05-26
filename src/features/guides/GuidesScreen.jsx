@@ -504,7 +504,7 @@ function GuideSkinCard({ targetSlug, label, allGuides, onOpen }) {
       ].join(' ')}
     >
       {/* hero strip */}
-      <div className={`relative h-24 bg-gradient-to-br ${gradient} overflow-hidden`}>
+      <div className={`relative aspect-video bg-gradient-to-br ${gradient} overflow-hidden`}>
         <img
           src={src}
           alt={name}
