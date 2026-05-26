@@ -11573,7 +11573,7 @@ export default function SocialFeed({
                         className="mt-2 w-full text-left rounded-xl overflow-hidden border border-zinc-700/60 bg-zinc-900/80 hover:border-zinc-600 active:border-cyan-700/60 transition-colors touch-manipulation [-webkit-tap-highlight-color:transparent]"
                         aria-label={`View AP Guide: ${loungePostDetail.reposted_post.game_title}`}
                       >
-                        <div className="relative h-20 bg-gradient-to-br from-amber-950/60 to-zinc-900 overflow-hidden">
+                        <div className="relative h-40 bg-gradient-to-br from-amber-950/60 to-zinc-900 overflow-hidden">
                           {loungePostDetail.reposted_post.guide_thumbnail_url || loungePostDetail.reposted_post.game_slug ? (
                             <img
                               src={loungePostDetail.reposted_post.guide_thumbnail_url || `/guides/${loungePostDetail.reposted_post.game_slug}/hero.webp`}
@@ -11639,7 +11639,7 @@ export default function SocialFeed({
                         className="mt-3 w-full text-left rounded-2xl overflow-hidden border border-zinc-700/80 bg-zinc-900/80 hover:border-zinc-600 active:border-cyan-700/60 transition-colors touch-manipulation [-webkit-tap-highlight-color:transparent]"
                         aria-label={`View AP Guide: ${loungePostDetail.game_title}`}
                       >
-                        <div className="relative h-28 bg-gradient-to-br from-amber-950/60 to-zinc-900 overflow-hidden">
+                        <div className="relative h-56 bg-gradient-to-br from-amber-950/60 to-zinc-900 overflow-hidden">
                           {loungePostDetail.guide_thumbnail_url || loungePostDetail.game_slug ? (
                             <img
                               src={loungePostDetail.guide_thumbnail_url || `/guides/${loungePostDetail.game_slug}/hero.webp`}
@@ -13954,3 +13954,4 @@ export default function SocialFeed({
     </div>
   )
 }
+
