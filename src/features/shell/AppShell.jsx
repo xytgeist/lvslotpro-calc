@@ -65,26 +65,85 @@ function TabLoadingFallback() {
   )
 }
 
+const TAB_ERROR_COUNT_KEY = 'lvsp_tab_error_count'
+
 class TabErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { error: null }
+    this.state = { error: null, attemptCount: 0, copied: false }
+    this.handleCopy = this.handleCopy.bind(this)
   }
 
   static getDerivedStateFromError(error) {
     return { error }
   }
 
+  componentDidCatch(error) {
+    const prev = parseInt(sessionStorage.getItem(TAB_ERROR_COUNT_KEY) || '0', 10)
+    const next = prev + 1
+    sessionStorage.setItem(TAB_ERROR_COUNT_KEY, String(next))
+    this.setState({ attemptCount: next })
+  }
+
+  componentDidMount() {
+    // Successful mount — clear the strike count
+    if (!this.state.error) sessionStorage.removeItem(TAB_ERROR_COUNT_KEY)
+  }
+
+  handleCopy() {
+    const msg = `LVSlotPro tab error\n${new Date().toISOString()}\n${this.state.error?.stack || this.state.error?.message || 'Unknown error'}`
+    navigator.clipboard?.writeText(msg).then(() => {
+      this.setState({ copied: true })
+      setTimeout(() => this.setState({ copied: false }), 2500)
+    })
+  }
+
   render() {
     if (this.state.error) {
+      const isFumble = this.state.attemptCount >= 2
+
+      if (isFumble) {
+        return (
+          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-6 text-center">
+            {/* Red flag SVG */}
+            <svg width="64" height="64" viewBox="0 0 40 52" aria-hidden fill="none">
+              <line x1="8" y1="2" x2="8" y2="50" stroke="#EF4444" strokeWidth="3.5" strokeLinecap="round"/>
+              <polygon points="8,4 36,13 8,22" fill="#EF4444"/>
+            </svg>
+            <div>
+              <div className="text-white text-2xl font-black tracking-tight">FUMBLE!</div>
+              <div className="mt-1 text-zinc-400 text-sm leading-relaxed">
+                Scott's demoted to the practice squad.
+              </div>
+              <div className="mt-2 max-w-xs text-zinc-600 text-[11px] leading-snug break-all">
+                {String(this.state.error?.message || 'Unknown penalty').slice(0, 140)}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={this.handleCopy}
+              className="min-h-11 rounded-2xl border border-rose-500/40 bg-rose-600/15 hover:bg-rose-600/25 px-5 py-2.5 text-sm font-bold text-rose-300 touch-manipulation transition-colors"
+            >
+              {this.state.copied ? '✓ Copied to clipboard' : 'Report Issue'}
+            </button>
+          </div>
+        )
+      }
+
       return (
         <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-6 text-center">
-          <div className="text-6xl select-none" aria-hidden>🚩</div>
+          {/* Yellow flag SVG */}
+          <svg width="64" height="64" viewBox="0 0 40 52" aria-hidden fill="none">
+            <line x1="8" y1="2" x2="8" y2="50" stroke="#EAB308" strokeWidth="3.5" strokeLinecap="round"/>
+            <polygon points="8,4 36,13 8,22" fill="#EAB308"/>
+          </svg>
           <div>
             <div className="text-white text-2xl font-black tracking-tight">False Start</div>
             <div className="mt-1 text-zinc-400 text-sm leading-relaxed">
-              Dev gets 10 lashes.<br />
-              <span className="text-zinc-600 text-xs">{String(this.state.error?.message || 'Unknown penalty').slice(0, 120)}</span>
+              Dev gets 10 lashes.
+            </div>
+            <div className="mt-2 max-w-xs text-zinc-600 text-[11px] leading-snug break-all">
+              {String(this.state.error?.message || 'Unknown penalty').slice(0, 140)}
             </div>
           </div>
           <button
