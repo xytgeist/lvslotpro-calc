@@ -1603,6 +1603,7 @@ export default function GuidesScreen({
   /** When set, scroll to and expand this guide card slug (used by Lounge guide embed tap). */
   openCardSlug = null,
 }) {
+  throw new Error('🧪 Simulated render crash — False Start test')
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
