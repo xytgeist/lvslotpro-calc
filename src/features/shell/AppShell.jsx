@@ -43,11 +43,7 @@ import NavLockGlyph from '../../components/NavLockGlyph.jsx'
 import {
   calculatorRequiresSlotsEdge,
   canOpenCalculator,
-  calculatorsTabFullyGated,
 } from '../calculators/calculatorAccess.js'
-import {
-  guidesTabFullyGated,
-} from '../guides/guideAccess.js'
 
 const LOUNGE_ACTIVITY_INAPP_TOAST_MS = 7000
 
@@ -57,6 +53,7 @@ const GuidesScreen = lazy(() => import('../guides/GuidesScreen.jsx'))
 const BankrollTracker = lazy(() => import('../bankroll/BankrollTracker.jsx'))
 const LocalIntel = lazy(() => import('../intel/LocalIntel.jsx'))
 const CalculatorsTab = lazy(() => import('../calculators/CalculatorsTab.jsx'))
+const SlotsScreen = lazy(() => import('../slots/SlotsScreen.jsx'))
 
 function TabLoadingFallback() {
   return (
@@ -813,15 +810,19 @@ export default function AppShell({
     setMenuOpen(false)
   }
 
+  const openSlotsTool = useCallback((toolId) => {
+    if (toolId !== 'calculators') setActiveCalculator(null)
+    setTab(toolId)
+  }, [])
+
+  const SLOTS_TOOL_TAB_IDS = new Set(['calculators', 'offers', 'bankroll', 'guides', 'intel'])
+  const isSlotsAreaTab = (activeTab) => activeTab === 'slots' || SLOTS_TOOL_TAB_IDS.has(activeTab)
+
   /** `subscriberGated`: show lock in menu for logged-in users without an active subscription (see `docs/access-tiers.md`). */
   const navItems = [
     { id: 'home', label: 'Lounge', icon: '🍻', subscriberGated: false },
-    { id: 'calculators', label: 'Calcs', icon: '🧮', subscriberGated: calculatorsTabFullyGated(contentAccessGatesMap) },
-    { id: 'offers', label: 'Calendar', icon: '📅', subscriberGated: false },
-    { id: 'bankroll', label: 'Bankroll', icon: '💰', subscriberGated: true },
-    { id: 'guides', label: 'AP Guides', icon: '📗', subscriberGated: guidesTabFullyGated(contentAccessGatesMap) },
-    { id: 'intel', label: 'Intel', icon: '📍', subscriberGated: false },
-    { id: 'team', label: 'Team', icon: '🤝', subscriberGated: false }
+    { id: 'slots', label: 'Slots', icon: '🎰', subscriberGated: false },
+    { id: 'team', label: 'Team', icon: '🤝', subscriberGated: false },
   ]
 
   const showNavSubscriberLocks =
@@ -864,13 +865,19 @@ export default function AppShell({
               setMenuOpen(false)
               return
             }
-            if (item.id !== 'calculators') setActiveCalculator(null)
-            else if (activeCalculator) setActiveCalculator(null)
-            setTab(item.id)
+            if (item.id === 'slots') {
+              setActiveCalculator(null)
+              setTab('slots')
+            } else {
+              setActiveCalculator(null)
+              setTab(item.id)
+            }
             setMenuOpen(false)
           }}
           className={`w-full rounded-xl px-3 py-2.5 text-left text-sm touch-manipulation ${
-            tab === item.id ? 'bg-zinc-800 text-white' : 'text-zinc-300 hover:bg-zinc-900'
+            tab === item.id || (item.id === 'slots' && isSlotsAreaTab(tab))
+              ? 'bg-zinc-800 text-white'
+              : 'text-zinc-300 hover:bg-zinc-900'
           }`}
         >
           <span className="flex min-w-0 items-center gap-2">
@@ -975,7 +982,20 @@ export default function AppShell({
 
     /** Lazy tab content: own Suspense so a loading lounge chunk does not block Offers / Guides / etc. */
     let visibleTab = null
-    if (tab === 'calculators') {
+    if (tab === 'slots') {
+      visibleTab = (
+        <SlotsScreen
+          titleBarNavSlot={renderTitleBarNavSlot()}
+          browseMode={browseMode}
+          onOpenAuth={() => onOpenAuth?.('login')}
+          onOpenTool={openSlotsTool}
+          onRequireSubscribe={onRequireSubscribe}
+          hasSlotsEdge={hasActiveSubscription}
+          isStaff={isStaff}
+          gatesMap={contentAccessGatesMap}
+        />
+      )
+    } else if (tab === 'calculators') {
       visibleTab = (
         <CalculatorsTab
           activeCalculator={activeCalculator}
