@@ -7,6 +7,28 @@ body,
 }
 
 /*
+ * ── Light mode ────────────────────────────────────────────────────────────────
+ * Tailwind v4 exposes every zinc-* color as a CSS custom property.
+ * Remapping the full scale here flips the entire UI without touching components.
+ * Accent colors (cyan, amber, lv-*) are intentionally unchanged — brand stays.
+ */
+html.light {
+  /* Inverted zinc scale: darkest dark → near-white, lightest dark → near-black */
+  --color-zinc-950: #fafafa;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-600: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-400: #52525b;
+  --color-zinc-300: #3f3f46;
+  --color-zinc-200: #27272a;
+  --color-zinc-100: #18181b;
+  --color-zinc-50:  #09090b;
+  color-scheme: light;
+}
+
+/*
  * LVSlotPro brand palette
  * - Tailwind: bg-lv-red, text-lv-blue, border-lv-purple, …
  * - CSS-only: var(--lv-red), …
@@ -48,13 +70,13 @@ body,
 }
 
 body {
-  background-color: #0a0a0a;
-  color: white;
+  background-color: var(--color-zinc-950, #0a0a0a);
+  color: var(--color-zinc-50, white);
 }
 
 #root {
   min-height: 100dvh;
-  background-color: #0a0a0a;
+  background-color: var(--color-zinc-950, #0a0a0a);
 }
 
 /* Native range look; expand hit-testing vertically without changing layout much. */
@@ -543,4 +565,58 @@ input[list]::-webkit-list-button {
   display: block;
   opacity: 0.88;
   mix-blend-mode: screen;
+}
+
+/* ── Light mode overrides ─────────────────────────────────────────────────── */
+
+/* react-datepicker light theme */
+html.light .offer-datepicker.react-datepicker {
+  background-color: #ffffff;
+  border-color: rgba(228, 228, 231, 0.9);
+  color: #18181b;
+}
+
+html.light .offer-datepicker .react-datepicker__header {
+  background: transparent;
+  color: #18181b;
+}
+
+html.light .offer-datepicker .react-datepicker__current-month,
+html.light .offer-datepicker .react-datepicker__day-name {
+  color: #27272a;
+}
+
+html.light .offer-datepicker .react-datepicker__day {
+  color: #27272a;
+}
+
+html.light .offer-datepicker .react-datepicker__time-list {
+  background-color: #ffffff !important;
+  border-left-color: rgba(228, 228, 231, 0.9);
+}
+
+html.light .offer-datepicker .react-datepicker__time-container {
+  background-color: #ffffff !important;
+}
+
+html.light .offer-datepicker .react-datepicker__time-list-item {
+  color: #27272a !important;
+}
+
+html.light .offer-datepicker-inline.react-datepicker {
+  background: transparent !important;
+}
+
+html.light .offer-datepicker-inline .react-datepicker__day-name {
+  color: rgba(63, 63, 70, 0.95) !important;
+}
+
+html.light .offer-datepicker-inline .react-datepicker__day--keyboard-selected:not(.react-datepicker__day--selected) {
+  color: rgba(39, 39, 42, 0.95) !important;
+}
+
+/* TV snow uses screen blend which looks bad on light bg — switch to multiply */
+html.light .guide-lock-glitch__tv-snow-canvas {
+  mix-blend-mode: multiply;
+  opacity: 0.55;
 }

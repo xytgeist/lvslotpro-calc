@@ -57,6 +57,7 @@ import {
 import { LOUNGE_NOTIFICATION_PREF_ROWS } from '../utils/loungeNotificationPreferencesApi.js'
 import LoungeDockMenuLayoutHelp from './LoungeDockMenuLayoutHelp.jsx'
 import IosPwaInstallHelpDialog from './IosPwaInstallHelpDialog.jsx'
+import { getTheme, setTheme } from '../utils/theme.js'
 import {
   hasSeenLoungeIosPwaSetup,
   iosPwaInstallRequired,
@@ -199,6 +200,7 @@ export default function LoungeDockSlidePanels({
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false)
   const [menuLayoutSettingsOpen, setMenuLayoutSettingsOpen] = useState(false)
   const [adminUtilsSettingsOpen, setAdminUtilsSettingsOpen] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState(() => getTheme())
   const [iosPwaHelpOpen, setIosPwaHelpOpen] = useState(false)
   const [iosInstallBannerHidden, setIosInstallBannerHidden] = useState(false)
   const [iosInstallRequired, setIosInstallRequired] = useState(false)
@@ -1274,7 +1276,38 @@ export default function LoungeDockSlidePanels({
               Lounge preferences.
             </p>
 
+            {/* ── Appearance ── */}
             <div className="mt-5">
+              <span className="block text-[15px] font-semibold text-zinc-100">Appearance</span>
+              <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
+                Choose dark, light, or follow your device.
+              </span>
+              <div className="mt-3 flex gap-1.5 rounded-xl bg-zinc-800/50 p-1">
+                {[
+                  { value: 'dark', label: 'Dark' },
+                  { value: 'system', label: 'System' },
+                  { value: 'light', label: 'Light' },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setTheme(value)
+                      setCurrentTheme(value)
+                    }}
+                    className={`flex-1 rounded-lg py-1.5 text-[13px] font-semibold transition-colors touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                      currentTheme === value
+                        ? 'bg-zinc-700 text-zinc-100 shadow-sm'
+                        : 'text-zinc-400 hover:text-zinc-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 border-t border-zinc-800 pt-5">
               <button
                 type="button"
                 aria-expanded={menuLayoutSettingsOpen}

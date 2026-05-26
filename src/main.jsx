@@ -7,6 +7,11 @@ import {
   readLoungeComposerDraftPendingWork,
   shouldShowLoungeColdBootSplash,
 } from './utils/loungeColdBootSplash.js'
+import { applyTheme, watchSystemTheme } from './utils/theme.js'
+
+// Apply theme before first paint to prevent flash
+applyTheme()
+watchSystemTheme()
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || 'https://8d6b45f5282d2474693cb8b9957f51d9@o4511453426876416.ingest.us.sentry.io/4511453430611968',
