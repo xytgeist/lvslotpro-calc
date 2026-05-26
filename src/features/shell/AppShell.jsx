@@ -96,7 +96,11 @@ class TabErrorBoundary extends React.Component {
     const body = encodeURIComponent(
       `App tab crashed twice — please investigate.\n\nTimestamp: ${new Date().toISOString()}\n\nError:\n${errText}`,
     )
+    // Open mail client
     window.location.href = `mailto:operations@lvslotpro.com?subject=${subject}&body=${body}`
+    // Clear strike counter so next visit starts fresh, then reload to Lounge
+    sessionStorage.removeItem(TAB_ERROR_COUNT_KEY)
+    setTimeout(() => window.location.reload(), 600)
   }
 
   render() {
