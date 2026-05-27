@@ -43,7 +43,7 @@ function PhoenixLink({ onBack }) {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
-  const [scoutPercentage, setScoutPercentage] = useState(10)
+  const [scoutPercentage, setScoutPercentage] = useState(12)
 
   const getRecommendedWalkAway = (counter) => {
     const oRTP = overallRTP / 100

@@ -45,7 +45,7 @@ function BuffaloLink({ onBack }) {
   const [hoverWalkAway, setHoverWalkAway] = useState(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
 
-  const [scoutPercentage, setScoutPercentage] = useState(10)
+  const [scoutPercentage, setScoutPercentage] = useState(12)
   const [useFullRunForFee, setUseFullRunForFee] = useState(false)
 
   // Walk-Away S-Curve
