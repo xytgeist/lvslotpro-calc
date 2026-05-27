@@ -457,7 +457,7 @@ export default function OfferFormModal({
   if (!showForm) return null
 
   return (
-    <div className="fixed inset-0 z-[70] flex bg-black/55 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[2px]">
+    <div data-offer-form className="fixed inset-0 z-[70] flex bg-black/55 px-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-[2px]">
       <div className="mx-auto flex w-full max-w-lg flex-1 items-end">
         <div
           className="relative w-full overflow-hidden rounded-t-[36px] bg-[#181b22] shadow-[0_6px_16px_rgba(0,0,0,0.12)]"

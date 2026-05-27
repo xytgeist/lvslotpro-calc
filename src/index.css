@@ -981,6 +981,76 @@ html.light .offer-datepicker-inline .react-datepicker__day--keyboard-selected:no
   color: rgba(39, 39, 42, 0.95) !important;
 }
 
+/* ── Offer Form Modal – light mode ──────────────────────────────────────── */
+
+/* Modal shell */
+html.light [data-offer-form] .bg-\[\#181b22\] { background-color: #f2f2f7 !important; }
+
+/* Field group cards */
+html.light [data-offer-form] .bg-\[\#2b2d34\] { background-color: #ffffff !important; }
+
+/* Dividers */
+html.light [data-offer-form] .bg-zinc-700\/75 { background-color: rgba(0,0,0,0.10) !important; }
+
+/* Primary text (labels, inputs, dropdown values, chevrons) */
+html.light [data-offer-form] .text-zinc-100 { color: #111827 !important; }
+html.light [data-offer-form] .text-zinc-50  { color: #111827 !important; }
+html.light [data-offer-form] .text-zinc-200 { color: #1f2937 !important; }
+html.light [data-offer-form] .text-zinc-300 { color: #4b5563 !important; }
+html.light [data-offer-form] .text-zinc-500 { color: #6b7280 !important; }
+
+/* Placeholder text */
+html.light [data-offer-form] input::placeholder,
+html.light [data-offer-form] textarea::placeholder { color: #9ca3af !important; }
+
+/* Date / time pills */
+html.light [data-offer-form] .bg-zinc-600\/60 { background-color: rgba(0,0,0,0.07) !important; }
+
+/* All-day toggle track (OFF state) */
+html.light [data-offer-form] .bg-zinc-600 { background-color: #d1d5db !important; }
+
+/* Header close / save-disabled buttons */
+html.light [data-offer-form] .bg-zinc-800\/90 { background-color: #f3f4f6 !important; }
+html.light [data-offer-form] .border-zinc-600 { border-color: #d1d5db !important; }
+
+/* Title text in header */
+html.light [data-offer-form] .text-white { color: #111827 !important; }
+
+/* Dropdown menus */
+html.light [data-offer-form] .bg-zinc-900\/95 { background-color: #ffffff !important; }
+html.light [data-offer-form] .bg-zinc-900\/90 { background-color: #f9f9fb !important; }
+html.light [data-offer-form] .bg-zinc-900\/55 { background-color: rgba(255,255,255,0.96) !important; }
+html.light [data-offer-form] .bg-zinc-900    { background-color: #ffffff !important; }
+html.light [data-offer-form] .border-zinc-600\/75 { border-color: rgba(0,0,0,0.12) !important; }
+html.light [data-offer-form] .border-zinc-600\/80 { border-color: rgba(0,0,0,0.12) !important; }
+html.light [data-offer-form] .border-zinc-700    { border-color: rgba(0,0,0,0.12) !important; }
+html.light [data-offer-form] .hover\:bg-zinc-800\/70:hover { background-color: rgba(0,0,0,0.05) !important; }
+html.light [data-offer-form] .hover\:bg-zinc-800:hover     { background-color: rgba(0,0,0,0.05) !important; }
+
+/* Time wheel */
+html.light [data-offer-form] .bg-\[\#2b2d34\].rounded-2xl { background-color: #f4f4f8 !important; }
+
+/* Inline calendar custom header */
+html.light [data-offer-form] .text-zinc-100.font-semibold { color: #111827 !important; }
+
+/* Photo import card */
+html.light [data-offer-form] .from-cyan-950\/35 { --tw-gradient-from: rgba(236,254,255,0.7) !important; }
+html.light [data-offer-form] .via-slate-900\/95 { --tw-gradient-via: rgba(255,255,255,0.95) !important; }
+html.light [data-offer-form] .to-zinc-900\/95  { --tw-gradient-to: rgba(248,250,252,0.95) !important; }
+html.light [data-offer-form] .border-cyan-500\/30 { border-color: rgba(59,130,246,0.25) !important; }
+html.light [data-offer-form] .text-cyan-100    { color: #1d4ed8 !important; }
+html.light [data-offer-form] .text-cyan-200\/75 { color: rgba(37,99,235,0.80) !important; }
+html.light [data-offer-form] .bg-cyan-500\/20  { background-color: rgba(37,99,235,0.12) !important; }
+html.light [data-offer-form] .text-cyan-200    { color: #2563eb !important; }
+
+/* Notice / propagate card */
+html.light [data-offer-form] .bg-emerald-950\/30 { background-color: rgba(220,252,231,0.6) !important; }
+html.light [data-offer-form] .border-emerald-500\/30 { border-color: rgba(34,197,94,0.4) !important; }
+html.light [data-offer-form] .text-emerald-100  { color: #166534 !important; }
+
+/* Discard confirm dialog */
+html.light [data-offer-form] .bg-zinc-700\/95 { background-color: #e5e7eb !important; }
+
 /* TV snow uses screen blend which looks bad on light bg — switch to multiply */
 html.light .guide-lock-glitch__tv-snow-canvas {
   mix-blend-mode: multiply;
