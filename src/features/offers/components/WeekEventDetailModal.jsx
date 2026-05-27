@@ -32,10 +32,12 @@ export default function WeekEventDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="week-detail-heading"
+      data-event-detail
       className="fixed inset-0 z-[55] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-[1px]"
       onClick={onClose}
     >
       <div
+        data-event-detail-card
         className={`w-full max-w-lg max-h-[min(85dvh,calc(100dvh-6rem))] overflow-y-auto rounded-3xl border border-zinc-700 p-5 shadow-2xl ${meta.card}`}
         onClick={(ev) => ev.stopPropagation()}
       >

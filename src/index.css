@@ -1051,6 +1051,14 @@ html.light [data-offer-form] .text-emerald-100  { color: #166534 !important; }
 /* Discard confirm dialog */
 html.light [data-offer-form] .bg-zinc-700\/95 { background-color: #e5e7eb !important; }
 
+/* ── Week Event Detail Modal – light mode ───────────────────────────────── */
+html.light [data-event-detail] { background-color: rgba(0,0,0,0.35) !important; }
+html.light [data-event-detail-card] {
+  background-color: #ffffff !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+html.light [data-event-detail] .text-white { color: #111827 !important; }
+
 /* TV snow uses screen blend which looks bad on light bg — switch to multiply */
 html.light .guide-lock-glitch__tv-snow-canvas {
   mix-blend-mode: multiply;
