@@ -70,7 +70,7 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       aria-label="Loading Lounge"
     >
       {/* Covers the transparent canvas gap before WASM boots and the first frame renders */}
-      <div ref={preFrameCoverRef} className="absolute inset-0 bg-[#09090b]" aria-hidden />
+      <div ref={preFrameCoverRef} className="absolute inset-0 bg-zinc-950" aria-hidden />
       <canvas
         ref={canvasRef}
         className="absolute inset-0 h-full w-full"
