@@ -463,7 +463,11 @@ function BuffaloLink({ onBack }) {
         <div className="bg-gray-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-amber-400">Walk-Away Advisor</h2>
-            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-amber-400">ℹ️</button>
+            <button onClick={() => setShowInfoModal(true)} className="w-8 h-8 flex items-center justify-center text-amber-400 hover:text-amber-300 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
           </div>
           <div className="bg-gray-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
