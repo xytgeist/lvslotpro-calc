@@ -1100,6 +1100,17 @@ html.light [data-offer-type] [class*="h-2"][class*="rounded-full"]:not([class*="
   background-color: var(--ot-color) !important;
 }
 
+/* Dark mode: --ot-color = lighter chip/dot hex (visible on dark bg) */
+[data-offer-type="free_play"]  { --ot-color: #8fa3d4; }
+[data-offer-type="hotel"]      { --ot-color: #7ab5b0; }
+[data-offer-type="dining"]     { --ot-color: #7dd5bf; }
+[data-offer-type="gift"]       { --ot-color: #d4c340; }
+[data-offer-type="multiplier"] { --ot-color: #da88ae; }
+[data-offer-type="tournament"] { --ot-color: #c47a87; }
+[data-offer-type="drawing"]    { --ot-color: #95b4cf; }
+[data-offer-type="other"]      { --ot-color: #b0a8c0; }
+
+/* Light mode: --ot-color = darker hex (readable on white) */
 html.light [data-offer-type="free_play"]  { --ot-color: #3d4f9f; }
 html.light [data-offer-type="hotel"]      { --ot-color: #2e6b65; }
 html.light [data-offer-type="dining"]     { --ot-color: #3b9e85; }
