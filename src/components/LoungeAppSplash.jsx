@@ -128,13 +128,29 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       }
 
       // Flip status bar from black to theme color as the D crosses the top of the screen.
-      // Primary mechanism: change the dedicated status bar strip div that sits on top of
-      // the canvas — iOS samples what's physically rendered in those pixels.
-      // Belt-and-suspenders: also update body/html background + theme-color meta.
       if (!barFlipped && currentFrame >= STATUS_BAR_FLIP_FRAME) {
         barFlipped = true
-        const { bg } = splashThemeColor()
-        if (statusBarRef.current) statusBarRef.current.style.background = bg
+        const { bg, meta } = splashThemeColor()
+
+        // 1. CSS transition on the strip: an animating property keeps the GPU compositor
+        //    running, which forces iOS to resample the status bar content continuously
+        //    during the transition rather than lazily after a navigation event.
+        const strip = statusBarRef.current
+        if (strip) {
+          strip.style.transition = 'background-color 200ms linear'
+          strip.style.backgroundColor = bg
+        }
+
+        // 2. Remove + re-add theme-color meta: a structural DOM mutation to <head> is a
+        //    stronger iOS signal than setAttribute alone — it triggers a full re-evaluation.
+        const oldMeta = document.querySelector('meta[name="theme-color"]')
+        if (oldMeta) oldMeta.remove()
+        const newMeta = document.createElement('meta')
+        newMeta.setAttribute('name', 'theme-color')
+        newMeta.setAttribute('content', meta)
+        document.head.appendChild(newMeta)
+
+        // 3. Belt-and-suspenders: body/html background explicit set.
         restoreStatusBar()
       }
 
@@ -184,8 +200,13 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
                pixels and updates the status bar accordingly. */}
       <div
         ref={statusBarRef}
-        className="absolute top-0 left-0 right-0 bg-black pointer-events-none"
-        style={{ height: 'env(safe-area-inset-top)' }}
+        className="absolute top-0 left-0 right-0 pointer-events-none"
+        style={{
+          height: 'env(safe-area-inset-top)',
+          backgroundColor: '#000',
+          willChange: 'background-color',
+          transform: 'translateZ(0)',
+        }}
         aria-hidden
       />
     </div>
