@@ -652,6 +652,7 @@ function App() {
               aria-modal="true"
               aria-labelledby="auth-modal-title"
               className="relative z-10 w-full max-w-sm max-h-[min(90dvh,calc(100dvh-2rem))] overflow-y-auto overscroll-contain rounded-3xl border border-zinc-600/80 bg-gray-900 p-6 shadow-2xl sm:p-8"
+              data-auth-modal
               onClick={(e) => e.stopPropagation()}
             >
               <button
