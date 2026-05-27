@@ -900,10 +900,10 @@ html.light .lounge-media-toolbar svg rect {
   fill-opacity: 0 !important;
 }
 
-/* Logo swap: white version in dark mode, black version in light mode */
+/* Logo swap: white version in dark mode, inverted (black) version in light mode */
 .edge-logo--light { display: none; }
 html.light .edge-logo--dark  { display: none; }
-html.light .edge-logo--light { display: inline; }
+html.light .edge-logo--light { display: inline; filter: invert(1); }
 
 /* Guide hero image scrims — lighter in light mode so less of the image is eaten */
 html.light .guide-hero-scrim {
