@@ -247,7 +247,7 @@ function StackUpPays({ onBack }) {
   }, [calculate])
 
   return (
-    <div className="min-h-full bg-slate-950 pb-12">
+    <div data-calc="stackup" className="min-h-full bg-slate-950 pb-12">
       <div className="w-full px-0 pt-1">
 
         {/* Title block */}

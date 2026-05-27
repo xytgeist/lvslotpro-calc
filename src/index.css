@@ -1252,3 +1252,20 @@ html.light [data-calc="mhb"] .ring-cyan-300\/80 {
 html.light [data-calc="mhb"] .focus\:ring-cyan-200\/85:focus {
   --tw-ring-color: rgba(59, 130, 246, 0.85);
 }
+
+/* ── StackUpPays (slate-* → light grays, backgrounds + shadows only) ──────── */
+html.light [data-calc="stackup"] {
+  background-color: #fafafa;
+}
+html.light [data-calc="stackup"] .bg-slate-950 {
+  background-color: #fafafa;
+}
+html.light [data-calc="stackup"] .bg-slate-900 {
+  background-color: #f4f4f5;
+  box-shadow: 0 6px 24px -4px rgba(0, 0, 0, 0.55);
+}
+html.light [data-calc="stackup"] .bg-slate-800,
+html.light [data-calc="stackup"] .bg-slate-800\/70 {
+  background-color: #e4e4e7;
+  box-shadow: none;
+}
