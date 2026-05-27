@@ -1264,7 +1264,7 @@ html.light [data-calc="mhb"] .bg-cyan-500\/40 {
   background-color: #3b82f6;
 }
 html.light [data-calc="mhb"] .border-cyan-300\/70 {
-  border-color: #3b82f6;
+  border-color: transparent;
 }
 
 /* Meter input ring — the global bg-gray-800 box-shadow:none wipes Tailwind rings,
