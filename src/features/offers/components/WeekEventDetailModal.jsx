@@ -38,6 +38,7 @@ export default function WeekEventDetailModal({
     >
       <div
         data-event-detail-card
+        data-offer-type={e.offer_type || 'other'}
         className={`w-full max-w-lg max-h-[min(85dvh,calc(100dvh-6rem))] overflow-y-auto rounded-3xl border border-zinc-700 p-5 shadow-2xl ${meta.card}`}
         onClick={(ev) => ev.stopPropagation()}
       >

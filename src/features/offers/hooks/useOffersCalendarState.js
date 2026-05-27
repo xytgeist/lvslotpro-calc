@@ -163,14 +163,14 @@ export default function useOffersCalendarState({
 
   const offerTypeMeta = useMemo(
     () => ({
-      free_play: { label: 'Free play', dot: 'bg-violet-400', chip: 'bg-violet-500/15 text-violet-200 border-violet-500/40', card: 'bg-violet-500/18' },
-      hotel: { label: 'Hotel stay', dot: 'bg-sky-400', chip: 'bg-sky-500/15 text-sky-200 border-sky-500/40', card: 'bg-sky-500/16' },
-      dining: { label: 'Dining credit', dot: 'bg-emerald-400', chip: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/40', card: 'bg-emerald-500/16' },
-      gift: { label: 'Gift day', dot: 'bg-amber-400', chip: 'bg-amber-500/15 text-amber-200 border-amber-500/40', card: 'bg-amber-500/16' },
-      multiplier: { label: 'Tier multiplier', dot: 'bg-fuchsia-400', chip: 'bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-500/40', card: 'bg-fuchsia-500/16' },
-      tournament: { label: 'Tournament', dot: 'bg-rose-400', chip: 'bg-rose-500/15 text-rose-200 border-rose-500/40', card: 'bg-rose-500/16' },
-      drawing: { label: 'Drawing', dot: 'bg-cyan-400', chip: 'bg-cyan-500/15 text-cyan-200 border-cyan-500/40', card: 'bg-cyan-500/16' },
-      other: { label: 'Other', dot: 'bg-zinc-400', chip: 'bg-zinc-500/15 text-zinc-200 border-zinc-500/40', card: 'bg-zinc-700/45' }
+      free_play:  { label: 'Free play',       dot: 'bg-[#8fa3d4]', chip: 'bg-[#3d4f9f]/20 text-[#8fa3d4] border-[#3d4f9f]/45', card: 'bg-[#3d4f9f]/20' },
+      hotel:      { label: 'Hotel stay',      dot: 'bg-[#7ab5b0]', chip: 'bg-[#2e6b65]/20 text-[#7ab5b0] border-[#2e6b65]/45', card: 'bg-[#2e6b65]/20' },
+      dining:     { label: 'Dining credit',   dot: 'bg-[#7dd5bf]', chip: 'bg-[#3b9e85]/20 text-[#7dd5bf] border-[#3b9e85]/45', card: 'bg-[#3b9e85]/20' },
+      gift:       { label: 'Gift day',        dot: 'bg-[#d4c340]', chip: 'bg-[#b8960a]/20 text-[#d4c340] border-[#b8960a]/45', card: 'bg-[#b8960a]/20' },
+      multiplier: { label: 'Tier multiplier', dot: 'bg-[#da88ae]', chip: 'bg-[#c4447a]/20 text-[#da88ae] border-[#c4447a]/45', card: 'bg-[#c4447a]/20' },
+      tournament: { label: 'Tournament',      dot: 'bg-[#c47a87]', chip: 'bg-[#8c2d3f]/20 text-[#c47a87] border-[#8c2d3f]/45', card: 'bg-[#8c2d3f]/20' },
+      drawing:    { label: 'Drawing',         dot: 'bg-[#95b4cf]', chip: 'bg-[#5b87b0]/20 text-[#95b4cf] border-[#5b87b0]/45', card: 'bg-[#5b87b0]/20' },
+      other:      { label: 'Other',           dot: 'bg-[#b0a8c0]', chip: 'bg-[#7a6d8f]/20 text-[#b0a8c0] border-[#7a6d8f]/45', card: 'bg-[#7a6d8f]/20' }
     }),
     []
   )
