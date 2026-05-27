@@ -376,10 +376,10 @@ function MHBCalculator({ onBack }) {
     }
   }, [manufacturer, igtTier, igtLineBet, igtDenom, mustHitBy])
 
-  // All manufacturers default to midpoint on switch.
+  // AGS and IGT default to full run (no midpoint); Ainsworth defaults to midpoint.
   useEffect(() => {
     if (manufacturer === 'manual') return
-    queueMicrotask(() => setUseMidpoint(true))
+    queueMicrotask(() => setUseMidpoint(manufacturer === 'ainsworth'))
   }, [manufacturer])
 
   // Briefly highlight MHB Meter whenever key selectors change.
