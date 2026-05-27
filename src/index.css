@@ -1204,9 +1204,15 @@ html.light [data-calc="buffalo"] .bg-green-900 .text-green-300 {
 html.light [data-calc="buffalo"] .bg-red-900 {
   background-color: #b91c1c;
 }
-html.light [data-calc="buffalo"] .bg-red-900 .text-red-300 {
-  color: #ffffff;
+html.light [data-calc="buffalo"] .bg-red-900 .text-red-300,
+html.light [data-calc="buffalo"] .bg-red-900.text-red-300 {
+  color: #18181b;
 }
+
+.buffalo-check-badge { display: none; }
+.buffalo-check-emoji { display: inline; }
+html.light .buffalo-check-badge { display: inline-flex; }
+html.light .buffalo-check-emoji { display: none; }
 /* YES / Max Major button (same green) */
 html.light [data-calc="buffalo"] .bg-green-600 {
   background-color: #16A34A;
