@@ -430,8 +430,8 @@ function BuffaloLink({ onBack }) {
                 <span className="text-gray-400 text-xs">Scout Share</span>
                 <span className="text-amber-400 font-bold">{scoutPercentage}%</span>
               </div>
-              <div className="flex items-center bg-gray-800 rounded-2xl p-1">
-                <div className="w-full px-2 py-3">
+              <div className="flex items-center bg-gray-800 rounded-2xl p-1 min-h-[52px]">
+                <div className="w-full px-2">
                   <input
                     type="range"
                     min="10"

@@ -409,8 +409,8 @@ function PhoenixLink({ onBack }) {
                 <label className="block text-gray-400 text-xs">Scout Share</label>
                 <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
               </div>
-              <div className="flex items-center bg-gray-800 rounded-2xl p-1">
-                <div className="w-full px-2 py-3">
+              <div className="flex items-center bg-gray-800 rounded-2xl p-1 min-h-[52px]">
+                <div className="w-full px-2">
                   <input 
                     type="range" 
                     min="10" 
