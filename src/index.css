@@ -1172,7 +1172,7 @@ html.light [data-calc="phoenix"] .text-yellow-400 {
 
 html.light [data-calc="buffalo"] h1 {
   color: #18181b !important;
-  text-shadow: none !important;
+  text-shadow: -1px -1px 0 #b45309, 1px -1px 0 #b45309, -1px 1px 0 #b45309, 1px 1px 0 #b45309 !important;
 }
 
 /* Accent colors */
