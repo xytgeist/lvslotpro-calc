@@ -1170,6 +1170,11 @@ html.light [data-calc="phoenix"] .text-yellow-400 {
 
 /* ── BuffaloLink (amber) ─────────────────────────────────────────────────── */
 
+html.light [data-calc="buffalo"] h1 {
+  color: #18181b;
+  text-shadow: none !important;
+}
+
 /* Accent colors */
 html.light [data-calc="buffalo"] .text-amber-400,
 html.light [data-calc="buffalo"] .text-amber-100 {
