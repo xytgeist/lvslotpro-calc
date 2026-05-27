@@ -1005,9 +1005,9 @@ html.light .lounge-media-toolbar .active\:text-sky-200:active {
  * data-calc="phoenix" | "buffalo" | "mhb" on each calculator root div.
  */
 
-/* Calculator list buttons — add shadow in light mode to match MHB */
+/* Calculator list buttons — uniform shadow in light mode matching MHB's shadow-lg shadow-black/30 */
 html.light .calc-list-btn {
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.22), 0 2px 8px -2px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.30), 0 4px 6px -4px rgba(0, 0, 0, 0.30);
 }
 
 /*
