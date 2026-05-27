@@ -1,10 +1,15 @@
 import { useLayoutEffect, useRef } from 'react'
 import { DotLottie } from '@lottiefiles/dotlottie-web'
 import wasmUrl from '@lottiefiles/dotlottie-web/dotlottie-player.wasm?url'
-import edgeSplashData from '../assets/lottie/edge-splash-v2.json'
+import edgeSplashDark from '../assets/lottie/edge-splash-v2.json'
+import edgeSplashLight from '../assets/lottie/edge-splash-v2-light.json'
 
 DotLottie.setWasmUrl(wasmUrl)
-const EDGE_SPLASH_DATA = JSON.stringify(edgeSplashData)
+
+// Resolved once at module load — theme class is applied by applyTheme() in main.jsx
+// before any React renders, so this is stable for the entire boot session.
+const isDarkTheme = document.documentElement.classList.contains('dark')
+const EDGE_SPLASH_DATA = JSON.stringify(isDarkTheme ? edgeSplashDark : edgeSplashLight)
 
 // Black Solid 1 ends at frame 157 → D fly-through begins.
 // Overlay fully transparent at frame 190 (~1 s before animation ends at 251).
@@ -115,29 +120,37 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       aria-live="polite"
       aria-label="Loading Lounge"
     >
-      {/* 1. Overlay — behind canvas, shows through transparent D-hole */}
-      <div ref={overlayRef} className="absolute inset-0 bg-black pointer-events-none" aria-hidden />
+      {/* 1. Overlay — behind canvas, shows through transparent D-hole.
+               Dark mode: black overlay fades out during fly-through to reveal feed.
+               Light mode: white overlay (matches light Lottie background). */}
+      <div
+        ref={overlayRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ backgroundColor: isDarkTheme ? '#000' : '#fff' }}
+        aria-hidden
+      />
 
       {/* 2. Canvas — Lottie renders here via OffscreenCanvas */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden />
 
       {/* 3. Pre-frame cover — on top, hides blank canvas until WASM boots.
-               Always black: seamless with the Lottie's Black Solid 1 opener. */}
-      <div ref={preFrameCoverRef} className="absolute inset-0 bg-black" aria-hidden />
+               Matches the Lottie opener: black in dark mode, white in light mode. */}
+      <div
+        ref={preFrameCoverRef}
+        className="absolute inset-0"
+        style={{ backgroundColor: isDarkTheme ? '#000' : '#fff' }}
+        aria-hidden
+      />
 
-      {/* 4. Status bar strip — covers only env(safe-area-inset-top), the exact pixels
-               iOS samples for its translucent status bar tint. Sits above everything else.
-               Starts black (matches the Lottie opener). At STATUS_BAR_FLIP_FRAME we set
-               its background to the theme color so iOS sees white/dark directly in those
-               pixels and updates the status bar accordingly. */}
+      {/* 4. Status bar strip — covers only env(safe-area-inset-top).
+               Matches the Lottie opener color so the iOS translucent status bar
+               tint is consistent with the animation background. */}
       <div
         ref={statusBarRef}
         className="absolute top-0 left-0 right-0 pointer-events-none"
         style={{
           height: 'env(safe-area-inset-top)',
-          backgroundColor: '#000',
-          willChange: 'background-color',
-          transform: 'translateZ(0)',
+          backgroundColor: isDarkTheme ? '#000' : '#fff',
         }}
         aria-hidden
       />
