@@ -1235,6 +1235,22 @@ html.light [data-calc="buffalo"] .bg-green-600.text-white {
 }
 
 /* ── MHBCalculator (cyan → blue in light) ────────────────────────────────── */
+/* +EV / -EV result pill */
+html.light [data-calc="mhb"] .bg-emerald-900 {
+  background-color: #16A34A;
+}
+html.light [data-calc="mhb"] .bg-emerald-900.text-emerald-300,
+html.light [data-calc="mhb"] .bg-emerald-900 .text-emerald-300 {
+  color: #ffffff;
+}
+html.light [data-calc="mhb"] .bg-red-900 {
+  background-color: #DC2626;
+}
+html.light [data-calc="mhb"] .bg-red-900.text-red-300,
+html.light [data-calc="mhb"] .bg-red-900 .text-red-300 {
+  color: #18181b;
+}
+
 /* JP checkbox rows — bg-gray-900/70 has no opacity variant override so it stays dark */
 html.light [data-calc="mhb"] .bg-gray-900\/70 {
   background-color: rgba(0, 0, 0, 0.06);
