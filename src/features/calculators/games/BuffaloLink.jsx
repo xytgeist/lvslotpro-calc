@@ -408,7 +408,7 @@ function BuffaloLink({ onBack }) {
           <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
           <p className="text-gray-400 text-sm mb-5">Fair finder's fee for scout</p>
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
+            <div className="flex flex-col">
               <label className="block text-gray-400 text-xs mb-2">EV Basis</label>
               <div className="flex bg-gray-800 rounded-2xl p-1">
                 <button
@@ -425,12 +425,12 @@ function BuffaloLink({ onBack }) {
                 </button>
               </div>
             </div>
-            <div>
+            <div className="flex flex-col">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-400 text-xs">Scout Share</span>
                 <span className="text-amber-400 font-bold">{scoutPercentage}%</span>
               </div>
-              <div className="flex items-center bg-gray-800 rounded-2xl p-1 min-h-[52px]">
+              <div className="flex-1 flex items-center bg-gray-800 rounded-2xl p-1">
                 <div className="w-full px-2">
                   <input
                     type="range"
