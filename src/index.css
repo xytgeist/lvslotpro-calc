@@ -1005,6 +1005,11 @@ html.light .lounge-media-toolbar .active\:text-sky-200:active {
  * data-calc="phoenix" | "buffalo" | "mhb" on each calculator root div.
  */
 
+/* Calculator list buttons — add shadow in light mode to match MHB */
+html.light .calc-list-btn {
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.22), 0 2px 8px -2px rgba(0, 0, 0, 0.14);
+}
+
 /*
  * Page background + base text.
  * Match the Shell's zinc-950 light value (#fafafa) so the calculator root

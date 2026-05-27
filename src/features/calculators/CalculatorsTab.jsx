@@ -79,7 +79,7 @@ function CalculatorsHome({
             type="button"
             title={locked ? 'Subscribe to unlock Slots Edge' : undefined}
             onClick={() => handleSelect(calc.key)}
-            className={`relative ${calc.buttonClassName}`}
+            className={`relative calc-list-btn ${calc.buttonClassName}`}
           >
             {isAdmin ? (
               <div className="absolute right-3 top-3 z-10">
