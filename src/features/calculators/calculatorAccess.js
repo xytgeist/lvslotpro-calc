@@ -69,10 +69,10 @@ export const CALCULATOR_CATALOG = [
     iconSrc: '/guides/buffalo-link/buffalo-link-calculator-icon.webp',
     iconAlt: 'Buffalo',
     iconWrapClassName:
-      'relative flex h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500/90 to-orange-700 shadow-inner ring-1 ring-orange-800/45',
+      'relative flex h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600/90 to-orange-800 shadow-inner ring-1 ring-orange-900/45',
     iconImgClassName: 'h-full w-full object-cover object-center',
     buttonClassName:
-      'mb-4 flex min-h-[7rem] w-full touch-manipulation items-center gap-4 rounded-3xl bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600 p-6 text-left ring-1 ring-orange-600/45 transition-all hover:from-yellow-400 hover:via-amber-400 hover:to-orange-500 hover:ring-orange-500/50 active:scale-[0.985] sm:gap-5 sm:p-8',
+      'mb-4 flex min-h-[7rem] w-full touch-manipulation items-center gap-4 rounded-3xl bg-gradient-to-br from-amber-700 via-orange-700 to-red-800 p-6 text-left ring-1 ring-orange-800/45 transition-all hover:from-amber-600 hover:via-orange-600 hover:to-red-700 hover:ring-orange-700/50 active:scale-[0.985] sm:gap-5 sm:p-8',
     titleClassName: 'line-clamp-2 text-2xl font-semibold leading-snug text-[#fff]',
     subtitleClassName: 'mt-0.5 line-clamp-1 text-base leading-snug text-[rgba(255,255,255,0.82)] sm:line-clamp-2',
   },
@@ -97,7 +97,7 @@ export const CALCULATOR_CATALOG = [
     iconAlt: '',
     iconWrapClassName: 'h-16 w-16 shrink-0 rounded-2xl object-cover shadow-lg',
     buttonClassName:
-      'mb-4 flex min-h-[7rem] w-full touch-manipulation items-center gap-4 rounded-3xl bg-gradient-to-br from-indigo-700 via-violet-700 to-blue-700 p-6 text-left shadow-lg shadow-black/30 transition-all hover:from-indigo-600 hover:via-violet-600 hover:to-blue-600 active:scale-[0.985] sm:gap-5 sm:p-8',
+      'mb-4 flex min-h-[7rem] w-full touch-manipulation items-center gap-4 rounded-3xl bg-gradient-to-br from-indigo-700 via-violet-700 to-cyan-700 p-6 text-left shadow-lg shadow-black/30 transition-all hover:from-indigo-600 hover:via-violet-600 hover:to-cyan-600 active:scale-[0.985] sm:gap-5 sm:p-8',
     titleClassName: 'line-clamp-2 text-2xl font-semibold leading-snug text-[#fff]',
     subtitleClassName: 'mt-0.5 line-clamp-1 text-base leading-snug text-[rgba(255,255,255,0.82)] sm:line-clamp-2',
   },

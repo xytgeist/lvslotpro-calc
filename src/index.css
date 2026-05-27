@@ -659,25 +659,6 @@ html.light .text-fuchsia-200 { color: var(--color-fuchsia-700); }
 html.light .text-fuchsia-300 { color: var(--color-fuchsia-700); }
 
 /*
- * -400 shades: vibrant/neon on dark mode but too bright on light bg.
- * Remap to muted -600/-700 equivalents in light mode.
- * Dark mode is unaffected (no html.light class present).
- */
-html.light .text-orange-400  { color: var(--color-orange-700); }
-html.light .text-green-400   { color: #16A34A; }
-html.light .text-red-400     { color: #DC2626; }
-html.light .text-yellow-400  { color: var(--color-amber-600); }
-html.light .text-blue-400    { color: var(--color-blue-700); }
-html.light .text-violet-400  { color: var(--color-violet-700); }
-html.light .text-purple-400  { color: var(--color-purple-700); }
-html.light .text-emerald-400 { color: var(--color-emerald-700); }
-html.light .text-cyan-400    { color: var(--color-cyan-700); }
-html.light .text-indigo-400  { color: var(--color-indigo-700); }
-html.light .text-pink-400    { color: var(--color-pink-700); }
-html.light .text-rose-400    { color: var(--color-rose-700); }
-html.light .text-sky-400     { color: var(--color-sky-700); }
-
-/*
  * Interaction bar (data-lounge-post-interaction-bar):
  * - Idle glyphs: zinc-500 in our inverted scale = #71717a, reads too dark on white →
  *   bump to a lighter neutral (#a1a1aa). Also soften active commented state

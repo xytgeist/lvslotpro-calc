@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { DropdownSelect } from '../DropdownSelect'
 import CalculatorDisclaimer from '../../../components/CalculatorDisclaimer'
 
 function defaultCurrentForCap(cap) {
@@ -708,12 +707,12 @@ function MHBCalculator({ onBack }) {
   }
 
   return (
-    <div className="min-h-full bg-zinc-950 pb-12">
+    <div className="min-h-full bg-zinc-900 pb-12">
       <div className="w-full px-0 pt-1">
 
         {/* Title */}
         <div className="flex items-center mb-6">
-          <button onClick={onBack} className="text-[52px] leading-none text-blue-500 hover:text-blue-400 -mt-1 mr-4 font-light active:opacity-70">‹</button>
+          <button onClick={onBack} className="text-[52px] leading-none text-cyan-400 hover:text-cyan-300 -mt-1 mr-4 font-light active:opacity-70">‹</button>
           <div className="flex items-center flex-1 justify-center gap-3">
             <img
               src="/guides/mhb/mhb-calculator-icon.webp"
@@ -722,7 +721,7 @@ function MHBCalculator({ onBack }) {
             />
             <div className="text-center leading-none">
               <h1
-                className="font-black text-zinc-50 tracking-[0.5px] text-[32px]"
+                className="font-black text-white tracking-[0.5px] text-[32px]"
                 style={{
                   textShadow:
                     '-2px -2px 0 #5b21b6, 2px -2px 0 #5b21b6, -2px 2px 0 #0e7490, 2px 2px 0 #0e7490, 0 0 20px rgba(6,182,212,0.35)',
@@ -730,7 +729,7 @@ function MHBCalculator({ onBack }) {
               >
                 MUST HIT BY
               </h1>
-              <div className="mt-1 text-[17px] font-semibold tracking-[0.18em] text-blue-300/90">
+              <div className="mt-1 text-[17px] font-semibold tracking-[0.18em] text-cyan-200/90">
                 JACKPOT ANALYZER
               </div>
             </div>
@@ -739,7 +738,7 @@ function MHBCalculator({ onBack }) {
             <button
               type="button"
               onClick={() => setShowCalcInfo(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-blue-500/45 bg-blue-500/10 text-sm font-bold italic text-blue-300 hover:bg-blue-500/20"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-cyan-400/45 bg-cyan-500/10 text-sm font-bold italic text-cyan-200 hover:bg-cyan-500/20"
               aria-label="How calculations work"
             >
               i
@@ -748,21 +747,33 @@ function MHBCalculator({ onBack }) {
         </div>
 
         {/* Main Inputs */}
-        <div className="bg-zinc-900 p-5 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)]">
+        <div className="bg-zinc-900 p-5 rounded-3xl">
           <div className="mb-4">
             <label className="block text-zinc-400 text-xs mb-1">Manufacturer</label>
-            <DropdownSelect
-              value={manufacturer}
-              onChange={setManufacturer}
-              options={[
-                { value: 'ainsworth', label: 'Ainsworth' },
-                { value: 'ags', label: 'AGS' },
-                { value: 'igt', label: 'IGT' },
-                { value: 'manual', label: 'Manual Entry' },
-              ]}
-              accentClass="text-blue-500"
-              size="md"
-            />
+            <div className="relative">
+              <select
+                value={manufacturer}
+                onChange={(e) => setManufacturer(e.target.value)}
+                className="w-full appearance-none rounded-2xl bg-zinc-900 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+              >
+                <option value="ainsworth">Ainsworth</option>
+                <option value="ags">AGS</option>
+                <option value="igt">IGT</option>
+                <option value="manual">Manual Entry</option>
+              </select>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
             <p className="text-zinc-500 text-[11px] mt-2 leading-snug">
               Switches the default meter, rise, reset, and RTP to typical for the selected manufacturer.
             </p>
@@ -773,29 +784,59 @@ function MHBCalculator({ onBack }) {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-zinc-400 text-[11px] mb-0.5">Denom</label>
-                  <DropdownSelect
-                    value={igtDenom}
-                    onChange={setIgtDenom}
-                    options={[
-                      { value: 0.01, label: '$0.01' },
-                      { value: 0.25, label: '$0.25' },
-                      { value: 1, label: '$1' },
-                      { value: 2, label: '$2' },
-                    ]}
-                    accentClass="text-blue-500"
-                    size="sm"
-                  />
+                  <div className="relative">
+                    <select
+                      value={igtDenom}
+                      onChange={(e) => setIgtDenom(Number(e.target.value))}
+                      className="w-full appearance-none rounded-2xl bg-zinc-900 p-3 pr-10 text-center text-base font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                    >
+                      <option value={0.01}>$0.01</option>
+                      <option value={0.25}>$0.25</option>
+                      <option value={1}>$1</option>
+                      <option value={2}>$2</option>
+                    </select>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-zinc-400 text-[11px] mb-0.5">Line Bet</label>
-                  <DropdownSelect
-                    value={igtLineBet}
-                    onChange={setIgtLineBet}
-                    options={[1, 2, 3, 5, 10].map(b => ({ value: b, label: `Bet ${b}` }))}
-                    accentClass="text-blue-500"
-                    size="sm"
-                  />
+                  <div className="relative">
+                    <select
+                      value={igtLineBet}
+                      onChange={(e) => setIgtLineBet(Number(e.target.value))}
+                      className="w-full appearance-none rounded-2xl bg-zinc-900 p-3 pr-10 text-center text-base font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                    >
+                      <option value={1}>Bet 1</option>
+                      <option value={2}>Bet 2</option>
+                      <option value={3}>Bet 3</option>
+                      <option value={5}>Bet 5</option>
+                      <option value={10}>Bet 10</option>
+                    </select>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
                 </div>
 
                 <div>
@@ -804,23 +845,35 @@ function MHBCalculator({ onBack }) {
                     <button
                       type="button"
                       onClick={() => setShowIgtTierInfo(true)}
-                      className="flex h-4 w-4 items-center justify-center rounded-sm border border-blue-500/45 bg-blue-500/10 text-[9px] font-bold italic leading-none text-blue-300 hover:bg-blue-500/20"
+                      className="flex h-4 w-4 items-center justify-center rounded-sm border border-cyan-400/45 bg-cyan-500/10 text-[9px] font-bold italic leading-none text-cyan-200 hover:bg-cyan-500/20"
                       aria-label="Show jackpot tier info"
                     >
                       i
                     </button>
                   </div>
-                  <DropdownSelect
-                    value={igtTier}
-                    onChange={setIgtTier}
-                    options={[
-                      { value: 'mini', label: 'Mini' },
-                      { value: 'minor', label: 'Minor' },
-                      { value: 'major', label: 'Major' },
-                    ]}
-                    accentClass="text-blue-500"
-                    size="sm"
-                  />
+                  <div className="relative">
+                    <select
+                      value={igtTier}
+                      onChange={(e) => setIgtTier(e.target.value)}
+                      className="w-full appearance-none rounded-2xl bg-zinc-900 p-3 pr-10 text-center text-base font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                    >
+                      <option value="mini">Mini</option>
+                      <option value="minor">Minor</option>
+                      <option value="major">Major</option>
+                    </select>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
                 </div>
               </div>
 
@@ -834,14 +887,14 @@ function MHBCalculator({ onBack }) {
                     onFocus={handleJpMeterFocus}
                     onChange={handleJpMeterChange}
                     onBlur={handleJpMeterBlur}
-                    className={`w-full rounded-2xl bg-zinc-800 p-4 text-center text-2xl font-bold text-zinc-50 outline-none transition-all duration-300 ring-1 ring-blue-400/80 focus:ring-2 focus:ring-blue-300/85 ${
-                      showMeterCue ? 'ring-2 ring-blue-100 shadow-[0_0_0_3px_rgba(103,232,249,0.6)] animate-pulse' : ''
+                    className={`w-full rounded-2xl bg-zinc-900 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-300/80 focus:ring-2 focus:ring-cyan-200/85 ${
+                      showMeterCue ? 'ring-2 ring-cyan-100 shadow-[0_0_0_3px_rgba(103,232,249,0.6)] animate-pulse' : ''
                     }`}
                   />
                 </div>
                 <div>
                   <label className="block text-zinc-400 text-xs mb-1">Must Hit By</label>
-                  <div className="w-full rounded-2xl bg-zinc-800 p-4 text-center text-2xl font-bold text-zinc-50 tabular-nums">
+                  <div className="w-full rounded-2xl bg-zinc-900 p-4 text-center text-2xl font-bold text-white tabular-nums">
                     {formatUsd(mustHitBy)}
                   </div>
                 </div>
@@ -859,8 +912,8 @@ function MHBCalculator({ onBack }) {
                   onClick={(e) => e.currentTarget.select()}
                   onChange={handleJpMeterChange}
                   onBlur={handleJpMeterBlur}
-                  className={`w-full rounded-2xl bg-zinc-800 p-4 text-center text-2xl font-bold text-zinc-50 outline-none transition-all duration-300 ring-1 ring-blue-400/80 focus:ring-2 focus:ring-blue-300/85 ${
-                    showMeterCue ? 'ring-2 ring-blue-100 shadow-[0_0_0_3px_rgba(103,232,249,0.6)] animate-pulse' : ''
+                  className={`w-full rounded-2xl bg-zinc-900 p-4 text-center text-2xl font-bold text-white outline-none transition-all duration-300 ring-1 ring-cyan-300/80 focus:ring-2 focus:ring-cyan-200/85 ${
+                    showMeterCue ? 'ring-2 ring-cyan-100 shadow-[0_0_0_3px_rgba(103,232,249,0.6)] animate-pulse' : ''
                   }`}
                 />
               </div>
@@ -876,20 +929,34 @@ function MHBCalculator({ onBack }) {
                       onClick={(e) => e.currentTarget.select()}
                       onChange={handleMustHitByChange}
                       onBlur={handleMustHitByBlur}
-                      className="w-full rounded-2xl bg-zinc-800 p-4 text-center text-2xl font-bold text-zinc-50 outline-none ring-blue-500/0 focus:ring-2 focus:ring-blue-500/35"
+                      className="w-full rounded-2xl bg-zinc-900 p-4 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
                     />
                   ) : (
-                    <DropdownSelect
-                      value={mustHitBy}
-                      onChange={setMustHitBy}
-                      options={[
-                        500,
-                        ...(manufacturer !== 'ainsworth' ? [5000] : []),
-                        ...(manufacturer !== 'ags' ? [10000] : []),
-                      ].map(v => ({ value: v, label: formatUsd(v) }))}
-                      accentClass="text-blue-500"
-                      size="lg"
-                    />
+                    <div className="relative">
+                      <select
+                        value={mustHitBy}
+                        onChange={(e) => setMustHitBy(Number(e.target.value))}
+                        className="w-full appearance-none rounded-2xl bg-zinc-900 p-4 pr-12 text-center text-2xl font-bold text-white outline-none ring-cyan-500/0 focus:ring-2 focus:ring-cyan-500/35"
+                      >
+                        <option value={500}>{formatUsd(500)}</option>
+                        {manufacturer !== 'ainsworth' ? (
+                          <option value={5000}>{formatUsd(5000)}</option>
+                        ) : null}
+                        {manufacturer !== 'ags' ? <option value={10000}>{formatUsd(10000)}</option> : null}
+                      </select>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/90"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.936a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
                   )}
               </div>
             </div>
@@ -897,10 +964,10 @@ function MHBCalculator({ onBack }) {
         </div>
 
         {/* Advanced Settings */}
-        <div className="mt-4 bg-zinc-900 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)] overflow-hidden">
+        <div className="mt-4 bg-zinc-900 rounded-3xl overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="flex w-full items-center justify-between p-5 text-left hover:bg-zinc-900">
-            <span className="font-semibold text-zinc-50">Advanced Settings</span>
-            <span className={`text-zinc-50 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
+            <span className="font-semibold text-white">Advanced Settings</span>
+            <span className={`text-white transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {showAdvanced && (
             <div className="p-4 pt-3 space-y-4 border-t border-zinc-800">
@@ -918,7 +985,7 @@ function MHBCalculator({ onBack }) {
                   onFocus={(e) => e.currentTarget.select()}
                     onChange={handleFloatChange(setOverallRTP, activePreset.rtp)}
                     onBlur={handleFloatBlur(setOverallRTP, activePreset.rtp)}
-                    className="h-12 w-full rounded-2xl bg-zinc-800 px-3 text-center text-xl font-bold text-zinc-50 outline-none focus:ring-2 focus:ring-blue-500/30"
+                    className="h-12 w-full rounded-2xl bg-zinc-900 px-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
                   />
                 </div>
 
@@ -932,7 +999,7 @@ function MHBCalculator({ onBack }) {
                     onClick={(e) => e.currentTarget.select()}
                     onChange={handleResetValueChange}
                     onBlur={handleResetValueBlur}
-                    className="h-12 w-full rounded-2xl bg-zinc-800 px-3 text-center text-xl font-bold text-zinc-50 outline-none focus:ring-2 focus:ring-blue-500/30"
+                    className="h-12 w-full rounded-2xl bg-zinc-900 px-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
                   />
                 </div>
               </div>
@@ -948,20 +1015,20 @@ function MHBCalculator({ onBack }) {
                     onClick={(e) => e.currentTarget.select()}
                     onChange={handleMeterRiseChange}
                     onBlur={handleMeterRiseBlur}
-                    className="h-12 w-full rounded-2xl bg-zinc-800 px-3 text-center text-xl font-bold text-zinc-50 outline-none focus:ring-2 focus:ring-blue-500/30"
+                    className="h-12 w-full rounded-2xl bg-zinc-900 px-3 text-center text-xl font-bold text-white outline-none focus:ring-2 focus:ring-cyan-500/30"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="flex h-12 cursor-pointer items-center gap-3 rounded-2xl bg-zinc-800 px-3 touch-manipulation">
+                <label className="flex h-12 cursor-pointer items-center gap-3 rounded-2xl bg-zinc-900 px-3 touch-manipulation">
                   <button
                     type="button"
                     role="switch"
                     aria-checked={useMidpoint}
                     onClick={() => setUseMidpoint((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/45 ${
-                      useMidpoint ? 'border-blue-400/70 bg-blue-500/40' : 'border-zinc-600 bg-zinc-700'
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/45 ${
+                      useMidpoint ? 'border-cyan-300/70 bg-cyan-500/40' : 'border-zinc-600 bg-zinc-700'
                     }`}
                   >
                     <span
@@ -976,8 +1043,8 @@ function MHBCalculator({ onBack }) {
 
               {jpCheckboxJackpots.length > 0 && (
                 <div>
-                  <div className="rounded-2xl bg-zinc-800 p-3">
-                    <div className="mb-2 text-center text-[11px] font-semibold text-blue-400">
+                  <div className="rounded-2xl bg-zinc-900 p-3">
+                    <div className="mb-2 text-center text-[11px] font-semibold text-cyan-300">
                       Include MHB Contribution to RTP
                     </div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -988,7 +1055,7 @@ function MHBCalculator({ onBack }) {
                         return (
                           <label
                             key={jp.key}
-                            className="flex items-center justify-between gap-2 rounded-xl bg-zinc-800/70 px-3 py-2 text-[11px] font-semibold text-zinc-50 tabular-nums"
+                            className="flex items-center justify-between gap-2 rounded-xl bg-zinc-900/70 px-3 py-2 text-[11px] font-semibold text-white tabular-nums"
                           >
                             <span>{label}</span>
                             <input
@@ -998,7 +1065,7 @@ function MHBCalculator({ onBack }) {
                                 const isChecked = e.target.checked
                                 setIncludedJpContributions((prev) => ({ ...prev, [jp.key]: isChecked }))
                               }}
-                              className="h-4 w-4 shrink-0 rounded border-zinc-600 bg-zinc-700 accent-blue-500"
+                              className="h-4 w-4 shrink-0 rounded border-zinc-600 bg-zinc-700 accent-cyan-500"
                             />
                           </label>
                         )
@@ -1013,9 +1080,9 @@ function MHBCalculator({ onBack }) {
         </div>
 
         {/* Outputs */}
-        <div className="mt-5 bg-zinc-900 p-6 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)]">
+        <div className="mt-5 bg-zinc-900 p-6 rounded-3xl">
           <h2
-            className="mb-6 text-center font-black text-[26px] tracking-[-1px] text-zinc-50"
+            className="mb-6 text-center font-black text-[26px] tracking-[-1px] text-white"
             style={{
               textShadow:
                 '-1.5px -1.5px 0 #5b21b6, 1.5px -1.5px 0 #5b21b6, -1.5px 1.5px 0 #0e7490, 1.5px 1.5px 0 #0e7490, 0 0 18px rgba(6,182,212,0.45), 0 0 10px rgba(139,92,246,0.35)',
@@ -1025,7 +1092,7 @@ function MHBCalculator({ onBack }) {
           </h2>
 
           <div className="grid grid-cols-2 gap-4 text-center">
-            <div className="bg-zinc-800 p-5 rounded-2xl border border-zinc-700">
+            <div className="bg-zinc-900 p-5 rounded-2xl">
               <div className="text-zinc-400 text-sm">Expected Value</div>
               <div className={`text-2xl leading-tight font-bold tracking-tight tabular-nums ${ev >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatUsd(ev)}
@@ -1034,20 +1101,20 @@ function MHBCalculator({ onBack }) {
                 ${evExact.toFixed(2)}
               </div>
             </div>
-            <div className="bg-zinc-800 p-5 rounded-2xl border border-zinc-700">
+            <div className="bg-zinc-900 p-5 rounded-2xl">
               <div className="text-zinc-400 text-sm">Breakeven Entry</div>
               <div className="text-2xl leading-tight font-bold tracking-tight tabular-nums text-amber-300">{formatUsd(breakeven)}</div>
               <div className="text-xs text-amber-300/70 mt-1">
                 ${breakevenExact.toFixed(2)}
               </div>
             </div>
-            <div className="bg-zinc-800 p-5 rounded-2xl border border-zinc-700">
+            <div className="bg-zinc-900 p-5 rounded-2xl">
               <div className="text-zinc-400 text-sm">Coin-in Expected</div>
-              <div className="text-2xl leading-tight font-bold tracking-tight tabular-nums text-zinc-50">
+              <div className="text-2xl leading-tight font-bold tracking-tight tabular-nums text-white">
                 {formatUsd(coinInExpected)}
               </div>
             </div>
-            <div className="bg-zinc-800 p-5 rounded-2xl border border-zinc-700">
+            <div className="bg-zinc-900 p-5 rounded-2xl">
               <div className="text-zinc-400 text-sm">Max Exposure</div>
               <div className="text-2xl leading-tight font-bold tracking-tight tabular-nums text-red-400">
                 -{formatUsd(exposure)}
@@ -1056,7 +1123,7 @@ function MHBCalculator({ onBack }) {
           </div>
 
           <div className={`mt-6 p-4 rounded-2xl text-center font-bold text-lg ${isPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
-            {isPositive ? '✅ +EV PLAY THIS ONE' : '❌ Still -EV Keep Waiting'}
+            {isPositive ? '✅ +EV — PLAY THIS ONE' : '❌ Still -EV — Keep Waiting'}
           </div>
         </div>
 
@@ -1064,18 +1131,18 @@ function MHBCalculator({ onBack }) {
 
         {showIgtTierInfo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-            <div className="w-full max-w-sm rounded-2xl bg-zinc-800 p-5 text-zinc-50 shadow-xl">
-              <h3 className="text-lg font-bold text-blue-400">IGT Jackpot Tier</h3>
+            <div className="w-full max-w-sm rounded-2xl bg-zinc-900 p-5 text-white shadow-xl">
+              <h3 className="text-lg font-bold text-cyan-300">IGT Jackpot Tier</h3>
               <p className="mt-3 text-sm leading-relaxed text-zinc-300">
                 This calculator uses
-                <span className="font-semibold text-blue-300"> Mini</span>,
-                <span className="font-semibold text-blue-300"> Minor</span>, and
-                <span className="font-semibold text-blue-300"> Major</span>
+                <span className="font-semibold text-cyan-200"> Mini</span>,
+                <span className="font-semibold text-cyan-200"> Minor</span>, and
+                <span className="font-semibold text-cyan-200"> Major</span>
                 {' '}
                 as a consistent naming convention to apply across multiple titles (
-                <span className="font-semibold text-blue-300">Coyote Moon Deluxe</span>,
-                <span className="font-semibold text-blue-300"> Money Storm Deluxe</span>,
-                <span className="font-semibold text-blue-300"> Lobstermania Deluxe</span>).
+                <span className="font-semibold text-cyan-200">Coyote Moon Deluxe</span>,
+                <span className="font-semibold text-cyan-200"> Money Storm Deluxe</span>,
+                <span className="font-semibold text-cyan-200"> Lobstermania Deluxe</span>).
               </p>
               <p className="mt-2 text-sm leading-relaxed text-zinc-300">
                 Many IGT games are the same underlying math with different skins, and the jackpot tier names shown on the cabinet can vary by title. Pick the tier by relative level (lowest/middle/highest).
@@ -1083,7 +1150,7 @@ function MHBCalculator({ onBack }) {
               <button
                 type="button"
                 onClick={() => setShowIgtTierInfo(false)}
-                className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-semibold hover:bg-blue-500"
+                className="mt-5 w-full rounded-xl bg-cyan-600 py-3 font-semibold hover:bg-cyan-500"
               >
                 Got it
               </button>
@@ -1093,15 +1160,15 @@ function MHBCalculator({ onBack }) {
 
         {showCalcInfo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-            <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-blue-500/30 bg-zinc-900 p-5 text-zinc-50 shadow-xl [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.25)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-400/20 hover:[&::-webkit-scrollbar-thumb]:bg-blue-400/35">
-              <h3 className="border-b border-blue-500/25 pb-2 text-center text-lg font-semibold tracking-[0.08em] text-blue-300 [font-family:Georgia,'Times_New_Roman',serif]">
+            <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-cyan-500/30 bg-zinc-900 p-5 text-white shadow-xl [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.25)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-cyan-300/20 hover:[&::-webkit-scrollbar-thumb]:bg-cyan-300/35">
+              <h3 className="border-b border-cyan-500/25 pb-2 text-center text-lg font-semibold tracking-[0.08em] text-cyan-200 [font-family:Georgia,'Times_New_Roman',serif]">
                 Analytical Methodology
               </h3>
-              <details className="mt-3 rounded-xl border border-blue-500/25 bg-zinc-900/60 p-3">
-                <summary className="cursor-pointer select-none text-sm font-semibold tracking-[0.03em] text-blue-300 [font-family:Georgia,'Times_New_Roman',serif]">
+              <details className="mt-3 rounded-xl border border-cyan-500/25 bg-zinc-900/60 p-3">
+                <summary className="cursor-pointer select-none text-sm font-semibold tracking-[0.03em] text-cyan-200 [font-family:Georgia,'Times_New_Roman',serif]">
                   Non-techie version
                 </summary>
-                <div className="mt-2 max-h-40 space-y-2 overflow-y-auto pr-1 text-sm leading-relaxed text-zinc-300 [font-family:Georgia,'Times_New_Roman',serif] [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.2)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-400/15 hover:[&::-webkit-scrollbar-thumb]:bg-blue-400/30">
+                <div className="mt-2 max-h-40 space-y-2 overflow-y-auto pr-1 text-sm leading-relaxed text-zinc-300 [font-family:Georgia,'Times_New_Roman',serif] [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.2)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-cyan-300/15 hover:[&::-webkit-scrollbar-thumb]:bg-cyan-300/30">
                   <p>
                     The calculator estimates whether a jackpot is worth playing right now, based on where the meter currently is and how fast it grows.
                   </p>
@@ -1119,38 +1186,38 @@ function MHBCalculator({ onBack }) {
                   </p>
                 </div>
               </details>
-              <details className="mt-3 rounded-xl border border-blue-500/25 bg-zinc-900/60 p-3">
-                <summary className="cursor-pointer select-none text-sm font-semibold tracking-[0.03em] text-blue-300 [font-family:Georgia,'Times_New_Roman',serif]">
+              <details className="mt-3 rounded-xl border border-cyan-500/25 bg-zinc-900/60 p-3">
+                <summary className="cursor-pointer select-none text-sm font-semibold tracking-[0.03em] text-cyan-200 [font-family:Georgia,'Times_New_Roman',serif]">
                   Dweeb-speak
                 </summary>
-                <div className="mt-2 max-h-52 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.2)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-400/15 hover:[&::-webkit-scrollbar-thumb]:bg-blue-400/30">
+                <div className="mt-2 max-h-52 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(34,211,238,0.2)_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-cyan-300/15 hover:[&::-webkit-scrollbar-thumb]:bg-cyan-300/30">
                   <p className="text-sm italic leading-relaxed text-zinc-300 [font-family:Georgia,'Times_New_Roman',serif]">
                     This analyzer is a quantitative framework for progressive-jackpot valuation, breakeven threshold detection, and stressed-loss envelope estimation.
                   </p>
                   <div className="mt-2 space-y-2 text-sm leading-relaxed text-zinc-300 [font-family:Georgia,'Times_New_Roman',serif]">
                   <p>
-                    <span className="font-semibold text-blue-300">I. State Space:</span> Let x denote entry meter, M the must-hit boundary, m the observed current meter, R the reset baseline, r the meter-rise coefficient ($ coin-in per $0.01 meter increment), and p the total machine RTP.
+                    <span className="font-semibold text-cyan-200">I. State Space:</span> Let x denote entry meter, M the must-hit boundary, m the observed current meter, R the reset baseline, r the meter-rise coefficient ($ coin-in per $0.01 meter increment), and p the total machine RTP.
                   </p>
                   <p>
-                    <span className="font-semibold text-blue-300">II. Terminal Payoff Functional:</span> The target operator T(x) is piecewise: T(x) = M (midpoint disabled), or T(x) = x + 0.5 x (M - x) (midpoint enabled). For live EV evaluation, set x = m.
+                    <span className="font-semibold text-cyan-200">II. Terminal Payoff Functional:</span> The target operator T(x) is piecewise: T(x) = M (midpoint disabled), or T(x) = x + 0.5 x (M - x) (midpoint enabled). For live EV evaluation, set x = m.
                   </p>
                   <p>
-                    <span className="font-semibold text-blue-300">III. Coin-in Path Integral (Discrete Step Form):</span> Required path coin-in is C(x) = ((T(x) - x) / 0.01) x r, i.e., meter displacement mapped to 0.01 increments and scaled by r.
+                    <span className="font-semibold text-cyan-200">III. Coin-in Path Integral (Discrete Step Form):</span> Required path coin-in is C(x) = ((T(x) - x) / 0.01) x r, i.e., meter displacement mapped to 0.01 increments and scaled by r.
                   </p>
                   <p>
-                    <span className="font-semibold text-blue-300">IV. Concurrent Progressive Return Extraction:</span> For each enabled jackpot i with hit value H_i, reset R_i, and rise coefficient r_i, contribution_i = H_i / (((H_i - R_i) / 0.01) x r_i). Aggregate progressive return term is P = sum_i(contribution_i).
+                    <span className="font-semibold text-cyan-200">IV. Concurrent Progressive Return Extraction:</span> For each enabled jackpot i with hit value H_i, reset R_i, and rise coefficient r_i, contribution_i = H_i / (((H_i - R_i) / 0.01) x r_i). Aggregate progressive return term is P = sum_i(contribution_i).
                   </p>
                   <p>
-                    <span className="font-semibold text-blue-300">V. Effective Base RTP Projection:</span> Progressive-adjusted RTP is p_eff = clamp(p - P, 0, 0.999999), enforcing bounded probability-domain behavior.
+                    <span className="font-semibold text-cyan-200">V. Effective Base RTP Projection:</span> Progressive-adjusted RTP is p_eff = clamp(p - P, 0, 0.999999), enforcing bounded probability-domain behavior.
                   </p>
                   <p>
-                    <span className="font-semibold text-blue-300">VI. Expectation Layer:</span> Expected path loss is L(x) = C(x) x (1 - p_eff), with net expected value EV(x) = T(x) - L(x).
+                    <span className="font-semibold text-cyan-200">VI. Expectation Layer:</span> Expected path loss is L(x) = C(x) x (1 - p_eff), with net expected value EV(x) = T(x) - L(x).
                   </p>
                   <p>
-                    <span className="font-semibold text-blue-300">VII. Breakeven Root Localization:</span> Solve x* such that EV(x*) = 0 over x in [0, M] using bisection on a sign-changing bracket. Displayed breakeven is ceil(x*), while the continuous root is reported beneath.
+                    <span className="font-semibold text-cyan-200">VII. Breakeven Root Localization:</span> Solve x* such that EV(x*) = 0 over x in [0, M] using bisection on a sign-changing bracket. Displayed breakeven is ceil(x*), while the continuous root is reported beneath.
                   </p>
                   <p>
-                    <span className="font-semibold text-blue-300">VIII. Stress-Case Loss Envelope:</span> Under adverse conversion efficiency, p_stress = 0.85 x p_eff. Stress loss is L_stress(x) = C(x) x (1 - p_stress), and downside exposure is Exposure(x) = max(0, L_stress(x) - T(x)).
+                    <span className="font-semibold text-cyan-200">VIII. Stress-Case Loss Envelope:</span> Under adverse conversion efficiency, p_stress = 0.85 x p_eff. Stress loss is L_stress(x) = C(x) x (1 - p_stress), and downside exposure is Exposure(x) = max(0, L_stress(x) - T(x)).
                   </p>
                   </div>
                 </div>
@@ -1158,7 +1225,7 @@ function MHBCalculator({ onBack }) {
               <button
                 type="button"
                 onClick={() => setShowCalcInfo(false)}
-                className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-semibold hover:bg-blue-500"
+                className="mt-5 w-full rounded-xl bg-cyan-600 py-3 font-semibold hover:bg-cyan-500"
               >
                 Got it
               </button>

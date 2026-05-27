@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { DropdownSelect } from '../DropdownSelect'
 import CalculatorDisclaimer from '../../../components/CalculatorDisclaimer'
 import { formatDenomLabel } from '../../../utils/formatDenomLabel'
 import { Line } from 'react-chartjs-2'
@@ -218,20 +217,20 @@ function BuffaloLink({ onBack }) {
   }
 
   return (
-    <div className="min-h-full bg-zinc-950 pb-12">
+    <div className="min-h-full bg-zinc-900 pb-12">
       <div className="w-full px-0 pt-1">
 
         {/* Large back chevron + Title with reduced padding */}
         <div className="flex items-center mb-4">
           <button
             onClick={onBack}
-            className="text-[52px] leading-none text-yellow-500 hover:text-yellow-300 -mt-1 mr-4 font-light active:opacity-70"
+            className="text-[52px] leading-none text-amber-400 hover:text-amber-300 -mt-1 mr-4 font-light active:opacity-70"
           >
             ‹
           </button>
 
           <div className="flex items-center flex-1 justify-center gap-3">
-            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-600 ring-1 ring-amber-950/35 shadow-md shadow-black/30">
+            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 ring-1 ring-amber-950/35 shadow-md shadow-black/30">
               <img
                 src="/guides/buffalo-link/buffalo-link-calculator-icon.webp"
                 alt="Buffalo"
@@ -239,7 +238,7 @@ function BuffaloLink({ onBack }) {
               />
             </div>
             <h1
-              className="text-[32px] font-black tracking-[-1.6px] text-yellow-100"
+              className="text-[32px] font-black tracking-[-1.6px] text-amber-100"
               style={{ textShadow: `-2px -2px 0 #b45309, 2px -2px 0 #b45309, -2px 2px 0 #b45309, 2px 2px 0 #b45309` }}
             >
               BUFFALO LINK
@@ -250,7 +249,7 @@ function BuffaloLink({ onBack }) {
         </div>
 
         {/* Counter + Bet + Denom */}
-        <div className="bg-zinc-900 p-3 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)] mb-4 space-y-3">
+        <div className="bg-zinc-900 p-3 rounded-3xl mb-4 space-y-3">
           <div>
             <label className="block text-zinc-400 mb-1 text-xs">Counter</label>
             <input
@@ -259,13 +258,13 @@ function BuffaloLink({ onBack }) {
               value={currentX}
               onChange={handleIntegerChange(setCurrentX, 1234)}
               onBlur={handleIntegerBlur(setCurrentX, 1234)}
-              className="w-full p-3 bg-zinc-800 rounded-2xl text-2xl font-bold text-center border-2 border-yellow-500"
+              className="w-full p-3 bg-zinc-900 rounded-2xl text-2xl font-bold text-center border-2 border-amber-500"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-zinc-400 mb-1 text-xs">Bet Size</label>
-              <div className="flex h-14 items-stretch gap-1 rounded-2xl bg-zinc-800 px-2.5 focus-within:ring-2 focus-within:ring-yellow-500/30">
+              <div className="flex h-14 items-stretch gap-1 rounded-2xl bg-zinc-900 px-2.5 focus-within:ring-2 focus-within:ring-amber-500/30">
                 <span className="flex shrink-0 items-center pl-0.5 text-2xl font-bold leading-none text-zinc-400" aria-hidden>
                   $
                 </span>
@@ -275,25 +274,29 @@ function BuffaloLink({ onBack }) {
                   value={betSize}
                   onChange={handleFloatChange(setBetSize, 25)}
                   onBlur={handleFloatBlur(setBetSize, 25)}
-                  className="min-w-0 flex-1 border-0 bg-transparent text-center text-2xl font-bold leading-none text-zinc-50 outline-none focus:ring-0"
+                  className="min-w-0 flex-1 border-0 bg-transparent text-center text-2xl font-bold leading-none text-white outline-none focus:ring-0"
                 />
               </div>
             </div>
             <div>
               <label className="block text-zinc-400 mb-1 text-xs">Denomination</label>
-              <DropdownSelect
+              <select
                 value={denom}
-                onChange={setDenom}
-                options={[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => ({ value: d, label: `$${formatDenomLabel(d)}` }))}
-                accentClass="text-yellow-500"
-                size="lg"
-              />
+                onChange={(e) => setDenom(parseFloat(e.target.value))}
+                className="h-14 w-full cursor-pointer rounded-2xl border-0 bg-zinc-900 px-2 text-center text-2xl font-bold leading-none text-white outline-none focus:ring-2 focus:ring-amber-500/30"
+              >
+                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map((d) => (
+                  <option key={d} value={d}>
+                    ${formatDenomLabel(d)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
 
         {/* Advanced Settings */}
-        <div className="bg-zinc-900 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)] mb-6 overflow-hidden">
+        <div className="bg-zinc-900 rounded-3xl mb-6 overflow-hidden">
           <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-900">
             <span className="text-base font-semibold">Advanced Settings</span>
             <span className={`text-xl transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>▼</span>
@@ -308,39 +311,39 @@ function BuffaloLink({ onBack }) {
               </div>
               <div>
                 <label className="block text-zinc-400 text-xs mb-1">Overall RTP (%)</label>
-                <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-zinc-800 rounded-xl border border-zinc-700" />
+                <input type="text" value={overallRTP} onChange={handleFloatChange(setOverallRTP, 91)} onBlur={handleFloatBlur(setOverallRTP, 91)} className="w-full p-3 bg-zinc-900 rounded-xl" />
               </div>
               <div>
                 <label className="block text-zinc-400 text-xs mb-1">Avg Bonus Pay (bets)</label>
-                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 20)} onBlur={handleFloatBlur(setAvgBonusPay, 20)} className="w-full p-3 bg-zinc-800 rounded-xl border border-zinc-700" />
+                <input type="text" value={avgBonusPay} onChange={handleFloatChange(setAvgBonusPay, 20)} onBlur={handleFloatBlur(setAvgBonusPay, 20)} className="w-full p-3 bg-zinc-900 rounded-xl" />
               </div>
               <div>
                 <div className="flex justify-between mb-1">
                   <label className="text-zinc-400 text-xs">Buffalos per Spin</label>
-                  <span className="text-yellow-500 font-bold">{buffalosPerSpin.toFixed(1)}</span>
+                  <span className="text-amber-400 font-bold">{buffalosPerSpin.toFixed(1)}</span>
                 </div>
-                <input type="range" min="1.5" max="1.9" step="0.1" value={buffalosPerSpin} onChange={(e) => setBuffalosPerSpin(parseFloat(e.target.value))} className="w-full range-touch-target accent-yellow-500" />
+                <input type="range" min="1.5" max="1.9" step="0.1" value={buffalosPerSpin} onChange={(e) => setBuffalosPerSpin(parseFloat(e.target.value))} className="w-full range-touch-target accent-amber-500" />
               </div>
               <div>
                 <div className="flex justify-between mb-1">
                   <label className="text-zinc-400 text-xs">Midpoint Factor</label>
-                  <span className="text-yellow-500 font-bold">{midpointFactor.toFixed(2)}</span>
+                  <span className="text-amber-400 font-bold">{midpointFactor.toFixed(2)}</span>
                 </div>
-                <input type="range" min="0" max="1" step="0.05" value={midpointFactor} onChange={(e) => setMidpointFactor(parseFloat(e.target.value))} className="w-full range-touch-target accent-yellow-500" />
+                <input type="range" min="0" max="1" step="0.05" value={midpointFactor} onChange={(e) => setMidpointFactor(parseFloat(e.target.value))} className="w-full range-touch-target accent-amber-500" />
               </div>
             </div>
           )}
         </div>
 
         {/* Current EV */}
-        <div className="bg-zinc-900 p-6 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)] mb-6">
+        <div className="bg-zinc-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold text-yellow-500">Current EV</h2>
+            <h2 className="text-xl font-semibold text-amber-400">Current EV</h2>
             <div className={`text-lg font-bold ${currentRTP >= 100 ? 'text-green-400' : 'text-red-400'}`}>{currentRTP.toFixed(1)}% RTP</div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-zinc-800 p-4 rounded-2xl border border-zinc-700">
+            <div className="bg-zinc-900 p-4 rounded-2xl">
               <div className="text-zinc-400 text-sm">Average Case</div>
               <div className={`text-3xl font-bold ${evAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evAvg.toFixed(1)}×</div>
               <div className="text-sm text-zinc-300">${(evAvg * betSize).toFixed(2)}</div>
@@ -348,7 +351,7 @@ function BuffaloLink({ onBack }) {
                 Max Exposure: <span className="text-red-400 font-bold">{maxExposureAvg} bets</span>
               </div>
             </div>
-            <div className="bg-zinc-800 p-4 rounded-2xl border border-zinc-700">
+            <div className="bg-zinc-900 p-4 rounded-2xl">
               <div className="text-zinc-400 text-sm">Full Run (to 1800)</div>
               <div className={`text-3xl font-bold ${evFullRun >= 0 ? 'text-green-400' : 'text-red-400'}`}>{evFullRun.toFixed(1)}×</div>
               <div className="text-sm text-zinc-300">${(evFullRun * betSize).toFixed(2)}</div>
@@ -359,10 +362,10 @@ function BuffaloLink({ onBack }) {
           </div>
 
           <div className={`p-4 rounded-2xl text-center font-bold ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-            {currentX >= beAvg ? '✅ PLAY +EV Expected' : '❌ Still -EV keep waiting'}
+            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
           </div>
 
-          <h2 className="text-xl font-semibold mt-8 mb-4 text-yellow-500">Break Even Points</h2>
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-amber-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-6 text-center">
             <div>
               <div className="text-zinc-400 text-sm">Average Case</div>
@@ -370,34 +373,34 @@ function BuffaloLink({ onBack }) {
             </div>
             <div>
               <div className="text-zinc-400 text-sm">Full Run (to 1800)</div>
-              <div className="text-4xl font-bold text-yellow-500">{beFullRun}</div>
+              <div className="text-4xl font-bold text-amber-400">{beFullRun}</div>
             </div>
           </div>
 
           {!isAlreadyPositive && fpDollarsNeeded > 0 && (
-            <div className="mt-6 text-center text-yellow-500 italic text-sm">
-              FP needed to reach +EV: <span className="font-bold text-zinc-50">${fpDollarsNeeded}</span> (play to {beAvg})
+            <div className="mt-6 text-center text-amber-400 italic text-sm">
+              FP needed to reach +EV: <span className="font-bold text-white">${fpDollarsNeeded}</span> (play to {beAvg})
             </div>
           )}
         </div>
 
         {/* Acquisition Fee */}
-        <div className="bg-zinc-900 p-6 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)] mb-6">
-          <h2 className="text-xl font-semibold text-yellow-500 mb-4">Acquisition Fee Calculator</h2>
+        <div className="bg-zinc-900 p-6 rounded-3xl mb-6">
+          <h2 className="text-xl font-semibold text-amber-400 mb-4">Acquisition Fee Calculator</h2>
           <p className="text-zinc-400 text-sm mb-5">Fair finder's fee for scout</p>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-zinc-400 text-xs mb-2">EV Basis</label>
-              <div className="flex bg-zinc-800 rounded-2xl p-1">
+              <div className="flex bg-zinc-900 rounded-2xl p-1">
                 <button
                   onClick={() => setUseFullRunForFee(false)}
-                  className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${!useFullRunForFee ? 'bg-yellow-600 text-zinc-50' : 'text-zinc-400'}`}
+                  className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${!useFullRunForFee ? 'bg-amber-600 text-white' : 'text-zinc-400'}`}
                 >
                   Average
                 </button>
                 <button
                   onClick={() => setUseFullRunForFee(true)}
-                  className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${useFullRunForFee ? 'bg-yellow-600 text-zinc-50' : 'text-zinc-400'}`}
+                  className={`flex-1 py-3 rounded-[14px] text-sm font-semibold ${useFullRunForFee ? 'bg-amber-600 text-white' : 'text-zinc-400'}`}
                 >
                   Full Run
                 </button>
@@ -406,7 +409,7 @@ function BuffaloLink({ onBack }) {
             <div>
               <div className="flex justify-between mb-1">
                 <span className="text-zinc-400 text-xs">Scout Share</span>
-                <span className="text-yellow-500 font-bold">{scoutPercentage}%</span>
+                <span className="text-amber-400 font-bold">{scoutPercentage}%</span>
               </div>
               <input
                 type="range"
@@ -415,20 +418,20 @@ function BuffaloLink({ onBack }) {
                 step="1"
                 value={scoutPercentage}
                 onChange={(e) => setScoutPercentage(Number(e.target.value))}
-                className="w-full range-touch-target accent-yellow-500"
+                className="w-full range-touch-target accent-amber-500"
               />
             </div>
           </div>
-          <div className="bg-zinc-800 rounded-2xl p-5 border border-zinc-700 mb-4 text-center">
+          <div className="bg-zinc-900 rounded-2xl p-5 mb-4 text-center">
             <div className="text-zinc-400 text-sm mb-1">Expected Profit</div>
-            <div className="text-4xl font-bold text-zinc-50">
+            <div className="text-4xl font-bold text-white">
               ${((useFullRunForFee ? evFullRun : evAvg) * betSize).toFixed(2)}
             </div>
             <div className="text-xs text-zinc-400 mt-1">
               {useFullRunForFee ? 'Full Run EV' : 'Average Case EV'}
             </div>
           </div>
-          <div className="bg-zinc-800 rounded-2xl p-5 border border-zinc-700 text-center">
+          <div className="bg-zinc-900 rounded-2xl p-5 text-center">
             <div className="text-zinc-400 text-sm mb-1">Recommended Finder's Fee</div>
             <div className="text-4xl font-bold text-green-400">
               ${(((useFullRunForFee ? evFullRun : evAvg) * betSize) * (scoutPercentage / 100)).toFixed(2)}
@@ -438,12 +441,12 @@ function BuffaloLink({ onBack }) {
         </div>
 
         {/* Walk-Away Advisor */}
-        <div className="bg-zinc-900 p-6 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)] mb-6">
+        <div className="bg-zinc-900 p-6 rounded-3xl mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-yellow-500">Walk-Away Advisor</h2>
-            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-yellow-500">ℹ️</button>
+            <h2 className="text-xl font-semibold text-amber-400">Walk-Away Advisor</h2>
+            <button onClick={() => setShowInfoModal(true)} className="text-2xl text-amber-400">ℹ️</button>
           </div>
-          <div className="bg-zinc-800 rounded-2xl p-4 mb-6 flex items-center gap-4">
+          <div className="bg-zinc-900 rounded-2xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-zinc-400 mb-1 text-xs">Test Counter</label>
               <input
@@ -452,7 +455,7 @@ function BuffaloLink({ onBack }) {
                 value={testCounter}
                 onChange={handleIntegerChange(setTestCounter, 1400)}
                 onBlur={handleIntegerBlur(setTestCounter, 1400)}
-                className="w-full p-3 bg-zinc-700 rounded-2xl text-2xl font-bold text-center border border-yellow-500"
+                className="w-full p-3 bg-zinc-700 rounded-2xl text-2xl font-bold text-center border border-amber-400"
               />
             </div>
             <div className="text-center">
@@ -465,21 +468,21 @@ function BuffaloLink({ onBack }) {
               </div>
             </div>
           </div>
-          <div className="h-80 bg-zinc-800 rounded-2xl p-4 border border-zinc-700 mb-6">
+          <div className="h-80 bg-zinc-900 rounded-2xl p-4 border border-zinc-700 mb-6">
             <Line data={chartData} options={chartOptions} />
           </div>
-          <div className="bg-zinc-800 rounded-2xl p-5 border border-zinc-700 text-center">
+          <div className="bg-zinc-900 rounded-2xl p-5 text-center">
             {hoverCounter !== null ? (
-              <>At <span className="text-yellow-500 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
+              <>At <span className="text-amber-400 font-semibold mx-1">{hoverCounter}</span> walk away around <span className="text-green-400 font-bold mx-1">+{hoverWalkAway} bets</span> <span className="text-green-400">(${ (hoverWalkAway * betSize).toFixed(0) })</span></>
             ) : (
-              <>At <span className="text-yellow-500 font-semibold mx-1">{currentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span></>
+              <>At <span className="text-amber-400 font-semibold mx-1">{currentX}</span> walk away around <span className="text-green-400 font-bold mx-1">+{getRecommendedWalkAway(currentX)} bets</span> <span className="text-green-400">(${ (getRecommendedWalkAway(currentX) * betSize).toFixed(0) })</span></>
             )}
           </div>
         </div>
 
         {/* EV Table */}
-        <div className="bg-zinc-900 p-6 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)]">
-          <h2 className="text-xl font-semibold mb-5 text-yellow-500">EV Table (1150 to 1775)</h2>
+        <div className="bg-zinc-900 p-6 rounded-3xl">
+          <h2 className="text-xl font-semibold mb-5 text-amber-400">EV Table (1150 to 1775)</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -512,13 +515,13 @@ function BuffaloLink({ onBack }) {
       {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 rounded-3xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)] max-w-md w-full p-6">
-            <h3 className="text-xl font-semibold text-yellow-500 mb-4">Walk-Away Advisor</h3>
+          <div className="bg-zinc-900 rounded-3xl max-w-md w-full p-6">
+            <h3 className="text-xl font-semibold text-amber-400 mb-4">Walk-Away Advisor</h3>
             <div className="text-zinc-300 text-[15px] leading-relaxed space-y-4">
-              <p>This advisor recommends the <strong>optimal stopping threshold</strong>: the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
+              <p>This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
               <p>Buffalo Link has high volatility. The advisor uses a logistic S-curve to balance remaining EV and drawdown risk.</p>
             </div>
-            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-yellow-600 py-4 rounded-2xl font-bold">Got it</button>
+            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-amber-600 py-4 rounded-2xl font-bold">Got it</button>
           </div>
         </div>
       )}
