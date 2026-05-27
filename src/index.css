@@ -1175,6 +1175,11 @@ html.light [data-calc="buffalo"] h1 {
   text-shadow: -1px -1px 0 #b45309, 1px -1px 0 #b45309, -1px 1px 0 #b45309, 1px 1px 0 #b45309 !important;
 }
 
+html.light [data-calc="buffalo"] h2,
+html.light [data-calc="buffalo"] h2.text-amber-400 {
+  color: #000000;
+}
+
 /* Accent colors */
 html.light [data-calc="buffalo"] .text-amber-400,
 html.light [data-calc="buffalo"] .text-amber-100 {
