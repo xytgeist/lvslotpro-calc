@@ -1038,6 +1038,12 @@ html.light [data-calc] .bg-gray-800 {
   background-color: #e4e4e7;
   box-shadow: none;
 }
+/* Range slider wrappers — transparent so they don't create a visible box */
+html.light [data-calc] .bg-gray-800:has(input[type="range"]) {
+  background-color: transparent;
+  box-shadow: none;
+  padding: 0;
+}
 /* Inputs that live inside bg-gray-800 wrappers inherit the wrapper bg */
 html.light [data-calc] input.bg-gray-800,
 html.light [data-calc] select.bg-gray-800 {
