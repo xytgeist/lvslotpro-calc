@@ -154,5 +154,30 @@ export function useLoungeColdBootSplash({ tab, browseMode }) {
     [],
   )
 
+  // After the splash fully fades out, the iOS status bar is still dark (it was forced
+  // black by the splash's preFrameCover and statusBar strip). iOS only resamples the
+  // translucent status bar on native history mutations — the same signal that fires when
+  // React Router navigates (e.g. menu → slots). We can't fire that during the animation,
+  // so we wait for the first user touchstart after the splash exits, then fire a
+  // replaceState (same URL, no back-button side effects) to trigger the resample.
+  //
+  // If replaceState turns out not to be sufficient (iOS may only resample on pushState),
+  // swap in: history.pushState(null, '', location.href) + rAF replaceState to collapse.
+  const splashRanRef = useRef(false)
+  useEffect(() => {
+    if (visible) {
+      splashRanRef.current = true
+      return
+    }
+    if (!splashRanRef.current) return
+    splashRanRef.current = false
+
+    const handler = () => {
+      window.history.replaceState(window.history.state, '', window.location.href)
+    }
+    window.addEventListener('touchstart', handler, { once: true, capture: true })
+    return () => window.removeEventListener('touchstart', handler, true)
+  }, [visible])
+
   return { splashVisible: visible, splashDismissing: dismissing, onSplashAnimationComplete }
 }
