@@ -1238,7 +1238,7 @@ html.light [data-calc="buffalo"] .bg-green-600.text-white {
 /* Title — remove dark mode purple/cyan outline shadow, use subtle drop shadow */
 html.light [data-calc="mhb"] h1 {
   color: #18181b !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+  text-shadow: -1px -1px 0 #5b21b6, 1px -1px 0 #5b21b6, -1px 1px 0 #0e7490, 1px 1px 0 #0e7490 !important;
 }
 html.light [data-calc="mhb"] h1 + div {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
