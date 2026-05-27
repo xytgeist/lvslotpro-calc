@@ -1282,6 +1282,11 @@ html.light [data-calc="stackup"] .text-slate-300 {
   color: #52525b;
 }
 
+/* Keep cyan accent text matching the cyan slider/bar color (overrides global cyan→blue remap) */
+html.light [data-calc="stackup"] .text-cyan-400 {
+  color: #06cefc !important;
+}
+
 /* +EV / -EV pills */
 html.light [data-calc="stackup"] .bg-emerald-900 {
   background-color: #16A34A;
