@@ -76,6 +76,16 @@ function PhoenixLink({ onBack }) {
   const isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light')
   const chartAxisColor  = isLight ? '#18181b' : '#9CA3AF'
   const chartGridColor  = isLight ? '#c4c4c8' : '#374151'
+  const chartBgPlugins  = isLight ? [{
+    id: 'chartAreaBg',
+    beforeDraw(chart) {
+      const { ctx } = chart
+      ctx.save()
+      ctx.fillStyle = '#e4e4e7'
+      ctx.fillRect(0, 0, chart.width, chart.height)
+      ctx.restore()
+    },
+  }] : []
 
   const chartOptions = {
     responsive: true,
@@ -459,7 +469,7 @@ function PhoenixLink({ onBack }) {
             </div>
           </div>
           <div className="h-80 bg-gray-950 rounded-2xl p-4 border border-gray-700 mb-4 relative">
-            <Line data={chartData} options={chartOptions} />
+            <Line data={chartData} options={chartOptions} plugins={chartBgPlugins} />
           </div>
           <div className="bg-gray-800 rounded-2xl p-4 text-center text-sm min-h-[52px] flex items-center justify-center">
             {hoverCounter !== null ? (

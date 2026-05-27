@@ -1017,6 +1017,11 @@ html.light [data-calc] {
   color: #18181b;
 }
 
+/* Chart container and any other bg-gray-950 inner elements → match inner-box gray */
+html.light [data-calc] .bg-gray-950 {
+  background-color: #e4e4e7;
+}
+
 /* Section cards (bg-gray-900 / rounded-3xl blocks) → light gray + strong shadow */
 html.light [data-calc] .bg-gray-900 {
   background-color: #f4f4f5;
