@@ -12,7 +12,9 @@ coverage/
 *.log
 
 # -- Binary / media assets
-Slots/
+# /Slots/ = root-level slot guide content library (game guides, hero images, meta JSON)
+# src/features/slots/ is intentionally NOT ignored (source code)
+/Slots/
 public/guides/
 public/onboarding/
 **/*.png
@@ -26,10 +28,6 @@ public/onboarding/
 **/*.woff
 **/*.woff2
 
-# -- Lottie JSON — large animation data
-src/assets/lottie/
-
 # -- Minified / bundled JS
 *.min.js
 *.bundle.js
-
