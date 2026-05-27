@@ -1045,7 +1045,13 @@ function MHBCalculator({ onBack }) {
           </div>
 
           <div className={`mt-6 p-4 rounded-2xl text-center font-bold text-lg ${isPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
-            {isPositive ? '✅ +EV PLAY THIS ONE' : '❌ Still -EV Keep Waiting'}
+            {isPositive ? (
+              <>
+                <span className="mhb-check-emoji">✅ </span>
+                <span className="mhb-check-badge inline-flex items-center justify-center w-5 h-5 rounded border-2 border-[#fff] text-[#fff] text-xs font-black leading-none mr-1.5">✓</span>
+                +EV PLAY THIS ONE
+              </>
+            ) : '❌ Still -EV Keep Waiting'}
           </div>
         </div>
 
