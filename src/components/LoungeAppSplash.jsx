@@ -136,8 +136,9 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
         aria-hidden
       />
 
-      {/* 2. Canvas — Lottie renders here via OffscreenCanvas */}
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden />
+      {/* 2. Canvas — Lottie renders here via OffscreenCanvas.
+               Shifted up 50px to visually center the animation accounting for the status bar. */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ top: '-50px' }} aria-hidden />
 
       {/* 3. Pre-frame cover — on top, hides blank canvas until WASM boots.
                Matches the Lottie opener: black in dark mode, white in light mode. */}
