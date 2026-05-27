@@ -1392,7 +1392,7 @@ html.light [data-calc="stackup"] .bg-slate-950 {
 }
 html.light [data-calc="stackup"] .bg-slate-900 {
   background-color: #f4f4f5;
-  box-shadow: 0 6px 24px -4px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 3px 15px -2px rgba(0, 0, 0, 0.36);
 }
 html.light [data-calc="stackup"] .bg-slate-800,
 html.light [data-calc="stackup"] .bg-slate-800\/70 {
