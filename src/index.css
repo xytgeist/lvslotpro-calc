@@ -861,14 +861,14 @@ html.light .lounge-dock-fab-center {
 
 /* OG badge — light mode color shift (placeholder, remove if unused) */
 
-/* Title bar nav button (hamburger/close) — white, hairline black border, blue shadow in light mode */
+/* Title bar nav button (hamburger/close) — white, hairline black border, red shadow in light mode */
 html.light .lounge-title-nav-btn {
   background-color: #ffffff !important;
   border: none !important;
   box-shadow:
     inset 0 0 0 0.33px #000000,
-    0 4px 16px rgba(59, 130, 246, 0.18),
-    0 1px 4px rgba(59, 130, 246, 0.10) !important;
+    0 4px 16px rgba(220, 38, 38, 0.18),
+    0 1px 4px rgba(220, 38, 38, 0.10) !important;
   color: #27272a !important;
 }
 
