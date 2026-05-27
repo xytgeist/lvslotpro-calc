@@ -73,6 +73,10 @@ function PhoenixLink({ onBack }) {
     }]
   }
 
+  const isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light')
+  const chartAxisColor  = isLight ? '#6b7280' : '#9CA3AF'
+  const chartGridColor  = isLight ? 'rgba(0,0,0,0.09)' : '#374151'
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -88,8 +92,8 @@ function PhoenixLink({ onBack }) {
       }
     },
     scales: {
-      x: { title: { display: true, text: 'Counter', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' } },
-      y: { title: { display: true, text: 'Walk-Away (Bets)', color: '#9CA3AF' }, grid: { color: '#374151' }, ticks: { color: '#9CA3AF' }, min: 0, max: 260 }
+      x: { title: { display: true, text: 'Counter', color: chartAxisColor }, grid: { color: chartGridColor }, ticks: { color: chartAxisColor }, border: { color: chartGridColor } },
+      y: { title: { display: true, text: 'Walk-Away (Bets)', color: chartAxisColor }, grid: { color: chartGridColor }, ticks: { color: chartAxisColor }, border: { color: chartGridColor }, min: 0, max: 260 }
     },
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   }
