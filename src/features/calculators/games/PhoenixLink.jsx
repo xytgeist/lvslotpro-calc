@@ -75,7 +75,7 @@ function PhoenixLink({ onBack }) {
 
   const isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light')
   const chartAxisColor  = isLight ? '#6b7280' : '#9CA3AF'
-  const chartGridColor  = isLight ? 'rgba(0,0,0,0.09)' : '#374151'
+  const chartGridColor  = isLight ? '#c4c4c8' : '#374151'
 
   const chartOptions = {
     responsive: true,
