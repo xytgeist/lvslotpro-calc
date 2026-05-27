@@ -62,6 +62,7 @@ function BuffaloLink({ onBack }) {
     return Math.max(75, Math.min(245, walkAway))
   }
 
+  const isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light')
   const chartLineColor = isLight ? '#b45309' : '#fcd34d'
   const chartFillColor = isLight ? 'rgba(180, 83, 9, 0.15)' : 'rgba(252, 211, 77, 0.15)'
 
@@ -78,8 +79,6 @@ function BuffaloLink({ onBack }) {
       pointHoverRadius: 7,
     }]
   }
-
-  const isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light')
   const chartAxisColor = isLight ? '#18181b' : '#d1d5db'
   const chartGridColor = isLight ? '#c4c4c8' : '#374151'
   const chartBgPlugins = isLight ? [{
