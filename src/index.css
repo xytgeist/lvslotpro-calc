@@ -1239,6 +1239,14 @@ html.light [data-calc="buffalo"] .bg-green-600.text-white {
 html.light [data-calc="mhb"] .bg-cyan-600.text-white {
   color: #ffffff !important;
 }
+/* Toggle switch active state — match the cyan-600 pill color */
+html.light [data-calc="mhb"] .bg-cyan-500\/40 {
+  background-color: #0891b2;
+}
+html.light [data-calc="mhb"] .border-cyan-300\/70 {
+  border-color: #0891b2;
+}
+
 /* Meter input ring — the global bg-gray-800 box-shadow:none wipes Tailwind rings,
    so we restore it explicitly as a blue outline matching dark mode's cyan ring. */
 html.light [data-calc="mhb"] .mhb-meter-input {
