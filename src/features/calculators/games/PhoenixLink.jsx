@@ -407,7 +407,7 @@ function PhoenixLink({ onBack }) {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-gray-400 text-xs">Scout Share</label>
-                <span className="font-bold text-orange-400 text-lg">{scoutPercentage}%</span>
+                <span className="font-bold text-orange-400 text-xs">{scoutPercentage}%</span>
               </div>
               <div className="flex h-14 items-center bg-gray-800 rounded-2xl px-3">
                 <input 
