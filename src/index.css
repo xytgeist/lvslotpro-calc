@@ -1070,13 +1070,11 @@ html.light [data-offer-type][data-card-view="week"] {
   box-shadow: 0 1px 4px rgba(0,0,0,0.10) !important;
 }
 
-/* List view cards: no card, thin colored line between date col and content */
+/* List view cards: white card, colored line between date col and content */
 html.light [data-offer-type][data-card-view="list"] {
-  background-color: transparent !important;
-  border: none !important;
-  border-bottom: 1px solid rgba(0,0,0,0.07) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
 }
 html.light [data-offer-type][data-card-view="list"] .flex-1 {
   border-left: 2px solid var(--ot-color) !important;
