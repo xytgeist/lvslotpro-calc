@@ -111,8 +111,11 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       {/* 2. Canvas — Lottie renders here via OffscreenCanvas */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden />
 
-      {/* 3. Pre-frame cover — on top, hides blank canvas until WASM boots */}
-      <div ref={preFrameCoverRef} className="absolute inset-0 bg-zinc-950" aria-hidden />
+      {/* 3. Pre-frame cover — on top, hides blank canvas until WASM boots.
+               Always black regardless of theme: the Lottie opens with a black
+               Black Solid 1 layer anyway, so preFrame→frame-1 is seamless, and
+               the black content makes the iOS translucent status bar appear black. */}
+      <div ref={preFrameCoverRef} className="absolute inset-0 bg-black" aria-hidden />
     </div>
   )
 }
