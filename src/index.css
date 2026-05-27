@@ -1005,25 +1005,33 @@ html.light .lounge-media-toolbar .active\:text-sky-200:active {
  * data-calc="phoenix" | "buffalo" | "mhb" on each calculator root div.
  */
 
-/* Page background — warm light gray so section cards pop above it */
+/* Page background + base text — warm light gray so section cards lift above it */
 html.light [data-calc] {
   background-color: #f4f4f5;
+  color: #18181b;
 }
 
-/* Section cards (bg-gray-900 / rounded-3xl blocks) → white with soft shadow */
+/* Section cards (bg-gray-900 / rounded-3xl blocks) → white with visible shadow */
 html.light [data-calc] .bg-gray-900 {
   background-color: #ffffff;
-  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 6px 24px -4px rgba(0, 0, 0, 0.14), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
 }
 
-/* Inner metric/input/display boxes (bg-gray-800) → subtle gray tint */
+/* Inner metric/input/display boxes (bg-gray-800) → off-white tint + hairline border */
 html.light [data-calc] .bg-gray-800 {
   background-color: #f0f0f2;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07);
+}
+/* Inputs that live inside bg-gray-800 wrappers shouldn't double-border */
+html.light [data-calc] input.bg-gray-800,
+html.light [data-calc] select.bg-gray-800 {
+  box-shadow: none;
 }
 
 /* Inactive toggle bg (bg-gray-700) → slightly darker tint */
 html.light [data-calc] .bg-gray-700 {
   background-color: #e4e4e7;
+  box-shadow: none;
 }
 
 /* Hover states */

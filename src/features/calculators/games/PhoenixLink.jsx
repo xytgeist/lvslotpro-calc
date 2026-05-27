@@ -351,7 +351,7 @@ function PhoenixLink({ onBack }) {
             </div>
           </div>
           <div className={`p-4 rounded-2xl text-center text-base font-bold mb-8 ${currentX >= beAvg ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-            {currentX >= beAvg ? '✅ PLAY — +EV Expected' : '❌ Still -EV — keep waiting'}
+            {currentX >= beAvg ? '✅ PLAY +EV Expected' : '❌ Still -EV keep waiting'}
           </div>
           <h2 className="text-xl font-semibold mb-5 text-orange-400">Break Even Points</h2>
           <div className="grid grid-cols-2 gap-4">
@@ -501,9 +501,9 @@ function PhoenixLink({ onBack }) {
           <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
             <h3 className="text-xl font-semibold text-orange-400 mb-4">Walk-Away Advisor</h3>
             <div className="text-gray-300 text-[15px] leading-relaxed space-y-4">
-              <p>This advisor recommends the <strong>optimal stopping threshold</strong> — the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
-              <p>Phoenix Link has extreme <strong>volatility drag</strong> and <strong>drawdown risk</strong>. Even with strong positive remainingEV, 100–300 bet drawdowns occur frequently.</p>
-              <p>The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining remainingEV and a logistic S-curve calibrated through Monte Carlo simulations.</p>
+              <p>This advisor recommends the <strong>optimal stopping threshold</strong>: the profit level (in bets) at which you should consider walking away, even while the machine remains in positive expected value (+EV).</p>
+              <p>Phoenix Link has extreme <strong>volatility drag</strong> and <strong>drawdown risk</strong>. Even with strong positive remaining EV, 100–300 bet drawdowns occur frequently.</p>
+              <p>The advisor calculates a <strong>risk-adjusted certainty equivalent</strong> by combining remaining EV and a logistic S-curve calibrated through Monte Carlo simulations.</p>
               <p>In short: it converts raw theoretical EV into a practical, utility-aware stopping rule.</p>
             </div>
             <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold text-lg transition-colors">

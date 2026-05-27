@@ -1123,7 +1123,7 @@ function MHBCalculator({ onBack }) {
           </div>
 
           <div className={`mt-6 p-4 rounded-2xl text-center font-bold text-lg ${isPositive ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}`}>
-            {isPositive ? '✅ +EV — PLAY THIS ONE' : '❌ Still -EV — Keep Waiting'}
+            {isPositive ? '✅ +EV PLAY THIS ONE' : '❌ Still -EV Keep Waiting'}
           </div>
         </div>
 
