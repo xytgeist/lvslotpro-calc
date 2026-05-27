@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { DropdownSelect } from '../DropdownSelect'
 import CalculatorDisclaimer from '../../../components/CalculatorDisclaimer'
 import { formatDenomLabel } from '../../../utils/formatDenomLabel'
 import { Line } from 'react-chartjs-2'
@@ -280,17 +281,13 @@ function BuffaloLink({ onBack }) {
             </div>
             <div>
               <label className="block text-gray-400 mb-1 text-xs">Denomination</label>
-              <select
+              <DropdownSelect
                 value={denom}
-                onChange={(e) => setDenom(parseFloat(e.target.value))}
-                className="h-14 w-full cursor-pointer rounded-2xl border-0 bg-gray-800 px-2 text-center text-2xl font-bold leading-none text-white outline-none focus:ring-2 focus:ring-amber-500/30"
-              >
-                {[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map((d) => (
-                  <option key={d} value={d}>
-                    ${formatDenomLabel(d)}
-                  </option>
-                ))}
-              </select>
+                onChange={setDenom}
+                options={[0.01,0.02,0.05,0.10,0.25,1,2,5,10,25,50,100].map(d => ({ value: d, label: `$${formatDenomLabel(d)}` }))}
+                accentClass="text-amber-400"
+                size="lg"
+              />
             </div>
           </div>
         </div>
