@@ -662,9 +662,20 @@ function App() {
               >
                 ← Continue without signing in
               </button>
-              <h2 id="auth-modal-title" className="text-2xl font-bold text-white mb-6 text-center">
-                Find Your Edge
-              </h2>
+              <svg
+                id="auth-modal-title"
+                viewBox="0 0 260 32"
+                width="100%"
+                className="mb-6 mx-auto block max-w-[300px]"
+                aria-label="Find Your Edge"
+                role="img"
+              >
+                <text x="26" y="24" textAnchor="start" fontFamily="'Montserrat', sans-serif" fontWeight="300" fontSize="24" fill="currentColor">
+                  Find Your
+                </text>
+                <image href="/edge-lounge-logo-transparent.png" x="150" y="6" width="77" height="19" className="edge-logo--dark" />
+                <image href="/edge-lounge-logo-light.png"       x="150" y="6" width="77" height="19" className="edge-logo--light" />
+              </svg>
 
               <AuthModalPanel
                 authTab={authTab}
