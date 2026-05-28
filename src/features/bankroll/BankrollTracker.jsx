@@ -866,15 +866,33 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                     </div>
                     <div>
                       <label className="block text-zinc-400 text-xs mb-1.5">Hours</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.1"
-                        min="0"
-                        value={pastFields.duration_hours}
-                        onChange={e => setPastFields(p => ({ ...p, duration_hours: e.target.value }))}
-                        className="w-full min-h-12 rounded-2xl bg-zinc-800 px-3 text-white text-sm outline-none focus:ring-2 focus:ring-cyan-500/40"
-                      />
+                      <div className="flex items-center rounded-2xl bg-zinc-800 overflow-hidden min-h-12">
+                        <button
+                          type="button"
+                          onPointerDown={e => e.preventDefault()}
+                          onClick={() => {
+                            const v = Math.max(0, Math.round((parseFloat(pastFields.duration_hours || 0) - 0.1) * 10) / 10)
+                            setPastFields(p => ({ ...p, duration_hours: String(v) }))
+                          }}
+                          className="px-2.5 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
+                        >−</button>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={pastFields.duration_hours}
+                          onChange={e => setPastFields(p => ({ ...p, duration_hours: e.target.value }))}
+                          className="flex-1 min-w-0 bg-transparent text-white text-sm text-center outline-none"
+                        />
+                        <button
+                          type="button"
+                          onPointerDown={e => e.preventDefault()}
+                          onClick={() => {
+                            const v = Math.round((parseFloat(pastFields.duration_hours || 0) + 0.1) * 10) / 10
+                            setPastFields(p => ({ ...p, duration_hours: String(v) }))
+                          }}
+                          className="px-2.5 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
+                        >+</button>
+                      </div>
                     </div>
                   </div>
                   {/* Row 2: Start amount · End amount · Win/Loss */}
