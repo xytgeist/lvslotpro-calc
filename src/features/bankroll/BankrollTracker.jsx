@@ -556,7 +556,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
             <div className="flex flex-col gap-2 mb-4">
               <button
                 onClick={openStartSession}
-                className="w-full rounded-3xl bg-cyan-600 py-4 text-white font-bold text-base touch-manipulation active:bg-cyan-700"
+                className="w-full rounded-3xl bg-cyan-600 py-4 text-white font-bold text-base touch-manipulation active:bg-cyan-700 shadow-lg shadow-cyan-900/50"
               >
                 + Start Session
               </button>
