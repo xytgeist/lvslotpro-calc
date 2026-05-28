@@ -20,6 +20,9 @@ alter table public.casinos add column if not exists aliases    text[]      not n
 alter table public.casinos add column if not exists source     text        not null default 'user_confirmed'
   check (source in ('seed', 'user_confirmed', 'admin'));
 alter table public.casinos add column if not exists created_by uuid        references auth.users(id) on delete set null;
+alter table public.casinos add column if not exists city       text;
+alter table public.casinos add column if not exists state      text;
+alter table public.casinos add column if not exists country    text;
 
 -- ── Indexes ──────────────────────────────────────────────────────────────────
 
