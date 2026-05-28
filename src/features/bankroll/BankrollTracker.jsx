@@ -1018,6 +1018,32 @@ function MoneyInput({
   autoFocus: shouldAutoFocus = false,
 }) {
   const [open, setOpen] = useState(shouldAutoFocus)
+  const containerRef = useRef(null)
+
+  // Scroll the focused field above the keypad when it opens
+  useEffect(() => {
+    if (!open || !containerRef.current) return
+    const KEYPAD_HEIGHT = 360 // approx keypad + preview + safe area
+    const timer = setTimeout(() => {
+      const el = containerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const visibleBottom = window.innerHeight - KEYPAD_HEIGHT - 16
+      if (rect.bottom > visibleBottom) {
+        const scrollBy = rect.bottom - visibleBottom
+        let parent = el.parentElement
+        while (parent && parent !== document.body) {
+          const { overflow, overflowY } = getComputedStyle(parent)
+          if (/(auto|scroll)/.test(overflow + overflowY)) {
+            parent.scrollBy({ top: scrollBy, behavior: 'smooth' })
+            break
+          }
+          parent = parent.parentElement
+        }
+      }
+    }, 60)
+    return () => clearTimeout(timer)
+  }, [open])
 
   const numVal = parseFloat(value)
   const hasValue = value !== '' && value !== '-'
@@ -1028,6 +1054,7 @@ function MoneyInput({
   return (
     <>
       <div
+        ref={containerRef}
         className="relative cursor-pointer"
         onPointerDown={() => setOpen(true)}
       >

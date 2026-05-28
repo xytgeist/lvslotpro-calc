@@ -1,21 +1,13 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-const KEYS = [
-  '7', '8', '9',
-  '4', '5', '6',
-  '1', '2', '3',
-  '−', '0', '⌫',
-  '.', null, 'Done',
-]
-
 function applyKey(current, key, allowNegative) {
   if (key === '⌫') return current.slice(0, -1)
 
   if (key === '−') {
     if (!allowNegative) return current
-    if (current === '') return '-'       // start negative before typing digits
-    if (current === '-') return ''       // tap again to cancel
+    if (current === '') return '-'
+    if (current === '-') return ''
     return current.startsWith('-') ? current.slice(1) : '-' + current
   }
 
@@ -31,6 +23,37 @@ function applyKey(current, key, allowNegative) {
   return current + key
 }
 
+const MAIN_ROWS = [
+  ['7', '8', '9'],
+  ['4', '5', '6'],
+  ['1', '2', '3'],
+  ['−', '0', '⌫'],
+]
+
+// Always-dark palette — bypasses Tailwind CSS variable chain entirely
+const C = {
+  bg:        '#1c1c1e',
+  border:    '#3a3a3c',
+  keyNum:    '#2c2c2e',
+  keyFn:     '#3a3a3c',
+  keyShadow: 'rgba(0,0,0,0.55)',
+  textKey:   '#ffffff',
+  textMuted: '#8e8e93',
+  cyan:      '#0891b2',
+}
+
+const keyBase = {
+  border: 'none',
+  borderRadius: 10,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  WebkitTapHighlightColor: 'transparent',
+  userSelect: 'none',
+  cursor: 'pointer',
+  transition: 'filter 0.08s',
+}
+
 export default function MoneyKeypad({ value, onChange, onClose, allowNegative = false }) {
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -43,66 +66,106 @@ export default function MoneyKeypad({ value, onChange, onClose, allowNegative = 
     onChange(applyKey(value, key, allowNegative))
   }
 
+  const num = parseFloat(value)
+  const hasValue = value !== '' && value !== '-'
+  const previewColor = !hasValue ? C.textMuted : num < 0 ? '#f87171' : '#34d399'
+  const previewText = hasValue
+    ? (num < 0 ? '−$' + Math.abs(num) : '+$' + value)
+    : value === '-' ? '−$…' : '$—'
+
   return createPortal(
     <>
-      {/* Invisible backdrop — tap anywhere above keypad to dismiss */}
-      <div className="fixed inset-0 z-[200]" onPointerDown={onClose} />
+      {/* Backdrop */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 200 }} onPointerDown={onClose} />
 
-      {/* Keypad panel */}
+      {/* Panel */}
       <div
         data-money-keypad
-        className="fixed bottom-0 left-0 right-0 z-[201] select-none"
+        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201, backgroundColor: C.bg }}
         onPointerDown={e => e.stopPropagation()}
       >
-        {/* Value preview bar */}
-        <div className="bg-zinc-800 border-t border-zinc-700/60 px-5 py-2.5 flex items-center justify-between">
-          <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Amount</span>
-          <span className={`text-lg font-black tabular-nums ${
-            value && value !== '-'
-              ? parseFloat(value) < 0 ? 'text-red-300' : 'text-emerald-300'
-              : 'text-zinc-500'
-          }`}>
-            {value ? (parseFloat(value) >= 0 && value !== '-' ? '+' : '') + '$' + value.replace('-', '') : '$0'}
+        {/* Preview bar */}
+        <div style={{
+          borderTop: `1px solid ${C.border}`,
+          padding: '10px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: C.bg,
+        }}>
+          <span style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Amount
+          </span>
+          <span style={{ color: previewColor, fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            {previewText}
           </span>
         </div>
 
-        {/* Keys grid */}
-        <div className="grid grid-cols-3 bg-zinc-950 border-t border-zinc-800">
-          {KEYS.map((key, i) => {
-            if (key === null) return <div key={i} className="bg-zinc-950" />
+        {/* Key grid */}
+        <div style={{ padding: '6px 6px 6px 6px', backgroundColor: C.bg }}>
+          {/* Main 4 rows (3 cols each) */}
+          {MAIN_ROWS.map((row, ri) => (
+            <div key={ri} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              {row.map(key => {
+                const isFn = key === '−' || key === '⌫'
+                const disabled = key === '−' && !allowNegative
+                return (
+                  <button
+                    key={key}
+                    onPointerDown={e => { e.preventDefault(); if (!disabled) press(key) }}
+                    style={{
+                      ...keyBase,
+                      flex: 1,
+                      height: 54,
+                      backgroundColor: isFn ? C.keyFn : C.keyNum,
+                      color: disabled ? C.textMuted : C.textKey,
+                      fontSize: key === '⌫' ? 22 : 28,
+                      fontWeight: isFn ? 500 : 300,
+                      boxShadow: `0 2px 0 ${C.keyShadow}`,
+                      opacity: disabled ? 0.35 : 1,
+                    }}
+                  >
+                    {key}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
 
-            const isDone = key === 'Done'
-            const isBack = key === '⌫'
-            const isMinus = key === '−'
-            const isSpecial = isDone || isBack || isMinus || key === '.'
-
-            return (
-              <button
-                key={i}
-                onPointerDown={e => { e.preventDefault(); press(key) }}
-                disabled={isMinus && !allowNegative}
-                className={[
-                  'h-[60px] flex items-center justify-center text-xl font-semibold',
-                  'border-b border-r border-zinc-800/60 touch-manipulation',
-                  'transition-colors active:brightness-75',
-                  isDone
-                    ? 'bg-cyan-600 text-white font-bold text-base'
-                    : isBack || isMinus
-                    ? 'bg-zinc-900 text-zinc-300'
-                    : key === '.'
-                    ? 'bg-zinc-900 text-zinc-300'
-                    : 'bg-zinc-950 text-white',
-                  isMinus && !allowNegative ? 'opacity-20 cursor-default' : '',
-                ].join(' ')}
-              >
-                {key}
-              </button>
-            )
-          })}
+          {/* Bottom row: . | Done (2×) */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onPointerDown={e => { e.preventDefault(); press('.') }}
+              style={{
+                ...keyBase,
+                flex: 1,
+                height: 54,
+                backgroundColor: C.keyFn,
+                color: C.textKey,
+                fontSize: 28,
+                fontWeight: 400,
+                boxShadow: `0 2px 0 ${C.keyShadow}`,
+              }}
+            >.</button>
+            <button
+              onPointerDown={e => { e.preventDefault(); press('Done') }}
+              style={{
+                ...keyBase,
+                flex: 2,
+                height: 54,
+                backgroundColor: C.cyan,
+                color: C.textKey,
+                fontSize: 17,
+                fontWeight: 700,
+                letterSpacing: 0.3,
+                boxShadow: `0 2px 0 rgba(0,0,0,0.4)`,
+              }}
+            >Done</button>
+          </div>
         </div>
 
-        {/* iOS safe area spacer */}
-        <div className="bg-zinc-950 pb-safe-bottom" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
+        {/* iOS safe-area spacer */}
+        <div style={{ backgroundColor: C.bg, paddingBottom: 'env(safe-area-inset-bottom)' }} />
       </div>
     </>,
     document.body,
