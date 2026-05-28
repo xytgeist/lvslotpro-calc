@@ -160,3 +160,22 @@ values
   ('Casino Innsbruck', 'seed'),
   ('Casino Graz', 'seed')
 on conflict (lower(name)) do nothing;
+
+-- Australian casinos
+insert into public.casinos (name, source)
+values
+  ('Crown Melbourne', 'seed'),
+  ('The Star Sydney', 'seed'),
+  ('Crown Sydney', 'seed'),
+  ('Crown Perth', 'seed'),
+  ('The Star Gold Coast', 'seed'),
+  ('The Star Brisbane', 'seed'),
+  ('Treasury Casino', 'seed'),
+  ('The Reef Hotel Casino', 'seed'),
+  ('The Ville Resort-Casino', 'seed'),
+  ('SkyCity Adelaide', 'seed'),
+  ('Casino Canberra', 'seed'),
+  ('Mindil Beach Casino Resort', 'seed'),
+  ('Lasseters Hotel Casino', 'seed'),
+  ('Crown Towers Melbourne', 'seed')
+on conflict (lower(name)) do nothing;
