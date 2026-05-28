@@ -1702,6 +1702,25 @@ html.light [data-bankroll-sheet] .bg-cyan-600 {
   background-color: #0891b2 !important;
 }
 
+/* End session W/L preview pill — light mode */
+html.light [data-wl-preview="win"] {
+  background-color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+}
+html.light [data-wl-preview="win"] .text-emerald-300 {
+  color: #059669 !important;
+}
+html.light [data-wl-preview="loss"] {
+  background-color: #fff1f2 !important;
+  border-color: #fca5a5 !important;
+}
+html.light [data-wl-preview="loss"] .text-red-300 {
+  color: #dc2626 !important;
+}
+html.light [data-wl-preview] .text-zinc-400 {
+  color: #6b7280 !important;
+}
+
 /* Active session card — light mode */
 html.light [data-session-card] {
   background-color: #ecfdf5 !important;

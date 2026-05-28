@@ -669,7 +669,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                     />
                   </div>
                   {endPreviewWL != null && (
-                    <div className={`rounded-2xl px-4 py-3 flex items-center justify-between ${endPreviewWL >= 0 ? 'bg-emerald-950/70 border border-emerald-800/40' : 'bg-red-950/70 border border-red-900/40'}`}>
+                    <div data-wl-preview={endPreviewWL >= 0 ? 'win' : 'loss'} className={`rounded-2xl px-4 py-3 flex items-center justify-between ${endPreviewWL >= 0 ? 'bg-emerald-950/70 border border-emerald-800/40' : 'bg-red-950/70 border border-red-900/40'}`}>
                       <div>
                         <div className={`text-sm font-bold ${endPreviewWL >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                           {endPreviewWL >= 0 ? '+' : ''}{fmt$(endPreviewWL)} this session
