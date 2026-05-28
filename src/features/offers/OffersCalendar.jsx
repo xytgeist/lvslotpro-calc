@@ -1602,9 +1602,9 @@ export default function OffersCalendar({
                     ) : null}
                     <div className="flex items-start gap-2">
                       <div className="w-10 shrink-0 text-center">
-                        <div className="text-zinc-500 text-[9px] font-semibold tracking-wide">{dayLabel}</div>
-                        <div className="text-zinc-100 text-2xl font-bold leading-tight">{dayNum}</div>
-                        <div className="text-[10px] font-bold tracking-wider" style={{ color: 'var(--ot-color)' }}>{monthLabel}</div>
+                        <div className="text-white/75 text-[9px] font-semibold tracking-wide">{dayLabel}</div>
+                        <div className="text-white text-2xl font-bold leading-tight">{dayNum}</div>
+                        <div className="text-white/80 text-[10px] font-bold tracking-wider" style={{ color: 'var(--list-month-color)' }}>{monthLabel}</div>
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">

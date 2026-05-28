@@ -33,7 +33,7 @@ export default function WeekEventDetailModal({
       aria-modal="true"
       aria-labelledby="week-detail-heading"
       data-event-detail
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[55] flex items-center justify-center bg-black/85 px-4 py-6 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -89,7 +89,7 @@ export default function WeekEventDetailModal({
           <button type="button" onClick={() => onEdit(e)} className="text-cyan-300 hover:text-cyan-200 text-sm font-semibold touch-manipulation">
             Edit
           </button>
-          <button type="button" onClick={() => onDuplicate(e)} style={{ color: '#94A3B8' }} className="text-sm font-semibold touch-manipulation opacity-90 hover:opacity-100">
+          <button type="button" onClick={() => onDuplicate(e)} style={{ color: '#97b4db' }} className="text-sm font-semibold touch-manipulation opacity-90 hover:opacity-100">
             Duplicate
           </button>
         </div>
