@@ -20,6 +20,9 @@ create table if not exists public.casinos (
   created_at  timestamptz not null default now()
 );
 
+-- Add aliases column if table existed before this column was introduced
+alter table public.casinos add column if not exists aliases text[] not null default '{}';
+
 -- Case-insensitive unique constraint on name
 create unique index if not exists casinos_name_lower_idx
   on public.casinos (lower(name));
