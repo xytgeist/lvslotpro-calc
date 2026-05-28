@@ -47,8 +47,10 @@ export default function CasinoAutocomplete({
   const [onlineLoading, setOnlineLoading] = useState(false)
   const [showOnline, setShowOnline] = useState(false)
   const [focused, setFocused] = useState(false)
+  const [userTyped, setUserTyped] = useState(false)
   const debounceRef = useRef(null)
   const wrapperRef = useRef(null)
+  const touchStartYRef = useRef(null)
 
   // Keep internal query in sync when parent resets value
   useEffect(() => { setQuery(value ?? '') }, [value])
@@ -92,6 +94,7 @@ export default function CasinoAutocomplete({
     const q = e.target.value
     setQuery(q)
     onChange(q)
+    setUserTyped(true)
     searchLocal(q)
   }
 
@@ -150,10 +153,10 @@ export default function CasinoAutocomplete({
     setLocalResults([])
   }
 
-  // What mode is the dropdown in?
-  const isTyping = query.length >= MIN_CHARS
-  const showNearby = focused && !isTyping && nearbyCasinos.length > 0
-  const showSearch = focused && isTyping
+  // Nearby shows whenever focused + not yet typed (even if field is pre-filled)
+  // Search shows only once user has actively typed
+  const showNearby = focused && !userTyped && nearbyCasinos.length > 0
+  const showSearch = focused && userTyped && query.length >= MIN_CHARS
   const showSearchOnlineOption = showSearch && !showOnline && localResults.length < 3
   const hasDropdown = showNearby || (showSearch && (localResults.length > 0 || showSearchOnlineOption || showOnline))
 
@@ -164,7 +167,7 @@ export default function CasinoAutocomplete({
           type="text"
           value={query}
           onChange={handleInput}
-          onFocus={() => setFocused(true)}
+          onFocus={() => { setFocused(true); setUserTyped(false) }}
           placeholder={gpsLoading ? 'Detecting location…' : placeholder}
           autoComplete="off"
           className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40 pr-10"
@@ -196,8 +199,12 @@ export default function CasinoAutocomplete({
                 <button
                   key={casino.id}
                   type="button"
-                  onMouseDown={() => pickNearby(casino)}
-                  onTouchStart={() => pickNearby(casino)}
+                  onMouseDown={e => { e.preventDefault(); pickNearby(casino) }}
+                  onTouchStart={e => { touchStartYRef.current = e.touches[0].clientY }}
+                  onTouchEnd={e => {
+                    const delta = Math.abs(e.changedTouches[0].clientY - (touchStartYRef.current ?? 0))
+                    if (delta < 8) { e.preventDefault(); pickNearby(casino) }
+                  }}
                   className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-zinc-700/60 active:bg-zinc-700 border-b border-zinc-700/40 last:border-0 ${i === 0 ? 'bg-zinc-700/30' : ''}`}
                 >
                   <div>
@@ -217,8 +224,12 @@ export default function CasinoAutocomplete({
               ))}
               <button
                 type="button"
-                onMouseDown={() => { setFocused(true); setQuery(' '); setTimeout(() => setQuery(''), 0) }}
-                onTouchStart={() => { setFocused(true); setQuery(' '); setTimeout(() => setQuery(''), 0) }}
+                onMouseDown={e => { e.preventDefault(); setUserTyped(true); setLocalResults([]) }}
+                onTouchStart={e => { touchStartYRef.current = e.touches[0].clientY }}
+                onTouchEnd={e => {
+                  const delta = Math.abs(e.changedTouches[0].clientY - (touchStartYRef.current ?? 0))
+                  if (delta < 8) { e.preventDefault(); setUserTyped(true); setLocalResults([]) }
+                }}
                 className="w-full text-left px-4 py-3 text-cyan-400 text-sm font-semibold hover:bg-zinc-700/60 active:bg-zinc-700 border-t border-zinc-700/40"
               >
                 🔍 Search all casinos…
@@ -233,8 +244,12 @@ export default function CasinoAutocomplete({
                 <button
                   key={casino.id}
                   type="button"
-                  onMouseDown={() => pickLocal(casino)}
-                  onTouchStart={() => pickLocal(casino)}
+                  onMouseDown={e => { e.preventDefault(); pickLocal(casino) }}
+                  onTouchStart={e => { touchStartYRef.current = e.touches[0].clientY }}
+                  onTouchEnd={e => {
+                    const delta = Math.abs(e.changedTouches[0].clientY - (touchStartYRef.current ?? 0))
+                    if (delta < 8) { e.preventDefault(); pickLocal(casino) }
+                  }}
                   className="w-full text-left px-4 py-3 hover:bg-zinc-700/60 active:bg-zinc-700 border-b border-zinc-700/40 last:border-0"
                 >
                   <div className="text-white text-sm font-semibold leading-tight">{casino.name}</div>
@@ -249,8 +264,12 @@ export default function CasinoAutocomplete({
               {showSearchOnlineOption && (
                 <button
                   type="button"
-                  onMouseDown={searchOnline}
-                  onTouchStart={searchOnline}
+                  onMouseDown={e => { e.preventDefault(); searchOnline() }}
+                  onTouchStart={e => { touchStartYRef.current = e.touches[0].clientY }}
+                  onTouchEnd={e => {
+                    const delta = Math.abs(e.changedTouches[0].clientY - (touchStartYRef.current ?? 0))
+                    if (delta < 8) { e.preventDefault(); searchOnline() }
+                  }}
                   className="w-full text-left px-4 py-3 flex items-center gap-2 text-cyan-400 text-sm font-semibold hover:bg-zinc-700/60 active:bg-zinc-700 border-t border-zinc-700/40"
                 >
                   <span>🔍</span>
@@ -268,8 +287,12 @@ export default function CasinoAutocomplete({
                     <button
                       key={place.place_id}
                       type="button"
-                      onMouseDown={() => pickOnline(place)}
-                      onTouchStart={() => pickOnline(place)}
+                      onMouseDown={e => { e.preventDefault(); pickOnline(place) }}
+                      onTouchStart={e => { touchStartYRef.current = e.touches[0].clientY }}
+                      onTouchEnd={e => {
+                        const delta = Math.abs(e.changedTouches[0].clientY - (touchStartYRef.current ?? 0))
+                        if (delta < 8) { e.preventDefault(); pickOnline(place) }
+                      }}
                       className="w-full text-left px-4 py-3 hover:bg-zinc-700/60 active:bg-zinc-700 border-b border-zinc-700/40 last:border-0"
                     >
                       <div className="text-white text-sm font-semibold leading-tight">{place.name}</div>
