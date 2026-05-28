@@ -20,8 +20,11 @@ create table if not exists public.casinos (
   created_at  timestamptz not null default now()
 );
 
--- Add aliases column if table existed before this column was introduced
-alter table public.casinos add column if not exists aliases text[] not null default '{}';
+-- Add columns if table existed before this schema was introduced
+alter table public.casinos add column if not exists aliases    text[]      not null default '{}';
+alter table public.casinos add column if not exists source     text        not null default 'user_confirmed';
+alter table public.casinos add column if not exists created_by uuid        references auth.users(id) on delete set null;
+alter table public.casinos add column if not exists created_at timestamptz not null default now();
 
 -- Case-insensitive unique constraint on name
 create unique index if not exists casinos_name_lower_idx
