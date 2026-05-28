@@ -186,7 +186,7 @@ export default function CasinoAutocomplete({
       </div>
 
       {hasDropdown && (
-        <div className="absolute z-50 mt-1.5 w-full rounded-2xl bg-zinc-800 border border-zinc-700/60 shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-1.5 w-full rounded-2xl bg-zinc-800 border border-zinc-700/60 shadow-xl overflow-hidden max-h-72 overflow-y-auto">
 
           {/* ── Nearby section ── */}
           {showNearby && (
