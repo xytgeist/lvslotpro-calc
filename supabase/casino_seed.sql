@@ -179,3 +179,31 @@ values
   ('Lasseters Hotel Casino', 'seed'),
   ('Crown Towers Melbourne', 'seed')
 on conflict (lower(name)) do nothing;
+
+-- Asian casinos
+insert into public.casinos (name, source)
+values
+  ('The Venetian Macao', 'seed'),
+  ('Wynn Palace', 'seed'),
+  ('MGM Cotai', 'seed'),
+  ('City of Dreams', 'seed'),
+  ('Galaxy Macau', 'seed'),
+  ('Sands Cotai Central', 'seed'),
+  ('Wynn Macau', 'seed'),
+  ('Sands Macao', 'seed'),
+  ('MGM Macau', 'seed'),
+  ('Grand Lisboa', 'seed'),
+  ('Marina Bay Sands', 'seed'),
+  ('Resorts World Sentosa', 'seed'),
+  ('Solaire Resort & Casino', 'seed'),
+  ('City of Dreams Manila', 'seed'),
+  ('Okada Manila', 'seed'),
+  ('Resorts World Manila', 'seed'),
+  ('Hard Rock Hotel Casino Manila', 'seed'),
+  ('Jeju Shinhwa World', 'seed'),
+  ('Paradise City', 'seed'),
+  ('Grand Walkerhill Casino', 'seed'),
+  ('NagaWorld', 'seed'),
+  ('Naga2', 'seed'),
+  ('Star Vegas', 'seed')
+on conflict (lower(name)) do nothing;
