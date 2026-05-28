@@ -7,6 +7,17 @@ body,
 }
 
 /*
+ * iOS Safari auto-zooms on any input with font-size < 16px and never zooms back.
+ * Setting a 16px floor prevents the zoom from triggering in the first place,
+ * which is friendlier than disabling user-scalable on the viewport meta.
+ */
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  font-size: max(16px, 1em) !important;
+}
+
+/*
  * ── Light mode ────────────────────────────────────────────────────────────────
  * Tailwind v4 exposes every zinc-* color as a CSS custom property.
  * Remapping the full scale here flips the entire UI without touching components.
