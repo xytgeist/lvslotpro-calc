@@ -1,0 +1,182 @@
+Casino Name,City,Region,Lat,Lng,Google Formatted Address,Status
+"Bellagio","Las Vegas","Nevada, USA",36.1129455,-115.1765067,"3600 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Caesars Palace","Las Vegas","Nevada, USA",36.1173161,-115.1733273,"Caesars Palace Dr, Paradise, NV 89109, USA",OK
+"MGM Grand","Las Vegas","Nevada, USA",36.1036224,-115.1675744,"3799 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"The Venetian","Las Vegas","Nevada, USA",36.121174,-115.1696526,"3355 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Wynn Las Vegas","Las Vegas","Nevada, USA",36.126119,-115.1619583,"3131 Las Vegas Blvd S, Las Vegas, NV 89109, USA",OK
+"Encore at Wynn","Las Vegas","Nevada, USA",36.1294396,-115.164314,"3121 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Aria Resort & Casino","Las Vegas","Nevada, USA",36.1073702,-115.1767526,"3730 S Las Vegas Blvd, Las Vegas, NV 89158, USA",OK
+"The Cosmopolitan","Las Vegas","Nevada, USA",36.10996,-115.1754159,"3708 Las Vegas Blvd S, Las Vegas, NV 89109, USA",OK
+"Resorts World Las Vegas","Las Vegas","Nevada, USA",36.134107,-115.1676586,"3000 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Planet Hollywood","Las Vegas","Nevada, USA",36.1099696,-115.1700646,"3667 Las Vegas Blvd S, Las Vegas, NV 89109, USA",OK
+"Flamingo Las Vegas","Las Vegas","Nevada, USA",36.1166377,-115.1703905,"3555 Las Vegas Blvd S, Las Vegas, NV 89109, USA",OK
+"Paris Las Vegas","Las Vegas","Nevada, USA",36.112462,-115.1707075,"3655 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Treasure Island","Las Vegas","Nevada, USA",36.1247462,-115.1720827,"3300 Las Vegas Blvd S, Las Vegas, NV 89109, USA",OK
+"Circus Circus","Las Vegas","Nevada, USA",36.1366568,-115.1628538,"2880 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Golden Nugget","Las Vegas","Nevada, USA",36.171563,-115.1391009,"Las Vegas, NV, USA",OK
+"The LINQ","Las Vegas","Nevada, USA",36.1182282,-115.1713506,"3535 Las Vegas Blvd S, Las Vegas, NV 89109, USA",OK
+"Park MGM","Las Vegas","Nevada, USA",36.1044046,-115.1766692,"3770 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"New York-New York","Las Vegas","Nevada, USA",36.102132,-115.1744225,"3790 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Excalibur","Las Vegas","Nevada, USA",36.0987973,-115.1754312,"3850 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"Luxor","Las Vegas","Nevada, USA",36.09551,-115.1760672,"3900 S Las Vegas Blvd, Las Vegas, NV 89119, USA",OK
+"Mandalay Bay","Las Vegas","Nevada, USA",36.0921847,-115.1748583,"3950 S Las Vegas Blvd, Las Vegas, NV 89119, USA",OK
+"Fontainebleau Las Vegas","Las Vegas","Nevada, USA",36.1373971,-115.1594354,"2777 S Las Vegas Blvd, Las Vegas, NV 89109, USA",OK
+"WinStar World Casino","Thackerville","Oklahoma, USA",33.7590479,-97.13034429999999,"777 Casino Ave, Thackerville, OK 73459, USA",OK
+"Hard Rock Casino","Catoosa","Oklahoma, USA",36.1652244,-95.7645441,"777 W Cherokee St, Catoosa, OK 74015, USA",OK
+"Choctaw Casino & Resort","Durant","Oklahoma, USA",33.9507354,-96.41393219999999,"4216 US-69, Durant, OK 74701, USA",OK
+"Cherokee Casino","West Siloam Springs","Oklahoma, USA",36.1777366,-94.56781810000001,"2416 US-412, West Siloam Springs, OK 74338, USA",OK
+"Riverwind Casino","Norman","Oklahoma, USA",35.1811021,-97.50052939999999,"1544 OK-9, Norman, OK 73072, USA",OK
+"Kickapoo Casino","Shawnee","Oklahoma, USA",35.3635252,-96.9679702,"38900 W MacArthur St, Shawnee, OK 74804, USA",OK
+"Comanche Nation Casino","Lawton","Oklahoma, USA",34.6038592,-98.3754766,"402 SE Interstate Dr, Lawton, OK 73501, USA",OK
+"Chickasaw Casino","Ardmore","Oklahoma, USA",34.2012162,-97.1091363,"Chickasaw St, Ardmore, OK 73401, USA",OK
+"Gold River Casino","Pauls Valley","Oklahoma, USA",34.7400809,-97.22224510000001,"Pauls Valley, OK, USA",OK
+"7 Clans First Council Casino","Newkirk","Oklahoma, USA",36.98351840000001,-97.043543,"12875 US-77, Newkirk, OK 74647, USA",OK
+"Apache Casino Hotel","Lawton","Oklahoma, USA",34.6069743,-98.3602121,"2315 E Gore Blvd, Lawton, OK 73501, USA",OK
+"Pechanga Resort Casino","Temecula","California, USA",33.4564921,-117.1066537,"45000 Pechanga Pkwy #45000, Temecula, CA 92592, USA",OK
+"Yaamava' Resort & Casino","Highland","California, USA",34.1501177,-117.2282869,"777 San Manuel Blvd S, Highland, CA 92346, USA",OK
+"Thunder Valley Casino Resort","Lincoln","California, USA",38.8401057,-121.3136799,"1200 Athens Ave, Lincoln, CA 95648, USA",OK
+"Morongo Casino Resort & Spa","Cabazon","California, USA",33.9218477,-116.8004373,"49500 Seminole Dr, Cabazon, CA 92230, USA",OK
+"San Manuel Casino","Highland","California, USA",34.1501177,-117.2282869,"777 San Manuel Blvd S, Highland, CA 92346, USA",OK
+"Agua Caliente Casino","Rancho Mirage","California, USA",33.813915,-116.4093283,"32-250 Bob Hope Dr, Rancho Mirage, CA 92270, USA",OK
+"Barona Resort & Casino","Lakeside","California, USA",32.9390049,-116.8736109,"1932 Wildcat Canyon Rd, Lakeside, CA 92040, USA",OK
+"Viejas Casino","Alpine","California, USA",32.8424708,-116.7046597,"5000 Willows Rd, Alpine, CA 91901, USA",OK
+"Jamul Casino","Jamul","California, USA",32.7030991,-116.8692108,"14145 Campo Rd, Jamul, CA 91935, USA",OK
+"Sycuan Casino Resort","El Cajon","California, USA",32.7862696,-116.8312666,"5469 Casino Way, El Cajon, CA 92019, USA",OK
+"Pala Casino Spa Resort","Pala","California, USA",33.3631911,-117.0847852,"11154 CA-76, Pala, CA 92059, USA",OK
+"Foxwoods Resort Casino","Mashantucket","Connecticut, USA",41.4733358,-71.96000339999999,"350 Trolley Line Blvd, Mashantucket, CT 06338, USA",OK
+"Mohegan Sun","Uncasville","Connecticut, USA",41.492739,-72.09846999999999,"Mohegan Sun, Montville, CT 06382, USA",OK
+"Borgata Hotel Casino & Spa","Atlantic City","New Jersey, USA",39.3783214,-74.4352672,"Borgata Hotel, Casino & Spa, 1 Borgata Way, Atlantic City, NJ 08401, USA",OK
+"Hard Rock Hotel & Casino","Atlantic City","New Jersey, USA",39.3600959,-74.42031229999999,"1000 Boardwalk, Atlantic City, NJ 08401, USA",OK
+"Ocean Casino Resort","Atlantic City","New Jersey, USA",39.362815,-74.41577269999999,"500 Boardwalk, Atlantic City, NJ 08401, USA",OK
+"Seminole Hard Rock Hotel & Casino","Tampa","Florida, USA",27.9928804,-82.37204849999999,"5223 Orient Rd, Tampa, FL 33610, USA",OK
+"Beau Rivage Resort & Casino","Biloxi","Mississippi, USA",30.3924252,-88.8915069,"875 Beach Blvd, Biloxi, MS 39530, USA",OK
+"Parx Casino","Bensalem","Pennsylvania, USA",40.1184168,-74.9530825,"2999 Street Rd, Bensalem, PA 19020, USA",OK
+"Wind Creek Bethlehem","Bethlehem","Pennsylvania, USA",40.6140872,-75.3569271,"77 Wind Creek Blvd, Bethlehem, PA 18015, USA",OK
+"Rivers Casino","Philadelphia","Pennsylvania, USA",39.964344,-75.1328133,"1001 N Delaware Ave, Philadelphia, PA 19125, USA",OK
+"Presque Isle Downs & Casino","Erie","Pennsylvania, USA",42.068477,-80.03099399999999,"8199 Perry Hwy, Erie, PA 16509, USA",OK
+"Harrah's Philadelphia","Chester","Pennsylvania, USA",39.8505188,-75.3492296,"777 Harrah's Blvd, Chester, PA 19013, USA",OK
+"Live! Casino Pittsburgh","Washington","Pennsylvania, USA",40.4276685,-80.01157010000001,"Mt Washington, Pittsburgh, PA, USA",OK
+"MGM National Harbor","Oxon Hill","Maryland, USA",38.795176,-77.0089483,"101 MGM National Ave, Forest Heights, MD 20745, USA",OK
+"Live! Casino & Hotel","Hanover","Maryland, USA",39.1577546,-76.7268883,"7002 Arundel Mills Cir #7777, Hanover, MD 21076, USA",OK
+"Ocean Downs Casino","Berlin","Maryland, USA",38.3522423,-75.16333139999999,"10218 Racetrack Rd, Berlin, MD 21811, USA",OK
+"Horseshoe Casino","Hammond","Indiana, USA",41.6941773,-87.50567439999999,"777 Casino Center Dr, Hammond, IN 46320, USA",OK
+"Blue Chip Casino","Michigan City","Indiana, USA",41.7186546,-86.8927612,"777 Blue Chip Dr, Michigan City, IN 46360, USA",OK
+"Belterra Casino","Belterra","Indiana, USA",38.7808204,-84.93862519999999,"777 Belterra Dr, Florence, IN 47020, USA",OK
+"French Lick Resort","French Lick","Indiana, USA",38.55406840000001,-86.6196442,"8670 IN-56, French Lick, IN 47432, USA",OK
+"Rising Sun Casino","Rising Sun","Indiana, USA",38.95212960000001,-84.8457961,"777 Rising Star Dr, Rising Sun, IN 47040, USA",OK
+"Ameristar Casino","St. Charles","Missouri, USA",38.766851,-90.4839786,"1 Ameristar Blvd, St Charles, MO 63301, USA",OK
+"Turning Stone Resort Casino","Verona","New York, USA",43.1157832,-75.58983599999999,"5218 Patrick Rd, Verona, NY 13478, USA",OK
+"Harrah's Cherokee Casino Resort","Cherokee","North Carolina, USA",35.4700203,-83.3003347,"777 Casino Dr, Cherokee, NC 28719, USA",OK
+"Coushatta Casino Resort","Kinder","Louisiana, USA",30.5458991,-92.8143812,"777 Coushatta Dr, Kinder, LA 70648, USA",OK
+"L'Auberge Casino Resort","Lake Charles","Louisiana, USA",30.2071335,-93.25921249999999,"777 Ave L'Auberge, Lake Charles, LA 70601, USA",OK
+"Margaritaville Resort Casino","Bossier City","Louisiana, USA",32.5211504,-93.7436314,"777 Margaritaville Way, Bossier City, LA 71111, USA",OK
+"Delta Downs Casino","Vinton","Louisiana, USA",30.1950801,-93.6233275,"2717 Delta Downs Dr, Vinton, LA 70668, USA",OK
+"Soaring Eagle Casino & Resort","Mount Pleasant","Michigan, USA",43.6089789,-84.7135266,"6800 Soaring Eagle Blvd, Mt Pleasant, MI 48858, USA",OK
+"FireKeepers Casino","Battle Creek","Michigan, USA",42.2968444,-85.0754547,"11177 E Michigan Ave, Battle Creek, MI 49014, USA",OK
+"Gun Lake Casino","Wayland","Michigan, USA",42.6314335,-85.65565520000001,"1123 129th Ave #9476, Wayland, MI 49348, USA",OK
+"Potawatomi Casino Hotel","Milwaukee","Wisconsin, USA",43.0309258,-87.9339802,"1721 W Canal St, Milwaukee, WI 53233, USA",OK
+"Ho-Chunk Casino","Baraboo","Wisconsin, USA",43.5286335,-89.7751949,"S3214 County Hwy BD, Baraboo, WI 53913, USA",OK
+"Oneida Casino","Green Bay","Wisconsin, USA",44.5248959,-88.0951978,"2522 W Mason St, Green Bay, WI 54303, USA",OK
+"Mystic Lake Casino","Prior Lake","Minnesota, USA",44.7307803,-93.4736248,"2400 Mystic Lk Blvd, Prior Lake, MN 55372, USA",OK
+"Canterbury Park","Shakopee","Minnesota, USA",44.7903875,-93.4837305,"1100 Canterbury Rd, Shakopee, MN 55379, USA",OK
+"Treasure Island Casino","Red Wing","Minnesota, USA",44.632285,-92.649891,"5734 Sturgeon Lake Rd, Welch, MN 55089, USA",OK
+"Jackpot Junction Casino","Morton","Minnesota, USA",44.5317724,-94.9989248,"39375 County Rd 24, Morton, MN 56270, USA",OK
+"Prairie Edge Casino","Watertown","South Dakota, USA",44.8912492,-97.1432492,"Watertown Event Center/Minervas Restaurant/Ramkota Hotel, 1901 9th Ave SW Prairie, Watertown, SD 57201, USA",OK
+"Deadwood Mountain Grand","Deadwood","South Dakota, USA",44.3743005,-103.7301731,"Deadwood Mountain Dr, Deadwood, SD 57732, USA",OK
+"Four Bears Casino","New Town","North Dakota, USA",47.97973589999999,-102.5751896,"202 Frontage Rd, New Town, ND 58763, USA",OK
+"Spirit Lake Casino","Fort Totten","North Dakota, USA",48.0154283,-98.9120365,"Unnamed Road, St Michael, ND 58370, USA",OK
+"Tulalip Resort Casino","Marysville","Washington, USA",48.08663050000001,-122.1895367,"10200 Quil Ceda Blvd, Tulalip, WA 98271, USA",OK
+"Muckleshoot Casino Resort","Auburn","Washington, USA",47.2909623,-122.1966087,"2402 Auburn Way S, Auburn, WA 98002, USA",OK
+"Snoqualmie Casino","Snoqualmie","Washington, USA",47.5189392,-121.8420797,"37500 SE North Bend Way, Snoqualmie, WA 98065, USA",OK
+"Little Creek Casino Resort","Shelton","Washington, USA",47.1285372,-123.1013335,"91 WA-108, Shelton, WA 98584, USA",OK
+"Isle Casino Waterloo","Waterloo","Iowa, USA",42.4485071,-92.30954659999999,"777 Isle of Capri Blvd, Waterloo, IA 50701, USA",OK
+"Horseshoe Council Bluffs","Council Bluffs","Iowa, USA",41.236731,-95.886667,"2701 23rd Ave, Council Bluffs, IA 51501, USA",OK
+"Argosy Casino","Alton","Illinois, USA",38.8888296,-90.1868203,"1 Piasa St, Alton, IL 62002, USA",OK
+"Hollywood Casino","Aurora","Illinois, USA",41.75928469999999,-88.31335949999999,"1 W New York St, Aurora, IL 60506, USA",OK
+"Mountaineer Casino","New Cumberland","West Virginia, USA",40.5820714,-80.65416979999999,"1420 Mountaineer Cir, New Cumberland, WV 26047, USA",OK
+"Jack Cleveland Casino","Cleveland","Ohio, USA",41.4985688,-81.6930995,"100 Public Square, Cleveland, OH 44113, USA",OK
+"MGM Northfield Park","Northfield","Ohio, USA",41.3484663,-81.52432759999999,"10777 Northfield Rd, Northfield, OH 44067, USA",OK
+"Wind Creek Atmore","Atmore","Alabama, USA",31.1027374,-87.4828643,"303 Poarch Rd, Atmore, AL 36502, USA",OK
+"Wind Creek Montgomery","Montgomery","Alabama, USA",32.4247969,-86.13878230000002,"1801 Eddie L Tullis Rd, Montgomery, AL 36117, USA",OK
+"Talking Stick Resort","Scottsdale","Arizona, USA",33.5410221,-111.8694239,"9800 E Talking Stick Wy, Scottsdale, AZ 85256, USA",OK
+"Casino Arizona","Scottsdale","Arizona, USA",33.4543466,-111.885611,"524 N 92nd St, Scottsdale, AZ 85256, USA",OK
+"Harrah's Ak-Chin Casino","Maricopa","Arizona, USA",33.0234836,-112.0507311,"15406 N Maricopa Rd, Maricopa, AZ 85139, USA",OK
+"Desert Diamond Casino","Tucson","Arizona, USA",32.1181567,-110.9641468,"7350 S Nogales Hwy, Tucson, AZ 85756, USA",OK
+"Casino Del Sol","Tucson","Arizona, USA",32.131541,-111.086605,"5655 W Valencia Rd, Tucson, AZ 85757, USA",OK
+"Casino de Monte-Carlo","Monte Carlo","Monaco",43.7390972,7.428068100000001,"Pl. du Casino, 98000 Monaco",OK
+"Grand Casino de Monte-Carlo","Monte Carlo","Monaco",43.7390972,7.428068100000001,"Pl. du Casino, 98000 Monaco",OK
+"Casino Baden-Baden","Baden-Baden","Germany",48.7535592,8.233721599999999,"Fremersbergstraße 23, 76530 Baden-Baden, Germany",OK
+"Casino Wiesbaden","Wiesbaden","Germany",50.0850983,8.2478594,"Kurhauspl. 1, 65189 Wiesbaden, Germany",OK
+"Casino Hohensyburg","Dortmund","Germany",51.4207198,7.488747399999998,"Hohensyburgstraße 200, 44265 Dortmund, Germany",OK
+"Spielbank Berlin","Berlin","Germany",52.52000659999999,13.404954,"Berlin, Germany",OK
+"Spielbank Hamburg","Hamburg","Germany",53.5488282,9.987170299999999,"Hamburg, Germany",OK
+"Casino Estoril","Estoril","Portugal",38.70793099999999,-9.397133799999999,"Edifício do Casino, Av. Dr. Stanley Ho, 2765-190 Estoril, Portugal",OK
+"Casino Lisboa","Lisbon","Portugal",38.7646407,-9.0966028,"Alameda dos Oceanos 45, 1990-204 Lisboa, Portugal",OK
+"Casino do Estoril","Estoril","Portugal",38.70793099999999,-9.397133799999999,"Edifício do Casino, Av. Dr. Stanley Ho, 2765-190 Estoril, Portugal",OK
+"Casino de Marbella","Marbella","Spain",36.4889065,-4.9619382,"Carretera Nacional 340, K174, Nueva Andalucía, 29660 Marbella, Málaga, Spain",OK
+"Casino de Barcelona","Barcelona","Spain",41.3866938,2.1970601,"Carrer de la Marina, 19, 21, Ciutat Vella, 08005 Barcelona, Spain",OK
+"Gran Casino de Madrid","Madrid","Spain",40.5660091,-3.9140435,"Autovía A6 (Madrid- A Coruña), salida 27, 28250 Torrelodones, Madrid, Spain",OK
+"Casino de Santander","Santander","Spain",43.4636346,-3.8226402,"Santander, Cantabria, Spain",OK
+"Casino Campione","Campione d'Italia","Italy",45.97083809999999,8.9717953,"Piazzale Milano, 2, 22061 Campione d'Italia CO, Italy",OK
+"Casino di Venezia","Venice","Italy",45.52031729999999,12.358686,"Via Paliaga, 4/8, 30173 Venezia VE, Italy",OK
+"Casino di Sanremo","Sanremo","Italy",43.81505869999999,7.771986,"Corso degli Inglesi, 18, 18038 Sanremo IM, Italy",OK
+"Casino di Saint-Vincent","Saint-Vincent","Italy",45.7522696,7.642709399999999,"Via Italo Mus, 11027 Saint-Vincent AO, Italy",OK
+"Casino de Deauville","Deauville","France",49.3595943,0.06941599999999999,"2 Rue Edmond Blanc, 14800 Deauville, France",OK
+"Casino Barrière Enghien-les-Bains","Enghien-les-Bains","France",48.96971689999999,2.3033255,"3 Av. de Ceinture, 95880 Enghien-les-Bains, France",OK
+"Casino Barrière Deauville","Deauville","France",49.3595943,0.06941599999999999,"2 Rue Edmond Blanc, 14800 Deauville, France",OK
+"Empire Casino","London","United Kingdom",51.5072178,-0.1275862,"London, UK",OK
+"The Hippodrome Casino","London","United Kingdom",51.5114416,-0.1286276,"Cranbourn St, Leicester Square, London WC2H 7JH, UK",OK
+"Aspers Casino","London","United Kingdom",51.5428084,-0.0064829,"Olympic Park, 312 Montfichet Rd, London E20 1ET, UK",OK
+"Grosvenor Casino","London","United Kingdom",51.5072178,-0.1275862,"London, UK",OK
+"Casino Admiral","Prague","Czech Republic",50.069313,14.4049851,"Nádražní 46/88, Smíchov, 150 00 Praha-Praha 5, Czechia",OK
+"Casino Corinthia","Prague","Czech Republic",50.0627877,14.432054,"Kongresová 1, 140 69 Praha 4-Nusle, Czechia",OK
+"Casino Royale","Riga","Latvia",56.9676941,24.1056221,"Riga, Latvia",OK
+"Olympic Casino","Tallinn","Estonia",59.43696079999999,24.7535746,"Tallinn, Estonia",OK
+"Casino Helsinki","Helsinki","Finland",60.171853,24.9456404,"Mikonkatu 19, 00100 Helsinki, Finland",OK
+"Casino Cosmopol","Stockholm","Sweden",59.33324090000001,18.0553687,"Kungsgatan 65, 101 20 Stockholm, Sweden",OK
+"Grand Casino Liechtenstein","Bendern","Liechtenstein",47.2051938,9.502598200000001,"Selemad 10, 9487 Bendern, Liechtenstein",OK
+"Casino Kursaal Interlaken","Interlaken","Switzerland",46.6884874,7.858228,"Strandbadstrasse 44, 3800 Interlaken, Switzerland",OK
+"Casino Lugano","Lugano","Switzerland",46.0041076,8.9551351,"Via Chiarina Stauffacher-Vedani, 1, 6900 Lugano, Switzerland",OK
+"Casino Bern","Bern","Switzerland",46.94696219999999,7.4482422,"Casinopl. 1, 3011 Bern, Switzerland",OK
+"Casino Baden","Baden","Switzerland",47.47870169999999,8.3105073,"Haselstrasse 2, 5400 Baden, Switzerland",OK
+"Casino Vienna","Vienna","Austria",48.20806959999999,16.3713095,"Vienna, Austria",OK
+"Casino Salzburg","Salzburg","Austria",47.8195712,12.9920258,"Kleßheim 1c Schloss Klessheim, 5071 Wals, Austria",OK
+"Casino Innsbruck","Innsbruck","Austria",47.262114,11.3963574,"Salurner Str. 15, 6020 Innsbruck, Austria",OK
+"Casino Graz","Graz","Austria",47.0697922,15.4377246,"Landhausgasse 10, 8010 Graz, Austria",OK
+"Crown Melbourne","Southbank","Victoria, Australia",-37.8242257,144.9575337,"Crown Melbourne, 8 Whiteman St, Southbank VIC 3006, Australia",OK
+"The Star Sydney","Sydney","New South Wales, Australia",-33.8683329,151.1949875,"20-80 Pyrmont St, Pyrmont NSW 2009, Australia",OK
+"Crown Sydney","Sydney","New South Wales, Australia",-33.8625104,151.201103,"1 Barangaroo Ave, Barangaroo NSW 2000, Australia",OK
+"Crown Perth","Burswood","Western Australia, Australia",-31.9605921,115.8942022,"Great Eastern Hwy, Burswood WA 6100, Australia",OK
+"The Star Gold Coast","Broadbeach","Queensland, Australia",-28.0316663,153.4282904,"1 Casino Dr, Broadbeach QLD 4218, Australia",OK
+"The Star Brisbane","Brisbane","Queensland, Australia",-27.4738528,153.0250142,"Lvl 5/33 William St, Brisbane City QLD 4000, Australia",OK
+"Treasury Casino","Brisbane","Queensland, Australia",-27.4726783,153.0246408,"130 William St, Brisbane City QLD 4000, Australia",OK
+"The Reef Hotel Casino","Cairns","Queensland, Australia",-16.923837,145.7796679,"35-41 Wharf St, Cairns City QLD 4870, Australia",OK
+"The Ville Resort-Casino","Townsville","Queensland, Australia",-19.2514004,146.8264475,"Sir Leslie Thiess Dr, Townsville City QLD 4810, Australia",OK
+"SkyCity Adelaide","Adelaide","South Australia, Australia",-34.9198664,138.5986428,"North Terrace, Adelaide SA 5001, Australia",OK
+"Casino Canberra","Canberra","ACT, Australia",-35.2831005,149.1342523,"21 Binara St, Canberra ACT 2601, Australia",OK
+"Mindil Beach Casino Resort","Darwin","Northern Territory, Australia",-12.448142,130.8302871,"Mindil Beach, Gilruth Ave, Darwin City NT 0820, Australia",OK
+"Lasseters Hotel Casino","Alice Springs","Northern Territory, Australia",-23.7183008,133.8786317,"93 Barrett Dr, Alice Springs NT 0870, Australia",OK
+"Crown Towers Melbourne","Southbank","Victoria, Australia",-37.8223655,144.9600278,"8 Whiteman St, Southbank VIC 3006, Australia",OK
+"The Venetian Macao","Macau","Macau",22.1470331,113.559839,"s/n Estrada da Baia de Nossa Senhora da Esperanca, Macao",OK
+"Wynn Palace","Macau","Macau",22.1882774,113.5460702,"R. Cidade de Sintra, Macao",OK
+"MGM Cotai","Macau","Macau",22.1457488,113.568286,"4HW9+78V, Av. da Nave Desportiva, Macao",OK
+"City of Dreams","Macau","Macau",22.1492274,113.5666788,"Estr. do Istmo, Macao",OK
+"Galaxy Macau","Macau","Macau",22.1492204,113.5537116,"「澳門銀河™」綜合度假城, Estrada da Baia de Nossa Senhora da Esperanca, Macao",OK
+"Sands Cotai Central","Macau","Macau",22.1458478,113.5653752,"Estrada da Baia de Nossa Senhora da Esperanca, Macao",OK
+"Wynn Macau","Macau","Macau",22.1882774,113.5460702,"R. Cidade de Sintra, Macao",OK
+"Sands Macao","Macau","Macau",22.1916311,113.5548706,"203 Largo de Monte Carlo, Macao",OK
+"MGM Macau","Macau","Macau",22.185475,113.547884,"Macao, 澳門美高梅澳門外港新填海區孫逸仙大馬路",OK
+"Grand Lisboa","Macau","Macau",22.1900469,113.5448502,"Av. de Lisboa, Macao",OK
+"Marina Bay Sands","Singapore","Singapore",1.2837575,103.8591065,"10 Bayfront Ave, Singapore 018956",OK
+"Resorts World Sentosa","Singapore","Singapore",1.255179,103.8218107,"8 Sentosa Gateway, Singapore 098269",OK
+"Solaire Resort & Casino","Manila","Philippines",14.5228793,120.9806383,"Entertainment City, 1 Asean Ave, Tambo, Parañaque, 1701 Metro Manila, Philippines",OK
+"City of Dreams Manila","Manila","Philippines",14.5241347,120.9915522,"Asean Avenue, corner Roxas Blvd, Entertainment, Parañaque, 1701 Metro Manila, Philippines",OK
+"Okada Manila","Manila","Philippines",14.5151576,120.9814988,"Entertainment City, New Seaside Dr, Parañaque, 1701 Kalakhang Maynila, Philippines",OK
+"Resorts World Manila","Manila","Philippines",14.5190748,121.019358,"G299+GW5, Newport Blvd, Pasay City, 1309 Metro Manila, Philippines",OK
+"Hard Rock Hotel Casino Manila","Manila","Philippines",14.5995133,120.984234,"Manila, Metro Manila, Philippines",OK
+"Jeju Shinhwa World","Jeju","South Korea",33.3075638,126.3176387,"South Korea, Jeju-do, Seogwipo, 특별자치도, 38 Sinhwayeoksa-Ro 304beon-Gil Andeok-Myeon,Seogwipo-Si",OK
+"Paradise City","Incheon","South Korea",37.4370548,126.4557987,"186 Yeongjonghaeannam-ro 321beon-gil, Jung-gu, Incheon, South Korea",OK
+"Grand Walkerhill Casino","Seoul","South Korea",37.5552126,127.1108905,"177 Walkerhill-ro, Gwangjin District, Seoul, South Korea",OK
+"NagaWorld","Phnom Penh","Cambodia",11.5563738,104.9282099,"Phnom Penh, Cambodia",OK
+"Naga2","Phnom Penh","Cambodia",11.5559147,104.9349038,"Park, 120101, Samdech Hun Sen St, Phnom Penh, Cambodia",OK
+"Star Vegas","Poipet","Cambodia",13.6654419,102.5538828,"MH83+5HC, Suwannason Rd, Aranyaprathet, Cambodia",OK

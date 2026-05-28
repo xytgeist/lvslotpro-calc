@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 import TimeWheelPicker from '../../components/TimeWheelPicker.jsx'
+import DateWheelPicker from '../../components/DateWheelPicker.jsx'
+import CasinoAutocomplete from '../../components/CasinoAutocomplete.jsx'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,20 @@ function hourlyRate(session) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+// ── Haversine distance (miles) ────────────────────────────────────────────────
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 3958.8
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function fmtMiles(mi) {
+  return mi < 10 ? `${mi.toFixed(1)} mi` : `${Math.round(mi)} mi`
+}
+
 export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null }) {
   const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -58,6 +74,11 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   const [elapsed, setElapsed] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // GPS nearby state
+  const [nearbyCasinos, setNearbyCasinos] = useState([])
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const casinoCoordCacheRef = useRef(null)
 
   // Sheet form state
   const [bankrollInput, setBankrollInput] = useState('')
@@ -235,18 +256,27 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   // ── Sheet openers ─────────────────────────────────────────────────────────
 
   const saveLogPast = async () => {
-    const startAmt = parseFloat(pastFields.start_amount)
-    const endAmt = parseFloat(pastFields.end_amount)
-    if (isNaN(startAmt) || startAmt < 0) { setError('Enter a valid start amount.'); return }
-    if (isNaN(endAmt) || endAmt < 0) { setError('Enter a valid end amount.'); return }
     if (!pastFields.date) { setError('Select a date.'); return }
+    if (!pastFields.start_time) { setError('Select a start time.'); return }
+    const durationHrs = parseFloat(pastFields.duration_hours)
+    if (isNaN(durationHrs) || durationHrs <= 0) { setError('Enter a session duration in hours.'); return }
+    const rawStart = parseFloat(pastFields.start_amount)
+    const rawEnd = parseFloat(pastFields.end_amount)
+    const rawWL = parseFloat(pastFields.win_loss)
+    let finalStart, finalEnd
+    if (!isNaN(rawStart) && !isNaN(rawEnd)) {
+      finalStart = rawStart; finalEnd = rawEnd
+    } else if (!isNaN(rawWL)) {
+      finalStart = !isNaN(rawStart) ? rawStart : 0
+      finalEnd = finalStart + rawWL
+    } else {
+      setError('Enter start + end amounts, or a win/loss amount.'); return
+    }
     setSaving(true); setError('')
     try {
-      const startAt = new Date(`${pastFields.date}T${pastFields.start_time || '12:00'}:00`).toISOString()
-      const durationHrs = parseFloat(pastFields.duration_hours)
-      const endAt = !isNaN(durationHrs) && durationHrs > 0
-        ? new Date(new Date(startAt).getTime() + durationHrs * 3_600_000).toISOString()
-        : null
+      const startAt = new Date(`${pastFields.date}T${pastFields.start_time}:00`).toISOString()
+      const endAt = new Date(new Date(startAt).getTime() + durationHrs * 3_600_000).toISOString()
+      const startAmt = finalStart; const endAmt = finalEnd
       const winLoss = endAmt - startAmt
       const { data, error: err } = await supabaseClient
         .from('bankroll_sessions')
@@ -280,10 +310,51 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     }
   }
 
+  // ── GPS nearby ────────────────────────────────────────────────────────────
+
+  const fetchNearby = useCallback(async (onNearest) => {
+    if (!navigator.geolocation) return
+    setGpsLoading(true)
+    try {
+      // Fetch casino coords once and cache in ref
+      if (!casinoCoordCacheRef.current) {
+        const { data } = await supabaseClient
+          .from('casinos')
+          .select('id, name, city, state, country, lat, lng')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+        casinoCoordCacheRef.current = data ?? []
+      }
+      const casinos = casinoCoordCacheRef.current
+      if (!casinos.length) return
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords
+          const withDist = casinos.map(c => ({
+            ...c,
+            distanceMi: haversine(latitude, longitude, c.lat, c.lng),
+          })).sort((a, b) => a.distanceMi - b.distanceMi)
+
+          const top5 = withDist.slice(0, 5)
+          setNearbyCasinos(top5)
+          if (top5.length > 0) onNearest(top5[0].name)
+          setGpsLoading(false)
+        },
+        () => setGpsLoading(false),
+        { timeout: 8000, maximumAge: 60000 }
+      )
+    } catch {
+      setGpsLoading(false)
+    }
+  }, [supabaseClient])
+
   const openLogPast = () => {
     const today = new Date().toISOString().slice(0, 10)
-    setPastFields({ casino_name: '', date: today, start_time: '', duration_hours: '', start_amount: '', end_amount: '', notes: '' })
+    setNearbyCasinos([])
+    setPastFields({ casino_name: '', date: today, start_time: '', duration_hours: '4', start_amount: '', end_amount: '', win_loss: '', notes: '' })
     setError(''); setSheet('logPast')
+    fetchNearby(name => setPastFields(p => ({ ...p, casino_name: name })))
   }
 
   const openSetBankroll = () => {
@@ -291,7 +362,9 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     setError(''); setSheet('setBankroll')
   }
   const openStartSession = () => {
+    setNearbyCasinos([])
     setStartCasino(''); setStartAmount(''); setError(''); setSheet('startSession')
+    fetchNearby(name => setStartCasino(name))
   }
   const openEndSession = () => {
     setEndAmount(''); setSessionNotes(''); setError(''); setSheet('endSession')
@@ -490,15 +563,15 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                   Your total gambling bankroll. This updates automatically each time you end a session.
                 </p>
                 <label className="block text-zinc-400 text-xs mb-1.5">Bankroll amount</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={bankrollInput}
-                  onChange={e => setBankrollInput(e.target.value)}
-                  placeholder="e.g. 10000"
-                  autoFocus
-                  className="w-full min-h-14 rounded-2xl bg-zinc-800 px-4 text-white text-xl font-bold outline-none focus:ring-2 focus:ring-cyan-500/40 mb-5"
-                />
+                <div className="mb-5">
+                  <MoneyInput
+                    value={bankrollInput}
+                    onChange={setBankrollInput}
+                    placeholder="10000"
+                    autoFocus
+                    inputClassName="min-h-14 text-xl font-bold"
+                  />
+                </div>
                 {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
                 <button
                   onClick={saveBankroll}
@@ -517,24 +590,20 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                 <div className="space-y-3 mb-5">
                   <div>
                     <label className="block text-zinc-400 text-xs mb-1.5">Casino / Location</label>
-                    <input
-                      type="text"
+                    <CasinoAutocomplete
                       value={startCasino}
-                      onChange={e => setStartCasino(e.target.value)}
-                      placeholder="e.g. Bellagio"
-                      autoFocus
-                      className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                      onChange={setStartCasino}
+                      supabaseClient={supabaseClient}
+                      nearbyCasinos={nearbyCasinos}
+                      gpsLoading={gpsLoading}
                     />
                   </div>
                   <div>
                     <label className="block text-zinc-400 text-xs mb-1.5">Session starting amount</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
+                    <MoneyInput
                       value={startAmount}
-                      onChange={e => setStartAmount(e.target.value)}
+                      onChange={setStartAmount}
                       placeholder="How much are you taking today?"
-                      className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
                 </div>
@@ -567,14 +636,11 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                 <div className="space-y-3 mb-5">
                   <div>
                     <label className="block text-zinc-400 text-xs mb-1.5">Final session amount</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
+                    <MoneyInput
                       value={endAmount}
-                      onChange={e => setEndAmount(e.target.value)}
+                      onChange={setEndAmount}
                       placeholder="How much are you walking away with?"
                       autoFocus
-                      className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
                   {endPreviewWL != null && (
@@ -619,79 +685,102 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                 <div className="space-y-3 mb-5">
                   <div>
                     <label className="block text-zinc-400 text-xs mb-1.5">Casino / Location</label>
-                    <input
-                      type="text"
+                    <CasinoAutocomplete
                       value={pastFields.casino_name}
-                      onChange={e => setPastFields(p => ({ ...p, casino_name: e.target.value }))}
-                      placeholder="e.g. Bellagio"
-                      autoFocus
-                      className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                      onChange={v => setPastFields(p => ({ ...p, casino_name: v }))}
+                      supabaseClient={supabaseClient}
+                      nearbyCasinos={nearbyCasinos}
+                      gpsLoading={gpsLoading}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Row 1: Date · Start time · Duration */}
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-zinc-400 text-xs mb-1.5">Date</label>
-                      <input
-                        type="date"
+                      <DateWheelPicker
                         value={pastFields.date}
-                        onChange={e => setPastFields(p => ({ ...p, date: e.target.value }))}
-                        className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                        onChange={v => setPastFields(p => ({ ...p, date: v }))}
                       />
                     </div>
                     <div>
-                      <label className="block text-zinc-400 text-xs mb-1.5">Start time (optional)</label>
+                      <label className="block text-zinc-400 text-xs mb-1.5">Start time</label>
                       <TimeWheelPicker
                         value={pastFields.start_time}
                         onChange={v => setPastFields(p => ({ ...p, start_time: v }))}
                       />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 text-xs mb-1.5">Duration in hours (optional — e.g. 2.5)</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={pastFields.duration_hours}
-                      onChange={e => setPastFields(p => ({ ...p, duration_hours: e.target.value }))}
-                      placeholder="e.g. 3"
-                      className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-zinc-400 text-xs mb-1.5">Start amount</label>
+                      <label className="block text-zinc-400 text-xs mb-1.5">Hours</label>
                       <input
                         type="number"
                         inputMode="decimal"
+                        step="0.1"
+                        min="0"
+                        value={pastFields.duration_hours}
+                        onChange={e => setPastFields(p => ({ ...p, duration_hours: e.target.value }))}
+                        className="w-full min-h-12 rounded-2xl bg-zinc-800 px-3 text-white text-sm outline-none focus:ring-2 focus:ring-cyan-500/40"
+                      />
+                    </div>
+                  </div>
+                  {/* Row 2: Start amount · End amount · Win/Loss */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-zinc-400 text-xs mb-1.5">Buy-in</label>
+                      <MoneyInput
                         value={pastFields.start_amount}
-                        onChange={e => setPastFields(p => ({ ...p, start_amount: e.target.value }))}
-                        placeholder="Buy-in"
-                        className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                        onChange={val => {
+                          const s = parseFloat(val)
+                          const e = parseFloat(pastFields.end_amount)
+                          const wl = !isNaN(s) && !isNaN(e) ? String((e - s).toFixed(2)) : pastFields.win_loss
+                          setPastFields(p => ({ ...p, start_amount: val, win_loss: wl }))
+                        }}
+                        placeholder="0"
+                        tight
                       />
                     </div>
                     <div>
-                      <label className="block text-zinc-400 text-xs mb-1.5">End amount</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
+                      <label className="block text-zinc-400 text-xs mb-1.5">Cash-out</label>
+                      <MoneyInput
                         value={pastFields.end_amount}
-                        onChange={e => setPastFields(p => ({ ...p, end_amount: e.target.value }))}
-                        placeholder="Cash-out"
-                        className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                        onChange={val => {
+                          const s = parseFloat(pastFields.start_amount)
+                          const e = parseFloat(val)
+                          const wl = !isNaN(s) && !isNaN(e) ? String((e - s).toFixed(2)) : pastFields.win_loss
+                          setPastFields(p => ({ ...p, end_amount: val, win_loss: wl }))
+                        }}
+                        placeholder="0"
+                        tight
                       />
                     </div>
-                  </div>
-                  {(() => {
-                    const s = parseFloat(pastFields.start_amount)
-                    const e = parseFloat(pastFields.end_amount)
-                    if (isNaN(s) || isNaN(e)) return null
-                    const wl = e - s
-                    return (
-                      <div className={`rounded-2xl px-4 py-3 text-sm font-bold ${wl >= 0 ? 'bg-emerald-950/70 border border-emerald-800/40 text-emerald-300' : 'bg-red-950/70 border border-red-900/40 text-red-300'}`}>
-                        {wl >= 0 ? '+' : ''}{fmt$(wl)} this session
+                    <div>
+                      <label className="block text-zinc-400 text-xs mb-1.5">Win / Loss</label>
+                      <div className="relative">
+                        <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold pointer-events-none ${
+                          !pastFields.win_loss ? 'text-zinc-400' : parseFloat(pastFields.win_loss) >= 0 ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
+                          {pastFields.win_loss && parseFloat(pastFields.win_loss) > 0 ? '+$' : '$'}
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={pastFields.win_loss}
+                          onChange={e => {
+                            const val = e.target.value
+                            const wl = parseFloat(val)
+                            const s = parseFloat(pastFields.start_amount)
+                            const end = !isNaN(wl) && !isNaN(s) ? String((s + wl).toFixed(2)) : pastFields.end_amount
+                            setPastFields(p => ({ ...p, win_loss: val, end_amount: end }))
+                          }}
+                          placeholder="0"
+                          className={`w-full min-h-12 rounded-2xl bg-zinc-800 pl-7 pr-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500/40 font-semibold ${
+                            pastFields.win_loss
+                              ? parseFloat(pastFields.win_loss) >= 0 ? 'text-emerald-300' : 'text-red-300'
+                              : 'text-white'
+                          }`}
+                        />
                       </div>
-                    )
-                  })()}
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-zinc-400 text-xs mb-1.5">Notes (optional)</label>
                     <textarea
@@ -720,32 +809,25 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                 <div className="space-y-3 mb-5">
                   <div>
                     <label className="block text-zinc-400 text-xs mb-1.5">Casino / Location</label>
-                    <input
-                      type="text"
+                    <CasinoAutocomplete
                       value={editFields.casino_name}
-                      onChange={e => setEditFields(p => ({ ...p, casino_name: e.target.value }))}
-                      className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                      onChange={v => setEditFields(p => ({ ...p, casino_name: v }))}
+                      supabaseClient={supabaseClient}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-zinc-400 text-xs mb-1.5">Start amount</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
+                      <MoneyInput
                         value={editFields.start_amount}
-                        onChange={e => setEditFields(p => ({ ...p, start_amount: e.target.value }))}
-                        className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                        onChange={val => setEditFields(p => ({ ...p, start_amount: val }))}
                       />
                     </div>
                     <div>
                       <label className="block text-zinc-400 text-xs mb-1.5">End amount</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
+                      <MoneyInput
                         value={editFields.end_amount}
-                        onChange={e => setEditFields(p => ({ ...p, end_amount: e.target.value }))}
-                        className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+                        onChange={val => setEditFields(p => ({ ...p, end_amount: val }))}
                       />
                     </div>
                   </div>
@@ -784,6 +866,23 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   )
 }
 
+
+function MoneyInput({ value, onChange, placeholder = '0', tight = false, inputClassName = '', ...rest }) {
+  return (
+    <div className="relative">
+      <span className={`absolute top-1/2 -translate-y-1/2 text-zinc-400 font-semibold pointer-events-none ${tight ? 'left-3 text-sm' : 'left-4'}`}>$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full min-h-12 rounded-2xl bg-zinc-800 ${tight ? 'pl-6 pr-1 text-sm' : 'pl-8 pr-4'} text-white outline-none focus:ring-2 focus:ring-cyan-500/40 ${inputClassName}`}
+        {...rest}
+      />
+    </div>
+  )
+}
 
 function SheetHeader({ title, onClose }) {
   return (
