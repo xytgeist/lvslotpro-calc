@@ -85,3 +85,15 @@ $$;
 
 -- Allow authenticated users to call the RPC
 grant execute on function public.upsert_casino_name(text) to authenticated;
+
+-- ── Seed from existing offer_events ─────────────────────────────────────────
+-- Inserts every distinct non-empty casino_name already in offer_events as a
+-- 'user_confirmed' entry. Skips any that conflict with an existing casino name
+-- (case-insensitive). Safe to re-run.
+
+insert into public.casinos (name, source)
+select distinct trim(casino_name), 'user_confirmed'
+from public.offer_events
+where casino_name is not null
+  and trim(casino_name) <> ''
+on conflict (lower(name)) do nothing;
