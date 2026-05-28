@@ -561,16 +561,15 @@ export default function OfferFormModal({
           )}
 
           {completingReviewItemId && (
-            <div className="rounded-3xl border border-cyan-700/45 bg-cyan-950/25 p-2.5">
-              <div className="text-[16px] font-medium text-cyan-100">Source mailer image</div>
+            <div className="overflow-hidden rounded-3xl border border-zinc-700/50 bg-zinc-800/40">
               {reviewSourceImageLoading ? (
-                <div className="mt-2 text-[16px] text-cyan-200/85">Loading…</div>
+                <div className="flex items-center justify-center h-24 text-sm text-zinc-500">Loading preview…</div>
               ) : reviewSourceImageUrl ? (
-                <a href={reviewSourceImageUrl} target="_blank" rel="noreferrer" className="-mx-3 mt-2 block px-3" title="Open full image">
-                  <img src={reviewSourceImageUrl} alt="" className="max-h-56 w-full rounded-lg object-contain" />
+                <a href={reviewSourceImageUrl} target="_blank" rel="noreferrer" title="Open full image" className="block">
+                  <img src={reviewSourceImageUrl} alt="Source mailer" className="max-h-64 w-full object-contain" />
                 </a>
               ) : (
-                <div className="mt-2 text-[16px] text-cyan-200/85">Preview unavailable · you can still edit below.</div>
+                <div className="flex items-center justify-center h-16 text-sm text-zinc-500">Preview unavailable</div>
               )}
             </div>
           )}
