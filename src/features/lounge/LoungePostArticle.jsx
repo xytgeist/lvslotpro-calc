@@ -562,20 +562,20 @@ export default function LoungePostArticle({
         )}
 
         {/* ── AP Guide embed card ─────────────────────────────────────────── */}
-        {!isPlainPostRepost && !isCommentRepost && post.is_ap_guide_post && post.game_slug ? (
+        {!isCommentRepost && displayPost.is_ap_guide_post && displayPost.game_slug ? (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
-              onOpenGuideCard?.(post.game_slug)
+              onOpenGuideCard?.(displayPost.game_slug)
             }}
             className="mt-3 w-full text-left rounded-2xl overflow-hidden border border-zinc-700/80 bg-zinc-900/80 hover:border-zinc-600 active:border-cyan-700/60 transition-colors touch-manipulation [-webkit-tap-highlight-color:transparent]"
-            aria-label={`View AP Guide: ${post.game_title}`}
+            aria-label={`View AP Guide: ${displayPost.game_title}`}
           >
             <div className="relative h-56 bg-gradient-to-br from-amber-950/60 to-zinc-900 overflow-hidden">
-              {post.guide_thumbnail_url || post.game_slug ? (
+              {displayPost.guide_thumbnail_url || displayPost.game_slug ? (
                 <img
-                  src={post.guide_thumbnail_url || `/guides/${post.game_slug}/hero.webp`}
+                  src={displayPost.guide_thumbnail_url || `/guides/${displayPost.game_slug}/hero.webp`}
                   alt=""
                   className="h-full w-full object-cover opacity-80"
                   loading="lazy"
@@ -585,7 +585,7 @@ export default function LoungePostArticle({
               ) : null}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
               <div className="absolute bottom-0 inset-x-0 px-3 pb-2.5 flex flex-col items-start gap-1">
-                <p className="text-[#fff] font-bold text-sm leading-tight truncate w-full">{post.game_title}</p>
+                <p className="text-[#fff] font-bold text-sm leading-tight truncate w-full">{displayPost.game_title}</p>
                 <span className="inline-flex items-center rounded-full border border-amber-500/50 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
                   AP Guide
                 </span>
