@@ -17,8 +17,8 @@ const EDGE_SPLASH_DATA_LIGHT = JSON.stringify(edgeSplashLight)
 const FLY_THROUGH_START = 157
 const FLY_THROUGH_END = 190
 
-// Shift canvas up slightly so the animation reads centered under the status bar.
-const CANVAS_OFFSET_Y = -20
+// Shift canvas up so the animation reads centered under the status bar.
+const CANVAS_OFFSET_Y = -40
 
 // 251 frames @ 60 fps ≈ 4.2 s. Force-dismiss after 7 s if complete event is late.
 const SPLASH_MAX_MS = 7000
@@ -38,6 +38,9 @@ const SPLASH_MAX_MS = 7000
  *   4. statusBar strip — height env(safe-area-inset-top), always bg-black. Sits in
  *                       the exact pixels iOS samples for its translucent status bar tint,
  *                       keeping the status bar dark for the full duration of the splash.
+ *   5. bottomCover strip — masks the viewport band below the shifted canvas so the feed
+ *                       cannot leak through transparent canvas pixels during fly-through.
+ *                       Stays opaque for the full splash (does not fade with overlay).
  *
  * Status bar: iOS PWA caches apple-mobile-web-app-status-bar-style at install time
  * and does not resample translucent-bar content dynamically during JS execution.
@@ -152,7 +155,17 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
         aria-hidden
       />
 
-      {/* 4. Status bar strip — covers only env(safe-area-inset-top).
+      {/* 4. Bottom cover — opaque band below shifted canvas; blocks feed leak outside D-hole. */}
+      <div
+        className="absolute bottom-0 left-0 right-0 pointer-events-none"
+        style={{
+          height: `calc(${-CANVAS_OFFSET_Y}px + env(safe-area-inset-bottom, 0px))`,
+          backgroundColor: splashBg,
+        }}
+        aria-hidden
+      />
+
+      {/* 5. Status bar strip — covers only env(safe-area-inset-top).
                Matches the Lottie opener color so the iOS translucent status bar
                tint is consistent with the animation background. */}
       <div
