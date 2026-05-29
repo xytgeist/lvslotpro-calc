@@ -68,6 +68,20 @@ function fmtMiles(mi) {
   return mi < 10 ? `${mi.toFixed(1)} mi` : `${Math.round(mi)} mi`
 }
 
+/** YYYY-MM-DD in the device timezone (not UTC — avoid toISOString().slice(0,10)). */
+function localYmd(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Combine local date + HH:MM into an ISO instant for Supabase timestamptz. */
+function localDateTimeToIso(dateYmd, timeHm) {
+  if (!dateYmd || !timeHm) return new Date().toISOString()
+  const [y, m, day] = dateYmd.split('-').map(Number)
+  const [hh, mm] = timeHm.split(':').map(Number)
+  if ([y, m, day, hh, mm].some(n => Number.isNaN(n))) return new Date().toISOString()
+  return new Date(y, m - 1, day, hh, mm).toISOString()
+}
+
 export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null }) {
   const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -236,9 +250,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     if (activeSession) { setError('You already have a session in progress.'); return }
     setSaving(true); setError('')
     try {
-      const startAt = startDate && startTime
-        ? new Date(`${startDate}T${startTime}:00`).toISOString()
-        : new Date().toISOString()
+      const startAt = localDateTimeToIso(startDate, startTime)
       const { data, error: err } = await supabaseClient
         .from('bankroll_sessions')
         .insert({ user_id: userId, casino_name: startCasino.trim() || null, start_amount: amt, start_at: startAt, status: 'active', game_type: startGameType })
@@ -344,7 +356,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     }
     setSaving(true); setError('')
     try {
-      const startAt = new Date(`${pastFields.date}T${pastFields.start_time}:00`).toISOString()
+      const startAt = localDateTimeToIso(pastFields.date, pastFields.start_time)
       const endAt = new Date(new Date(startAt).getTime() + durationHrs * 3_600_000).toISOString()
       const startAmt = finalStart; const endAmt = finalEnd
       const winLoss = endAmt - startAmt
@@ -421,7 +433,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   }, [supabaseClient])
 
   const openLogPast = () => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localYmd()
     setNearbyCasinos([])
     setPastFields({ casino_name: '', date: today, start_time: '', duration_hours: '4', start_amount: '', end_amount: '', win_loss: '', notes: '', game_type: 'slots' })
     setError(''); setSheet('logPast')
@@ -434,7 +446,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   }
   const openStartSession = () => {
     const now = new Date()
-    const today = now.toISOString().slice(0, 10)
+    const today = localYmd(now)
     const hh = String(now.getHours()).padStart(2, '0')
     const mm = String(now.getMinutes()).padStart(2, '0')
     setNearbyCasinos([])
