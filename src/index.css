@@ -1357,6 +1357,11 @@ html.light [data-calc] [data-bankroll-need-help-btn] {
   color: #ffffff !important;
 }
 
+/* Bankroll Risk — high-risk warning cancel button (light bg-gray-800, dark label) */
+html.light [data-calc] [data-bankroll-high-risk-cancel-btn] {
+  color: #18181b !important;
+}
+
 /* ── PhoenixLink ─────────────────────────────────────────────────────────── */
 
 /* PLAY pill checkmark: emoji in dark mode, white-outlined badge in light mode */

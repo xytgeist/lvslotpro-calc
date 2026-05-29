@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react'
 import { loungeChatInvoke } from '../../utils/loungeChatApi.js'
 
 const RISK_KEY = 'lvsp:bankrollRiskPct'
+const RISK_HIGH_WARN_DISMISS_KEY = 'lvsp:bankrollHighRiskWarnDismissed'
+const RISK_PCT_MIN = 1
+const RISK_PCT_MAX = 10
+const RISK_PCT_DEFAULT = 2
+const RISK_PCT_HIGH_THRESHOLD = 5
 
 function fmt$(n) {
   if (n == null || isNaN(n)) return '$0'
@@ -215,6 +220,83 @@ function InfoIconButton({ accentClass, onClick }) {
   )
 }
 
+function isHighRiskWarningDismissed() {
+  try {
+    return localStorage.getItem(RISK_HIGH_WARN_DISMISS_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function BankrollHighRiskWarningModal({ accentClass, accentBtnClass, onConfirm, onCancel }) {
+  const [dontShowAgain, setDontShowAgain] = useState(false)
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-3xl max-w-md w-full p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500/15"
+            aria-hidden
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-6 w-6 text-amber-400"
+            >
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <h3 className={`text-xl font-semibold ${accentClass}`}>Higher risk setting</h3>
+        </div>
+        <p className="text-gray-300 text-[15px] leading-relaxed mb-4">
+          <strong className="text-white">Risking above 5%</strong>
+          {' '}of your bankroll on a single play comes with a significant increase to{' '}
+          <strong className="text-white">Risk of Ruin</strong>
+          {' '}when things go bad.{' '}
+          <strong className="text-white">Professional players stay at 2-5%</strong>
+          {' '}for that reason.
+        </p>
+        <label className="flex items-start gap-3 mb-6 cursor-pointer touch-manipulation">
+          <input
+            type="checkbox"
+            checked={dontShowAgain}
+            onChange={e => setDontShowAgain(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-600 bg-gray-800 text-cyan-600 focus:ring-cyan-600 focus:ring-offset-gray-900"
+          />
+          <span className="text-gray-400 text-sm leading-snug">
+            I&apos;m <strong className="font-bold text-gray-300">degen AF</strong> bro...don&apos;t show me this shit again!
+          </span>
+        </label>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            data-bankroll-high-risk-cancel-btn
+            onClick={onCancel}
+            className="flex-1 py-4 rounded-2xl font-bold text-lg text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors touch-manipulation"
+          >
+            Stay at 5%
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(dontShowAgain)}
+            className={`flex-1 py-4 rounded-2xl font-bold text-lg text-white transition-colors touch-manipulation ${accentBtnClass}`}
+          >
+            I understand
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BankrollRiskInfoModal({ accentClass, accentBtnClass, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -225,7 +307,7 @@ function BankrollRiskInfoModal({ accentClass, accentBtnClass, onClose }) {
             This is a <strong className="text-white">fixed fractional risk assessment</strong>. A standard bankroll rule that caps how much of your roll you&apos;re willing to lose on one play, then compares that to this calculator&apos;s worst-case cost before you commit money on the floor.
           </p>
           <p>
-            <strong className="text-white">How it&apos;s calculated.</strong> We pull your <strong className="text-white">overall bankroll</strong> from the Bankroll Tracker and multiply it by your chosen risk % (1-5%, default 2%). That gives your <strong className="text-white">risk budget</strong>, your fixed slice of bankroll for this opportunity. <strong className="text-white">Exposure</strong> is the worst-case dollars to complete the play. <strong className="text-white">Coverage</strong> is how much of that exposure your budget can absorb. If you&apos;re underfunded, we show how much of your <strong className="text-white">bet size</strong> to consider selling (e.g. $20 of a $25 play).
+            <strong className="text-white">How it&apos;s calculated.</strong> We pull your <strong className="text-white">overall bankroll</strong> from the Bankroll Tracker and multiply it by your chosen risk % (1-10%, default 2%). That gives your <strong className="text-white">risk budget</strong>, your fixed slice of bankroll for this opportunity. Settings above 5% are allowed but significantly increase risk of ruin. <strong className="text-white">Exposure</strong> is the worst-case dollars to complete the play. <strong className="text-white">Coverage</strong> is how much of that exposure your budget can absorb. If you&apos;re underfunded, we show how much of your <strong className="text-white">bet size</strong> to consider selling (e.g. $20 of a $25 play).
           </p>
           <p>
             <strong className="text-white">Why fixed fractional over Kelly?</strong> Kelly sizes bets to maximize long-run growth from edge and payoff ratio. Useful in theory, but far too aggressive for AP slots. Slot variance is brutal: fat tails, long loss streaks, and rare huge wins. Full Kelly (and often even half-Kelly) assumes you can tolerate swings that would put most real bankrolls into 50%+ drawdowns or ruin. <strong className="text-white">Fixed fractional risk</strong> produces smoother equity curves and a much lower chance of catastrophic drawdowns, so you stay in the game long enough for edge to matter.
@@ -276,9 +358,13 @@ export default function BankrollRiskAdvisor({
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showInfoModal, setShowInfoModal] = useState(false)
+  const [showHighRiskWarning, setShowHighRiskWarning] = useState(false)
+  const [pendingRiskPct, setPendingRiskPct] = useState(null)
   const [riskPct, setRiskPct] = useState(() => {
     const saved = localStorage.getItem(RISK_KEY)
-    return saved ? Math.min(5, Math.max(1, Number(saved))) : 2
+    return saved
+      ? Math.min(RISK_PCT_MAX, Math.max(RISK_PCT_MIN, Number(saved)))
+      : RISK_PCT_DEFAULT
   })
 
   useEffect(() => {
@@ -305,12 +391,46 @@ export default function BankrollRiskAdvisor({
     return () => { cancelled = true }
   }, [supabaseClient])
 
+  const applyRiskPct = (next) => {
+    const clamped = Math.min(RISK_PCT_MAX, Math.max(RISK_PCT_MIN, next))
+    setRiskPct(clamped)
+    localStorage.setItem(RISK_KEY, String(clamped))
+  }
+
   const adjustRisk = (delta) => {
-    setRiskPct(prev => {
-      const next = Math.min(5, Math.max(1, prev + delta))
-      localStorage.setItem(RISK_KEY, String(next))
-      return next
-    })
+    const next = Math.min(RISK_PCT_MAX, Math.max(RISK_PCT_MIN, riskPct + delta))
+    if (next === riskPct) return
+
+    if (
+      delta > 0
+      && riskPct <= RISK_PCT_HIGH_THRESHOLD
+      && next > RISK_PCT_HIGH_THRESHOLD
+      && !isHighRiskWarningDismissed()
+    ) {
+      setPendingRiskPct(next)
+      setShowHighRiskWarning(true)
+      return
+    }
+
+    applyRiskPct(next)
+  }
+
+  const confirmHighRisk = (dontShowAgain = false) => {
+    if (dontShowAgain) {
+      try {
+        localStorage.setItem(RISK_HIGH_WARN_DISMISS_KEY, '1')
+      } catch {
+        // ignore quota / private mode
+      }
+    }
+    if (pendingRiskPct != null) applyRiskPct(pendingRiskPct)
+    setPendingRiskPct(null)
+    setShowHighRiskWarning(false)
+  }
+
+  const cancelHighRisk = () => {
+    setPendingRiskPct(null)
+    setShowHighRiskWarning(false)
   }
 
   if (!maxExpectedLoss || maxExpectedLoss <= 0) return null
@@ -342,13 +462,13 @@ export default function BankrollRiskAdvisor({
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => adjustRisk(-1)}
-              disabled={riskPct <= 1}
+              disabled={riskPct <= RISK_PCT_MIN}
               className="w-7 h-7 rounded-full bg-gray-700 text-white text-sm flex items-center justify-center disabled:opacity-30 touch-manipulation active:bg-gray-600"
             >−</button>
             <span className="text-white text-sm font-semibold w-8 text-center">{riskPct}%</span>
             <button
               onClick={() => adjustRisk(1)}
-              disabled={riskPct >= 5}
+              disabled={riskPct >= RISK_PCT_MAX}
               className="w-7 h-7 rounded-full bg-gray-700 text-white text-sm flex items-center justify-center disabled:opacity-30 touch-manipulation active:bg-gray-600"
             >+</button>
           </div>
@@ -438,6 +558,15 @@ export default function BankrollRiskAdvisor({
           </>
         )}
       </div>
+
+      {showHighRiskWarning && (
+        <BankrollHighRiskWarningModal
+          accentClass={accentClass}
+          accentBtnClass={accentBtnClass}
+          onConfirm={confirmHighRisk}
+          onCancel={cancelHighRisk}
+        />
+      )}
 
       {showInfoModal && (
         <BankrollRiskInfoModal
