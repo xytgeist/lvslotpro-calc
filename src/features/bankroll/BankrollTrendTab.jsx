@@ -321,6 +321,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
   const [infoModal, setInfoModal] = useState(null)
   const [tooltip, setTooltip] = useState(null) // { type:'session'|'fan', x, y, side, ... }
   const [isDark, setIsDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const orderedSessionsRef = useRef([])
   const sessionResultsRef = useRef([])
@@ -873,9 +874,22 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
 
         {/* Advanced metrics */}
         {m && (
-          <div data-bankroll-card className="rounded-3xl bg-zinc-900 border border-zinc-800/60 p-4 space-y-5">
-            <div className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Advanced Metrics</div>
+          <div data-bankroll-card className="rounded-3xl bg-zinc-900 border border-zinc-800/60 p-4">
+            <button
+              className="w-full flex items-center justify-between touch-manipulation"
+              onClick={() => setShowAdvanced(v => !v)}
+            >
+              <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Advanced Metrics</span>
+              <svg
+                className="w-4 h-4 text-zinc-500 transition-transform duration-200"
+                style={{ transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
+            {showAdvanced && <div className="mt-5 space-y-5">
             {/* FOUNDATION */}
             <MetricSection title="Foundation">
               <div className="flex gap-2">
@@ -1014,6 +1028,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
                 />
               </div>
             </MetricSection>
+            </div>}
           </div>
         )}
 
