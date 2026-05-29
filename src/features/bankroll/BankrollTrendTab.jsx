@@ -119,6 +119,39 @@ function sessionDurationHours(s) {
   return Math.max(0, (end - start) / 3_600_000)
 }
 
+function readChartIsDark() {
+  const html = document.documentElement
+  if (html.classList.contains('light')) return false
+  if (html.classList.contains('dark')) return true
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true
+}
+
+/** Monte Carlo fan — line/fill/legend tokens tuned per theme. */
+function fanChartStyle(isDark) {
+  if (isDark) {
+    return {
+      bandOuter: 'rgba(96,165,250,0.16)',
+      bandInner: 'rgba(96,165,250,0.28)',
+      bandEdge: 'rgba(147,197,253,0.62)',
+      medianLine: 'rgba(147,197,253,0.92)',
+      medianWidth: 2.25,
+      ruinLine: 'rgba(248,113,113,0.82)',
+      ruinWidth: 2,
+      legendText: '#a1a1aa',
+    }
+  }
+  return {
+    bandOuter: 'rgba(37,99,235,0.22)',
+    bandInner: 'rgba(37,99,235,0.40)',
+    bandEdge: 'rgba(29,78,216,0.65)',
+    medianLine: 'rgba(29,78,216,0.92)',
+    medianWidth: 2.5,
+    ruinLine: 'rgba(220,38,38,0.78)',
+    ruinWidth: 2,
+    legendText: '#3f3f46',
+  }
+}
+
 function fmtDurationHrs(hrs) {
   if (hrs < 0.02) return '—'
   const h = Math.floor(hrs)
@@ -320,7 +353,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
   const [sessionModal, setSessionModal] = useState(null)
   const [infoModal, setInfoModal] = useState(null)
   const [tooltip, setTooltip] = useState(null) // { type:'session'|'fan', x, y, side, ... }
-  const [isDark, setIsDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
+  const [isDark, setIsDark] = useState(readChartIsDark)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const orderedSessionsRef = useRef([])
@@ -330,11 +363,19 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
   const chartContainerRef = useRef(null)
 
   useEffect(() => {
+    const sync = () => setIsDark(readChartIsDark())
+    sync()
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = e => setIsDark(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
+    mq.addEventListener('change', sync)
+    const obs = new MutationObserver(sync)
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => {
+      mq.removeEventListener('change', sync)
+      obs.disconnect()
+    }
   }, [])
+
+  const fanStyle = useMemo(() => fanChartStyle(isDark), [isDark])
 
   const showInfo = (key) => setInfoModal(INFO[key])
 
@@ -537,22 +578,22 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
         data: ruinY != null
           ? [...Array(nHist).fill(null), ...Array(horizon).fill(ruinY)]
           : [],
-        borderColor: 'rgba(248,113,113,0.45)',
-        borderWidth: 1,
-        borderDash: [5, 4],
+        borderColor: fanStyle.ruinLine,
+        borderWidth: fanStyle.ruinWidth,
+        borderDash: [6, 4],
         pointRadius: 0,
         pointHoverRadius: 0,
         fill: false,
         tension: 0,
       })
       // Dataset 2 — p90, fill '+4' → p10
-      datasets.push({ data: [...projNulls, ...p90d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+4', backgroundColor: isDark ? 'rgba(147,197,253,0.07)' : 'rgba(96,165,250,0.22)', tension: 0.35, spanGaps: false })
-      // Dataset 3 — p75, fill '+2' → p25
-      datasets.push({ data: [...projNulls, ...p75d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+2', backgroundColor: isDark ? 'rgba(147,197,253,0.13)' : 'rgba(96,165,250,0.38)', tension: 0.35, spanGaps: false })
+      datasets.push({ data: [...projNulls, ...p90d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+4', backgroundColor: fanStyle.bandOuter, tension: 0.35, spanGaps: false })
+      // Dataset 3 — p75, fill '+2' → p25 (upper IQR edge visible)
+      datasets.push({ data: [...projNulls, ...p75d], borderColor: fanStyle.bandEdge, borderWidth: 1.25, borderDash: [4, 3], pointRadius: 0, pointHoverRadius: 0, fill: '+2', backgroundColor: fanStyle.bandInner, tension: 0.35, spanGaps: false })
       // Dataset 4 — p50 median
-      datasets.push({ data: [...projNulls, ...p50d], borderColor: 'rgba(147,197,253,0.55)', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0.35, spanGaps: false })
-      // Dataset 5 — p25
-      datasets.push({ data: [...projNulls, ...p25d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0.35, spanGaps: false })
+      datasets.push({ data: [...projNulls, ...p50d], borderColor: fanStyle.medianLine, borderWidth: fanStyle.medianWidth, borderDash: [6, 4], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0.35, spanGaps: false })
+      // Dataset 5 — p25 (lower IQR edge visible)
+      datasets.push({ data: [...projNulls, ...p25d], borderColor: fanStyle.bandEdge, borderWidth: 1.25, borderDash: [4, 3], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0.35, spanGaps: false })
       // Dataset 6 — p10
       datasets.push({ data: [...projNulls, ...p10d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0.35, spanGaps: false })
     }
@@ -562,7 +603,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
       : labels
 
     return { labels: extLabels, datasets }
-  }, [dataPoints, sessionResults, pointColors, pointRadius, activeMC, totalPL, fanHorizon, labels, isDark])
+  }, [dataPoints, sessionResults, pointColors, pointRadius, activeMC, totalPL, fanHorizon, labels, fanStyle])
 
   const boundaryPlugin = useMemo(() => {
     if (!activeMC) return null
@@ -844,18 +885,27 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
 
           {/* Fan chart legend */}
           {activeMC && filteredSessions.length >= 2 && (
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
               <div className="flex items-center gap-1.5">
-                <div className="w-6 h-0" style={{ borderTop: '1.5px dashed rgba(147,197,253,0.55)' }} />
-                <span className="text-zinc-500 text-[10px]">Median projection</span>
+                <div
+                  className="w-7 shrink-0"
+                  style={{ borderTop: `${fanStyle.medianWidth}px dashed ${fanStyle.medianLine}` }}
+                />
+                <span className="text-[11px] font-medium" style={{ color: fanStyle.legendText }}>Median projection</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-blue-400/20" />
-                <span className="text-zinc-500 text-[10px]">25–75th %ile</span>
+                <div
+                  className="w-3.5 h-3.5 rounded-sm shrink-0 border"
+                  style={{ backgroundColor: fanStyle.bandInner, borderColor: fanStyle.bandEdge }}
+                />
+                <span className="text-[11px] font-medium" style={{ color: fanStyle.legendText }}>25–75th %ile</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-6 h-0" style={{ borderTop: '1px dashed rgba(248,113,113,0.45)' }} />
-                <span className="text-zinc-500 text-[10px]">Ruin threshold (25% remaining)</span>
+                <div
+                  className="w-7 shrink-0"
+                  style={{ borderTop: `${fanStyle.ruinWidth}px dashed ${fanStyle.ruinLine}` }}
+                />
+                <span className="text-[11px] font-medium" style={{ color: fanStyle.legendText }}>Ruin threshold (25% remaining)</span>
               </div>
             </div>
           )}

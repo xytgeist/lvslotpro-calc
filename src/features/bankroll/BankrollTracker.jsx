@@ -82,6 +82,19 @@ function localDateTimeToIso(dateYmd, timeHm) {
   return new Date(y, m - 1, day, hh, mm).toISOString()
 }
 
+function isoToLocalYmd(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : localYmd(d)
+}
+
+function isoToLocalHm(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null }) {
   const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -302,12 +315,33 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     const startAmt = parseFloat(editFields.start_amount)
     const endAmt = editFields.end_amount !== '' ? parseFloat(editFields.end_amount) : null
     if (isNaN(startAmt) || startAmt < 0) { setError('Enter a valid start amount.'); return }
+    if (!editFields.start_date || !editFields.start_time) {
+      setError('Select session start date and time.')
+      return
+    }
+    const startAt = localDateTimeToIso(editFields.start_date, editFields.start_time)
+    const startMs = new Date(startAt).getTime()
+    const needsEnd = editingSession.status === 'completed'
+    let endAt = null
+    if (needsEnd) {
+      if (!editFields.end_date || !editFields.end_time) {
+        setError('Select session end date and time.')
+        return
+      }
+      endAt = localDateTimeToIso(editFields.end_date, editFields.end_time)
+      if (new Date(endAt).getTime() < startMs) {
+        setError('End time must be after start time.')
+        return
+      }
+    }
     setSaving(true); setError('')
     try {
       const { data, error: err } = await supabaseClient
         .from('bankroll_sessions')
         .update({
           casino_name: (editFields.casino_name || '').trim() || null,
+          start_at: startAt,
+          end_at: endAt,
           start_amount: startAmt,
           end_amount: endAmt != null && !isNaN(endAmt) ? endAmt : null,
           notes: (editFields.notes || '').trim() || null,
@@ -508,6 +542,10 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     setEditingSession(session)
     setEditFields({
       casino_name: session.casino_name || '',
+      start_date: isoToLocalYmd(session.start_at),
+      start_time: isoToLocalHm(session.start_at),
+      end_date: isoToLocalYmd(session.end_at) || isoToLocalYmd(session.start_at),
+      end_time: isoToLocalHm(session.end_at) || isoToLocalHm(session.start_at),
       start_amount: String(session.start_amount),
       end_amount: session.end_amount != null ? String(session.end_amount) : '',
       notes: session.notes || '',
@@ -1397,6 +1435,36 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                     <label className="block text-zinc-400 text-xs mb-1.5">Game type</label>
                     <GameTypeToggle value={editFields.game_type || 'slots'} onChange={v => setEditFields(p => ({ ...p, game_type: v }))} />
                   </div>
+                  <div>
+                    <label className="block text-zinc-400 text-xs mb-1.5">Start</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DateWheelPicker
+                        value={editFields.start_date}
+                        onChange={v => setEditFields(p => ({ ...p, start_date: v }))}
+                        showYear
+                      />
+                      <TimeWheelPicker
+                        value={editFields.start_time}
+                        onChange={v => setEditFields(p => ({ ...p, start_time: v }))}
+                      />
+                    </div>
+                  </div>
+                  {editingSession.status === 'completed' && (
+                    <div>
+                      <label className="block text-zinc-400 text-xs mb-1.5">End</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <DateWheelPicker
+                          value={editFields.end_date}
+                          onChange={v => setEditFields(p => ({ ...p, end_date: v }))}
+                          showYear
+                        />
+                        <TimeWheelPicker
+                          value={editFields.end_time}
+                          onChange={v => setEditFields(p => ({ ...p, end_time: v }))}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-zinc-400 text-xs mb-1.5">Start amount</label>
