@@ -14,7 +14,7 @@ import {
   subscribeLoungeColdBootPendingWork,
 } from '../../utils/loungeColdBootPendingWork.js'
 
-const SPLASH_FADE_MS = 220
+const SPLASH_FADE_MS = 120
 
 /** Sync eligibility on first paint — avoids one frame of feed "Loading…" before splash. */
 function readInitialColdBootSplashVisible(tab) {
