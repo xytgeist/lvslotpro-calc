@@ -71,10 +71,11 @@ export function useLoungeColdBootSplash({ tab, browseMode }) {
     const minMs = isMember ? LOUNGE_COLD_BOOT_MEMBER_MIN_MS : LOUNGE_COLD_BOOT_ANON_MIN_MS
     const maxMs = isMember ? LOUNGE_COLD_BOOT_MEMBER_MAX_MS : LOUNGE_COLD_BOOT_ANON_MAX_MS
     const elapsed = Date.now() - shownAtRef.current
-    if (elapsed < minMs) return false
-    if (!isMember) return true
+    // Lottie can hit fly-through end (frame 190) before minMs on fast devices — don't hold the splash.
     if (animationDoneRef.current) return true
     if (elapsed >= maxMs) return true
+    if (elapsed < minMs) return false
+    if (!isMember) return true
     return false
   }, [isMember])
 
@@ -84,8 +85,10 @@ export function useLoungeColdBootSplash({ tab, browseMode }) {
 
   const onSplashAnimationComplete = useCallback(() => {
     animationDoneRef.current = true
-    attemptFinishSplash()
-  }, [attemptFinishSplash])
+    // Don't wait for the 48ms poll — dismiss on the animation event itself.
+    if (canFinishSplash()) finishSplash()
+    else attemptFinishSplash()
+  }, [attemptFinishSplash, canFinishSplash, finishSplash])
 
   /** Initial cold boot (killed app / fresh tab). */
   useEffect(() => {

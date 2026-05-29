@@ -13,7 +13,7 @@ const EDGE_SPLASH_DATA_DARK = JSON.stringify(edgeSplashDark)
 const EDGE_SPLASH_DATA_LIGHT = JSON.stringify(edgeSplashLight)
 
 // Black Solid 1 ends at frame 157 → D fly-through begins.
-// Overlay fully transparent at frame 190 — fly-through done; playback segment ends here too.
+// Overlay fully transparent at frame 190 — fly-through done; playback stops here.
 const FLY_THROUGH_START = 157
 const FLY_THROUGH_END = 190
 
@@ -39,10 +39,8 @@ const SPLASH_MAX_MS = 7000
  *                       the exact pixels iOS samples for its translucent status bar tint,
  *                       keeping the status bar dark for the full duration of the splash.
  *   5. bottomCover strip — topmost layer at the bottom; masks the band below the shifted
- *                       canvas so the feed cannot leak through transparent canvas pixels.
- *                       Hidden with the canvas when fly-through finishes (frame 190).
- *                       (Hiding the cover alone is invisible — the canvas keeps painting the
- *                       same opaque Lottie pixels underneath until playback stops.)
+ *                       canvas so the feed cannot leak through transparent canvas pixels
+ *                       during fly-through. Removed when fly-through finishes (frame 190).
  *
  * Status bar: iOS PWA caches apple-mobile-web-app-status-bar-style at install time
  * and does not resample translucent-bar content dynamically during JS execution.
@@ -84,14 +82,12 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
     const player = new DotLottie({
       canvas: offscreen,
       data: isDarkEffect ? EDGE_SPLASH_DATA_DARK : EDGE_SPLASH_DATA_LIGHT,
-      autoplay: true,
+      autoplay: false,
       loop: false,
       useFrameInterpolation: false,
       backgroundColor: '#00000000',
       layout: { fit: 'cover', align: [0.5, 0.5] },
       renderConfig: { autoResize: false },
-      // Stop at fly-through end — file continues to frame 251 but that tail repaints the
-      // same opaque bottom band on the canvas, so hiding bottomCover alone looked like no-op.
       segment: [0, FLY_THROUGH_END],
     })
 
@@ -99,24 +95,72 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
     const fallback = setTimeout(done, SPLASH_MAX_MS)
     let dismissSignaled = false
     let flyThroughFinished = false
+    let pollRaf = 0
+
     const signalDismiss = () => {
       if (dismissSignaled) return
       dismissSignaled = true
       done()
     }
+
+    const stopPolling = () => {
+      if (pollRaf) {
+        cancelAnimationFrame(pollRaf)
+        pollRaf = 0
+      }
+    }
+
     const finishFlyThrough = () => {
       if (flyThroughFinished) return
       flyThroughFinished = true
+      stopPolling()
+
+      try {
+        player.pause()
+      } catch {
+        // ignore
+      }
+
       if (bottomCoverRef.current) {
         bottomCoverRef.current.style.display = 'none'
         bottomCoverRef.current = null
       }
-      // Canvas sits under bottomCover but keeps painting identical opaque Lottie pixels
-      // through the file tail — hide it so the bottom band actually clears.
-      if (canvasRef.current) {
-        canvasRef.current.style.visibility = 'hidden'
+      if (overlayRef.current) {
+        overlayRef.current.style.display = 'none'
+        overlayRef.current = null
       }
+      if (canvasRef.current) {
+        canvasRef.current.style.display = 'none'
+        canvasRef.current = null
+      }
+      if (preFrameCoverRef.current) {
+        preFrameCoverRef.current.style.display = 'none'
+        preFrameCoverRef.current = null
+      }
+      if (statusBarRef.current) {
+        statusBarRef.current.style.display = 'none'
+        statusBarRef.current = null
+      }
+
       signalDismiss()
+    }
+
+    const syncFlyThroughFromFrame = (currentFrame) => {
+      if (currentFrame >= FLY_THROUGH_START && overlayRef.current) {
+        const t = Math.min(1, (currentFrame - FLY_THROUGH_START) / (FLY_THROUGH_END - FLY_THROUGH_START))
+        overlayRef.current.style.opacity = String(1 - t)
+      }
+      if (currentFrame >= FLY_THROUGH_END) {
+        finishFlyThrough()
+      }
+    }
+
+    const pollCurrentFrame = () => {
+      if (flyThroughFinished) return
+      syncFlyThroughFromFrame(player.currentFrame)
+      if (!flyThroughFinished) {
+        pollRaf = requestAnimationFrame(pollCurrentFrame)
+      }
     }
 
     player.addEventListener('frame', ({ currentFrame }) => {
@@ -131,16 +175,7 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
         requestAnimationFrame(() => { cover.style.display = 'none' })
       }
 
-      // Fade the overlay via direct DOM mutation — not setState — so it works
-      // reliably inside DotLottie's native event listener on iOS PWA.
-      if (currentFrame >= FLY_THROUGH_START && overlayRef.current) {
-        const t = Math.min(1, (currentFrame - FLY_THROUGH_START) / (FLY_THROUGH_END - FLY_THROUGH_START))
-        overlayRef.current.style.opacity = String(1 - t)
-      }
-
-      if (currentFrame >= FLY_THROUGH_END) {
-        finishFlyThrough()
-      }
+      syncFlyThroughFromFrame(currentFrame)
     })
 
     player.addEventListener('complete', () => {
@@ -148,7 +183,14 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       finishFlyThrough()
     })
 
+    player.addEventListener('ready', () => {
+      player.setSegment(0, FLY_THROUGH_END)
+      player.play()
+      pollRaf = requestAnimationFrame(pollCurrentFrame)
+    })
+
     return () => {
+      stopPolling()
       clearTimeout(fallback)
       player.destroy()
     }
@@ -186,9 +228,7 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
         aria-hidden
       />
 
-      {/* 4. Status bar strip — covers only env(safe-area-inset-top).
-               Matches the Lottie opener color so the iOS translucent status bar
-               tint is consistent with the animation background. */}
+      {/* 4. Status bar strip — covers only env(safe-area-inset-top). */}
       <div
         ref={statusBarRef}
         className="absolute top-0 left-0 right-0 pointer-events-none"
