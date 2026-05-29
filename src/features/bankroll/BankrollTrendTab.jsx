@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Chart as ChartJS,
   LineElement,
@@ -319,9 +319,21 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
   const [showMonteCarlo, setShowMonteCarlo] = useState(true)
   const [sessionModal, setSessionModal] = useState(null)
   const [infoModal, setInfoModal] = useState(null)
+  const [tooltip, setTooltip] = useState(null) // { type:'session'|'fan', x, y, side, ... }
+  const [isDark, setIsDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
 
-  const activeIdxRef = useRef(null)
   const orderedSessionsRef = useRef([])
+  const sessionResultsRef = useRef([])
+  const mcResultRef = useRef(null)
+  const totalPLRef = useRef(0)
+  const chartContainerRef = useRef(null)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = e => setIsDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const showInfo = (key) => setInfoModal(INFO[key])
 
@@ -381,6 +393,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
   }, [filteredSessions, adjustments, filter])
 
   orderedSessionsRef.current = orderedSessions
+  sessionResultsRef.current = sessionResults
 
   const totalPL = dataPoints.length > 0 ? dataPoints[dataPoints.length - 1] : 0
   const maxPL   = dataPoints.length > 0 ? Math.max(...dataPoints) : 0
@@ -465,6 +478,9 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
 
   const activeMC = showMonteCarlo ? mcResult : null
 
+  mcResultRef.current = mcResult
+  totalPLRef.current = totalPL
+
   // ── Chart helpers ──────────────────────────────────────────────────────────
   const pointColors = sessionResults.map(r => r >= 0 ? '#34d399' : '#f87171')
   const pointRadius = activeMC ? 0 : (dataPoints.length <= 20 ? 5 : dataPoints.length <= 50 ? 3 : 0)
@@ -529,9 +545,9 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
         tension: 0,
       })
       // Dataset 2 — p90, fill '+4' → p10
-      datasets.push({ data: [...projNulls, ...p90d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+4', backgroundColor: 'rgba(147,197,253,0.07)', tension: 0.35, spanGaps: false })
+      datasets.push({ data: [...projNulls, ...p90d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+4', backgroundColor: isDark ? 'rgba(147,197,253,0.07)' : 'rgba(96,165,250,0.22)', tension: 0.35, spanGaps: false })
       // Dataset 3 — p75, fill '+2' → p25
-      datasets.push({ data: [...projNulls, ...p75d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+2', backgroundColor: 'rgba(147,197,253,0.13)', tension: 0.35, spanGaps: false })
+      datasets.push({ data: [...projNulls, ...p75d], borderColor: 'transparent', borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '+2', backgroundColor: isDark ? 'rgba(147,197,253,0.13)' : 'rgba(96,165,250,0.38)', tension: 0.35, spanGaps: false })
       // Dataset 4 — p50 median
       datasets.push({ data: [...projNulls, ...p50d], borderColor: 'rgba(147,197,253,0.55)', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0.35, spanGaps: false })
       // Dataset 5 — p25
@@ -545,7 +561,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
       : labels
 
     return { labels: extLabels, datasets }
-  }, [dataPoints, sessionResults, pointColors, pointRadius, activeMC, totalPL, fanHorizon, labels])
+  }, [dataPoints, sessionResults, pointColors, pointRadius, activeMC, totalPL, fanHorizon, labels, isDark])
 
   const boundaryPlugin = useMemo(() => {
     if (!activeMC) return null
@@ -578,63 +594,54 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
     maintainAspectRatio: false,
     animation: false,
     interaction: { mode: 'index', intersect: false },
-    onClick: (evt, elements, chart) => {
-      if (elements.length > 0) {
-        const idx = elements[0].index
-        if (idx >= orderedSessionsRef.current.length) {
-          activeIdxRef.current = null
-          chart.tooltip.setActiveElements([], { x: 0, y: 0 })
-          chart.update('none')
-          return
-        }
-        if (activeIdxRef.current === idx) {
-          setSessionModal(orderedSessionsRef.current[idx])
+    onClick: (evt, _elements, chart) => {
+      const native = evt.native ?? evt
+      const snapped = chart.getElementsAtEventForMode(native, 'index', { intersect: false }, false)
+      if (snapped.length > 0) {
+        const idx = snapped[0].index
+        const containerRect = chartContainerRef.current?.getBoundingClientRect()
+        const tapX = containerRect ? native.clientX - containerRect.left : 0
+        const tapY = containerRect ? native.clientY - containerRect.top : 0
+        const side = tapX > (containerRect?.width ?? 300) / 2 ? 'right' : 'left'
+        const nHist = orderedSessionsRef.current.length
+
+        if (idx >= nHist) {
+          // Tapped in the fan projection area
+          const mc = mcResultRef.current
+          if (!mc) { setTooltip(null); return }
+          const projIdx = Math.min(idx - nHist, mc.p10.length - 1)
+          const off = v => parseFloat((v + totalPLRef.current).toFixed(2))
+          setTooltip({
+            type: 'fan',
+            x: tapX,
+            y: tapY,
+            side,
+            step: projIdx + 1,
+            p10: off(mc.p10[projIdx]),
+            p25: off(mc.p25[projIdx]),
+            p50: off(mc.p50[projIdx]),
+            p75: off(mc.p75[projIdx]),
+            p90: off(mc.p90[projIdx]),
+            ror: mc.ror,
+          })
         } else {
-          activeIdxRef.current = idx
-          chart.tooltip.setActiveElements(
-            [{ datasetIndex: 0, index: idx }],
-            { x: evt.x ?? 0, y: evt.y ?? 0 }
-          )
-          chart.update('none')
+          setTooltip({
+            type: 'session',
+            x: tapX,
+            y: tapY,
+            side,
+            session: orderedSessionsRef.current[idx],
+            sessionPL: sessionResultsRef.current[idx],
+            cumPL: chart.data.datasets[0].data[idx],
+          })
         }
       } else {
-        activeIdxRef.current = null
-        chart.tooltip.setActiveElements([], { x: 0, y: 0 })
-        chart.update('none')
+        setTooltip(null)
       }
     },
     plugins: {
       legend: { display: false },
-      tooltip: {
-        filter: item => item.datasetIndex === 0 && item.dataset.data[item.dataIndex] != null,
-        callbacks: {
-          title: () => [],
-          afterTitle: ctx => {
-            const idx = ctx[0]?.dataIndex
-            const s = orderedSessions[idx]
-            return s ? fmtDate(s.start_at) : ''
-          },
-          label: ctx => {
-            const idx = ctx.dataIndex
-            const sessionPL = sessionResults[idx]
-            const cumPL = ctx.parsed.y
-            return [
-              `This session:  ${sessionPL >= 0 ? '+' : ''}${fmt$(sessionPL)}`,
-              `Cumulative:   ${cumPL >= 0 ? '+' : ''}${fmt$(cumPL)}`,
-            ]
-          },
-          footer: () => ['Tap again to view details →'],
-        },
-        titleColor: '#a1a1aa',
-        bodyColor: '#fff',
-        footerColor: '#52525b',
-        footerFont: { size: 10, style: 'italic' },
-        backgroundColor: '#18181b',
-        borderColor: '#3f3f46',
-        borderWidth: 1,
-        padding: 12,
-        displayColors: false,
-      },
+      tooltip: { enabled: false },
     },
     scales: {
       x: {
@@ -649,8 +656,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
         ticks: { color: '#71717a', font: { size: 10 }, callback: v => fmt$(v) },
       },
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [orderedSessions, sessionResults])
+  }), [])
 
   if (sessions.length === 0) {
     return (
@@ -700,7 +706,7 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
             {FILTERS.map(f => (
               <button
                 key={f.label}
-                onClick={() => { activeIdxRef.current = null; setFilter(f.label) }}
+                onClick={() => { setTooltip(null); setFilter(f.label) }}
                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold touch-manipulation transition-colors ${
                   filter === f.label ? 'bg-zinc-700 text-white' : 'text-zinc-500 active:bg-zinc-800'
                 }`}
@@ -745,8 +751,93 @@ export default function BankrollTrendTab({ sessions, adjustments, initialBankrol
               Not enough sessions in this period.
             </div>
           ) : (
-            <div className="h-[220px]">
+            <div ref={chartContainerRef} className="h-[220px] relative">
               <Line data={chartData} options={chartOptions} plugins={boundaryPlugin ? [boundaryPlugin] : []} />
+
+              {/* Dismiss backdrop — fixed so tapping anywhere outside the tooltip closes it */}
+              {tooltip && (
+                <div
+                  className="fixed inset-0 z-[19]"
+                  onClick={() => setTooltip(null)}
+                />
+              )}
+
+              {/* HTML tooltip — session detail or fan projection callout */}
+              {tooltip && (() => {
+                // Light-mode theme — dark mode is unchanged
+                const bg  = isDark ? '#18181b' : '#ffffff'
+                const bdr = isDark ? '#3f3f46' : '#d4d4d8'
+                const clrDate  = isDark ? '#a1a1aa' : '#52525b'
+                const clrLabel = isDark ? '#71717a' : '#52525b'
+                const clrPos   = isDark ? '#34d399' : '#059669'  // emerald-400 / emerald-700
+                const clrNeg   = isDark ? '#f87171' : '#dc2626'  // red-400 / red-600
+                const clrLink  = isDark ? '#22d3ee' : '#0284c7'  // cyan-400 / sky-600
+                const clrHead  = isDark ? '#93c5fd' : '#2563eb'  // blue-300 / blue-600
+                const clrMuted = isDark ? '#71717a' : '#71717a'
+                const clrDivider = isDark ? '#3f3f46' : '#e4e4e7'
+                return (
+                  <div
+                    className="absolute z-[20] rounded-xl shadow-xl"
+                    style={{
+                      background: bg,
+                      border: `1px solid ${bdr}`,
+                      padding: '10px 14px',
+                      minWidth: tooltip.type === 'fan' ? 190 : 170,
+                      maxWidth: 220,
+                      top: Math.max(4, tooltip.y - (tooltip.type === 'fan' ? 120 : 90)),
+                      ...(tooltip.side === 'left'
+                        ? { left: tooltip.x + 12 }
+                        : { right: `calc(100% - ${tooltip.x}px + 12px)` }),
+                    }}
+                  >
+                    {tooltip.type === 'fan' ? (
+                      <>
+                        <div className="text-[11px] font-semibold mb-2" style={{ color: clrHead }}>+{tooltip.step} sessions projected</div>
+                        {[
+                          { label: 'Best (p90)', val: tooltip.p90 },
+                          { label: 'Upper (p75)', val: tooltip.p75 },
+                          { label: 'Median',      val: tooltip.p50 },
+                          { label: 'Lower (p25)', val: tooltip.p25 },
+                          { label: 'Worst (p10)', val: tooltip.p10 },
+                        ].map(({ label, val }) => (
+                          <div key={label} className="flex justify-between gap-3 text-[11px] mb-0.5">
+                            <span style={{ color: clrMuted }}>{label}</span>
+                            <span style={{ color: val >= 0 ? clrPos : clrNeg }}>
+                              {val >= 0 ? '+' : ''}{fmt$(val)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="mt-2 pt-2 flex justify-between gap-3 text-[11px]" style={{ borderTop: `1px solid ${clrDivider}` }}>
+                          <span style={{ color: clrMuted }}>Risk of Ruin</span>
+                          <span style={{ color: tooltip.ror < 5 ? clrPos : tooltip.ror < 20 ? '#f59e0b' : clrNeg }}>
+                            {tooltip.ror.toFixed(1)}%
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        className="text-left w-full"
+                        onClick={() => { setSessionModal(tooltip.session); setTooltip(null) }}
+                      >
+                        <div className="text-[11px] mb-1.5" style={{ color: clrDate }}>{fmtDate(tooltip.session.start_at)}</div>
+                        <div className="text-[12px] mb-0.5">
+                          <span style={{ color: clrLabel }}>This session: </span>
+                          <span style={{ color: tooltip.sessionPL >= 0 ? clrPos : clrNeg }}>
+                            {tooltip.sessionPL >= 0 ? '+' : ''}{fmt$(tooltip.sessionPL)}
+                          </span>
+                        </div>
+                        <div className="text-[12px] mb-2">
+                          <span style={{ color: clrLabel }}>Cumulative: </span>
+                          <span style={{ color: tooltip.cumPL >= 0 ? clrPos : clrNeg }}>
+                            {tooltip.cumPL >= 0 ? '+' : ''}{fmt$(tooltip.cumPL)}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-semibold" style={{ color: clrLink }}>View details →</div>
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )}
 
