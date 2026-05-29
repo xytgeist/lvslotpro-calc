@@ -36,15 +36,18 @@ function toYYYYMMDD({ month, day, year }) {
   return `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
-function displayLabel(yyyymmdd) {
+function displayLabel(yyyymmdd, showYear = false) {
   if (!yyyymmdd) return null
   const [y, m, d] = yyyymmdd.split('-').map(Number)
   const date = new Date(y, m - 1, d)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const opts = showYear
+    ? { month: 'short', day: 'numeric', year: 'numeric' }
+    : { month: 'short', day: 'numeric' }
+  return date.toLocaleDateString('en-US', opts)
 }
 
 const currentYear = new Date().getFullYear()
-const YEARS = Array.from({ length: 5 }, (_, i) => String(currentYear - 3 + i))
+const YEARS = Array.from({ length: 8 }, (_, i) => String(currentYear - 7 + i))
 
 export default function DateWheelPicker({ value, onChange, showYear = false }) {
   const [open, setOpen] = useState(false)
@@ -75,7 +78,7 @@ export default function DateWheelPicker({ value, onChange, showYear = false }) {
     onChange(toYYYYMMDD(resolved))
   }
 
-  const label = displayLabel(value) ?? displayLabel(toYYYYMMDD(nowParts()))
+  const label = displayLabel(value, showYear) ?? displayLabel(toYYYYMMDD(nowParts()), showYear)
 
   return (
     <div>

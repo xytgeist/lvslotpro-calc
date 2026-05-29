@@ -3,6 +3,9 @@ import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitl
 import TimeWheelPicker from '../../components/TimeWheelPicker.jsx'
 import DateWheelPicker from '../../components/DateWheelPicker.jsx'
 import CasinoAutocomplete from '../../components/CasinoAutocomplete.jsx'
+import BankrollTrendTab from './BankrollTrendTab.jsx'
+import BankrollChartsTab from './BankrollChartsTab.jsx'
+import BankrollLocationsTab from './BankrollLocationsTab.jsx'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -68,8 +71,11 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
   const [sessions, setSessions] = useState([])
+  const [adjustments, setAdjustments] = useState([])
   const [loading, setLoading] = useState(true)
-  const [sheet, setSheet] = useState(null) // null | 'setBankroll' | 'startSession' | 'endSession' | 'editSession' | 'logPast'
+  const [activeTab, setActiveTab] = useState('overview') // 'overview' | 'locations' | 'charts' | 'trend'
+  const [gameTypeFilter, setGameTypeFilter] = useState('all') // 'all' | 'slots' | 'tables'
+  const [sheet, setSheet] = useState(null)
   const [editingSession, setEditingSession] = useState(null)
   const [elapsed, setElapsed] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -83,6 +89,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   // Sheet form state
   const [bankrollInput, setBankrollInput] = useState('')
   const [startCasino, setStartCasino] = useState('')
+  const [startGameType, setStartGameType] = useState('slots')
   const [startDate, setStartDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [startAmount, setStartAmount] = useState('')
@@ -95,6 +102,9 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
 
   const activeSession = sessions.find(s => s.status === 'active') ?? null
   const completedSessions = sessions.filter(s => s.status === 'completed')
+  const tabSessions = gameTypeFilter === 'all'
+    ? completedSessions
+    : completedSessions.filter(s => (s.game_type || 'slots') === gameTypeFilter)
   const overallBankroll = profile ? Number(profile.overall_bankroll) : null
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -104,16 +114,21 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     try {
       const { data: { user } } = await supabaseClient.auth.getUser()
       if (user) setUserId(user.id)
-      const [profileRes, sessionsRes] = await Promise.all([
+      const [profileRes, sessionsRes, adjRes] = await Promise.all([
         supabaseClient.from('bankroll_profiles').select('*').maybeSingle(),
         supabaseClient
           .from('bankroll_sessions')
           .select('*')
           .order('start_at', { ascending: false })
-          .limit(200)
+          .limit(500),
+        supabaseClient
+          .from('bankroll_adjustments')
+          .select('*')
+          .order('occurred_at', { ascending: true })
       ])
       if (profileRes.data) setProfile(profileRes.data)
       if (sessionsRes.data) setSessions(sessionsRes.data)
+      if (adjRes.data) setAdjustments(adjRes.data)
     } catch (e) {
       console.error('BankrollTracker load error:', e)
     } finally {
@@ -154,11 +169,21 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     if (isNaN(val) || val < 0) { setError('Enter a valid amount.'); return }
     setSaving(true); setError('')
     try {
+      const oldVal = profile ? Number(profile.overall_bankroll) : 0
+      const delta = val - oldVal
       const { data, error: err } = await supabaseClient
         .from('bankroll_profiles')
         .upsert({ user_id: userId, overall_bankroll: val }, { onConflict: 'user_id' })
         .select().single()
       if (err) throw err
+      // Log adjustment delta if this is an edit (not initial set) and amount changed
+      if (profile && Math.abs(delta) > 0.001) {
+        const { data: adjData } = await supabaseClient
+          .from('bankroll_adjustments')
+          .insert({ user_id: userId, amount: delta, note: 'Manual adjustment' })
+          .select().single()
+        if (adjData) setAdjustments(prev => [...prev, adjData])
+      }
       setProfile(data)
       setSheet(null)
     } catch (e) {
@@ -179,11 +204,11 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
         : new Date().toISOString()
       const { data, error: err } = await supabaseClient
         .from('bankroll_sessions')
-        .insert({ user_id: userId, casino_name: startCasino.trim() || null, start_amount: amt, start_at: startAt, status: 'active' })
+        .insert({ user_id: userId, casino_name: startCasino.trim() || null, start_amount: amt, start_at: startAt, status: 'active', game_type: startGameType })
         .select().single()
       if (err) throw err
       setSessions(prev => [data, ...prev])
-      setSheet(null); setStartCasino(''); setStartAmount('')
+      setSheet(null); setStartCasino(''); setStartAmount(''); setStartGameType('slots')
     } catch (e) {
       setError(e.message || 'Could not start session.')
     } finally {
@@ -236,7 +261,8 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
           casino_name: (editFields.casino_name || '').trim() || null,
           start_amount: startAmt,
           end_amount: endAmt != null && !isNaN(endAmt) ? endAmt : null,
-          notes: (editFields.notes || '').trim() || null
+          notes: (editFields.notes || '').trim() || null,
+          game_type: editFields.game_type || 'slots'
         })
         .eq('id', editingSession.id)
         .select().single()
@@ -295,7 +321,8 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
           start_amount: startAmt,
           end_amount: endAmt,
           status: 'completed',
-          notes: (pastFields.notes || '').trim() || null
+          notes: (pastFields.notes || '').trim() || null,
+          game_type: pastFields.game_type || 'slots'
         })
         .select().single()
       if (err) throw err
@@ -359,7 +386,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
   const openLogPast = () => {
     const today = new Date().toISOString().slice(0, 10)
     setNearbyCasinos([])
-    setPastFields({ casino_name: '', date: today, start_time: '', duration_hours: '4', start_amount: '', end_amount: '', win_loss: '', notes: '' })
+    setPastFields({ casino_name: '', date: today, start_time: '', duration_hours: '4', start_amount: '', end_amount: '', win_loss: '', notes: '', game_type: 'slots' })
     setError(''); setSheet('logPast')
     fetchNearby(name => setPastFields(p => ({ ...p, casino_name: name })))
   }
@@ -434,7 +461,8 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
       casino_name: session.casino_name || '',
       start_amount: String(session.start_amount),
       end_amount: session.end_amount != null ? String(session.end_amount) : '',
-      notes: session.notes || ''
+      notes: session.notes || '',
+      game_type: session.game_type || 'slots'
     })
     setError(''); setSheet('editSession')
   }
@@ -449,12 +477,73 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const TAB_ITEMS = [
+    { id: 'overview', label: 'OVERVIEW' },
+    { id: 'locations', label: 'LOCATIONS' },
+    { id: 'charts', label: 'CHARTS' },
+    { id: 'trend', label: 'TREND' },
+  ]
+
   return (
     <>
       <ScrollLinkedEdgeTitleBarShell
         titleBarNavSlot={titleBarNavSlot}
-        contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
+        contentClassName="px-3 pt-2 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
       >
+
+        {/* Tab navigation */}
+        <div className="flex gap-1 overflow-x-auto no-scrollbar mb-5 -mx-3 px-3">
+          {TAB_ITEMS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wide touch-manipulation transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-zinc-800 text-zinc-400 active:bg-zinc-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Game type filter — shown on analytics tabs */}
+        {activeTab !== 'overview' && completedSessions.length > 0 && (
+          <div className="flex gap-1.5 mb-4">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'slots', label: '🎰 Slots' },
+              { id: 'tables', label: '🃏 Tables' },
+            ].map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setGameTypeFilter(opt.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold touch-manipulation transition-colors ${
+                  gameTypeFilter === opt.id
+                    ? 'bg-zinc-700 text-white'
+                    : 'bg-zinc-800/60 text-zinc-500 active:bg-zinc-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Non-overview tabs ── */}
+        {activeTab === 'trend' && (
+          <BankrollTrendTab sessions={tabSessions} adjustments={adjustments} initialBankroll={profile?.overall_bankroll ?? null} />
+        )}
+        {activeTab === 'charts' && (
+          <BankrollChartsTab sessions={tabSessions} />
+        )}
+        {activeTab === 'locations' && (
+          <BankrollLocationsTab sessions={tabSessions} />
+        )}
+
+        {/* ── Overview tab ── */}
+        {activeTab === 'overview' && <>
 
         {/* Overall bankroll card */}
         <div data-bankroll-card className="rounded-3xl bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700/40 p-5 mb-4">
@@ -589,8 +678,8 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-semibold text-sm truncate flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-white font-semibold text-sm truncate min-w-0">
                             {session.casino_name || 'Session'}
                           </span>
                           <span className="text-zinc-600 text-xs shrink-0">{fmtDate(session.start_at)}</span>
@@ -623,6 +712,8 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
         {!loading && completedSessions.length === 0 && !activeSession && overallBankroll != null && (
           <div className="text-center text-zinc-600 text-sm mt-12">No sessions yet — start one above.</div>
         )}
+
+        </>}
 
       </ScrollLinkedEdgeTitleBarShell>
 
@@ -678,12 +769,17 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                       gpsLoading={gpsLoading}
                     />
                   </div>
+                  <div>
+                    <label className="block text-zinc-400 text-xs mb-1.5">Game type</label>
+                    <GameTypeToggle value={startGameType} onChange={setStartGameType} />
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-zinc-400 text-xs mb-1.5">Date</label>
                       <DateWheelPicker
                         value={startDate}
                         onChange={setStartDate}
+                        showYear
                       />
                     </div>
                     <div>
@@ -850,13 +946,18 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                       gpsLoading={gpsLoading}
                     />
                   </div>
-                  {/* Row 1: Date · Start time · Duration */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-zinc-400 text-xs mb-1.5">Game type</label>
+                    <GameTypeToggle value={pastFields.game_type || 'slots'} onChange={v => setPastFields(p => ({ ...p, game_type: v }))} />
+                  </div>
+                  {/* Row 1: Date · Start time */}
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-zinc-400 text-xs mb-1.5">Date</label>
                       <DateWheelPicker
                         value={pastFields.date}
                         onChange={v => setPastFields(p => ({ ...p, date: v }))}
+                        showYear
                       />
                     </div>
                     <div>
@@ -866,35 +967,36 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                         onChange={v => setPastFields(p => ({ ...p, start_time: v }))}
                       />
                     </div>
-                    <div>
-                      <label className="block text-zinc-400 text-xs mb-1.5">Hours</label>
-                      <div className="flex items-center rounded-2xl bg-zinc-800 overflow-hidden min-h-12">
-                        <button
-                          type="button"
-                          onPointerDown={e => e.preventDefault()}
-                          onClick={() => {
-                            const v = Math.max(0, Math.round((parseFloat(pastFields.duration_hours || 0) - 0.1) * 10) / 10)
-                            setPastFields(p => ({ ...p, duration_hours: String(v) }))
-                          }}
-                          className="px-2.5 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
-                        >−</button>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={pastFields.duration_hours}
-                          onChange={e => setPastFields(p => ({ ...p, duration_hours: e.target.value }))}
-                          className="flex-1 min-w-0 bg-transparent text-white text-sm text-center outline-none"
-                        />
-                        <button
-                          type="button"
-                          onPointerDown={e => e.preventDefault()}
-                          onClick={() => {
-                            const v = Math.round((parseFloat(pastFields.duration_hours || 0) + 0.1) * 10) / 10
-                            setPastFields(p => ({ ...p, duration_hours: String(v) }))
-                          }}
-                          className="px-2.5 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
-                        >+</button>
-                      </div>
+                  </div>
+                  {/* Duration */}
+                  <div>
+                    <label className="block text-zinc-400 text-xs mb-1.5">Hours played</label>
+                    <div className="flex items-center rounded-2xl bg-zinc-800 overflow-hidden min-h-12">
+                      <button
+                        type="button"
+                        onPointerDown={e => e.preventDefault()}
+                        onClick={() => {
+                          const v = Math.max(0, Math.round((parseFloat(pastFields.duration_hours || 0) - 0.1) * 10) / 10)
+                          setPastFields(p => ({ ...p, duration_hours: String(v) }))
+                        }}
+                        className="px-4 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
+                      >−</button>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={pastFields.duration_hours}
+                        onChange={e => setPastFields(p => ({ ...p, duration_hours: e.target.value }))}
+                        className="flex-1 min-w-0 bg-transparent text-white text-sm text-center outline-none"
+                      />
+                      <button
+                        type="button"
+                        onPointerDown={e => e.preventDefault()}
+                        onClick={() => {
+                          const v = Math.round((parseFloat(pastFields.duration_hours || 0) + 0.1) * 10) / 10
+                          setPastFields(p => ({ ...p, duration_hours: String(v) }))
+                        }}
+                        className="px-4 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
+                      >+</button>
                     </div>
                   </div>
                   {/* Row 2: Start amount · End amount · Win/Loss */}
@@ -977,6 +1079,10 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                       onChange={v => setEditFields(p => ({ ...p, casino_name: v }))}
                       supabaseClient={supabaseClient}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-xs mb-1.5">Game type</label>
+                    <GameTypeToggle value={editFields.game_type || 'slots'} onChange={v => setEditFields(p => ({ ...p, game_type: v }))} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1063,6 +1169,27 @@ function MoneyInput({
         autoFocus={autoFocus}
         className={`w-full min-h-12 rounded-2xl bg-zinc-800 ${tight ? 'pl-6 pr-1 text-sm' : 'pl-8 pr-4'} outline-none focus:ring-2 focus:ring-cyan-500/40 font-semibold ${hasValue ? textColor : ''} ${inputClassName}`}
       />
+    </div>
+  )
+}
+
+function GameTypeToggle({ value, onChange }) {
+  return (
+    <div className="flex rounded-2xl bg-zinc-800 p-1 gap-1">
+      {['slots', 'tables'].map(type => (
+        <button
+          key={type}
+          type="button"
+          onClick={() => onChange(type)}
+          className={`flex-1 py-2 rounded-xl text-sm font-semibold touch-manipulation transition-colors capitalize ${
+            value === type
+              ? 'bg-cyan-600 text-white'
+              : 'text-zinc-400 active:bg-zinc-700'
+          }`}
+        >
+          {type === 'slots' ? '🎰 Slots' : '🃏 Tables'}
+        </button>
+      ))}
     </div>
   )
 }
