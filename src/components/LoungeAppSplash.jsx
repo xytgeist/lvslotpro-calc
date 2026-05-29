@@ -17,6 +17,9 @@ const EDGE_SPLASH_DATA_LIGHT = JSON.stringify(edgeSplashLight)
 const FLY_THROUGH_START = 157
 const FLY_THROUGH_END = 190
 
+// Shift canvas up slightly so the animation reads centered under the status bar.
+const CANVAS_OFFSET_Y = -20
+
 // 251 frames @ 60 fps ≈ 4.2 s. Force-dismiss after 7 s if complete event is late.
 const SPLASH_MAX_MS = 7000
 
@@ -137,8 +140,8 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       />
 
       {/* 2. Canvas — Lottie renders here via OffscreenCanvas.
-               Shifted up 50px to visually center the animation accounting for the status bar. */}
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ top: '-50px' }} aria-hidden />
+               Shifted up slightly to visually center under the status bar (light + dark). */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ top: `${CANVAS_OFFSET_Y}px` }} aria-hidden />
 
       {/* 3. Pre-frame cover — on top, hides blank canvas until WASM boots.
                Matches the Lottie opener: black in dark mode, white in light mode. */}
