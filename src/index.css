@@ -1751,3 +1751,17 @@ html.light [data-session-card] .text-emerald-200 {
 }
 
 /* MoneyKeypad uses inline styles — no Tailwind overrides needed */
+
+/* Bankroll cards + button — shadows in light mode only */
+html.light [data-bankroll-card] {
+  box-shadow: 0 10px 20px -4px rgba(0,0,0,0.15), 0 4px 8px -4px rgba(0,0,0,0.1);
+}
+html.light [data-session-card] {
+  box-shadow: 0 10px 20px -4px rgba(0,0,0,0.15), 0 4px 8px -4px rgba(0,0,0,0.1);
+}
+html.light [data-start-session-btn] {
+  box-shadow: 0 8px 20px -4px rgba(6,182,212,0.45);
+}
+html.light [data-session-row] {
+  box-shadow: 0 4px 10px -3px rgba(0,0,0,0.12);
+}

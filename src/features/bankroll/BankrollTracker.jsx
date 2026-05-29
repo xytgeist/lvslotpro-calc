@@ -457,7 +457,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
       >
 
         {/* Overall bankroll card */}
-        <div className="rounded-3xl bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700/40 p-5 mb-4">
+        <div data-bankroll-card className="rounded-3xl bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700/40 p-5 mb-4">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="text-zinc-400 text-xs font-semibold uppercase tracking-wide mb-1">Overall Bankroll</div>
@@ -556,6 +556,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
             <div className="flex flex-col gap-2 mb-4">
               <button
                 onClick={openStartSession}
+                data-start-session-btn
                 className="w-full rounded-3xl bg-cyan-600 py-4 text-white font-bold text-base touch-manipulation active:bg-cyan-700"
               >
                 + Start Session
@@ -583,6 +584,7 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
                   <button
                     key={session.id}
                     onClick={() => openEditSession(session)}
+                    data-session-row
                     className="w-full text-left rounded-2xl bg-zinc-900 border border-zinc-800/60 p-4 touch-manipulation active:bg-zinc-800 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-3">
