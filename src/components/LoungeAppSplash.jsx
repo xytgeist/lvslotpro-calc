@@ -13,14 +13,14 @@ const EDGE_SPLASH_DATA_DARK = JSON.stringify(edgeSplashDark)
 const EDGE_SPLASH_DATA_LIGHT = JSON.stringify(edgeSplashLight)
 
 // Black Solid 1 ends at frame 157 → D fly-through begins.
-// Overlay fully transparent at frame 190 — fly-through done; playback stops here.
+// Overlay fully transparent at frame 190 (~1 s before animation ends at 251).
 const FLY_THROUGH_START = 157
 const FLY_THROUGH_END = 190
 
 // Shift canvas up so the animation reads centered under the status bar.
 const CANVAS_OFFSET_Y = -40
 
-// Force-dismiss if frame events stall.
+// 251 frames @ 60 fps ≈ 4.2 s. Force-dismiss after 7 s if complete event is late.
 const SPLASH_MAX_MS = 7000
 
 /**
@@ -38,9 +38,9 @@ const SPLASH_MAX_MS = 7000
  *   4. statusBar strip — height env(safe-area-inset-top), always bg-black. Sits in
  *                       the exact pixels iOS samples for its translucent status bar tint,
  *                       keeping the status bar dark for the full duration of the splash.
- *   5. bottomCover strip — topmost layer at the bottom; masks the band below the shifted
- *                       canvas so the feed cannot leak through transparent canvas pixels
- *                       during fly-through. Removed when fly-through finishes (frame 190).
+ *   5. bottomCover strip — masks the viewport band below the shifted canvas so the feed
+ *                       cannot leak through transparent canvas pixels during fly-through.
+ *                       Fades out with the overlay during frames 157–190, then removed.
  *
  * Status bar: iOS PWA caches apple-mobile-web-app-status-bar-style at install time
  * and does not resample translucent-bar content dynamically during JS execution.
@@ -88,68 +88,20 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
       backgroundColor: '#00000000',
       layout: { fit: 'cover', align: [0.5, 0.5] },
       renderConfig: { autoResize: false },
-      segment: [0, FLY_THROUGH_END],
     })
 
     const done = () => onCompleteRef.current?.()
     const fallback = setTimeout(done, SPLASH_MAX_MS)
-    let dismissSignaled = false
-    let flyThroughFinished = false
-    let sawFrameEvent = false
 
-    const signalDismiss = () => {
-      if (dismissSignaled) return
-      dismissSignaled = true
-      done()
-    }
-
-    const finishFlyThrough = () => {
-      if (flyThroughFinished) return
-      flyThroughFinished = true
-
-      try {
-        player.pause()
-      } catch {
-        // ignore
-      }
-
-      if (bottomCoverRef.current) {
-        bottomCoverRef.current.style.display = 'none'
-        bottomCoverRef.current = null
-      }
-      if (overlayRef.current) {
-        overlayRef.current.style.display = 'none'
-        overlayRef.current = null
-      }
-      if (canvasRef.current) {
-        canvasRef.current.style.display = 'none'
-        canvasRef.current = null
-      }
-      if (preFrameCoverRef.current) {
-        preFrameCoverRef.current.style.display = 'none'
-        preFrameCoverRef.current = null
-      }
-      if (statusBarRef.current) {
-        statusBarRef.current.style.display = 'none'
-        statusBarRef.current = null
-      }
-
-      signalDismiss()
-    }
-
-    const syncFlyThroughFromFrame = (currentFrame) => {
-      if (currentFrame >= FLY_THROUGH_START && overlayRef.current) {
-        const t = Math.min(1, (currentFrame - FLY_THROUGH_START) / (FLY_THROUGH_END - FLY_THROUGH_START))
-        overlayRef.current.style.opacity = String(1 - t)
-      }
-      // Only finish after real playback — currentFrame can read end-of-segment before play().
-      if (sawFrameEvent && currentFrame >= FLY_THROUGH_END) {
-        finishFlyThrough()
-      }
+    const setFlyThroughOpacity = (opacity) => {
+      const value = String(opacity)
+      if (overlayRef.current) overlayRef.current.style.opacity = value
+      // Bottom cover was added as a separate opaque strip — fade it with the overlay
+      // so it dismisses when fly-through finishes instead of lingering to splash end.
+      if (bottomCoverRef.current) bottomCoverRef.current.style.opacity = value
     }
 
     player.addEventListener('frame', ({ currentFrame }) => {
-      sawFrameEvent = true
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(offscreen, 0, 0)
 
@@ -161,12 +113,26 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
         requestAnimationFrame(() => { cover.style.display = 'none' })
       }
 
-      syncFlyThroughFromFrame(currentFrame)
+      // Fade overlay + bottom cover via direct DOM mutation — not setState — so it works
+      // reliably inside DotLottie's native event listener on iOS PWA.
+      if (currentFrame >= FLY_THROUGH_START) {
+        const t = Math.min(1, (currentFrame - FLY_THROUGH_START) / (FLY_THROUGH_END - FLY_THROUGH_START))
+        setFlyThroughOpacity(1 - t)
+      }
+
+      if (currentFrame >= FLY_THROUGH_END && bottomCoverRef.current) {
+        bottomCoverRef.current.style.display = 'none'
+        bottomCoverRef.current = null
+      }
     })
 
     player.addEventListener('complete', () => {
       clearTimeout(fallback)
-      finishFlyThrough()
+      if (bottomCoverRef.current) {
+        bottomCoverRef.current.style.display = 'none'
+        bottomCoverRef.current = null
+      }
+      done()
     })
 
     return () => {
@@ -207,15 +173,8 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
         aria-hidden
       />
 
-      {/* 4. Status bar strip — covers only env(safe-area-inset-top). */}
-      <div
-        ref={statusBarRef}
-        className="absolute top-0 left-0 right-0 pointer-events-none"
-        style={{ height: 'env(safe-area-inset-top)', backgroundColor: splashBg }}
-        aria-hidden
-      />
-
-      {/* 5. Bottom cover — topmost at the bottom edge; masks feed leak below shifted canvas. */}
+      {/* 4. Bottom cover — opaque band below shifted canvas; blocks feed leak outside D-hole.
+               Fades with overlay during fly-through; removed at frame 190. */}
       <div
         ref={bottomCoverRef}
         className="absolute bottom-0 left-0 right-0 pointer-events-none"
@@ -223,6 +182,16 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationComplet
           height: `calc(${-CANVAS_OFFSET_Y}px + env(safe-area-inset-bottom, 0px))`,
           backgroundColor: splashBg,
         }}
+        aria-hidden
+      />
+
+      {/* 5. Status bar strip — covers only env(safe-area-inset-top).
+               Matches the Lottie opener color so the iOS translucent status bar
+               tint is consistent with the animation background. */}
+      <div
+        ref={statusBarRef}
+        className="absolute top-0 left-0 right-0 pointer-events-none"
+        style={{ height: 'env(safe-area-inset-top)', backgroundColor: splashBg }}
         aria-hidden
       />
     </div>
