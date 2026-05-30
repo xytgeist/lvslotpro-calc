@@ -13235,7 +13235,7 @@ export default function SocialFeed({
                               value={quoteRepostCategoryPills}
                               onChange={setQuoteRepostCategoryPills}
                               disabled={quoteRepostBusy}
-                              hint="Optional — inherited from the original post; swap up to 3."
+                              hint=""
                             />
                             <input
                               id={LOUNGE_QUOTE_REPOST_MEDIA_INPUT_ID}

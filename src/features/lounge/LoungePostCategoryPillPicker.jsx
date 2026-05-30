@@ -37,7 +37,9 @@ export default function LoungePostCategoryPillPicker({
 
   return (
     <div className="mt-2">
-      <p className="mb-1.5 text-[11px] leading-snug text-zinc-500">{hint}</p>
+      {hint ? (
+        <p className="mb-1.5 text-[11px] leading-snug text-zinc-500">{hint}</p>
+      ) : null}
       <div
         className="lounge-pill-row flex flex-wrap gap-1.5"
         data-lounge-category-picker=""
