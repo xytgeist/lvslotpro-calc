@@ -194,6 +194,7 @@ export function LoungeImageLightbox({
 
   return createPortal(
     <div
+      data-lounge-media-lightbox
       className={`fixed inset-0 ${lightboxPortalClass} flex flex-col bg-black`}
       role="dialog"
       aria-modal="true"
@@ -250,7 +251,7 @@ export function LoungeImageLightbox({
           className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2"
         >
           {multi ? (
-            <>
+            <div data-lounge-lightbox-carousel className="contents">
               <button
                 type="button"
                 aria-label="Previous image"
@@ -282,7 +283,7 @@ export function LoungeImageLightbox({
               <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] font-medium tabular-nums text-zinc-200 backdrop-blur-[2px]">
                 {idx + 1} / {list.length}
               </div>
-            </>
+            </div>
           ) : null}
           <div className="inline-flex max-h-full max-w-full origin-center" style={mediaTransformStyle}>
             <img

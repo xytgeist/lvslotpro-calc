@@ -18,6 +18,35 @@ function fmt$(n) {
   }).format(Math.abs(n))
 }
 
+/** Bet size → rounding increment for sell / max-action amounts. */
+function bankrollRiskDollarStep(betSize) {
+  const b = Number(betSize)
+  if (!Number.isFinite(b) || b <= 0) return 1
+  if (b <= 5) return 0.25
+  if (b <= 25) return 0.5
+  return 1
+}
+
+function roundBankrollRiskDollars(amount, betSize) {
+  const n = Number(amount)
+  if (!Number.isFinite(n)) return 0
+  const step = bankrollRiskDollarStep(betSize)
+  return Math.round(n / step) * step
+}
+
+/** Currency format matched to bet-size rounding tier (sell / play stake lines). */
+function fmtRisk$(n, betSize) {
+  if (n == null || Number.isNaN(Number(n))) return '$0'
+  const step = bankrollRiskDollarStep(betSize)
+  const fracDigits = step >= 1 ? 0 : step === 0.5 ? 1 : 2
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: fracDigits,
+    maximumFractionDigits: fracDigits,
+  }).format(Math.abs(Number(n)))
+}
+
 /** playStake = bet size / $ per play unit (e.g. $25/spin). */
 function resolvePlayStake(playDetails) {
   const raw = playDetails?.playStake ?? playDetails?.betSize
@@ -31,17 +60,21 @@ function computeRiskMetrics({ maxExpectedLoss, riskBudget, playStake }) {
   const coveragePct = maxLoss > 0 ? Math.min(100, Math.round((budget / maxLoss) * 100)) : 0
   const sellPct = Math.max(0, 100 - coveragePct)
   const coverageDollars = Math.round(Math.min(budget, maxLoss))
-  const sellOnPlay = playStake != null ? Math.round(playStake * sellPct / 100) : null
-  const maxActionOnPlay = playStake != null
-    ? Math.max(0, Math.round(playStake * coveragePct / 100))
+  const stake = playStake != null ? Number(playStake) : null
+  const sellOnPlay = stake != null
+    ? roundBankrollRiskDollars(stake * sellPct / 100, stake)
+    : null
+  const maxActionOnPlay = stake != null
+    ? Math.max(0, roundBankrollRiskDollars(stake * coveragePct / 100, stake))
     : budget
+  const displayPlayStake = stake != null ? roundBankrollRiskDollars(stake, stake) : null
   return {
     coveragePct,
     sellPct,
     coverageDollars,
     sellOnPlay,
     maxActionOnPlay,
-    playStake,
+    playStake: displayPlayStake,
     fullyFunded: maxLoss > 0 && budget >= maxLoss,
   }
 }
@@ -54,11 +87,11 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, su
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
 
-  const playStake = resolvePlayStake(playDetails)
-  const { coveragePct, sellPct, coverageDollars, sellOnPlay } = computeRiskMetrics({
+  const playStakeRaw = resolvePlayStake(playDetails)
+  const { coveragePct, sellPct, coverageDollars, sellOnPlay, playStake: playStakeRounded } = computeRiskMetrics({
     maxExpectedLoss,
     riskBudget,
-    playStake,
+    playStake: playStakeRaw,
   })
 
   const handleSend = async () => {
@@ -86,8 +119,8 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, su
         ``,
         `Exposure (worst case): ${fmt$(maxExpectedLoss)}`,
         `My Coverage: ${fmt$(coverageDollars)} (${coveragePct}%)`,
-        playStake != null
-          ? `Looking to Sell: ${fmt$(sellOnPlay)} of action on this ${fmt$(playStake)} play (${sellPct}%)`
+        playStakeRaw != null
+          ? `Looking to Sell: ${fmtRisk$(sellOnPlay, playStakeRaw)} of action on this ${fmtRisk$(playStakeRounded, playStakeRaw)} play (${sellPct}%)`
           : `Looking to Sell: ${sellPct}% of action`,
       )
       if (comment.trim()) lines.push(``, comment.trim())
@@ -171,8 +204,12 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, su
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Looking to Sell</span>
                   <span className="text-cyan-400 font-semibold text-right">
-                    {playStake != null
-                      ? <>{fmt$(sellOnPlay)} on {fmt$(playStake)} play ({sellPct}%)</>
+                    {playStakeRaw != null
+                      ? (
+                        <>
+                          {fmtRisk$(sellOnPlay, playStakeRaw)} on {fmtRisk$(playStakeRounded, playStakeRaw)} play ({sellPct}%)
+                        </>
+                      )
                       : <>{sellPct}% of action</>}
                   </span>
                 </div>
@@ -440,15 +477,16 @@ export default function BankrollRiskAdvisor({
   const hasBankroll = bankroll != null && Number(bankroll) > 0
   const bk = Number(bankroll) || 0
   const riskBudget = hasBankroll ? Math.round(bk * riskPct / 100) : 0
-  const playStake = resolvePlayStake(playDetails)
+  const playStakeRaw = resolvePlayStake(playDetails)
   const {
     coveragePct,
     sellPct,
     coverageDollars,
     sellOnPlay,
     maxActionOnPlay,
+    playStake: playStakeRounded,
     fullyFunded,
-  } = computeRiskMetrics({ maxExpectedLoss, riskBudget, playStake })
+  } = computeRiskMetrics({ maxExpectedLoss, riskBudget, playStake: playStakeRaw })
 
   return (
     <>
@@ -513,7 +551,9 @@ export default function BankrollRiskAdvisor({
               {!fullyFunded && (
                 <p className="mt-2 text-xs italic text-gray-500 leading-snug">
                   * Your risk profile and bankroll dictate{' '}
-                  <span className="text-gray-400 not-italic font-medium">{fmt$(maxActionOnPlay)}</span>
+                  <span className="text-gray-400 not-italic font-medium">
+                    {playStakeRaw != null ? fmtRisk$(maxActionOnPlay, playStakeRaw) : fmt$(maxActionOnPlay)}
+                  </span>
                   {' '}is the maximum action you should take on this play.
                 </p>
               )}
@@ -528,12 +568,12 @@ export default function BankrollRiskAdvisor({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 rounded-2xl bg-gray-800">
                 <div className="min-w-0 flex-1">
                   <p className="text-base text-gray-400 leading-snug">
-                    {playStake != null ? (
+                    {playStakeRaw != null ? (
                       <>
                         Consider selling{' '}
-                        <span className="text-cyan-400 font-semibold">{fmt$(sellOnPlay)}</span>
+                        <span className="text-cyan-400 font-semibold">{fmtRisk$(sellOnPlay, playStakeRaw)}</span>
                         {' '}of action on this{' '}
-                        <span className="text-white font-semibold">{fmt$(playStake)}</span>
+                        <span className="text-white font-semibold">{fmtRisk$(playStakeRounded, playStakeRaw)}</span>
                         {' '}play.
                       </>
                     ) : (

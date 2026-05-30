@@ -781,10 +781,10 @@ function MHBCalculator({ onBack, supabaseClient = null, onOpenLogbook = null }) 
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-gray-400 text-[11px] mb-0.5">Denom</label>
-                  <div className="grid grid-cols-2 gap-1 p-1 bg-gray-800 rounded-2xl">
+                  <div className="flex flex-col gap-1 p-1 bg-gray-800 rounded-2xl">
                     {[[0.01,'1¢'],[0.25,'25¢'],[1,'$1'],[2,'$2']].map(([val,label]) => (
                       <button key={val} type="button" onClick={() => setIgtDenom(val)}
-                        className={`py-2 rounded-xl text-xs font-bold text-center transition-colors touch-manipulation ${igtDenom === val ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                        className={`py-1.5 rounded-xl text-xs font-bold text-center transition-colors touch-manipulation ${igtDenom === val ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                         {label}
                       </button>
                     ))}
@@ -815,10 +815,10 @@ function MHBCalculator({ onBack, supabaseClient = null, onOpenLogbook = null }) 
                       i
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 p-1 bg-gray-800 rounded-2xl">
+                  <div className="flex flex-col gap-1 p-1 bg-gray-800 rounded-2xl">
                     {[['mini','Mini'],['minor','Minor'],['major','Major']].map(([val,label]) => (
                       <button key={val} type="button" onClick={() => setIgtTier(val)}
-                        className={`py-2 rounded-xl text-xs font-bold text-center transition-colors touch-manipulation ${igtTier === val ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                        className={`py-1.5 rounded-xl text-xs font-bold text-center transition-colors touch-manipulation ${igtTier === val ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                         {label}
                       </button>
                     ))}

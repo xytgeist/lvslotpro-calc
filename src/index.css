@@ -715,6 +715,71 @@ html.light .text-lv-yellow {
 }
 
 /*
+ * Lounge image/GIF/Stream hero lightboxes — black cinema shell in both themes.
+ * Light mode inverts the zinc scale globally; restore dark palette inside lightbox only.
+ * Dark mode: no data attr / rules — unchanged.
+ */
+html.light [data-lounge-media-lightbox] {
+  --color-zinc-950: #09090b;
+  --color-zinc-900: #18181b;
+  --color-zinc-800: #27272a;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-600: #52525b;
+  --color-zinc-500: #71717a;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-50: #fafafa;
+}
+html.light [data-lounge-media-lightbox] .text-white:not([class*="bg-"]) {
+  color: #ffffff;
+}
+html.light [data-lounge-media-lightbox] .text-white\/90:not([class*="bg-"]) {
+  color: rgb(255 255 255 / 0.9);
+}
+html.light [data-lounge-media-lightbox] .text-white\/80:not([class*="bg-"]) {
+  color: rgb(255 255 255 / 0.8);
+}
+html.light [data-lounge-media-lightbox] .text-white\/70:not([class*="bg-"]) {
+  color: rgb(255 255 255 / 0.7);
+}
+html.light [data-lounge-media-lightbox] .text-white\/60:not([class*="bg-"]) {
+  color: rgb(255 255 255 / 0.6);
+}
+/* Image/GIF carousel arrows + pager (not the interaction bar). */
+html.light [data-lounge-media-lightbox] [data-lounge-lightbox-carousel] .text-zinc-100,
+html.light [data-lounge-media-lightbox] [data-lounge-lightbox-carousel] .text-zinc-200 {
+  color: #f4f4f5 !important;
+}
+/* Pill interaction row — undo global feed light-mode bar tweaks on black chrome. */
+html.light [data-lounge-media-lightbox] [data-lounge-post-interaction-bar] .text-zinc-200 {
+  color: #e4e4e7 !important;
+}
+html.light [data-lounge-media-lightbox] [data-lounge-post-interaction-bar] .text-zinc-500 {
+  color: #e4e4e7 !important;
+}
+html.light [data-lounge-media-lightbox] [data-lounge-post-interaction-bar] .text-zinc-100 {
+  color: #f4f4f5 !important;
+}
+/* Stream video author row only (image lightbox has no stream chrome). */
+html.light [data-lounge-media-lightbox] [data-lounge-stream-lightbox-chrome] .text-\[\#fff\] {
+  color: #ffffff !important;
+}
+html.light [data-lounge-media-lightbox] [data-lounge-stream-lightbox-chrome] .text-\[\#d4d4d8\] {
+  color: #d4d4d8 !important;
+}
+/* Stream video pill row — white glyphs (image lightbox keeps #e4e4e7 above). */
+html.light [data-lounge-media-lightbox] [data-lounge-stream-lightbox-chrome] [data-lounge-post-interaction-bar] .text-zinc-200,
+html.light [data-lounge-media-lightbox] [data-lounge-stream-lightbox-chrome] [data-lounge-post-interaction-bar] .text-zinc-500,
+html.light [data-lounge-media-lightbox] [data-lounge-stream-lightbox-chrome] [data-lounge-post-interaction-bar] .text-zinc-100 {
+  color: #ffffff !important;
+}
+html.light [data-lounge-media-lightbox] .text-lv-yellow {
+  color: #ffea00;
+}
+
+/*
  * GIF picker sheet — hardcoded dark bg won't flip with the zinc scale,
  * so override it explicitly in light mode.
  */

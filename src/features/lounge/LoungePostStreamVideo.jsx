@@ -3183,7 +3183,7 @@ export default function LoungePostStreamVideo({
                     ? `Unmute video in ${inlineSoundScopeLabel}`
                     : 'Unmute video'
               }
-              className="absolute bottom-2 left-2 z-[3] inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-zinc-100 touch-manipulation [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50 sm:bottom-2.5 sm:left-2.5"
+              className="absolute bottom-2 left-2 z-[3] inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-[#fff] touch-manipulation [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50 sm:bottom-2.5 sm:left-2.5"
               onClick={(e) => {
                 e.stopPropagation()
                 onSoundStripPress()
@@ -3211,6 +3211,7 @@ export default function LoungePostStreamVideo({
                 />
               </div>
               <div
+                data-lounge-media-lightbox
                 className="fixed inset-0"
                 style={{ zIndex: heroOverlayZIndex }}
                 role="dialog"

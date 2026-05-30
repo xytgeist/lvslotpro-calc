@@ -1,10 +1,12 @@
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
-import {
-  LOUNGE_FEED_AVATAR_CLASS,
-  LOUNGE_FEED_DISPLAY_NAME_CLASS,
-  LOUNGE_FEED_META_ROW_CLASS,
-} from './loungeFeedAvatar.js'
+import { LOUNGE_FEED_AVATAR_CLASS, LOUNGE_FEED_META_ROW_CLASS } from './loungeFeedAvatar.js'
 import { renderRichCaption } from './loungeCaption'
+
+/** Stream video hero overlay only — hardcoded light text (survives html.light zinc + text-white flips). */
+const LOUNGE_LIGHTBOX_DISPLAY_NAME_CLASS =
+  'min-w-0 truncate font-semibold text-[17px] leading-none text-[#fff]'
+const LOUNGE_LIGHTBOX_HANDLE_CLASS = 'text-[#d4d4d8]'
+const LOUNGE_LIGHTBOX_CAPTION_CLASS = 'text-[#fff]'
 
 /** Top-bar icon buttons — matches lightbox interaction pill overlay. */
 export const LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS =
@@ -103,7 +105,10 @@ export default function LoungeStreamVideoLightboxChrome({
   }
 
   return (
-    <div className="pointer-events-none flex w-full flex-col gap-2 landscape:flex-row landscape:items-center landscape:justify-between landscape:gap-4">
+    <div
+      data-lounge-stream-lightbox-chrome
+      className="pointer-events-none flex w-full flex-col gap-2 landscape:flex-row landscape:items-center landscape:justify-between landscape:gap-4"
+    >
       <div className="pointer-events-auto flex min-w-0 flex-1 items-start gap-2.5 pr-1 landscape:pr-0">
         <button
           type="button"
@@ -131,11 +136,13 @@ export default function LoungeStreamVideoLightboxChrome({
                   role={profile?.role}
                   isOg={profile?.is_og === true}
                   displayName={displayName}
-                  displayNameClassName={`${LOUNGE_FEED_DISPLAY_NAME_CLASS} text-white`}
+                  displayNameClassName={LOUNGE_LIGHTBOX_DISPLAY_NAME_CLASS}
                 />
               </div>
               {handle ? (
-                <span className="-mt-1 block truncate text-[13px] leading-tight text-zinc-300/90">{handle}</span>
+                <span className={`-mt-1 block truncate text-[13px] leading-tight ${LOUNGE_LIGHTBOX_HANDLE_CLASS}`}>
+                  {handle}
+                </span>
               ) : null}
             </div>
           </button>
@@ -148,12 +155,12 @@ export default function LoungeStreamVideoLightboxChrome({
                   if (openProfileGateIfNeeded?.()) return
                   onCaptionClick()
                 }}
-                className="mt-1 line-clamp-2 w-full text-left text-[14px] leading-snug text-zinc-100/95 touch-manipulation hover:text-white [-webkit-tap-highlight-color:transparent]"
+                className={`mt-1 line-clamp-2 w-full text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS} touch-manipulation hover:opacity-90 [-webkit-tap-highlight-color:transparent]`}
               >
                 {renderRichCaption(caption, { onMentionClick, onHashtagClick })}
               </button>
             ) : (
-              <div className="mt-1 line-clamp-2 text-left text-[14px] leading-snug text-zinc-100/95">
+              <div className={`mt-1 line-clamp-2 text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS}`}>
                 {renderRichCaption(caption, { onMentionClick, onHashtagClick })}
               </div>
             )
