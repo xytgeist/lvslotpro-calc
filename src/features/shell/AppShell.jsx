@@ -41,6 +41,7 @@ import {
 import { queueLoungeActivityMarkRead } from '../../utils/loungeActivityMarkReadQueue.js'
 import NavLockGlyph from '../../components/NavLockGlyph.jsx'
 import TitleBarQuickLinks from '../../components/TitleBarQuickLinks.jsx'
+import TitleBarCloseButton from '../../components/TitleBarCloseButton.jsx'
 import {
   calculatorRequiresSlotsEdge,
   canOpenCalculator,
@@ -900,6 +901,9 @@ export default function AppShell({
       )
     })
 
+  const slotsToolTitleBarCloseVisible =
+    SLOTS_TOOL_TAB_IDS.has(tab) && !(tab === 'calculators' && activeCalculator)
+
   const renderTitleBarNavSlot = () => (
     <div className="flex items-center gap-1.5 shrink-0" data-title-bar-nav-cluster>
       <TitleBarQuickLinks
@@ -931,6 +935,9 @@ export default function AppShell({
         </span>
       </button>
       </div>
+      {slotsToolTitleBarCloseVisible ? (
+        <TitleBarCloseButton onClick={backToSlotsHub} ariaLabel="Close" />
+      ) : null}
     </div>
   )
 
@@ -1067,7 +1074,7 @@ export default function AppShell({
           onSetContentGate={onSetContentAccessGate}
           onRequireSubscribe={onRequireSubscribe}
           titleBarNavSlot={renderTitleBarNavSlot()}
-          onBackToSlotsHub={backToSlotsHub}
+          titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
           supabaseClient={supabaseClient}
         />
       )
@@ -1184,8 +1191,8 @@ export default function AppShell({
           onSetContentGate={onSetContentAccessGate}
           onRequireSubscribe={onRequireSubscribe}
           titleBarNavSlot={renderTitleBarNavSlot()}
+          titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
           openCardSlug={guideOpenCardSlug}
-          onBackToSlotsHub={backToSlotsHub}
         />
       )
     } else if (tab === 'offers') {
@@ -1199,8 +1206,8 @@ export default function AppShell({
           hasSlotsEdge={hasActiveSubscription || isStaff}
           onRequireSubscribe={() => onRequireSubscribe?.('slots-edge')}
           titleBarNavSlot={renderTitleBarNavSlot()}
+          titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
           isAdmin={isAdmin}
-          onBackToSlotsHub={backToSlotsHub}
         />
       )
     } else if (tab === 'bankroll') {
@@ -1208,7 +1215,7 @@ export default function AppShell({
         <BankrollTracker
           supabaseClient={supabaseClient}
           titleBarNavSlot={renderTitleBarNavSlot()}
-          onBackToSlotsHub={backToSlotsHub}
+          titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
         />
       )
     } else if (tab === 'logbook') {
@@ -1216,7 +1223,7 @@ export default function AppShell({
         <PlayLogbook
           supabaseClient={supabaseClient}
           titleBarNavSlot={renderTitleBarNavSlot()}
-          onBackToSlotsHub={backToSlotsHub}
+          titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
         />
       )
     } else if (tab === 'intel') {
@@ -1224,7 +1231,7 @@ export default function AppShell({
         <LocalIntel
           supabaseClient={supabaseClient}
           titleBarNavSlot={renderTitleBarNavSlot()}
-          onBackToSlotsHub={backToSlotsHub}
+          titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
         />
       )
     } else if (tab === 'team') {

@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
-import SlotsToolPageHeader from '../../components/SlotsToolPageHeader.jsx'
 
-export default function LocalIntel({ supabaseClient, titleBarNavSlot = null, onBackToSlotsHub = null }) {
+export default function LocalIntel({
+  supabaseClient,
+  titleBarNavSlot = null,
+  titleBarToolCloseVisible = false,
+}) {
   const [intelView, setIntelView] = useState({ screen: 'home', cityId: null, casinoId: null })
 
   const [cities, setCities] = useState([])
@@ -180,8 +183,11 @@ export default function LocalIntel({ supabaseClient, titleBarNavSlot = null, onB
 
   if (intelView.screen === 'home') {
     return (
-      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
-        <SlotsToolPageHeader onBackToSlotsHub={onBackToSlotsHub} />
+      <ScrollLinkedEdgeTitleBarShell
+        titleBarNavSlot={titleBarNavSlot}
+        titleBarToolCloseVisible={titleBarToolCloseVisible}
+        contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
+      >
         <Header title="Local Intel" subtitle="City + casino updates (skeleton)" />
 
         <SetupHint />
@@ -225,7 +231,11 @@ export default function LocalIntel({ supabaseClient, titleBarNavSlot = null, onB
     const city = cities.find((c) => c.id === intelView.cityId)
     const isFollowing = intelView.cityId ? follows.city.has(intelView.cityId) : false
     return (
-      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
+      <ScrollLinkedEdgeTitleBarShell
+        titleBarNavSlot={titleBarNavSlot}
+        titleBarToolCloseVisible={titleBarToolCloseVisible}
+        contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
+      >
         <Header
           title={city?.name || 'City'}
           subtitle="City feed + casinos"
@@ -350,7 +360,11 @@ export default function LocalIntel({ supabaseClient, titleBarNavSlot = null, onB
     const casino = casinos.find((c) => c.id === intelView.casinoId)
     const isFollowing = intelView.casinoId ? follows.casino.has(intelView.casinoId) : false
     return (
-      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
+      <ScrollLinkedEdgeTitleBarShell
+        titleBarNavSlot={titleBarNavSlot}
+        titleBarToolCloseVisible={titleBarToolCloseVisible}
+        contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
+      >
         <Header
           title={casino?.name || 'Casino'}
           subtitle="Casino-specific updates"

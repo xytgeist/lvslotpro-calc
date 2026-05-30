@@ -1597,7 +1597,7 @@ export default function GuidesScreen({
   titleBarNavSlot = null,
   /** When set, scroll to and expand this guide card slug (used by Lounge guide embed tap). */
   openCardSlug = null,
-  onBackToSlotsHub = null,
+  titleBarToolCloseVisible = false,
 }) {
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState([])
@@ -1815,8 +1815,12 @@ export default function GuidesScreen({
 
   return (
     <>
-      <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
-        <SlotsToolPageHeader onBackToSlotsHub={onBackToSlotsHub} quickLinkDestinationId="guides" />
+      <ScrollLinkedEdgeTitleBarShell
+        titleBarNavSlot={titleBarNavSlot}
+        titleBarToolCloseVisible={titleBarToolCloseVisible}
+        contentClassName="px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
+      >
+        <SlotsToolPageHeader quickLinkDestinationId="guides" />
         <h1 className="sr-only">AP Guides</h1>
         {isAdmin && !gatesDbReady ? (
           <p className="mb-4 text-xs text-fuchsia-300/90">

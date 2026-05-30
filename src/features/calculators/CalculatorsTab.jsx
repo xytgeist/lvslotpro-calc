@@ -142,16 +142,17 @@ export default function CalculatorsTab({
   gatesDbReady = false,
   onSetContentGate,
   titleBarNavSlot = null,
-  onBackToSlotsHub = null,
+  titleBarToolCloseVisible = false,
   supabaseClient = null,
 }) {
   if (!activeCalculator) {
     return (
       <ScrollLinkedEdgeTitleBarShell
         titleBarNavSlot={titleBarNavSlot}
+        titleBarToolCloseVisible={titleBarToolCloseVisible}
         contentClassName="px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
       >
-        <SlotsToolPageHeader onBackToSlotsHub={onBackToSlotsHub} quickLinkDestinationId="calculators" />
+        <SlotsToolPageHeader quickLinkDestinationId="calculators" />
         <CalculatorsHome
           onSelectCalculator={setActiveCalculator}
           browseMode={browseMode}

@@ -37,7 +37,7 @@ export default function OffersCalendar({
   onRequireSubscribe,
   titleBarNavSlot = null,
   isAdmin = false,
-  onBackToSlotsHub = null,
+  titleBarToolCloseVisible = false,
 }) {
   /** Gate for the large legacy push / iOS help block below (was `false &&`). */
   const showLegacyOffersPushPanel = false
@@ -998,6 +998,7 @@ export default function OffersCalendar({
     <>
       <ScrollLinkedEdgeTitleBarShell
         titleBarNavSlot={titleBarNavSlot}
+        titleBarToolCloseVisible={titleBarToolCloseVisible}
         fullWidth={weekLayoutFullBleed}
         contentClassName={
           weekLayoutFullBleed
@@ -1007,7 +1008,6 @@ export default function OffersCalendar({
       >
 
       <SlotsToolPageHeader
-        onBackToSlotsHub={onBackToSlotsHub}
         quickLinkDestinationId="offers"
         center={
           <div className="flex min-h-10 w-full items-center justify-center gap-1.5">

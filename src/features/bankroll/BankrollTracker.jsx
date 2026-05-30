@@ -96,7 +96,11 @@ function isoToLocalHm(iso) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null, onBackToSlotsHub = null }) {
+export default function BankrollTracker({
+  supabaseClient,
+  titleBarNavSlot = null,
+  titleBarToolCloseVisible = false,
+}) {
   const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
   const [sessions, setSessions] = useState([])
@@ -638,10 +642,11 @@ export default function BankrollTracker({ supabaseClient, titleBarNavSlot = null
     <>
       <ScrollLinkedEdgeTitleBarShell
         titleBarNavSlot={titleBarNavSlot}
+        titleBarToolCloseVisible={titleBarToolCloseVisible}
         contentClassName="px-3 pt-2 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
       >
 
-        <SlotsToolPageHeader onBackToSlotsHub={onBackToSlotsHub} quickLinkDestinationId="bankroll" />
+        <SlotsToolPageHeader quickLinkDestinationId="bankroll" />
 
         {/* Tab navigation */}
         <div className="flex gap-1 overflow-x-auto no-scrollbar mb-5 -mx-3 px-3">

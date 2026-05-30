@@ -18,6 +18,8 @@ const defaultShellContentClassName = 'px-3 pb-[calc(6rem+env(safe-area-inset-bot
 
 export default function ScrollLinkedEdgeTitleBarShell({
   titleBarNavSlot = null,
+  /** Slot tool × in nav cluster — reserve logo width (matches `titleBarLayout.toolCloseVisible`). */
+  titleBarToolCloseVisible = false,
   children,
   contentClassName = defaultShellContentClassName,
   fullWidth = false,
@@ -32,7 +34,9 @@ export default function ScrollLinkedEdgeTitleBarShell({
   const [titleReveal, setTitleReveal] = useState(1)
   const [feedViewportTopPx, setFeedViewportTopPx] = useState(0)
   const quickLinkIds = useQuickLinkIds()
-  const logoClassName = edgeLogoTitleBarClassName(quickLinkIds.length)
+  const logoClassName = edgeLogoTitleBarClassName(quickLinkIds.length, {
+    toolCloseVisible: titleBarToolCloseVisible,
+  })
 
   useLayoutEffect(() => {
     const bar = titleBarRef.current
