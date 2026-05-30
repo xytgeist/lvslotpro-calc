@@ -12,7 +12,6 @@ import ReviewQueuePanel from './components/ReviewQueuePanel'
 import UploadProgressOverlay from './components/UploadProgressOverlay'
 import OfferFormModal from './components/OfferFormModal'
 import WeekEventDetailModal from './components/WeekEventDetailModal'
-import AddEventFab from './components/AddEventFab'
 import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
 import SlotsToolPageHeader from '../../components/SlotsToolPageHeader.jsx'
 import useOffersCalendarState from './hooks/useOffersCalendarState'
@@ -949,6 +948,12 @@ export default function OffersCalendar({
     }
   }
 
+  const handleAddEvent = () => {
+    setViewMenuOpen(false)
+    const dayKey = selectedDays.length === 1 ? selectedDays[0] : null
+    openForm(dayKey)
+  }
+
   const hasVisibleTime = (iso) => {
     const d = new Date(iso)
     return d.getHours() !== 0 || d.getMinutes() !== 0
@@ -1008,7 +1013,6 @@ export default function OffersCalendar({
       >
 
       <SlotsToolPageHeader
-        quickLinkDestinationId="offers"
         center={
           <div className="flex min-h-10 w-full items-center justify-center gap-1.5">
             {activeCalendarView !== 'agenda' ? (
@@ -1053,7 +1057,18 @@ export default function OffersCalendar({
           </div>
         }
         trailing={
-          <div ref={viewMenuRef} className="relative z-20 shrink-0">
+          <div className="relative z-20 flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={handleAddEvent}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center text-[28px] font-bold leading-none text-violet-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+              aria-label="Add event"
+            >
+              <span className="block translate-y-[-0.06em]" aria-hidden>
+                +
+              </span>
+            </button>
+            <div ref={viewMenuRef} className="relative shrink-0">
             <button
               type="button"
               onClick={() => setViewMenuOpen((v) => !v)}
@@ -1125,6 +1140,7 @@ export default function OffersCalendar({
                 </button>
               </div>
             ) : null}
+            </div>
           </div>
         }
       />
@@ -1698,8 +1714,6 @@ export default function OffersCalendar({
           deleteEvent(eventId)
         }}
       />
-
-      <AddEventFab onClick={() => openForm(null)} />
 
       <OfferFormModal
         showForm={showForm}

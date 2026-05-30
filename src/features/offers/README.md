@@ -14,7 +14,6 @@ This folder holds the **Offers calendar** feature. The main screen component is 
 - `components/`
   - Presentational UI pieces for Offers.
   - Current components:
-    - `AddEventFab.jsx`
     - `DateTimeInput.jsx`
     - `OfferFormModal.jsx`
     - `ReviewQueuePanel.jsx`

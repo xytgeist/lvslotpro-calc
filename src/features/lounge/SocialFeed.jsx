@@ -218,6 +218,7 @@ import {
 } from './loungeFeedAvatar.js'
 import { useQuickLinkIds } from '../shell/quickLinksStore.js'
 import { edgeLogoTitleBarClassName } from '../shell/titleBarLayout.js'
+import { useEdgeTitleBarReveal } from '../shell/edgeTitleBarRevealStore.js'
 import LoungePostDetailCommentSort from './LoungePostDetailCommentSort.jsx'
 import LoungePostDetailCommentHierarchy from './LoungePostDetailCommentHierarchy.jsx'
 import { readLoungeDetailCommentSort } from '../../utils/loungeFeedCommentSort.js'
@@ -10183,12 +10184,13 @@ export default function SocialFeed({
     () => false,
   )
   const loungeDockFabBottomObstaclePx = loungePostUploadBar ? loungeUploadBarHeightPx + 10 : 0
+  const toolScrollTitleReveal = useEdgeTitleBarReveal()
 
   const showLoungeViewportDock = !loungePostDetail && !loungeStreamLightboxOpen
   const loungeDockPanelChrome =
     loungeDockPanel ?? (!isActivePage ? 'awayFromFeed' : null)
   const loungeDockReveal = !isActivePage
-    ? 1
+    ? toolScrollTitleReveal
     : profileModalOpen
       ? loungeProfileDockReveal
       : loungeDockPanel

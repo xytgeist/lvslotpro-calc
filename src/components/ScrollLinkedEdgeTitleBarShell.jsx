@@ -4,6 +4,7 @@ import TitleBarStatusLine from './TitleBarStatusLine.jsx'
 import { LOUNGE_FEED_TITLE_BAR_ROW_CLASS } from '../features/lounge/loungeFeedAvatar.js'
 import { useQuickLinkIds } from '../features/shell/quickLinksStore.js'
 import { edgeLogoTitleBarClassName } from '../features/shell/titleBarLayout.js'
+import { setEdgeTitleBarReveal } from '../features/shell/edgeTitleBarRevealStore.js'
 
 /**
  * Fixed EDGE title bar + scroll-linked hide/show — same chrome and tuning as
@@ -20,6 +21,8 @@ export default function ScrollLinkedEdgeTitleBarShell({
   titleBarNavSlot = null,
   /** Slot tool × in nav cluster — reserve logo width (matches `titleBarLayout.toolCloseVisible`). */
   titleBarToolCloseVisible = false,
+  /** Publish scroll-linked reveal for the portaled lounge dock on other tabs. */
+  publishScrollReveal = true,
   children,
   contentClassName = defaultShellContentClassName,
   fullWidth = false,
@@ -116,6 +119,12 @@ export default function ScrollLinkedEdgeTitleBarShell({
       if (scrollVisualRafRef.current) window.cancelAnimationFrame(scrollVisualRafRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!publishScrollReveal) return undefined
+    setEdgeTitleBarReveal(titleReveal)
+    return () => setEdgeTitleBarReveal(1)
+  }, [publishScrollReveal, titleReveal])
 
   return (
     <div
