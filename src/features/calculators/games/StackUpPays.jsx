@@ -133,6 +133,7 @@ function StackUpPays({ onBack }) {
 
   const [scoutPercentage, setScoutPercentage] = useState(10)
   const [showInfoModal, setShowInfoModal] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     if (!DENOM_OPTIONS.some((d) => Math.abs(d - denom) < 1e-9)) {
@@ -279,8 +280,8 @@ function StackUpPays({ onBack }) {
           <div className="w-12 shrink-0" aria-hidden />
         </div>
 
-        {/* Bet Size + Denomination + RTP Override */}
-        <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-3 gap-3 sm:gap-4">
+        {/* Bet Size + Denomination */}
+        <div className="bg-slate-900 p-5 rounded-3xl mb-6 grid grid-cols-2 gap-3 sm:gap-4">
           <div>
             <label className="block text-slate-400 text-xs mb-1">Bet Size</label>
             <div className="flex h-14 items-stretch gap-1 rounded-2xl bg-slate-800 px-2.5 focus-within:ring-2 focus-within:ring-cyan-500/25">
@@ -308,31 +309,51 @@ function StackUpPays({ onBack }) {
               size="lg"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-slate-400 text-xs mb-1">RTP %</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={rtpInput}
-              onChange={(e) => {
-                const next = e.target.value.replace(/[^0-9.]/g, '')
-                setRtpInput(next)
-                const parsed = parseFloat(next)
-                if (Number.isFinite(parsed) && parsed > 0) {
-                  // Live-update calculations/markers while user types a valid RTP override.
-                  setOverallRTP(parsed)
-                }
-              }}
-              onBlur={() => {
-                const parsed = parseFloat(rtpInput)
-                const safeRtp = Number.isFinite(parsed) && parsed > 0 ? parsed : 89
-                setOverallRTP(safeRtp)
-                setRtpInput(String(safeRtp))
-              }}
-              className="calc-field-lg h-14 w-full rounded-2xl border-0 bg-slate-800 px-2 text-center text-2xl font-bold leading-none text-white outline-none focus:ring-2 focus:ring-cyan-500/25"
-            />
-          </div>
+        {/* Advanced Settings */}
+        <div className="bg-slate-900 rounded-3xl mb-6 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/80 touch-manipulation"
+            aria-expanded={showAdvanced}
+          >
+            <span className="text-base font-semibold text-white">Advanced Settings</span>
+            <span className={`text-xl text-slate-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} aria-hidden>
+              ▼
+            </span>
+          </button>
+          {showAdvanced ? (
+            <div className="space-y-4 border-t border-slate-800 p-4 pt-4">
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">Overall RTP (%)</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={rtpInput}
+                  onChange={(e) => {
+                    const next = e.target.value.replace(/[^0-9.]/g, '')
+                    setRtpInput(next)
+                    const parsed = parseFloat(next)
+                    if (Number.isFinite(parsed) && parsed > 0) {
+                      setOverallRTP(parsed)
+                    }
+                  }}
+                  onBlur={() => {
+                    const parsed = parseFloat(rtpInput)
+                    const safeRtp = Number.isFinite(parsed) && parsed > 0 ? parsed : 89
+                    setOverallRTP(safeRtp)
+                    setRtpInput(String(safeRtp))
+                  }}
+                  className="calc-field-lg h-14 w-full rounded-2xl border-0 bg-slate-800 px-3 text-center text-2xl font-bold leading-none text-white outline-none focus:ring-2 focus:ring-cyan-500/25"
+                />
+                <p className="mt-1.5 text-[11px] italic leading-relaxed text-slate-500">
+                  Defaults by denomination; override only if your floor paytable differs.
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Meters — green labels + arrow = approx +EV threshold (same scale as slider) */}
