@@ -15,7 +15,7 @@ export const PLAY_LOG_METRIC_FALLBACK = /** @type {Record<string, { label: strin
   bonus_count: { label: 'Bonuses', value_type: 'integer' },
   money_in: { label: 'Total money in', value_type: 'money' },
   money_out: { label: 'Total money out', value_type: 'money' },
-  counter_at_hit: { label: 'Counter at hit', value_type: 'integer' },
+  counter_at_hit: { label: 'Counter hit at', value_type: 'integer' },
   mega: { label: 'Mega', value_type: 'integer' },
   grand: { label: 'Grand', value_type: 'integer' },
   major: { label: 'Major', value_type: 'integer' },

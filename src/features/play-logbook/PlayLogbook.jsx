@@ -5,6 +5,7 @@ import DateWheelPicker from '../../components/DateWheelPicker.jsx'
 import TimeWheelPicker from '../../components/TimeWheelPicker.jsx'
 import CasinoAutocomplete from '../../components/CasinoAutocomplete.jsx'
 import { resolveDefaultCaptureCasino } from '../../utils/nearbyCasinos.js'
+import { consumePlayLogPrefill } from '../../utils/playLogPrefill.js'
 import {
   formatMetricValue,
   metricDefMap,
@@ -13,6 +14,7 @@ import {
   valuesForStorage,
 } from './playLogMetrics.js'
 import { analyzePlayLogEntries } from './playLogAnalysis.js'
+import { buildPlayLogCsv, downloadPlayLogCsv } from './playLogExport.js'
 
 function localYmd(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -42,6 +44,17 @@ function emptyFormFields(metricSlugs) {
   const o = {}
   for (const s of metricSlugs) o[s] = ''
   return o
+}
+
+/** @param {Record<string, number | string> | null | undefined} values @param {string[]} metricSlugs */
+function formFieldsFromPrefill(values, metricSlugs) {
+  const fields = emptyFormFields(metricSlugs)
+  if (!values) return fields
+  for (const slug of metricSlugs) {
+    const v = values[slug]
+    if (v != null && v !== '') fields[slug] = String(v)
+  }
+  return fields
 }
 
 export default function PlayLogbook({
@@ -172,22 +185,47 @@ export default function PlayLogbook({
     })
   }, [supabaseClient])
 
-  const openLogPlay = (templateId = '') => {
-    const tid = templateId || sortedTemplates[0]?.id || ''
-    setSelectedTemplateId(tid)
-    const tpl = tid ? templateById[tid] : null
-    setFormFields(emptyFormFields(tpl?.metric_slugs || []))
-    setCaptureCasino('')
-    setCaptureNotes('')
-    setCaptureDate(localYmd())
-    const d = new Date()
-    setCaptureTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
-    setNearbyCasinos([])
-    setGpsLoading(false)
-    setSheet('logPlay')
-    setError('')
-    populateCaptureCasino()
-  }
+  const openLogPlay = useCallback(
+    (opts = {}) => {
+      const templateId = opts.templateId || sortedTemplates[0]?.id || ''
+      setSelectedTemplateId(templateId)
+      const tpl = templateId ? templateById[templateId] : null
+      const slugs = tpl?.metric_slugs || []
+      setFormFields(
+        opts.prefillValues
+          ? formFieldsFromPrefill(opts.prefillValues, slugs)
+          : emptyFormFields(slugs),
+      )
+      setCaptureCasino(opts.casinoName?.trim() || '')
+      setCaptureNotes('')
+      setCaptureDate(localYmd())
+      const d = new Date()
+      setCaptureTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
+      setNearbyCasinos([])
+      setGpsLoading(false)
+      setSheet('logPlay')
+      setError('')
+      if (!opts.casinoName && !opts.skipCasinoPopulate) populateCaptureCasino()
+    },
+    [sortedTemplates, templateById, populateCaptureCasino],
+  )
+
+  useEffect(() => {
+    if (loading || !templates.length) return
+    const pre = consumePlayLogPrefill()
+    if (!pre) return
+    const tpl =
+      templates.find(t => pre.calculatorSlug && t.calculator_slug === pre.calculatorSlug) ||
+      templates.find(t => pre.templateSlug && t.slug === pre.templateSlug)
+    if (!tpl) return
+    setActiveTab('log')
+    openLogPlay({
+      templateId: tpl.id,
+      prefillValues: pre.values || {},
+      casinoName: pre.casinoName || null,
+      skipCasinoPopulate: Boolean(pre.casinoName),
+    })
+  }, [loading, templates, openLogPlay])
 
   const openCreateTemplate = () => {
     setCustomName('')
@@ -260,7 +298,7 @@ export default function PlayLogbook({
       if (e) throw e
       closeSheet()
       await loadAll()
-      if (data?.id) openLogPlay(data.id)
+      if (data?.id) openLogPlay({ templateId: data.id })
     } catch (e) {
       setError(e?.message || 'Failed to create template')
     } finally {
@@ -445,7 +483,7 @@ export default function PlayLogbook({
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
-                          onClick={() => openLogPlay(t.id)}
+                          onClick={() => openLogPlay({ templateId: t.id })}
                           className="text-cyan-400 text-xs font-bold touch-manipulation active:text-cyan-300 px-2 py-1"
                         >
                           Log
@@ -484,20 +522,35 @@ export default function PlayLogbook({
                 <div className="text-zinc-400 text-sm">No entries for this game yet.</div>
               </div>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {analysisStats.map(stat => (
-                  <div
-                    key={stat.key}
-                    className="rounded-2xl bg-zinc-900 border border-zinc-800/60 p-4"
-                    data-play-logbook-card
-                    data-play-logbook-stat
+              <>
+                <div className="flex justify-end mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const slug = analyzeTemplate?.slug || 'game'
+                      const csv = buildPlayLogCsv(filteredAnalyzeEntries, analyzeTemplate, defsMap)
+                      downloadPlayLogCsv(csv, `play-logbook-${slug}-${localYmd()}.csv`)
+                    }}
+                    className="min-h-10 rounded-xl bg-zinc-800 px-4 text-sm font-semibold text-cyan-300 touch-manipulation active:bg-zinc-700"
                   >
-                    <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wide">{stat.label}</div>
-                    <div className="text-white text-2xl font-black tabular-nums mt-1">{stat.value}</div>
-                    {stat.hint ? <p className="text-zinc-500 text-xs mt-2 leading-snug">{stat.hint}</p> : null}
-                  </div>
-                ))}
-              </div>
+                    Export CSV
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {analysisStats.map(stat => (
+                    <div
+                      key={stat.key}
+                      className="rounded-2xl bg-zinc-900 border border-zinc-800/60 p-4"
+                      data-play-logbook-card
+                      data-play-logbook-stat
+                    >
+                      <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wide">{stat.label}</div>
+                      <div className="text-white text-2xl font-black tabular-nums mt-1">{stat.value}</div>
+                      {stat.hint ? <p className="text-zinc-500 text-xs mt-2 leading-snug">{stat.hint}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </>
         )}

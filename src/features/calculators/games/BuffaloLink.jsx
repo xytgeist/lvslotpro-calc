@@ -4,6 +4,7 @@ import CalculatorDisclaimer from '../../../components/CalculatorDisclaimer'
 import { formatDenomLabel } from '../../../utils/formatDenomLabel'
 import { Line } from 'react-chartjs-2'
 import BankrollRiskAdvisor from '../BankrollRiskAdvisor.jsx'
+import CalculatorLogPlayButton from '../CalculatorLogPlayButton.jsx'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -19,7 +20,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const MUST_HIT = 1800
 const RTP_FLOOR_COUNTER = 850
 
-function BuffaloLink({ onBack, supabaseClient = null }) {
+function BuffaloLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
   const [currentX, setCurrentX] = useState(1234)   // Changed default to 1234
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -410,6 +411,13 @@ function BuffaloLink({ onBack, supabaseClient = null }) {
           playLabel="Buffalo Link"
           playDetails={{ counter: currentX, betSize }}
           accentClass="text-amber-400"
+          accentBtnClass="bg-amber-600 hover:bg-amber-500"
+        />
+
+        <CalculatorLogPlayButton
+          calculatorSlug="buffalo"
+          prefillValues={{ counter: currentX, bet_size: betSize, denom }}
+          onOpenLogbook={onOpenLogbook}
           accentBtnClass="bg-amber-600 hover:bg-amber-500"
         />
 

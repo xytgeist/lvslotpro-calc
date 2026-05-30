@@ -59,7 +59,7 @@ export function analyzePlayLogEntries(entries, metricSlugs) {
   if (slugSet.has('counter_at_hit')) {
     const hits = numericSamples(entries, 'counter_at_hit')
     if (hits.length) {
-      stats.push({ key: 'avg_hit_counter', label: 'Avg counter at hit', value: avg(hits).toFixed(1) })
+      stats.push({ key: 'avg_hit_counter', label: 'Avg counter hit at', value: avg(hits).toFixed(1) })
       const min = Math.min(...hits)
       const max = Math.max(...hits)
       stats.push({ key: 'hit_range', label: 'Hit counter range', value: `${min} – ${max}` })

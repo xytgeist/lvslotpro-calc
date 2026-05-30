@@ -136,7 +136,7 @@ insert into public.play_log_metric_defs (slug, label, value_type, sort_order) va
   ('bonus_count',       'Bonuses',              'integer', 50),
   ('money_in',          'Total money in',       'money',   60),
   ('money_out',         'Total money out',      'money',   70),
-  ('counter_at_hit',    'Counter at hit',       'integer', 80),
+  ('counter_at_hit',    'Counter hit at',       'integer', 80),
   ('mega',              'Mega',                 'integer', 90),
   ('grand',             'Grand',                'integer', 100),
   ('major',             'Major',                'integer', 110),

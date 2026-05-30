@@ -87,14 +87,14 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 - **SQL (test first):** e.g. `play_log_metric_defs` (slug, label, value_type), `play_log_game_templates` (builtin flag, `user_id` nullable for system templates, `machine_slug` optional FK, `metric_slugs text[]`), `play_log_entries` (`user_id`, `template_id`, `captured_at`, `casino_name` optional, `values jsonb` keyed by metric slug). RLS: users CRUD own templates (custom) + own entries; public read on builtin template defs only.
 - **Seed:** map known games → metric sets (Phoenix, Buffalo, Stack Up, generic MHB preset).
 - **Client:** Logbook home (recent entries + **+ Log play**), game picker, dynamic form from template, history list, **Analysis** tab/screen with game filter + computed stats.
-- **Cross-links (later):** pre-fill from open calculator session; attach entry to active **bankroll session**; export CSV.
+- **Cross-links (later):** pre-fill from open calculator session; **casino/location** on log capture = active bankroll session’s casino if set, else GPS nearest (same as Bankroll start session — `resolveDefaultCaptureCasino` in `nearbyCasinos.js`); export CSV.
 
 ### Status
 
 - [x] **Phase 0 — spec + schema:** `supabase/play_logbook.sql` + migration **`20260529120000_play_logbook.sql`** — metric registry, system templates (Phoenix Link, Buffalo Link, Stack Up Pays, MHB generic), RLS. **Apply on test before UI works.**
 - [x] **Phase 1 — capture UI:** `src/features/play-logbook/PlayLogbook.jsx` — Slots hub **Logbook** tile, game picker, dynamic form, custom template builder, entry list.
 - [x] **Phase 2 — analysis UI:** ANALYZE tab — per-game derived stats (`playLogAnalysis.js`).
-- [ ] **Phase 3 — polish:** calculator pre-fill, bankroll session link, CSV export (optional).
+- [x] **Phase 3 — polish:** calculator **Log play in Logbook** pre-fill (`playLogPrefill.js`, `CalculatorLogPlayButton` on Phoenix/Buffalo/Stack Up/MHB); capture **casino/location** via active bankroll session casino or GPS nearest (`resolveDefaultCaptureCasino`); **Export CSV** on ANALYZE tab. Ryan smoke pending.
 
 **Built on `test` (2026-05-29)** — Ryan smoke pending. Apply SQL on test Supabase first.
 
@@ -742,6 +742,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 - 2026-05-09: Documented modular frontend: `App.jsx` (auth) + `features/shell/AppShell.jsx` (logged-in shell); Lounge, Offers, Intel, Bankroll, Calculators under `src/features/`; calculator games under `features/calculators/games/` (see `docs/frontend-architecture.md`).
 - 2026-05-09: Doc sync — marked **A2** (caption-only, legacy columns dropped) and **A4** (DB rate limit in phase A SQL) complete on test; clarified A3 includes 30-minute author update policy in SQL.
 - 2026-05-29: **Quick links v1 (test):** Title bar shortcuts (max 2, `localStorage`); **`TitleBarQuickLinks`** in hamburger cluster; per-page **`QuickLinkPageToggle`** on Calcs home, Bankroll, Logbook, Calendar, AP Guides; at-cap modal; dynamic logo width via **`titleBarLayout.js`** (extra reserve on Lounge dock panels for **×** close). Light-mode **`data-quick-link-*`** CSS.
+- 2026-05-29: **Play Logbook Phase 3 (`test`):** Calculator **Log play in Logbook** pre-fill; capture casino = active bankroll session or GPS nearest; ANALYZE **Export CSV**. Ryan smoke pending.
 - 2026-05-29: **Play Logbook (test / branch `test`):** Schema **`supabase/play_logbook.sql`** + migration **`20260529120000`**; client **`src/features/play-logbook/`** (LOG + ANALYZE tabs, custom templates); Slots hub **Logbook** tile; Slots Edge gate; light-mode scoped CSS **`data-play-logbook*`** in **`index.css`**. **Apply SQL on test before smoke.**
 - 2026-05-29: **Planned (Play Logbook):** Ryan spec captured → shipped v1 (see row above).
 - 2026-05-26: **Fix: comment repost like counter optimistic update (`test`):** `toggleLoungeDetailCommentLike` was only patching `setLoungeDetailComments` (detail view), never `communityPosts`. Added `setCommunityPosts` patch that updates `p.reposted_comment.like_count` when a matching comment id is found. Ryan **PASSED** on `test` @ `e1d09a4`.

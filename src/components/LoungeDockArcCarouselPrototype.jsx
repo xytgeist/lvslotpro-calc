@@ -34,6 +34,7 @@ import {
   NEON_BLUE_ITEM_GLOW_IDLE,
   NEON_BLUE_ITEM_GLOW_PAGE_ACTIVE,
 } from '../utils/loungeDockFabGlow.js'
+import { Z_LOUNGE_DOCK_VIEWPORT } from '../constants/appZIndex.js'
 
 const HOME_ITEM_ID = 'home'
 /** Compact FAB + home chip (search/notifications/settings/chat panels, or any non-feed screen). */
@@ -1448,7 +1449,10 @@ export default function LoungeDockArcCarouselPrototype({
   }
 
   const dockLayer = (
-    <div className="pointer-events-none fixed inset-0 z-[115]">
+    <div
+      className="pointer-events-none fixed inset-0"
+      style={{ zIndex: Z_LOUNGE_DOCK_VIEWPORT }}
+    >
       {clickShield ? (
         <button
           type="button"
@@ -1629,8 +1633,9 @@ export default function LoungeDockArcCarouselPrototype({
       {/* Following-filter toggle flash — rendered here so it survives the menu closing before the flash fires */}
       {followingFlash && followingItemCenterRef.current ? (
         <span
-          className="pointer-events-none fixed z-[116] -translate-x-1/2 whitespace-nowrap"
+          className="pointer-events-none fixed -translate-x-1/2 whitespace-nowrap"
           style={{
+            zIndex: Z_LOUNGE_DOCK_VIEWPORT + 1,
             left: followingItemCenterRef.current.x,
             top: followingItemCenterRef.current.y - LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX / 2 - 4,
           }}

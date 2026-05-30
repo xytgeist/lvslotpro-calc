@@ -81,7 +81,7 @@ Shipped on **`test`** (code only until SQL applied):
 
 - **Slots → Logbook** — LOG tab (capture + custom templates) + ANALYZE tab (derived stats)
 - **SQL:** run **`supabase/play_logbook.sql`** or migration **`20260529120000_play_logbook.sql`** on test Supabase
-- **Phase 3 still open:** calculator pre-fill, bankroll session link, CSV export
+- **Phase 3 shipped (code):** calculator pre-fill, capture casino (active bankroll session casino or GPS nearest — not a DB link to session), CSV export
 
 See **`docs/test-buildout-backlog.md`** → *Planned (Play Logbook)*.
 

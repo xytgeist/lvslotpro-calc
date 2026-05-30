@@ -15,6 +15,7 @@ import {
   uploadProfileAvatar,
 } from '../profiles/profileGate'
 import ProfileHandleConflictDialog from '../profiles/ProfileHandleConflictDialog.jsx'
+import { Z_APP_MODAL } from '../../constants/appZIndex.js'
 import { adminSetProfileRole } from '../profiles/adminSetProfileRole.js'
 import {
   collectLoungePostInteractionHydrateIds,
@@ -13588,7 +13589,12 @@ export default function SocialFeed({
 
       {profileGateOpen && typeof document !== 'undefined'
         ? createPortal(
-            <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" role="dialog" aria-modal>
+            <div
+              className="fixed inset-0 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]"
+              style={{ zIndex: Z_APP_MODAL }}
+              role="dialog"
+              aria-modal
+            >
           <button
             type="button"
             className="absolute inset-0 z-0 cursor-default"

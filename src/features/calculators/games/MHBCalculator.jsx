@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import CalculatorDisclaimer from '../../../components/CalculatorDisclaimer'
 import BankrollRiskAdvisor from '../BankrollRiskAdvisor.jsx'
+import CalculatorLogPlayButton from '../CalculatorLogPlayButton.jsx'
 
 function defaultCurrentForCap(cap) {
   return Math.round(cap * 0.95)
@@ -258,7 +259,7 @@ function formatUsd(amount) {
   }).format(n)
 }
 
-function MHBCalculator({ onBack, supabaseClient = null }) {
+function MHBCalculator({ onBack, supabaseClient = null, onOpenLogbook = null }) {
   const isLight = document.documentElement.classList.contains('light')
   const scrollThumb = isLight
     ? '[&::-webkit-scrollbar-thumb]:bg-blue-400/40 hover:[&::-webkit-scrollbar-thumb]:bg-blue-400/60 [scrollbar-color:rgba(96,165,250,0.45)_transparent]'
@@ -1070,6 +1071,13 @@ function MHBCalculator({ onBack, supabaseClient = null }) {
           playLabel="Must Hit By"
           playDetails={{ current, mustHitBy, playStake: igtLineBet }}
           accentClass="text-cyan-400"
+          accentBtnClass="bg-cyan-600 hover:bg-cyan-500"
+        />
+
+        <CalculatorLogPlayButton
+          calculatorSlug="mhb"
+          prefillValues={{ counter: current, bet_size: igtLineBet, denom: igtDenom }}
+          onOpenLogbook={onOpenLogbook}
           accentBtnClass="bg-cyan-600 hover:bg-cyan-500"
         />
 

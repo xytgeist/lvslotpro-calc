@@ -821,6 +821,12 @@ export default function AppShell({
     setTab(toolId)
   }, [])
 
+  const openLogbook = useCallback(() => {
+    setActiveCalculator(null)
+    setTab('logbook')
+    setMenuOpen(false)
+  }, [])
+
   const backToSlotsHub = useCallback(() => {
     setActiveCalculator(null)
     setTab('slots')
@@ -1073,6 +1079,7 @@ export default function AppShell({
           gatesDbReady={contentAccessGatesDbReady}
           onSetContentGate={onSetContentAccessGate}
           onRequireSubscribe={onRequireSubscribe}
+          onOpenLogbook={openLogbook}
           titleBarNavSlot={renderTitleBarNavSlot()}
           titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
           supabaseClient={supabaseClient}

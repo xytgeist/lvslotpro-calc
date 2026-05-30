@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import CalculatorDisclaimer from '../../../components/CalculatorDisclaimer'
+import CalculatorLogPlayButton from '../CalculatorLogPlayButton.jsx'
 import { formatDenomLabel } from '../../../utils/formatDenomLabel'
 import { DropdownSelect } from '../DropdownSelect'
 
@@ -112,7 +113,7 @@ function getCalibratedStateRTP(overallRTP, meters) {
   return baseRTP + stateBonusRTP
 }
 
-function StackUpPays({ onBack }) {
+function StackUpPays({ onBack, onOpenLogbook = null }) {
   const [mega, setMega] = useState(300)
   const [grand, setGrand] = useState(225)
   const [major, setMajor] = useState(175)
@@ -474,6 +475,13 @@ function StackUpPays({ onBack }) {
             <div className="text-xs text-slate-400 mt-1">to scout ({scoutPercentage}% of expected profit)</div>
           </div>
         </div>
+
+        <CalculatorLogPlayButton
+          calculatorSlug="stackup"
+          prefillValues={{ mega, grand, major, minor, mini, bet_size: betSize, denom }}
+          onOpenLogbook={onOpenLogbook}
+          accentBtnClass="bg-cyan-600 hover:bg-cyan-500"
+        />
 
         <CalculatorDisclaimer className="border-slate-800/80" />
       </div>
