@@ -4,7 +4,7 @@
  * Props:
  *   value       — selected option value
  *   onChange    — fn(value: string)
- *   options     — [{ value: string, label: string }]
+ *   options     — [{ value: string, label: string }] or section labels { type: 'label', label: string }
  *   ariaLabel   — accessibility label for trigger
  *   placeholder — shown when value is empty / unknown
  */
@@ -25,7 +25,8 @@ export default function LogPlayOptionPicker({
 }) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef(null)
-  const selected = options.find(o => o.value === value)
+  const selectableOptions = options.filter(o => o?.type !== 'label')
+  const selected = selectableOptions.find(o => o.value === value)
   const display = selected?.label ?? placeholder
 
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function LogPlayOptionPicker({
         type="button"
         aria-label={ariaLabel}
         aria-expanded={open}
-        disabled={options.length === 0}
+        disabled={selectableOptions.length === 0}
         onClick={() => setOpen(o => !o)}
         className={`${TRIGGER_CLASS} disabled:opacity-50`}
       >
@@ -65,7 +66,18 @@ export default function LogPlayOptionPicker({
       </button>
       {open && options.length > 0 ? (
         <div className={MENU_CLASS} role="listbox">
-          {options.map(opt => {
+          {options.map((opt, index) => {
+            if (opt?.type === 'label') {
+              return (
+                <div
+                  key={`label:${opt.label}:${index}`}
+                  className="px-4 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 border-b border-zinc-700/40"
+                  role="presentation"
+                >
+                  {opt.label}
+                </div>
+              )
+            }
             const picked = opt.value === value
             return (
               <button

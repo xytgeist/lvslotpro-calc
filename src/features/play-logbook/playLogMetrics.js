@@ -131,11 +131,44 @@ export function buildCustomMetricDefsForTemplate(drafts, reservedSlugs) {
     const key = label.toLowerCase()
     if (labelsSeen.has(key)) continue
     labelsSeen.add(key)
-    const slug = uniqueCustomMetricSlug(label, existing)
+    const preserved = d.slug && String(d.slug).trim()
+    const slug =
+      preserved && !existing.has(preserved)
+        ? preserved
+        : uniqueCustomMetricSlug(label, existing)
     existing.add(slug)
     out.push({ slug, label, value_type: d.value_type })
   }
   return out
+}
+
+/**
+ * Form state when editing an existing user template.
+ * @param {PlayLogTemplate} template
+ * @param {Record<string, PlayLogMetricDef>} defsMap
+ */
+export function customTemplateFormStateFromTemplate(template, defsMap) {
+  const customDefs = templateCustomMetricDefs(template)
+  const customSlugSet = new Set(customDefs.map(d => d.slug))
+  const standardMetrics = new Set(
+    (template.metric_slugs || []).filter(
+      slug =>
+        !PLAY_LOG_TEMPLATE_REQUIRED_FIELD_SLUG_SET.has(slug) &&
+        !PLAY_LOG_SNAPSHOT_FIELD_SLUGS.has(slug) &&
+        !customSlugSet.has(slug) &&
+        defsMap[slug],
+    ),
+  )
+  return {
+    displayName: template.display_name || '',
+    standardMetrics,
+    customFieldDrafts: customDefs.map(d => ({
+      id: d.slug,
+      slug: d.slug,
+      label: d.label,
+      value_type: d.value_type,
+    })),
+  }
 }
 
 /** @param {string[]} metricSlugs @param {Record<string, PlayLogMetricDef>} defsMap */
@@ -472,6 +505,34 @@ export function templatesSortedByPlayCount(templates, entries) {
     if (cb !== ca) return cb - ca
     return a.display_name.localeCompare(b.display_name)
   })
+}
+
+/**
+ * Log Play game dropdown: system games (by play count), then optional "Custom games" section.
+ * @param {PlayLogTemplate[]} templates
+ * @param {PlayLogEntry[]} entries
+ * @returns {Array<{ value: string, label: string } | { type: 'label', label: string }>}
+ */
+export function buildLogPlayGamePickerOptions(templates, entries) {
+  const counts = playCountByTemplateId(entries)
+  const sortGroup = list =>
+    [...list].sort((a, b) => {
+      const ca = counts.get(String(a.id)) || 0
+      const cb = counts.get(String(b.id)) || 0
+      if (cb !== ca) return cb - ca
+      return a.display_name.localeCompare(b.display_name)
+    })
+  const system = sortGroup((templates || []).filter(t => t.is_system))
+  const custom = sortGroup((templates || []).filter(t => !t.is_system))
+  /** @type {Array<{ value: string, label: string } | { type: 'label', label: string }>} */
+  const options = system.map(t => ({ value: t.id, label: t.display_name }))
+  if (custom.length > 0) {
+    options.push({ type: 'label', label: 'Custom games' })
+    for (const t of custom) {
+      options.push({ value: t.id, label: t.display_name })
+    }
+  }
+  return options
 }
 
 /**

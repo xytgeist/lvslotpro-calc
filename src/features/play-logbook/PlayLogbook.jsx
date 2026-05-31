@@ -30,11 +30,13 @@ import {
   sortMetricSlugs,
   targetBonusPaidInBets,
   templatesSorted,
+  buildLogPlayGamePickerOptions,
   templatesSortedByPlayCount,
   valuesForStorage,
   getLogPlaySaveValidationError,
   defsMapForTemplate,
   buildCustomMetricDefsForTemplate,
+  customTemplateFormStateFromTemplate,
   CUSTOM_METRIC_TYPE_OPTIONS,
   standardTemplatePickerSlugs,
   metricSlugsForUserTemplate,
@@ -163,7 +165,8 @@ export default function PlayLogbook({
 
   const [customName, setCustomName] = useState('')
   const [customMetrics, setCustomMetrics] = useState(() => new Set())
-  /** @type {[Array<{ id: string, label: string, value_type: import('./playLogMetrics.js').PlayLogValueType }>, Function]} */
+  const [editingCustomTemplateId, setEditingCustomTemplateId] = useState(/** @type {string | null} */ (null))
+  /** @type {[Array<{ id: string, slug?: string, label: string, value_type: import('./playLogMetrics.js').PlayLogValueType }>, Function]} */
   const [customFieldDrafts, setCustomFieldDrafts] = useState([])
   const [newFieldLabel, setNewFieldLabel] = useState('')
   const [newFieldType, setNewFieldType] = useState(
@@ -180,6 +183,10 @@ export default function PlayLogbook({
   const sortedTemplates = useMemo(() => templatesSorted(templates), [templates])
   const logPlayTemplatesSorted = useMemo(
     () => templatesSortedByPlayCount(templates, entries),
+    [templates, entries],
+  )
+  const logPlayGamePickerOptions = useMemo(
+    () => buildLogPlayGamePickerOptions(templates, entries),
     [templates, entries],
   )
 
@@ -304,6 +311,7 @@ export default function PlayLogbook({
     setDetailPartners([])
     setEditingEntryId(null)
     setEditingSessionId(null)
+    setEditingCustomTemplateId(null)
     setPartners([])
     setError('')
     setSaveAlertMessage('')
@@ -458,10 +466,27 @@ export default function PlayLogbook({
     })
   }, [loading, templates, openLogPlay])
 
-  const openCreateTemplate = () => {
+  const resetCustomTemplateForm = () => {
+    setEditingCustomTemplateId(null)
     setCustomName('')
     setCustomMetrics(new Set(['spin_count']))
     setCustomFieldDrafts([])
+    setNewFieldLabel('')
+    setNewFieldType('integer')
+  }
+
+  const openCreateTemplate = () => {
+    resetCustomTemplateForm()
+    setSheet('createTemplate')
+    setError('')
+  }
+
+  const openEditCustomTemplate = template => {
+    const form = customTemplateFormStateFromTemplate(template, defsMap)
+    setEditingCustomTemplateId(template.id)
+    setCustomName(form.displayName)
+    setCustomMetrics(form.standardMetrics)
+    setCustomFieldDrafts(form.customFieldDrafts)
     setNewFieldLabel('')
     setNewFieldType('integer')
     setSheet('createTemplate')
@@ -608,23 +633,40 @@ export default function PlayLogbook({
         [...customMetrics, ...customDefs.map(d => d.slug)],
         sortMap,
       )
-      const { data, error: e } = await supabaseClient
-        .from('play_log_game_templates')
-        .insert({
-          user_id: userId,
-          display_name: name,
-          metric_slugs,
-          custom_metric_defs: customDefs,
-          is_system: false,
-        })
-        .select('*')
-        .single()
-      if (e) throw e
-      closeSheet()
-      await loadAll()
-      if (data?.id) openLogPlay({ templateId: data.id })
+      const payload = {
+        display_name: name,
+        metric_slugs,
+        custom_metric_defs: customDefs,
+      }
+      if (editingCustomTemplateId) {
+        const { error: e } = await supabaseClient
+          .from('play_log_game_templates')
+          .update(payload)
+          .eq('id', editingCustomTemplateId)
+          .eq('is_system', false)
+        if (e) throw e
+        closeSheet()
+        await loadAll()
+      } else {
+        const { data, error: e } = await supabaseClient
+          .from('play_log_game_templates')
+          .insert({
+            user_id: userId,
+            ...payload,
+            is_system: false,
+          })
+          .select('*')
+          .single()
+        if (e) throw e
+        closeSheet()
+        await loadAll()
+        if (data?.id) openLogPlay({ templateId: data.id })
+      }
     } catch (e) {
-      setError(e?.message || 'Failed to create template')
+      setError(
+        e?.message ||
+          (editingCustomTemplateId ? 'Failed to update template' : 'Failed to create template'),
+      )
     } finally {
       setSaving(false)
     }
@@ -682,6 +724,7 @@ export default function PlayLogbook({
         .eq('is_system', false)
       if (e) throw e
       if (analyzeTemplateId === templateId) setAnalyzeTemplateId('')
+      if (editingCustomTemplateId === templateId) resetCustomTemplateForm()
       await loadAll()
     } catch (e) {
       setError(e?.message || 'Failed to delete template')
@@ -766,7 +809,7 @@ export default function PlayLogbook({
                 disabled={schemaMissing}
                 className="w-full rounded-2xl py-3 text-zinc-400 text-sm font-semibold touch-manipulation active:text-zinc-200 disabled:opacity-40"
               >
-                Create custom game template
+                Custom game templates
               </button>
             </div>
 
@@ -868,43 +911,6 @@ export default function PlayLogbook({
               </div>
             )}
 
-            {sortedTemplates.some(t => !t.is_system) && (
-              <div className="mt-6">
-                <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wide px-1 mb-2">
-                  Your custom games
-                </div>
-                <div className="space-y-2">
-                  {sortedTemplates.filter(t => !t.is_system).map(t => (
-                    <div
-                      key={t.id}
-                      className="flex items-center justify-between rounded-2xl bg-zinc-900 border border-zinc-800/60 px-4 py-3"
-                      data-play-logbook-card
-                    >
-                      <div className="min-w-0">
-                        <div className="text-white font-semibold truncate">{t.display_name}</div>
-                        <div className="text-zinc-500 text-xs">{t.metric_slugs?.length || 0} fields</div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => openLogPlay({ templateId: t.id })}
-                          className="text-cyan-400 text-xs font-bold touch-manipulation active:text-cyan-300 px-2 py-1"
-                        >
-                          Log
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteCustomTemplate(t.id)}
-                          className="text-zinc-500 text-xs font-semibold touch-manipulation active:text-red-400 px-2 py-1"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </>
         ) : (
           <>
@@ -990,10 +996,7 @@ export default function PlayLogbook({
                         <LogPlayOptionPicker
                           value={selectedTemplateId}
                           onChange={onTemplateChange}
-                          options={logPlayTemplatesSorted.map(t => ({
-                            value: t.id,
-                            label: t.display_name,
-                          }))}
+                          options={logPlayGamePickerOptions}
                           ariaLabel="Game"
                           placeholder="Select game"
                         />
@@ -1213,10 +1216,71 @@ export default function PlayLogbook({
 
             {sheet === 'createTemplate' && (
               <>
-                <SheetHeader title="Create Game Template" onClose={closeSheet} />
+                <SheetHeader
+                  title={editingCustomTemplateId ? 'Edit Game Template' : 'Create Game Template'}
+                  onClose={closeSheet}
+                />
                 <p className="text-zinc-400 text-sm mb-4 leading-relaxed">
-                  Name your game and pick which fields to capture each time you log a play.
+                  {editingCustomTemplateId
+                    ? 'Update fields for this game, or pick another template below to edit.'
+                    : 'Name your game and pick which fields to capture each time you log a play.'}
                 </p>
+                {sortedTemplates.some(t => !t.is_system) ? (
+                  <div className="mb-4">
+                    <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wide mb-2">
+                      Your custom games
+                    </div>
+                    <ul className="space-y-1.5">
+                      {sortedTemplates
+                        .filter(t => !t.is_system)
+                        .map(t => {
+                          const editing = editingCustomTemplateId === t.id
+                          return (
+                            <li
+                              key={t.id}
+                              className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${
+                                editing
+                                  ? 'bg-cyan-600/15 border border-cyan-500/40'
+                                  : 'bg-zinc-800/80 border border-transparent'
+                              }`}
+                            >
+                              <span className="min-w-0 truncate text-sm font-semibold text-zinc-200">
+                                {t.display_name}
+                              </span>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditCustomTemplate(t)}
+                                  className="text-cyan-400 text-xs font-bold px-2 py-1 touch-manipulation active:text-cyan-300"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteCustomTemplate(t.id)}
+                                  className="text-zinc-500 text-xs font-semibold px-2 py-1 touch-manipulation active:text-red-400"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </li>
+                          )
+                        })}
+                    </ul>
+                    {editingCustomTemplateId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetCustomTemplateForm()
+                          setError('')
+                        }}
+                        className="mt-2 text-cyan-400 text-xs font-semibold touch-manipulation active:text-cyan-300"
+                      >
+                        + New custom game
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mb-4">
                   <label className="block text-zinc-400 text-xs mb-1.5">Game name</label>
                   <input
@@ -1343,7 +1407,13 @@ export default function PlayLogbook({
                   disabled={saving}
                   className="w-full min-h-12 rounded-2xl bg-cyan-600 text-white font-bold touch-manipulation active:bg-cyan-700 disabled:opacity-50"
                 >
-                  {saving ? 'Creating…' : 'Create & Log Play'}
+                  {saving
+                    ? editingCustomTemplateId
+                      ? 'Saving…'
+                      : 'Creating…'
+                    : editingCustomTemplateId
+                      ? 'Save changes'
+                      : 'Create & Log Play'}
                 </button>
               </>
             )}
