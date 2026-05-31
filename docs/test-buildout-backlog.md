@@ -111,7 +111,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 | **Add to partner log** | **Auto-add** on save (no invite/accept in v1). |
 | **Notifications** | **Lounge Alerts** — new `activity_events.event_type` (e.g. `play_log_shared`) + existing in-app panel + push pipeline (`lounge-send-activity-push`). Tap opens Logbook entry (deep link TBD). Not a separate play-log-only inbox. |
 | **Edit** | **Creator only** updates canonical session (RPC syncs mirrored fields on all partner `play_log_entries`). |
-| **Delete** | **Creator** can delete session (cascade all partners’ rows). **Partner** may delete **only their own** `play_log_entries` row (gone from their LOG tab only). **Do not** remove them from `play_log_session_partners` — creator and other partners still see them on the shared session / their entries. |
+| **Delete** | **Owner** (`created_by_user_id`) deletes the session via `play_log_delete_shared_session` — cascades all partners’ `play_log_entries`. **Partner** may delete **only their own** row (gone from their LOG tab only; session and other partners unchanged). |
 
 **Data model (sketch):**
 
@@ -776,7 +776,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 - 2026-05-29: **Planned (Play Logbook — shared plays):** Ryan locked product rules — attribution-only %; partners from followers∪following + guests; auto-add; notify via Lounge `activity_events`; creator edits; partner delete = own row only, partner row stays on session for others.
 - 2026-05-29: **Play Logbook Phase 4 — shared plays (client + SQL migration `20260531140000`):** partners UI, RPC save/update/delete session, Lounge Alerts `play_log_shared`, push/deep link to Logbook entry. Apply migration on test + redeploy Edge push; Ryan smoke pending.
 - 2026-05-29: **Play Logbook — calc EV snapshot:** migration **`20260531150000_play_log_calc_ev_metrics.sql`**; Log play from calcs pre-fills **Current EV (RTP %)** + **Average case (×/$)** (Phoenix/Buffalo/Stack Up) or **Expected EV ($)** (MHB). Apply on test with play logbook migrations.
-- 2026-05-29: **Play Logbook — acquisition fee:** migration **`20260531160000_play_log_acquisition_fee.sql`**; **Acquisition fee** field on Phoenix/Buffalo/Stack Up templates; pre-filled from calc recommended finder's fee (scout % × EV basis × bet). Apply on test.
+- 2026-05-29: **Play Logbook — acquisition fee:** migration **`20260531160000_play_log_acquisition_fee.sql`**; **Acquisition fee** field on Phoenix/Buffalo/Stack Up templates (manual entry in log form; calc finder's-fee UI does not pre-fill). Apply on test.
 - 2026-05-29: **Play Logbook — partner picker fix:** client loads partners via same **`fetchProfileFollowListProfiles`** path as Lounge Following/Followers (not RPC-only); migration **`20260531170000_play_log_partner_candidates_fix.sql`** hardens RPC fallback.
 - 2026-05-29: **Play Logbook — edit shared attributions:** migration **`20260531180000_play_log_update_shared_partners.sql`** extends **`play_log_update_shared_session`** with **`p_partners`** (sync %, add/remove partners, fan-out + alert for new users). Creator edit form partners section no longer read-only.
 - 2026-05-29: **Play Logbook — manager + Paid:** migration **`20260531190000_play_log_session_manager_paid.sql`** — one **manager** per shared play (radio), **Paid** checkbox per partner; manager or creator can update paid via **`play_log_update_session_partners_paid`**. Apply on test.

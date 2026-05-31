@@ -647,11 +647,6 @@ function StackUpPays({ onBack, supabaseClient = null, onOpenLogbook = null }) {
               currentRtpPct: currentRTP,
               averageCaseMult: evAvg,
               betSize,
-              acquisitionFeeUsd: recommendedAcquisitionFeeUsd({
-                evMult: evAvg,
-                betSize,
-                scoutPercent: scoutPercentage,
-              }),
             }),
           }}
           onOpenLogbook={onOpenLogbook}

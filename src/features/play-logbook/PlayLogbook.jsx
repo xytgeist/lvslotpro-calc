@@ -36,6 +36,9 @@ import { buildPlayLogCsv, downloadPlayLogCsv } from './playLogExport.js'
 import PlayLogPartnersSection from './PlayLogPartnersSection.jsx'
 import {
   defaultCreatorPartnerRow,
+  playLogEntryIsSessionOwner,
+  playLogEntrySessionOwnerId,
+  playLogPartnersForSave,
   playLogPartnersFromSessionList,
   playLogPartnersHasExtraPartner,
   playLogPartnersToRpcPayload,
@@ -218,7 +221,7 @@ export default function PlayLogbook({
         supabaseClient.from('play_log_game_templates').select('*').order('display_name'),
         supabaseClient
           .from('play_log_entries')
-          .select('*')
+          .select('*, play_log_sessions ( created_by_user_id )')
           .order('captured_at', { ascending: false })
           .limit(200),
         supabaseClient
@@ -289,6 +292,16 @@ export default function PlayLogbook({
     })
   }, [supabaseClient])
 
+  const sessionOwnerId = useCallback(
+    (sessionId, entry = null) => {
+      if (!sessionId) return userId
+      const fromEntry = entry ? playLogEntrySessionOwnerId(entry, sessionMetaById) : null
+      if (fromEntry) return fromEntry
+      return sessionMetaById.get(String(sessionId))?.created_by_user_id ?? null
+    },
+    [sessionMetaById, userId],
+  )
+
   const openEntryDetail = useCallback(
     async entry => {
       if (!entry?.id) return
@@ -299,13 +312,15 @@ export default function PlayLogbook({
       if (entry.session_id) {
         try {
           const rows = await fetchPlayLogSessionPartners(supabaseClient, entry.session_id)
-          setDetailPartners(playLogPartnersFromSessionList(rows))
+          setDetailPartners(
+            playLogPartnersFromSessionList(rows, sessionOwnerId(entry.session_id)),
+          )
         } catch {
           setDetailPartners([])
         }
       }
     },
-    [supabaseClient],
+    [supabaseClient, sessionOwnerId],
   )
 
   const openLogPlay = useCallback(
@@ -337,20 +352,11 @@ export default function PlayLogbook({
     [sortedTemplates, templateById, populateCaptureCasino, userId, viewerProfile],
   )
 
-  const isSessionCreator = useCallback(
-    (entry) => {
-      if (!entry?.session_id) return true
-      const meta = sessionMetaById.get(String(entry.session_id))
-      return meta?.created_by_user_id === userId
-    },
-    [sessionMetaById, userId],
-  )
-
   const openEditEntry = useCallback(
     async (entry) => {
       const tpl = templateById[entry.template_id]
       if (!tpl) return
-      if (entry.session_id && !isSessionCreator(entry)) return
+      if (entry.session_id && !playLogEntryIsSessionOwner(entry, userId, sessionMetaById)) return
       setViewingEntryId(null)
       setDetailPartners([])
       const { date, time } = captureDateTimeFromIso(entry.captured_at)
@@ -369,7 +375,9 @@ export default function PlayLogbook({
       if (entry.session_id) {
         try {
           const rows = await fetchPlayLogSessionPartners(supabaseClient, entry.session_id)
-          setPartners(playLogPartnersFromSessionList(rows))
+          setPartners(
+            playLogPartnersFromSessionList(rows, sessionOwnerId(entry.session_id)),
+          )
         } catch {
           setPartners(userId ? [defaultCreatorPartnerRow(userId, viewerProfile)] : [])
         }
@@ -377,7 +385,7 @@ export default function PlayLogbook({
         setPartners(userId ? [defaultCreatorPartnerRow(userId, viewerProfile)] : [])
       }
     },
-    [templateById, isSessionCreator, supabaseClient, userId, viewerProfile],
+    [templateById, sessionMetaById, supabaseClient, userId, viewerProfile, sessionOwnerId],
   )
 
   useEffect(() => {
@@ -444,7 +452,9 @@ export default function PlayLogbook({
     const sharedOnEdit = Boolean(editingSessionId)
 
     if (useShared || sharedOnEdit) {
-      const partnerErr = playLogPartnersValidationError(partners, userId)
+      const ownerId = sessionOwnerId(editingSessionId)
+      const partnersForSave = playLogPartnersForSave(partners, ownerId)
+      const partnerErr = playLogPartnersValidationError(partnersForSave, userId)
       if (partnerErr) {
         setSaveAlertMessage(partnerErr)
         return
@@ -459,6 +469,10 @@ export default function PlayLogbook({
       const casino_name = captureCasino.trim() || null
       const notes = captureNotes.trim() || null
 
+      const sharedPartnersPayload = playLogPartnersToRpcPayload(
+        playLogPartnersForSave(partners, sessionOwnerId(editingSessionId)),
+      )
+
       if (sharedOnEdit && editingSessionId) {
         await updatePlayLogSharedSession(supabaseClient, {
           sessionId: editingSessionId,
@@ -466,7 +480,7 @@ export default function PlayLogbook({
           casinoName: casino_name,
           notes,
           values: stored,
-          partners: playLogPartnersToRpcPayload(partners),
+          partners: sharedPartnersPayload,
         })
       } else if (useShared) {
         await savePlayLogSharedSession(supabaseClient, {
@@ -475,7 +489,7 @@ export default function PlayLogbook({
           casinoName: casino_name,
           notes,
           values: stored,
-          partners: playLogPartnersToRpcPayload(partners),
+          partners: sharedPartnersPayload,
         })
       } else if (editingEntryId) {
         const { error: e } = await supabaseClient
@@ -548,9 +562,25 @@ export default function PlayLogbook({
   const deleteEntry = async (entry) => {
     const entryId = entry?.id || entry
     const sessionId = entry?.session_id
-    const creator = isSessionCreator(entry)
+    let isOwner = playLogEntryIsSessionOwner(entry, userId, sessionMetaById)
+    if (sessionId && !isOwner && !playLogEntrySessionOwnerId(entry, sessionMetaById)) {
+      try {
+        const meta = await fetchPlayLogSessionsMeta(supabaseClient, [sessionId])
+        const fetched = meta.get(String(sessionId))?.created_by_user_id
+        if (fetched && String(fetched) === String(userId)) isOwner = true
+        if (fetched) {
+          setSessionMetaById(prev => {
+            const next = new Map(prev)
+            next.set(String(sessionId), { created_by_user_id: fetched })
+            return next
+          })
+        }
+      } catch {
+        /* fall through — partner-only delete */
+      }
+    }
     const msg = sessionId
-      ? creator
+      ? isOwner
         ? 'Delete this shared play for everyone? All partners will lose their log entries.'
         : 'Remove this play from your logbook only? Other partners keep their entries.'
       : 'Delete this log entry?'
@@ -558,7 +588,7 @@ export default function PlayLogbook({
     setError('')
     const wasViewing = viewingEntryId != null && String(viewingEntryId) === String(entryId)
     try {
-      if (sessionId && creator) {
+      if (sessionId && isOwner) {
         await deletePlayLogSharedSession(supabaseClient, sessionId)
       } else {
         const { error: e } = await supabaseClient.from('play_log_entries').delete().eq('id', entryId)
@@ -632,7 +662,8 @@ export default function PlayLogbook({
             <code className="text-cyan-300">20260531140000_play_log_shared_sessions.sql</code> (shared partners),{' '}
             <code className="text-cyan-300">20260531180000_play_log_update_shared_partners.sql</code> (edit attributions),{' '}
             <code className="text-cyan-300">20260531190000_play_log_session_manager_paid.sql</code> (manager / paid),{' '}
-            <code className="text-cyan-300">20260531200000_play_log_partner_paid_notification.sql</code> (paid alerts).
+            <code className="text-cyan-300">20260531200000_play_log_partner_paid_notification.sql</code> (paid alerts),{' '}
+            <code className="text-cyan-300">20260531210000_play_log_manager_owner_default.sql</code> (owner = manager default).
           </div>
         )}
 
@@ -919,6 +950,7 @@ export default function PlayLogbook({
                       <PlayLogPartnersSection
                         supabaseClient={supabaseClient}
                         userId={userId}
+                        ownerUserId={sessionOwnerId(editingSessionId) ?? userId}
                         viewerProfile={viewerProfile}
                         partners={partners}
                         onPartnersChange={setPartners}
@@ -926,9 +958,7 @@ export default function PlayLogbook({
                         canEditPaid={playLogPartnersViewerCanMarkPaid(
                           partners,
                           userId,
-                          editingSessionId
-                            ? sessionMetaById.get(String(editingSessionId))?.created_by_user_id
-                            : userId,
+                          sessionOwnerId(editingSessionId) ?? userId,
                         )}
                       />
                     ) : null}
@@ -952,7 +982,8 @@ export default function PlayLogbook({
               const tpl = templateById[viewingEntry.template_id]
               const detailRows = entryDetailFieldsForEntry(viewingEntry, tpl, defsMap)
               const shared = Boolean(viewingEntry.session_id)
-              const canEdit = !shared || isSessionCreator(viewingEntry)
+              const isOwner = playLogEntryIsSessionOwner(viewingEntry, userId, sessionMetaById)
+              const canEdit = !shared || isOwner
               const realRtpSnap = realRtpSnapByEntryId[viewingEntry.id]
               const runningRtpLabel = realRtpSnap?.label
               const runningRtpTone = rtpToneFromPercentLabel(runningRtpLabel)
@@ -961,9 +992,7 @@ export default function PlayLogbook({
                 viewingEntry.values?.money_out,
                 viewingEntry.values?.acquisition_fee,
               )
-              const detailCreatorId = viewingEntry.session_id
-                ? sessionMetaById.get(String(viewingEntry.session_id))?.created_by_user_id
-                : null
+              const detailCreatorId = sessionOwnerId(viewingEntry.session_id, viewingEntry)
               const detailCanMarkPaid = playLogPartnersViewerCanMarkPaid(
                 detailPartners,
                 userId,
@@ -1020,6 +1049,7 @@ export default function PlayLogbook({
                         <PlayLogPartnersSection
                           supabaseClient={supabaseClient}
                           userId={userId}
+                          ownerUserId={sessionOwnerId(viewingEntry.session_id, viewingEntry)}
                           viewerProfile={viewerProfile}
                           partners={detailPartners}
                           onPartnersChange={setDetailPartners}
@@ -1059,7 +1089,7 @@ export default function PlayLogbook({
                         canEdit ? 'flex-1' : 'w-full'
                       }`}
                     >
-                      Delete
+                      {shared && isOwner ? 'Delete for all' : shared ? 'Remove from my log' : 'Delete'}
                     </button>
                   </div>
                 </>

@@ -15,6 +15,7 @@ import {
  * @param {{
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
  *   userId: string,
+ *   ownerUserId?: string,
  *   viewerProfile?: { handle?: string, display_name?: string } | null,
  *   partners: import('./playLogPartners.js').PlayLogPartnerRow[],
  *   onPartnersChange: (rows: import('./playLogPartners.js').PlayLogPartnerRow[]) => void,
@@ -28,6 +29,7 @@ import {
 export default function PlayLogPartnersSection({
   supabaseClient,
   userId,
+  ownerUserId = userId,
   viewerProfile,
   partners,
   onPartnersChange,
@@ -116,7 +118,7 @@ export default function PlayLogPartnersSection({
       return
     }
     if (!next.some(r => r.isManager)) {
-      next = playLogPartnersEnsureManager(next, userId)
+      next = playLogPartnersEnsureManager(next, ownerUserId)
     }
     onPartnersChange(next)
   }
@@ -161,6 +163,8 @@ export default function PlayLogPartnersSection({
       )}
       {row.kind === 'user' && String(row.userId) === String(userId) ? (
         <span className="text-zinc-500"> (you)</span>
+      ) : row.kind === 'user' && String(row.userId) === String(ownerUserId) ? (
+        <span className="text-zinc-500"> (owner)</span>
       ) : null}
       {row.isManager ? (
         <span className="ml-1 rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
@@ -343,11 +347,9 @@ export default function PlayLogPartnersSection({
       ) : null}
 
       <p className="text-zinc-500 text-xs leading-snug mt-1">
-        Pick one <span className="text-amber-300/90">manager</span> to track who has paid (manager is not marked paid).
-        Registered partners get this play in their logbook and a Lounge alert. Guests are attribution only.
-        {netOutcome != null && Number.isFinite(netOutcome) ? (
-          <> Dollar share is each partner&apos;s % of session net win/loss.</>
-        ) : null}
+        The <span className="text-amber-300/90">owner</span> is the manager by default (change the radio if someone else
+        tracks paid; manager is not marked paid). Registered partners get this play in their logbook and a Lounge alert.
+        Guests are attribution only.
       </p>
     </div>
   )

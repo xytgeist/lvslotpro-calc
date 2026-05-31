@@ -24,7 +24,6 @@ export function recommendedAcquisitionFeeUsd({ evMult = null, betSize = null, sc
  *   averageCaseMult?: number | null,
  *   betSize?: number | null,
  *   expectedEvUsd?: number | null,
- *   acquisitionFeeUsd?: number | null,
  * }} args
  * @returns {Record<string, number>}
  */
@@ -33,7 +32,6 @@ export function playLogCalcEvPrefill({
   averageCaseMult = null,
   betSize = null,
   expectedEvUsd = null,
-  acquisitionFeeUsd = null,
 }) {
   /** @type {Record<string, number>} */
   const out = {}
@@ -49,13 +47,6 @@ export function playLogCalcEvPrefill({
   }
   if (Number.isFinite(expectedEvUsd)) {
     out.expected_ev_usd = Math.round(expectedEvUsd * 100) / 100
-  }
-  const fee =
-    acquisitionFeeUsd != null
-      ? Number(acquisitionFeeUsd)
-      : null
-  if (Number.isFinite(fee)) {
-    out.acquisition_fee = Math.round(Math.abs(fee) * 100) / 100
   }
   return out
 }

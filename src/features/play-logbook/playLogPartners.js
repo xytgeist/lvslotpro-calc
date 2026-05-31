@@ -95,14 +95,43 @@ export function playLogPartnersWithManager(rows, managerKey) {
   }))
 }
 
-/** @param {PlayLogPartnerRow[]} rows @param {string} creatorUserId */
-export function playLogPartnersEnsureManager(rows, creatorUserId) {
-  if (rows.some(r => r.isManager)) return rows
-  const creatorKey = rows.find(
-    r => r.kind === 'user' && String(r.userId) === String(creatorUserId),
+/** Session owner is play manager when none is selected. */
+/** @param {PlayLogPartnerRow[]} rows @param {string} ownerUserId */
+export function playLogPartnersEnsureManager(rows, ownerUserId) {
+  if (rows.filter(r => r.isManager).length === 1) return rows
+  const ownerKey = rows.find(
+    r => r.kind === 'user' && String(r.userId) === String(ownerUserId),
   )?.key
-  if (!creatorKey) return rows
-  return playLogPartnersWithManager(rows, creatorKey)
+  if (!ownerKey) return rows
+  return playLogPartnersWithManager(rows, ownerKey)
+}
+
+/** @param {Array<Record<string, unknown>>} rows @param {string} [ownerUserId] */
+export function playLogPartnersFromSessionList(rows, ownerUserId) {
+  const mapped = (rows || []).map(row => {
+    const kind = row.participant_kind === 'guest' ? 'guest' : 'user'
+    const userId = row.user_id ? String(row.user_id) : ''
+    const guestLabel = row.guest_label ? String(row.guest_label) : ''
+    return {
+      key: kind === 'guest' ? `guest:${row.id}` : `user:${userId}`,
+      kind,
+      userId: kind === 'user' ? userId : undefined,
+      handle: row.handle ? String(row.handle) : '',
+      displayName: row.display_name ? String(row.display_name) : '',
+      avatarUrl: row.avatar_url ? String(row.avatar_url) : '',
+      guestLabel: kind === 'guest' ? guestLabel : undefined,
+      sharePercent: String(row.share_percent ?? ''),
+      isManager: Boolean(row.is_manager),
+      paid: Boolean(row.paid),
+    }
+  })
+  const owner = String(ownerUserId || '').trim()
+  return owner ? playLogPartnersEnsureManager(mapped, owner) : mapped
+}
+
+/** @param {PlayLogPartnerRow[]} rows @param {string} ownerUserId */
+export function playLogPartnersForSave(rows, ownerUserId) {
+  return playLogPartnersEnsureManager(rows, ownerUserId)
 }
 
 /** @param {PlayLogPartnerRow[]} rows @param {string} userId */
@@ -135,27 +164,6 @@ export function defaultCreatorPartnerRow(userId, profile) {
   }
 }
 
-/** @param {Array<Record<string, unknown>>} rows */
-export function playLogPartnersFromSessionList(rows) {
-  return (rows || []).map(row => {
-    const kind = row.participant_kind === 'guest' ? 'guest' : 'user'
-    const userId = row.user_id ? String(row.user_id) : ''
-    const guestLabel = row.guest_label ? String(row.guest_label) : ''
-    return {
-      key: kind === 'guest' ? `guest:${row.id}` : `user:${userId}`,
-      kind,
-      userId: kind === 'user' ? userId : undefined,
-      handle: row.handle ? String(row.handle) : '',
-      displayName: row.display_name ? String(row.display_name) : '',
-      avatarUrl: row.avatar_url ? String(row.avatar_url) : '',
-      guestLabel: kind === 'guest' ? guestLabel : undefined,
-      sharePercent: String(row.share_percent ?? ''),
-      isManager: Boolean(row.is_manager),
-      paid: Boolean(row.paid),
-    }
-  })
-}
-
 /**
  * Partner attribution: share of session net P&L (money out − money in − acquisition fee).
  * @param {number | null | undefined} netOutcome
@@ -182,6 +190,29 @@ export function playLogPartnerOutcomeShareToneClass(usd) {
   if (usd > 0) return 'text-emerald-300'
   if (usd < 0) return 'text-red-300'
   return 'text-zinc-300'
+}
+
+/**
+ * Session owner (`play_log_sessions.created_by_user_id`) for a shared entry.
+ * @param {{ session_id?: string | null, play_log_sessions?: { created_by_user_id?: string } | null }} entry
+ * @param {Map<string, { created_by_user_id?: string }>} sessionMetaById
+ */
+export function playLogEntrySessionOwnerId(entry, sessionMetaById) {
+  const sid = entry?.session_id
+  if (!sid) return null
+  const embedded = entry?.play_log_sessions?.created_by_user_id
+  if (embedded) return String(embedded)
+  const meta = sessionMetaById?.get(String(sid))
+  if (meta?.created_by_user_id) return String(meta.created_by_user_id)
+  return null
+}
+
+/** Solo entries: viewer owns the row. Shared: only session owner. */
+export function playLogEntryIsSessionOwner(entry, viewerUserId, sessionMetaById) {
+  if (!entry?.session_id) return true
+  const ownerId = playLogEntrySessionOwnerId(entry, sessionMetaById)
+  if (!ownerId) return false
+  return String(ownerId) === String(viewerUserId || '')
 }
 
 /** @param {{ handle?: string, display_name?: string, user_id?: string, avatar_url?: string }} profile */

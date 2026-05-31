@@ -404,11 +404,6 @@ function PhoenixLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
               currentRtpPct: currentRTP,
               averageCaseMult: evAvg,
               betSize,
-              acquisitionFeeUsd: recommendedAcquisitionFeeUsd({
-                evMult: useFullRunForFee ? evFullRun : evAvg,
-                betSize,
-                scoutPercent: scoutPercentage,
-              }),
             }),
           }}
           onOpenLogbook={onOpenLogbook}
