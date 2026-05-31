@@ -1,4 +1,7 @@
-import { fetchProfileFollowListProfiles } from '../lounge/loungeProfileFollowList.js'
+import {
+  fetchProfileFollowListProfiles,
+  fetchViewerFollowingAmong,
+} from '../lounge/loungeProfileFollowList.js'
 import { playLogPartnerLabel } from './playLogPartners.js'
 
 /**
@@ -29,17 +32,77 @@ export async function fetchPlayLogPartnerCandidatesFromFollowLists(supabaseClien
   )
 }
 
+function sortPartnerProfiles(rows, viewerUserId) {
+  const uid = String(viewerUserId || '').trim()
+  return (rows || [])
+    .filter(p => {
+      const id = String(p?.user_id || '')
+      return id && id !== uid
+    })
+    .sort((a, b) =>
+      playLogPartnerLabel(a).localeCompare(playLogPartnerLabel(b), undefined, { sensitivity: 'base' }),
+    )
+}
+
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {string} viewerUserId
  */
 export async function fetchPlayLogPartnerCandidates(supabaseClient, viewerUserId) {
+  const data = await fetchPlayLogPartnerPickerData(supabaseClient, viewerUserId)
+  if (data.error) throw new Error(data.error)
+  return data.candidates
+}
+
+/**
+ * Partner picker: merged list + who the viewer already follows (for Follow buttons).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} viewerUserId
+ */
+export async function fetchPlayLogPartnerPickerData(supabaseClient, viewerUserId) {
+  const uid = String(viewerUserId || '').trim()
+  if (!uid) {
+    return { candidates: [], viewerFollowingIds: new Set(), error: null }
+  }
+
   try {
-    return await fetchPlayLogPartnerCandidatesFromFollowLists(supabaseClient, viewerUserId)
-  } catch {
-    const { data, error } = await supabaseClient.rpc('play_log_partner_candidates')
-    if (error) throw error
-    return Array.isArray(data) ? data : []
+    const [followingRes, followersRes] = await Promise.all([
+      fetchProfileFollowListProfiles(supabaseClient, uid, 'following'),
+      fetchProfileFollowListProfiles(supabaseClient, uid, 'followers'),
+    ])
+    if (followingRes.error) throw followingRes.error
+    if (followersRes.error) throw followersRes.error
+
+    const viewerFollowingIds = new Set(
+      (followingRes.profiles || []).map(p => String(p.user_id)).filter(id => id && id !== uid),
+    )
+    const byId = new Map()
+    for (const p of [...(followingRes.profiles || []), ...(followersRes.profiles || [])]) {
+      const id = String(p?.user_id || '')
+      if (!id || id === uid) continue
+      byId.set(id, p)
+    }
+    const candidates = [...byId.values()].sort((a, b) =>
+      playLogPartnerLabel(a).localeCompare(playLogPartnerLabel(b), undefined, { sensitivity: 'base' }),
+    )
+    return { candidates, viewerFollowingIds, error: null }
+  } catch (e) {
+    try {
+      const { data, error } = await supabaseClient.rpc('play_log_partner_candidates')
+      if (error) throw error
+      const candidates = sortPartnerProfiles(Array.isArray(data) ? data : [], uid)
+      const ids = candidates.map(p => String(p.user_id)).filter(Boolean)
+      const viewerFollowingIds = await fetchViewerFollowingAmong(supabaseClient, uid, ids)
+      return { candidates, viewerFollowingIds, error: null }
+    } catch (fallbackErr) {
+      const msg =
+        fallbackErr instanceof Error
+          ? fallbackErr.message
+          : e instanceof Error
+            ? e.message
+            : 'Could not load partners.'
+      return { candidates: [], viewerFollowingIds: new Set(), error: msg }
+    }
   }
 }
 /**
