@@ -187,10 +187,190 @@ export function playLogWinLoss(inRaw, outRaw) {
   return out - inn
 }
 
+/** @param {{ slug?: string, label?: string }} field */
+export function isTargetBonusPaidField(field) {
+  const slug = String(field?.slug ?? '').trim()
+  if (slug === 'target_bonus_paid' || /target_bonus_paid$/i.test(slug)) return true
+  return /target\s+bonus\s+paid/i.test(String(field?.label ?? ''))
+}
+
+/** Target bonus paid ÷ bet size → number of bets (null if not computable). */
+export function targetBonusPaidInBets(paidRaw, betSizeRaw) {
+  const paid = Number(String(paidRaw ?? '').replace(/[^0-9.\-]/g, ''))
+  const bet = Number(String(betSizeRaw ?? '').replace(/[^0-9.\-]/g, ''))
+  if (!Number.isFinite(paid) || !Number.isFinite(bet) || bet <= 0) return null
+  return paid / bet
+}
+
+/** @param {number | null} bets */
+export function formatTargetBonusPaidBetsLabel(bets) {
+  if (bets == null || !Number.isFinite(bets)) return null
+  const rounded = Math.round(bets * 100) / 100
+  const display = rounded.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return `${display} bets`
+}
+
 /** @param {PlayLogTemplate[]} templates */
 export function templatesSorted(templates) {
   return [...templates].sort((a, b) => {
     if (a.is_system !== b.is_system) return a.is_system ? -1 : 1
     return a.display_name.localeCompare(b.display_name)
   })
+}
+
+/**
+ * Real (wager-weighted) RTP % = (Σ money out ÷ Σ money in) × 100.
+ * Same as weighting each play's RTP by its wager—not averaging play RTP % in arithmetic mean.
+ */
+export function playLogRealRtpPct(totalMoneyIn, totalMoneyOut) {
+  const inn = Number(totalMoneyIn)
+  const out = Number(totalMoneyOut)
+  if (!Number.isFinite(inn) || !Number.isFinite(out) || inn <= 0) return null
+  return (out / inn) * 100
+}
+
+/** @deprecated alias */
+export const playLogRunningRtpPct = playLogRealRtpPct
+
+/** @param {number | null} rtpPct */
+export function formatPlayLogRealRtp(rtpPct) {
+  if (rtpPct == null || !Number.isFinite(rtpPct)) return null
+  return `${rtpPct.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+}
+
+/** @deprecated alias */
+export const formatPlayLogRunningRtp = formatPlayLogRealRtp
+
+/**
+ * @typedef {{
+ *   label: string | null,
+ *   totalMoneyIn: number,
+ *   totalMoneyOut: number,
+ *   wagerAgnosticRtpPct: number | null,
+ * }} PlayLogRealRtpSnapshot
+ */
+
+/** Arithmetic mean of each play's RTP % (sessions weighted equally). */
+export function playLogWagerAgnosticRtpPct(playRtpPercents) {
+  const vals = (playRtpPercents || []).filter(n => Number.isFinite(n))
+  if (!vals.length) return null
+  return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
+/**
+ * Per-entry Real RTP for each game (cumulative through that play, oldest → newest).
+ * @param {PlayLogEntry[]} entries
+ * @returns {Record<string, PlayLogRealRtpSnapshot>}
+ */
+export function runningRealRtpByEntryId(entries) {
+  /** @type {Map<string, PlayLogEntry[]>} */
+  const byTemplate = new Map()
+  for (const entry of entries || []) {
+    const tid = String(entry?.template_id ?? '')
+    if (!tid) continue
+    if (!byTemplate.has(tid)) byTemplate.set(tid, [])
+    byTemplate.get(tid).push(entry)
+  }
+
+  /** @type {Record<string, PlayLogRealRtpSnapshot>} */
+  const out = {}
+  for (const list of byTemplate.values()) {
+    list.sort((a, b) => new Date(a.captured_at).getTime() - new Date(b.captured_at).getTime())
+    let sumIn = 0
+    let sumOut = 0
+    /** @type {number[]} */
+    const playRtpPercents = []
+    for (const entry of list) {
+      const inn = Number(entry.values?.money_in)
+      const outVal = Number(entry.values?.money_out)
+      if (Number.isFinite(inn)) sumIn += inn
+      if (Number.isFinite(outVal)) sumOut += outVal
+      const playRtp = playLogRealRtpPct(inn, outVal)
+      if (playRtp != null) playRtpPercents.push(playRtp)
+      out[entry.id] = {
+        label: formatPlayLogRealRtp(playLogRealRtpPct(sumIn, sumOut)),
+        totalMoneyIn: sumIn,
+        totalMoneyOut: sumOut,
+        wagerAgnosticRtpPct: playLogWagerAgnosticRtpPct(playRtpPercents),
+      }
+    }
+  }
+  return out
+}
+
+/** @deprecated alias — use runningRealRtpByEntryId */
+export function runningRtpLabelByEntryId(entries) {
+  const snaps = runningRealRtpByEntryId(entries)
+  /** @type {Record<string, string | null>} */
+  const labels = {}
+  for (const [id, snap] of Object.entries(snaps)) labels[id] = snap.label
+  return labels
+}
+
+/** Tap explainer beside aggregate weighted RTP on recent-entry cards (intro only). */
+export const PLAY_LOG_REAL_RTP_INFO_INTRO =
+  'Aggregate Weighted RTP: This is your "Real" experienced wager-weighted return on this game for all your plays up to this point. It is NOT a simple average of each session\'s RTP %.'
+
+/** RTP % for a single logged play. */
+export function playRtpLabelForEntry(entry) {
+  const values = entry?.values || {}
+  return formatPlayLogRealRtp(playLogRealRtpPct(values.money_in, values.money_out))
+}
+
+/** @param {string | null | undefined} label e.g. "94.32%" */
+export function rtpToneFromPercentLabel(label) {
+  const pct = parseRtpPercentLabel(label)
+  if (pct == null) return 'neutral'
+  return pct >= 100 ? 'win' : 'loss'
+}
+
+/**
+ * Chips for LOG tab recent-entry cards — bet size, denom, profit/loss, play RTP.
+ * @param {PlayLogEntry} entry
+ * @param {Record<string, PlayLogMetricDef>} defsMap
+ * @returns {{ key: string, label: string, value: string, tone?: 'win' | 'loss' | 'neutral' }[]}
+ */
+export function recentEntryDisplayChips(entry, defsMap) {
+  const values = entry?.values || {}
+  const betDef = defsMap.bet_size
+  const denomDef = defsMap.denom
+  const pnl = playLogWinLoss(values.money_in, values.money_out)
+  const playRtpLabel = playRtpLabelForEntry(entry)
+
+  return [
+    {
+      key: 'bet_size',
+      label: betDef?.label || 'Bet size',
+      value: formatMetricValue(values.bet_size, betDef?.value_type || 'money'),
+      tone: 'neutral',
+    },
+    {
+      key: 'denom',
+      label: denomDef?.label || 'Denom',
+      value: formatMetricValue(values.denom, denomDef?.value_type || 'money'),
+      tone: 'neutral',
+    },
+    {
+      key: 'pnl',
+      label: 'Profit/loss',
+      value: pnl == null ? '—' : formatMetricValue(pnl, 'money'),
+      tone: pnl == null ? 'neutral' : pnl >= 0 ? 'win' : 'loss',
+    },
+    {
+      key: 'rtp',
+      label: 'RTP',
+      value: playRtpLabel || '—',
+      tone: rtpToneFromPercentLabel(playRtpLabel),
+    },
+  ]
+}
+
+/** @param {string | null | undefined} label e.g. "94.32%" */
+function parseRtpPercentLabel(label) {
+  if (!label) return null
+  const n = Number(String(label).replace(/[^0-9.\-]/g, ''))
+  return Number.isFinite(n) ? n : null
 }

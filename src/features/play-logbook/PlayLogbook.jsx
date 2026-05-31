@@ -14,9 +14,17 @@ import {
   LOG_PLAY_DENOM_DEFAULT,
   LOG_PLAY_DENOM_OPTIONS,
   normalizeDenomFormValue,
+  formatTargetBonusPaidBetsLabel,
+  isTargetBonusPaidField,
   orderedLogPlayFormFields,
   playLogWinLoss,
+  PLAY_LOG_REAL_RTP_INFO_INTRO,
+  formatPlayLogRealRtp,
+  recentEntryDisplayChips,
+  runningRealRtpByEntryId,
+  rtpToneFromPercentLabel,
   sortMetricSlugs,
+  targetBonusPaidInBets,
   templatesSorted,
   valuesForStorage,
 } from './playLogMetrics.js'
@@ -33,6 +41,21 @@ function localDateTimeToIso(dateYmd, timeHm) {
   const [hh, mm] = timeHm.split(':').map(Number)
   if ([y, m, day, hh, mm].some(n => Number.isNaN(n))) return new Date().toISOString()
   return new Date(y, m - 1, day, hh, mm).toISOString()
+}
+
+function captureDateTimeFromIso(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    const now = new Date()
+    return {
+      date: localYmd(now),
+      time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    }
+  }
+  return {
+    date: localYmd(d),
+    time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+  }
 }
 
 function fmtCapturedAt(iso) {
@@ -86,6 +109,7 @@ export default function PlayLogbook({
   const [entries, setEntries] = useState([])
 
   const [sheet, setSheet] = useState(null)
+  const [editingEntryId, setEditingEntryId] = useState(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [formFields, setFormFields] = useState({})
   const [captureCasino, setCaptureCasino] = useState('')
@@ -132,6 +156,8 @@ export default function PlayLogbook({
     if (!selectedTemplate) return []
     return orderedLogPlayFormFields(selectedTemplate.metric_slugs || [], defsMap)
   }, [selectedTemplate, defsMap])
+
+  const realRtpSnapByEntryId = useMemo(() => runningRealRtpByEntryId(entries), [entries])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -188,6 +214,7 @@ export default function PlayLogbook({
 
   const closeSheet = () => {
     setSheet(null)
+    setEditingEntryId(null)
     setError('')
     setNearbyCasinos([])
     setGpsLoading(false)
@@ -204,6 +231,7 @@ export default function PlayLogbook({
 
   const openLogPlay = useCallback(
     (opts = {}) => {
+      setEditingEntryId(null)
       const templateId = opts.templateId || sortedTemplates[0]?.id || ''
       setSelectedTemplateId(templateId)
       const tpl = templateId ? templateById[templateId] : null
@@ -225,6 +253,26 @@ export default function PlayLogbook({
       if (!opts.casinoName && !opts.skipCasinoPopulate) populateCaptureCasino()
     },
     [sortedTemplates, templateById, populateCaptureCasino],
+  )
+
+  const openEditEntry = useCallback(
+    (entry) => {
+      const tpl = templateById[entry.template_id]
+      if (!tpl) return
+      const { date, time } = captureDateTimeFromIso(entry.captured_at)
+      setEditingEntryId(entry.id)
+      setSelectedTemplateId(entry.template_id)
+      setFormFields(formFieldsFromPrefill(entry.values, tpl.metric_slugs || []))
+      setCaptureCasino(String(entry.casino_name || '').trim())
+      setCaptureNotes(String(entry.notes || '').trim())
+      setCaptureDate(date)
+      setCaptureTime(time)
+      setNearbyCasinos([])
+      setGpsLoading(false)
+      setSheet('logPlay')
+      setError('')
+    },
+    [templateById],
   )
 
   useEffect(() => {
@@ -269,19 +317,24 @@ export default function PlayLogbook({
         setSaving(false)
         return
       }
-      const { error: e } = await supabaseClient.from('play_log_entries').insert({
-        user_id: userId,
+      const row = {
         template_id: selectedTemplate.id,
         captured_at: localDateTimeToIso(captureDate, captureTime),
         casino_name: captureCasino.trim() || null,
         notes: captureNotes.trim() || null,
         values: stored,
-      })
+      }
+      const { error: e } = editingEntryId
+        ? await supabaseClient.from('play_log_entries').update(row).eq('id', editingEntryId)
+        : await supabaseClient.from('play_log_entries').insert({
+            user_id: userId,
+            ...row,
+          })
       if (e) throw e
       closeSheet()
       await loadAll()
     } catch (e) {
-      setError(e?.message || 'Failed to save entry')
+      setError(e?.message || (editingEntryId ? 'Failed to update entry' : 'Failed to save entry'))
     } finally {
       setSaving(false)
     }
@@ -436,7 +489,10 @@ export default function PlayLogbook({
                 </div>
                 {entries.map(entry => {
                   const tpl = templateById[entry.template_id]
-                  const slugs = sortMetricSlugs(tpl?.metric_slugs || Object.keys(entry.values || {}), defsMap).slice(0, 4)
+                  const chips = recentEntryDisplayChips(entry, defsMap)
+                  const realRtpSnap = realRtpSnapByEntryId[entry.id]
+                  const runningRtpLabel = realRtpSnap?.label
+                  const runningRtpTone = rtpToneFromPercentLabel(runningRtpLabel)
                   return (
                     <div
                       key={entry.id}
@@ -446,36 +502,67 @@ export default function PlayLogbook({
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="min-w-0">
-                          <div className="text-white font-bold truncate">{tpl?.display_name || 'Unknown game'}</div>
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                            <span className="min-w-0 truncate text-white font-bold">
+                              {tpl?.display_name || 'Unknown game'}
+                            </span>
+                            {runningRtpLabel ? (
+                              <RunningRtpLabelButton
+                                label={runningRtpLabel}
+                                wagerAgnosticRtpPct={realRtpSnap?.wagerAgnosticRtpPct ?? null}
+                                toneClass={
+                                  runningRtpTone === 'win'
+                                    ? 'text-emerald-300'
+                                    : runningRtpTone === 'loss'
+                                      ? 'text-red-300'
+                                      : 'text-zinc-400'
+                                }
+                              />
+                            ) : null}
+                          </div>
                           <div className="text-zinc-500 text-xs mt-0.5">{fmtCapturedAt(entry.captured_at)}</div>
                           {entry.casino_name ? (
                             <div className="text-zinc-400 text-xs mt-0.5 truncate">{entry.casino_name}</div>
                           ) : null}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => deleteEntry(entry.id)}
-                          className="shrink-0 text-zinc-500 text-xs font-semibold touch-manipulation active:text-red-400 px-2 py-1"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditEntry(entry)}
+                            className="text-zinc-500 text-xs font-semibold touch-manipulation active:text-cyan-300 px-2 py-1"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteEntry(entry.id)}
+                            className="text-red-400 text-xs font-semibold touch-manipulation active:text-red-300 px-2 py-1"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {slugs.map(slug => (
+                        {chips.map(chip => (
                           <span
-                            key={slug}
+                            key={chip.key}
                             className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-xs"
                           >
-                            <span className="text-zinc-500">{defsMap[slug]?.label || slug}:</span>
-                            <span className="text-zinc-200 font-semibold tabular-nums">
-                              {formatMetricValue(entry.values?.[slug], defsMap[slug]?.value_type || 'decimal')}
+                            <span className="text-zinc-500">{chip.label}:</span>
+                            <span
+                              className={`font-semibold tabular-nums ${
+                                chip.tone === 'win'
+                                  ? 'text-emerald-300'
+                                  : chip.tone === 'loss'
+                                    ? 'text-red-300'
+                                    : 'text-zinc-200'
+                              }`}
+                            >
+                              {chip.value}
                             </span>
                           </span>
                         ))}
                       </div>
-                      {entry.notes ? (
-                        <p className="text-zinc-400 text-xs mt-2 line-clamp-2">{entry.notes}</p>
-                      ) : null}
                     </div>
                   )
                 })}
@@ -585,17 +672,23 @@ export default function PlayLogbook({
           >
             {sheet === 'logPlay' && selectedTemplate && (
               <>
-                <SheetHeader title="Log Play" onClose={closeSheet} />
+                <SheetHeader title={editingEntryId ? 'Edit Play' : 'Log Play'} onClose={closeSheet} />
                 <div className="space-y-3 mb-5">
                   <div>
                     <label className="block text-zinc-400 text-xs mb-1.5">Game</label>
-                    <LogPlayOptionPicker
-                      value={selectedTemplateId}
-                      onChange={onTemplateChange}
-                      options={sortedTemplates.map(t => ({ value: t.id, label: t.display_name }))}
-                      ariaLabel="Game"
-                      placeholder="Select game"
-                    />
+                    {editingEntryId ? (
+                      <div className="flex min-h-12 items-center rounded-2xl bg-zinc-800/90 px-4 text-sm font-semibold text-white">
+                        {selectedTemplate.display_name}
+                      </div>
+                    ) : (
+                      <LogPlayOptionPicker
+                        value={selectedTemplateId}
+                        onChange={onTemplateChange}
+                        options={sortedTemplates.map(t => ({ value: t.id, label: t.display_name }))}
+                        ariaLabel="Game"
+                        placeholder="Select game"
+                      />
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -641,7 +734,7 @@ export default function PlayLogbook({
                   disabled={saving}
                   className="w-full min-h-12 rounded-2xl bg-cyan-600 text-white font-bold touch-manipulation active:bg-cyan-700 disabled:opacity-50"
                 >
-                  {saving ? 'Saving…' : 'Save Entry'}
+                  {saving ? 'Saving…' : editingEntryId ? 'Save changes' : 'Save Entry'}
                 </button>
               </>
             )}
@@ -809,6 +902,11 @@ function LogPlayMetricFieldsList({ fields, formFields, setFormFields }) {
       )
       continue
     }
+    const betsLabel = isTargetBonusPaidField(field)
+      ? formatTargetBonusPaidBetsLabel(
+          targetBonusPaidInBets(formFields[field.slug], formFields.bet_size),
+        )
+      : null
     nodes.push(
       <div key={field.slug}>
         <label className="block text-zinc-400 text-xs mb-1.5">{field.label}</label>
@@ -816,6 +914,7 @@ function LogPlayMetricFieldsList({ fields, formFields, setFormFields }) {
           field={field}
           value={formFields[field.slug] ?? ''}
           onChange={v => setFormFields(p => ({ ...p, [field.slug]: v }))}
+          trailingHint={betsLabel}
         />
       </div>,
     )
@@ -853,7 +952,7 @@ function LogPlayMetricPairRow({ left, right, formFields, setFormFields, footer =
   )
 }
 
-function LogPlayFormMetricControl({ field, value, onChange }) {
+function LogPlayFormMetricControl({ field, value, onChange, trailingHint = null }) {
   if (field.slug === 'denom') {
     return (
       <DenomSelect
@@ -867,6 +966,7 @@ function LogPlayFormMetricControl({ field, value, onChange }) {
       value={value}
       onChange={onChange}
       valueType={field.value_type}
+      trailingHint={trailingHint}
     />
   )
 }
@@ -882,7 +982,7 @@ function DenomSelect({ value, onChange }) {
   )
 }
 
-function MetricFieldInput({ value, onChange, valueType }) {
+function MetricFieldInput({ value, onChange, valueType, trailingHint = null }) {
   if (valueType === 'money') {
     return (
       <div className="relative">
@@ -892,8 +992,15 @@ function MetricFieldInput({ value, onChange, valueType }) {
           inputMode="decimal"
           value={value}
           onChange={e => onChange(e.target.value.replace(/[^0-9.\-]/g, ''))}
-          className="w-full min-h-12 rounded-2xl bg-zinc-800 pl-8 pr-4 text-white font-semibold outline-none focus:ring-2 focus:ring-cyan-500/40"
+          className={`w-full min-h-12 rounded-2xl bg-zinc-800 pl-8 text-white font-semibold outline-none focus:ring-2 focus:ring-cyan-500/40 ${
+            trailingHint ? 'pr-[7.25rem]' : 'pr-4'
+          }`}
         />
+        {trailingHint ? (
+          <span className="pointer-events-none absolute top-1/2 right-4 max-w-[6.5rem] -translate-y-1/2 truncate text-right text-[11px] font-semibold tabular-nums text-zinc-400">
+            {trailingHint}
+          </span>
+        ) : null}
       </div>
     )
   }
@@ -915,6 +1022,61 @@ function MetricFieldInput({ value, onChange, valueType }) {
       onChange={e => onChange(e.target.value)}
       className="w-full min-h-12 rounded-2xl bg-zinc-800 px-4 text-white font-semibold outline-none focus:ring-2 focus:ring-cyan-500/40"
     />
+  )
+}
+
+function wagerAgnosticRtpPctToneClass(wagerAgnosticRtpPct) {
+  const tone = rtpToneFromPercentLabel(formatPlayLogRealRtp(wagerAgnosticRtpPct))
+  if (tone === 'win') return 'text-emerald-300'
+  if (tone === 'loss') return 'text-red-300'
+  return 'text-zinc-300'
+}
+
+function RunningRtpLabelButton({ label, toneClass, wagerAgnosticRtpPct }) {
+  const [open, setOpen] = useState(false)
+  const wagerAgnosticLabel = formatPlayLogRealRtp(wagerAgnosticRtpPct)
+
+  return (
+    <span className={`relative inline-flex shrink-0 ${toneClass}`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`Aggregate weighted RTP ${label}. Tap for details.`}
+        onClick={() => setOpen(v => !v)}
+        className={`shrink-0 touch-manipulation border-0 bg-transparent p-0 text-xs font-bold tabular-nums underline decoration-dotted decoration-current/50 underline-offset-2 opacity-95 hover:opacity-100 active:opacity-100 [-webkit-tap-highlight-color:transparent] ${toneClass}`}
+      >
+        {label}
+      </button>
+      {open ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 cursor-default bg-transparent"
+            aria-label="Close RTP info"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="tooltip"
+            className="absolute left-0 top-full z-50 mt-1 w-[min(17rem,calc(100vw-2.5rem))] rounded-xl border border-zinc-600/80 bg-zinc-800 px-3 py-2.5 text-left text-[11px] leading-snug text-zinc-200 shadow-lg"
+          >
+            <p>{PLAY_LOG_REAL_RTP_INFO_INTRO}</p>
+            {wagerAgnosticLabel ? (
+              <>
+                <hr className="my-2 border-zinc-600/60" />
+                <p className="font-bold leading-snug text-zinc-200">
+                  Your wager-agnostic total RTP is{' '}
+                  <span
+                    className={`font-bold tabular-nums ${wagerAgnosticRtpPctToneClass(wagerAgnosticRtpPct)}`}
+                  >
+                    {wagerAgnosticLabel}
+                  </span>
+                </p>
+              </>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </span>
   )
 }
 
