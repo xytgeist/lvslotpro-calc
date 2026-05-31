@@ -29,7 +29,7 @@ function filterPartnerProfiles(rows, query) {
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
  *   userId: string,
  *   usedUserIds: Set<string>,
- *   onConfirmSelected: (profiles: object[]) => void,
+ *   onConfirm: (payload: { profiles: object[], guestLabels: string[] }) => void,
  * }} props
  */
 export default function PlayLogPartnerPickerModal({
@@ -38,16 +38,25 @@ export default function PlayLogPartnerPickerModal({
   supabaseClient,
   userId,
   usedUserIds,
-  onConfirmSelected,
+  onConfirm,
 }) {
   const [search, setSearch] = useState('')
-  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  /** @type {[object[], Function]} */
+  const [stagedProfiles, setStagedProfiles] = useState([])
+  const [stagedGuests, setStagedGuests] = useState([])
   const [candidates, setCandidates] = useState([])
   const [viewerFollowingIds, setViewerFollowingIds] = useState(() => new Set())
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [followBusyId, setFollowBusyId] = useState('')
   const searchRef = useRef(null)
+
+  const stagedUserIds = useMemo(
+    () => new Set(stagedProfiles.map(p => String(p.user_id || '').trim()).filter(Boolean)),
+    [stagedProfiles],
+  )
+
+  const stagedCount = stagedProfiles.length + stagedGuests.length
 
   const load = useCallback(async () => {
     if (!userId) {
@@ -79,32 +88,49 @@ export default function PlayLogPartnerPickerModal({
   useEffect(() => {
     if (!open) {
       setSearch('')
-      setSelectedIds(new Set())
+      setStagedProfiles([])
+      setStagedGuests([])
       return
     }
-    setSelectedIds(new Set())
+    setStagedProfiles([])
+    setStagedGuests([])
     void load()
     const t = window.setTimeout(() => searchRef.current?.focus(), 120)
     return () => window.clearTimeout(t)
   }, [open, load])
 
-  const selectedCount = selectedIds.size
-
-  const toggleSelected = uid => {
-    const id = String(uid || '').trim()
-    if (!id || usedUserIds.has(id)) return
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const addProfileToStaged = profile => {
+    const uid = String(profile?.user_id || '').trim()
+    if (!uid || usedUserIds.has(uid) || stagedUserIds.has(uid)) return
+    setStagedProfiles(prev => [...prev, profile])
   }
 
-  const confirmSelected = () => {
-    if (selectedCount === 0) return
-    const picked = candidates.filter(p => selectedIds.has(String(p.user_id)))
-    if (picked.length > 0) onConfirmSelected(picked)
+  const removeStagedProfile = uid => {
+    const id = String(uid || '').trim()
+    setStagedProfiles(prev => prev.filter(p => String(p.user_id) !== id))
+  }
+
+  const searchTrimmed = search.trim()
+
+  const guestProposalStaged = useMemo(() => {
+    if (!searchTrimmed) return false
+    const key = searchTrimmed.toLowerCase()
+    return stagedGuests.some(g => g.toLowerCase() === key)
+  }, [searchTrimmed, stagedGuests])
+
+  const addGuestToStaged = () => {
+    if (!searchTrimmed || guestProposalStaged) return
+    setStagedGuests(prev => [...prev, searchTrimmed])
+    setSearch('')
+  }
+
+  const removeStagedGuest = index => {
+    setStagedGuests(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const finish = () => {
+    if (stagedCount === 0) return
+    onConfirm({ profiles: stagedProfiles, guestLabels: stagedGuests })
     onClose()
   }
 
@@ -174,8 +200,53 @@ export default function PlayLogPartnerPickerModal({
               Cancel
             </button>
           </div>
+
+          {stagedCount > 0 ? (
+            <div className="mb-3">
+              <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-wide mb-2">
+                Adding to this play
+              </p>
+              <ul className="flex flex-wrap gap-1.5">
+                {stagedProfiles.map(profile => {
+                  const uid = String(profile.user_id)
+                  return (
+                    <li key={`user:${uid}`}>
+                      <span className="inline-flex max-w-full items-center gap-1 rounded-lg bg-cyan-600/15 border border-cyan-500/30 pl-2.5 pr-1 py-1 text-xs font-semibold text-cyan-200">
+                        <span className="truncate">{playLogPartnerLabel(profile)}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeStagedProfile(uid)}
+                          className="shrink-0 rounded-md px-1 text-cyan-300/80 touch-manipulation active:text-white"
+                          aria-label={`Remove ${playLogPartnerLabel(profile)}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    </li>
+                  )
+                })}
+                {stagedGuests.map((label, i) => (
+                  <li key={`guest:${i}:${label}`}>
+                    <span className="inline-flex max-w-full items-center gap-1 rounded-lg bg-zinc-800 border border-zinc-600/60 pl-2.5 pr-1 py-1 text-xs font-semibold text-zinc-200">
+                      <span className="truncate">{label}</span>
+                      <span className="text-zinc-500 text-[10px] font-medium shrink-0">guest</span>
+                      <button
+                        type="button"
+                        onClick={() => removeStagedGuest(i)}
+                        className="shrink-0 rounded-md px-1 text-zinc-400 touch-manipulation active:text-white"
+                        aria-label={`Remove guest ${label}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <label className="sr-only" htmlFor="play-log-partner-search">
-            Search followers and following
+            Search followers and following, or type a guest name
           </label>
           <input
             id="play-log-partner-search"
@@ -183,11 +254,37 @@ export default function PlayLogPartnerPickerModal({
             type="search"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or @handle"
+            placeholder="Search or type a guest name"
             autoComplete="off"
-            enterKeyHint="search"
+            enterKeyHint="done"
             className="w-full min-h-11 rounded-xl bg-zinc-950 border border-zinc-700/60 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && searchTrimmed && !guestProposalStaged) {
+                e.preventDefault()
+                addGuestToStaged()
+              }
+            }}
           />
+
+          {searchTrimmed ? (
+            <div className="mt-2 flex items-center gap-2 rounded-xl border border-zinc-700/60 bg-zinc-950 px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-zinc-100">{searchTrimmed}</p>
+                <p className="text-zinc-500 text-xs mt-0.5">Guest (not on app)</p>
+              </div>
+              {guestProposalStaged ? (
+                <span className="shrink-0 text-xs font-semibold text-cyan-400/90">Added</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={addGuestToStaged}
+                  className="shrink-0 min-h-9 rounded-full bg-cyan-600/20 border border-cyan-500/40 px-4 text-xs font-bold text-cyan-300 touch-manipulation active:bg-cyan-600/30"
+                >
+                  Add guest
+                </button>
+              )}
+            </div>
+          ) : null}
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2">
@@ -202,37 +299,37 @@ export default function PlayLogPartnerPickerModal({
           ) : filteredRows.length === 0 ? (
             <div className="flex h-full min-h-[12rem] items-center justify-center px-2">
               <p className="text-zinc-500 text-sm text-center">
-                {search.trim() ? 'No matches.' : 'No followers or following yet.'}
+                {searchTrimmed
+                  ? 'No matches in your network.'
+                  : 'No followers or following yet — type a name to add a guest.'}
               </p>
             </div>
           ) : (
             <ul className="divide-y divide-zinc-800/70">
               {filteredRows.map(profile => {
                 const uid = String(profile.user_id)
-                const alreadyAdded = usedUserIds.has(uid)
-                const checked = !alreadyAdded && selectedIds.has(uid)
+                const onPlayAlready = usedUserIds.has(uid)
+                const picked = stagedUserIds.has(uid)
+                const disabled = onPlayAlready || picked
                 const followingThem = viewerFollowingIds.has(uid)
-                const showFollow = !followingThem
+                const showFollow = !followingThem && !disabled
                 return (
                   <li key={uid}>
                     <div
-                      className={`flex items-start gap-2 rounded-xl px-2 py-3 ${
-                        alreadyAdded ? 'opacity-40' : ''
+                      className={`flex items-start gap-2 rounded-xl px-2 py-1 ${
+                        onPlayAlready ? 'opacity-40' : ''
                       }`}
                     >
-                      <label
-                        className={`flex min-w-0 flex-1 items-start gap-3 touch-manipulation ${
-                          alreadyAdded ? 'cursor-not-allowed' : 'cursor-pointer active:bg-zinc-800/80'
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => addProfileToStaged(profile)}
+                        className={`min-w-0 flex-1 flex items-start gap-2 rounded-xl px-1 py-2 text-left touch-manipulation ${
+                          disabled
+                            ? 'cursor-default'
+                            : 'active:bg-zinc-800/80 cursor-pointer'
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={alreadyAdded}
-                          onChange={() => toggleSelected(uid)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-600 bg-zinc-950 accent-cyan-500 disabled:opacity-50"
-                          aria-label={`Select ${playLogPartnerLabel(profile)}`}
-                        />
                         <span className="min-w-0 flex-1 text-sm">
                           <span className="text-zinc-100 font-medium">{playLogPartnerLabel(profile)}</span>
                           {profile.handle ? (
@@ -240,23 +337,26 @@ export default function PlayLogPartnerPickerModal({
                               @{String(profile.handle).trim().replace(/^@/, '')}
                             </span>
                           ) : null}
-                          {alreadyAdded ? (
-                            <span className="block text-zinc-500 text-xs mt-0.5">Already added</span>
+                          {onPlayAlready ? (
+                            <span className="block text-zinc-500 text-xs mt-0.5">Already on this play</span>
+                          ) : picked ? (
+                            <span className="block text-cyan-400/90 text-xs mt-0.5">Added</span>
                           ) : showFollow ? (
-                            <span className="block text-zinc-500 text-xs mt-0.5">Follows you</span>
-                          ) : null}
+                            <span className="block text-zinc-500 text-xs mt-0.5">Follows you · tap to add</span>
+                          ) : (
+                            <span className="block text-zinc-500 text-xs mt-0.5">Tap to add</span>
+                          )}
                         </span>
-                      </label>
+                      </button>
                       {showFollow ? (
                         <button
                           type="button"
                           disabled={followBusyId === uid}
                           onClick={e => {
-                            e.preventDefault()
                             e.stopPropagation()
                             void followUser(uid)
                           }}
-                          className="mt-0.5 shrink-0 min-h-9 rounded-full bg-white px-4 text-[13px] font-bold text-zinc-950 touch-manipulation active:bg-zinc-200 disabled:opacity-50"
+                          className="mt-2 shrink-0 min-h-9 rounded-full bg-white px-4 text-[13px] font-bold text-zinc-950 touch-manipulation active:bg-zinc-200 disabled:opacity-50"
                         >
                           {followBusyId === uid ? '…' : 'Follow'}
                         </button>
@@ -278,15 +378,15 @@ export default function PlayLogPartnerPickerModal({
         <footer className="shrink-0 border-t border-zinc-800/80 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
           <button
             type="button"
-            onClick={confirmSelected}
-            disabled={selectedCount === 0 || loading}
+            onClick={finish}
+            disabled={stagedCount === 0 || loading}
             className="w-full min-h-12 rounded-2xl bg-cyan-600 text-white font-bold touch-manipulation active:bg-cyan-700 disabled:opacity-40"
           >
-            {selectedCount === 0
-              ? 'Add selected'
-              : selectedCount === 1
-                ? 'Add 1 partner'
-                : `Add ${selectedCount} partners`}
+            {stagedCount === 0
+              ? 'Done'
+              : stagedCount === 1
+                ? 'Done · 1 partner'
+                : `Done · ${stagedCount} partners`}
           </button>
         </footer>
       </div>

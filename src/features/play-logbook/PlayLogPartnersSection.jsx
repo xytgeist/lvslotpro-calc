@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import PlayLogPartnerPickerModal from './PlayLogPartnerPickerModal.jsx'
 import {
-  defaultCreatorPartnerRow,
   formatPlayLogPartnerOutcomeShare,
+  playLogPartnersEnsureCreatorRow,
+  playLogPartnersHasExtraPartner,
   playLogPartnerLabel,
   playLogPartnerOutcomeShareToneClass,
   playLogPartnerOutcomeShareUsdRounded,
@@ -42,8 +43,16 @@ export default function PlayLogPartnersSection({
   onPaidPersistError = null,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [guestName, setGuestName] = useState('')
   const [paidSaving, setPaidSaving] = useState(false)
+
+  const hasExtraPartner = useMemo(
+    () => playLogPartnersHasExtraPartner(partners, ownerUserId),
+    [partners, ownerUserId],
+  )
+  const displayPartners = useMemo(() => {
+    if (readOnly || hasExtraPartner) return partners
+    return []
+  }, [partners, readOnly, hasExtraPartner])
 
   const percentSum = useMemo(() => playLogPartnersPercentSum(partners), [partners])
   const sumOk = Math.abs(percentSum - 100) < 0.02
@@ -54,13 +63,6 @@ export default function PlayLogPartnersSection({
     () => new Set(partners.filter(p => p.kind === 'user').map(p => String(p.userId))),
     [partners],
   )
-
-  useEffect(() => {
-    if (readOnly || partners.length > 1) return
-    if (partners.length === 0 && userId) {
-      onPartnersChange([defaultCreatorPartnerRow(userId, viewerProfile)])
-    }
-  }, [partners.length, readOnly, userId, viewerProfile, onPartnersChange])
 
   const updateRow = (key, patch) => {
     onPartnersChange(partners.map(row => (row.key === key ? { ...row, ...patch } : row)))
@@ -88,8 +90,8 @@ export default function PlayLogPartnersSection({
 
   const removeRow = key => {
     let next = partners.filter(row => row.key !== key)
-    if (next.length === 0 && userId) {
-      onPartnersChange([defaultCreatorPartnerRow(userId, viewerProfile)])
+    if (!playLogPartnersHasExtraPartner(next, ownerUserId)) {
+      onPartnersChange([])
       return
     }
     if (!next.some(r => r.isManager)) {
@@ -98,13 +100,16 @@ export default function PlayLogPartnersSection({
     onPartnersChange(next)
   }
 
-  const addUserPartners = profiles => {
-    let next = [...partners]
+  const commitPartnersFromPicker = ({ profiles = [], guestLabels = [] }) => {
+    let next = playLogPartnersEnsureCreatorRow(partners, ownerUserId, userId, viewerProfile)
     const seen = new Set(usedUserIds)
-    for (const profile of profiles || []) {
+    let changed = next.length !== partners.length
+
+    for (const profile of profiles) {
       const uid = String(profile?.user_id || '').trim()
       if (!uid || seen.has(uid)) continue
       seen.add(uid)
+      changed = true
       next.push({
         key: `user:${uid}`,
         kind: 'user',
@@ -117,19 +122,23 @@ export default function PlayLogPartnersSection({
         paid: false,
       })
     }
-    if (next.length !== partners.length) onPartnersChange(next)
-    setPickerOpen(false)
-  }
 
-  const addGuestPartner = () => {
-    const label = guestName.trim()
-    if (!label) return
-    const key = `guest:${Date.now()}`
-    onPartnersChange([
-      ...partners,
-      { key, kind: 'guest', guestLabel: label, sharePercent: '', isManager: false, paid: false },
-    ])
-    setGuestName('')
+    for (const rawLabel of guestLabels) {
+      const label = String(rawLabel || '').trim()
+      if (!label) continue
+      changed = true
+      next.push({
+        key: `guest:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: 'guest',
+        guestLabel: label,
+        sharePercent: '',
+        isManager: false,
+        paid: false,
+      })
+    }
+
+    if (changed) onPartnersChange(next)
+    setPickerOpen(false)
   }
 
   const partnerName = row => (
@@ -152,8 +161,12 @@ export default function PlayLogPartnersSection({
     </>
   )
 
-  const canRemoveRow = row =>
-    partners.length > 1 || row.kind !== 'user' || String(row.userId) !== String(userId)
+  const canRemoveRow = row => {
+    if (row.kind === 'user' && String(row.userId) === String(ownerUserId)) {
+      return hasExtraPartner
+    }
+    return true
+  }
 
   const partnerMetricsHeader = (
     <div className="flex items-center gap-2 mb-1">
@@ -172,7 +185,7 @@ export default function PlayLogPartnersSection({
     <>
       {partnerMetricsHeader}
       <ul className="space-y-2 mb-3">
-        {partners.map(row => (
+        {displayPartners.map(row => (
           <li key={row.key} className="flex items-center gap-2">
             {!readOnly && canEditManager ? (
               <input
@@ -249,30 +262,30 @@ export default function PlayLogPartnersSection({
     <div className="rounded-2xl bg-zinc-800/50 border border-zinc-700/50 p-3">
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Partners</div>
-        <span
-          className={`text-xs font-semibold tabular-nums ${sumOk ? 'text-emerald-400' : 'text-amber-400'}`}
-        >
-          Total: {percentSum.toFixed(1)}%
-        </span>
+        {hasExtraPartner ? (
+          <span
+            className={`text-xs font-semibold tabular-nums ${sumOk ? 'text-emerald-400' : 'text-amber-400'}`}
+          >
+            Total: {percentSum.toFixed(1)}%
+          </span>
+        ) : null}
       </div>
 
-      {canEditManager ? (
+      {hasExtraPartner && canEditManager ? (
         <p className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wide mb-1.5">
           Tap a partner to set manager
         </p>
       ) : null}
 
-      {partnerList}
+      {displayPartners.length > 0 ? partnerList : null}
 
-      <div className="flex flex-wrap gap-2 mb-2">
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="rounded-xl bg-zinc-900 border border-zinc-700/60 px-3 py-2 text-xs font-semibold text-cyan-300 touch-manipulation active:bg-zinc-800"
-        >
-          + Add follower / following
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setPickerOpen(true)}
+        className="w-full min-h-11 rounded-xl bg-zinc-900 border border-zinc-700/60 px-3 py-2 text-sm font-semibold text-cyan-300 touch-manipulation active:bg-zinc-800 mb-2"
+      >
+        + Add partner
+      </button>
 
       <PlayLogPartnerPickerModal
         open={pickerOpen}
@@ -280,31 +293,19 @@ export default function PlayLogPartnersSection({
         supabaseClient={supabaseClient}
         userId={userId}
         usedUserIds={usedUserIds}
-        onConfirmSelected={addUserPartners}
+        onConfirm={commitPartnersFromPicker}
       />
 
-      <div className="flex gap-2 mb-2">
-        <input
-          type="text"
-          value={guestName}
-          onChange={e => setGuestName(e.target.value)}
-          placeholder="Guest name (not on app)"
-          className="min-w-0 flex-1 min-h-9 rounded-xl bg-zinc-900 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-cyan-500/40"
-        />
-        <button
-          type="button"
-          onClick={addGuestPartner}
-          disabled={!guestName.trim()}
-          className="shrink-0 rounded-xl bg-zinc-900 border border-zinc-700/60 px-3 py-2 text-xs font-semibold text-cyan-300 touch-manipulation active:bg-zinc-800 disabled:opacity-40"
-        >
-          + Guest
-        </button>
-      </div>
-
       <p className="text-zinc-500 text-xs leading-snug mt-1">
-        The <span className="text-amber-300/90">owner</span> is the manager by default (change the radio if someone else
-        tracks paid; manager is not marked paid). Registered partners get this play in their logbook and a Lounge alert.
-        Guests are attribution only.
+        {hasExtraPartner ? (
+          <>
+            The <span className="text-amber-300/90">owner</span> is the manager by default (change the radio if someone
+            else tracks paid; manager is not marked paid). Registered partners get this play in their logbook and a
+            Lounge alert. Guests are attribution only.
+          </>
+        ) : (
+          <>Tap Add partner to search your network or type a name to add a guest. Your row appears once you add someone.</>
+        )}
       </p>
     </div>
   )

@@ -446,6 +446,34 @@ export function templatesSorted(templates) {
   })
 }
 
+/** @param {PlayLogEntry[]} entries */
+export function playCountByTemplateId(entries) {
+  /** @type {Map<string, number>} */
+  const counts = new Map()
+  for (const e of entries || []) {
+    const tid = e?.template_id
+    if (!tid) continue
+    const key = String(tid)
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+  return counts
+}
+
+/**
+ * Log Play game picker: most-logged templates first, then A–Z for never-played games.
+ * @param {PlayLogTemplate[]} templates
+ * @param {PlayLogEntry[]} entries
+ */
+export function templatesSortedByPlayCount(templates, entries) {
+  const counts = playCountByTemplateId(entries)
+  return [...templates].sort((a, b) => {
+    const ca = counts.get(String(a.id)) || 0
+    const cb = counts.get(String(b.id)) || 0
+    if (cb !== ca) return cb - ca
+    return a.display_name.localeCompare(b.display_name)
+  })
+}
+
 /**
  * Real (wager-weighted) RTP % = (Σ money out ÷ Σ money in) × 100.
  * Same as weighting each play's RTP by its wager—not averaging play RTP % in arithmetic mean.

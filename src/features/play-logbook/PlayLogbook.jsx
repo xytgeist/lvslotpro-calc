@@ -30,6 +30,7 @@ import {
   sortMetricSlugs,
   targetBonusPaidInBets,
   templatesSorted,
+  templatesSortedByPlayCount,
   valuesForStorage,
   getLogPlaySaveValidationError,
   defsMapForTemplate,
@@ -43,7 +44,6 @@ import { analyzePlayLogEntries } from './playLogAnalysis.js'
 import { buildPlayLogCsv, downloadPlayLogCsv } from './playLogExport.js'
 import PlayLogPartnersSection from './PlayLogPartnersSection.jsx'
 import {
-  defaultCreatorPartnerRow,
   playLogEntryIsSessionOwner,
   playLogEntrySessionOwnerId,
   playLogPartnersForSave,
@@ -178,6 +178,10 @@ export default function PlayLogbook({
 
   const defsMap = useMemo(() => metricDefMap(metricDefs), [metricDefs])
   const sortedTemplates = useMemo(() => templatesSorted(templates), [templates])
+  const logPlayTemplatesSorted = useMemo(
+    () => templatesSortedByPlayCount(templates, entries),
+    [templates, entries],
+  )
 
   const templateById = useMemo(() => {
     /** @type {Record<string, typeof templates[0]>} */
@@ -363,8 +367,8 @@ export default function PlayLogbook({
       setViewingEntryId(null)
       setEditingEntryId(null)
       setEditingSessionId(null)
-      setPartners(userId ? [defaultCreatorPartnerRow(userId, viewerProfile)] : [])
-      const templateId = opts.templateId || sortedTemplates[0]?.id || ''
+      setPartners([])
+      const templateId = opts.templateId || logPlayTemplatesSorted[0]?.id || ''
       setSelectedTemplateId(templateId)
       const tpl = templateId ? templateById[templateId] : null
       const slugs = tpl?.metric_slugs || []
@@ -384,7 +388,7 @@ export default function PlayLogbook({
       setError('')
       if (!opts.casinoName && !opts.skipCasinoPopulate) populateCaptureCasino()
     },
-    [sortedTemplates, templateById, populateCaptureCasino, userId, viewerProfile],
+    [logPlayTemplatesSorted, templateById, populateCaptureCasino, userId, viewerProfile],
   )
 
   const openEditEntry = useCallback(
@@ -414,10 +418,10 @@ export default function PlayLogbook({
             playLogPartnersFromSessionList(rows, sessionOwnerId(entry.session_id)),
           )
         } catch {
-          setPartners(userId ? [defaultCreatorPartnerRow(userId, viewerProfile)] : [])
+          setPartners([])
         }
       } else {
-        setPartners(userId ? [defaultCreatorPartnerRow(userId, viewerProfile)] : [])
+        setPartners([])
       }
     },
     [templateById, sessionMetaById, supabaseClient, userId, viewerProfile, sessionOwnerId],
@@ -986,7 +990,10 @@ export default function PlayLogbook({
                         <LogPlayOptionPicker
                           value={selectedTemplateId}
                           onChange={onTemplateChange}
-                          options={sortedTemplates.map(t => ({ value: t.id, label: t.display_name }))}
+                          options={logPlayTemplatesSorted.map(t => ({
+                            value: t.id,
+                            label: t.display_name,
+                          }))}
                           ariaLabel="Game"
                           placeholder="Select game"
                         />

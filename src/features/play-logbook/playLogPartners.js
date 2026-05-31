@@ -163,6 +163,21 @@ export function defaultCreatorPartnerRow(userId, profile) {
 }
 
 /**
+ * When the first partner is added, ensure the session owner row exists for share split UI.
+ * @param {PlayLogPartnerRow[]} rows
+ * @param {string} ownerUserId
+ * @param {string} userId
+ * @param {{ handle?: string, display_name?: string } | null} [profile]
+ */
+export function playLogPartnersEnsureCreatorRow(rows, ownerUserId, userId, profile) {
+  const owner = String(ownerUserId || userId || '').trim()
+  if (!owner) return rows
+  if (rows.some(r => r.kind === 'user' && String(r.userId) === owner)) return rows
+  const creator = defaultCreatorPartnerRow(userId, profile)
+  return [{ ...creator, sharePercent: '', isManager: true }, ...rows]
+}
+
+/**
  * Partner attribution: share of session net P&L (money out − money in − acquisition fee).
  * @param {number | null | undefined} netOutcome
  * @param {string} sharePercentStr
