@@ -380,7 +380,8 @@ export default function LoungeNotificationsPanel({
 
       if (
         (event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.PLAY_LOG_SHARED ||
-          event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.PLAY_LOG_PARTNER_PAID) &&
+          event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.PLAY_LOG_PARTNER_PAID ||
+          event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.PLAY_LOG_PARTNER_UNPAID) &&
         event.play_log_entry_id
       ) {
         const params = new URLSearchParams()

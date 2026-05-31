@@ -24,6 +24,7 @@ import {
  *   canEditPaid?: boolean,
  *   netOutcome?: number | null,
  *   onPaidPersist?: (rows: import('./playLogPartners.js').PlayLogPartnerRow[]) => void | Promise<void>,
+ *   onPaidPersistError?: (message: string) => void,
  * }} props
  */
 export default function PlayLogPartnersSection({
@@ -38,6 +39,7 @@ export default function PlayLogPartnersSection({
   canEditPaid = false,
   netOutcome = null,
   onPaidPersist = null,
+  onPaidPersistError = null,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [guestName, setGuestName] = useState('')
@@ -69,15 +71,19 @@ export default function PlayLogPartnersSection({
   }
 
   const togglePaid = async (key, nextPaid) => {
-    const next = partners.map(row => (row.key === key ? { ...row, paid: nextPaid } : row))
+    const prior = partners
+    const next = prior.map(row => (row.key === key ? { ...row, paid: nextPaid } : row))
     onPartnersChange(next)
-    if (onPaidPersist) {
-      setPaidSaving(true)
-      try {
-        await onPaidPersist(next)
-      } finally {
-        setPaidSaving(false)
-      }
+    if (!onPaidPersist) return
+    setPaidSaving(true)
+    try {
+      await onPaidPersist(next)
+    } catch (e) {
+      onPartnersChange(prior)
+      const msg = e?.message || 'Could not update paid status'
+      onPaidPersistError?.(msg)
+    } finally {
+      setPaidSaving(false)
     }
   }
 

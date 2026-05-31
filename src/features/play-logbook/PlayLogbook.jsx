@@ -662,7 +662,9 @@ export default function PlayLogbook({
             <code className="text-cyan-300">20260531140000_play_log_shared_sessions.sql</code> (shared partners),{' '}
             <code className="text-cyan-300">20260531180000_play_log_update_shared_partners.sql</code> (edit attributions),{' '}
             <code className="text-cyan-300">20260531190000_play_log_session_manager_paid.sql</code> (manager / paid),{' '}
-            <code className="text-cyan-300">20260531200000_play_log_partner_paid_notification.sql</code> (paid alerts),{' '}
+            <code className="text-cyan-300">20260531200000_play_log_partner_paid_notification.sql</code> (paid alerts; or{' '}
+            <code className="text-cyan-300">20260531300000_play_log_partner_paid_notify_repair.sql</code> if that was skipped),{' '}
+            <code className="text-cyan-300">20260531310000_play_log_partner_unpaid_notification.sql</code> (unpaid alerts),{' '}
             <code className="text-cyan-300">20260531210000_play_log_manager_owner_default.sql</code> (owner = manager default).
           </div>
         )}
@@ -960,6 +962,22 @@ export default function PlayLogbook({
                           userId,
                           sessionOwnerId(editingSessionId) ?? userId,
                         )}
+                        onPaidPersist={
+                          editingSessionId &&
+                          playLogPartnersViewerCanMarkPaid(
+                            partners,
+                            userId,
+                            sessionOwnerId(editingSessionId) ?? userId,
+                          )
+                            ? async rows => {
+                                await updatePlayLogSessionPartnersPaid(supabaseClient, {
+                                  sessionId: editingSessionId,
+                                  partners: playLogPartnersToRpcPayload(rows),
+                                })
+                              }
+                            : undefined
+                        }
+                        onPaidPersistError={msg => setError(msg)}
                       />
                     ) : null}
                   </div>
@@ -1067,6 +1085,7 @@ export default function PlayLogbook({
                                 }
                               : undefined
                           }
+                          onPaidPersistError={msg => setError(msg)}
                         />
                       ) : null}
                     </div>

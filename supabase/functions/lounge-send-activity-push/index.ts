@@ -120,6 +120,8 @@ function actionPhrase(eventType: string, commentId: string | null, isReply = fal
       return 'added you to a play log'
     case 'play_log_partner_paid':
       return 'marked your play log share as paid'
+    case 'play_log_partner_unpaid':
+      return 'marked your play log share as unpaid'
     default:
       return 'interacted with you'
   }
@@ -147,7 +149,9 @@ function buildTargetUrl(
   params.set('tab', 'home')
 
   if (
-    (event.event_type === 'play_log_shared' || event.event_type === 'play_log_partner_paid') &&
+    (event.event_type === 'play_log_shared' ||
+      event.event_type === 'play_log_partner_paid' ||
+      event.event_type === 'play_log_partner_unpaid') &&
     event.play_log_entry_id
   ) {
     params.set('tab', 'logbook')
@@ -343,7 +347,9 @@ async function handleImmediatePush(
   )
 
   if (
-    (event.event_type === 'play_log_shared' || event.event_type === 'play_log_partner_paid') &&
+    (event.event_type === 'play_log_shared' ||
+      event.event_type === 'play_log_partner_paid' ||
+      event.event_type === 'play_log_partner_unpaid') &&
     event.play_log_entry_id
   ) {
     const who = actorLabel((actorProfile as ActorProfile | null) || null)
@@ -369,13 +375,15 @@ async function handleImmediatePush(
     }
     const pctStr =
       sharePct != null && Number.isFinite(sharePct) ? ` (${sharePct}%)` : ''
-    const paidVerb =
+    const playLogVerb =
       event.event_type === 'play_log_partner_paid'
         ? `marked your share as paid on ${gameName}`
-        : `added you to ${gameName}`
+        : event.event_type === 'play_log_partner_unpaid'
+          ? `marked your share as unpaid on ${gameName}`
+          : `added you to ${gameName}`
     notification = {
       title: 'Edge Lounge',
-      body: `${who} ${paidVerb}${event.event_type === 'play_log_shared' ? pctStr : ''}`,
+      body: `${who} ${playLogVerb}${event.event_type === 'play_log_shared' ? pctStr : ''}`,
       url: buildTargetUrl(event, (actorProfile as ActorProfile | null) || null, {
         activityEventId: event.id,
       }),
