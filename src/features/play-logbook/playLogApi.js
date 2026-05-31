@@ -44,6 +44,63 @@ function sortPartnerProfiles(rows, viewerUserId) {
     )
 }
 
+/** @param {object[]} profiles @param {string} viewerUserId @param {Map<string, number>} partnerCounts */
+function sortProfilesByPartnerCount(profiles, viewerUserId, partnerCounts) {
+  const uid = String(viewerUserId || '').trim()
+  return [...(profiles || [])].sort((a, b) => {
+    const ca = partnerCounts.get(String(a.user_id)) || 0
+    const cb = partnerCounts.get(String(b.user_id)) || 0
+    if (cb !== ca) return cb - ca
+    return playLogPartnerLabel(a).localeCompare(playLogPartnerLabel(b), undefined, {
+      sensitivity: 'base',
+    })
+  })
+}
+
+/**
+ * How often each user appeared as a partner on plays the viewer can see.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} viewerUserId
+ */
+export async function fetchPlayLogPartnerUserCounts(supabaseClient, viewerUserId) {
+  const uid = String(viewerUserId || '').trim()
+  const { data, error } = await supabaseClient
+    .from('play_log_session_partners')
+    .select('user_id')
+    .eq('participant_kind', 'user')
+  if (error) throw error
+  /** @type {Map<string, number>} */
+  const counts = new Map()
+  for (const row of data || []) {
+    const id = String(row.user_id || '').trim()
+    if (!id || id === uid) continue
+    counts.set(id, (counts.get(id) || 0) + 1)
+  }
+  return counts
+}
+
+/**
+ * Guest label usage across visible shared plays (for picker ordering).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ */
+export async function fetchPlayLogGuestUsageCounts(supabaseClient) {
+  const { data, error } = await supabaseClient
+    .from('play_log_session_partners')
+    .select('guest_label')
+    .eq('participant_kind', 'guest')
+  if (error) throw error
+  /** @type {Map<string, { label: string, count: number }>} */
+  const counts = new Map()
+  for (const row of data || []) {
+    const label = String(row.guest_label || '').trim()
+    if (!label) continue
+    const key = label.toLowerCase()
+    const prev = counts.get(key)
+    counts.set(key, { label, count: (prev?.count || 0) + 1 })
+  }
+  return counts
+}
+
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {string} viewerUserId
@@ -82,15 +139,27 @@ export async function fetchPlayLogPartnerPickerData(supabaseClient, viewerUserId
       if (!id || id === uid) continue
       byId.set(id, p)
     }
-    const candidates = [...byId.values()].sort((a, b) =>
-      playLogPartnerLabel(a).localeCompare(playLogPartnerLabel(b), undefined, { sensitivity: 'base' }),
-    )
+    let candidates = [...byId.values()]
+    try {
+      const partnerCounts = await fetchPlayLogPartnerUserCounts(supabaseClient, uid)
+      candidates = sortProfilesByPartnerCount(candidates, uid, partnerCounts)
+    } catch {
+      candidates.sort((a, b) =>
+        playLogPartnerLabel(a).localeCompare(playLogPartnerLabel(b), undefined, { sensitivity: 'base' }),
+      )
+    }
     return { candidates, viewerFollowingIds, error: null }
   } catch (e) {
     try {
       const { data, error } = await supabaseClient.rpc('play_log_partner_candidates')
       if (error) throw error
-      const candidates = sortPartnerProfiles(Array.isArray(data) ? data : [], uid)
+      let candidates = sortPartnerProfiles(Array.isArray(data) ? data : [], uid)
+      try {
+        const partnerCounts = await fetchPlayLogPartnerUserCounts(supabaseClient, uid)
+        candidates = sortProfilesByPartnerCount(candidates, uid, partnerCounts)
+      } catch {
+        /* keep alpha sort */
+      }
       const ids = candidates.map(p => String(p.user_id)).filter(Boolean)
       const viewerFollowingIds = await fetchViewerFollowingAmong(supabaseClient, uid, ids)
       return { candidates, viewerFollowingIds, error: null }

@@ -32,6 +32,13 @@ export function playLogPartnersSumValid(rows) {
 }
 
 /** @param {PlayLogPartnerRow[]} rows */
+export function playLogPartnersSplitForDisplay(rows) {
+  const users = (rows || []).filter(r => r.kind === 'user')
+  const guests = (rows || []).filter(r => r.kind === 'guest')
+  return { users, guests }
+}
+
+/** @param {PlayLogPartnerRow[]} rows */
 export function playLogPartnersHasExtraPartner(rows, creatorUserId) {
   const creator = String(creatorUserId || '').trim()
   return rows.some(row => {

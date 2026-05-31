@@ -4,6 +4,7 @@ import {
   formatPlayLogPartnerOutcomeShare,
   playLogPartnersEnsureCreatorRow,
   playLogPartnersHasExtraPartner,
+  playLogPartnersSplitForDisplay,
   playLogPartnerLabel,
   playLogPartnerOutcomeShareToneClass,
   playLogPartnerOutcomeShareUsdRounded,
@@ -11,6 +12,7 @@ import {
   playLogPartnersPercentSum,
   playLogPartnersWithManager,
 } from './playLogPartners.js'
+import { addSavedGuestLabel } from './playLogSavedGuests.js'
 
 /**
  * @param {{
@@ -62,6 +64,20 @@ export default function PlayLogPartnersSection({
   const usedUserIds = useMemo(
     () => new Set(partners.filter(p => p.kind === 'user').map(p => String(p.userId))),
     [partners],
+  )
+  const usedGuestLabels = useMemo(
+    () =>
+      new Set(
+        partners
+          .filter(p => p.kind === 'guest')
+          .map(p => String(p.guestLabel || '').trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    [partners],
+  )
+  const { users: displayUserRows, guests: displayGuestRows } = useMemo(
+    () => playLogPartnersSplitForDisplay(displayPartners),
+    [displayPartners],
   )
 
   const updateRow = (key, patch) => {
@@ -126,6 +142,7 @@ export default function PlayLogPartnersSection({
     for (const rawLabel of guestLabels) {
       const label = String(rawLabel || '').trim()
       if (!label) continue
+      addSavedGuestLabel(userId, label)
       changed = true
       next.push({
         key: `guest:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -141,7 +158,7 @@ export default function PlayLogPartnersSection({
     setPickerOpen(false)
   }
 
-  const partnerName = row => (
+  const partnerNameContent = row => (
     <>
       {row.kind === 'guest' ? (
         row.guestLabel
@@ -149,17 +166,15 @@ export default function PlayLogPartnersSection({
         playLogPartnerLabel({ display_name: row.displayName, handle: row.handle })
       )}
       {row.kind === 'user' && String(row.userId) === String(userId) ? (
-        <span className="text-zinc-500"> (you)</span>
+        <span className={row.isManager ? 'text-amber-300/70 font-normal' : 'text-zinc-500'}> (you)</span>
       ) : row.kind === 'user' && String(row.userId) === String(ownerUserId) ? (
-        <span className="text-zinc-500"> (owner)</span>
-      ) : null}
-      {row.isManager ? (
-        <span className="ml-1 rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
-          Manager
-        </span>
+        <span className={row.isManager ? 'text-amber-300/70 font-normal' : 'text-zinc-500'}> (owner)</span>
       ) : null}
     </>
   )
+
+  const partnerNameClass = row =>
+    row.isManager ? 'text-amber-300 font-semibold' : 'text-zinc-200'
 
   const canRemoveRow = row => {
     if (row.kind === 'user' && String(row.userId) === String(ownerUserId)) {
@@ -168,10 +183,26 @@ export default function PlayLogPartnersSection({
     return true
   }
 
-  const partnerMetricsHeader = (
+  const showManagerNameHint = !readOnly && canEditManager && hasExtraPartner
+
+  const partnersCardTitle = (
+    <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Partners</div>
+      {hasExtraPartner ? (
+        <span
+          className={`text-xs font-semibold tabular-nums ${sumOk ? 'text-emerald-400' : 'text-amber-400'}`}
+        >
+          Total: {percentSum.toFixed(1)}%
+        </span>
+      ) : null}
+    </div>
+  )
+
+  const partnerColumnHeader = (
     <div className="flex items-center gap-2 mb-1">
-      {!readOnly && canEditManager ? <span className="w-4 shrink-0" aria-hidden /> : null}
-      <span className="min-w-0 flex-1" aria-hidden />
+      <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+        Partner
+      </span>
       <div className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
         <span className="w-12 text-right">Share</span>
         <span className="min-w-[4.75rem] text-right">Amount</span>
@@ -181,101 +212,115 @@ export default function PlayLogPartnersSection({
     </div>
   )
 
-  const partnerList = (
-    <>
-      {partnerMetricsHeader}
-      <ul className="space-y-2 mb-3">
-        {displayPartners.map(row => (
-          <li key={row.key} className="flex items-center gap-2">
-            {!readOnly && canEditManager ? (
-              <input
-                type="radio"
-                name="play-log-manager"
-                checked={Boolean(row.isManager)}
-                onChange={() => setManager(row.key)}
-                className="h-4 w-4 shrink-0 accent-cyan-500"
-                aria-label={`Manager: ${row.kind === 'guest' ? row.guestLabel : playLogPartnerLabel(row)}`}
+  const managerNameHint = showManagerNameHint ? (
+    <p className="text-zinc-600 text-[10px] mb-1.5 font-normal normal-case tracking-normal">
+      Tap name to set manager
+    </p>
+  ) : null
+
+  const renderPartnerRow = row => (
+    <li key={row.key} className="flex items-center gap-2">
+      {!readOnly && canEditManager && row.kind === 'user' ? (
+        <button
+          type="button"
+          onClick={() => setManager(row.key)}
+          className={`min-w-0 flex-1 text-left text-sm truncate touch-manipulation active:opacity-80 ${partnerNameClass(row)}`}
+          aria-label={`${row.isManager ? 'Play manager' : 'Set as play manager'}: ${playLogPartnerLabel(row)}`}
+          aria-pressed={Boolean(row.isManager)}
+        >
+          {partnerNameContent(row)}
+        </button>
+      ) : (
+        <div className={`min-w-0 flex-1 text-sm truncate ${partnerNameClass(row)}`}>
+          {partnerNameContent(row)}
+        </div>
+      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {readOnly ? (
+          <span className="flex h-4 w-12 items-center justify-end text-cyan-300 text-xs font-semibold tabular-nums leading-none">
+            {row.sharePercent}%
+          </span>
+        ) : (
+          <input
+            type="text"
+            inputMode="decimal"
+            value={row.sharePercent}
+            onChange={e => updateRow(row.key, { sharePercent: e.target.value })}
+            placeholder="0"
+            className="w-12 min-h-8 rounded-lg bg-zinc-900 px-1 text-right text-sm text-white font-semibold tabular-nums outline-none focus:ring-2 focus:ring-cyan-500/40"
+            aria-label="Share percent"
+          />
+        )}
+        <div
+          className={`flex min-w-[4.75rem] items-center justify-end ${readOnly ? 'h-4' : 'min-h-8'}`}
+        >
+          <PartnerShareAmount netOutcome={netOutcome} sharePercent={row.sharePercent} />
+        </div>
+        {showPaidColumn ? (
+          <div className={`flex w-6 items-center justify-center ${readOnly ? 'h-4' : 'min-h-8'}`}>
+            {!row.isManager ? (
+              <PaidCheckbox
+                checked={Boolean(row.paid)}
+                disabled={!canEditPaid || paidSaving}
+                onChange={next => void togglePaid(row.key, next)}
               />
             ) : null}
-            <div className="min-w-0 flex-1 text-sm text-zinc-200 truncate">{partnerName(row)}</div>
-            <div className="flex shrink-0 items-center gap-2">
-              {readOnly ? (
-                <span className="flex h-4 w-12 items-center justify-end text-cyan-300 text-xs font-semibold tabular-nums leading-none">
-                  {row.sharePercent}%
-                </span>
-              ) : (
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={row.sharePercent}
-                  onChange={e => updateRow(row.key, { sharePercent: e.target.value })}
-                  placeholder="0"
-                  className="w-12 min-h-8 rounded-lg bg-zinc-900 px-1 text-right text-sm text-white font-semibold tabular-nums outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  aria-label="Share percent"
-                />
-              )}
-              <div
-                className={`flex min-w-[4.75rem] items-center justify-end ${readOnly ? 'h-4' : 'min-h-8'}`}
-              >
-                <PartnerShareAmount netOutcome={netOutcome} sharePercent={row.sharePercent} />
-              </div>
-              {showPaidColumn ? (
-                <div
-                  className={`flex w-6 items-center justify-center ${readOnly ? 'h-4' : 'min-h-8'}`}
-                >
-                  {!row.isManager ? (
-                    <PaidCheckbox
-                      checked={Boolean(row.paid)}
-                      disabled={!canEditPaid || paidSaving}
-                      onChange={next => void togglePaid(row.key, next)}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            {!readOnly && canRemoveRow(row) ? (
-              <button
-                type="button"
-                onClick={() => removeRow(row.key)}
-                className="shrink-0 text-zinc-500 text-xs font-semibold px-1 touch-manipulation active:text-red-400"
-                aria-label="Remove partner"
-              >
-                ×
-              </button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+          </div>
+        ) : null}
+      </div>
+      {!readOnly && canRemoveRow(row) ? (
+        <button
+          type="button"
+          onClick={() => removeRow(row.key)}
+          className="shrink-0 text-zinc-500 text-xs font-semibold px-1 touch-manipulation active:text-red-400"
+          aria-label={row.kind === 'guest' ? `Remove guest ${row.guestLabel}` : 'Remove partner'}
+        >
+          ×
+        </button>
+      ) : readOnly ? null : (
+        <span className="w-4 shrink-0" aria-hidden />
+      )}
+    </li>
+  )
+
+  const partnerListBody = (
+    <div className="space-y-3 mb-3">
+      {displayUserRows.length > 0 ? (
+        <div>
+          <ul className="space-y-2">{displayUserRows.map(renderPartnerRow)}</ul>
+        </div>
+      ) : null}
+      {displayGuestRows.length > 0 ? (
+        <div>
+          <p className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wide mb-1.5 px-0.5">
+            Guests
+          </p>
+          <ul className="space-y-2">{displayGuestRows.map(renderPartnerRow)}</ul>
+        </div>
+      ) : null}
+    </div>
+  )
+
+  const partnerList = (
+    <>
+      {managerNameHint}
+      {partnerColumnHeader}
+      {partnerListBody}
     </>
   )
 
   if (readOnly) {
     return (
       <div className="rounded-2xl bg-zinc-800/50 border border-zinc-700/50 p-3">
-        <div className="text-zinc-400 text-xs font-semibold uppercase tracking-wide mb-2">Partners</div>
-        {partnerList}
+        {partnersCardTitle}
+        {displayPartners.length > 0 ? partnerList : null}
       </div>
     )
   }
 
   return (
     <div className="rounded-2xl bg-zinc-800/50 border border-zinc-700/50 p-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Partners</div>
-        {hasExtraPartner ? (
-          <span
-            className={`text-xs font-semibold tabular-nums ${sumOk ? 'text-emerald-400' : 'text-amber-400'}`}
-          >
-            Total: {percentSum.toFixed(1)}%
-          </span>
-        ) : null}
-      </div>
-
-      {hasExtraPartner && canEditManager ? (
-        <p className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wide mb-1.5">
-          Tap a partner to set manager
-        </p>
-      ) : null}
+      {partnersCardTitle}
 
       {displayPartners.length > 0 ? partnerList : null}
 
@@ -293,14 +338,16 @@ export default function PlayLogPartnersSection({
         supabaseClient={supabaseClient}
         userId={userId}
         usedUserIds={usedUserIds}
+        usedGuestLabels={usedGuestLabels}
         onConfirm={commitPartnersFromPicker}
       />
 
       <p className="text-zinc-500 text-xs leading-snug mt-1">
         {hasExtraPartner ? (
           <>
-            The <span className="text-amber-300/90">owner</span> is the manager by default (change the radio if someone
-            else tracks paid; manager is not marked paid). Registered partners get this play in their logbook and a
+            The <span className="text-amber-300/90">owner</span> is the manager by default (tap another partner&apos;s
+            name if someone else tracks paid; manager is not marked paid). Registered partners get this play in their
+            logbook and a
             Lounge alert. Guests are attribution only.
           </>
         ) : (

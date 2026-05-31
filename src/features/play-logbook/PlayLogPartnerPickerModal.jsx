@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Z_APP_ALERT } from '../../constants/appZIndex.js'
-import { fetchPlayLogPartnerPickerData } from './playLogApi.js'
+import { fetchPlayLogGuestUsageCounts, fetchPlayLogPartnerPickerData } from './playLogApi.js'
 import { playLogPartnerLabel } from './playLogPartners.js'
+import {
+  addSavedGuestLabel,
+  loadSavedGuestLabels,
+  mergeGuestLabelsForPicker,
+  removeSavedGuestLabel,
+} from './playLogSavedGuests.js'
 
 const PANEL_HEIGHT_CLASS =
   'h-[min(88dvh,calc(100dvh-env(safe-area-inset-top,0px)-1rem))]'
@@ -29,6 +35,7 @@ function filterPartnerProfiles(rows, query) {
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
  *   userId: string,
  *   usedUserIds: Set<string>,
+ *   usedGuestLabels?: Set<string>,
  *   onConfirm: (payload: { profiles: object[], guestLabels: string[] }) => void,
  * }} props
  */
@@ -38,6 +45,7 @@ export default function PlayLogPartnerPickerModal({
   supabaseClient,
   userId,
   usedUserIds,
+  usedGuestLabels = new Set(),
   onConfirm,
 }) {
   const [search, setSearch] = useState('')
@@ -49,6 +57,8 @@ export default function PlayLogPartnerPickerModal({
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [followBusyId, setFollowBusyId] = useState('')
+  /** @type {[Array<{ label: string, count: number }>, Function]} */
+  const [savedGuests, setSavedGuests] = useState([])
   const searchRef = useRef(null)
 
   const stagedUserIds = useMemo(
@@ -58,16 +68,34 @@ export default function PlayLogPartnerPickerModal({
 
   const stagedCount = stagedProfiles.length + stagedGuests.length
 
+  const refreshSavedGuests = useCallback(async () => {
+    if (!userId) {
+      setSavedGuests([])
+      return
+    }
+    const saved = loadSavedGuestLabels(userId)
+    try {
+      const usage = await fetchPlayLogGuestUsageCounts(supabaseClient)
+      setSavedGuests(mergeGuestLabelsForPicker(saved, usage))
+    } catch {
+      setSavedGuests(mergeGuestLabelsForPicker(saved, new Map()))
+    }
+  }, [supabaseClient, userId])
+
   const load = useCallback(async () => {
     if (!userId) {
       setCandidates([])
       setViewerFollowingIds(new Set())
+      setSavedGuests([])
       return
     }
     setLoading(true)
     setErr('')
     try {
-      const data = await fetchPlayLogPartnerPickerData(supabaseClient, userId)
+      const [data] = await Promise.all([
+        fetchPlayLogPartnerPickerData(supabaseClient, userId),
+        refreshSavedGuests(),
+      ])
       if (data.error) {
         setErr(data.error)
         setCandidates([])
@@ -83,7 +111,7 @@ export default function PlayLogPartnerPickerModal({
     } finally {
       setLoading(false)
     }
-  }, [supabaseClient, userId])
+  }, [supabaseClient, userId, refreshSavedGuests])
 
   useEffect(() => {
     if (!open) {
@@ -115,13 +143,32 @@ export default function PlayLogPartnerPickerModal({
   const guestProposalStaged = useMemo(() => {
     if (!searchTrimmed) return false
     const key = searchTrimmed.toLowerCase()
-    return stagedGuests.some(g => g.toLowerCase() === key)
-  }, [searchTrimmed, stagedGuests])
+    return stagedGuests.some(g => g.toLowerCase() === key) || usedGuestLabels.has(key)
+  }, [searchTrimmed, stagedGuests, usedGuestLabels])
 
-  const addGuestToStaged = () => {
-    if (!searchTrimmed || guestProposalStaged) return
-    setStagedGuests(prev => [...prev, searchTrimmed])
-    setSearch('')
+  const filteredSavedGuests = useMemo(() => {
+    const q = searchTrimmed.toLowerCase()
+    if (!q) return savedGuests
+    return savedGuests.filter(g => g.label.toLowerCase().includes(q))
+  }, [savedGuests, searchTrimmed])
+
+  const addGuestToStaged = label => {
+    const trimmed = String(label || '').trim()
+    if (!trimmed) return
+    const key = trimmed.toLowerCase()
+    if (stagedGuests.some(g => g.toLowerCase() === key)) return
+    if (usedGuestLabels.has(key)) return
+    setStagedGuests(prev => [...prev, trimmed])
+    addSavedGuestLabel(userId, trimmed)
+    void refreshSavedGuests()
+    if (trimmed === searchTrimmed) setSearch('')
+  }
+
+  const removeSavedGuestFromList = label => {
+    removeSavedGuestLabel(userId, label)
+    const key = String(label || '').trim().toLowerCase()
+    setSavedGuests(prev => prev.filter(g => g.label.toLowerCase() !== key))
+    setStagedGuests(prev => prev.filter(g => g.toLowerCase() !== key))
   }
 
   const removeStagedGuest = index => {
@@ -167,6 +214,10 @@ export default function PlayLogPartnerPickerModal({
     () => filterPartnerProfiles(candidates, search),
     [candidates, search],
   )
+
+  const showSavedGuestsSection = filteredSavedGuests.length > 0
+  const showNetworkSection =
+    !loading && (filteredRows.length > 0 || (!searchTrimmed && candidates.length > 0))
 
   if (!open) return null
 
@@ -261,7 +312,7 @@ export default function PlayLogPartnerPickerModal({
             onKeyDown={e => {
               if (e.key === 'Enter' && searchTrimmed && !guestProposalStaged) {
                 e.preventDefault()
-                addGuestToStaged()
+                addGuestToStaged(searchTrimmed)
               }
             }}
           />
@@ -277,7 +328,7 @@ export default function PlayLogPartnerPickerModal({
               ) : (
                 <button
                   type="button"
-                  onClick={addGuestToStaged}
+                  onClick={() => addGuestToStaged(searchTrimmed)}
                   className="shrink-0 min-h-9 rounded-full bg-cyan-600/20 border border-cyan-500/40 px-4 text-xs font-bold text-cyan-300 touch-manipulation active:bg-cyan-600/30"
                 >
                   Add guest
@@ -292,11 +343,11 @@ export default function PlayLogPartnerPickerModal({
             <div className="flex h-full min-h-[12rem] items-center justify-center">
               <p className="text-zinc-500 text-sm text-center">Loading…</p>
             </div>
-          ) : err && candidates.length === 0 ? (
+          ) : err && candidates.length === 0 && savedGuests.length === 0 ? (
             <div className="flex h-full min-h-[12rem] items-center justify-center px-2">
               <p className="text-red-400 text-sm text-center">{err}</p>
             </div>
-          ) : filteredRows.length === 0 ? (
+          ) : !showSavedGuestsSection && filteredRows.length === 0 ? (
             <div className="flex h-full min-h-[12rem] items-center justify-center px-2">
               <p className="text-zinc-500 text-sm text-center">
                 {searchTrimmed
@@ -305,8 +356,61 @@ export default function PlayLogPartnerPickerModal({
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-800/70">
-              {filteredRows.map(profile => {
+            <>
+              {showSavedGuestsSection ? (
+                <div className="pt-1 pb-2">
+                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Guests
+                  </p>
+                  <ul className="divide-y divide-zinc-800/70">
+                    {filteredSavedGuests.map(guest => {
+                      const key = guest.label.toLowerCase()
+                      const onPlay = usedGuestLabels.has(key)
+                      const picked = stagedGuests.some(l => l.toLowerCase() === key)
+                      const disabled = onPlay || picked
+                      return (
+                        <li key={`saved-guest:${key}`}>
+                          <div className="flex items-center gap-1 rounded-xl px-2 py-1">
+                            <button
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => addGuestToStaged(guest.label)}
+                              className={`min-w-0 flex-1 rounded-xl px-1 py-2 text-left touch-manipulation ${
+                                disabled ? 'cursor-default opacity-50' : 'active:bg-zinc-800/80'
+                              }`}
+                            >
+                              <span className="text-sm font-medium text-zinc-100">{guest.label}</span>
+                              <span className="block text-zinc-500 text-xs mt-0.5">
+                                {onPlay
+                                  ? 'Already on this play'
+                                  : picked
+                                    ? 'Added'
+                                    : 'Guest · tap to add'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeSavedGuestFromList(guest.label)}
+                              className="shrink-0 px-2 py-2 text-zinc-500 text-sm font-semibold touch-manipulation active:text-red-400"
+                              aria-label={`Remove ${guest.label} from guest list`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+
+              {showNetworkSection && filteredRows.length > 0 ? (
+                <div className={showSavedGuestsSection ? 'pt-2 border-t border-zinc-800/80' : 'pt-1'}>
+                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Your network
+                  </p>
+                  <ul className="divide-y divide-zinc-800/70">
+                    {filteredRows.map(profile => {
                 const uid = String(profile.user_id)
                 const onPlayAlready = usedUserIds.has(uid)
                 const picked = stagedUserIds.has(uid)
@@ -367,7 +471,10 @@ export default function PlayLogPartnerPickerModal({
                   </li>
                 )
               })}
-            </ul>
+                  </ul>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
 
