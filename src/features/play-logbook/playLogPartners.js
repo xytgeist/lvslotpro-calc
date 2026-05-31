@@ -12,6 +12,8 @@ import { formatMetricValue } from './playLogMetrics.js'
  * @property {string} [avatarUrl]
  * @property {string} [guestLabel]
  * @property {string} sharePercent — form string, e.g. "50"
+ * @property {boolean} [isManager]
+ * @property {boolean} [paid]
  */
 
 const PERCENT_SUM_TARGET = 100
@@ -51,6 +53,8 @@ export function playLogPartnersValidationError(rows, creatorUserId) {
     const sum = playLogPartnersPercentSum(rows)
     return `Partner shares must total 100% (currently ${sum.toFixed(1)}%).`
   }
+  const managerCount = rows.filter(r => r.isManager).length
+  if (managerCount !== 1) return 'Select exactly one play manager.'
   for (const row of rows) {
     const n = Number(String(row.sharePercent ?? '').replace(/[^0-9.]/g, ''))
     if (!Number.isFinite(n) || n <= 0 || n > 100) return 'Each partner needs a share between 0 and 100%.'
@@ -68,14 +72,52 @@ export function playLogPartnersToRpcPayload(rows) {
         kind: 'guest',
         guest_label: String(row.guestLabel || '').trim(),
         share_percent,
+        is_manager: Boolean(row.isManager),
+        paid: row.isManager ? false : Boolean(row.paid),
       }
     }
     return {
       kind: 'user',
       user_id: row.userId,
       share_percent,
+      is_manager: Boolean(row.isManager),
+      paid: row.isManager ? false : Boolean(row.paid),
     }
   })
+}
+
+/** @param {PlayLogPartnerRow[]} rows @param {string} managerKey */
+export function playLogPartnersWithManager(rows, managerKey) {
+  return rows.map(row => ({
+    ...row,
+    isManager: row.key === managerKey,
+    paid: row.key === managerKey ? false : row.paid,
+  }))
+}
+
+/** @param {PlayLogPartnerRow[]} rows @param {string} creatorUserId */
+export function playLogPartnersEnsureManager(rows, creatorUserId) {
+  if (rows.some(r => r.isManager)) return rows
+  const creatorKey = rows.find(
+    r => r.kind === 'user' && String(r.userId) === String(creatorUserId),
+  )?.key
+  if (!creatorKey) return rows
+  return playLogPartnersWithManager(rows, creatorKey)
+}
+
+/** @param {PlayLogPartnerRow[]} rows @param {string} userId */
+export function playLogPartnersViewerIsManager(rows, userId) {
+  return rows.some(
+    r => r.isManager && r.kind === 'user' && String(r.userId) === String(userId),
+  )
+}
+
+/** Creator (session owner) or designated manager may mark partners paid. */
+export function playLogPartnersViewerCanMarkPaid(rows, userId, creatorUserId) {
+  const uid = String(userId || '').trim()
+  if (!uid) return false
+  if (String(creatorUserId || '').trim() === uid) return true
+  return playLogPartnersViewerIsManager(rows, uid)
 }
 
 /** @param {string} userId @param {{ handle?: string, display_name?: string } | null} [profile] */
@@ -88,6 +130,8 @@ export function defaultCreatorPartnerRow(userId, profile) {
     displayName: profile?.display_name || '',
     avatarUrl: '',
     sharePercent: '100',
+    isManager: true,
+    paid: false,
   }
 }
 
@@ -106,6 +150,8 @@ export function playLogPartnersFromSessionList(rows) {
       avatarUrl: row.avatar_url ? String(row.avatar_url) : '',
       guestLabel: kind === 'guest' ? guestLabel : undefined,
       sharePercent: String(row.share_percent ?? ''),
+      isManager: Boolean(row.is_manager),
+      paid: Boolean(row.paid),
     }
   })
 }

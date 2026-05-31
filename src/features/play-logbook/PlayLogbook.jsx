@@ -40,12 +40,14 @@ import {
   playLogPartnersHasExtraPartner,
   playLogPartnersToRpcPayload,
   playLogPartnersValidationError,
+  playLogPartnersViewerCanMarkPaid,
 } from './playLogPartners.js'
 import {
   deletePlayLogSharedSession,
   fetchPlayLogSessionPartners,
   fetchPlayLogSessionsMeta,
   savePlayLogSharedSession,
+  updatePlayLogSessionPartnersPaid,
   updatePlayLogSharedSession,
 } from './playLogApi.js'
 
@@ -628,7 +630,9 @@ export default function PlayLogbook({
             Apply play logbook SQL on your Supabase test project, then refresh. Migrations:{' '}
             <code className="text-cyan-300">20260529120000_play_logbook.sql</code>,{' '}
             <code className="text-cyan-300">20260531140000_play_log_shared_sessions.sql</code> (shared partners),{' '}
-            <code className="text-cyan-300">20260531180000_play_log_update_shared_partners.sql</code> (edit attributions).
+            <code className="text-cyan-300">20260531180000_play_log_update_shared_partners.sql</code> (edit attributions),{' '}
+            <code className="text-cyan-300">20260531190000_play_log_session_manager_paid.sql</code> (manager / paid),{' '}
+            <code className="text-cyan-300">20260531200000_play_log_partner_paid_notification.sql</code> (paid alerts).
           </div>
         )}
 
@@ -919,6 +923,13 @@ export default function PlayLogbook({
                         partners={partners}
                         onPartnersChange={setPartners}
                         netOutcome={logPlayNetOutcome}
+                        canEditPaid={playLogPartnersViewerCanMarkPaid(
+                          partners,
+                          userId,
+                          editingSessionId
+                            ? sessionMetaById.get(String(editingSessionId))?.created_by_user_id
+                            : userId,
+                        )}
                       />
                     ) : null}
                   </div>
@@ -949,6 +960,14 @@ export default function PlayLogbook({
                 viewingEntry.values?.money_in,
                 viewingEntry.values?.money_out,
                 viewingEntry.values?.acquisition_fee,
+              )
+              const detailCreatorId = viewingEntry.session_id
+                ? sessionMetaById.get(String(viewingEntry.session_id))?.created_by_user_id
+                : null
+              const detailCanMarkPaid = playLogPartnersViewerCanMarkPaid(
+                detailPartners,
+                userId,
+                detailCreatorId,
               )
               return (
                 <>
@@ -1003,9 +1022,21 @@ export default function PlayLogbook({
                           userId={userId}
                           viewerProfile={viewerProfile}
                           partners={detailPartners}
-                          onPartnersChange={() => {}}
+                          onPartnersChange={setDetailPartners}
                           readOnly
+                          canEditManager={false}
+                          canEditPaid={detailCanMarkPaid}
                           netOutcome={detailNetOutcome}
+                          onPaidPersist={
+                            detailCanMarkPaid && viewingEntry.session_id
+                              ? async rows => {
+                                  await updatePlayLogSessionPartnersPaid(supabaseClient, {
+                                    sessionId: viewingEntry.session_id,
+                                    partners: playLogPartnersToRpcPayload(rows),
+                                  })
+                                }
+                              : undefined
+                          }
                         />
                       ) : null}
                     </div>

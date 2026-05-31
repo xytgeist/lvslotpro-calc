@@ -102,6 +102,19 @@ export async function updatePlayLogSharedSession(supabaseClient, args) {
 }
 
 /**
+ * Creator or play manager — update paid flags only.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ sessionId: string, partners: unknown[] }} args
+ */
+export async function updatePlayLogSessionPartnersPaid(supabaseClient, args) {
+  const { error } = await supabaseClient.rpc('play_log_update_session_partners_paid', {
+    p_session_id: args.sessionId,
+    p_partners: args.partners,
+  })
+  if (error) throw error
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {string} sessionId
  */

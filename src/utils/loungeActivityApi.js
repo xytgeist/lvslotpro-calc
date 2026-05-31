@@ -13,6 +13,7 @@ export const LOUNGE_ACTIVITY_EVENT_TYPES = {
   LIKE: 'like',
   BOOKMARK: 'bookmark',
   PLAY_LOG_SHARED: 'play_log_shared',
+  PLAY_LOG_PARTNER_PAID: 'play_log_partner_paid',
 }
 
 /** Maps `activity_events.event_type` → notification avatar badge kind (null = no badge). */
@@ -36,6 +37,7 @@ export function loungeActivityNotificationBadgeKind(eventType) {
     case LOUNGE_ACTIVITY_EVENT_TYPES.BOOKMARK:
       return 'bookmark'
     case LOUNGE_ACTIVITY_EVENT_TYPES.PLAY_LOG_SHARED:
+    case LOUNGE_ACTIVITY_EVENT_TYPES.PLAY_LOG_PARTNER_PAID:
       return 'play_log'
     default:
       return null
@@ -143,6 +145,10 @@ export function loungeActivityActionPhrase(event) {
       const pctStr =
         pct != null && Number.isFinite(Number(pct)) ? ` (${Number(pct)}%)` : ''
       return `added you to ${game}${pctStr}`
+    }
+    case LOUNGE_ACTIVITY_EVENT_TYPES.PLAY_LOG_PARTNER_PAID: {
+      const game = String(event?.play_log_game_name || '').trim() || 'a play log'
+      return `marked your share as paid on ${game}`
     }
     default:
       return 'interacted with you'

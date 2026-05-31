@@ -118,6 +118,8 @@ function actionPhrase(eventType: string, commentId: string | null, isReply = fal
       return commentId ? (isReply ? 'liked your reply' : 'liked your comment') : 'liked your post'
     case 'play_log_shared':
       return 'added you to a play log'
+    case 'play_log_partner_paid':
+      return 'marked your play log share as paid'
     default:
       return 'interacted with you'
   }
@@ -144,7 +146,10 @@ function buildTargetUrl(
   const params = new URLSearchParams()
   params.set('tab', 'home')
 
-  if (event.event_type === 'play_log_shared' && event.play_log_entry_id) {
+  if (
+    (event.event_type === 'play_log_shared' || event.event_type === 'play_log_partner_paid') &&
+    event.play_log_entry_id
+  ) {
     params.set('tab', 'logbook')
     params.set('playLogEntry', event.play_log_entry_id)
   } else if (event.event_type === 'follow') {
@@ -337,7 +342,10 @@ async function handleImmediatePush(
     isReply,
   )
 
-  if (event.event_type === 'play_log_shared' && event.play_log_entry_id) {
+  if (
+    (event.event_type === 'play_log_shared' || event.event_type === 'play_log_partner_paid') &&
+    event.play_log_entry_id
+  ) {
     const who = actorLabel((actorProfile as ActorProfile | null) || null)
     let gameName = 'a play log'
     let sharePct: number | null = null
@@ -361,9 +369,13 @@ async function handleImmediatePush(
     }
     const pctStr =
       sharePct != null && Number.isFinite(sharePct) ? ` (${sharePct}%)` : ''
+    const paidVerb =
+      event.event_type === 'play_log_partner_paid'
+        ? `marked your share as paid on ${gameName}`
+        : `added you to ${gameName}`
     notification = {
       title: 'Edge Lounge',
-      body: `${who} added you to ${gameName}${pctStr}`,
+      body: `${who} ${paidVerb}${event.event_type === 'play_log_shared' ? pctStr : ''}`,
       url: buildTargetUrl(event, (actorProfile as ActorProfile | null) || null, {
         activityEventId: event.id,
       }),
