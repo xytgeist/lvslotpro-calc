@@ -22,6 +22,7 @@ import {
   PLAY_LOG_REAL_RTP_INFO_INTRO,
   formatPlayLogRealRtp,
   recentEntryDisplayChips,
+  entryDetailFieldsForEntry,
   runningRealRtpByEntryId,
   rtpToneFromPercentLabel,
   sortMetricSlugs,
@@ -133,6 +134,8 @@ export default function PlayLogbook({
   const [editingSessionId, setEditingSessionId] = useState(null)
 
   const [sheet, setSheet] = useState(null)
+  const [viewingEntryId, setViewingEntryId] = useState(null)
+  const [detailPartners, setDetailPartners] = useState([])
   const [editingEntryId, setEditingEntryId] = useState(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [formFields, setFormFields] = useState({})
@@ -182,6 +185,11 @@ export default function PlayLogbook({
   }, [selectedTemplate, defsMap])
 
   const realRtpSnapByEntryId = useMemo(() => runningRealRtpByEntryId(entries), [entries])
+
+  const viewingEntry = useMemo(() => {
+    if (!viewingEntryId) return null
+    return entries.find(e => String(e.id) === String(viewingEntryId)) || null
+  }, [viewingEntryId, entries])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -254,6 +262,8 @@ export default function PlayLogbook({
 
   const closeSheet = () => {
     setSheet(null)
+    setViewingEntryId(null)
+    setDetailPartners([])
     setEditingEntryId(null)
     setEditingSessionId(null)
     setPartners([])
@@ -272,8 +282,28 @@ export default function PlayLogbook({
     })
   }, [supabaseClient])
 
+  const openEntryDetail = useCallback(
+    async entry => {
+      if (!entry?.id) return
+      setViewingEntryId(entry.id)
+      setDetailPartners([])
+      setSheet('entryDetail')
+      setError('')
+      if (entry.session_id) {
+        try {
+          const rows = await fetchPlayLogSessionPartners(supabaseClient, entry.session_id)
+          setDetailPartners(playLogPartnersFromSessionList(rows))
+        } catch {
+          setDetailPartners([])
+        }
+      }
+    },
+    [supabaseClient],
+  )
+
   const openLogPlay = useCallback(
     (opts = {}) => {
+      setViewingEntryId(null)
       setEditingEntryId(null)
       setEditingSessionId(null)
       setPartners(userId ? [defaultCreatorPartnerRow(userId, viewerProfile)] : [])
@@ -314,6 +344,8 @@ export default function PlayLogbook({
       const tpl = templateById[entry.template_id]
       if (!tpl) return
       if (entry.session_id && !isSessionCreator(entry)) return
+      setViewingEntryId(null)
+      setDetailPartners([])
       const { date, time } = captureDateTimeFromIso(entry.captured_at)
       setEditingEntryId(entry.id)
       setEditingSessionId(entry.session_id || null)
@@ -343,12 +375,16 @@ export default function PlayLogbook({
 
   useEffect(() => {
     if (!highlightEntryId || loading) return
+    const entry = entries.find(e => String(e.id) === String(highlightEntryId))
     const el = document.querySelector(`[data-play-log-entry-id="${highlightEntryId}"]`)
     if (el && typeof el.scrollIntoView === 'function') {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+    if (entry) {
+      void openEntryDetail(entry)
       onHighlightEntryConsumed?.()
     }
-  }, [highlightEntryId, loading, entries, onHighlightEntryConsumed])
+  }, [highlightEntryId, loading, entries, onHighlightEntryConsumed, openEntryDetail])
 
   useEffect(() => {
     if (loading || !templates.length) return
@@ -512,6 +548,7 @@ export default function PlayLogbook({
       : 'Delete this log entry?'
     if (!window.confirm(msg)) return
     setError('')
+    const wasViewing = viewingEntryId != null && String(viewingEntryId) === String(entryId)
     try {
       if (sessionId && creator) {
         await deletePlayLogSharedSession(supabaseClient, sessionId)
@@ -519,6 +556,7 @@ export default function PlayLogbook({
         const { error: e } = await supabaseClient.from('play_log_entries').delete().eq('id', entryId)
         if (e) throw e
       }
+      if (wasViewing) closeSheet()
       await loadAll()
     } catch (e) {
       setError(e?.message || 'Failed to delete entry')
@@ -632,67 +670,48 @@ export default function PlayLogbook({
                   const runningRtpLabel = realRtpSnap?.label
                   const runningRtpTone = rtpToneFromPercentLabel(runningRtpLabel)
                   const shared = Boolean(entry.session_id)
-                  const canEdit = !shared || isSessionCreator(entry)
                   const highlight =
                     highlightEntryId && String(highlightEntryId) === String(entry.id)
                   return (
-                    <div
+                    <button
                       key={entry.id}
+                      type="button"
                       data-play-log-entry-id={entry.id}
-                      className={`rounded-2xl bg-zinc-900 border p-4 ${
+                      onClick={() => void openEntryDetail(entry)}
+                      className={`w-full text-left rounded-2xl bg-zinc-900 border p-4 touch-manipulation active:bg-zinc-800/90 ${
                         highlight ? 'border-cyan-500/70 ring-1 ring-cyan-500/30' : 'border-zinc-800/60'
                       }`}
                       data-play-logbook-card
                       data-play-logbook-entry
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                            <span className="min-w-0 truncate text-white font-bold">
-                              {tpl?.display_name || 'Unknown game'}
+                      <div className="mb-2 min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                          <span className="min-w-0 truncate text-white font-bold">
+                            {tpl?.display_name || 'Unknown game'}
+                          </span>
+                          {shared ? (
+                            <span className="shrink-0 rounded-md bg-cyan-600/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">
+                              Shared
                             </span>
-                            {shared ? (
-                              <span className="shrink-0 rounded-md bg-cyan-600/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">
-                                Shared
-                              </span>
-                            ) : null}
-                            {runningRtpLabel ? (
-                              <RunningRtpLabelButton
-                                label={runningRtpLabel}
-                                wagerAgnosticRtpPct={realRtpSnap?.wagerAgnosticRtpPct ?? null}
-                                toneClass={
-                                  runningRtpTone === 'win'
-                                    ? 'text-emerald-300'
-                                    : runningRtpTone === 'loss'
-                                      ? 'text-red-300'
-                                      : 'text-zinc-400'
-                                }
-                              />
-                            ) : null}
-                          </div>
-                          <div className="text-zinc-500 text-xs mt-0.5">{fmtCapturedAt(entry.captured_at)}</div>
-                          {entry.casino_name ? (
-                            <div className="text-zinc-400 text-xs mt-0.5 truncate">{entry.casino_name}</div>
+                          ) : null}
+                          {runningRtpLabel ? (
+                            <RunningRtpLabelButton
+                              label={runningRtpLabel}
+                              wagerAgnosticRtpPct={realRtpSnap?.wagerAgnosticRtpPct ?? null}
+                              toneClass={
+                                runningRtpTone === 'win'
+                                  ? 'text-emerald-300'
+                                  : runningRtpTone === 'loss'
+                                    ? 'text-red-300'
+                                    : 'text-zinc-400'
+                              }
+                            />
                           ) : null}
                         </div>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          {canEdit ? (
-                            <button
-                              type="button"
-                              onClick={() => void openEditEntry(entry)}
-                              className="text-zinc-500 text-xs font-semibold touch-manipulation active:text-cyan-300 px-2 py-1"
-                            >
-                              Edit
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => deleteEntry(entry)}
-                            className="text-red-400 text-xs font-semibold touch-manipulation active:text-red-300 px-2 py-1"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <div className="text-zinc-500 text-xs mt-0.5">{fmtCapturedAt(entry.captured_at)}</div>
+                        {entry.casino_name ? (
+                          <div className="text-zinc-400 text-xs mt-0.5 truncate">{entry.casino_name}</div>
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {chips.map(chip => (
@@ -715,7 +734,7 @@ export default function PlayLogbook({
                           </span>
                         ))}
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -820,7 +839,7 @@ export default function PlayLogbook({
           <div
             data-bankroll-sheet
             className={
-              sheet === 'logPlay'
+              sheet === 'logPlay' || sheet === 'entryDetail'
                 ? `${APP_MODAL_SHEET_PANEL_CLASS} !overflow-y-hidden flex flex-col !pb-0`
                 : APP_MODAL_SHEET_PANEL_CLASS
             }
@@ -910,6 +929,98 @@ export default function PlayLogbook({
                 </div>
               </>
             )}
+
+            {sheet === 'entryDetail' && viewingEntry && (() => {
+              const tpl = templateById[viewingEntry.template_id]
+              const detailRows = entryDetailFieldsForEntry(viewingEntry, tpl, defsMap)
+              const shared = Boolean(viewingEntry.session_id)
+              const canEdit = !shared || isSessionCreator(viewingEntry)
+              const realRtpSnap = realRtpSnapByEntryId[viewingEntry.id]
+              const runningRtpLabel = realRtpSnap?.label
+              const runningRtpTone = rtpToneFromPercentLabel(runningRtpLabel)
+              return (
+                <>
+                  <SheetHeader title={tpl?.display_name || 'Play entry'} onClose={closeSheet} />
+                  <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mt-2">
+                    <div className="space-y-4 pb-3">
+                      <div>
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                          {shared ? (
+                            <span className="shrink-0 rounded-md bg-cyan-600/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">
+                              Shared
+                            </span>
+                          ) : null}
+                          {runningRtpLabel ? (
+                            <RunningRtpLabelButton
+                              label={runningRtpLabel}
+                              wagerAgnosticRtpPct={realRtpSnap?.wagerAgnosticRtpPct ?? null}
+                              toneClass={
+                                runningRtpTone === 'win'
+                                  ? 'text-emerald-300'
+                                  : runningRtpTone === 'loss'
+                                    ? 'text-red-300'
+                                    : 'text-zinc-400'
+                              }
+                            />
+                          ) : null}
+                        </div>
+                        <div className="text-zinc-500 text-sm mt-1">{fmtCapturedAt(viewingEntry.captured_at)}</div>
+                        {viewingEntry.casino_name ? (
+                          <div className="text-zinc-400 text-sm mt-0.5">{viewingEntry.casino_name}</div>
+                        ) : null}
+                      </div>
+                      {detailRows.length > 0 ? (
+                        <div className="rounded-2xl bg-zinc-800/50 border border-zinc-800/80 px-4 divide-y divide-zinc-800/80">
+                          {detailRows.map(row => (
+                            <div key={row.slug} className="flex items-start justify-between gap-3 py-2.5">
+                              <span className="text-zinc-500 text-sm shrink-0">{row.label}</span>
+                              <span className="text-white text-sm font-semibold tabular-nums text-right">{row.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {viewingEntry.notes ? (
+                        <div>
+                          <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wide mb-1.5">Notes</div>
+                          <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{viewingEntry.notes}</p>
+                        </div>
+                      ) : null}
+                      {shared && detailPartners.length > 0 && userId ? (
+                        <PlayLogPartnersSection
+                          supabaseClient={supabaseClient}
+                          userId={userId}
+                          viewerProfile={viewerProfile}
+                          partners={detailPartners}
+                          onPartnersChange={() => {}}
+                          readOnly
+                        />
+                      ) : null}
+                    </div>
+                    {error ? <p className="text-red-400 text-sm pb-3">{error}</p> : null}
+                  </div>
+                  <div className="shrink-0 flex gap-2 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => void openEditEntry(viewingEntry)}
+                        className="flex-1 min-h-12 rounded-2xl bg-zinc-800 text-white font-bold touch-manipulation active:bg-zinc-700"
+                      >
+                        Edit
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => deleteEntry(viewingEntry)}
+                      className={`min-h-12 rounded-2xl bg-red-600/20 text-red-400 font-bold touch-manipulation active:bg-red-600/30 ${
+                        canEdit ? 'flex-1' : 'w-full'
+                      }`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
 
             {sheet === 'createTemplate' && (
               <>
@@ -1299,7 +1410,10 @@ function RunningRtpLabelButton({ label, toneClass, wagerAgnosticRtpPct }) {
         type="button"
         aria-expanded={open}
         aria-label={`Aggregate weighted RTP ${label}. Tap for details.`}
-        onClick={() => setOpen(v => !v)}
+        onClick={e => {
+          e.stopPropagation()
+          setOpen(v => !v)
+        }}
         className={`shrink-0 touch-manipulation border-0 bg-transparent p-0 text-xs font-bold tabular-nums underline decoration-dotted decoration-current/50 underline-offset-2 opacity-95 hover:opacity-100 active:opacity-100 [-webkit-tap-highlight-color:transparent] ${toneClass}`}
       >
         {label}

@@ -1,3 +1,5 @@
+import { formatPlayLogCalcMetricDisplay } from '../../utils/playLogCalcSnapshot.js'
+
 /** @typedef {'integer' | 'money' | 'decimal' | 'text'} PlayLogValueType */
 
 /** @typedef {{ slug: string, label: string, value_type: PlayLogValueType, sort_order: number }} PlayLogMetricDef */
@@ -495,6 +497,37 @@ export function recentEntryDisplayChips(entry, defsMap) {
   }
 
   return chips
+}
+
+const PLAY_LOG_CALC_DISPLAY_SLUGS = new Set([
+  'current_ev_rtp',
+  'average_case_mult',
+  'average_case_usd',
+  'expected_ev_usd',
+])
+
+/** @param {string} slug @param {unknown} value @param {PlayLogValueType} valueType */
+export function formatPlayLogEntryFieldValue(slug, value, valueType) {
+  if (slug === 'acquisition_fee') return formatAcquisitionFeeValue(value)
+  if (PLAY_LOG_CALC_DISPLAY_SLUGS.has(slug)) {
+    return formatPlayLogCalcMetricDisplay(slug, value, valueType)
+  }
+  return formatMetricValue(value, valueType)
+}
+
+/** All populated metrics for an entry (template order). */
+export function entryDetailFieldsForEntry(entry, template, defsMap) {
+  const values = entry?.values || {}
+  return orderedLogPlayFormFields(template?.metric_slugs || [], defsMap)
+    .filter(f => {
+      const v = values[f.slug]
+      return v != null && v !== ''
+    })
+    .map(f => ({
+      slug: f.slug,
+      label: f.label,
+      value: formatPlayLogEntryFieldValue(f.slug, values[f.slug], f.value_type),
+    }))
 }
 
 /** @param {string | null | undefined} label e.g. "94.32%" */
