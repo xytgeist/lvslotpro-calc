@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitleBarShell.jsx'
-import SlotsToolPageHeader from '../../components/SlotsToolPageHeader.jsx'
+import QuickLinkPageToggle from '../../components/QuickLinkPageToggle.jsx'
 import DateWheelPicker from '../../components/DateWheelPicker.jsx'
 import TimeWheelPicker from '../../components/TimeWheelPicker.jsx'
 import CasinoAutocomplete from '../../components/CasinoAutocomplete.jsx'
@@ -643,10 +643,12 @@ export default function PlayLogbook({
       contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
     >
       <div data-play-logbook>
-        <SlotsToolPageHeader quickLinkDestinationId="logbook" />
         <div className="mb-5">
-          <div className="text-white text-2xl font-black tracking-tight">Play Logbook</div>
-          <div className="text-zinc-400 text-sm mt-0.5">Capture AP slot data · analyze later</div>
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="min-w-0 text-white text-2xl font-black tracking-tight">Play Logbook</h1>
+            <QuickLinkPageToggle destinationId="logbook" className="mb-0 shrink-0" />
+          </div>
+          <p className="text-zinc-400 text-sm mt-0.5">Capture AP slot data · analyze later</p>
         </div>
 
         <div className="flex rounded-2xl bg-zinc-900 p-1 gap-1 mb-5" data-play-logbook-card>
@@ -865,19 +867,6 @@ export default function PlayLogbook({
               </div>
             ) : (
               <>
-                <div className="flex justify-end mb-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const slug = analyzeTemplate?.slug || 'game'
-                      const csv = buildPlayLogCsv(filteredAnalyzeEntries, analyzeTemplate, defsMap)
-                      downloadPlayLogCsv(csv, `play-logbook-${slug}-${localYmd()}.csv`)
-                    }}
-                    className="min-h-10 rounded-xl bg-zinc-800 px-4 text-sm font-semibold text-cyan-300 touch-manipulation active:bg-zinc-700"
-                  >
-                    Export CSV
-                  </button>
-                </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {analysisStats.map(stat => (
                     <div
@@ -891,6 +880,19 @@ export default function PlayLogbook({
                       {stat.hint ? <p className="text-zinc-500 text-xs mt-2 leading-snug">{stat.hint}</p> : null}
                     </div>
                   ))}
+                </div>
+                <div className="mt-4 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const slug = analyzeTemplate?.slug || 'game'
+                      const csv = buildPlayLogCsv(filteredAnalyzeEntries, analyzeTemplate, defsMap)
+                      downloadPlayLogCsv(csv, `play-logbook-${slug}-${localYmd()}.csv`)
+                    }}
+                    className="w-full min-h-12 rounded-2xl bg-zinc-800 text-sm font-semibold text-cyan-300 touch-manipulation active:bg-zinc-700"
+                  >
+                    Export CSV
+                  </button>
                 </div>
               </>
             )}
