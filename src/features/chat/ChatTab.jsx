@@ -144,9 +144,15 @@ export default function ChatTab({
   }, [loadRooms])
 
   // ── Handle initialPeerUserId (from profile Message tap) ──────────────────
+  // Use a ref so we don't re-fire when loadRooms/supabaseClient identity changes.
+  const handledPeerRef = useRef(/** @type {string|null} */ (null))
 
   useEffect(() => {
+    // Wait until both the intent and the viewer session are ready,
+    // and only fire once per distinct peerUserId value.
     if (!initialPeerUserId || !viewerUserId || !supabaseClient) return
+    if (handledPeerRef.current === initialPeerUserId) return
+    handledPeerRef.current = initialPeerUserId
     const consumed = onInitialPeerConsumed
     void (async () => {
       setActionErr('')
@@ -165,7 +171,7 @@ export default function ChatTab({
         consumed?.()
       }
     })()
-  }, [initialPeerUserId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialPeerUserId, viewerUserId, supabaseClient, onInitialPeerConsumed, loadRooms])
 
   // ── Handle initialRoomId (from deep link / push tap) ─────────────────────
 
