@@ -683,79 +683,77 @@ export default function ChatConversation({
     <div className="relative overflow-hidden bg-zinc-950" style={{ height: '100dvh' }} data-chat-feature>
 
       {/* ── Floating overlay header ─────────────────────────────────────────── */}
+      {/* Single flex row — items-start so button tops align with avatar top */}
       <div
-        className="absolute inset-x-0 top-0 z-20 flex flex-col"
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        className="absolute inset-x-0 top-0 z-20 flex items-start gap-2 px-3 pb-4 pt-2"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}
       >
-        {/* Row 1 — Back + Options (same glass, same size) */}
-        <div className="flex items-center justify-between px-3 pb-1 pt-2">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Back to conversations"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
-            style={GLASS}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+        {/* Back button */}
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back to conversations"
+          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
+          style={GLASS}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
 
-          {/* Channel title (non-DM) in the center of row 1 */}
-          {room.kind !== 'dm' && (
-            <span className="text-[15px] font-semibold text-zinc-100">{roomTitle}</span>
+        {/* Center — avatar + pill for DMs; plain title for channels */}
+        <div className="flex min-w-0 flex-1 flex-col items-center">
+          {room.kind === 'dm' ? (
+            <>
+              {peerAvatar ? (
+                <img
+                  src={peerAvatar}
+                  alt={peerDisplayName}
+                  className="relative z-10 h-16 w-16 rounded-full object-cover shadow-lg ring-2 ring-white/20"
+                />
+              ) : (
+                <div className="relative z-10 grid h-16 w-16 place-items-center rounded-full bg-zinc-700 text-[22px] font-bold text-zinc-300 shadow-lg ring-2 ring-white/15">
+                  {peerInitial}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => peerUserId && onViewProfile?.(peerUserId)}
+                disabled={!peerUserId || !onViewProfile}
+                className="-mt-1 flex items-center gap-1 rounded-full px-4 py-1.5 touch-manipulation transition-opacity active:opacity-75"
+                style={{
+                  background: 'rgba(20, 22, 40, 0.42)',
+                  backdropFilter: 'blur(20px) saturate(160%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+                  border: '1px solid rgba(255,255,255,0.13)',
+                }}
+                aria-label={peerUserId ? `View ${peerDisplayName}'s profile` : undefined}
+              >
+                <span className="text-[16px] font-bold text-white">{peerDisplayName}</span>
+                {peerUserId && <span className="text-[15px] font-normal text-zinc-300">›</span>}
+              </button>
+            </>
+          ) : (
+            <div className="flex h-10 items-center">
+              <span className="text-[15px] font-semibold text-zinc-100">{roomTitle}</span>
+            </div>
           )}
-
-          <button
-            type="button"
-            onClick={() => setOptionsMenuOpen(true)}
-            aria-label="Chat options"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
-            style={GLASS}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="5"  r="1.5" />
-              <circle cx="12" cy="12" r="1.5" />
-              <circle cx="12" cy="19" r="1.5" />
-            </svg>
-          </button>
         </div>
 
-        {/* Row 2 — Avatar + name pill (DM only) */}
-        {room.kind === 'dm' && (
-          <div className="flex flex-col items-center pb-4">
-            {/* Large avatar (2× previous size) */}
-            {peerAvatar ? (
-              <img
-                src={peerAvatar}
-                alt={peerDisplayName}
-                className="relative z-10 h-16 w-16 rounded-full object-cover shadow-lg ring-2 ring-white/20"
-              />
-            ) : (
-              <div className="relative z-10 grid h-16 w-16 place-items-center rounded-full bg-zinc-700 text-[22px] font-bold text-zinc-300 shadow-lg ring-2 ring-white/15">
-                {peerInitial}
-              </div>
-            )}
-
-            {/* Name pill — avatar barely kisses the top edge (-4px overlap) */}
-            <button
-              type="button"
-              onClick={() => peerUserId && onViewProfile?.(peerUserId)}
-              disabled={!peerUserId || !onViewProfile}
-              className="-mt-1 flex items-center gap-1 rounded-full px-4 py-1.5 touch-manipulation transition-opacity active:opacity-75"
-              style={{
-                background: 'rgba(20, 22, 40, 0.42)',
-                backdropFilter: 'blur(20px) saturate(160%)',
-                WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-                border: '1px solid rgba(255,255,255,0.13)',
-              }}
-              aria-label={peerUserId ? `View ${peerDisplayName}'s profile` : undefined}
-            >
-              <span className="text-[16px] font-bold text-white">{peerDisplayName}</span>
-              {peerUserId && <span className="text-[15px] font-normal text-zinc-300">›</span>}
-            </button>
-          </div>
-        )}
+        {/* Options button */}
+        <button
+          type="button"
+          onClick={() => setOptionsMenuOpen(true)}
+          aria-label="Chat options"
+          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
+          style={GLASS}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5"  r="1.5" />
+            <circle cx="12" cy="12" r="1.5" />
+            <circle cx="12" cy="19" r="1.5" />
+          </svg>
+        </button>
       </div>
 
       {/* ── Options menu (portal so it escapes stacking context) ───────────── */}
