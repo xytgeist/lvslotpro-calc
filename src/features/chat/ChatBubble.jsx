@@ -1,7 +1,11 @@
 import { useCallback, useRef, useState } from 'react'
+import ChatEmojiPicker, { saveRecentEmoji } from './ChatEmojiPicker'
 
-/** Allowed emoji reactions. */
-const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
+/**
+ * Quick-reaction strip shown at the top of the long-press menu.
+ * 12 emojis in a horizontally scrollable row + a grayed smiley that opens the full picker.
+ */
+const QUICK_REACTIONS = ['👍','❤️','😂','🔥','😮','😢','🎉','😍','👏','💯','🙏','🤣']
 
 /**
  * @param {{
@@ -39,7 +43,7 @@ export default function ChatBubble({
   onRemoveReaction,
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
+  const [fullPickerOpen, setFullPickerOpen] = useState(false)
   const longPressTimer = useRef(null)
   const isDeleted = Boolean(message.deleted_at)
 
@@ -68,9 +72,10 @@ export default function ChatBubble({
     if (group?.viewerReacted) {
       onRemoveReaction(message.id, emoji)
     } else {
+      saveRecentEmoji(emoji)
       onAddReaction(message.id, emoji)
     }
-    setReactionPickerOpen(false)
+    setFullPickerOpen(false)
     setMenuOpen(false)
   }
 
@@ -198,24 +203,50 @@ export default function ChatBubble({
     {menuOpen && (
       <div
         className="fixed inset-0 z-[110] flex items-end justify-center pb-8"
-        onClick={() => { setMenuOpen(false); setReactionPickerOpen(false) }}
+        onClick={() => setMenuOpen(false)}
       >
         <div
           className="w-full max-w-sm rounded-2xl border border-zinc-700/50 bg-zinc-900 shadow-2xl mx-4"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Reaction picker */}
-          <div className="flex justify-around border-b border-zinc-800 px-4 py-3">
-            {REACTION_EMOJIS.map((e) => (
+          {/* Quick reaction strip — horizontally scrollable, 12 emojis + full-picker smiley */}
+          <div className="relative border-b border-zinc-800">
+            {/* Right fade hint */}
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-zinc-900 to-transparent z-10 rounded-tr-2xl" />
+
+            <div className="flex items-center overflow-x-auto scrollbar-none px-3 py-3 gap-1">
+              {QUICK_REACTIONS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => toggleReaction(e)}
+                  className={`shrink-0 text-[26px] touch-manipulation active:scale-90 transition-transform px-1 ${
+                    reactionGroups[e]?.viewerReacted ? 'opacity-100 scale-110' : 'opacity-90'
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+
+              {/* Separator */}
+              <div className="shrink-0 mx-1 h-6 w-px bg-zinc-700" />
+
+              {/* Open full picker */}
               <button
-                key={e}
                 type="button"
-                onClick={() => toggleReaction(e)}
-                className="text-2xl touch-manipulation active:scale-90 transition-transform"
+                onClick={() => setFullPickerOpen(true)}
+                className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 touch-manipulation active:bg-zinc-700 transition-colors"
+                title="More emoji"
+                aria-label="Open emoji picker"
               >
-                {e}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 13.5s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
+                  <circle cx="9" cy="9.5" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="15" cy="9.5" r="1" fill="currentColor" stroke="none" />
+                </svg>
               </button>
-            ))}
+            </div>
           </div>
 
           {/* Actions */}
@@ -234,7 +265,7 @@ export default function ChatBubble({
             <button
               type="button"
               onClick={() => { onDeleteMessage(message.id); setMenuOpen(false) }}
-              className="flex w-full items-center gap-3 rounded-b-2xl px-5 py-4 text-[15px] font-semibold text-rose-400 touch-manipulation hover:bg-zinc-800/60"
+              className="flex w-full items-center gap-3 px-5 py-4 text-[15px] font-semibold text-rose-400 touch-manipulation hover:bg-zinc-800/60"
             >
               <span aria-hidden className="text-lg">🗑</span>
               Delete message
@@ -250,6 +281,14 @@ export default function ChatBubble({
           </button>
         </div>
       </div>
+    )}
+
+    {/* Full emoji picker — renders above the action menu */}
+    {fullPickerOpen && (
+      <ChatEmojiPicker
+        onSelect={(emoji) => toggleReaction(emoji)}
+        onClose={() => setFullPickerOpen(false)}
+      />
     )}
   </div>
   )
