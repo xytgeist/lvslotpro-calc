@@ -743,7 +743,12 @@ export default function ChatConversation({
               onClick={() => peerUserId && onViewProfile?.(peerUserId)}
               disabled={!peerUserId || !onViewProfile}
               className="-mt-1 flex items-center gap-1 rounded-full px-4 pb-1.5 pt-2 touch-manipulation transition-opacity active:opacity-75"
-              style={GLASS}
+              style={{
+                background: 'rgba(20, 22, 40, 0.42)',
+                backdropFilter: 'blur(20px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+                border: '1px solid rgba(255,255,255,0.13)',
+              }}
               aria-label={peerUserId ? `View ${peerDisplayName}'s profile` : undefined}
             >
               <span className="text-[16px] font-bold text-white">{peerDisplayName}</span>
