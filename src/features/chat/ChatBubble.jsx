@@ -220,35 +220,27 @@ export default function ChatBubble({
             <div className="px-1 text-[11px] font-semibold text-zinc-500">{senderLabel}</div>
           )}
 
-          {/* Reply quote — iOS style: mini card above + curved connector */}
-          {!isDeleted && message.reply_to_message_id && message.reply_to_preview && (
-            <>
-              {/* Mini quoted card — on the ORIGINAL SENDER'S side of the chat */}
-              {(() => {
-                // True if the quoted message was sent by the viewer; fall back to opposite-of-reply.
-                const isQuoteMine = message.reply_to_sender_id != null
-                  ? message.reply_to_sender_id === viewerUserId
-                  : !isMine
-                return (
-                  <>
-                    <div className={`max-w-[90%] rounded-2xl px-3 py-1.5 text-[12px] leading-snug opacity-60 ${
-                      isQuoteMine
-                        ? 'self-end bg-cyan-800/70 text-cyan-50'
-                        : 'self-start bg-zinc-800/90 text-zinc-100'
-                    }`}>
-                      <p className="line-clamp-2">{message.reply_to_preview}</p>
-                    </div>
-                    {/* Curved thread connector — stays on the quote card's side */}
-                    <div className={`h-4 w-5 ${
-                      isQuoteMine
-                        ? 'self-end mr-1 border-r-2 border-b-2 border-zinc-500/50 rounded-br-[10px]'
-                        : 'self-start ml-1 border-l-2 border-b-2 border-zinc-500/50 rounded-bl-[10px]'
-                    }`} />
-                  </>
-                )
-              })()}
-            </>
-          )}
+          {/* Twitter-style reply pill — compact quoted bubble above the reply */}
+          {!isDeleted && message.reply_to_message_id && message.reply_to_preview && (() => {
+            const isQuoteFromMe = message.reply_to_sender_id != null
+              ? message.reply_to_sender_id === viewerUserId
+              : !isMine
+            return (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden
+                  className={`text-zinc-400 ${isMine ? 'self-end mr-3' : 'self-start ml-3 scale-x-[-1]'}`}>
+                  <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/>
+                </svg>
+                <div className={`rounded-2xl px-3 py-1.5 text-[12px] leading-snug opacity-70 ${
+                  isQuoteFromMe
+                    ? 'bg-cyan-800/70 text-cyan-50'
+                    : 'bg-zinc-800/90 text-zinc-100'
+                }`}>
+                  <p className="line-clamp-2">{message.reply_to_preview}</p>
+                </div>
+              </>
+            )
+          })()}
 
           {/* Bubble */}
           <div
@@ -271,6 +263,7 @@ export default function ChatBubble({
               <span>This message was deleted</span>
             ) : (
               <>
+
                 {message.body && (
                   <div className="whitespace-pre-wrap break-words">{message.body}</div>
                 )}
