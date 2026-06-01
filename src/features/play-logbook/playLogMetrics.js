@@ -29,7 +29,7 @@ export const PLAY_LOG_METRIC_FALLBACK = /** @type {Record<string, { label: strin
   current_ev_rtp: { label: 'Current EV (RTP %)', value_type: 'decimal' },
   average_case_mult: { label: 'Average case (×)', value_type: 'decimal' },
   average_case_usd: { label: 'Average case ($)', value_type: 'money' },
-  expected_ev_usd: { label: 'EV ($)', value_type: 'money' },
+  expected_ev_usd: { label: 'EV ($) (optional)', value_type: 'money' },
   acquisition_fee: { label: 'Acquisition fee', value_type: 'money' },
   mhb_manufacturer: { label: 'Manufacturer', value_type: 'text' },
   mhb_meter: { label: 'MHB meter', value_type: 'money' },
@@ -55,7 +55,7 @@ export function formatMhbManufacturerValue(raw) {
 export function logPlayMetricDisplayLabel(slug, label) {
   if (slug === 'spin_count') return '# Spins (optional)'
   if (slug === 'bonus_count') return '# Bonuses (optional)'
-  if (slug === 'expected_ev_usd') return 'EV ($)'
+  if (slug === 'expected_ev_usd') return 'EV ($) (optional)'
   return label
 }
 
@@ -432,7 +432,7 @@ export const LOG_PLAY_FORM_FIELDS = [
   { slug: 'current_ev_rtp', label: 'Current EV' },
   { slug: 'average_case_mult', label: 'Avg case (×)' },
   { slug: 'average_case_usd', label: 'Avg case ($)' },
-  { slug: 'expected_ev_usd', label: 'EV ($)' },
+  { slug: 'expected_ev_usd', label: 'EV ($) (optional)' },
   { slug: 'acquisition_fee', label: 'Acquisition fee' },
 ]
 
@@ -757,7 +757,7 @@ export function recentEntryDisplayChips(entry, defsMap) {
     const evUsd = Number(values.expected_ev_usd)
     chips.push({
       key: 'expected_ev_usd',
-      label: defsMap.expected_ev_usd?.label || 'EV ($)',
+      label: defsMap.expected_ev_usd?.label || 'EV ($) (optional)',
       value: formatMetricValue(evUsd, 'money'),
       tone: evUsd >= 0 ? 'win' : 'loss',
     })

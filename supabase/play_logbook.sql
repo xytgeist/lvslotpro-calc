@@ -147,7 +147,7 @@ insert into public.play_log_metric_defs (slug, label, value_type, sort_order) va
   ('current_ev_rtp',    'Current EV (RTP %)',     'decimal', 145),
   ('average_case_mult', 'Average case (×)',     'decimal', 146),
   ('average_case_usd',  'Average case ($)',     'money',   147),
-  ('expected_ev_usd',   'EV ($)',               'money',   148),
+  ('expected_ev_usd',   'EV ($) (optional)',    'money',   148),
   ('acquisition_fee',   'Acquisition fee',      'money',   149),
   ('mhb_manufacturer', 'Manufacturer',        'text',    15),
   ('mhb_meter',        'MHB meter',             'money',   16),

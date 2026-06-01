@@ -1,4 +1,4 @@
--- Play Logbook — rename expected_ev_usd display label; value lives on the form, not notes.
+-- Play Logbook — EV ($) field is optional (label only).
 
 update public.play_log_metric_defs
 set label = 'EV ($) (optional)'
