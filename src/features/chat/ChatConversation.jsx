@@ -835,7 +835,7 @@ export default function ChatConversation({
         {/* Top gradient — fades/darkens messages toward the header so floating UI pops */}
         <div
           className="chat-top-gradient pointer-events-none absolute inset-x-0 top-0 z-10"
-          style={{ height: gradientHeight }}
+          style={{ height: listPaddingTop }}
         />
 
         <div
