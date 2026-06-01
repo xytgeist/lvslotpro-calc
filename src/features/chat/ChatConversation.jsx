@@ -742,7 +742,7 @@ export default function ChatConversation({
               type="button"
               onClick={() => peerUserId && onViewProfile?.(peerUserId)}
               disabled={!peerUserId || !onViewProfile}
-              className="-mt-1 flex items-center gap-1 rounded-full px-4 pb-1.5 pt-2 touch-manipulation transition-opacity active:opacity-75"
+              className="-mt-1 flex items-center gap-1 rounded-full px-4 py-1.5 touch-manipulation transition-opacity active:opacity-75"
               style={{
                 background: 'rgba(20, 22, 40, 0.42)',
                 backdropFilter: 'blur(20px) saturate(160%)',
