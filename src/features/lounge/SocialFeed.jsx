@@ -5866,15 +5866,21 @@ export default function SocialFeed({
     ],
   )
   const onLoungeDockChat = useCallback(() => {
-    ensureLoungeFeedVisible()
-    setLoungeDockPanel((p) => {
-      if (p === 'chat') {
-        setChatDockInitialPeerUserId(null)
-        return null
-      }
-      return 'chat'
-    })
-  }, [ensureLoungeFeedVisible])
+    if (typeof onOpenChatRoomFromDock === 'function') {
+      // Navigate straight to the full Chat tab (no pre-selected room)
+      onOpenChatRoomFromDock(null)
+    } else {
+      // Fallback: open dock chat panel (no Chat tab available)
+      ensureLoungeFeedVisible()
+      setLoungeDockPanel((p) => {
+        if (p === 'chat') {
+          setChatDockInitialPeerUserId(null)
+          return null
+        }
+        return 'chat'
+      })
+    }
+  }, [onOpenChatRoomFromDock, ensureLoungeFeedVisible])
 
   const onLoungeDockSettings = useCallback(() => {
     if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {

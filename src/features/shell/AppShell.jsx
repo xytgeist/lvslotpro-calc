@@ -1093,8 +1093,7 @@ export default function AppShell({
               setMenuOpen(false)
             }}
             onOpenChatRoomFromDock={(roomId) => {
-              if (!roomId) return
-              setPendingChatRoomId(roomId)
+              if (roomId) setPendingChatRoomId(roomId)
               setTab('chat')
               setMenuOpen(false)
             }}
