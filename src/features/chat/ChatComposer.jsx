@@ -154,7 +154,9 @@ export default function ChatComposer({
       {/* Reply strip */}
       {replyTarget && (
         <div className="chat-header-glass mb-1 flex items-start gap-2 rounded-2xl px-3 py-2">
-          <span aria-hidden className="mt-0.5 shrink-0 text-sm text-cyan-400">↩</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden className="mt-0.5 shrink-0 text-cyan-400">
+              <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/>
+            </svg>
           <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold text-cyan-400">Replying</div>
             <div className="line-clamp-1 text-[12px] text-zinc-400">
