@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { clearAppDebugLines, getAppDebugLines, subscribeAppDebugLog, unsubscribeAppDebugLog } from '../utils/appDebugLog.js'
 import { loungePostInteractionScore } from '../utils/communityFeedPost'
 import {
   loungePostCategoryPillChipClass,
@@ -205,6 +206,14 @@ export default function LoungeDockSlidePanels({
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false)
   const [menuLayoutSettingsOpen, setMenuLayoutSettingsOpen] = useState(false)
   const [adminUtilsSettingsOpen, setAdminUtilsSettingsOpen] = useState(false)
+  const [debugLogOpen, setDebugLogOpen] = useState(false)
+  const [debugLogLines, setDebugLogLines] = useState(() => getAppDebugLines())
+
+  useEffect(() => {
+    const refresh = () => setDebugLogLines(getAppDebugLines())
+    subscribeAppDebugLog(refresh)
+    return () => unsubscribeAppDebugLog(refresh)
+  }, [])
   const [currentTheme, setCurrentTheme] = useState(() => getTheme())
   const [iosPwaHelpOpen, setIosPwaHelpOpen] = useState(false)
   const [iosInstallBannerHidden, setIosInstallBannerHidden] = useState(false)
@@ -1743,6 +1752,50 @@ export default function LoungeDockSlidePanels({
                         />
                       </span>
                     </button>
+                    {/* Console log viewer */}
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setDebugLogOpen((o) => !o)}
+                        className="flex w-full items-center justify-between rounded-lg border border-zinc-700/90 bg-zinc-950/80 px-3.5 py-3 text-left touch-manipulation hover:bg-zinc-900/70"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-[15px] font-semibold text-zinc-100">Console log</span>
+                          <span className="mt-0.5 block text-[12px] leading-snug text-zinc-500">Last {debugLogLines.length} lines captured since load.</span>
+                        </span>
+                        <span aria-hidden className={`shrink-0 text-zinc-400 transition-transform ${debugLogOpen ? 'rotate-180' : ''}`}>
+                          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </span>
+                      </button>
+                      {debugLogOpen && (
+                        <div className="mt-1 rounded-lg border border-zinc-800 bg-black/80">
+                          <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2">
+                            <span className="text-[11px] text-zinc-500">Tap a line to copy it</span>
+                            <button
+                              type="button"
+                              onClick={() => { clearAppDebugLines(); setDebugLogLines([]) }}
+                              className="text-[11px] text-rose-400 touch-manipulation"
+                            >Clear</button>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto p-2 space-y-0.5">
+                            {debugLogLines.length === 0 ? (
+                              <p className="text-[11px] text-zinc-600 py-2 text-center">No logs yet.</p>
+                            ) : [...debugLogLines].reverse().map((line, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => navigator.clipboard?.writeText(line).catch(() => {})}
+                                className={`block w-full text-left font-mono text-[10px] leading-snug break-all rounded px-1 py-0.5 touch-manipulation active:bg-zinc-800 ${
+                                  line.includes(' ERR ') ? 'text-rose-300' : line.includes(' WARN ') ? 'text-amber-300' : 'text-zinc-400'
+                                }`}
+                              >
+                                {line}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : null}
               </div>

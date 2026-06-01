@@ -8,6 +8,10 @@ import {
   shouldShowLoungeColdBootSplash,
 } from './utils/loungeColdBootSplash.js'
 import { applyTheme, watchSystemTheme } from './utils/theme.js'
+import { installAppDebugLog } from './utils/appDebugLog.js'
+
+// Capture console output for in-app debug log (staff only)
+installAppDebugLog()
 
 // Apply theme before first paint to prevent flash
 applyTheme()
