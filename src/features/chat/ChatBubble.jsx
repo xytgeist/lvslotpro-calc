@@ -346,8 +346,8 @@ export default function ChatBubble({
                 }`}
               >
                 {e === '❤️'
-                  ? <LoungeFlameIcon liked className="h-[32px] w-[32px] translate-y-0.5" />
-                  : <span className="text-[26px]">{e}</span>
+                  ? <LoungeFlameIcon liked className="h-[20px] w-[20px] translate-y-0.5" />
+                  : <span className="text-[17px]">{e}</span>
                 }
               </button>
             ))}
