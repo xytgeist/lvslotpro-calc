@@ -52,6 +52,21 @@ export function targetHuman(t) {
   return "default (.env only)";
 }
 
+/** Apply target-specific env vars when set (e.g. Vercel preview vs production). */
+function applyTargetEnvFromProcess(target) {
+  const suffix = target === "production" ? "_PRODUCTION" : "_TEST";
+  const url =
+    process.env[`SUPABASE_URL${suffix}`]?.trim() ||
+    (target === "test" ? process.env.SUPABASE_URL?.trim() : "") ||
+    "";
+  const key =
+    process.env[`SUPABASE_SERVICE_ROLE_KEY${suffix}`]?.trim() ||
+    (target === "test" ? process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() : "") ||
+    "";
+  if (url) process.env.SUPABASE_URL = url.replace(/\/+$/, "");
+  if (key) process.env.SUPABASE_SERVICE_ROLE_KEY = key;
+}
+
 /** @param {"test" | "production" | null | undefined} target */
 export function loadSupabaseEnv(target) {
   applyEnvFile(path.join(repoRoot, ".env"), { fillEmptyOnly: true });
@@ -59,11 +74,18 @@ export function loadSupabaseEnv(target) {
   const file = TARGET_ENV_FILES[target];
   if (!file) return;
   const full = path.join(repoRoot, file);
-  if (!applyEnvFile(full, { fillEmptyOnly: false })) {
-    throw new Error(
-      `Missing ${file} for target=${target}. Create it in the repo root with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.`
-    );
-  }
+  if (applyEnvFile(full, { fillEmptyOnly: false })) return;
+
+  // Vercel / CI: no gitignored file — use dashboard env (SUPABASE_* or SUPABASE_*_TEST / *_PRODUCTION)
+  applyTargetEnvFromProcess(target);
+  const { url, key } = readSupabaseCredentials();
+  if (url && key) return;
+
+  throw new Error(
+    `Missing ${file} for target=${target} (local dev), and no Supabase credentials in process.env. ` +
+      `Local: create repo-root ${file} with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. ` +
+      `Vercel: set those vars (or SUPABASE_URL_${target === "production" ? "PRODUCTION" : "TEST"} + matching service role key) on the deployment.`
+  );
 }
 
 export function readSupabaseCredentials() {

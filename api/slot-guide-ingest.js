@@ -13,7 +13,9 @@
  *   Token is validated against the test Supabase project; caller must have
  *   profiles.role = 'admin'. No separate ingest secret needed.
  *
- * Supabase: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY on Vercel (per environment).
+ * Supabase: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY on Vercel (test ingest), or
+ *   SUPABASE_URL_PRODUCTION + SUPABASE_SERVICE_ROLE_KEY_PRODUCTION when target=production.
+ *   (No .env.supabase.* file on Vercel — uses process.env only.)
  * Local dev with repo writes: SLOT_GUIDE_WRITE_REPO=1 and run via `npm run slot-guide:serve`.
  */
 
