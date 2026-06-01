@@ -1270,6 +1270,14 @@ html.light .guide-ev-threshold-text {
   color: #27272a;
 }
 
+/* AP Guides search — light bg from zinc-900 remap; text-white is not flipped when bg-* is present */
+html.light .ap-guides-search-input {
+  color: #18181b !important;
+}
+html.light .ap-guides-search-input::placeholder {
+  color: #71717a !important;
+}
+
 /* react-datepicker light theme */
 html.light .offer-datepicker.react-datepicker {
   background-color: #ffffff;
@@ -1657,7 +1665,7 @@ html.light .lounge-media-toolbar .active\:text-sky-200:active {
  * Calculators use Tailwind gray-* classes which do NOT auto-invert with the
  * zinc-* scale. Every shade must be overridden here explicitly.
  *
- * data-calc="phoenix" | "buffalo" | "mhb" on each calculator root div.
+ * data-calc="phoenix" | "buffalo-link" | "mhb" on each calculator root div.
  */
 
 /* Calculator list buttons — uniform shadow in light mode matching MHB's shadow-lg shadow-black/30 */
@@ -1851,49 +1859,49 @@ html.light [data-calc="phoenix"] .text-yellow-400 {
 
 /* ── BuffaloLink (amber) ─────────────────────────────────────────────────── */
 
-html.light [data-calc="buffalo"] h1 {
+html.light [data-calc="buffalo-link"] h1 {
   color: #18181b !important;
   text-shadow: -1px -1px 0 #b45309, 1px -1px 0 #b45309, -1px 1px 0 #b45309, 1px 1px 0 #b45309 !important;
 }
 
-html.light [data-calc="buffalo"] h2,
-html.light [data-calc="buffalo"] h2.text-amber-400 {
+html.light [data-calc="buffalo-link"] h2,
+html.light [data-calc="buffalo-link"] h2.text-amber-400 {
   color: #000000;
 }
 
 /* Accent colors */
-html.light [data-calc="buffalo"] .text-amber-400,
-html.light [data-calc="buffalo"] .text-amber-100 {
+html.light [data-calc="buffalo-link"] .text-amber-400,
+html.light [data-calc="buffalo-link"] .text-amber-100 {
   color: #b45309;
 }
-html.light [data-calc="buffalo"] .border-amber-500,
-html.light [data-calc="buffalo"] .border-amber-400 {
+html.light [data-calc="buffalo-link"] .border-amber-500,
+html.light [data-calc="buffalo-link"] .border-amber-400 {
   border-color: #b45309;
 }
 /* EV / RTP positive/negative indicators */
-html.light [data-calc="buffalo"] .text-green-400 {
+html.light [data-calc="buffalo-link"] .text-green-400 {
   color: #16A34A;
 }
-html.light [data-calc="buffalo"] .text-red-400 {
+html.light [data-calc="buffalo-link"] .text-red-400 {
   color: #dc2626;
 }
 /* Max Exposure span */
-html.light [data-calc="buffalo"] .text-red-400 {
+html.light [data-calc="buffalo-link"] .text-red-400 {
   color: #dc2626;
 }
 /* +EV / -EV pills */
-html.light [data-calc="buffalo"] .bg-green-900 {
+html.light [data-calc="buffalo-link"] .bg-green-900 {
   background-color: #16A34A;
 }
-html.light [data-calc="buffalo"] .bg-green-900.text-green-300,
-html.light [data-calc="buffalo"] .bg-green-900 .text-green-300 {
+html.light [data-calc="buffalo-link"] .bg-green-900.text-green-300,
+html.light [data-calc="buffalo-link"] .bg-green-900 .text-green-300 {
   color: #ffffff;
 }
-html.light [data-calc="buffalo"] .bg-red-900 {
+html.light [data-calc="buffalo-link"] .bg-red-900 {
   background-color: #b91c1c;
 }
-html.light [data-calc="buffalo"] .bg-red-900 .text-red-300,
-html.light [data-calc="buffalo"] .bg-red-900.text-red-300 {
+html.light [data-calc="buffalo-link"] .bg-red-900 .text-red-300,
+html.light [data-calc="buffalo-link"] .bg-red-900.text-red-300 {
   color: #18181b;
 }
 
@@ -1902,11 +1910,11 @@ html.light [data-calc="buffalo"] .bg-red-900.text-red-300 {
 html.light .buffalo-check-badge { display: inline-flex; }
 html.light .buffalo-check-emoji { display: none; }
 /* YES / Max Major button (same green) */
-html.light [data-calc="buffalo"] .bg-green-600 {
+html.light [data-calc="buffalo-link"] .bg-green-600 {
   background-color: #16A34A;
 }
-html.light [data-calc="buffalo"] .bg-green-600 .text-white,
-html.light [data-calc="buffalo"] .bg-green-600.text-white {
+html.light [data-calc="buffalo-link"] .bg-green-600 .text-white,
+html.light [data-calc="buffalo-link"] .bg-green-600.text-white {
   color: #ffffff !important;
 }
 

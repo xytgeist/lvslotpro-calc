@@ -156,7 +156,14 @@ function isLocalDemoGuide(row) {
 function resolveCalculatorKey(machine) {
   if (!machine) return null
   const { slug, calculator_slug: calc, has_calculator: has } = machine
-  if (slug === 'buffalo-link' || slug === 'lightning-buffalo-link' || calc === 'buffalo') return 'buffalo'
+  if (
+    slug === 'buffalo-link' ||
+    slug === 'lightning-buffalo-link' ||
+    calc === 'buffalo-link' ||
+    calc === 'buffalo'
+  ) {
+    return 'buffalo-link'
+  }
   if (slug === 'stack-up-pays' || calc === 'stack-up-pays') return 'stackup'
   if (slug === 'phoenix-link' || calc === 'phoenix-link') return 'phoenix'
   if (
@@ -172,7 +179,9 @@ function resolveCalculatorKey(machine) {
   }
   if (slug === 'cash-machine-lock' || calc === 'cash-machine-lock') return null
   if (has && calc === 'mhb') return 'mhb'
-  if (has && calc && ['buffalo', 'stackup', 'phoenix', 'mhb'].includes(calc)) return calc
+  if (has && calc && ['buffalo-link', 'buffalo', 'stackup', 'phoenix', 'mhb'].includes(calc)) {
+    return calc === 'buffalo' ? 'buffalo-link' : calc
+  }
   return null
 }
 
@@ -1835,7 +1844,7 @@ export default function GuidesScreen({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search slot name…"
-          className="w-full min-h-12 rounded-2xl bg-zinc-900 border border-zinc-700 px-4 py-3 text-white text-base placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+          className="ap-guides-search-input w-full min-h-12 rounded-2xl bg-zinc-900 border border-zinc-700 px-4 py-3 text-white text-base placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
           enterKeyHint="search"
         />
       </label>

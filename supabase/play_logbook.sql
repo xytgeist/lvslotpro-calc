@@ -172,8 +172,8 @@ from (values
   (
     'buffalo-link',
     'Buffalo Link',
-    'buffalo-ascension',
-    'buffalo',
+    'buffalo-link',
+    'buffalo-link',
     array['counter','bet_size','denom','spin_count','bonus_count','money_in','money_out','counter_at_hit','current_ev_rtp','average_case_mult','average_case_usd','acquisition_fee']::text[]
   ),
   (
@@ -215,8 +215,8 @@ from (values
   (
     'buffalo-link',
     'Buffalo Link',
-    'buffalo-ascension',
-    'buffalo',
+    'buffalo-link',
+    'buffalo-link',
     array['counter','bet_size','denom','spin_count','bonus_count','money_in','money_out','counter_at_hit','current_ev_rtp','average_case_mult','average_case_usd','acquisition_fee']::text[]
   ),
   (

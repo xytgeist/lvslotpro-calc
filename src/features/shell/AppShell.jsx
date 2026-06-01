@@ -197,7 +197,7 @@ export default function AppShell({
   const [pendingOfferEventIds, setPendingOfferEventIds] = useState([])
   const [offerSpotlightEventIds, setOfferSpotlightEventIds] = useState([])
   const [menuOpen, setMenuOpen] = useState(false)
-  const [activeCalculator, setActiveCalculator] = useState(null) // 'phoenix' | 'buffalo' | 'stackup' | 'mhb' | null
+  const [activeCalculator, setActiveCalculator] = useState(null) // 'phoenix' | 'buffalo-link' | 'stackup' | 'mhb' | null
   const [communityPosts, setCommunityPosts] = useState([])
   const [communityFeedLoading, setCommunityFeedLoading] = useState(false)
   const [communityFeedLoadingMore, setCommunityFeedLoadingMore] = useState(false)

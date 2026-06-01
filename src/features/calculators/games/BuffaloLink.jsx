@@ -238,7 +238,7 @@ function BuffaloLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
   }
 
   return (
-    <div data-calc="buffalo" className="min-h-full pb-12">
+    <div data-calc="buffalo-link" className="min-h-full pb-12">
       <div className="w-full px-0 pt-1">
 
         {/* Large back chevron + Title with reduced padding */}
@@ -420,7 +420,7 @@ function BuffaloLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
         />
 
         <CalculatorLogPlayButton
-          calculatorSlug="buffalo"
+          calculatorSlug="buffalo-link"
           prefillValues={{
             counter: currentX,
             bet_size: betSize,

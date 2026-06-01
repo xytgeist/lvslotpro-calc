@@ -1,8 +1,8 @@
 import { resolveRequiresSlotsEdge } from '../billing/contentAccessGates.js'
 
-/** @typedef {'phoenix'|'buffalo'|'stackup'|'mhb'} CalculatorKey */
+/** @typedef {'phoenix'|'buffalo-link'|'stackup'|'mhb'} CalculatorKey */
 
-export const CALCULATOR_KEYS = /** @type {CalculatorKey[]} */ (['phoenix', 'buffalo', 'stackup', 'mhb'])
+export const CALCULATOR_KEYS = /** @type {CalculatorKey[]} */ (['phoenix', 'buffalo-link', 'stackup', 'mhb'])
 
 /**
  * Calculators available to free (logged-in) users without Slots Edge.
@@ -63,7 +63,7 @@ export const CALCULATOR_CATALOG = [
     subtitleClassName: 'mt-0.5 line-clamp-1 text-base leading-snug text-gray-400 sm:line-clamp-2',
   },
   {
-    key: 'buffalo',
+    key: 'buffalo-link',
     title: 'Buffalo Link EV Calc',
     subtitle: 'Midpoint-based counter analyzer',
     iconSrc: '/guides/buffalo-link/buffalo-link-calculator-icon.webp',

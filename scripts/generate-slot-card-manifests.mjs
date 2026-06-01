@@ -24,7 +24,7 @@ const LEGACY_ASSET_FOLDERS = {
 
 /** App has calculators even when seed `has_calculator` is false — keep manifest aligned with UI. */
 const CALCULATOR_OVERRIDES = {
-  "buffalo-link": { has_calculator: true, calculator_slug: "buffalo" },
+  "buffalo-link": { has_calculator: true, calculator_slug: "buffalo-link" },
   "phoenix-link": { has_calculator: true, calculator_slug: "phoenix" },
   "stack-up-pays": { has_calculator: true, calculator_slug: "stack-up-pays" },
 };

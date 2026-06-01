@@ -189,7 +189,7 @@ export default function CalculatorsTab({
           />
         </ScrollLinkedEdgeTitleBarShell>
       ) : null}
-      {activeCalculator === 'buffalo' ? (
+      {activeCalculator === 'buffalo-link' ? (
         <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pt-3 pb-[calc(3rem+env(safe-area-inset-bottom,0px))]">
           <BuffaloLink
             onBack={() => setActiveCalculator(null)}
