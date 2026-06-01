@@ -161,9 +161,18 @@ Web form for complete guide cards (machine fields, emoji-section markdown, hero 
 | Vercel API | `POST /api/slot-guide-ingest` |
 | Local API (repo writes) | `npm run slot-guide:serve` → `http://localhost:8787/ingest` |
 
-**Auth:** request header `x-guide-ingest-secret` must match env **`GUIDE_INGEST_SECRET`** (set on Vercel per environment; use any strong secret locally).
+**Auth (Vercel `/api/slot-guide-ingest`):** `Authorization: Bearer <supabase-session-token>`; caller must have **`profiles.role = admin`** on the test auth project (validated in **`api/slot-guide-ingest.js`**). Sign in on the form via **`LoginGate.jsx`** — no separate ingest secret on the deployed path.
 
-**Supabase:** API upserts `machines` + `guides` using **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**. For two-project workflow, local server loads `.env.supabase.test` / `.env.supabase.production` from the form **target** field (same as `slots:sync`).
+**Auth (local `npm run slot-guide:serve`):** optional **`x-guide-ingest-secret`** header vs env **`GUIDE_INGEST_SECRET`** (see that server’s README / handler).
+
+**Supabase:** API upserts `machines` + `guides` using **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**.
+
+| Where | Credentials |
+| --- | --- |
+| **Local scripts / `slot-guide:serve`** | Repo-root **`.env.supabase.test`** / **`.env.supabase.production`** (gitignored), selected by form **target** (same as `slots:sync`) |
+| **Vercel serverless** | Dashboard env vars — **no** `.env.supabase.*` files on the server. **Test** ingest: **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**. **Production** ingest: optional **`SUPABASE_URL_PRODUCTION`** + **`SUPABASE_SERVICE_ROLE_KEY_PRODUCTION`** |
+
+**Draft vs ingest:** **Save draft** stores WIP in browser **`localStorage`** (`slotGuideFormDraft:v1`) — not Supabase. **Ingest guide** creates the DB row; then **Fetch guides → Load → Save changes** for later edits.
 
 **Images:** converted to WebP. Local server writes **`public/guides/<slug>/`** and **`Slots/<slug>/`**. Vercel API uploads to Supabase Storage bucket **`guide-assets`** (run **`supabase/guide_assets_storage.sql`** on test + prod first) and stores public URLs in `machines.thumbnail_url` + markdown when repo files are not written.
 
@@ -175,7 +184,7 @@ npm run slot-guide:serve
 
 # Terminal 2
 npm run dev
-# Open /slot-guide-form — API URL http://localhost:8787/ingest, paste GUIDE_INGEST_SECRET
+# Open /slot-guide-form — sign in as admin; for local ingest API set URL http://localhost:8787/ingest + GUIDE_INGEST_SECRET on that server
 
 git add Slots/ public/guides/
 npm run slots:sync:test   # optional if ingest already synced Supabase

@@ -16,6 +16,7 @@ Treat **`jtjgtucumuoswnbauxry`** as reference (**test**) unless documented elsew
 - [ ] Confirm **`origin/main`** (or whichever Git/Vercel branch fronts **`lvslotpro.com`)**) carries exactly what should ship.
 - [ ] Confirm **`production`** Supabase project ref **`wedrhwtsxifbnnbgxdkm`** is intentional CLI/UI link (`supabase link --project-ref wedrhwtsxifbnnbgxdkm`).
 - [ ] Confirm **Vercel** production env has **`VITE_SUPABASE_URL`** / **`VITE_SUPABASE_ANON_KEY`** (and any other `VITE_*`) pointed at **production**.
+- [ ] **AP Guide ingest API** (if prod hosts **`/api/slot-guide-ingest`** or editors use prod target): **`SUPABASE_URL_PRODUCTION`** + **`SUPABASE_SERVICE_ROLE_KEY_PRODUCTION`** (or plain **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`** when only one project). **Preview / test deploy** (e.g. **tx18**): **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`** for **test** project — **service_role**, not anon. No repo **`.env.supabase.*`** on Vercel; **`scripts/lib/supabaseEnv.mjs`** reads dashboard vars @ **`24d0412`**.
 - [ ] Prefer a **no-op or tagged deploy** after env changes if clients cache aggressively.
 
 ---
@@ -52,6 +53,7 @@ Track **everything else** already used on test that production must also have ap
 - [ ] **`supabase/migrations/20260520170000_lounge_search_bundled.sql`** — **`lounge_search()`** bundled RPC (posts + profiles + comments + pagination meta), **`lounge_search_text_matches`** (escaped LIKE + trgm), profile **`about_me`** search, **`lounge_search_analytics`**, rate limit **30 / 5 min** per call; revoke split RPC **`authenticated`** execute.
 - [ ] **`supabase/migrations/20260520180000_lounge_search_handle_keyword.sql`** — **`@handle keyword`** compound queries (e.g. **`@selena buffalo`**).
 - [ ] Any earlier schema you rely on: **`offers`** / **`offer_events`**, **`push_subscriptions`**, notification SQL, etc. — mirror **test** `supabase/` files that are not yet on prod
+- [ ] **Play Logbook (if prod ships Logbook):** apply test-validated chain through **`20260531540000_buffalo_calculator_slug_buffalo_link.sql`** — base **`20260529120000_play_logbook.sql`**, shared sessions **`20260531140000`**, manager/paid **`20260531190000`**, paid/unpaid notify repair order (**`20260531300000`** → **`20260531310000`**, repair **`20260531320000`** if needed), custom metrics **`20260531350000`**, admin primary templates **`20260531400000`**, MHB fields **`20260531500000`**, label migrations **`20260531330000`**–**`20260531360000`**, **`20260531510000`**–**`20260531530000`**, **`20260531540000`**. Redeploy **`lounge-send-activity-push`** after activity-event migrations.
 
 **After deploy — quick smoke SQL (production):**
 
@@ -159,6 +161,7 @@ Secrets (secrets / env vault in Supabase) for push + web-push must exist on prod
 - [ ] **Lounge images (Cloudflare R2):** post a photo; URL should be on prod media subdomain (e.g. **`media.lvslotpro.com`**). Response headers include **`Cache-Control: public, max-age=31536000, immutable`**. Delete post removes R2 object. Legacy rows should already point at R2 if **§3.5** migrate ran.
 - [ ] **Lounge search (Phase G):** signed-in dock **Search** — **2+ chars** returns posts/profiles; logged-out tap → account gate. Requires **`20260518160000_lounge_search_phase_g.sql`** on prod DB.
 - [ ] **Lounge media lightbox:** image full-screen pinch-zoom + pan; Stream hero expand with interaction bar — spot-check feed + post detail (client-only; no extra deploy beyond app bundle).
+- [ ] **AP Guide editor (`/slot-guide-form`):** admin login → **+ New guide** → **Save draft** (optional) → **Ingest guide** with Vercel **§1** Supabase service vars set → **Fetch guides** → **Load** → edit section → **Save changes**. Spot-check **Buffalo Link** calculator slug **`buffalo-link`** in app after **`20260531540000`** on prod DB.
 
 ---
 
@@ -184,4 +187,4 @@ Already planned for Slot Pro backlog; prod cutover reminders:
 
 ---
 
-_Last updated: Lounge **Cloudflare R2** feed images (`lounge-cf-r2-*`, custom domain, migrate/backfill ops, immutable cache headers) + **unified Stream/image lightbox** (`LoungeStreamLightboxContext`, pinch-zoom) + **Phase G search** migration + **Cloudflare Stream** (`stream_video_uid`, direct-upload, delete-video, delete-orphan, purge + pg_cron migrations / Vault). Frontend layout map: `docs/frontend-architecture.md`._
+_Last updated: **Play Logbook** migration chain through **`20260531540000`** + **AP Guide editor** (`/slot-guide-form`, draft localStorage, Vercel ingest env vars, admin JWT auth). Prior: Lounge **Cloudflare R2** feed images + **unified Stream/image lightbox** + **Phase G search** + **Cloudflare Stream**. Frontend: `docs/frontend-architecture.md`; test tracking: `docs/test-buildout-backlog.md`._

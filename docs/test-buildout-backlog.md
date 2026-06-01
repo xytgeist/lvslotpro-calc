@@ -55,7 +55,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ---
 
-## Planned (Play Logbook — not started)
+## Play Logbook (shipped on `test` — Ryan smoke pending)
 
 **Product intent (Ryan, 2026-05-29):** AP slot players — especially on **newer titles** — need a **Play Logbook** to capture floor data during scouting/plays and **analyze** it later for exploitation (hit distributions, bonus frequency, counter behavior, etc.). Distinct from **Bankroll Tracker** (session P&L only) and from **Local Intel** (public field reports).
 
@@ -98,7 +98,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 **Built on `test` (2026-05-29)** — Ryan smoke pending. Apply SQL on test Supabase first.
 
-### Planned — shared plays / partners (not started)
+### Shared plays / partners (shipped — smoke pending)
 
 **Product intent:** Creator logs one play with **partners** (registered users + optional **guest** name). Each registered partner gets the same play in **their** LOG tab; guests are attribution-only (no account, no row).
 
@@ -125,6 +125,35 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 **Smoke (when built):** User A follows B; A saves play with B at 40%; B sees entry in Logbook + unread Lounge Alert; A edits → B’s row updates; B deletes own row → gone from B’s LOG only, A (and any other partner) still shows B on session; guest name visible on A’s detail only.
 
 - [x] **Phase 4 — shared plays (code on branch; apply SQL on test):** migration **`20260531140000_play_log_shared_sessions.sql`** — sessions/partners, RPC fan-out, Lounge `play_log_shared` + Alerts/deep link (`/?tab=logbook&playLogEntry=`). Redeploy **`lounge-send-activity-push`** after SQL. Ryan smoke pending.
+
+- [x] **Label polish (metric defs + client `metricDefMap`):** migrations **`20260531330000`** (Counter Pop), **`20260531340000`** (Cash In / Cash Out), **`20260531360000`** (Counter Start); optional spin/bonus/EV labels **`20260531510000`**–**`20260531530000`**. Client normalizes legacy labels on read.
+
+- [x] **Manager default + owner rules:** migration **`20260531210000_play_log_manager_owner_default.sql`** — creator default manager; owner-only session delete; partner row delete unchanged.
+
+---
+
+## AP Guide editor (`/slot-guide-form`)
+
+**Surface:** separate Vite entry **`src/slot-guide-form/`** (`SlotGuideFormApp.jsx`, `LoginGate.jsx` admin session). Deployed at **`/slot-guide-form`** on app host (e.g. **`lvslotpro-calc-tx18.vercel.app`**). Not in main `AppShell` hamburger.
+
+| Mode | Action |
+| --- | --- |
+| **New guide** | **Ingest guide** → `POST /api/slot-guide-ingest` (target **test** / **production**); optional hero + sparse body sections OK |
+| **WIP (same browser)** | **Save draft** → `localStorage` **`slotGuideFormDraft:v1`** (text only; re-attach hero/diagram files after restore) |
+| **Existing guide** | **Fetch guides** → **Load →** → **Save changes** (direct Supabase update, not ingest) |
+
+**Auth (ingest API):** `Authorization: Bearer <supabase-session>`; caller **`profiles.role = admin`** (test project hardcoded in **`api/slot-guide-ingest.js`** for JWT validation). **Not** `x-guide-ingest-secret` on Vercel path.
+
+**Vercel ingest env (required on preview/prod that serves `/api/slot-guide-ingest`):** **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`** for test target (no repo **`.env.supabase.test`** on server — **`scripts/lib/supabaseEnv.mjs`** falls back to `process.env` @ **`24d0412`**). Production target: **`SUPABASE_URL_PRODUCTION`** + **`SUPABASE_SERVICE_ROLE_KEY_PRODUCTION`** optional.
+
+### Status
+
+- [x] **Draft save + restore:** manual **Save draft** + auto-save (~2s); **Restore draft** banner; bottom **Save draft** beside **Ingest** @ **`d4d6c09`**
+- [x] **Optional fields (new ingest):** hero, skins, risk bullets, guide body sections, +EV threshold (client + **`slotGuideIngestCore.mjs`** @ **`25d81f1`**)
+- [x] **Slug typing:** **`slugifyInput`** allows trailing hyphen while typing (`buffalo-link`) @ **`25d81f1`**
+- [x] **Vercel env fallback:** ingest no longer requires **`.env.supabase.test`** file on server @ **`24d0412`**
+- [ ] **Ryan smoke — ingest on tx18:** Vercel env vars set + deploy **`test`** ≥ **`24d0412`**; ingest Buffalo Link (or other) → **Fetch guides** → **Load** → edit → **Save changes**
+- [x] **AP Guides light-mode search:** **`ap-guides-search-input`** + **`html.light`** rules in **`index.css`** (readable on light gray) @ **`ea1d72e`**
 
 ---
 
@@ -504,7 +533,11 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
         - [x] *(Optional)* **Staff crown / badge tip:** hover or tap **`LoungeBadgeHoverTip`** — reads/positions OK; dismiss on outside tap / **Escape** (`LoungeBadgeHoverTip.jsx`, 2026-05-18).
     13. **Lounge chat:** after **`chat_phase1.sql`** + Edge **`lounge-chat`** on test — dock **Chat** → Inbox / Topics; subscriber (or staff) can **Join** a topic; two completed profiles exchange a **DM** (profile **Message** beside Follow opens dock); send message; Realtime (messages appear without refresh). *(Ryan, 2026-05-18, **PASSED** on test @ **`aa222ec`**.)*
     14. **Lounge FAB wheel:** tap **+** → wheel; open **Search** / **Chat** / **Settings**; toggle **Following** (cyan fill, no extra glow); **Compose** from feed and from an open panel (keyboard); long-press **+**, drag, release over a post — post must **not** open (brief ~1s dead zone OK); liked chip-heart + count alignment when toggling like. **Upload bar:** while **Uploading post…** / prep bar is visible, FAB **nudges up** so **Cancel** is not covered. **Stream + image lightbox:** open feed **video hero** or **image/GIF** full-screen → dock **FAB hidden**; Stream **swipe down on the video** dismisses; backdrop **solid black** when landed (not translucent during expand). *(Ryan, 2026-05-19, **PASSED** on test @ **`f6a975e`** for image/GIF FAB hide.)*
-    15. **Video submit queue + parallel prep** (after **`57eaca2`** on test):
+    16. **Play Logbook + AP Guide editor (when promoting Play Log / guide tooling):**
+        - [ ] **SQL on test:** play-log migrations through **`20260531540000`** applied; **`lounge-send-activity-push`** redeployed after shared-play / paid-notify migrations.
+        - [ ] **Logbook:** Slots hub → **Logbook** → log play (Phoenix/Buffalo/Stack Up/MHB); optional shared play + partner alert; ANALYZE export CSV; admin **Primary game templates** if applicable.
+        - [ ] **Guide form:** **`/slot-guide-form`** — admin login; **Save draft** restores on return; **Ingest** with Vercel **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`** on preview host; **Fetch guides → Load → Save changes**.
+    17. **Video submit queue + parallel prep** (after **`57eaca2`** on test):
         - [x] **Back-to-back videos:** post video 1, immediately post video 2 → bar **Post 1 of 2** / **Post 2 of 2**; both appear in feed with playable video + poster. *(Ryan, 2026-05-18, **PASSED**.)*
         - [x] **Fast lane:** while video 1 uploading, post text-only, image-only, and GIF-only — each lands **without** waiting for the video queue to drain. *(2026-05-18 **PASSED**.)*
         - [x] **Parallel prep:** DevTools **Network** while **Post 1 of 2** active — **two** **`lounge-cf-stream-tus-create`** (201) and **two** tus upload ids (`?tusv2=true`) before job 2's bar turn; red **`video.m3u8`** poll noise OK if posts succeed. *(2026-05-18 **PASSED**.)*
@@ -787,4 +820,9 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 - 2026-05-29: **Play Logbook — spins/bonuses labels:** migration **`20260531510000_play_log_spin_bonus_optional_labels.sql`** + client `metricDefMap` — `# Spins (optional)` / `# Bonuses (optional)` on Log Play, entry detail, template builder, CSV.
 - 2026-05-29: **Play Logbook — EV ($) field:** migrations **`20260531520000`** / **`20260531530000`**; metric **`expected_ev_usd`** label **EV ($) (optional)**; calculator prefill no longer duplicates EV in notes (form field only).
 - 2026-05-29: **Buffalo Link calculator slug:** **`buffalo`** → **`buffalo-link`** (`calculatorAccess.js`, Guides resolve, play log + machines + `content_access_gates`); migration **`20260531540000_buffalo_calculator_slug_buffalo_link.sql`**. Apply on test.
+- 2026-05-29: **Play Logbook — metric label polish:** **`20260531330000`** Counter Pop, **`20260531340000`** Cash In/Out, **`20260531360000`** Counter Start; client **`playLogMetrics.js`** / **`metricDefMap`** keeps optional spin/bonus/EV labels aligned with DB.
+- 2026-05-29: **Play Logbook — manager/owner defaults:** **`20260531210000_play_log_manager_owner_default.sql`** — apply on test with other play-log migrations.
+- 2026-05-29: **AP Guide editor — draft + relaxed ingest:** **`src/slot-guide-form/`** localStorage draft (**`slotGuideFormDraft:v1`**), optional hero/sections on ingest, **`slugifyInput`**, bottom **Save draft** @ **`25d81f1`** / **`d4d6c09`**.
+- 2026-05-29: **AP Guide ingest on Vercel:** **`supabaseEnv.mjs`** uses dashboard **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`** when gitignored target file absent @ **`24d0412`** — set on **tx18** (or preview) before ingest smoke.
+- 2026-05-29: **AP Guides light-mode search input:** **`GuidesScreen.jsx`** + **`index.css`** **`ap-guides-search-input`** contrast fix @ **`ea1d72e`**.
 - 2026-05-26: **Fix: comment repost like counter optimistic update (`test`):** `toggleLoungeDetailCommentLike` was only patching `setLoungeDetailComments` (detail view), never `communityPosts`. Added `setCommunityPosts` patch that updates `p.reposted_comment.like_count` when a matching comment id is found. Ryan **PASSED** on `test` @ `e1d09a4`.
