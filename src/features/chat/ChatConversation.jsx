@@ -668,69 +668,99 @@ export default function ChatConversation({
   }, [])
 
   // ── Peer info for DM header ───────────────────────────────────────────────
-  const peerUserId   = room.kind === 'dm' ? (room.peer_user_id ?? null) : null
-  const peerProfile  = peerUserId ? (profilesById[peerUserId] || localProfiles[peerUserId] || null) : null
-  const peerAvatar   = peerProfile?.avatar_url || room.peer_avatar_url || null
-  const peerInitial  = (roomTitle || '?').replace(/^@/, '')[0]?.toUpperCase() || '?'
+  const peerUserId      = room.kind === 'dm' ? (room.peer_user_id ?? null) : null
+  const peerProfile     = peerUserId ? (profilesById[peerUserId] || localProfiles[peerUserId] || null) : null
+  const peerAvatar      = peerProfile?.avatar_url || room.peer_avatar_url || null
+  const peerDisplayName = peerProfile?.display_name || room.peer_display_name || roomTitle
+  const peerHandle      = peerProfile?.handle ? `@${peerProfile.handle}` : null
+  const peerInitial     = (peerDisplayName || '?').replace(/^@/, '')[0]?.toUpperCase() || '?'
+  // Extra top padding for DM header (tall: avatar + pill); channel is shorter
+  const listPaddingTop  = room.kind === 'dm'
+    ? 'calc(env(safe-area-inset-top, 0px) + 11rem)'
+    : 'calc(env(safe-area-inset-top, 0px) + 4.5rem)'
 
   return (
     <div className="relative overflow-hidden bg-zinc-950" style={{ height: '100dvh' }} data-chat-feature>
 
       {/* ── Floating overlay header ─────────────────────────────────────────── */}
       <div
-        className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pb-2"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}
+        className="absolute inset-x-0 top-0 z-20 flex flex-col"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        {/* Back button — frosted glass circle */}
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to conversations"
-          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
-          style={GLASS}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
+        {/* Row 1 — Back + Options (same glass, same size) */}
+        <div className="flex items-center justify-between px-3 pb-1 pt-2">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to conversations"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
+            style={GLASS}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
 
-        {/* Center: avatar + name */}
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 flex-col items-center gap-0.5 touch-manipulation"
-          onClick={() => peerUserId && onViewProfile?.(peerUserId)}
-          disabled={!peerUserId || !onViewProfile}
-          aria-label={peerUserId ? `View ${roomTitle}'s profile` : undefined}
-        >
-          {peerAvatar ? (
-            <img src={peerAvatar} alt={roomTitle} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/15" />
-          ) : (
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-zinc-700 text-[13px] font-bold text-zinc-300 ring-1 ring-white/10">
-              {peerInitial}
-            </div>
+          {/* Channel title (non-DM) in the center of row 1 */}
+          {room.kind !== 'dm' && (
+            <span className="text-[15px] font-semibold text-zinc-100">{roomTitle}</span>
           )}
-          <span className="max-w-[180px] truncate text-[13px] font-semibold text-zinc-100 leading-none">
-            {roomTitle}
-          </span>
-          {room.kind === 'channel' && (
-            <span className="text-[10px] text-zinc-500 leading-none">Topic channel</span>
-          )}
-        </button>
 
-        {/* Options button — frosted glass circle */}
-        <button
-          type="button"
-          onClick={() => setOptionsMenuOpen(true)}
-          aria-label="Chat options"
-          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
-          style={GLASS}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5"  r="1.5" />
-            <circle cx="12" cy="12" r="1.5" />
-            <circle cx="12" cy="19" r="1.5" />
-          </svg>
-        </button>
+          <button
+            type="button"
+            onClick={() => setOptionsMenuOpen(true)}
+            aria-label="Chat options"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
+            style={GLASS}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5"  r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="19" r="1.5" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Row 2 — Avatar + name pill (DM only) */}
+        {room.kind === 'dm' && (
+          <div className="flex flex-col items-center pb-4">
+            {/* Large avatar (2× previous size) */}
+            {peerAvatar ? (
+              <img
+                src={peerAvatar}
+                alt={peerDisplayName}
+                className="relative z-10 h-16 w-16 rounded-full object-cover shadow-lg ring-2 ring-white/20"
+              />
+            ) : (
+              <div className="relative z-10 grid h-16 w-16 place-items-center rounded-full bg-zinc-700 text-[22px] font-bold text-zinc-300 shadow-lg ring-2 ring-white/15">
+                {peerInitial}
+              </div>
+            )}
+
+            {/* Name pill — pulls up -12px so avatar overlaps its top edge */}
+            <button
+              type="button"
+              onClick={() => peerUserId && onViewProfile?.(peerUserId)}
+              disabled={!peerUserId || !onViewProfile}
+              className="-mt-3 flex items-center gap-1 rounded-full px-4 pb-2 pt-4 touch-manipulation transition-opacity active:opacity-75"
+              style={GLASS}
+              aria-label={peerUserId ? `View ${peerDisplayName}'s profile` : undefined}
+            >
+              <span className="text-[16px] font-bold text-white">{peerDisplayName}</span>
+              {peerUserId && <span className="text-[15px] font-normal text-zinc-300">›</span>}
+            </button>
+
+            {/* Handle sub-pill */}
+            {peerHandle && (
+              <div
+                className="mt-1.5 rounded-full px-3 py-0.5"
+                style={{ background: 'rgba(18,18,28,0.62)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <span className="text-[11px] text-zinc-400">{peerHandle}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Options menu (portal so it escapes stacking context) ───────────── */}
@@ -821,6 +851,15 @@ export default function ChatConversation({
 
       {/* Message list — scrollable region */}
       <div className="relative min-h-0 flex-1">
+        {/* Top gradient — fades/darkens messages toward the header so floating UI pops */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10"
+          style={{
+            height: listPaddingTop,
+            background: 'linear-gradient(to bottom, rgba(3,7,18,0.90) 0%, rgba(3,7,18,0.55) 60%, transparent 100%)',
+          }}
+        />
+
         <div
           ref={listRef}
           onScroll={handleScroll}
@@ -829,10 +868,7 @@ export default function ChatConversation({
           onTouchEnd={handleSwipeTouchEnd}
           onTouchCancel={handleSwipeTouchEnd}
           className="h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3"
-          style={{
-            touchAction: 'pan-y',
-            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)',
-          }}
+          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop }}
         >
           {loadingMore && (
             <div className="py-2 text-center text-[12px] text-zinc-600">Loading older messages…</div>
