@@ -342,11 +342,14 @@ export default function ChatBubble({
                 key={e}
                 type="button"
                 onClick={() => toggleReaction(e)}
-                className={`shrink-0 touch-manipulation px-1.5 text-[26px] transition-transform active:scale-90 ${
+                className={`shrink-0 touch-manipulation px-1.5 transition-transform active:scale-90 ${
                   reactionGroups[e]?.viewerReacted ? 'scale-110' : ''
                 }`}
               >
-                {e}
+                {e === '❤️'
+                  ? <LoungeFlameIcon liked className="h-[32px] w-[32px] translate-y-0.5" />
+                  : <span className="text-[26px]">{e}</span>
+                }
               </button>
             ))}
 
