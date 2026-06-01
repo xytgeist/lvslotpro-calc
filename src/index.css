@@ -2307,16 +2307,19 @@ html.light .chat-header-glass {
 }
 
 .chat-top-gradient {
-  /* Tail feathers out through many tiny steps so the bottom edge is imperceptible */
+  /* Feathered throughout — no abrupt band anywhere */
   background: linear-gradient(
     to bottom,
     rgba(3, 7, 18, 0.78)   0%,
-    rgba(3, 7, 18, 0.45)  55%,
-    rgba(3, 7, 18, 0.26)  68%,
-    rgba(3, 7, 18, 0.12)  78%,
-    rgba(3, 7, 18, 0.05)  86%,
-    rgba(3, 7, 18, 0.02)  92%,
-    rgba(3, 7, 18, 0.005) 97%,
+    rgba(3, 7, 18, 0.70)  12%,
+    rgba(3, 7, 18, 0.60)  24%,
+    rgba(3, 7, 18, 0.48)  36%,
+    rgba(3, 7, 18, 0.36)  47%,
+    rgba(3, 7, 18, 0.24)  57%,
+    rgba(3, 7, 18, 0.14)  67%,
+    rgba(3, 7, 18, 0.06)  76%,
+    rgba(3, 7, 18, 0.02)  86%,
+    rgba(3, 7, 18, 0.005) 94%,
     transparent           100%
   );
 }
@@ -2324,12 +2327,15 @@ html.light .chat-top-gradient {
   background: linear-gradient(
     to bottom,
     rgba(245, 246, 252, 0.78)   0%,
-    rgba(245, 246, 252, 0.45)  55%,
-    rgba(245, 246, 252, 0.26)  68%,
-    rgba(245, 246, 252, 0.12)  78%,
-    rgba(245, 246, 252, 0.05)  86%,
-    rgba(245, 246, 252, 0.02)  92%,
-    rgba(245, 246, 252, 0.005) 97%,
+    rgba(245, 246, 252, 0.70)  12%,
+    rgba(245, 246, 252, 0.60)  24%,
+    rgba(245, 246, 252, 0.48)  36%,
+    rgba(245, 246, 252, 0.36)  47%,
+    rgba(245, 246, 252, 0.24)  57%,
+    rgba(245, 246, 252, 0.14)  67%,
+    rgba(245, 246, 252, 0.06)  76%,
+    rgba(245, 246, 252, 0.02)  86%,
+    rgba(245, 246, 252, 0.005) 94%,
     transparent                100%
   );
 }
