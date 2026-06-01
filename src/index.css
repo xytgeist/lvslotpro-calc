@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 html,
+body {
+  /* Prevent body scroll/rubber-band on iOS Safari.
+     All scrolling in this app is inside specific overflow containers. */
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html,
 body,
 #root {
   background-color: #030712;
