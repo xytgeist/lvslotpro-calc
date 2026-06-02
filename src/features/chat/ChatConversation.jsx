@@ -97,6 +97,7 @@ export default function ChatConversation({
   viewerUserId,
   viewerProfile,
   profilesById,
+  otherUnreadCount = 0,
   onBack,
   onViewProfile = null,
 }) {
@@ -1022,11 +1023,16 @@ export default function ChatConversation({
           type="button"
           onClick={onBack}
           aria-label="Back to conversations"
-          className="chat-header-glass shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
+          className="chat-header-glass relative shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="15 18 9 12 15 6" />
           </svg>
+          {otherUnreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[10px] font-bold leading-none text-zinc-950">
+              {otherUnreadCount > 99 ? '99+' : otherUnreadCount}
+            </span>
+          )}
         </button>
 
         {/* Center — avatar + pill for DMs; plain title for channels */}

@@ -241,6 +241,7 @@ export default function ChatTab({
 
   if (activeRoomId && (activeRoom || !roomsLoading)) {
     const room = activeRoom || { id: activeRoomId, kind: 'dm' }
+    const otherUnreadCount = rooms.filter(r => r.id !== activeRoomId && r.hasUnread).length
     return (
       <ChatConversation
         supabaseClient={supabaseClient}
@@ -248,6 +249,7 @@ export default function ChatTab({
         viewerUserId={viewerUserId}
         viewerProfile={viewerProfile}
         profilesById={profilesById}
+        otherUnreadCount={otherUnreadCount}
         onBack={() => { setActiveRoomId(null); void loadRooms() }}
       />
     )
