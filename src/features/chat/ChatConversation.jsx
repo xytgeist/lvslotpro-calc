@@ -20,6 +20,8 @@ import { notifyLoungeDockSuppress } from '../lounge/loungeDockSuppressRegistry.j
 
 const PAGE_SIZE = 50
 const IS_ANDROID = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+const IS_IOS =
+  typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
 /** Extra grab area above composer for iOS keyboard dismiss (px). */
 const IOS_COMPOSER_DISMISS_PAD_PX = 32
 /** Show scroll-to-bottom when this many newer messages are off-screen. */
@@ -27,6 +29,8 @@ const SCROLL_UP_MSG_THRESHOLD = 20
 const JUMP_BTN_ABOVE_COMPOSER_PX = 8
 /** Last message must sit this far below the composer top before we auto-scroll. */
 const COMPOSER_SCROLL_GAP_PX = 8
+/** Message stack shorter than this gap under the composer viewport → treat as "fits" (no push). */
+const LIST_CONTENT_FITS_GAP_PX = 24
 /** iOS keyboard dismiss: wait for viewport settle, then one smooth list scroll. */
 const IOS_KEYBOARD_DISMISS_SCROLL_SETTLE_MS = 100
 const IOS_KEYBOARD_DISMISS_SCROLL_MAX_WAIT_MS = 420
@@ -396,8 +400,19 @@ export default function ChatConversation({
 
   // ── Jump to live end ──────────────────────────────────────────────────────
 
+  /** True when the message stack fits in the list without needing tail scroll (ignores bottom padding). */
+  const listContentFitsInView = useCallback(() => {
+    const list = listRef.current
+    const layer = translateLayerRef.current
+    if (!list || !layer) return true
+    const nodes = list.querySelectorAll('[data-chat-message-id]')
+    if (nodes.length === 0) return true
+    return layer.offsetHeight <= list.clientHeight - composerBarH - LIST_CONTENT_FITS_GAP_PX
+  }, [composerBarH])
+
   /** True when the tail message sits under (or would sit under) the floating composer. */
   const contentExtendsBelowComposer = useCallback(() => {
+    if (listContentFitsInView()) return false
     const list = listRef.current
     const composer = composerBarRef.current
     if (!list || !composer) return false
@@ -407,14 +422,14 @@ export default function ChatConversation({
     const composerTop = composer.getBoundingClientRect().top
     const lastBottom = last.getBoundingClientRect().bottom
     return lastBottom > composerTop - COMPOSER_SCROLL_GAP_PX
-  }, [])
+  }, [listContentFitsInView])
 
   const scrollToBottom = useCallback((behavior = 'instant', { force = false } = {}) => {
     const el = listRef.current
     if (!el) return
-    if (!force && !contentExtendsBelowComposer()) return
+    if (!force && (listContentFitsInView() || !contentExtendsBelowComposer())) return
     el.scrollTo({ top: el.scrollHeight, behavior })
-  }, [contentExtendsBelowComposer])
+  }, [contentExtendsBelowComposer, listContentFitsInView])
 
   const measureScrolledUpCount = useCallback(() => {
     const list = listRef.current
@@ -800,43 +815,76 @@ export default function ChatConversation({
   // Track composer textarea focus — extends iOS dismiss grab strip above composer.
   useEffect(() => {
     const composer = composerBarRef.current
-    const list = listRef.current
     if (!composer) return
-    let scrollTopOnFocus = 0
-
     const sync = () => {
       setComposerFocused(Boolean(composer.querySelector('textarea:focus, input:focus')))
+    }
+    const onFocusOut = () => requestAnimationFrame(sync)
+    composer.addEventListener('focusin', sync)
+    composer.addEventListener('focusout', onFocusOut)
+    return () => {
+      composer.removeEventListener('focusin', sync)
+      composer.removeEventListener('focusout', onFocusOut)
+    }
+  }, [])
+
+  // iOS: Safari scrolls the list when the keyboard opens — keep short threads pinned at top.
+  useEffect(() => {
+    if (!IS_IOS) return
+    const composer = composerBarRef.current
+    const list = listRef.current
+    if (!composer || !list) return
+
+    let scrollTopOnFocus = 0
+    let raf = 0
+
+    const composerInputFocused = () =>
+      Boolean(composer.querySelector('textarea:focus, input:focus'))
+
+    const applyIosKeyboardScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        if (!composerInputFocused()) return
+        if (listContentFitsInView()) {
+          list.scrollTop = scrollTopOnFocus
+          return
+        }
+        if (atBottomRef.current) {
+          list.scrollTop = Math.max(0, list.scrollHeight - list.clientHeight)
+        }
+      })
     }
 
     const onFocusIn = (e) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
-        scrollTopOnFocus = list?.scrollTop ?? 0
-      }
-      sync()
-    }
-
-    const clampScrollForShortThread = () => {
-      if (!list || !composer.querySelector('textarea:focus, input:focus')) return
-      if (!contentExtendsBelowComposer()) {
-        list.scrollTop = scrollTopOnFocus
+        scrollTopOnFocus = list.scrollTop
+        applyIosKeyboardScroll()
+        requestAnimationFrame(applyIosKeyboardScroll)
+        window.setTimeout(applyIosKeyboardScroll, 50)
+        window.setTimeout(applyIosKeyboardScroll, 180)
       }
     }
 
-    const onFocusOut = () => requestAnimationFrame(sync)
-    composer.addEventListener('focusin', onFocusIn)
-    composer.addEventListener('focusout', onFocusOut)
+    const onListScroll = () => {
+      if (!composerInputFocused() || !listContentFitsInView()) return
+      if (list.scrollTop !== scrollTopOnFocus) list.scrollTop = scrollTopOnFocus
+    }
+
+    composer.addEventListener('focusin', onFocusIn, true)
+    list.addEventListener('scroll', onListScroll, { passive: true })
 
     const vv = window.visualViewport
-    vv?.addEventListener('resize', clampScrollForShortThread)
-    vv?.addEventListener('scroll', clampScrollForShortThread)
+    vv?.addEventListener('resize', applyIosKeyboardScroll)
+    vv?.addEventListener('scroll', applyIosKeyboardScroll)
 
     return () => {
-      composer.removeEventListener('focusin', onFocusIn)
-      composer.removeEventListener('focusout', onFocusOut)
-      vv?.removeEventListener('resize', clampScrollForShortThread)
-      vv?.removeEventListener('scroll', clampScrollForShortThread)
+      cancelAnimationFrame(raf)
+      composer.removeEventListener('focusin', onFocusIn, true)
+      list.removeEventListener('scroll', onListScroll)
+      vv?.removeEventListener('resize', applyIosKeyboardScroll)
+      vv?.removeEventListener('scroll', applyIosKeyboardScroll)
     }
-  }, [contentExtendsBelowComposer])
+  }, [listContentFitsInView])
 
   // Track composer bar height so the scroll list can pad its bottom
   useEffect(() => {
@@ -996,9 +1044,6 @@ export default function ChatConversation({
     }
 
     const snapBottomAfterKeyboardCloseIOS = () => {
-      if (!nearBottom()) return
-      atBottomRef.current = true
-      setIsAtBottom(true)
       clearIosKeyboardDismissScroll()
 
       let finished = false
@@ -1006,8 +1051,14 @@ export default function ChatConversation({
         if (finished) return
         finished = true
         clearIosKeyboardDismissScroll()
-        const top = contentExtendsBelowComposer() ? listEl.scrollHeight : 0
-        listEl.scrollTo({ top, behavior: 'smooth' })
+        if (listContentFitsInView()) {
+          listEl.scrollTo({ top: 0, behavior: 'smooth' })
+          return
+        }
+        if (!nearBottom()) return
+        atBottomRef.current = true
+        setIsAtBottom(true)
+        listEl.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' })
       }
 
       const scheduleFinish = () => {
@@ -1091,7 +1142,7 @@ export default function ChatConversation({
       composer.removeEventListener('touchend', onEnd)
       composer.removeEventListener('touchcancel', onEnd)
     }
-  }, [contentExtendsBelowComposer])
+  }, [contentExtendsBelowComposer, listContentFitsInView])
 
   const listPaddingTop  = room.kind === 'dm'
     ? 'calc(env(safe-area-inset-top, 0px) + 11rem)'
