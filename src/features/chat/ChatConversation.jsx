@@ -14,6 +14,7 @@ import {
 } from './chatApi.js'
 import { subscribeToTyping } from './chatTypingBroadcast.js'
 import { notifyLoungeDockSuppress } from '../lounge/loungeDockSuppressRegistry.js'
+import { useLoungeKeyboardOverlapPx } from '../lounge/useLoungeKeyboardOverlapPx.js'
 
 // Glass styles are defined in index.css as .chat-header-glass / .chat-menu-glass
 // with html.light overrides — do not use inline styles for these.
@@ -143,7 +144,7 @@ export default function ChatConversation({
   const iosKeyboardDismissScrollTimerRef = useRef(0)
   const iosKeyboardDismissVvHandlerRef = useRef(/** @type {(() => void) | null} */ (null))
   const [composerFocused, setComposerFocused] = useState(false)
-  const [composerBarH, setComposerBarH] = useState(80)
+  const kbOverlapPx = useLoungeKeyboardOverlapPx(true)
 
   // Swipe-to-reveal timestamps
   const translateLayerRef = useRef(null)
@@ -407,8 +408,8 @@ export default function ChatConversation({
     if (!list || !layer) return true
     const nodes = list.querySelectorAll('[data-chat-message-id]')
     if (nodes.length === 0) return true
-    return layer.offsetHeight <= list.clientHeight - composerBarH - LIST_CONTENT_FITS_GAP_PX
-  }, [composerBarH])
+    return layer.offsetHeight <= list.clientHeight - LIST_CONTENT_FITS_GAP_PX
+  }, [])
 
   /** True when the tail message sits under (or would sit under) the floating composer. */
   const contentExtendsBelowComposer = useCallback(() => {
@@ -886,17 +887,6 @@ export default function ChatConversation({
     }
   }, [listContentFitsInView])
 
-  // Track composer bar height so the scroll list can pad its bottom
-  useEffect(() => {
-    const el = composerBarRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setComposerBarH(entry.contentRect.height + 16)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
   // Android + resizes-content: when the keyboard opens/closes the list height
   // changes — keep newest messages pinned above the composer (iOS unchanged).
   useEffect(() => {
@@ -1147,8 +1137,14 @@ export default function ChatConversation({
   const listPaddingTop  = room.kind === 'dm'
     ? 'calc(env(safe-area-inset-top, 0px) + 11rem)'
     : 'calc(env(safe-area-inset-top, 0px) + 4.5rem)'
+  const composerPadBottom =
+    kbOverlapPx > 0 ? `${kbOverlapPx}px` : 'max(0.625rem, env(safe-area-inset-bottom))'
+
   return (
-    <div className="relative overflow-hidden bg-zinc-950" style={{ height: '100dvh' }} data-chat-feature>
+    <div
+      className="fixed inset-0 z-[90] flex h-dvh max-h-dvh flex-col overflow-hidden bg-zinc-950"
+      data-chat-feature
+    >
 
       {/* ── Floating overlay header ─────────────────────────────────────────── */}
       {/* Single flex row — items-start so button tops align with avatar top */}
@@ -1262,8 +1258,8 @@ export default function ChatConversation({
         document.body
       )}
 
-      {/* ── Main content: full-screen scroll area + floating composer overlay ── */}
-      <div className="absolute inset-0">
+      {/* ── Body + composer (post-detail flex column — footer host owns kb overlap) ── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
       {/* Mute duration picker */}
       {muteMenuOpen && (
@@ -1302,9 +1298,7 @@ export default function ChatConversation({
         </div>
       )}
 
-      {/* Message list — fills the full screen; bottom padding tracks composer height */}
-      <div className="absolute inset-0">
-        {/* Top gradient — fades/darkens messages toward the header so floating UI pops */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         <div
           className="chat-top-gradient pointer-events-none absolute inset-x-0 top-0 z-10"
           style={{ height: listPaddingTop }}
@@ -1318,7 +1312,7 @@ export default function ChatConversation({
           onTouchEnd={handleSwipeTouchEnd}
           onTouchCancel={handleSwipeTouchEnd}
           className="h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3"
-          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop, paddingBottom: composerBarH }}
+          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop }}
         >
           {loadingMore && (
             <div className="py-2 text-center text-[12px] text-zinc-600">Loading older messages…</div>
@@ -1353,19 +1347,18 @@ export default function ChatConversation({
             </div>
           )}
         </div>
-
       </div>
-      </div>{/* end main scroll area */}
 
-      {/* ── Floating composer overlay — no background, sits above the message list ── */}
       <div
         ref={composerBarRef}
-        className="absolute inset-x-0 bottom-0 z-20 pointer-events-none"
+        data-chat-composer-host
+        className="relative z-20 shrink-0 border-t border-zinc-800/90 bg-zinc-950/95 px-3 pt-2.5 pb-0 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/80"
+        style={{ paddingBottom: composerPadBottom }}
       >
         {(newMsgCount > 0 || hasNewer || scrolledUpCount >= SCROLL_UP_MSG_THRESHOLD) && (
           <div
-            className="absolute inset-x-0 flex justify-center pointer-events-none"
-            style={{ bottom: '100%', paddingBottom: JUMP_BTN_ABOVE_COMPOSER_PX }}
+            className="absolute inset-x-0 bottom-full flex justify-center pointer-events-none"
+            style={{ paddingBottom: JUMP_BTN_ABOVE_COMPOSER_PX }}
           >
             <button
               type="button"
@@ -1397,7 +1390,6 @@ export default function ChatConversation({
         )}
         <div
           ref={composerTouchRef}
-          className="pointer-events-auto"
           style={
             composerFocused && !IS_ANDROID
               ? { paddingTop: IOS_COMPOSER_DISMISS_PAD_PX }
@@ -1405,7 +1397,7 @@ export default function ChatConversation({
           }
         >
           {typingUsers.length > 0 && isAtBottom && (
-            <div className="px-6 pb-1 text-[12px] text-zinc-500">
+            <div className="pb-1 text-[12px] text-zinc-500">
               {typingUsers.length === 1
                 ? `${typingUsers[0].displayName} is typing…`
                 : `${typingUsers.map((u) => u.displayName).join(', ')} are typing…`}
@@ -1419,8 +1411,10 @@ export default function ChatConversation({
             onSend={handleSend}
             onTyping={(name) => typingRef.current?.(name)}
             viewerDisplayName={viewerDisplayName}
+            footerHost
           />
         </div>
+      </div>
       </div>
     </div>
   )

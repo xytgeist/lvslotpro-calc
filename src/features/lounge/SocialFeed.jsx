@@ -12591,6 +12591,7 @@ export default function SocialFeed({
                     viewerDisplayName={String(
                       composerUserProfile?.display_name || composerUserProfile?.handle || '',
                     ).trim()}
+                    footerHost
                   />
                 ) : (
                   <>

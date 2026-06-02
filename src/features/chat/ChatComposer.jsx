@@ -22,7 +22,9 @@ const COMPOSER_EXPANDED_RADIUS_PX = 20
  *   onTyping: (displayName: string) => void,
  *   viewerDisplayName?: string,
  *   disabled?: boolean,
+ *   footerHost?: boolean,
  * }} props
+ * @param props.footerHost Parent footer host already applies padding + keyboard overlap.
  */
 export default function ChatComposer({
   supabaseClient,
@@ -33,6 +35,7 @@ export default function ChatComposer({
   onTyping,
   viewerDisplayName = '',
   disabled = false,
+  footerHost = false,
 }) {
   const [body, setBody]           = useState('')
   const [images, setImages]       = useState(/** @type {string[]} */ ([]))
@@ -187,8 +190,12 @@ export default function ChatComposer({
 
   return (
     <div
-      className="shrink-0 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
-      style={{ paddingTop: 6 }}
+      className={
+        footerHost
+          ? 'shrink-0'
+          : 'shrink-0 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]'
+      }
+      style={footerHost ? undefined : { paddingTop: 6 }}
     >
       {/* Reply strip */}
       {replyTarget && (
