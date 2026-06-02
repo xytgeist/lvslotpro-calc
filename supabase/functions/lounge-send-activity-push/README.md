@@ -27,6 +27,7 @@ Apply migrations in order:
 
 - **`20260523160000_lounge_activity_events_push.sql`** — immediate push trigger
 - **`20260523170000_lounge_activity_push_h3.sql`** — batched like/bookmark (10s debounce), `notification_preferences`, cron flush
+- **`20260602200000_chat_dm_push_debounce.sql`** — batched `chat_dm` per room (**60s** debounce, same cron flush)
 - **`20260523180000_lounge_activity_mark_push_opened.sql`** — RPC **`lounge_activity_mark_push_opened`** (tap marks single event or whole batch read)
 
 Then create Vault secrets (SQL Editor, once per project):
@@ -48,12 +49,13 @@ Lounge **Settings → Notifications**:
 - **Push notifications** — device master toggle (`push_subscriptions` + localStorage)
 - **Notify me about** — per-category prefs in `notification_preferences` (account-wide)
 
-Like/bookmark pushes are **debounced 10 seconds** and **grouped** (`@a and 4 others liked your post`). Replies, mentions, follows, and reposts stay **immediate**.
+Like/bookmark pushes are **debounced 10 seconds** and **grouped** (`@a and 4 others liked your post`). **DM messages** are debounced **60 seconds per conversation** (`@a sent you 3 messages`; timer resets on each new message). Replies, mentions, follows, and reposts stay **immediate**.
 
 Tap targets (URL + push JSON fields):
 
 - **Follow** → `/?tab=home&u=<handle>` (+ optional **`activityEventId`**)
 - **Post activity** → `/?tab=home&post=<uuid>` (+ **`activityEventId`** or batched **`activityBatchId`**)
+- **DM (batched)** → `/?tab=chat&room=<uuid>` (+ **`activityBatchId`**)
 - Fallback → `/?tab=home&lounge=notifications`
 
 Push JSON also includes **`activityEventId`** / **`activityBatchId`** so **`push-sw.js`** can mark read on tap without waiting for the Alerts panel. Client: **`lounge_activity_mark_push_opened`** RPC + **`refreshLoungeNotificationsUnread`** in **`SocialFeed.jsx`** (via **`lounge-push-opened`** custom event from **`AppShell.jsx`** or cold-start URL params). **Redeploy Edge** after payload changes; old notifications without IDs still need Alerts open or the 60s poll to clear badges.

@@ -46,6 +46,7 @@ type PushBatchRow = {
   event_type: string
   post_id: string | null
   comment_id: string | null
+  chat_room_id: string | null
   sent_at: string | null
 }
 
@@ -146,7 +147,10 @@ type PushNotificationPayload = {
 }
 
 function buildTargetUrl(
-  event: Pick<ActivityEventRow, 'event_type' | 'post_id' | 'comment_id' | 'play_log_entry_id'>,
+  event: Pick<
+    ActivityEventRow,
+    'event_type' | 'post_id' | 'comment_id' | 'play_log_entry_id' | 'chat_room_id'
+  >,
   actor: ActorProfile | null | undefined,
   markRead?: PushMarkReadIds,
 ): string {
@@ -204,6 +208,20 @@ function buildGroupedBody(
   }
   const otherLabel = othersCount === 1 ? '1 other' : `${othersCount} others`
   return `${leadName} and ${otherLabel} ${verb} ${targetPhrase}`
+}
+
+/** Batched DM push after debounce window (one notification per burst in a room). */
+function buildChatDmGroupedBody(actors: ActorProfile[], messageCount: number): string {
+  const leadName = actorDisplayName(actors[0])
+  const n = Math.max(1, messageCount)
+  if (n === 1) {
+    return `${leadName} sent you a message`
+  }
+  if (actors.length <= 1) {
+    return `${leadName} sent you ${n} messages`
+  }
+  const otherLabel = actors.length === 2 ? '1 other' : `${actors.length - 1} others`
+  return `${leadName} and ${otherLabel} sent you ${n} messages`
 }
 
 function buildSingleNotification(
@@ -422,7 +440,7 @@ async function handleBatchPush(
 ) {
   const { data: batchRow, error: batchError } = await admin
     .from('activity_push_batches')
-    .select('id, recipient_user_id, event_type, post_id, comment_id, sent_at')
+    .select('id, recipient_user_id, event_type, post_id, comment_id, chat_room_id, sent_at')
     .eq('id', batchId)
     .maybeSingle()
 
@@ -467,7 +485,9 @@ async function handleBatchPush(
 
   const { data: events, error: eventsError } = await admin
     .from('activity_events')
-    .select('id, recipient_user_id, actor_user_id, event_type, post_id, comment_id, created_at')
+    .select(
+      'id, recipient_user_id, actor_user_id, event_type, post_id, comment_id, chat_room_id, created_at',
+    )
     .in('id', eventIds)
     .order('created_at', { ascending: true })
 
@@ -497,22 +517,41 @@ async function handleBatchPush(
     uniqueActors.push(profileByUser.get(uid) || { user_id: uid, handle: null, display_name: null })
   }
 
-  let isReply = false
-  if (batch.comment_id) {
-    const { data: commentRow } = await admin
-      .from('feed_comments')
-      .select('parent_comment_id')
-      .eq('id', batch.comment_id)
-      .maybeSingle()
-    isReply = Boolean(commentRow?.parent_comment_id)
-  }
+  let notification: PushNotificationPayload
+  if (batch.event_type === 'chat_dm') {
+    const roomId = batch.chat_room_id || eventList[0]?.chat_room_id || null
+    const body = buildChatDmGroupedBody(uniqueActors, eventList.length)
+    const urlEvent = {
+      event_type: 'chat_dm' as const,
+      post_id: null,
+      comment_id: null,
+      play_log_entry_id: null,
+      chat_room_id: roomId,
+    }
+    notification = {
+      title: 'Edge Lounge',
+      body,
+      url: buildTargetUrl(urlEvent, uniqueActors[0] || null, { activityBatchId: batchId }),
+      activityBatchId: batchId,
+    }
+  } else {
+    let isReply = false
+    if (batch.comment_id) {
+      const { data: commentRow } = await admin
+        .from('feed_comments')
+        .select('parent_comment_id')
+        .eq('id', batch.comment_id)
+        .maybeSingle()
+      isReply = Boolean(commentRow?.parent_comment_id)
+    }
 
-  const body = buildGroupedBody(batch.event_type, uniqueActors, batch.comment_id, isReply)
-  const notification: PushNotificationPayload = {
-    title: 'Edge Lounge',
-    body,
-    url: buildTargetUrl(batch, uniqueActors[0] || null, { activityBatchId: batchId }),
-    activityBatchId: batchId,
+    const body = buildGroupedBody(batch.event_type, uniqueActors, batch.comment_id, isReply)
+    notification = {
+      title: 'Edge Lounge',
+      body,
+      url: buildTargetUrl(batch, uniqueActors[0] || null, { activityBatchId: batchId }),
+      activityBatchId: batchId,
+    }
   }
 
   const result = await sendPushToUser(

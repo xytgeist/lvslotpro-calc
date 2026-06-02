@@ -865,6 +865,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 - 2026-05-29: **AP Guides light-mode search input:** **`GuidesScreen.jsx`** + **`index.css`** **`ap-guides-search-input`** contrast fix @ **`ea1d72e`**.
 - 2026-05-26: **Fix: comment repost like counter optimistic update (`test`):** `toggleLoungeDetailCommentLike` was only patching `setLoungeDetailComments` (detail view), never `communityPosts`. Added `setCommunityPosts` patch that updates `p.reposted_comment.like_count` when a matching comment id is found. Ryan **PASSED** on `test` @ `e1d09a4`.
 - 2026-06-02: **Chat DM push duplicate fix:** `lounge-chat` `send_message` removed redundant `fetch` to `lounge-send-activity-push` after `activity_events` insert — H2 trigger `trg_activity_events_enqueue_push` already invokes Edge once per row (was 2× OS notification per message). **Redeploy `lounge-chat` on test/prod**; smoke one DM → one push.
+- 2026-06-02: **Chat DM push debounce (60s):** migration **`20260602200000_chat_dm_push_debounce.sql`** — `chat_dm` uses `activity_push_batches` per recipient+room (60s debounce, timer resets on each message; like/bookmark stay 10s); flush via existing pg_cron. Edge **`lounge-send-activity-push`**: batched body e.g. “X sent you 3 messages”. Apply migration + redeploy Edge on test; smoke rapid DMs → one push ~60s after last message.
 
 ---
 
