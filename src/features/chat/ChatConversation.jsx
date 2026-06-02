@@ -35,6 +35,8 @@ const LIST_CONTENT_FITS_GAP_PX = 24
 /** iOS keyboard dismiss: wait for viewport settle, then one smooth list scroll. */
 const IOS_KEYBOARD_DISMISS_SCROLL_SETTLE_MS = 100
 const IOS_KEYBOARD_DISMISS_SCROLL_MAX_WAIT_MS = 420
+/** Tail-pin rAF follow while iOS keyboard animates open/closed. */
+const IOS_KEYBOARD_TAIL_PIN_MS = 320
 
 /**
  * Max messages kept in the DOM at any time.
@@ -143,8 +145,10 @@ export default function ChatConversation({
   const keyboardDismissPreserveRef = useRef(/** @type {number | null} */ (null))
   const iosKeyboardDismissScrollTimerRef = useRef(0)
   const iosKeyboardDismissVvHandlerRef = useRef(/** @type {(() => void) | null} */ (null))
+  const tailPinFollowRafRef = useRef(0)
+  const tailPinFollowUntilRef = useRef(0)
   const [composerFocused, setComposerFocused] = useState(false)
-  const kbOverlapPx = useLoungeKeyboardOverlapPx(true)
+  const kbOverlapPx = useLoungeKeyboardOverlapPx(true, { smooth: IS_IOS })
 
   // Swipe-to-reveal timestamps
   const translateLayerRef = useRef(null)
@@ -441,6 +445,31 @@ export default function ChatConversation({
     const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
     if (!force && !atBottomRef.current && !nearBottom && !inputFocused) return
     list.scrollTop = list.scrollHeight
+  }, [])
+
+  /** iOS: pin each animation frame while keyboard slides; Android: one snap. */
+  const runTailPinFollow = useCallback(() => {
+    if (!IS_IOS) {
+      pinListToTail({ force: true })
+      return
+    }
+    tailPinFollowUntilRef.current = performance.now() + IOS_KEYBOARD_TAIL_PIN_MS
+    if (tailPinFollowRafRef.current) return
+
+    const tick = () => {
+      pinListToTail({ force: true })
+      if (performance.now() < tailPinFollowUntilRef.current) {
+        tailPinFollowRafRef.current = requestAnimationFrame(tick)
+      } else {
+        tailPinFollowRafRef.current = 0
+        pinListToTail({ force: true })
+      }
+    }
+    tailPinFollowRafRef.current = requestAnimationFrame(tick)
+  }, [pinListToTail])
+
+  useEffect(() => () => {
+    if (tailPinFollowRafRef.current) cancelAnimationFrame(tailPinFollowRafRef.current)
   }, [])
 
   const measureScrolledUpCount = useCallback(() => {
@@ -845,16 +874,9 @@ export default function ChatConversation({
     const composer = composerBarRef.current
     if (!composer) return undefined
 
-    const schedulePin = () => {
-      pinListToTail({ force: true })
-      requestAnimationFrame(() => pinListToTail({ force: true }))
-      window.setTimeout(() => pinListToTail({ force: true }), 50)
-      window.setTimeout(() => pinListToTail({ force: true }), 180)
-    }
-
     const onFocusIn = (e) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
-        schedulePin()
+        runTailPinFollow()
       }
     }
 
@@ -863,7 +885,7 @@ export default function ChatConversation({
     const vv = window.visualViewport
     const onVvResize = () => {
       if (!composer.querySelector('textarea:focus, input:focus')) return
-      schedulePin()
+      runTailPinFollow()
     }
     vv?.addEventListener('resize', onVvResize)
 
@@ -871,26 +893,25 @@ export default function ChatConversation({
       composer.removeEventListener('focusin', onFocusIn, true)
       vv?.removeEventListener('resize', onVvResize)
     }
-  }, [pinListToTail])
+  }, [runTailPinFollow])
 
   useEffect(() => {
-    if (kbOverlapPx <= 0) return undefined
-    pinListToTail({ force: true })
-    requestAnimationFrame(() => pinListToTail({ force: true }))
-    const t = window.setTimeout(() => pinListToTail({ force: true }), 50)
-    return () => window.clearTimeout(t)
-  }, [kbOverlapPx, pinListToTail])
+    if (kbOverlapPx <= 0.5) return undefined
+    runTailPinFollow()
+    return undefined
+  }, [kbOverlapPx, runTailPinFollow])
 
   useEffect(() => {
     const composer = composerBarRef.current
     if (!composer) return undefined
     const ro = new ResizeObserver(() => {
       if (!composer.querySelector('textarea:focus, input:focus')) return
-      pinListToTail({ force: true })
+      if (IS_IOS) runTailPinFollow()
+      else pinListToTail({ force: true })
     })
     ro.observe(composer)
     return () => ro.disconnect()
-  }, [pinListToTail])
+  }, [pinListToTail, runTailPinFollow])
 
   // resizes-content: when the keyboard opens/closes the list height changes — pin tail.
   useEffect(() => {
@@ -909,9 +930,11 @@ export default function ChatConversation({
       if (growing && preservedGap != null) {
         container.scrollTop = container.scrollHeight - container.clientHeight - preservedGap
       } else if (shrinking && (atBottomRef.current || inputFocused)) {
-        pinListToTail({ force: true })
+        if (IS_IOS) runTailPinFollow()
+        else pinListToTail({ force: true })
       } else if (growing && (atBottomRef.current || inputFocused)) {
-        pinListToTail({ force: true })
+        if (IS_IOS) runTailPinFollow()
+        else pinListToTail({ force: true })
       } else if (IS_ANDROID && contentExtendsBelowComposer()) {
         if (growing || (shrinking && (atBottomRef.current || inputFocused))) {
           container.scrollTop = container.scrollHeight
@@ -921,7 +944,7 @@ export default function ChatConversation({
     })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [contentExtendsBelowComposer, pinListToTail])
+  }, [contentExtendsBelowComposer, pinListToTail, runTailPinFollow])
 
   // Android: swipe-down dismiss on message list — lock scroll at tail + preserve position.
   // iOS: messages scroll freely; dismiss only from composer strip (see below).
@@ -1147,7 +1170,9 @@ export default function ChatConversation({
     ? 'calc(env(safe-area-inset-top, 0px) + 11rem)'
     : 'calc(env(safe-area-inset-top, 0px) + 4.5rem)'
   const composerPadBottom =
-    kbOverlapPx > 0 ? `${kbOverlapPx}px` : 'max(0.625rem, env(safe-area-inset-bottom))'
+    kbOverlapPx > 0.5
+      ? `${Math.round(kbOverlapPx)}px`
+      : 'max(0.625rem, env(safe-area-inset-bottom))'
 
   return (
     <div
@@ -1361,7 +1386,7 @@ export default function ChatConversation({
       <div
         ref={composerBarRef}
         data-chat-composer-host
-        className="relative z-20 shrink-0 border-t border-zinc-800/90 bg-zinc-950/95 px-3 pt-2.5 pb-0 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/80"
+        className="relative z-20 shrink-0 bg-zinc-950/95 px-3 pt-2.5 pb-0 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/80"
         style={{ paddingBottom: composerPadBottom }}
       >
         {(newMsgCount > 0 || hasNewer || scrolledUpCount >= SCROLL_UP_MSG_THRESHOLD) && (
