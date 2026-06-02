@@ -432,6 +432,17 @@ export default function ChatConversation({
     el.scrollTo({ top: el.scrollHeight, behavior })
   }, [contentExtendsBelowComposer, listContentFitsInView])
 
+  /** Pin tail above composer when keyboard resizes the list (iOS + Android). */
+  const pinListToTail = useCallback(({ force = false } = {}) => {
+    const list = listRef.current
+    if (!list) return
+    const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80
+    const tag = document.activeElement?.tagName
+    const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
+    if (!force && !atBottomRef.current && !nearBottom && !inputFocused) return
+    list.scrollTop = list.scrollHeight
+  }, [])
+
   const measureScrolledUpCount = useCallback(() => {
     const list = listRef.current
     if (!list) return 0
@@ -829,24 +840,80 @@ export default function ChatConversation({
     }
   }, [])
 
-  // Android + resizes-content: when the keyboard opens/closes the list height
-  // changes — keep newest messages pinned above the composer (iOS unchanged).
+  // Composer focus / keyboard: keep the latest messages riding above the composer.
   useEffect(() => {
-    if (!/Android/i.test(navigator.userAgent)) return
+    const composer = composerBarRef.current
+    if (!composer) return undefined
+
+    const schedulePin = () => {
+      pinListToTail({ force: true })
+      requestAnimationFrame(() => pinListToTail({ force: true }))
+      window.setTimeout(() => pinListToTail({ force: true }), 50)
+      window.setTimeout(() => pinListToTail({ force: true }), 180)
+    }
+
+    const onFocusIn = (e) => {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+        schedulePin()
+      }
+    }
+
+    composer.addEventListener('focusin', onFocusIn, true)
+
+    const vv = window.visualViewport
+    const onVvResize = () => {
+      if (!composer.querySelector('textarea:focus, input:focus')) return
+      schedulePin()
+    }
+    vv?.addEventListener('resize', onVvResize)
+
+    return () => {
+      composer.removeEventListener('focusin', onFocusIn, true)
+      vv?.removeEventListener('resize', onVvResize)
+    }
+  }, [pinListToTail])
+
+  useEffect(() => {
+    if (kbOverlapPx <= 0) return undefined
+    pinListToTail({ force: true })
+    requestAnimationFrame(() => pinListToTail({ force: true }))
+    const t = window.setTimeout(() => pinListToTail({ force: true }), 50)
+    return () => window.clearTimeout(t)
+  }, [kbOverlapPx, pinListToTail])
+
+  useEffect(() => {
+    const composer = composerBarRef.current
+    if (!composer) return undefined
+    const ro = new ResizeObserver(() => {
+      if (!composer.querySelector('textarea:focus, input:focus')) return
+      pinListToTail({ force: true })
+    })
+    ro.observe(composer)
+    return () => ro.disconnect()
+  }, [pinListToTail])
+
+  // resizes-content: when the keyboard opens/closes the list height changes — pin tail.
+  useEffect(() => {
     const container = listRef.current
-    if (!container) return
+    if (!container) return undefined
     let prevH = container.clientHeight
 
     const ro = new ResizeObserver(() => {
       const h = container.clientHeight
       const growing = h > prevH
+      const shrinking = h < prevH
       const preservedGap = keyboardDismissPreserveRef.current
+      const tag = document.activeElement?.tagName
+      const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
+
       if (growing && preservedGap != null) {
         container.scrollTop = container.scrollHeight - container.clientHeight - preservedGap
-      } else if (contentExtendsBelowComposer()) {
-        const tag = document.activeElement?.tagName
-        const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
-        if (growing || (h < prevH && (atBottomRef.current || inputFocused))) {
+      } else if (shrinking && (atBottomRef.current || inputFocused)) {
+        pinListToTail({ force: true })
+      } else if (growing && (atBottomRef.current || inputFocused)) {
+        pinListToTail({ force: true })
+      } else if (IS_ANDROID && contentExtendsBelowComposer()) {
+        if (growing || (shrinking && (atBottomRef.current || inputFocused))) {
           container.scrollTop = container.scrollHeight
         }
       }
@@ -854,7 +921,7 @@ export default function ChatConversation({
     })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [contentExtendsBelowComposer])
+  }, [contentExtendsBelowComposer, pinListToTail])
 
   // Android: swipe-down dismiss on message list — lock scroll at tail + preserve position.
   // iOS: messages scroll freely; dismiss only from composer strip (see below).
