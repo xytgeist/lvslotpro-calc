@@ -272,6 +272,10 @@ export default function ChatComposer({
             placeholder="Message…"
             disabled={disabled}
             rows={1}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="sentences"
+            spellCheck={false}
             className={`box-border w-full resize-none bg-transparent py-0 pl-4 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none disabled:opacity-50 ${
               expanded ? 'leading-5' : 'h-full'
             }`}
