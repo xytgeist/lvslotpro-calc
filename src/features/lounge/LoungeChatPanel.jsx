@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { loungeChatInvoke } from '../../utils/loungeChatApi'
 import { LOUNGE_CHAT_TOPIC_CHANNELS } from '../../utils/loungeChatConstants'
+import ChatGroupHeaderStack from '../chat/ChatGroupHeaderStack.jsx'
+import {
+  chatGroupHeaderMembersBatch,
+  enrichChatRoomRow,
+} from '../chat/chatApi.js'
 
 /**
  * Dock slide panel — **conversation list only**.
@@ -23,6 +28,7 @@ export default function LoungeChatPanel({
   const [roomsLoading, setRoomsLoading] = useState(true)
   const [actionErr, setActionErr] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
+  const [groupHeaderByRoomId, setGroupHeaderByRoomId] = useState(/** @type {Record<string, any[]>} */ ({}))
 
   const subscriberOk = Boolean(hasActiveSubscription || isStaff)
 
@@ -35,7 +41,6 @@ export default function LoungeChatPanel({
     setRoomsErr('')
     setRoomsLoading(true)
     try {
-      // Single RPC — replaces 3 sequential client-side queries
       const { data, error } = await supabaseClient.rpc('chat_rooms_for_user', {
         p_user_id: viewerUserId,
       })
@@ -53,13 +58,20 @@ export default function LoungeChatPanel({
           listLabel = r.title || 'Group chat'
         }
         return {
-          ...r,
+          ...enrichChatRoomRow(r, viewerUserId),
           listLabel,
-          hasUnread: Boolean(r.has_unread),
         }
       })
 
       setRooms(enriched)
+      const groupIds = enriched.filter((r) => r.kind === 'group').map((r) => r.id)
+      if (groupIds.length > 0) {
+        void chatGroupHeaderMembersBatch(supabaseClient, groupIds)
+          .then(setGroupHeaderByRoomId)
+          .catch(() => setGroupHeaderByRoomId({}))
+      } else {
+        setGroupHeaderByRoomId({})
+      }
     } catch (e) {
       setRoomsErr(e?.message || 'Could not load chats.')
       setRooms([])
@@ -87,7 +99,7 @@ export default function LoungeChatPanel({
         setActionBusy(false)
       }
     },
-    [supabaseClient, loadRooms, onOpenChatRoom]
+    [supabaseClient, loadRooms, onOpenChatRoom],
   )
 
   useEffect(() => {
@@ -111,7 +123,7 @@ export default function LoungeChatPanel({
         setActionBusy(false)
       }
     },
-    [supabaseClient, loadRooms, onOpenChatRoom]
+    [supabaseClient, loadRooms, onOpenChatRoom],
   )
 
   if (!viewerUserId) {
@@ -124,7 +136,6 @@ export default function LoungeChatPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Tab bar */}
       <div className="flex shrink-0 gap-1 border-b border-zinc-800 px-2 py-2">
         <button
           type="button"
@@ -202,12 +213,22 @@ export default function LoungeChatPanel({
                 onClick={() => onOpenChatRoom?.(r.id)}
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left touch-manipulation hover:bg-zinc-900/60 active:bg-zinc-900"
               >
-                <div className="relative shrink-0">
-                  <div className={`grid h-10 w-10 place-items-center rounded-full text-[16px] font-bold ${
-                    r.kind === 'channel' ? 'bg-violet-900/60 text-violet-300' : 'bg-zinc-800 text-zinc-300'
-                  }`}>
-                    {r.kind === 'channel' ? '#' : r.listLabel?.[0]?.toUpperCase() || '?'}
-                  </div>
+                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+                  {r.kind === 'dm' && r.peerAvatarUrl ? (
+                    <img src={r.peerAvatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+                  ) : r.kind === 'group' ? (
+                    <ChatGroupHeaderStack
+                      groupAvatarUrl={r.avatar_url}
+                      members={groupHeaderByRoomId[r.id] || []}
+                      size={40}
+                    />
+                  ) : (
+                    <div className={`grid h-10 w-10 place-items-center rounded-full text-[16px] font-bold ${
+                      r.kind === 'channel' ? 'bg-violet-900/60 text-violet-300' : 'bg-zinc-800 text-zinc-300'
+                    }`}>
+                      {r.kind === 'channel' ? '#' : r.listLabel?.[0]?.toUpperCase() || '?'}
+                    </div>
+                  )}
                   {r.hasUnread && (
                     <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 bg-cyan-500" />
                   )}
@@ -229,14 +250,13 @@ export default function LoungeChatPanel({
         </ul>
       )}
 
-      {/* Open in full chat tab CTA */}
-      {rooms.length > 0 && onOpenChatRoom && (
+      {rooms.length > 0 && onOpenChatRoom ? (
         <div className="shrink-0 border-t border-zinc-800 px-3 py-2">
           <p className="text-center text-[12px] text-zinc-600">
             Tap a conversation to open the full Chat tab
           </p>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

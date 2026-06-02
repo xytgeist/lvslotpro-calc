@@ -165,6 +165,45 @@ export function chatJoinChannel(supabase, slug) {
  * @param {{ kind: string, title?: string | null, slug?: string | null, dm_key?: string | null, peerLabel?: string | null, peer_display_name?: string | null }} room
  * @returns {string}
  */
+/**
+ * Normalize a `chat_rooms_for_user` row for inbox + conversation props.
+ * @param {Record<string, unknown>} r
+ * @param {string} viewerUserId
+ */
+export function enrichChatRoomRow(r, viewerUserId) {
+  const peerLabel = (r.peer_display_name && String(r.peer_display_name).trim())
+    || (r.peer_handle ? `@${r.peer_handle}` : null)
+  const senderName = r.last_message_sender_id === viewerUserId
+    ? 'You'
+    : r.sender_handle
+      ? `@${r.sender_handle}`
+      : r.sender_display_name || ''
+  const previewText = r.last_message_preview
+    ? (senderName ? `${senderName}: ${r.last_message_preview}` : r.last_message_preview)
+    : null
+  return {
+    ...r,
+    peerLabel,
+    peerAvatarUrl: r.peer_avatar_url || null,
+    previewText,
+    memberRole: r.member_role || 'member',
+    member_role: r.member_role || 'member',
+    created_by: r.created_by || null,
+    avatar_url: r.avatar_url || null,
+    description: r.description || null,
+    hasUnread: Boolean(r.has_unread),
+    isMuted: chatRoomIsMuted(r.muted_until),
+  }
+}
+
+/** Load one room row for the viewer (for dock/deep-link open before inbox list catches up). */
+export async function chatFetchRoomForViewer(supabase, roomId, viewerUserId) {
+  const { data, error } = await supabase.rpc('chat_rooms_for_user', { p_user_id: viewerUserId })
+  if (error) throw new Error(error.message)
+  const row = (data || []).find((r) => r.id === roomId)
+  return row ? enrichChatRoomRow(row, viewerUserId) : null
+}
+
 export function chatRoomLabel(room) {
   if (room.kind === 'dm') {
     const name = room.peer_display_name && String(room.peer_display_name).trim()

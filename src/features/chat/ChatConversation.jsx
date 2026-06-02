@@ -146,6 +146,7 @@ export default function ChatConversation({
   const [roomMeta, setRoomMeta] = useState(() => ({ ...room }))
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
   const [groupHeaderMembers, setGroupHeaderMembers] = useState(/** @type {any[]} */ ([]))
+  const [groupHeaderLoadFailed, setGroupHeaderLoadFailed] = useState(false)
   const [starredIds, setStarredIds] = useState(() => new Set())
   const [pinnedIds, setPinnedIds] = useState(() => new Set())
   const [highlightMessageId, setHighlightMessageId] = useState(/** @type {string | null} */ (null))
@@ -225,6 +226,7 @@ export default function ChatConversation({
   useEffect(() => {
     if (!isGroupRoom || !room.id) {
       setGroupHeaderMembers([])
+      setGroupHeaderLoadFailed(false)
       setStarredIds(new Set())
       setPinnedIds(new Set())
       return undefined
@@ -239,19 +241,21 @@ export default function ChatConversation({
         ])
         if (!cancelled) {
           setGroupHeaderMembers(members)
+          setGroupHeaderLoadFailed(members.length === 0 && !String(room.avatar_url || roomMeta.avatar_url || '').trim())
           setStarredIds(stars)
           setPinnedIds(pins)
         }
       } catch {
         if (!cancelled) {
           setGroupHeaderMembers([])
+          setGroupHeaderLoadFailed(true)
           setStarredIds(new Set())
           setPinnedIds(new Set())
         }
       }
     })()
     return () => { cancelled = true }
-  }, [isGroupRoom, room.id, supabaseClient])
+  }, [isGroupRoom, room.id, room.avatar_url, roomMeta.avatar_url, supabaseClient])
 
   const refreshPinnedIds = useCallback(async () => {
     if (!isGroupRoom || !room.id) return
@@ -1404,6 +1408,11 @@ export default function ChatConversation({
                   <span className="text-[15px] font-normal text-zinc-300">›</span>
                 </button>
               )}
+              {groupHeaderLoadFailed ? (
+                <p className="mt-1 max-w-[280px] px-2 text-center text-[11px] leading-snug text-amber-400/90">
+                  Apply Supabase migrations 20260603100000 + 20260603120000 on test, then hard-refresh.
+                </p>
+              ) : null}
             </>
           ) : (
             <div className="flex h-10 items-center">

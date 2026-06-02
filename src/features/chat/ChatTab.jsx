@@ -16,6 +16,8 @@ import {
   chatRoomLabel,
   chatRoomIsMuted,
   chatGroupHeaderMembersBatch,
+  enrichChatRoomRow,
+  chatFetchRoomForViewer,
 } from './chatApi.js'
 import { LOUNGE_CHAT_TOPIC_CHANNELS } from '../../utils/loungeChatConstants.js'
 import { loungeChatInvoke } from '../../utils/loungeChatApi.js'
@@ -76,6 +78,9 @@ export default function ChatTab({
   const [groupSearchBusy, setGroupSearchBusy] = useState(false)
   const groupSearchTimerRef = useRef(null)
   const [groupHeaderByRoomId, setGroupHeaderByRoomId] = useState(/** @type {Record<string, any[]>} */ ({}))
+  /** Room metadata when opening by id before/without inbox row (dock deep-link). */
+  const [hydratedOpenRoom, setHydratedOpenRoom] = useState(/** @type {any | null} */ (null))
+  const [hydrateOpenRoomDone, setHydrateOpenRoomDone] = useState(false)
   /** @type {React.MutableRefObject<Record<string, any>>} */
   const profilesCacheRef = useRef({})
 
@@ -168,7 +173,6 @@ export default function ChatTab({
       if (error) throw error
 
       const enriched = (data || []).map((r) => {
-        // Cache profiles for ChatConversation lookup
         if (r.peer_user_id) {
           profilesCacheRef.current[r.peer_user_id] = {
             user_id: r.peer_user_id,
@@ -178,7 +182,6 @@ export default function ChatTab({
           }
         }
         if (r.last_message_sender_id && r.sender_handle) {
-          // Merge — don't clobber a richer peer entry that already has avatar_url
           profilesCacheRef.current[r.last_message_sender_id] = {
             ...profilesCacheRef.current[r.last_message_sender_id],
             user_id: r.last_message_sender_id,
@@ -186,32 +189,7 @@ export default function ChatTab({
             display_name: r.sender_display_name,
           }
         }
-
-        const peerLabel = (r.peer_display_name && String(r.peer_display_name).trim())
-          || (r.peer_handle ? `@${r.peer_handle}` : null)
-
-        const senderName = r.last_message_sender_id === viewerUserId
-          ? 'You'
-          : r.sender_handle
-          ? `@${r.sender_handle}`
-          : r.sender_display_name || ''
-
-        const previewText = r.last_message_preview
-          ? (senderName ? `${senderName}: ${r.last_message_preview}` : r.last_message_preview)
-          : null
-
-        return {
-          ...r,
-          peerLabel,
-          peerAvatarUrl: r.peer_avatar_url || null,
-          previewText,
-          memberRole: r.member_role || 'member',
-          created_by: r.created_by || null,
-          avatar_url: r.avatar_url || null,
-          description: r.description || null,
-          hasUnread: Boolean(r.has_unread),
-          isMuted: chatRoomIsMuted(r.muted_until),
-        }
+        return enrichChatRoomRow(r, viewerUserId)
       })
 
       setRooms(enriched)
@@ -285,10 +263,16 @@ export default function ChatTab({
   // ── Handle initialRoomId (from deep link / push tap) ─────────────────────
 
   useEffect(() => {
-    if (!initialRoomId) return
-    setActiveRoomId(initialRoomId)
-    onInitialRoomConsumed?.()
-  }, [initialRoomId]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!initialRoomId || !viewerUserId || !supabaseClient) return
+    let cancelled = false
+    void (async () => {
+      await loadRooms()
+      if (cancelled) return
+      setActiveRoomId(initialRoomId)
+      onInitialRoomConsumed?.()
+    })()
+    return () => { cancelled = true }
+  }, [initialRoomId, viewerUserId, supabaseClient, loadRooms, onInitialRoomConsumed])
 
   // ── Join topic channel ────────────────────────────────────────────────────
 
@@ -426,9 +410,35 @@ export default function ChatTab({
   // ── Active room data ──────────────────────────────────────────────────────
 
   const activeRoom = useMemo(
-    () => rooms.find((r) => r.id === activeRoomId) || null,
-    [rooms, activeRoomId]
+    () => rooms.find((r) => r.id === activeRoomId) || hydratedOpenRoom || null,
+    [rooms, activeRoomId, hydratedOpenRoom]
   )
+
+  useEffect(() => {
+    if (!activeRoomId || !viewerUserId || !supabaseClient) {
+      setHydratedOpenRoom(null)
+      setHydrateOpenRoomDone(false)
+      return undefined
+    }
+    if (rooms.some((r) => r.id === activeRoomId)) {
+      setHydratedOpenRoom(null)
+      setHydrateOpenRoomDone(true)
+      return undefined
+    }
+    setHydrateOpenRoomDone(false)
+    let cancelled = false
+    void (async () => {
+      try {
+        const row = await chatFetchRoomForViewer(supabaseClient, activeRoomId, viewerUserId)
+        if (!cancelled) setHydratedOpenRoom(row)
+      } catch {
+        if (!cancelled) setHydratedOpenRoom(null)
+      } finally {
+        if (!cancelled) setHydrateOpenRoomDone(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [activeRoomId, rooms, supabaseClient, viewerUserId])
 
   // ── Profiles map for ChatConversation ─────────────────────────────────────
 
@@ -462,9 +472,31 @@ export default function ChatTab({
 
   // ── Conversation view (full-screen within this tab) ───────────────────────
 
-  if (activeRoomId && (activeRoom || !roomsLoading)) {
-    const room = activeRoom || { id: activeRoomId, kind: 'dm' }
-    const otherUnreadCount = rooms.filter(r => r.id !== activeRoomId && r.hasUnread).length
+  if (activeRoomId) {
+    const room = activeRoom || hydratedOpenRoom
+    const resolvingRoom = !room && (roomsLoading || !hydrateOpenRoomDone)
+    if (resolvingRoom) {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center text-[14px] text-zinc-500">
+          Opening conversation…
+        </div>
+      )
+    }
+    if (!room) {
+      return (
+        <div className="px-4 py-8 text-center">
+          <p className="text-[14px] text-rose-300">Could not open this chat.</p>
+          <button
+            type="button"
+            className="mt-4 text-[14px] font-semibold text-cyan-400 touch-manipulation"
+            onClick={() => setActiveRoomId(null)}
+          >
+            Back to inbox
+          </button>
+        </div>
+      )
+    }
+    const otherUnreadCount = rooms.filter((r) => r.id !== activeRoomId && r.hasUnread).length
     return (
       <ChatConversation
         supabaseClient={supabaseClient}
@@ -473,7 +505,7 @@ export default function ChatTab({
         viewerProfile={viewerProfile}
         profilesById={profilesById}
         otherUnreadCount={otherUnreadCount}
-        onBack={() => { setActiveRoomId(null); void loadRooms() }}
+        onBack={() => { setActiveRoomId(null); setHydratedOpenRoom(null); void loadRooms() }}
       />
     )
   }
@@ -491,7 +523,12 @@ export default function ChatTab({
       <div className="px-3 pt-4 pb-2 flex items-center justify-between">
         <div>
           <div className="text-2xl font-black tracking-tight text-zinc-100">Chat</div>
-          <div className="text-sm text-zinc-500 mt-0.5">Messages &amp; topic rooms</div>
+          <div className="text-sm text-zinc-500 mt-0.5">
+            Messages &amp; topic rooms
+            {import.meta.env.VITE_BUILD_SHA ? (
+              <span className="ml-1 text-[10px] text-zinc-600">· {import.meta.env.VITE_BUILD_SHA}</span>
+            ) : null}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
