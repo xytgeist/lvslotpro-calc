@@ -384,9 +384,9 @@ export default function ChatBubble({
                 </svg>
                 <div
                   className={`rounded-2xl px-3 py-1.5 text-[12px] leading-snug opacity-70 ${
-                    isQuoteFromMe ? 'text-zinc-900' : 'bg-zinc-800/90 text-zinc-100'
+                    isQuoteFromMe ? 'text-white' : 'bg-zinc-800/90 text-zinc-100'
                   }`}
-                  style={isQuoteFromMe ? { backgroundColor: 'rgba(6, 206, 252, 0.65)' } : undefined}
+                  style={isQuoteFromMe ? { backgroundColor: '#3b82f6' } : undefined}
                 >
                   <p className="line-clamp-2">{message.reply_to_preview}</p>
                 </div>
@@ -409,14 +409,14 @@ export default function ChatBubble({
               isDeleted
                 ? 'border border-zinc-800 bg-transparent italic text-zinc-600'
                 : isMine
-                ? 'text-zinc-900'
+                ? 'text-white'
                 : 'bg-zinc-800/90 text-zinc-100'
             } ${menuOpen ? 'opacity-80' : 'opacity-100'}`}
             style={{
               WebkitUserSelect: 'none',
               userSelect: 'none',
               borderRadius: compactBubble ? '9999px' : BUBBLE_EXPANDED_RADIUS_PX,
-              backgroundColor: isMine && !isDeleted ? 'rgba(6, 206, 252, 0.65)' : undefined,
+              backgroundColor: isMine && !isDeleted ? '#3b82f6' : undefined,
             }}
           >
             {isDeleted ? (
