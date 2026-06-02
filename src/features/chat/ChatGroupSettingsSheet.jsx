@@ -69,6 +69,8 @@ export default function ChatGroupSettingsSheet({
   const [title, setTitle] = useState(String(room.title || ''))
   const [description, setDescription] = useState(String(room.description || ''))
   const [members, setMembers] = useState(/** @type {any[]} */ ([]))
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [membersError, setMembersError] = useState('')
   const [starred, setStarred] = useState(/** @type {any[]} */ ([]))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -82,12 +84,23 @@ export default function ChatGroupSettingsSheet({
 
   const reload = useCallback(async () => {
     if (!room?.id) return
-    const [mems, stars] = await Promise.all([
-      chatGroupMembersList(supabaseClient, room.id),
-      chatStarredMessagesPage(supabaseClient, room.id, 40),
-    ])
-    setMembers(mems)
-    setStarred(stars)
+    setMembersLoading(true)
+    setMembersError('')
+    try {
+      const mems = await chatGroupMembersList(supabaseClient, room.id)
+      setMembers(mems)
+    } catch (e) {
+      setMembers([])
+      setMembersError(e?.message || 'Could not load members.')
+    } finally {
+      setMembersLoading(false)
+    }
+    try {
+      const stars = await chatStarredMessagesPage(supabaseClient, room.id, 40)
+      setStarred(stars)
+    } catch {
+      setStarred([])
+    }
   }, [room?.id, supabaseClient])
 
   useEffect(() => {
@@ -268,10 +281,12 @@ export default function ChatGroupSettingsSheet({
         )}
 
         <Section title={isOwner ? 'Members (you can mute or remove)' : 'Members'}>
-          {members.length === 0 ? (
-            <p className="text-[13px] text-zinc-500">
-              Could not load members. Apply chat migrations on Supabase test, then reload.
-            </p>
+          {membersLoading ? (
+            <p className="text-[13px] text-zinc-500">Loading members…</p>
+          ) : membersError ? (
+            <p className="text-[13px] leading-snug text-amber-400/90">{membersError}</p>
+          ) : members.length === 0 ? (
+            <p className="text-[13px] text-zinc-500">No members found for this group.</p>
           ) : (
           <ul className="space-y-2">
             {members.map((m) => (

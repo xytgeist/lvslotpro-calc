@@ -1408,13 +1408,6 @@ export default function ChatConversation({
               {groupHeaderErr ? (
                 <p className="mt-1 max-w-[300px] px-2 text-center text-[11px] leading-snug text-amber-400/90">
                   {groupHeaderErr}
-                  {import.meta.env.VITE_SUPABASE_URL ? (
-                    <span className="mt-1 block text-[10px] text-amber-400/70">
-                      DB: {String(import.meta.env.VITE_SUPABASE_URL).replace(/^https?:\/\//, '').split('.')[0]}
-                      {' '}
-                      (test = jtjgtucumuoswnbauxry)
-                    </span>
-                  ) : null}
                 </p>
               ) : null}
             </>

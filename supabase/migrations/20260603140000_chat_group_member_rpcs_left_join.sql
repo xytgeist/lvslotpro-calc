@@ -1,5 +1,9 @@
 -- Group member RPCs: include members even when profiles row is missing (LEFT JOIN).
+-- Requires moderation_muted_until (from 20260603100000); adds column if that migration was skipped.
 BEGIN;
+
+ALTER TABLE public.chat_room_members
+  ADD COLUMN IF NOT EXISTS moderation_muted_until timestamptz;
 
 CREATE OR REPLACE FUNCTION public.chat_group_header_members(p_room_id uuid)
 RETURNS TABLE (
@@ -58,5 +62,12 @@ AS $$
     )
   ORDER BY m.joined_at ASC NULLS LAST;
 $$;
+
+REVOKE ALL ON FUNCTION public.chat_group_header_members(uuid) FROM public, anon;
+REVOKE ALL ON FUNCTION public.chat_group_members_list(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.chat_group_header_members(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_group_members_list(uuid) TO authenticated;
+
+NOTIFY pgrst, 'reload schema';
 
 COMMIT;

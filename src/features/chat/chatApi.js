@@ -370,7 +370,11 @@ export async function chatGroupHeaderMembersResolved(supabase, roomId) {
     if (list.length > 0) return { members, error: null }
     return { members: [], error: lastErr || 'No members returned (check Supabase project + migrations).' }
   } catch (e) {
-    return { members: [], error: e?.message || lastErr || 'chat_group_members_list failed' }
+    const msg = e?.message || lastErr || 'chat_group_members_list failed'
+    const hint = msg.includes('chat_group_members_list') || msg.includes('chat_group_header_members')
+      ? ' Apply supabase/migrations/20260603150000_chat_group_member_rpcs_repair.sql in the SQL editor, then reload the app.'
+      : ''
+    return { members: [], error: msg + hint }
   }
 }
 
@@ -410,7 +414,7 @@ export async function chatStarredMessagesPage(supabase, roomId, limit = 50) {
     p_room_id: roomId,
     p_limit: limit,
   })
-  if (error) throw new Error(error.message)
+  if (error) return []
   return data || []
 }
 
