@@ -19,6 +19,9 @@ import { notifyLoungeDockSuppress } from '../lounge/loungeDockSuppressRegistry.j
 // with html.light overrides — do not use inline styles for these.
 
 const PAGE_SIZE = 50
+const IS_ANDROID = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+/** Extra grab area above composer for iOS keyboard dismiss (px). */
+const IOS_COMPOSER_DISMISS_PAD_PX = 32
 
 /**
  * Max messages kept in the DOM at any time.
@@ -121,6 +124,7 @@ export default function ChatConversation({
   const composerTouchRef = useRef(null)
   /** Android: bottom gap (px) to restore after swipe keyboard dismiss — shared with RO. */
   const keyboardDismissPreserveRef = useRef(/** @type {number | null} */ (null))
+  const [composerFocused, setComposerFocused] = useState(false)
   const [composerBarH, setComposerBarH] = useState(80)
 
   // Swipe-to-reveal timestamps
@@ -677,6 +681,22 @@ export default function ChatConversation({
   const peerHandle      = peerProfile?.handle ? `@${peerProfile.handle}` : null
   const peerInitial     = (peerDisplayName || '?').replace(/^@/, '')[0]?.toUpperCase() || '?'
   // Extra top padding for DM header (tall: avatar + pill); channel is shorter
+  // Track composer textarea focus — extends iOS dismiss grab strip above composer.
+  useEffect(() => {
+    const composer = composerBarRef.current
+    if (!composer) return
+    const sync = () => {
+      setComposerFocused(Boolean(composer.querySelector('textarea:focus, input:focus')))
+    }
+    const onFocusOut = () => requestAnimationFrame(sync)
+    composer.addEventListener('focusin', sync)
+    composer.addEventListener('focusout', onFocusOut)
+    return () => {
+      composer.removeEventListener('focusin', sync)
+      composer.removeEventListener('focusout', onFocusOut)
+    }
+  }, [])
+
   // Track composer bar height so the scroll list can pad its bottom
   useEffect(() => {
     const el = composerBarRef.current
@@ -713,14 +733,13 @@ export default function ChatConversation({
     return () => ro.disconnect()
   }, [])
 
-  // Swipe-down-to-dismiss keyboard — independent of the timestamp-swipe logic.
-  // Android: lock scroll at thread tail during dismiss + preserve reading position.
-  // iOS messages: allow list scroll; dismiss on a deliberate downward flick at touchend only.
+  // Android: swipe-down dismiss on message list — lock scroll at tail + preserve position.
+  // iOS: messages scroll freely; dismiss only from composer strip (see below).
   useEffect(() => {
+    if (!IS_ANDROID) return
     const el = listRef.current
     if (!el) return
-    const isAndroid = /Android/i.test(navigator.userAgent)
-    const dismissDyPx = isAndroid ? 50 : 40
+    const dismissDyPx = 50
     let startY = 0
     let startX = 0
     let startScrollTop = 0
@@ -736,7 +755,6 @@ export default function ChatConversation({
       el.scrollTop = el.scrollHeight - el.clientHeight - gap
     }
 
-    /** Android: re-apply preserved gap while the keyboard animates closed. */
     const schedulePreserveRestore = () => {
       const vv = window.visualViewport
       let timer = null
@@ -758,23 +776,6 @@ export default function ChatConversation({
       }
     }
 
-    /** iOS: instant snap after keyboard close — smooth scroll while keyboard is up causes jank. */
-    const snapBottomAfterKeyboardCloseIOS = () => {
-      atBottomRef.current = true
-      const vv = window.visualViewport
-      const snap = () => { el.scrollTop = el.scrollHeight }
-      if (vv) {
-        vv.addEventListener('resize', snap)
-        snap()
-        setTimeout(() => {
-          vv.removeEventListener('resize', snap)
-          snap()
-        }, 400)
-      } else {
-        requestAnimationFrame(snap)
-      }
-    }
-
     const onStart = (e) => {
       dismissActive = false
       startScrollTop = el.scrollTop
@@ -785,12 +786,11 @@ export default function ChatConversation({
     }
 
     const onMove = (e) => {
-      if (!keyboardWasOpen || !isAndroid) return
+      if (!keyboardWasOpen) return
       const t = e.touches[0]
       if (!t) return
       const dy = t.clientY - startY
       const dx = t.clientX - startX
-
       if (!dismissActive) {
         if (dy > 10 && dy > Math.abs(dx) && nearBottom()) {
           dismissActive = true
@@ -804,51 +804,62 @@ export default function ChatConversation({
 
     const onEnd = (e) => {
       const dy = (e.changedTouches[0]?.clientY ?? 0) - startY
-      const dx = (e.changedTouches[0]?.clientX ?? 0) - startX
-      const downwardDismiss = isAndroid
-        ? dy > dismissDyPx
-        : dy > dismissDyPx && dy > Math.abs(dx)
-
-      if (isAndroid && downwardDismiss && keyboardWasOpen) {
+      if (dy > dismissDyPx && keyboardWasOpen) {
         document.activeElement?.blur?.()
         keyboardDismissPreserveRef.current = bottomGap()
         schedulePreserveRestore()
-      } else if (!isAndroid && downwardDismiss && keyboardWasOpen) {
-        document.activeElement?.blur?.()
-        if (nearBottom()) snapBottomAfterKeyboardCloseIOS()
       }
-
       dismissActive = false
       keyboardWasOpen = false
     }
 
     el.addEventListener('touchstart', onStart, { passive: true })
-    if (isAndroid) {
-      el.addEventListener('touchmove', onMove, { passive: false })
-    }
+    el.addEventListener('touchmove', onMove, { passive: false })
     el.addEventListener('touchend', onEnd, { passive: true })
     el.addEventListener('touchcancel', onEnd, { passive: true })
     return () => {
       el.removeEventListener('touchstart', onStart)
-      if (isAndroid) el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)
       el.removeEventListener('touchcancel', onEnd)
     }
   }, [])
 
-  // Composer overlay sits above the list — swipes here miss list listeners and trigger
-  // Safari scroll-to-bottom. Same downward-dismiss gesture, but no list snap on iOS.
+  // Composer (+ optional strip above): iOS keyboard dismiss; Android also uses message list.
   useEffect(() => {
     const composer = composerTouchRef.current
     const listEl = listRef.current
     if (!composer || !listEl) return
-    const isAndroid = /Android/i.test(navigator.userAgent)
-    const dismissDyPx = isAndroid ? 50 : 18
+    const dismissDyPx = IS_ANDROID ? 50 : 18
     let startY = 0
     let startX = 0
     let startScrollTop = 0
     let keyboardWasOpen = false
     let dismissedThisGesture = false
+
+    const nearBottom = () => listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 80
+
+    const snapBottomAfterKeyboardCloseIOS = () => {
+      if (!nearBottom()) return
+      atBottomRef.current = true
+      const vv = window.visualViewport
+      const snap = () => { listEl.scrollTop = listEl.scrollHeight }
+      if (vv) {
+        vv.addEventListener('resize', snap)
+        snap()
+        setTimeout(() => {
+          vv.removeEventListener('resize', snap)
+          snap()
+        }, 400)
+      } else {
+        requestAnimationFrame(snap)
+      }
+    }
+
+    const blurComposer = () => {
+      const ae = document.activeElement
+      if (ae instanceof HTMLElement && composerBarRef.current?.contains(ae)) ae.blur()
+    }
 
     const onStart = (e) => {
       dismissedThisGesture = false
@@ -867,21 +878,23 @@ export default function ChatConversation({
       const dx = t.clientX - startX
       if (dy <= 8 || dy <= Math.abs(dx)) return
       e.preventDefault()
-      if (isAndroid) listEl.scrollTop = startScrollTop
+      if (IS_ANDROID) listEl.scrollTop = startScrollTop
       if (!dismissedThisGesture && dy > 10) {
         dismissedThisGesture = true
-        document.activeElement?.blur?.()
+        blurComposer()
+        if (!IS_ANDROID) snapBottomAfterKeyboardCloseIOS()
       }
     }
 
     const onEnd = (e) => {
       const dy = (e.changedTouches[0]?.clientY ?? 0) - startY
       const dx = (e.changedTouches[0]?.clientX ?? 0) - startX
-      const downwardDismiss = isAndroid
+      const downwardDismiss = IS_ANDROID
         ? dy > dismissDyPx
         : dy > dismissDyPx && dy > Math.abs(dx)
       if (downwardDismiss && keyboardWasOpen && !dismissedThisGesture) {
-        document.activeElement?.blur?.()
+        blurComposer()
+        if (!IS_ANDROID) snapBottomAfterKeyboardCloseIOS()
       }
       dismissedThisGesture = false
       keyboardWasOpen = false
@@ -1124,7 +1137,15 @@ export default function ChatConversation({
         ref={composerBarRef}
         className="absolute inset-x-0 bottom-0 z-20 pointer-events-none"
       >
-        <div ref={composerTouchRef} className="pointer-events-auto">
+        <div
+          ref={composerTouchRef}
+          className="pointer-events-auto"
+          style={
+            composerFocused && !IS_ANDROID
+              ? { paddingTop: IOS_COMPOSER_DISMISS_PAD_PX }
+              : undefined
+          }
+        >
           {typingUsers.length > 0 && (
             <div className="px-6 pb-1 text-[12px] text-zinc-500">
               {typingUsers.length === 1
