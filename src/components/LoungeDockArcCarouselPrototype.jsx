@@ -36,7 +36,7 @@ import {
   NEON_BLUE_ITEM_GLOW_IDLE,
   NEON_BLUE_ITEM_GLOW_PAGE_ACTIVE,
 } from '../utils/loungeDockFabGlow.js'
-import { Z_LOUNGE_DOCK_VIEWPORT } from '../constants/appZIndex.js'
+import { Z_LOUNGE_DOCK_ABOVE_SLIDE_PANEL, Z_LOUNGE_DOCK_VIEWPORT } from '../constants/appZIndex.js'
 
 const HOME_ITEM_ID = 'home'
 /** Compact FAB + home chip (search/notifications/settings/chat panels, or any non-feed screen). */
@@ -63,7 +63,6 @@ const FAB_COMPACT_VISUAL_PX = 30
 /** Visible FAB dims to half opacity after this long without interaction. */
 const FAB_IDLE_DIM_MS = 10_000
 const FAB_IDLE_DIM_OPACITY = 0.5
-const FAB_COMPACT_MIN_OPACITY = 0.55
 const FAB_LONG_PRESS_RING_COUNT = 4
 /** ms per phase: ring2 in → ring3 in → ring4 in → rings 2–4 out (loops; ring1 stays). */
 const FAB_LONG_PRESS_RING_SEGMENT_MS = 280
@@ -255,10 +254,12 @@ export default function LoungeDockArcCarouselPrototype({
   /** Unread in-app notifications — FAB badge clears on menu expand; Alerts item clears on panel visit. */
   notificationsUnreadCount = 0,
   /**
-   * When false (Lounge home feed tab), FAB stays full-size with scroll-reveal + idle dim only.
-   * When true (other tabs / away from feed), idle compact pip (30px corner) may apply.
+   * When false (Lounge home feed tab only), FAB stays full-size with scroll-reveal + idle dim only.
+   * When true (other tabs, away from feed, or search/notifications/settings panels), idle compact pip may apply.
    */
   enableFabCompactPip = true,
+  /** Raise above `LoungeDockSlidePanels` (z-99) on search / notifications / settings. */
+  stackAboveSlidePanel = false,
 }) {
   const panelCompactChrome = panelChrome != null && PANEL_CHROME_PANELS.has(panelChrome)
   const isCornerL = menuLayout === 'cornerL'
@@ -880,23 +881,19 @@ export default function LoungeDockArcCarouselPrototype({
   }, [armFabCompactTimer, armFabIdleTimer])
 
   const fabVisible = reveal > FAB_REVEAL_VISIBLE
-  /** Compact pip stays on-screen even when scroll would hide the full FAB. */
-  const fabEffectivelyVisible = fabCompactActive || fabVisible
+  /** Scroll-linked title bar: FAB + home chip fade with `reveal` (feed, panels, away-from-feed). */
+  const fabEffectivelyVisible = fabVisible
   const fabScrollOpacity = clamp(reveal, 0, 1)
-  const rawFabDisplayOpacity =
-    fabScrollOpacity *
-    (fabIdleDimmed && fabEffectivelyVisible && !open && !repositioning ? FAB_IDLE_DIM_OPACITY : 1)
   const fabDisplayOpacity =
-    fabCompactActive && !open
-      ? Math.max(rawFabDisplayOpacity, FAB_COMPACT_MIN_OPACITY)
-      : rawFabDisplayOpacity
+    fabScrollOpacity *
+    (fabIdleDimmed && fabVisible && !open && !repositioning ? FAB_IDLE_DIM_OPACITY : 1)
 
   useEffect(() => {
     fabIdleDimmedRef.current = fabIdleDimmed
   }, [fabIdleDimmed])
 
   useEffect(() => {
-    if (!fabVisible || open || repositioning) {
+    if (open || repositioning) {
       clearFabIdleTimer()
       clearFabCompactTimer()
       setFabIdleDimmed(false)
@@ -904,10 +901,23 @@ export default function LoungeDockArcCarouselPrototype({
       setFabWakePop(false)
       return undefined
     }
-    /** Scroll / reveal changes count as activity — reset compact + dim and restart idle clocks. */
+    if (!fabVisible) {
+      clearFabIdleTimer()
+      clearFabCompactTimer()
+      setFabIdleDimmed(false)
+      setFabWakePop(false)
+      /** Keep armed pip while scroll-hidden so scroll-up restores corner pip without re-idling. */
+      if (!enableFabCompactPip || !fabCompactPipRef.current) {
+        setFabCompactPip(false)
+      }
+      return undefined
+    }
+    /** Scroll / reveal changes count as activity — reset dim and restart idle clocks. */
     setFabIdleDimmed(false)
-    setFabCompactPip(false)
-    if (enableFabCompactPip) armFabCompactTimer()
+    if (!fabCompactPipRef.current) {
+      setFabCompactPip(false)
+      if (enableFabCompactPip) armFabCompactTimer()
+    }
     armFabIdleTimer()
     return () => {
       clearFabIdleTimer()
@@ -1490,6 +1500,10 @@ export default function LoungeDockArcCarouselPrototype({
 
   if (items.length === 0 || !fabPos || fabCenterX == null || fabCenterY == null) return null
 
+  const dockLayerZIndex = stackAboveSlidePanel
+    ? Z_LOUNGE_DOCK_ABOVE_SLIDE_PANEL
+    : Z_LOUNGE_DOCK_VIEWPORT
+
   const pickerOffset =
     menuExpanded && spinEnabled
       ? (wheelLayout.offsets[wheelLayout.focusedIndex] ?? { x: 0, y: 0 })
@@ -1655,7 +1669,7 @@ export default function LoungeDockArcCarouselPrototype({
   const dockLayer = (
     <div
       className="pointer-events-none fixed inset-0"
-      style={{ zIndex: Z_LOUNGE_DOCK_VIEWPORT }}
+      style={{ zIndex: dockLayerZIndex }}
     >
       {clickShield ? (
         <button
@@ -1861,7 +1875,7 @@ export default function LoungeDockArcCarouselPrototype({
         <span
           className="pointer-events-none fixed -translate-x-1/2 whitespace-nowrap"
           style={{
-            zIndex: Z_LOUNGE_DOCK_VIEWPORT + 1,
+            zIndex: dockLayerZIndex + 1,
             left: followingItemCenterRef.current.x,
             top: followingItemCenterRef.current.y - LOUNGE_DOCK_FAB_ITEM_CIRCLE_PX / 2 - 4,
           }}

@@ -78,8 +78,9 @@ const VERTICAL_BEATS_HORIZONTAL = 1.52
 /**
  * Full-screen Lounge dock panels (search / notifications / chat) over the feed column (`max-w-2xl`).
  * Same **title bar** chrome as the feed (logo, updating line, nav slot) with **scroll-linked hide/show**;
- * Bottom scroll inset clears the draggable FAB menu (`SocialFeed` mounts `LoungeDockArcCarouselPrototype` at
- * `z-[100]` above this layer). Swipe horizontally to dismiss (left or right). `viewportTitleTopPx` must
+ * Bottom scroll inset clears the draggable FAB menu. On search / notifications / settings,
+ * `SocialFeed` raises the viewport dock to z-index 100 above this `z-[99]` layer.
+ * Swipe horizontally to dismiss (left or right). `viewportTitleTopPx` must
  * match the feed title’s `top` offset so the bar aligns with the main Lounge shell.
  *
  * Search tab: `postCardProps` is the same shape as profile/feed `LoungePostArticle` handlers (without

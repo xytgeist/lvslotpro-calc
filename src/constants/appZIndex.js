@@ -8,6 +8,12 @@
 /** Draggable cyan menu FAB + wheel (SocialFeed viewport dock). */
 export const Z_LOUNGE_DOCK_VIEWPORT = 48
 
+/**
+ * Search / notifications / settings slide panels (`LoungeDockSlidePanels` z-[99]).
+ * Post detail still hides the dock in `SocialFeed` when `loungePostDetail` is open.
+ */
+export const Z_LOUNGE_DOCK_ABOVE_SLIDE_PANEL = 100
+
 /** Default floor for full-screen app sheets/dialogs (bankroll, logbook, offers, lounge prompts). */
 export const Z_APP_MODAL = 120
 

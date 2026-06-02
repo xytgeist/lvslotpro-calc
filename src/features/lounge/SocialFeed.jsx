@@ -10249,6 +10249,10 @@ export default function SocialFeed({
         : loungeTitleReveal
   const loungeDockBottomObstaclePx = isActivePage ? loungeDockFabBottomObstaclePx : 0
   const loungeFeedHomeActive = isActivePage && !loungeDockPanel
+  const loungeDockStackAboveSlidePanel =
+    loungeDockPanel === 'search' ||
+    loungeDockPanel === 'notifications' ||
+    loungeDockPanel === 'settings'
   const loungeTitleBarChromePx = loungeTitleBarHeight > 0 ? loungeTitleBarHeight : 56
   /** Scroll inset for the opaque dock icon row only. Outer column uses `pb-0`; home-indicator inset lives in feed bottom padding + scroll content. */
   const loungeDockFeedContentInsetPx = showLoungeViewportDock
@@ -10304,7 +10308,8 @@ export default function SocialFeed({
       bottomObstacleInsetPx={loungeDockBottomObstaclePx}
       onPointerBlockChange={setLoungeFabPointerBlocked}
       notificationsUnreadCount={loungeNotificationsUnread}
-      enableFabCompactPip={!isActivePage}
+      enableFabCompactPip={!isActivePage || loungeDockStackAboveSlidePanel}
+      stackAboveSlidePanel={loungeDockStackAboveSlidePanel}
     />
   ) : null
 
