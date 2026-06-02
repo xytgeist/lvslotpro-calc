@@ -189,12 +189,13 @@ export default function ChatBubble({
   // Cancel if the pointer moves > 8px (user is scrolling, not holding).
 
   const handlePointerDown = useCallback((e) => {
-    if (IS_IOS) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     let cancelled = false
+    const startX = e.clientX
+    const startY = e.clientY
 
     const onMove = (ev) => {
-      if (Math.abs(ev.movementX) > 8 || Math.abs(ev.movementY) > 8) {
+      if (Math.abs(ev.clientX - startX) > 8 || Math.abs(ev.clientY - startY) > 8) {
         cancelled = true
         clearLongPressTimer()
         document.removeEventListener('pointermove', onMove)
@@ -222,76 +223,6 @@ export default function ChatBubble({
 
   // iOS Safari: rapidly clear any selection Safari creates during a press, without
   // blocking scroll (no preventDefault). Also drives the long-press menu timer.
-  useEffect(() => {
-    if (!IS_IOS) return
-    const el = bubbleRef.current
-    if (!el) return
-
-    let startX = 0
-    let startY = 0
-    let cancelled = false
-    let selInterval = null
-
-    const clearSel = () => window.getSelection()?.removeAllRanges()
-
-    const stopSelInterval = () => {
-      if (selInterval != null) {
-        clearInterval(selInterval)
-        selInterval = null
-      }
-    }
-
-    const onTouchStart = (e) => {
-      if (e.touches.length !== 1) return
-      e.preventDefault()
-      cancelled = false
-      startX = e.touches[0].clientX
-      startY = e.touches[0].clientY
-
-      clearSel()
-      stopSelInterval()
-      selInterval = setInterval(clearSel, 30)
-
-      clearLongPressTimer()
-      longPressTimer.current = setTimeout(() => {
-        if (cancelled) return
-        stopSelInterval()
-        clearSel()
-        openLongPressMenu()
-      }, 450)
-    }
-
-    const onTouchMove = (e) => {
-      if (cancelled || e.touches.length !== 1) return
-      const dx = e.touches[0].clientX - startX
-      const dy = e.touches[0].clientY - startY
-      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-        cancelled = true
-        clearLongPressTimer()
-        stopSelInterval()
-      }
-    }
-
-    const onTouchEnd = () => {
-      clearLongPressTimer()
-      stopSelInterval()
-      clearSel()
-    }
-
-    el.addEventListener('touchstart', onTouchStart, { passive: false })
-    el.addEventListener('touchmove', onTouchMove, { passive: true })
-    el.addEventListener('touchend', onTouchEnd, { passive: true })
-    el.addEventListener('touchcancel', onTouchEnd, { passive: true })
-
-    return () => {
-      clearLongPressTimer()
-      stopSelInterval()
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove', onTouchMove)
-      el.removeEventListener('touchend', onTouchEnd)
-      el.removeEventListener('touchcancel', onTouchEnd)
-    }
-  }, [clearLongPressTimer, openLongPressMenu])
 
   // ── Reaction helpers ────────────────────────────────────────────────────────
 
@@ -437,6 +368,7 @@ export default function ChatBubble({
             style={{
               WebkitUserSelect: 'none',
               userSelect: 'none',
+              WebkitTouchCallout: 'none',
               touchAction: 'pan-y',
               borderRadius: compactBubble ? '9999px' : BUBBLE_EXPANDED_RADIUS_PX,
               backgroundColor: isMine && !isDeleted ? '#3b82f6' : undefined,
