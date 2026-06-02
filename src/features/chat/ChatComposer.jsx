@@ -4,8 +4,10 @@ import { uploadLoungeFeedPostImage } from '../../utils/communityFeedPost.js'
 
 const MAX_BODY   = 4000
 const MAX_IMAGES = 4
-/** Fixed radius — pill on one line (38px tall), rounded rect when expanded. */
-const COMPOSER_RADIUS_PX = 19
+const COMPOSER_MIN_H = 38
+const COMPOSER_MAX_H = 160
+/** Corner radius once the field grows past a single line. */
+const COMPOSER_EXPANDED_RADIUS_PX = 20
 
 /**
  * Chat message composer — floating glass bar matching the header style.
@@ -40,6 +42,7 @@ export default function ChatComposer({
   const [plusRect, setPlusRect]   = useState(/** @type {DOMRect|null} */ (null))
 
   const textareaRef  = useRef(null)
+  const inputWrapRef = useRef(null)
   const fileInputRef = useRef(null)
   const gifInputRef  = useRef(null)
   const plusBtnRef   = useRef(null)
@@ -47,12 +50,19 @@ export default function ChatComposer({
   const hasContent = body.trim().length > 0 || images.length > 0
   const canSend    = !disabled && !sending && !uploading && hasContent
 
-  // Auto-resize textarea
+  // Auto-resize textarea; pill radius on one line, fixed radius when expanded
   useEffect(() => {
     const ta = textareaRef.current
+    const wrap = inputWrapRef.current
     if (!ta) return
     ta.style.height = 'auto'
-    ta.style.height = `${Math.max(38, Math.min(ta.scrollHeight, 160))}px`
+    const h = Math.max(COMPOSER_MIN_H, Math.min(ta.scrollHeight, COMPOSER_MAX_H))
+    ta.style.height = `${h}px`
+    if (wrap) {
+      wrap.style.borderRadius = h > COMPOSER_MIN_H + 2
+        ? `${COMPOSER_EXPANDED_RADIUS_PX}px`
+        : `${h / 2}px`
+    }
   }, [body])
 
   const handleBodyChange = (e) => {
@@ -223,8 +233,9 @@ export default function ChatComposer({
 
         {/* Textarea + inline send button */}
         <div
+          ref={inputWrapRef}
           className="chat-input-glass relative flex-1 overflow-hidden"
-          style={{ borderRadius: COMPOSER_RADIUS_PX }}
+          style={{ borderRadius: COMPOSER_MIN_H / 2 }}
         >
           <textarea
             ref={textareaRef}
@@ -235,7 +246,7 @@ export default function ChatComposer({
             disabled={disabled}
             rows={1}
             className="w-full resize-none bg-transparent pl-4 text-[16px] leading-5 text-zinc-100 placeholder:text-zinc-500 outline-none disabled:opacity-50"
-            style={{ minHeight: 38, maxHeight: 160, paddingTop: 9, paddingBottom: 9, paddingRight: hasContent ? 46 : 12 }}
+            style={{ minHeight: COMPOSER_MIN_H, maxHeight: COMPOSER_MAX_H, paddingTop: 9, paddingBottom: 9, paddingRight: hasContent ? 46 : 12 }}
           />
 
           {/* Send button — appears inside textarea when content exists */}
