@@ -146,7 +146,7 @@ export default function ChatConversation({
   const [roomMeta, setRoomMeta] = useState(() => ({ ...room }))
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
   const [groupHeaderMembers, setGroupHeaderMembers] = useState(/** @type {any[]} */ ([]))
-  const [groupHeaderLoadFailed, setGroupHeaderLoadFailed] = useState(false)
+  const [groupHeaderErr, setGroupHeaderErr] = useState('')
   const [starredIds, setStarredIds] = useState(() => new Set())
   const [pinnedIds, setPinnedIds] = useState(() => new Set())
   const [highlightMessageId, setHighlightMessageId] = useState(/** @type {string | null} */ (null))
@@ -226,32 +226,29 @@ export default function ChatConversation({
   useEffect(() => {
     if (!isGroupRoom || !room.id) {
       setGroupHeaderMembers([])
-      setGroupHeaderLoadFailed(false)
+      setGroupHeaderErr('')
       setStarredIds(new Set())
       setPinnedIds(new Set())
       return undefined
     }
     let cancelled = false
     void (async () => {
-      try {
-        const [members, stars, pins] = await Promise.all([
-          chatGroupHeaderMembersResolved(supabaseClient, room.id),
-          chatStarredMessageIds(supabaseClient, room.id),
-          chatPinnedMessageIds(supabaseClient, room.id),
-        ])
-        if (!cancelled) {
-          setGroupHeaderMembers(members)
-          setGroupHeaderLoadFailed(members.length === 0 && !String(room.avatar_url || roomMeta.avatar_url || '').trim())
-          setStarredIds(stars)
-          setPinnedIds(pins)
-        }
-      } catch {
-        if (!cancelled) {
-          setGroupHeaderMembers([])
-          setGroupHeaderLoadFailed(true)
-          setStarredIds(new Set())
-          setPinnedIds(new Set())
-        }
+      const { members, error: memberErr } = await chatGroupHeaderMembersResolved(supabaseClient, room.id)
+      if (cancelled) return
+      setGroupHeaderMembers(members)
+      setGroupHeaderErr(
+        memberErr
+        || (members.length === 0 && !String(room.avatar_url || roomMeta.avatar_url || '').trim()
+          ? 'Could not load member avatars for this group.'
+          : ''),
+      )
+      const [stars, pins] = await Promise.all([
+        chatStarredMessageIds(supabaseClient, room.id),
+        chatPinnedMessageIds(supabaseClient, room.id),
+      ])
+      if (!cancelled) {
+        setStarredIds(stars)
+        setPinnedIds(pins)
       }
     })()
     return () => { cancelled = true }
@@ -1408,9 +1405,16 @@ export default function ChatConversation({
                   <span className="text-[15px] font-normal text-zinc-300">›</span>
                 </button>
               )}
-              {groupHeaderLoadFailed ? (
-                <p className="mt-1 max-w-[280px] px-2 text-center text-[11px] leading-snug text-amber-400/90">
-                  Apply Supabase migrations 20260603100000 + 20260603120000 on test, then hard-refresh.
+              {groupHeaderErr ? (
+                <p className="mt-1 max-w-[300px] px-2 text-center text-[11px] leading-snug text-amber-400/90">
+                  {groupHeaderErr}
+                  {import.meta.env.VITE_SUPABASE_URL ? (
+                    <span className="mt-1 block text-[10px] text-amber-400/70">
+                      DB: {String(import.meta.env.VITE_SUPABASE_URL).replace(/^https?:\/\//, '').split('.')[0]}
+                      {' '}
+                      (test = jtjgtucumuoswnbauxry)
+                    </span>
+                  ) : null}
                 </p>
               ) : null}
             </>

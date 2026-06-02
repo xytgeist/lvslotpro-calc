@@ -345,25 +345,32 @@ export async function chatGroupHeaderMembers(supabase, roomId) {
   return data || []
 }
 
-/** First 3 members for stacked avatar — falls back to full member list RPC if header RPC is missing. */
+/**
+ * First 3 members for stacked avatar — falls back to full member list RPC if header RPC is missing.
+ * @returns {Promise<{ members: any[], error: string | null }>}
+ */
 export async function chatGroupHeaderMembersResolved(supabase, roomId) {
+  let lastErr = /** @type {string | null} */ (null)
   try {
     const header = await chatGroupHeaderMembers(supabase, roomId)
-    if (header.length > 0) return header
-  } catch {
-    // header RPC not deployed yet
+    if (header.length > 0) return { members: header, error: null }
+  } catch (e) {
+    lastErr = e?.message || 'chat_group_header_members failed'
   }
   try {
     const list = await chatGroupMembersList(supabase, roomId)
-    return list.slice(0, 3).map((m) => ({
+    const members = list.slice(0, 3).map((m) => ({
       user_id: m.user_id,
       display_name: m.display_name,
       handle: m.handle,
       avatar_url: m.avatar_url,
       joined_at: m.joined_at,
     }))
-  } catch {
-    return []
+    if (members.length > 0) return { members, error: null }
+    if (list.length > 0) return { members, error: null }
+    return { members: [], error: lastErr || 'No members returned (check Supabase project + migrations).' }
+  } catch (e) {
+    return { members: [], error: e?.message || lastErr || 'chat_group_members_list failed' }
   }
 }
 
@@ -373,7 +380,8 @@ export async function chatGroupHeaderMembersBatch(supabase, roomIds) {
   const out = /** @type {Record<string, any[]>} */ ({})
   await Promise.all(
     ids.map(async (id) => {
-      out[id] = await chatGroupHeaderMembersResolved(supabase, id)
+      const { members } = await chatGroupHeaderMembersResolved(supabase, id)
+      out[id] = members
     }),
   )
   return out
@@ -387,7 +395,13 @@ export async function chatGroupMembersList(supabase, roomId) {
 
 export async function chatStarredMessageIds(supabase, roomId) {
   const { data, error } = await supabase.rpc('chat_starred_message_ids', { p_room_id: roomId })
-  if (error) throw new Error(error.message)
+  if (error) return new Set()
+  return new Set((data || []).map((r) => r.message_id))
+}
+
+export async function chatPinnedMessageIds(supabase, roomId) {
+  const { data, error } = await supabase.rpc('chat_pinned_message_ids', { p_room_id: roomId })
+  if (error) return new Set()
   return new Set((data || []).map((r) => r.message_id))
 }
 
@@ -423,12 +437,6 @@ export async function chatPinnedMessagesPage(supabase, roomId, limit = 50) {
   })
   if (error) throw new Error(error.message)
   return data || []
-}
-
-export async function chatPinnedMessageIds(supabase, roomId) {
-  const { data, error } = await supabase.rpc('chat_pinned_message_ids', { p_room_id: roomId })
-  if (error) throw new Error(error.message)
-  return new Set((data || []).map((r) => r.message_id))
 }
 
 export async function chatRoomSharedMedia(supabase, roomId, limit = 80) {
