@@ -123,6 +123,7 @@ export default function ChatConversation({
   // DOM refs
   const listRef = useRef(null)
   const atBottomRef = useRef(true)
+  const [isAtBottom, setIsAtBottom] = useState(true)
   const typingRef = useRef(null)
   const lastReadDebounceRef = useRef(null)
   const composerBarRef = useRef(null)
@@ -270,7 +271,11 @@ export default function ChatConversation({
 
   // Scroll to bottom once initial load resolves
   useEffect(() => {
-    if (!loading) scrollToBottom('instant')
+    if (!loading) {
+      scrollToBottom('instant')
+      atBottomRef.current = true
+      setIsAtBottom(true)
+    }
   }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load older messages (prepend) ─────────────────────────────────────────
@@ -505,6 +510,7 @@ export default function ChatConversation({
       void loadMessages()
     } else {
       atBottomRef.current = true
+      setIsAtBottom(true)
       scrollToBottom('smooth')
       scheduleMarkLastRead()
     }
@@ -515,10 +521,12 @@ export default function ChatConversation({
   const handleScroll = useCallback(() => {
     const el = listRef.current
     if (!el) return
-    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    atBottomRef.current = atBottom
+    setIsAtBottom(atBottom)
     // Trigger older-message load when within 200px of the top
     if (el.scrollTop < 200) void loadMore()
-    if (atBottomRef.current) {
+    if (atBottom) {
       setNewMsgCount(0)
       setScrolledUpCount(0)
       scheduleMarkLastRead()
@@ -883,6 +891,7 @@ export default function ChatConversation({
     const snapBottomAfterKeyboardCloseIOS = () => {
       if (!nearBottom()) return
       atBottomRef.current = true
+      setIsAtBottom(true)
       const vv = window.visualViewport
       const snap = () => { listEl.scrollTop = listEl.scrollHeight }
       if (vv) {
@@ -1209,7 +1218,7 @@ export default function ChatConversation({
               : undefined
           }
         >
-          {typingUsers.length > 0 && (
+          {typingUsers.length > 0 && isAtBottom && (
             <div className="px-6 pb-1 text-[12px] text-zinc-500">
               {typingUsers.length === 1
                 ? `${typingUsers[0].displayName} is typing…`
