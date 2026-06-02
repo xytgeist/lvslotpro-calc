@@ -2303,18 +2303,11 @@ html.light .reaction-pill {
   border: 1px solid #fff;
 }
 
-/* Entire chat surface — prevent iOS long-press text selection and magnifier.
-   Inputs/textareas (composer) are explicitly re-allowed below. */
+/* Entire chat surface — no text selection anywhere, no iOS magnifier/callout. */
 [data-chat-feature] {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-}
-[data-chat-feature] textarea,
-[data-chat-feature] input {
-  -webkit-user-select: text;
-  user-select: text;
-  -webkit-touch-callout: default;
 }
 
 /* ── Chat conversation — theme-aware glass / gradient ──────────────────────
