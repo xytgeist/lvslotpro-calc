@@ -2379,3 +2379,17 @@ html.light .chat-input-glass {
   -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.02);
   border: 1px solid rgba(0, 0, 0, 0.10);
 }
+
+/* Android renders translucent chat glass much fainter than iOS — bump 25% → 50%. */
+html.platform-android .chat-header-glass {
+  background: rgba(20, 22, 40, 0.5);
+}
+html.light.platform-android .chat-header-glass {
+  background: rgba(235, 238, 255, 0.5);
+}
+html.platform-android .chat-menu-glass {
+  background: rgba(20, 22, 40, 0.5);
+}
+html.light.platform-android .chat-menu-glass {
+  background: rgba(235, 238, 255, 0.5);
+}

@@ -38,6 +38,16 @@ export function applyTheme() {
   }
 }
 
+/** UA hint for Android-only CSS (e.g. stronger chat glass opacity). */
+export function applyPlatformClass() {
+  const html = document.documentElement
+  if (/Android/i.test(navigator.userAgent)) {
+    html.classList.add('platform-android')
+  } else {
+    html.classList.remove('platform-android')
+  }
+}
+
 /** Persist a new theme preference and apply it immediately. */
 export function setTheme(value) {
   try {
