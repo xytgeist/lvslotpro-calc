@@ -45,6 +45,8 @@ export default function ChatComposer({
   const [plusOpen, setPlusOpen]   = useState(false)
   const [plusRect, setPlusRect]   = useState(/** @type {DOMRect|null} */ (null))
   const [expanded, setExpanded]     = useState(false)
+  /** footerHost: no textarea in DOM until tap — matches lounge reply collapsed pill (iOS keyboard). */
+  const [composerActive, setComposerActive] = useState(!footerHost)
 
   const textareaRef  = useRef(null)
   const inputWrapRef = useRef(null)
@@ -55,8 +57,33 @@ export default function ChatComposer({
   const hasContent = body.trim().length > 0 || images.length > 0
   const canSend    = !disabled && !sending && !uploading && hasContent
 
+  useEffect(() => {
+    if (!footerHost) setComposerActive(true)
+  }, [footerHost])
+
+  useEffect(() => {
+    if (replyTarget || images.length > 0) setComposerActive(true)
+  }, [replyTarget, images.length])
+
+  const activateComposer = useCallback(() => {
+    if (disabled) return
+    setComposerActive(true)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }, [disabled])
+
+  const maybeCollapseComposer = useCallback(() => {
+    if (!footerHost) return
+    window.setTimeout(() => {
+      if (body.trim() || images.length > 0 || replyTarget || plusOpen) return
+      const ae = document.activeElement
+      if (textareaRef.current && ae === textareaRef.current) return
+      setComposerActive(false)
+    }, 220)
+  }, [body, footerHost, images.length, plusOpen, replyTarget])
+
   // Single line: lock wrapper to h-10 (same as +). Grow only when text wraps.
   useLayoutEffect(() => {
+    if (footerHost && !composerActive) return
     const ta = textareaRef.current
     const wrap = inputWrapRef.current
     if (!ta) return
@@ -93,7 +120,7 @@ export default function ChatComposer({
         wrap.style.borderRadius = '9999px'
       }
     }
-  }, [body])
+  }, [body, composerActive, footerHost])
 
   const handleBodyChange = (e) => {
     setBody(e.target.value.slice(0, MAX_BODY))
@@ -174,6 +201,10 @@ export default function ChatComposer({
   }
 
   const openPlus = () => {
+    if (footerHost && !composerActive) {
+      activateComposer()
+      return
+    }
     const rect = plusBtnRef.current?.getBoundingClientRect()
     if (rect) setPlusRect(rect)
     setPlusOpen(true)
@@ -187,6 +218,36 @@ export default function ChatComposer({
     width: 180,
     zIndex: 115,
   } : {}
+
+  if (footerHost && !composerActive) {
+    return (
+      <div className="shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            ref={plusBtnRef}
+            type="button"
+            disabled={disabled || uploading}
+            onClick={openPlus}
+            aria-label="Attach media or GIF"
+            className="chat-header-glass shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity disabled:opacity-40"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={activateComposer}
+            className="chat-header-glass flex h-10 min-w-0 flex-1 touch-manipulation items-center rounded-full px-4 text-left text-[16px] text-zinc-500 active:opacity-80"
+          >
+            Message…
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -276,6 +337,7 @@ export default function ChatComposer({
             value={body}
             onChange={handleBodyChange}
             onKeyDown={handleKeyDown}
+            onBlur={maybeCollapseComposer}
             placeholder="Message…"
             disabled={disabled}
             rows={1}

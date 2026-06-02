@@ -11410,7 +11410,7 @@ export default function SocialFeed({
               />
               {loungeLayoutTestDetail ? (
                 <p className="px-4 py-8 text-center text-[14px] text-zinc-500">
-                  Tap the composer below to test keyboard layout.
+                  Tap Message below to test keyboard layout.
                 </p>
               ) : (
               <div className="px-4 py-4 pb-4">

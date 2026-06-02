@@ -829,64 +829,6 @@ export default function ChatConversation({
     }
   }, [])
 
-  // iOS: Safari scrolls the list when the keyboard opens — keep short threads pinned at top.
-  useEffect(() => {
-    if (!IS_IOS) return
-    const composer = composerBarRef.current
-    const list = listRef.current
-    if (!composer || !list) return
-
-    let scrollTopOnFocus = 0
-    let raf = 0
-
-    const composerInputFocused = () =>
-      Boolean(composer.querySelector('textarea:focus, input:focus'))
-
-    const applyIosKeyboardScroll = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        if (!composerInputFocused()) return
-        if (listContentFitsInView()) {
-          list.scrollTop = scrollTopOnFocus
-          return
-        }
-        if (atBottomRef.current) {
-          list.scrollTop = Math.max(0, list.scrollHeight - list.clientHeight)
-        }
-      })
-    }
-
-    const onFocusIn = (e) => {
-      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
-        scrollTopOnFocus = list.scrollTop
-        applyIosKeyboardScroll()
-        requestAnimationFrame(applyIosKeyboardScroll)
-        window.setTimeout(applyIosKeyboardScroll, 50)
-        window.setTimeout(applyIosKeyboardScroll, 180)
-      }
-    }
-
-    const onListScroll = () => {
-      if (!composerInputFocused() || !listContentFitsInView()) return
-      if (list.scrollTop !== scrollTopOnFocus) list.scrollTop = scrollTopOnFocus
-    }
-
-    composer.addEventListener('focusin', onFocusIn, true)
-    list.addEventListener('scroll', onListScroll, { passive: true })
-
-    const vv = window.visualViewport
-    vv?.addEventListener('resize', applyIosKeyboardScroll)
-    vv?.addEventListener('scroll', applyIosKeyboardScroll)
-
-    return () => {
-      cancelAnimationFrame(raf)
-      composer.removeEventListener('focusin', onFocusIn, true)
-      list.removeEventListener('scroll', onListScroll)
-      vv?.removeEventListener('resize', applyIosKeyboardScroll)
-      vv?.removeEventListener('scroll', applyIosKeyboardScroll)
-    }
-  }, [listContentFitsInView])
-
   // Android + resizes-content: when the keyboard opens/closes the list height
   // changes — keep newest messages pinned above the composer (iOS unchanged).
   useEffect(() => {
