@@ -204,20 +204,32 @@ export default function ChatConversation({
     return () => notifyLoungeDockSuppress(false)
   }, [])
 
-  // Kill any text selection iOS creates inside the chat. selectionchange fires
-  // after iOS starts a selection (loupe/handles appear) — we clear it immediately.
-  // This runs without touching scroll events at all.
+  // Belt-and-suspenders iOS selection kill.
+  // CSS user-select:none on [data-chat-feature] is the primary guard.
+  // selectionchange + contextmenu are the fallback for the ~25% iOS races.
   useEffect(() => {
+    const chatRoot = document.querySelector('[data-chat-feature]')
+
     const onSelChange = () => {
       const sel = window.getSelection()
       if (!sel || sel.isCollapsed) return
-      const chatRoot = document.querySelector('[data-chat-feature]')
       if (chatRoot && sel.anchorNode && chatRoot.contains(sel.anchorNode)) {
         sel.removeAllRanges()
       }
     }
+
+    const onContextMenu = (e) => {
+      if (chatRoot && chatRoot.contains(e.target)) {
+        e.preventDefault()
+      }
+    }
+
     document.addEventListener('selectionchange', onSelChange)
-    return () => document.removeEventListener('selectionchange', onSelChange)
+    document.addEventListener('contextmenu', onContextMenu, { passive: false })
+    return () => {
+      document.removeEventListener('selectionchange', onSelChange)
+      document.removeEventListener('contextmenu', onContextMenu)
+    }
   }, [])
 
   // ── Lazy sender profile resolution ───────────────────────────────────────
