@@ -251,6 +251,7 @@ import {
   LOUNGE_LAYOUT_TEST_POST,
 } from './loungeLayoutTestPost.js'
 import ChatDmHeaderChrome from '../chat/ChatDmHeaderChrome.jsx'
+import ChatComposer from '../chat/ChatComposer.jsx'
 import LoungeFeedCategoryFilter from './LoungeFeedCategoryFilter.jsx'
 import LoungePullRefreshZone from './LoungePullRefreshZone.jsx'
 import { useLoungePullToRefresh } from './useLoungePullToRefresh.js'
@@ -6142,6 +6143,8 @@ export default function SocialFeed({
     return undefined
   }, [layoutTestOpenPostDetailRequest, openLoungePostDetail])
 
+  const layoutTestChatSendNoop = useCallback(async () => {}, [])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     let cancelled = false
@@ -11407,7 +11410,7 @@ export default function SocialFeed({
               />
               {loungeLayoutTestDetail ? (
                 <p className="px-4 py-8 text-center text-[14px] text-zinc-500">
-                  Tap Reply below to test keyboard layout.
+                  Tap the composer below to test keyboard layout.
                 </p>
               ) : (
               <div className="px-4 py-4 pb-4">
@@ -12577,6 +12580,20 @@ export default function SocialFeed({
                       : `max(0.625rem, env(safe-area-inset-bottom))`,
                 }}
               >
+                {loungeLayoutTestDetail ? (
+                  <ChatComposer
+                    supabaseClient={supabaseClient}
+                    viewerUserId={composerUserId}
+                    replyTarget={null}
+                    onClearReply={() => {}}
+                    onSend={layoutTestChatSendNoop}
+                    onTyping={() => {}}
+                    viewerDisplayName={String(
+                      composerUserProfile?.display_name || composerUserProfile?.handle || '',
+                    ).trim()}
+                  />
+                ) : (
+                  <>
                 {loungeDetailCommentErr ? (
                   <div className="mb-1 rounded-xl border border-rose-500/45 bg-rose-950/25 px-2.5 py-1.5 text-[13px] leading-snug text-rose-200">
                     {loungeDetailCommentErr}
@@ -12963,6 +12980,8 @@ export default function SocialFeed({
                       )
                     })()}
                   </button>
+                )}
+                  </>
                 )}
               </div>
             ) : null}
