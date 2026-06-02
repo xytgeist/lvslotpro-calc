@@ -108,17 +108,17 @@ export default function ChatComposer({
 
   const handleSend = useCallback(async () => {
     if (!canSend) return
+    // Snapshot before clearing so the send payload is correct
+    const snapshot = { body: body.trim(), imageUrls: images, replyToMessageId: replyTarget?.id ?? null }
+    // Clear immediately — don't wait for the network round-trip
+    setBody('')
+    setImages([])
+    onClearReply()
+    // Keep the keyboard open by refocusing the now-empty textarea
+    textareaRef.current?.focus()
     setSending(true)
     try {
-      await onSend({
-        body: body.trim(),
-        imageUrls: images,
-        replyToMessageId: replyTarget?.id ?? null,
-      })
-      setBody('')
-      setImages([])
-      onClearReply()
-      textareaRef.current?.focus()
+      await onSend(snapshot)
     } finally {
       setSending(false)
     }
