@@ -326,7 +326,7 @@ Deno.serve(async (req) => {
       return json(400, { error: sErr.message })
     }
 
-    // Fire DM push notification (fire-and-forget, never fail the send on push errors).
+    // DM push: insert activity_events only — trg_activity_events_enqueue_push → lounge-send-activity-push (H2/H3).
     if (room.kind === 'dm' && room.dm_key && inserted?.id) {
       void (async () => {
         try {
@@ -357,29 +357,11 @@ Deno.serve(async (req) => {
           const lastReadAt = peerMem?.last_read_at ? new Date(peerMem.last_read_at) : null
           if (lastReadAt && Date.now() - lastReadAt.getTime() < 30_000) return
 
-          // Insert activity event for the recipient.
-          const { data: evt } = await admin
-            .from('activity_events')
-            .insert({
-              recipient_user_id: peerId,
-              actor_user_id: user.id,
-              event_type: 'chat_dm',
-              chat_room_id: roomId,
-            })
-            .select('id')
-            .maybeSingle()
-          if (!evt?.id) return
-
-          // Call push function.
-          const pushSecret = Deno.env.get('LOUNGE_ACTIVITY_PUSH_SECRET') || ''
-          if (!pushSecret) return
-          await fetch(`${supabaseUrl}/functions/v1/lounge-send-activity-push`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-lounge-activity-push-secret': pushSecret,
-            },
-            body: JSON.stringify({ activityEventId: evt.id }),
+          await admin.from('activity_events').insert({
+            recipient_user_id: peerId,
+            actor_user_id: user.id,
+            event_type: 'chat_dm',
+            chat_room_id: roomId,
           })
         } catch {
           // Push errors must never surface to the sender.
