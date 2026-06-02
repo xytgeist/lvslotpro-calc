@@ -75,6 +75,7 @@ export default function ChatComposer({
     if (isMultiLine) {
       const h = Math.max(COMPOSER_ROW_H, Math.min(scrollH, COMPOSER_MAX_H))
       ta.style.height = `${h}px`
+      ta.style.lineHeight = ''
       if (wrap) {
         wrap.style.height = ''
         wrap.style.minHeight = `${COMPOSER_ROW_H}px`
@@ -82,6 +83,7 @@ export default function ChatComposer({
       }
     } else {
       ta.style.height = '100%'
+      ta.style.lineHeight = `${COMPOSER_ROW_H}px`
       if (wrap) {
         wrap.style.height = `${COMPOSER_ROW_H}px`
         wrap.style.minHeight = ''
