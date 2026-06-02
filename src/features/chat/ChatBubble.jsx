@@ -1,9 +1,13 @@
 import { createPortal } from 'react-dom'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ChatEmojiPicker, { saveRecentEmoji } from './ChatEmojiPicker'
 import LoungeFlameIcon from '../lounge/LoungeFlameIcon'
 
 const QUICK_REACTIONS = ['👍','❤️','😂','🔥','😮','😢','🎉','😍','👏','💯','🙏','🤣']
+
+/** SVG chip art inset in 24×24 viewBox — render ~25% larger than adjacent emoji text. */
+const REACTION_CHIP_CLASS = 'h-5 w-5 shrink-0'
+const QUICK_CHIP_CLASS = 'h-6 w-6 shrink-0'
 
 /**
  * Frosted-glass style shared by the floating menus.
@@ -109,19 +113,41 @@ export default function ChatBubble({
   const [bubbleRect, setBubbleRect]       = useState(/** @type {DOMRect | null} */ (null))
 
   const longPressTimer = useRef(null)
+  const selectionSuppressCleanupRef = useRef(/** @type {(() => void) | null} */ (null))
   const bubbleRef      = useRef(null)
   const isDeleted      = Boolean(message.deleted_at)
+
+  const stopSelectionSuppression = useCallback(() => {
+    selectionSuppressCleanupRef.current?.()
+    selectionSuppressCleanupRef.current = null
+  }, [])
+
+  const startSelectionSuppression = useCallback(() => {
+    stopSelectionSuppression()
+    const suppress = () => {
+      const sel = window.getSelection()
+      if (sel && sel.type === 'Range') sel.removeAllRanges()
+    }
+    document.addEventListener('selectionchange', suppress)
+    selectionSuppressCleanupRef.current = () => {
+      document.removeEventListener('selectionchange', suppress)
+      suppress()
+    }
+  }, [stopSelectionSuppression])
 
   // ── Long-press detection ────────────────────────────────────────────────────
   // Cancel if the pointer moves > 8px (user is scrolling, not holding).
 
-  const handlePointerDown = useCallback(() => {
+  const handlePointerDown = useCallback((e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    startSelectionSuppression()
     let cancelled = false
 
-    const onMove = (e) => {
-      if (Math.abs(e.movementX) > 8 || Math.abs(e.movementY) > 8) {
+    const onMove = (ev) => {
+      if (Math.abs(ev.movementX) > 8 || Math.abs(ev.movementY) > 8) {
         cancelled = true
         clearTimeout(longPressTimer.current)
+        stopSelectionSuppression()
         document.removeEventListener('pointermove', onMove)
       }
     }
@@ -130,29 +156,33 @@ export default function ChatBubble({
 
     longPressTimer.current = setTimeout(() => {
       document.removeEventListener('pointermove', onMove)
+      stopSelectionSuppression()
       if (cancelled) return
       const rect = bubbleRef.current?.getBoundingClientRect()
       if (rect) {
-        // Clear any text selection iOS may have started during the hold
         window.getSelection()?.removeAllRanges()
         setBubbleRect(rect)
         setMenuOpen(true)
       }
     }, 450)
-  }, [])
+  }, [startSelectionSuppression, stopSelectionSuppression])
 
   const cancelLongPress = useCallback(() => {
+    stopSelectionSuppression()
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
-  }, [])
+  }, [stopSelectionSuppression])
 
   const closeMenu = useCallback(() => {
+    stopSelectionSuppression()
     setMenuOpen(false)
     setBubbleRect(null)
     setFullPickerOpen(false)
-  }, [])
+  }, [stopSelectionSuppression])
+
+  useEffect(() => () => stopSelectionSuppression(), [stopSelectionSuppression])
 
   // ── Reaction helpers ────────────────────────────────────────────────────────
 
@@ -247,7 +277,8 @@ export default function ChatBubble({
             onPointerCancel={cancelLongPress}
             onPointerLeave={cancelLongPress}
             onContextMenu={(e) => e.preventDefault()}
-            className={`relative select-none rounded-2xl px-3 py-2 text-[15px] leading-snug touch-manipulation transition-opacity ${
+            onSelectStart={(e) => e.preventDefault()}
+            className={`chat-bubble-surface relative select-none rounded-2xl px-3 py-2 text-[15px] leading-snug touch-manipulation transition-opacity ${
               isDeleted
                 ? 'border border-zinc-800 bg-transparent italic text-zinc-600'
                 : isMine
@@ -262,7 +293,7 @@ export default function ChatBubble({
               <>
 
                 {message.body && (
-                  <div className="whitespace-pre-wrap break-words">{message.body}</div>
+                  <div className="chat-bubble-body whitespace-pre-wrap break-words">{message.body}</div>
                 )}
                 {imageUrls.length > 0 && (
                   <div className={`mt-1.5 grid gap-1 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
@@ -289,7 +320,7 @@ export default function ChatBubble({
                 <div className="reaction-pill flex items-center gap-1 rounded-full px-2.5 py-1">
                   {reactions.map((r) => (
                     r.emoji === '❤️'
-                      ? <LoungeFlameIcon key={r.emoji} liked className="h-[18px] w-[18px]" />
+                      ? <LoungeFlameIcon key={r.emoji} liked className={REACTION_CHIP_CLASS} />
                       : <span key={r.emoji} className="text-[16px] leading-none">{r.emoji}</span>
                   ))}
                   {totalCount >= 2 && (
@@ -346,7 +377,7 @@ export default function ChatBubble({
                 }`}
               >
                 {e === '❤️'
-                  ? <LoungeFlameIcon liked className="h-[22px] w-[22px] translate-y-0.5" />
+                  ? <LoungeFlameIcon liked className={QUICK_CHIP_CLASS} />
                   : <span className="text-[20px] leading-none">{e}</span>
                 }
               </button>

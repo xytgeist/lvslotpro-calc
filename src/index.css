@@ -2300,6 +2300,14 @@ html.light .reaction-pill {
   border: 1px solid #fff;
 }
 
+/* Long-press menu target — iOS Safari ignores select-none on descendants without this. */
+[data-chat-feature] .chat-bubble-surface,
+[data-chat-feature] .chat-bubble-surface .chat-bubble-body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 /* ── Chat conversation — theme-aware glass / gradient ──────────────────────
  * Dark (default): dark navy translucent glass + dark gradient fade.
  * Light: white/pale translucent glass + pale gradient fade.
