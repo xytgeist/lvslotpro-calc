@@ -4,7 +4,8 @@ import { uploadLoungeFeedPostImage } from '../../utils/communityFeedPost.js'
 
 const MAX_BODY   = 4000
 const MAX_IMAGES = 4
-const COMPOSER_MIN_H = 40
+/** Matches Tailwind `h-10` on the + button (40px border-box). */
+const COMPOSER_ROW_H = 40
 const COMPOSER_MAX_H = 160
 /** Corner radius once the field wraps past one line. */
 const COMPOSER_EXPANDED_RADIUS_PX = 20
@@ -69,11 +70,11 @@ export default function ChatComposer({
 
     ta.style.height = 'auto'
     const scrollH = ta.scrollHeight
-    const h = Math.max(COMPOSER_MIN_H, Math.min(scrollH, COMPOSER_MAX_H))
+    const h = Math.max(COMPOSER_ROW_H, Math.min(scrollH, COMPOSER_MAX_H))
     ta.style.height = `${h}px`
 
     if (wrap) {
-      const singleCap = (singleLineScrollHRef.current ?? COMPOSER_MIN_H) + COMPOSER_MULTI_LINE_SCROLL_SLACK
+      const singleCap = (singleLineScrollHRef.current ?? COMPOSER_ROW_H) + COMPOSER_MULTI_LINE_SCROLL_SLACK
       const isMultiLine = body.includes('\n') || scrollH > singleCap
       wrap.style.borderRadius = isMultiLine
         ? `${COMPOSER_EXPANDED_RADIUS_PX}px`
@@ -261,8 +262,13 @@ export default function ChatComposer({
             placeholder="Message…"
             disabled={disabled}
             rows={1}
-            className="w-full resize-none bg-transparent pl-4 text-[16px] leading-5 text-zinc-100 placeholder:text-zinc-500 outline-none disabled:opacity-50"
-            style={{ minHeight: COMPOSER_MIN_H, maxHeight: COMPOSER_MAX_H, paddingTop: 10, paddingBottom: 10, paddingRight: hasContent ? 46 : 12 }}
+            className="box-border w-full resize-none bg-transparent py-2.5 pl-4 text-[16px] leading-5 text-zinc-100 placeholder:text-zinc-500 outline-none disabled:opacity-50"
+            style={{
+              height: COMPOSER_ROW_H,
+              minHeight: COMPOSER_ROW_H,
+              maxHeight: COMPOSER_MAX_H,
+              paddingRight: hasContent ? 46 : 12,
+            }}
           />
 
           {/* Send button — appears inside textarea when content exists */}
