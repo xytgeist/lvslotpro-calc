@@ -685,6 +685,28 @@ export default function ChatConversation({
     return () => ro.disconnect()
   }, [])
 
+  // Android + resizes-content: when the keyboard opens/closes the list height
+  // changes — keep newest messages pinned above the composer (iOS unchanged).
+  useEffect(() => {
+    if (!/Android/i.test(navigator.userAgent)) return
+    const container = listRef.current
+    if (!container) return
+    let prevH = container.clientHeight
+
+    const ro = new ResizeObserver(() => {
+      const h = container.clientHeight
+      const growing = h > prevH
+      const tag = document.activeElement?.tagName
+      const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
+      if (growing || (h < prevH && (atBottomRef.current || inputFocused))) {
+        container.scrollTop = container.scrollHeight
+      }
+      prevH = h
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
+
   // Swipe-down-to-dismiss keyboard — independent of the timestamp-swipe logic.
   // Captures keyboard-open state at touchstart so scroll position can't block dismiss.
   useEffect(() => {
