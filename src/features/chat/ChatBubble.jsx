@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ChatEmojiPicker, { saveRecentEmoji } from './ChatEmojiPicker'
 import LoungeFlameIcon from '../lounge/LoungeFlameIcon'
 
@@ -18,6 +18,7 @@ const QUICK_CHIP_CLASS = 'h-7 w-7 shrink-0'
  */
 
 const PILL_H = 64
+const BUBBLE_EXPANDED_RADIUS_PX = 16
 const MENU_ROW_H = 50
 const MENU_DIV_H = 1
 const LAYOUT_GAP = 12
@@ -163,6 +164,7 @@ export default function ChatBubble({
   const [menuOpen, setMenuOpen]           = useState(false)
   const [fullPickerOpen, setFullPickerOpen] = useState(false)
   const [bubbleRect, setBubbleRect]       = useState(/** @type {DOMRect | null} */ (null))
+  const [compactBubble, setCompactBubble] = useState(true)
 
   const longPressTimer = useRef(null)
   const bubbleRef      = useRef(null)
@@ -302,6 +304,40 @@ export default function ChatBubble({
 
   const imageUrls = Array.isArray(message.image_urls) ? message.image_urls.filter(Boolean) : []
 
+  // Pill ends on one visual line of text; fixed radius when wrapped or media attached.
+  useLayoutEffect(() => {
+    const el = bubbleRef.current
+    if (!el) return
+
+    const measure = () => {
+      if (imageUrls.length > 0) {
+        setCompactBubble(false)
+        return
+      }
+      if (!message.body?.trim()) {
+        setCompactBubble(true)
+        return
+      }
+      if (message.body.includes('\n')) {
+        setCompactBubble(false)
+        return
+      }
+      const textEl = el.querySelector('.chat-bubble-body')
+      if (!textEl) {
+        setCompactBubble(true)
+        return
+      }
+      const lineHeight = parseFloat(getComputedStyle(textEl).lineHeight) || 22
+      const lines = Math.max(1, Math.round(textEl.scrollHeight / lineHeight))
+      setCompactBubble(lines <= 1)
+    }
+
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [message.body, imageUrls.length])
+
   // Floating menu layout — computed fresh each render so it tracks the latest rect
   const layout = bubbleRect ? computeLayout(bubbleRect, isMine, { isDeleted }) : null
 
@@ -366,14 +402,20 @@ export default function ChatBubble({
             onPointerLeave={cancelLongPress}
             onContextMenu={(e) => e.preventDefault()}
             onSelectStart={(e) => e.preventDefault()}
-            className={`chat-bubble-surface relative select-none rounded-2xl px-3 py-2 text-[15px] leading-snug transition-opacity ${IS_IOS ? 'touch-none' : 'touch-manipulation'} ${
+            className={`chat-bubble-surface relative select-none px-3 py-2 text-[15px] leading-snug transition-opacity ${IS_IOS ? 'touch-none' : 'touch-manipulation'} ${
+              compactBubble ? '' : 'rounded-2xl'
+            } ${
               isDeleted
                 ? 'border border-zinc-800 bg-transparent italic text-zinc-600'
                 : isMine
                 ? 'bg-cyan-800/70 text-cyan-50'
                 : 'bg-zinc-800/90 text-zinc-100'
             } ${menuOpen ? 'opacity-80' : 'opacity-100'}`}
-            style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
+            style={{
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+              borderRadius: compactBubble ? '9999px' : BUBBLE_EXPANDED_RADIUS_PX,
+            }}
           >
             {isDeleted ? (
               <span>This message was deleted</span>
