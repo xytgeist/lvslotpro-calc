@@ -291,9 +291,10 @@ export default function ChatComposer({
               expanded ? 'bottom-1.5' : 'top-1/2 -translate-y-1/2'
             } ${
               hasContent
-                ? 'bg-cyan-800/70 text-white opacity-100 active:opacity-50'
+                ? 'text-zinc-900 opacity-100 active:opacity-50'
                 : 'pointer-events-none opacity-0'
             }`}
+            style={hasContent ? { backgroundColor: '#06cefc' } : undefined}
           >
             {sending ? (
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />

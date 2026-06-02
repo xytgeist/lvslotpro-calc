@@ -382,11 +382,12 @@ export default function ChatBubble({
                   className={`text-zinc-400 ${isMine ? 'self-end mr-3' : 'self-start ml-3 scale-x-[-1]'}`}>
                   <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/>
                 </svg>
-                <div className={`rounded-2xl px-3 py-1.5 text-[12px] leading-snug opacity-70 ${
-                  isQuoteFromMe
-                    ? 'bg-cyan-800/70 text-cyan-50'
-                    : 'bg-zinc-800/90 text-zinc-100'
-                }`}>
+                <div
+                  className={`rounded-2xl px-3 py-1.5 text-[12px] leading-snug opacity-70 ${
+                    isQuoteFromMe ? 'text-zinc-900' : 'bg-zinc-800/90 text-zinc-100'
+                  }`}
+                  style={isQuoteFromMe ? { backgroundColor: 'rgba(6, 206, 252, 0.65)' } : undefined}
+                >
                   <p className="line-clamp-2">{message.reply_to_preview}</p>
                 </div>
               </>
@@ -408,13 +409,14 @@ export default function ChatBubble({
               isDeleted
                 ? 'border border-zinc-800 bg-transparent italic text-zinc-600'
                 : isMine
-                ? 'bg-cyan-800/70 text-cyan-50'
+                ? 'text-zinc-900'
                 : 'bg-zinc-800/90 text-zinc-100'
             } ${menuOpen ? 'opacity-80' : 'opacity-100'}`}
             style={{
               WebkitUserSelect: 'none',
               userSelect: 'none',
               borderRadius: compactBubble ? '9999px' : BUBBLE_EXPANDED_RADIUS_PX,
+              backgroundColor: isMine && !isDeleted ? 'rgba(6, 206, 252, 0.65)' : undefined,
             }}
           >
             {isDeleted ? (
