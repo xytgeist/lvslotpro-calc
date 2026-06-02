@@ -220,7 +220,8 @@ export default function ChatBubble({
     setFullPickerOpen(false)
   }, [])
 
-  // iOS Safari: CSS/selectstart cannot stop the loupe — preventDefault on touchstart is required.
+  // iOS Safari: rapidly clear any selection Safari creates during a press, without
+  // blocking scroll (no preventDefault). Also drives the long-press menu timer.
   useEffect(() => {
     if (!IS_IOS) return
     const el = bubbleRef.current
@@ -229,15 +230,33 @@ export default function ChatBubble({
     let startX = 0
     let startY = 0
     let cancelled = false
+    let selInterval = null
+
+    const clearSel = () => window.getSelection()?.removeAllRanges()
+
+    const stopSelInterval = () => {
+      if (selInterval != null) {
+        clearInterval(selInterval)
+        selInterval = null
+      }
+    }
 
     const onTouchStart = (e) => {
       if (e.touches.length !== 1) return
       cancelled = false
       startX = e.touches[0].clientX
       startY = e.touches[0].clientY
+
+      // Rapidly nuke any selection Safari tries to create
+      clearSel()
+      stopSelInterval()
+      selInterval = setInterval(clearSel, 30)
+
       clearLongPressTimer()
       longPressTimer.current = setTimeout(() => {
         if (cancelled) return
+        stopSelInterval()
+        clearSel()
         openLongPressMenu()
       }, 450)
     }
@@ -249,20 +268,24 @@ export default function ChatBubble({
       if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
         cancelled = true
         clearLongPressTimer()
+        stopSelInterval()
       }
     }
 
     const onTouchEnd = () => {
       clearLongPressTimer()
+      stopSelInterval()
+      clearSel()
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: true })
-    el.addEventListener('touchend', onTouchEnd)
-    el.addEventListener('touchcancel', onTouchEnd)
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true })
 
     return () => {
       clearLongPressTimer()
+      stopSelInterval()
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
