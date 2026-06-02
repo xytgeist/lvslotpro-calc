@@ -273,7 +273,7 @@ export default function ChatComposer({
             disabled={disabled}
             rows={1}
             className={`box-border w-full resize-none bg-transparent py-0 pl-4 text-[16px] text-zinc-100 placeholder:text-zinc-500 outline-none disabled:opacity-50 ${
-              expanded ? 'leading-5' : 'h-full'
+              expanded ? 'leading-5' : 'h-full overflow-hidden'
             }`}
             style={{
               maxHeight: COMPOSER_MAX_H,
