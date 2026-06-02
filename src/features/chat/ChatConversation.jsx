@@ -118,6 +118,8 @@ export default function ChatConversation({
   const typingRef = useRef(null)
   const lastReadDebounceRef = useRef(null)
   const composerBarRef = useRef(null)
+  /** Bottom gap (px) to restore after swipe keyboard dismiss — shared with Android RO. */
+  const keyboardDismissPreserveRef = useRef(/** @type {number | null} */ (null))
   const [composerBarH, setComposerBarH] = useState(80)
 
   // Swipe-to-reveal timestamps
@@ -698,7 +700,10 @@ export default function ChatConversation({
       const growing = h > prevH
       const tag = document.activeElement?.tagName
       const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
-      if (growing || (h < prevH && (atBottomRef.current || inputFocused))) {
+      const preservedGap = keyboardDismissPreserveRef.current
+      if (growing && preservedGap != null) {
+        container.scrollTop = container.scrollHeight - container.clientHeight - preservedGap
+      } else if (growing || (h < prevH && (atBottomRef.current || inputFocused))) {
         container.scrollTop = container.scrollHeight
       }
       prevH = h
@@ -708,59 +713,96 @@ export default function ChatConversation({
   }, [])
 
   // Swipe-down-to-dismiss keyboard — independent of the timestamp-swipe logic.
-  // Captures keyboard-open state at touchstart so scroll position can't block dismiss.
+  // Locks list scroll during a clear dismiss gesture; preserves reading position after blur.
   useEffect(() => {
     const el = listRef.current
     if (!el) return
     let startY = 0
+    let startX = 0
     let keyboardWasOpen = false
-    const isAndroid = /Android/i.test(navigator.userAgent)
+    let dismissActive = false
+    let lockedScrollTop = 0
 
-    /** Android: keyboard close reshapes the list (paddingBottom) mid-animation;
-     *  smooth scroll fights that and causes jumpiness — snap once layout settles. */
-    const snapBottomAfterKeyboardClose = () => {
-      atBottomRef.current = true
+    const bottomGap = () => el.scrollHeight - el.scrollTop - el.clientHeight
+    const nearBottom = () => bottomGap() < 80
+
+    const restorePreservedScroll = () => {
+      const gap = keyboardDismissPreserveRef.current
+      if (gap == null) return
+      el.scrollTop = el.scrollHeight - el.clientHeight - gap
+    }
+
+    /** Re-apply preserved gap while the keyboard animates closed (viewport/list resize). */
+    const schedulePreserveRestore = () => {
       const vv = window.visualViewport
       let timer = null
-      const snap = () => {
+      const run = () => {
         clearTimeout(timer)
-        timer = setTimeout(() => { el.scrollTop = el.scrollHeight }, 100)
+        timer = setTimeout(restorePreservedScroll, 50)
       }
+      run()
       if (vv) {
-        vv.addEventListener('resize', snap)
-        snap()
+        vv.addEventListener('resize', run)
         setTimeout(() => {
-          vv.removeEventListener('resize', snap)
+          vv.removeEventListener('resize', run)
           clearTimeout(timer)
-          el.scrollTop = el.scrollHeight
-        }, 350)
+          restorePreservedScroll()
+          keyboardDismissPreserveRef.current = null
+        }, 400)
       } else {
-        snap()
+        setTimeout(() => { keyboardDismissPreserveRef.current = null }, 400)
       }
     }
 
     const onStart = (e) => {
+      dismissActive = false
       startY = e.touches[0]?.clientY ?? 0
+      startX = e.touches[0]?.clientX ?? 0
       const tag = document.activeElement?.tagName
       keyboardWasOpen = tag === 'TEXTAREA' || tag === 'INPUT'
     }
+
+    const onMove = (e) => {
+      if (!keyboardWasOpen) return
+      const t = e.touches[0]
+      if (!t) return
+      const dy = t.clientY - startY
+      const dx = t.clientX - startX
+
+      if (!dismissActive) {
+        // Downward intent + already at bottom → lock scroll (nowhere to scroll anyway)
+        if (dy > 10 && dy > Math.abs(dx) && nearBottom()) {
+          dismissActive = true
+          lockedScrollTop = el.scrollTop
+        } else {
+          return
+        }
+      }
+
+      e.preventDefault()
+      el.scrollTop = lockedScrollTop
+    }
+
     const onEnd = (e) => {
       const dy = (e.changedTouches[0]?.clientY ?? 0) - startY
       if (dy > 50 && keyboardWasOpen) {
+        keyboardDismissPreserveRef.current = bottomGap()
         document.activeElement?.blur?.()
-        if (isAndroid) {
-          snapBottomAfterKeyboardClose()
-        } else {
-          atBottomRef.current = true
-          requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }))
-        }
+        schedulePreserveRestore()
       }
+      dismissActive = false
+      keyboardWasOpen = false
     }
+
     el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
     el.addEventListener('touchend', onEnd, { passive: true })
+    el.addEventListener('touchcancel', onEnd, { passive: true })
     return () => {
       el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
     }
   }, [])
 
