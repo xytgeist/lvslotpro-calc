@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { uploadLoungeFeedPostImage } from '../../utils/communityFeedPost.js'
+import {
+  focusLoungeComposerCaption,
+  scheduleLoungeComposerTextareaFocus,
+} from '../lounge/loungeDockComposeFocus.js'
 
 const MAX_BODY   = 4000
 const MAX_IMAGES = 4
@@ -62,14 +66,25 @@ export default function ChatComposer({
   }, [footerHost])
 
   useEffect(() => {
-    if (replyTarget || images.length > 0) setComposerActive(true)
-  }, [replyTarget, images.length])
+    if (!replyTarget && images.length === 0) return
+    if (footerHost) {
+      flushSync(() => setComposerActive(true))
+    } else {
+      setComposerActive(true)
+    }
+  }, [replyTarget, images.length, footerHost])
 
-  const activateComposer = useCallback(() => {
+  const activateAndFocusComposer = useCallback(() => {
     if (disabled) return
-    setComposerActive(true)
-    requestAnimationFrame(() => textareaRef.current?.focus())
-  }, [disabled])
+    const getTextarea = () => textareaRef.current
+    if (footerHost) {
+      flushSync(() => setComposerActive(true))
+    } else {
+      setComposerActive(true)
+    }
+    focusLoungeComposerCaption(getTextarea)
+    scheduleLoungeComposerTextareaFocus({ getTextarea })
+  }, [disabled, footerHost])
 
   const maybeCollapseComposer = useCallback(() => {
     if (!footerHost) return
@@ -184,7 +199,11 @@ export default function ChatComposer({
     setImages([])
     onClearReply()
     // Keep the keyboard open by refocusing the now-empty textarea
-    textareaRef.current?.focus()
+    try {
+      textareaRef.current?.focus({ preventScroll: true })
+    } catch {
+      textareaRef.current?.focus()
+    }
     setSending(true)
     try {
       await onSend(snapshot)
@@ -202,7 +221,7 @@ export default function ChatComposer({
 
   const openPlus = () => {
     if (footerHost && !composerActive) {
-      activateComposer()
+      activateAndFocusComposer()
       return
     }
     const rect = plusBtnRef.current?.getBoundingClientRect()
@@ -239,7 +258,7 @@ export default function ChatComposer({
           <button
             type="button"
             disabled={disabled}
-            onClick={activateComposer}
+            onClick={activateAndFocusComposer}
             className="chat-header-glass flex h-10 min-w-0 flex-1 touch-manipulation items-center rounded-full px-4 text-left text-[16px] text-zinc-500 active:opacity-80"
           >
             Message…
@@ -338,6 +357,19 @@ export default function ChatComposer({
             onChange={handleBodyChange}
             onKeyDown={handleKeyDown}
             onBlur={maybeCollapseComposer}
+            onFocus={
+              footerHost
+                ? (e) => {
+                    requestAnimationFrame(() => {
+                      try {
+                        e.currentTarget.focus({ preventScroll: true })
+                      } catch {
+                        // ignore
+                      }
+                    })
+                  }
+                : undefined
+            }
             placeholder="Message…"
             disabled={disabled}
             rows={1}
