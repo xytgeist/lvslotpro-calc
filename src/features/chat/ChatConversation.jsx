@@ -204,6 +204,21 @@ export default function ChatConversation({
     return () => notifyLoungeDockSuppress(false)
   }, [])
 
+  // Lock the entire document body against text selection while chat is mounted.
+  // Portal elements (long-press menu, emoji strip) render into document.body and
+  // are outside [data-chat-feature], so the body-level lock is necessary.
+  useEffect(() => {
+    const { style } = document.body
+    style.webkitUserSelect = 'none'
+    style.userSelect = 'none'
+    style.webkitTouchCallout = 'none'
+    return () => {
+      style.webkitUserSelect = ''
+      style.userSelect = ''
+      style.webkitTouchCallout = ''
+    }
+  }, [])
+
   // Belt-and-suspenders iOS selection kill.
   // CSS user-select:none on [data-chat-feature] is the primary guard.
   // selectionchange + contextmenu are the fallback for the ~25% iOS races.
