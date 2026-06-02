@@ -173,8 +173,16 @@ export default function ChatGroupSettingsSheet({
       if (!session?.user) throw new Error('Not signed in.')
       const { data: url, error: upErr } = await uploadProfileAvatar({ supabaseClient, user: session.user, file })
       if (upErr) throw upErr
-      await chatUpdateGroup(supabaseClient, { roomId: room.id, avatarUrl: url })
+      if (!url) throw new Error('Upload succeeded but no URL returned.')
+      // Show the photo locally right away so the user sees the change immediately.
       onRoomUpdated({ avatar_url: url })
+      // Persist to DB — show a clear inline error if this step fails (photo will still
+      // display locally but won't survive a page reload until the Edge call succeeds).
+      try {
+        await chatUpdateGroup(supabaseClient, { roomId: room.id, avatarUrl: url })
+      } catch (saveErr) {
+        setErr(`Photo uploaded but could not save to group: ${saveErr?.message || 'unknown error'}. Try again.`)
+      }
     } catch (ex) {
       setErr(ex?.message || 'Could not update photo.')
     } finally {
@@ -244,11 +252,12 @@ export default function ChatGroupSettingsSheet({
 
         {/* ── Hero ──────────────────────────────────────────────── */}
         <div className="flex flex-col items-center px-4 pb-5 pt-6">
+          {/* Avatar — tappable for owners to change photo */}
           <div className="relative">
             <ChatGroupHeaderStack
               groupAvatarUrl={room.avatar_url}
               members={headerMembers}
-              size={80}
+              size={84}
             />
             {isOwner && (
               <>
@@ -257,10 +266,10 @@ export default function ChatGroupSettingsSheet({
                   type="button"
                   disabled={busy}
                   onClick={() => avatarInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-zinc-950 bg-zinc-700 text-zinc-200 shadow touch-manipulation active:bg-zinc-600 disabled:opacity-40"
+                  className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-zinc-950 bg-cyan-600 text-zinc-950 shadow touch-manipulation active:bg-cyan-500 disabled:opacity-40"
                   aria-label="Change group photo"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                     <circle cx="12" cy="13" r="4" />
                   </svg>
@@ -269,8 +278,46 @@ export default function ChatGroupSettingsSheet({
             )}
           </div>
 
+          {/* Photo action links — always visible to owner, no edit mode required */}
+          {isOwner ? (
+            <div className="mt-2.5 flex items-center gap-3">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => avatarInputRef.current?.click()}
+                className="text-[13px] font-semibold text-cyan-400 touch-manipulation active:opacity-70 disabled:opacity-40"
+              >
+                {busy ? 'Uploading…' : room.avatar_url ? 'Change photo' : 'Set group photo'}
+              </button>
+              {room.avatar_url ? (
+                <>
+                  <span className="text-zinc-700">·</span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="text-[13px] font-medium text-zinc-500 touch-manipulation active:text-zinc-300 disabled:opacity-40"
+                    onClick={async () => {
+                      setBusy(true)
+                      setErr('')
+                      try {
+                        await chatUpdateGroup(supabaseClient, { roomId: room.id, avatarUrl: '' })
+                        onRoomUpdated({ avatar_url: null })
+                      } catch (ex) {
+                        setErr(ex?.message || 'Could not remove photo.')
+                      } finally {
+                        setBusy(false)
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
           {editMode ? (
-            <div className="mt-5 w-full space-y-2">
+            <div className="mt-4 w-full space-y-2">
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -294,31 +341,10 @@ export default function ChatGroupSettingsSheet({
               >
                 {busy ? 'Saving…' : 'Save changes'}
               </button>
-              {room.avatar_url ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  className="w-full py-1 text-center text-[13px] text-zinc-500 touch-manipulation active:text-zinc-300 disabled:opacity-40"
-                  onClick={async () => {
-                    setBusy(true)
-                    setErr('')
-                    try {
-                      await chatUpdateGroup(supabaseClient, { roomId: room.id, avatarUrl: '' })
-                      onRoomUpdated({ avatar_url: null })
-                    } catch (ex) {
-                      setErr(ex?.message || 'Could not remove photo.')
-                    } finally {
-                      setBusy(false)
-                    }
-                  }}
-                >
-                  Remove group photo
-                </button>
-              ) : null}
             </div>
           ) : (
-            <div className="mt-4 text-center">
-              <p className="text-[20px] font-bold text-zinc-100 leading-tight">
+            <div className="mt-3 text-center">
+              <p className="text-[20px] font-bold leading-tight text-zinc-100">
                 {room.title || title || 'Group chat'}
               </p>
               {(room.description || description) ? (
