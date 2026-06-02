@@ -162,11 +162,14 @@ export function chatJoinChannel(supabase, slug) {
 
 /**
  * Derive a human-readable label for a chat room.
- * @param {{ kind: string, title?: string | null, slug?: string | null, dm_key?: string | null, peerLabel?: string | null }} room
+ * @param {{ kind: string, title?: string | null, slug?: string | null, dm_key?: string | null, peerLabel?: string | null, peer_display_name?: string | null }} room
  * @returns {string}
  */
 export function chatRoomLabel(room) {
-  if (room.kind === 'dm') return room.peerLabel || 'Direct message'
+  if (room.kind === 'dm') {
+    const name = room.peer_display_name && String(room.peer_display_name).trim()
+    return name || room.peerLabel || 'Direct message'
+  }
   if (room.kind === 'channel') return room.title ? `#${room.slug} · ${room.title}` : `#${room.slug}`
   return room.title || 'Group chat'
 }

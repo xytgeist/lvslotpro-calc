@@ -182,9 +182,8 @@ export default function ChatTab({
           }
         }
 
-        const peerLabel = r.peer_handle
-          ? `@${r.peer_handle}`
-          : r.peer_display_name || null
+        const peerLabel = (r.peer_display_name && String(r.peer_display_name).trim())
+          || (r.peer_handle ? `@${r.peer_handle}` : null)
 
         const senderName = r.last_message_sender_id === viewerUserId
           ? 'You'
@@ -851,7 +850,7 @@ function ChatRoomListRow({ room, label, onOpen, onLongPress }) {
             <div className={`grid h-11 w-11 place-items-center rounded-full text-[18px] ${
               room.kind === 'channel' ? 'bg-violet-900/60' : room.kind === 'group' ? 'bg-amber-900/60' : 'bg-zinc-800'
             }`}>
-              {room.kind === 'channel' ? '#' : room.kind === 'group' ? '👥' : (room.peerLabel?.[1] || '?').toUpperCase()}
+              {room.kind === 'channel' ? '#' : room.kind === 'group' ? '👥' : (room.peer_display_name?.[0] || room.peer_handle?.[0] || '?').toUpperCase()}
             </div>
           )}
           {room.hasUnread && (
@@ -860,20 +859,34 @@ function ChatRoomListRow({ room, label, onOpen, onLongPress }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
             {room.pinned && (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="shrink-0 text-cyan-500">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0 text-cyan-500" aria-hidden>
                 <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
               </svg>
             )}
-            <span className={`truncate text-[15px] font-semibold ${room.hasUnread ? 'text-zinc-100' : 'text-zinc-300'}`}>
-              {label}
-            </span>
-            {room.isMuted && (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="shrink-0 text-zinc-600">
-                <line x1="1" y1="1" x2="23" y2="23" /><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-              </svg>
-            )}
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+              <span className={`truncate text-[15px] font-semibold ${room.hasUnread ? 'text-zinc-100' : 'text-zinc-300'}`}>
+                {label}
+              </span>
+              {room.isMuted && (
+                <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500" aria-hidden>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="block h-4 w-4"
+                  >
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                </span>
+              )}
+            </div>
           </div>
           {room.previewText ? (
             <div className={`truncate text-[13px] ${room.hasUnread ? 'font-medium text-zinc-300' : 'text-zinc-500'}`}>
