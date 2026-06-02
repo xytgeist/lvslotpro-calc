@@ -24,10 +24,14 @@ const MENU_DIV_H = 1
 const LAYOUT_GAP = 12
 
 /** Match rendered action-card rows (Reply / Copy / … / Delete). */
-function estimateMenuHeight(isDeleted, isMine) {
+function estimateMenuHeight(isDeleted, isMine, enableStar = false) {
   if (isDeleted) return MENU_ROW_H + 8
   let rows = 4 // Reply, Copy, Forward, Report
   let divs = 2
+  if (enableStar) {
+    rows += 1
+    divs += 1
+  }
   if (isMine) {
     rows += 1
     divs += 1
@@ -41,12 +45,12 @@ function estimateMenuHeight(isDeleted, isMine) {
  *
  * Preferred stack: emoji pill above bubble, action card below bubble.
  */
-function computeLayout(rect, isMine, { isDeleted = false } = {}) {
+function computeLayout(rect, isMine, { isDeleted = false, enableStar = false } = {}) {
   const vw  = window.innerWidth
   const vh  = window.innerHeight
   const SAFE_TOP    = 52
   const SAFE_BOTTOM = 120 // composer overlay + home indicator
-  const MENU_H      = estimateMenuHeight(isDeleted, isMine)
+  const MENU_H      = estimateMenuHeight(isDeleted, isMine, enableStar)
   const PILL_W      = Math.min(360, vw - 32)
   const MENU_W      = Math.min(252, vw - 32)
 
@@ -146,6 +150,9 @@ function computeLayout(rect, isMine, { isDeleted = false } = {}) {
  *   onAddReaction: (messageId: string, emoji: string) => void,
  *   onRemoveReaction: (messageId: string, emoji: string) => void,
  *   hideSenderInfo?: boolean,
+ *   enableStar?: boolean,
+ *   isStarred?: boolean,
+ *   onToggleStar?: (messageId: string, starred: boolean) => void,
  * }} props
  */
 export default function ChatBubble({
@@ -160,6 +167,9 @@ export default function ChatBubble({
   onAddReaction,
   onRemoveReaction,
   hideSenderInfo = false,
+  enableStar = false,
+  isStarred = false,
+  onToggleStar,
 }) {
   const [menuOpen, setMenuOpen]           = useState(false)
   const [fullPickerOpen, setFullPickerOpen] = useState(false)
@@ -345,7 +355,7 @@ export default function ChatBubble({
   }, [message.body, imageUrls.length])
 
   // Floating menu layout — computed fresh each render so it tracks the latest rect
-  const layout = bubbleRect ? computeLayout(bubbleRect, isMine, { isDeleted }) : null
+  const layout = bubbleRect ? computeLayout(bubbleRect, isMine, { isDeleted, enableStar }) : null
 
   return (
     <div
@@ -560,6 +570,20 @@ export default function ChatBubble({
               />
             )}
 
+            {!isDeleted && enableStar && onToggleStar && (
+              <>
+                <Divider />
+                <ActionRow
+                  icon={<StarIcon filled={isStarred} />}
+                  label={isStarred ? 'Unstar' : 'Star'}
+                  onClick={() => {
+                    onToggleStar(message.id, !isStarred)
+                    closeMenu()
+                  }}
+                />
+              </>
+            )}
+
             {!isDeleted && (
               <>
                 <Divider />
@@ -643,3 +667,10 @@ function CopyIcon()    { return <svg {...S}><rect x="9" y="9" width="13" height=
 function ForwardIcon() { return <svg {...S}><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg> }
 function FlagIcon()    { return <svg {...S}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg> }
 function TrashIcon()   { return <svg {...S}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg> }
+function StarIcon({ filled = false }) {
+  return (
+    <svg {...S} fill={filled ? 'currentColor' : 'none'}>
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  )
+}

@@ -216,7 +216,11 @@ Deno.serve(async (req) => {
     if (gErr || !room?.id) {
       return json(400, { error: gErr?.message || 'Could not create group.' })
     }
-    const rows = unique.map((uid) => ({ room_id: room.id, user_id: uid }))
+    const rows = unique.map((uid) => ({
+      room_id: room.id,
+      user_id: uid,
+      role: uid === user.id ? 'admin' : 'member',
+    }))
     const { error: mErr } = await admin.from('chat_room_members').insert(rows)
     if (mErr) {
       await admin.from('chat_rooms').delete().eq('id', room.id)
@@ -259,12 +263,15 @@ Deno.serve(async (req) => {
 
     const { data: mem, error: memErr } = await admin
       .from('chat_room_members')
-      .select('room_id')
+      .select('room_id, moderation_muted_until')
       .eq('room_id', roomId)
       .eq('user_id', user.id)
       .maybeSingle()
     if (memErr || !mem) {
       return json(403, { error: 'You are not a member of this room.' })
+    }
+    if (mem.moderation_muted_until && new Date(mem.moderation_muted_until) > new Date()) {
+      return json(403, { error: 'You are temporarily muted in this group.' })
     }
 
     // Rate limit: max 5 messages per 5 seconds per user, across all rooms.
@@ -550,6 +557,199 @@ Deno.serve(async (req) => {
       .eq('room_id', roomId)
       .eq('user_id', user.id)
     if (dErr) return json(400, { error: dErr.message })
+    return json(200, { ok: true })
+  }
+
+  async function isGroupAdmin(roomId: string, uid: string) {
+    const { data: room } = await admin
+      .from('chat_rooms')
+      .select('id, kind, created_by')
+      .eq('id', roomId)
+      .maybeSingle()
+    if (!room || room.kind !== 'group') return false
+    if (room.created_by === uid) return true
+    const { data: mem } = await admin
+      .from('chat_room_members')
+      .select('role')
+      .eq('room_id', roomId)
+      .eq('user_id', uid)
+      .maybeSingle()
+    return mem?.role === 'admin'
+  }
+
+  async function requireGroupMember(roomId: string) {
+    const { data: mem } = await admin
+      .from('chat_room_members')
+      .select('room_id')
+      .eq('room_id', roomId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    return Boolean(mem?.room_id)
+  }
+
+  if (action === 'update_group') {
+    const roomId = String(body?.room_id || '').trim()
+    if (!roomId) return json(400, { error: 'room_id is required.' })
+    if (!(await isGroupAdmin(roomId, user.id))) {
+      return json(403, { error: 'Only the group owner can change group settings.' })
+    }
+    const patch: Record<string, unknown> = {}
+    if (body?.title != null) patch.title = String(body.title).trim().slice(0, 80)
+    if (body?.description != null) patch.description = String(body.description).trim().slice(0, 500)
+    if (body?.avatar_url != null) {
+      const url = String(body.avatar_url).trim()
+      patch.avatar_url = url.length > 0 ? url.slice(0, 2048) : null
+    }
+    if (Object.keys(patch).length === 0) return json(400, { error: 'Nothing to update.' })
+    const { error: uErr } = await admin.from('chat_rooms').update(patch).eq('id', roomId)
+    if (uErr) return json(400, { error: uErr.message })
+    return json(200, { ok: true })
+  }
+
+  if (action === 'add_group_members') {
+    const roomId = String(body?.room_id || '').trim()
+    const rawIds = Array.isArray(body?.member_user_ids)
+      ? body.member_user_ids.map((x) => String(x).trim()).filter(Boolean)
+      : []
+    if (!roomId) return json(400, { error: 'room_id is required.' })
+    if (!(await requireGroupMember(roomId))) {
+      return json(403, { error: 'Not a member of this group.' })
+    }
+    const { count } = await admin
+      .from('chat_room_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('room_id', roomId)
+    const roomCap = 10
+    const slots = roomCap - (count ?? 0)
+    if (slots <= 0) return json(403, { error: 'Group is full (10 members max).' })
+    const toAdd = [...new Set(rawIds.filter((id) => id !== user.id))].slice(0, slots)
+    if (toAdd.length === 0) return json(400, { error: 'No new members to add.' })
+    for (const uid of toAdd) {
+      const { data: pr } = await admin.from('profiles').select('handle, display_name').eq('user_id', uid).maybeSingle()
+      if (!minProfile(pr)) return json(403, { error: `Member ${uid} does not have a completed profile.` })
+    }
+    const rows = toAdd.map((uid) => ({ room_id: roomId, user_id: uid, role: 'member' }))
+    const { error: insErr } = await admin.from('chat_room_members').insert(rows)
+    if (insErr) return json(400, { error: insErr.message })
+    return json(200, { ok: true, added: toAdd.length })
+  }
+
+  if (action === 'remove_group_member') {
+    const roomId = String(body?.room_id || '').trim()
+    const targetId = String(body?.target_user_id || '').trim()
+    if (!roomId || !targetId) return json(400, { error: 'room_id and target_user_id are required.' })
+    if (!(await isGroupAdmin(roomId, user.id))) {
+      return json(403, { error: 'Only the group owner can remove members.' })
+    }
+    if (targetId === user.id) return json(400, { error: 'Use leave_room to leave the group.' })
+    const { error: dErr } = await admin
+      .from('chat_room_members')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', targetId)
+    if (dErr) return json(400, { error: dErr.message })
+    return json(200, { ok: true })
+  }
+
+  if (action === 'mute_group_member') {
+    const roomId = String(body?.room_id || '').trim()
+    const targetId = String(body?.target_user_id || '').trim()
+    const minutes = Number(body?.mute_minutes ?? 0)
+    if (!roomId || !targetId) return json(400, { error: 'room_id and target_user_id are required.' })
+    if (!(await isGroupAdmin(roomId, user.id))) {
+      return json(403, { error: 'Only the group owner can mute members.' })
+    }
+    const until = minutes > 0
+      ? new Date(Date.now() + minutes * 60 * 1000).toISOString()
+      : new Date('2099-01-01T00:00:00Z').toISOString()
+    const { error: uErr } = await admin
+      .from('chat_room_members')
+      .update({ moderation_muted_until: until })
+      .eq('room_id', roomId)
+      .eq('user_id', targetId)
+    if (uErr) return json(400, { error: uErr.message })
+    return json(200, { ok: true, moderation_muted_until: until })
+  }
+
+  if (action === 'unmute_group_member') {
+    const roomId = String(body?.room_id || '').trim()
+    const targetId = String(body?.target_user_id || '').trim()
+    if (!roomId || !targetId) return json(400, { error: 'room_id and target_user_id are required.' })
+    if (!(await isGroupAdmin(roomId, user.id))) {
+      return json(403, { error: 'Only the group owner can unmute members.' })
+    }
+    const { error: uErr } = await admin
+      .from('chat_room_members')
+      .update({ moderation_muted_until: null })
+      .eq('room_id', roomId)
+      .eq('user_id', targetId)
+    if (uErr) return json(400, { error: uErr.message })
+    return json(200, { ok: true })
+  }
+
+  if (action === 'mute_room_until') {
+    const roomId = String(body?.room_id || '').trim()
+    const untilRaw = String(body?.muted_until || '').trim()
+    if (!roomId || !untilRaw) return json(400, { error: 'room_id and muted_until are required.' })
+    const until = new Date(untilRaw)
+    if (Number.isNaN(until.getTime())) return json(400, { error: 'Invalid muted_until.' })
+    const { error: uErr } = await admin
+      .from('chat_room_members')
+      .update({ muted_until: until.toISOString() })
+      .eq('room_id', roomId)
+      .eq('user_id', user.id)
+    if (uErr) return json(400, { error: uErr.message })
+    return json(200, { ok: true, muted_until: until.toISOString() })
+  }
+
+  if (action === 'star_message' || action === 'unstar_message') {
+    const messageId = String(body?.message_id || '').trim()
+    if (!messageId) return json(400, { error: 'message_id is required.' })
+    const { data: msg } = await admin
+      .from('chat_messages')
+      .select('room_id, deleted_at')
+      .eq('id', messageId)
+      .maybeSingle()
+    if (!msg || msg.deleted_at) return json(404, { error: 'Message not found.' })
+    if (!(await requireGroupMember(msg.room_id))) {
+      return json(403, { error: 'Not a member of this room.' })
+    }
+    if (action === 'star_message') {
+      const { error: sErr } = await admin
+        .from('chat_message_stars')
+        .upsert({ message_id: messageId, user_id: user.id }, { onConflict: 'message_id,user_id', ignoreDuplicates: true })
+      if (sErr) return json(400, { error: sErr.message })
+    } else {
+      const { error: dErr } = await admin
+        .from('chat_message_stars')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('user_id', user.id)
+      if (dErr) return json(400, { error: dErr.message })
+    }
+    return json(200, { ok: true })
+  }
+
+  if (action === 'pin_message' || action === 'unpin_message') {
+    const roomId = String(body?.room_id || '').trim()
+    const messageId = String(body?.message_id || '').trim()
+    if (!roomId || !messageId) return json(400, { error: 'room_id and message_id are required.' })
+    if (!(await isGroupAdmin(roomId, user.id))) {
+      return json(403, { error: 'Only the group owner can pin messages.' })
+    }
+    if (action === 'pin_message') {
+      const { error: pErr } = await admin
+        .from('chat_pinned_messages')
+        .upsert({ room_id: roomId, message_id: messageId, pinned_by: user.id }, { onConflict: 'room_id,message_id' })
+      if (pErr) return json(400, { error: pErr.message })
+    } else {
+      const { error: dErr } = await admin
+        .from('chat_pinned_messages')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('message_id', messageId)
+      if (dErr) return json(400, { error: dErr.message })
+    }
     return json(200, { ok: true })
   }
 

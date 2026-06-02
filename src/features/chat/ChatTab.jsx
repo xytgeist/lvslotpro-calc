@@ -203,6 +203,9 @@ export default function ChatTab({
           peerAvatarUrl: r.peer_avatar_url || null,
           previewText,
           memberRole: r.member_role || 'member',
+          created_by: r.created_by || null,
+          avatar_url: r.avatar_url || null,
+          description: r.description || null,
           hasUnread: Boolean(r.has_unread),
           isMuted: chatRoomIsMuted(r.muted_until),
         }

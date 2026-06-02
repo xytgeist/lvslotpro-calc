@@ -234,6 +234,105 @@ export function chatUnblockUser(supabase, targetUserId) {
  * @param {string} otherUserId
  * @returns {Promise<{ iBlockThem: boolean, theyBlockMe: boolean }>}
  */
+export function chatUpdateGroup(supabase, { roomId, title, description, avatarUrl }) {
+  const body = { action: 'update_group', room_id: roomId }
+  if (title != null) body.title = title
+  if (description != null) body.description = description
+  if (avatarUrl != null) body.avatar_url = avatarUrl
+  return loungeChatInvoke(supabase, body)
+}
+
+export function chatAddGroupMembers(supabase, roomId, memberUserIds) {
+  return loungeChatInvoke(supabase, {
+    action: 'add_group_members',
+    room_id: roomId,
+    member_user_ids: memberUserIds,
+  })
+}
+
+export function chatRemoveGroupMember(supabase, roomId, targetUserId) {
+  return loungeChatInvoke(supabase, {
+    action: 'remove_group_member',
+    room_id: roomId,
+    target_user_id: targetUserId,
+  })
+}
+
+/** @param {number} muteMinutes — 0 = permanent */
+export function chatMuteGroupMember(supabase, roomId, targetUserId, muteMinutes) {
+  return loungeChatInvoke(supabase, {
+    action: 'mute_group_member',
+    room_id: roomId,
+    target_user_id: targetUserId,
+    mute_minutes: muteMinutes,
+  })
+}
+
+export function chatUnmuteGroupMember(supabase, roomId, targetUserId) {
+  return loungeChatInvoke(supabase, {
+    action: 'unmute_group_member',
+    room_id: roomId,
+    target_user_id: targetUserId,
+  })
+}
+
+export function chatMuteRoomUntil(supabase, roomId, mutedUntilIso) {
+  return loungeChatInvoke(supabase, {
+    action: 'mute_room_until',
+    room_id: roomId,
+    muted_until: mutedUntilIso,
+  })
+}
+
+export function chatStarMessage(supabase, messageId) {
+  return loungeChatInvoke(supabase, { action: 'star_message', message_id: messageId })
+}
+
+export function chatUnstarMessage(supabase, messageId) {
+  return loungeChatInvoke(supabase, { action: 'unstar_message', message_id: messageId })
+}
+
+export function chatPinMessage(supabase, roomId, messageId) {
+  return loungeChatInvoke(supabase, { action: 'pin_message', room_id: roomId, message_id: messageId })
+}
+
+export function chatUnpinMessage(supabase, roomId, messageId) {
+  return loungeChatInvoke(supabase, { action: 'unpin_message', room_id: roomId, message_id: messageId })
+}
+
+export async function chatGroupHeaderMembers(supabase, roomId) {
+  const { data, error } = await supabase.rpc('chat_group_header_members', { p_room_id: roomId })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function chatGroupMembersList(supabase, roomId) {
+  const { data, error } = await supabase.rpc('chat_group_members_list', { p_room_id: roomId })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function chatStarredMessageIds(supabase, roomId) {
+  const { data, error } = await supabase.rpc('chat_starred_message_ids', { p_room_id: roomId })
+  if (error) throw new Error(error.message)
+  return new Set((data || []).map((r) => r.message_id))
+}
+
+export async function chatStarredMessagesPage(supabase, roomId, limit = 50) {
+  const { data, error } = await supabase.rpc('chat_starred_messages_page', {
+    p_room_id: roomId,
+    p_limit: limit,
+  })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export function chatIsGroupOwner(room, viewerUserId) {
+  if (!room || room.kind !== 'group' || !viewerUserId) return false
+  if (room.created_by === viewerUserId) return true
+  return room.memberRole === 'admin' || room.member_role === 'admin'
+}
+
 export async function chatGetBlockStatus(supabase, viewerUserId, otherUserId) {
   if (!viewerUserId || !otherUserId) return { iBlockThem: false, theyBlockMe: false }
   const { data } = await supabase

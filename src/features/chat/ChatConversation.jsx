@@ -2,6 +2,8 @@ import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ChatBubble from './ChatBubble.jsx'
 import ChatComposer from './ChatComposer.jsx'
+import ChatGroupHeaderStack from './ChatGroupHeaderStack.jsx'
+import ChatGroupSettingsSheet from './ChatGroupSettingsSheet.jsx'
 import {
   chatSendMessage,
   chatDeleteMessage,
@@ -11,6 +13,10 @@ import {
   chatMuteRoom,
   chatUnmuteRoom,
   chatRoomIsMuted,
+  chatGroupHeaderMembers,
+  chatStarredMessageIds,
+  chatStarMessage,
+  chatUnstarMessage,
 } from './chatApi.js'
 import { subscribeToTyping } from './chatTypingBroadcast.js'
 import { notifyLoungeDockSuppress } from '../lounge/loungeDockSuppressRegistry.js'
@@ -132,6 +138,10 @@ export default function ChatConversation({
   const [muted, setMuted] = useState(() => chatRoomIsMuted(room.muted_until))
   const [muteMenuOpen, setMuteMenuOpen] = useState(false)
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false)
+  const [roomMeta, setRoomMeta] = useState(() => ({ ...room }))
+  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
+  const [groupHeaderMembers, setGroupHeaderMembers] = useState(/** @type {any[]} */ ([]))
+  const [starredIds, setStarredIds] = useState(() => new Set())
 
   // DOM refs
   const listRef = useRef(null)
@@ -191,6 +201,54 @@ export default function ChatConversation({
   }, [messages])
 
   const viewerDisplayName = viewerProfile?.display_name || viewerProfile?.handle || 'You'
+  const activeRoom = { ...room, ...roomMeta }
+  const isGroupRoom = activeRoom.kind === 'group'
+
+  useEffect(() => {
+    setRoomMeta({ ...room })
+  }, [room])
+
+  useEffect(() => {
+    if (!isGroupRoom || !room.id) {
+      setGroupHeaderMembers([])
+      setStarredIds(new Set())
+      return undefined
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const [members, stars] = await Promise.all([
+          chatGroupHeaderMembers(supabaseClient, room.id),
+          chatStarredMessageIds(supabaseClient, room.id),
+        ])
+        if (!cancelled) {
+          setGroupHeaderMembers(members)
+          setStarredIds(stars)
+        }
+      } catch {
+        if (!cancelled) {
+          setGroupHeaderMembers([])
+          setStarredIds(new Set())
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isGroupRoom, room.id, supabaseClient])
+
+  const handleToggleStar = useCallback(async (messageId, starred) => {
+    try {
+      if (starred) await chatStarMessage(supabaseClient, messageId)
+      else await chatUnstarMessage(supabaseClient, messageId)
+      setStarredIds((prev) => {
+        const next = new Set(prev)
+        if (starred) next.add(messageId)
+        else next.delete(messageId)
+        return next
+      })
+    } catch {
+      // ignore
+    }
+  }, [supabaseClient])
 
   // ── Reaction loader ───────────────────────────────────────────────────────
 
@@ -798,7 +856,7 @@ export default function ChatConversation({
     return (profilesById[senderId] || localProfiles[senderId])?.avatar_url || null
   }, [profilesById, localProfiles, viewerUserId, viewerProfile])
 
-  const roomTitle = room.peerLabel || room.title || (room.slug ? `#${room.slug}` : 'Chat')
+  const roomTitle = activeRoom.peerLabel || activeRoom.title || (activeRoom.slug ? `#${activeRoom.slug}` : 'Chat')
 
   // ── Swipe-to-reveal timestamps ────────────────────────────────────────────
   // Direct DOM manipulation — no React re-renders during the gesture.
@@ -848,14 +906,19 @@ export default function ChatConversation({
     }
   }, [])
 
-  // ── Peer info for DM header ───────────────────────────────────────────────
-  const peerUserId      = room.kind === 'dm' ? (room.peer_user_id ?? null) : null
-  const peerProfile     = peerUserId ? (profilesById[peerUserId] || localProfiles[peerUserId] || null) : null
-  const peerAvatar      = peerProfile?.avatar_url || room.peer_avatar_url || null
-  const peerDisplayName = peerProfile?.display_name || room.peer_display_name || roomTitle
-  const peerHandle      = peerProfile?.handle ? `@${peerProfile.handle}` : null
-  const peerInitial     = (peerDisplayName || '?').replace(/^@/, '')[0]?.toUpperCase() || '?'
-  // Extra top padding for DM header (tall: avatar + pill); channel is shorter
+  // ── Header chrome: DM + group use avatar + pill; channels use compact title ──
+  const useRichHeader = activeRoom.kind === 'dm' || isGroupRoom
+  const peerUserId = activeRoom.kind === 'dm' ? (activeRoom.peer_user_id ?? null) : null
+  const peerProfile = peerUserId ? (profilesById[peerUserId] || localProfiles[peerUserId] || null) : null
+  const peerAvatar = peerProfile?.avatar_url || activeRoom.peer_avatar_url || null
+  const peerDisplayName = peerProfile?.display_name || activeRoom.peer_display_name || roomTitle
+  const headerDisplayName = isGroupRoom
+    ? (String(activeRoom.title || '').trim() || 'Group chat')
+    : peerDisplayName
+  const headerAvatar = activeRoom.kind === 'dm' ? peerAvatar : null
+  const headerInitial = (peerDisplayName || '?').replace(/^@/, '')[0]?.toUpperCase() || '?'
+  const headerAvatarClass =
+    'relative z-10 grid h-16 w-16 place-items-center rounded-full bg-zinc-700 text-[22px] font-bold text-zinc-300 shadow-lg ring-2 ring-white/15'
   // Track composer textarea focus — extends iOS dismiss grab strip above composer.
   useEffect(() => {
     const composer = composerBarRef.current
@@ -1178,7 +1241,7 @@ export default function ChatConversation({
     }
   }, [contentExtendsBelowComposer, listContentFitsInView])
 
-  const listPaddingTop  = room.kind === 'dm'
+  const listPaddingTop = useRichHeader
     ? 'calc(env(safe-area-inset-top, 0px) + 11rem)'
     : 'calc(env(safe-area-inset-top, 0px) + 4.5rem)'
   const composerPadBottom = loungeComposerFooterPaddingBottom(kbOverlapPx, iosSafeBottomPx, {
@@ -1214,31 +1277,47 @@ export default function ChatConversation({
           )}
         </button>
 
-        {/* Center — avatar + pill for DMs; plain title for channels */}
+        {/* Center — avatar + pill (DM + group); compact title (channels) */}
         <div className="flex min-w-0 flex-1 flex-col items-center">
-          {room.kind === 'dm' ? (
+          {useRichHeader ? (
             <>
-              {peerAvatar ? (
+              {isGroupRoom ? (
+                <ChatGroupHeaderStack
+                  groupAvatarUrl={activeRoom.avatar_url}
+                  members={groupHeaderMembers}
+                  size={64}
+                />
+              ) : headerAvatar ? (
                 <img
-                  src={peerAvatar}
-                  alt={peerDisplayName}
+                  src={headerAvatar}
+                  alt={headerDisplayName}
                   className="relative z-10 h-16 w-16 rounded-full object-cover shadow-lg ring-2 ring-white/20"
                 />
               ) : (
-                <div className="relative z-10 grid h-16 w-16 place-items-center rounded-full bg-zinc-700 text-[22px] font-bold text-zinc-300 shadow-lg ring-2 ring-white/15">
-                  {peerInitial}
-                </div>
+                <div className={headerAvatarClass}>{headerInitial}</div>
               )}
-              <button
-                type="button"
-                onClick={() => peerUserId && onViewProfile?.(peerUserId)}
-                disabled={!peerUserId || !onViewProfile}
-              className="chat-header-glass -mt-1 flex items-center gap-1 rounded-full px-4 py-1.5 touch-manipulation transition-opacity active:opacity-75"
-              aria-label={peerUserId ? `View ${peerDisplayName}'s profile` : undefined}
-            >
-              <span className="text-[16px] font-bold text-zinc-50">{peerDisplayName}</span>
-              {peerUserId && <span className="text-[15px] font-normal text-zinc-300">›</span>}
-              </button>
+              {activeRoom.kind === 'dm' ? (
+                <button
+                  type="button"
+                  onClick={() => peerUserId && onViewProfile?.(peerUserId)}
+                  disabled={!peerUserId || !onViewProfile}
+                  className="chat-header-glass -mt-1 flex items-center gap-1 rounded-full px-4 py-1.5 touch-manipulation transition-opacity active:opacity-75"
+                  aria-label={peerUserId ? `View ${headerDisplayName}'s profile` : undefined}
+                >
+                  <span className="text-[16px] font-bold text-zinc-50">{headerDisplayName}</span>
+                  {peerUserId && <span className="text-[15px] font-normal text-zinc-300">›</span>}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setGroupSettingsOpen(true)}
+                  className="chat-header-glass -mt-1 flex max-w-full items-center gap-1 rounded-full px-4 py-1.5 touch-manipulation transition-opacity active:opacity-75"
+                  aria-label="Group settings"
+                >
+                  <span className="truncate text-[16px] font-bold text-zinc-50">{headerDisplayName}</span>
+                  <span className="text-[15px] font-normal text-zinc-300">›</span>
+                </button>
+              )}
             </>
           ) : (
             <div className="flex h-10 items-center">
@@ -1382,7 +1461,10 @@ export default function ChatConversation({
                   isMine={msg.sender_id === viewerUserId}
                   reactions={reactions[msg.id] || []}
                   viewerUserId={viewerUserId}
-                  hideSenderInfo={room.kind === 'dm'}
+                  hideSenderInfo={activeRoom.kind === 'dm'}
+                  enableStar={isGroupRoom}
+                  isStarred={starredIds.has(msg.id)}
+                  onToggleStar={handleToggleStar}
                   onReply={setReplyTarget}
                   onDeleteMessage={handleDelete}
                   onAddReaction={handleAddReaction}
@@ -1461,6 +1543,19 @@ export default function ChatConversation({
         </div>
       </div>
       </div>
+
+      {isGroupRoom ? (
+        <ChatGroupSettingsSheet
+          open={groupSettingsOpen}
+          onClose={() => setGroupSettingsOpen(false)}
+          supabaseClient={supabaseClient}
+          room={activeRoom}
+          viewerUserId={viewerUserId}
+          headerMembers={groupHeaderMembers}
+          onRoomUpdated={(patch) => setRoomMeta((prev) => ({ ...prev, ...patch }))}
+          onLeftGroup={onBack}
+        />
+      ) : null}
     </div>
   )
 }

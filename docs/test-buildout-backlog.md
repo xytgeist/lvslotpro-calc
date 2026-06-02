@@ -58,6 +58,10 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 - [ ] **Deep link** — Navigate to `?tab=chat&room=<uuid>`; confirm conversation opens.
 - [ ] **Quick link** — Toggle Chat quick link on/off; verify it appears in the title bar shortcut strip.
 - [ ] **Anon gate** — Open chat while not signed in; confirm sign-in prompt renders.
+- [ ] **Group header** — Open a group with no custom photo: three overlapping member avatars + title pill; tap pill → settings sheet.
+- [ ] **Group photo** — Owner uploads group avatar in settings; header switches to single large photo.
+- [ ] **Group settings** — Owner: rename, description, add/remove member, mute member (5m–permanent). Member: leave, mute group (presets + mute-until datetime), add member, starred list.
+- [ ] **Star message** — Long-press a group message → Star; appears under Starred messages in settings.
 
 ### Production replay
 - Replay migration `20260601120000_chat_phase2.sql` on production Supabase.
@@ -605,6 +609,8 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 ---
 
 ## Update log
+
+- 2026-06-03: **Group chat header + settings v1 (code on `test`):** migration **`20260603100000_chat_group_features.sql`** (`avatar_url`, `description`, `moderation_muted_until`, `chat_message_stars`, `chat_pinned_messages`, RPCs `chat_group_header_members`, `chat_group_members_list`, `chat_starred_*`, extended `chat_rooms_for_user`). Edge **`lounge-chat`**: `update_group`, `add_group_members`, `remove_group_member`, `mute_group_member`, `star_message`, `mute_room_until`, etc. Client: overlapping member avatars or single group photo; pill → **`ChatGroupSettingsSheet`**; long-press **Star** on group messages. **Apply migration + redeploy Edge on test before smoke.** Stubs: in-chat search, pin-from-menu, media/links viewer.
 
 - 2026-05-26: **Per-guide Slots Edge toggles + admin lock switches:** **`guideAccess.js`** (`FREE_GUIDE_SLUGS` default **`phoenix-link`**, **`stack-up-pays`**); AP Guides tab partially open like Calcs; lock icons + subscribe on expand. **`content_access_gates`** table + admin-only lock switches on calculator/guide rows (migration **`20260526150000_content_access_gates.sql`**). **`calculatorAccess.js`** honors DB overrides. **`docs/access-tiers.md`** updated.
 
