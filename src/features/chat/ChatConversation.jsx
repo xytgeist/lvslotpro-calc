@@ -118,7 +118,7 @@ export default function ChatConversation({
   const typingRef = useRef(null)
   const lastReadDebounceRef = useRef(null)
   const composerBarRef = useRef(null)
-  /** Bottom gap (px) to restore after swipe keyboard dismiss — shared with Android RO. */
+  /** Android: bottom gap (px) to restore after swipe keyboard dismiss — shared with RO. */
   const keyboardDismissPreserveRef = useRef(/** @type {number | null} */ (null))
   const [composerBarH, setComposerBarH] = useState(80)
 
@@ -713,10 +713,12 @@ export default function ChatConversation({
   }, [])
 
   // Swipe-down-to-dismiss keyboard — independent of the timestamp-swipe logic.
-  // Locks list scroll during a clear dismiss gesture; preserves reading position after blur.
+  // Android: lock scroll during dismiss + preserve reading position after blur.
+  // iOS: blur only, then smooth scroll to bottom (prior behavior — scroll lock breaks iOS).
   useEffect(() => {
     const el = listRef.current
     if (!el) return
+    const isAndroid = /Android/i.test(navigator.userAgent)
     let startY = 0
     let startX = 0
     let keyboardWasOpen = false
@@ -732,7 +734,7 @@ export default function ChatConversation({
       el.scrollTop = el.scrollHeight - el.clientHeight - gap
     }
 
-    /** Re-apply preserved gap while the keyboard animates closed (viewport/list resize). */
+    /** Android: re-apply preserved gap while the keyboard animates closed. */
     const schedulePreserveRestore = () => {
       const vv = window.visualViewport
       let timer = null
@@ -763,14 +765,13 @@ export default function ChatConversation({
     }
 
     const onMove = (e) => {
-      if (!keyboardWasOpen) return
+      if (!isAndroid || !keyboardWasOpen) return
       const t = e.touches[0]
       if (!t) return
       const dy = t.clientY - startY
       const dx = t.clientX - startX
 
       if (!dismissActive) {
-        // Downward intent + already at bottom → lock scroll (nowhere to scroll anyway)
         if (dy > 10 && dy > Math.abs(dx) && nearBottom()) {
           dismissActive = true
           lockedScrollTop = el.scrollTop
@@ -786,21 +787,28 @@ export default function ChatConversation({
     const onEnd = (e) => {
       const dy = (e.changedTouches[0]?.clientY ?? 0) - startY
       if (dy > 50 && keyboardWasOpen) {
-        keyboardDismissPreserveRef.current = bottomGap()
         document.activeElement?.blur?.()
-        schedulePreserveRestore()
+        if (isAndroid) {
+          keyboardDismissPreserveRef.current = bottomGap()
+          schedulePreserveRestore()
+        } else {
+          atBottomRef.current = true
+          requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }))
+        }
       }
       dismissActive = false
       keyboardWasOpen = false
     }
 
     el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchmove', onMove, { passive: false })
+    if (isAndroid) {
+      el.addEventListener('touchmove', onMove, { passive: false })
+    }
     el.addEventListener('touchend', onEnd, { passive: true })
     el.addEventListener('touchcancel', onEnd, { passive: true })
     return () => {
       el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchmove', onMove)
+      if (isAndroid) el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)
       el.removeEventListener('touchcancel', onEnd)
     }
