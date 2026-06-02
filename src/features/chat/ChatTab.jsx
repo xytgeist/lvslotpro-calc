@@ -4,6 +4,7 @@ import QuickLinkPageToggle from '../../components/QuickLinkPageToggle.jsx'
 import ChatConversation from './ChatConversation.jsx'
 import {
   chatOpenDm,
+  chatCreateGroup,
   chatRoomLabel,
   chatRoomIsMuted,
 } from './chatApi.js'
@@ -49,6 +50,15 @@ export default function ChatTab({
   const [searchResults, setSearchResults] = useState(/** @type {any[]} */ ([]))
   const [searchBusy, setSearchBusy] = useState(false)
   const searchTimerRef = useRef(null)
+
+  // Group creation
+  const [showGroupCreate, setShowGroupCreate] = useState(false)
+  const [groupTitle, setGroupTitle] = useState('')
+  const [groupMembers, setGroupMembers] = useState(/** @type {any[]} */ ([]))
+  const [groupSearch, setGroupSearch] = useState('')
+  const [groupSearchResults, setGroupSearchResults] = useState(/** @type {any[]} */ ([]))
+  const [groupSearchBusy, setGroupSearchBusy] = useState(false)
+  const groupSearchTimerRef = useRef(null)
   /** @type {React.MutableRefObject<Record<string, any>>} */
   const profilesCacheRef = useRef({})
 
@@ -266,6 +276,58 @@ export default function ChatTab({
     }
   }, [supabaseClient, loadRooms])
 
+  // ── Group creation ────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (groupSearchTimerRef.current) clearTimeout(groupSearchTimerRef.current)
+    const q = groupSearch.trim()
+    if (q.length < 2) { setGroupSearchResults([]); return }
+    groupSearchTimerRef.current = setTimeout(async () => {
+      if (!supabaseClient) return
+      setGroupSearchBusy(true)
+      try {
+        const term = q.replace(/^@/, '')
+        const excludeIds = [viewerUserId, ...groupMembers.map(m => m.user_id)]
+        const { data, error } = await supabaseClient
+          .from('profiles')
+          .select('user_id, handle, display_name, avatar_url')
+          .is('banned_at', null)
+          .or(`handle.ilike.%${term}%,display_name.ilike.%${term}%`)
+          .not('user_id', 'in', `(${excludeIds.join(',')})`)
+          .limit(6)
+        if (error) throw error
+        setGroupSearchResults(data || [])
+      } catch { setGroupSearchResults([]) }
+      finally { setGroupSearchBusy(false) }
+    }, 200)
+    return () => { if (groupSearchTimerRef.current) clearTimeout(groupSearchTimerRef.current) }
+  }, [groupSearch, supabaseClient, viewerUserId, groupMembers])
+
+  const createGroup = useCallback(async () => {
+    if (!groupTitle.trim() || groupMembers.length < 1) return
+    setActionErr('')
+    setActionBusy(true)
+    try {
+      const res = await chatCreateGroup(supabaseClient, {
+        title: groupTitle.trim(),
+        memberUserIds: [viewerUserId, ...groupMembers.map(m => m.user_id)],
+      })
+      if (res?.room_id) {
+        setShowGroupCreate(false)
+        setGroupTitle('')
+        setGroupMembers([])
+        setGroupSearch('')
+        await loadRooms()
+        setActiveRoomId(res.room_id)
+        setTab('inbox')
+      }
+    } catch (e) {
+      setActionErr(e?.message || 'Could not create group.')
+    } finally {
+      setActionBusy(false)
+    }
+  }, [supabaseClient, groupTitle, groupMembers, viewerUserId, loadRooms])
+
   // ── Active room data ──────────────────────────────────────────────────────
 
   const activeRoom = useMemo(
@@ -337,29 +399,49 @@ export default function ChatTab({
         <QuickLinkPageToggle destinationId="chat" />
       </div>
 
-      {/* New message search */}
+      {/* New message search + New group button */}
       <div className="relative px-3 pb-2">
-        <div className="flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-900/80 px-3 py-2">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-zinc-500">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="New message — search users…"
-            className="min-w-0 flex-1 bg-transparent text-[14px] text-zinc-100 placeholder-zinc-500 outline-none"
-          />
-          {searchQuery.length > 0 && (
-            <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]) }} className="shrink-0 text-zinc-500 touch-manipulation">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          {/* DM search input */}
+          <div className="flex flex-1 items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-900/80 px-3 py-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-zinc-500">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="New message…"
+              className="min-w-0 flex-1 bg-transparent text-[14px] text-zinc-100 placeholder-zinc-500 outline-none"
+            />
+            {searchQuery.length > 0 && (
+              <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]) }} className="shrink-0 text-zinc-500 touch-manipulation">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* New group button */}
+          <button
+            type="button"
+            onClick={() => { setShowGroupCreate(v => !v); setSearchQuery(''); setSearchResults([]) }}
+            aria-label="New group chat"
+            className={`shrink-0 flex h-9 w-9 items-center justify-center rounded-full border touch-manipulation transition-colors ${
+              showGroupCreate ? 'border-cyan-600 bg-cyan-900/40 text-cyan-400' : 'border-zinc-700/60 bg-zinc-900/80 text-zinc-400'
+            }`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <line x1="19" y1="8" x2="19" y2="14"/>
+              <line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+          </button>
         </div>
 
-        {/* Search results dropdown */}
+        {/* DM search results dropdown */}
         {(searchResults.length > 0 || searchBusy) && (
           <div className="absolute inset-x-3 top-full z-20 mt-1 overflow-hidden rounded-2xl border border-zinc-700/50 bg-zinc-900 shadow-2xl">
             {searchBusy && searchResults.length === 0 ? (
@@ -387,6 +469,85 @@ export default function ChatTab({
           </div>
         )}
       </div>
+
+      {/* New group creation panel */}
+      {showGroupCreate && (
+        <div className="mx-3 mb-2 rounded-2xl border border-zinc-700/50 bg-zinc-900 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-zinc-300">New group chat</span>
+            <button type="button" onClick={() => { setShowGroupCreate(false); setGroupTitle(''); setGroupMembers([]); setGroupSearch('') }}
+              className="text-zinc-500 touch-manipulation">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Group name */}
+          <input
+            type="text"
+            value={groupTitle}
+            onChange={e => setGroupTitle(e.target.value)}
+            placeholder="Group name…"
+            maxLength={80}
+            className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/60 px-3 py-2 text-[14px] text-zinc-100 placeholder-zinc-500 outline-none focus:border-cyan-600"
+          />
+
+          {/* Member search */}
+          <div className="relative">
+            <input
+              type="text"
+              value={groupSearch}
+              onChange={e => setGroupSearch(e.target.value)}
+              placeholder="Add members…"
+              className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/60 px-3 py-2 text-[14px] text-zinc-100 placeholder-zinc-500 outline-none focus:border-cyan-600"
+            />
+            {(groupSearchResults.length > 0 || groupSearchBusy) && (
+              <div className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-zinc-700/50 bg-zinc-900 shadow-xl">
+                {groupSearchBusy && groupSearchResults.length === 0 ? (
+                  <div className="px-3 py-2 text-[13px] text-zinc-500">Searching…</div>
+                ) : groupSearchResults.map(p => (
+                  <button key={p.user_id} type="button"
+                    onClick={() => { setGroupMembers(prev => [...prev, p]); setGroupSearch(''); setGroupSearchResults([]) }}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left touch-manipulation hover:bg-zinc-800">
+                    {p.avatar_url
+                      ? <img src={p.avatar_url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                      : <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-zinc-700 text-[11px] font-bold text-zinc-300">{(p.handle?.[0] || '?').toUpperCase()}</div>
+                    }
+                    <div className="min-w-0">
+                      {p.display_name && <span className="truncate text-[13px] font-semibold text-zinc-100">{p.display_name} </span>}
+                      <span className="text-[12px] text-zinc-400">@{p.handle}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Selected members chips */}
+          {groupMembers.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {groupMembers.map(m => (
+                <span key={m.user_id} className="flex items-center gap-1 rounded-full bg-cyan-900/50 border border-cyan-700/40 px-2.5 py-1 text-[12px] text-cyan-200">
+                  @{m.handle}
+                  <button type="button" onClick={() => setGroupMembers(prev => prev.filter(x => x.user_id !== m.user_id))}
+                    className="text-cyan-400 touch-manipulation leading-none">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Create button */}
+          <button
+            type="button"
+            disabled={!groupTitle.trim() || groupMembers.length < 1 || actionBusy}
+            onClick={() => void createGroup()}
+            className="w-full rounded-xl bg-cyan-700 py-2.5 text-[14px] font-bold text-white touch-manipulation hover:bg-cyan-600 disabled:bg-zinc-800 disabled:text-zinc-500"
+          >
+            {actionBusy ? 'Creating…' : `Create group${groupMembers.length > 0 ? ` · ${groupMembers.length + 1} members` : ''}`}
+          </button>
+        </div>
+      )}
 
       {/* Inbox / Topics tabs */}
       <div className="flex gap-1 border-b border-zinc-800 px-3 pb-0 pt-1">

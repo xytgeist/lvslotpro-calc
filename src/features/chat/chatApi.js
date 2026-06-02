@@ -13,6 +13,16 @@ export function chatOpenDm(supabase, peerUserId) {
 }
 
 /**
+ * Create a new group chat with a title and list of member user IDs.
+ * @param {SupabaseClient} supabase
+ * @param {{ title: string, memberUserIds: string[] }} opts
+ * @returns {Promise<{ room_id: string }>}
+ */
+export function chatCreateGroup(supabase, { title, memberUserIds }) {
+  return loungeChatInvoke(supabase, { action: 'create_group', title, member_user_ids: memberUserIds })
+}
+
+/**
  * Generate a short unique key for send idempotency.
  * @returns {string}
  */
