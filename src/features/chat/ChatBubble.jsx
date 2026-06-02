@@ -23,7 +23,7 @@ function computeLayout(rect, isMine) {
   const vh  = window.innerHeight
   const SAFE_TOP    = 52   // generous for notch / Dynamic Island
   const SAFE_BOTTOM = 40   // home indicator
-  const PILL_H      = 60
+  const PILL_H      = 68
   const MENU_H      = 230  // estimated max action card height
   const GAP         = 10
   const PILL_W      = Math.min(360, vw - 32)
@@ -286,14 +286,14 @@ export default function ChatBubble({
             const totalCount = reactions.reduce((sum, r) => sum + r.count, 0)
             return (
               <div className={`-mt-3 relative z-10 flex px-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                <div className="reaction-pill flex items-center gap-0.5 rounded-full px-1.5 py-0.5">
+                <div className="reaction-pill flex items-center gap-1 rounded-full px-2.5 py-1">
                   {reactions.map((r) => (
                     r.emoji === '❤️'
-                      ? <LoungeFlameIcon key={r.emoji} liked className="h-[15px] w-[15px]" />
-                      : <span key={r.emoji} className="text-[14px] leading-none">{r.emoji}</span>
+                      ? <LoungeFlameIcon key={r.emoji} liked className="h-[18px] w-[18px]" />
+                      : <span key={r.emoji} className="text-[16px] leading-none">{r.emoji}</span>
                   ))}
                   {totalCount >= 2 && (
-                    <span className="ml-0.5 text-[11px] font-semibold leading-none text-zinc-400">{totalCount}</span>
+                    <span className="ml-0.5 text-[12px] font-semibold leading-none text-zinc-400">{totalCount}</span>
                   )}
                 </div>
               </div>
@@ -324,12 +324,12 @@ export default function ChatBubble({
 
           {/* Floating emoji pill */}
           <div
-            className="chat-menu-glass fixed z-[109] flex items-center overflow-x-auto rounded-full px-2 py-1 scrollbar-none"
+            className="chat-menu-glass fixed z-[109] flex items-center gap-1 overflow-x-auto rounded-full px-2.5 py-1.5 scrollbar-none"
             style={{
               top:   layout.pillTop,
               left:  layout.pillLeft,
               width: layout.pillW,
-              height: 56,
+              height: 64,
               touchAction: 'pan-x',
               overscrollBehaviorX: 'contain',
             }}
@@ -341,25 +341,25 @@ export default function ChatBubble({
                 key={e}
                 type="button"
                 onClick={() => toggleReaction(e)}
-                className={`shrink-0 touch-manipulation px-1.5 transition-transform active:scale-90 ${
-                  reactionGroups[e]?.viewerReacted ? 'scale-110' : ''
+                className={`shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-zinc-700/60 touch-manipulation transition-transform active:scale-90 ${
+                  reactionGroups[e]?.viewerReacted ? 'scale-110 ring-1 ring-cyan-500/50' : ''
                 }`}
               >
                 {e === '❤️'
-                  ? <LoungeFlameIcon liked className="h-[20px] w-[20px] translate-y-0.5" />
-                  : <span className="text-[17px]">{e}</span>
+                  ? <LoungeFlameIcon liked className="h-[22px] w-[22px] translate-y-0.5" />
+                  : <span className="text-[20px] leading-none">{e}</span>
                 }
               </button>
             ))}
 
             {/* Separator */}
-            <div className="mx-1 h-6 shrink-0 w-px bg-zinc-600/70" />
+            <div className="mx-1.5 h-8 shrink-0 w-px bg-zinc-600/70" />
 
             {/* Open full picker */}
             <button
               type="button"
               onClick={() => setFullPickerOpen(true)}
-              className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700/60 text-zinc-400 touch-manipulation transition-colors active:bg-zinc-600"
+              className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-zinc-700/60 text-zinc-400 touch-manipulation transition-colors active:bg-zinc-600"
               aria-label="More emoji"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5">
