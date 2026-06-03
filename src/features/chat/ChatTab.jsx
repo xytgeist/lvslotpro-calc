@@ -525,6 +525,7 @@ export default function ChatTab({
     const otherUnreadCount = rooms.filter((r) => r.id !== activeRoomId && r.hasUnread).length
     return (
       <ChatConversation
+        key={activeRoomId}
         supabaseClient={supabaseClient}
         room={room}
         viewerUserId={viewerUserId}

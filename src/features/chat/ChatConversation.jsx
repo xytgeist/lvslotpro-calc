@@ -526,26 +526,61 @@ export default function ChatConversation({
 
   useEffect(() => { void loadMessages() }, [loadMessages])
 
+  // Reset thread state when switching rooms so we never scroll stale messages or skip open-tail pin.
   useEffect(() => {
     openScrollPendingRef.current = true
+    setLoading(true)
+    setError('')
+    setMessages([])
+    setReactions({})
+    setHasMore(false)
+    hasMoreRef.current = false
+    hasNewerRef.current = false
+    setHasNewer(false)
+    setNewMsgCount(0)
+    setScrolledUpCount(0)
+    setReplyTarget(null)
   }, [room.id])
 
-  // Always land on the latest message when a conversation opens (or reloads to live end).
+  const pinOpenTail = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    atBottomRef.current = true
+    setIsAtBottom(true)
+    setScrolledUpCount(0)
+    setNewMsgCount(0)
+  }, [])
+
+  // Land on the latest message when a conversation opens (after load + composer inset settle).
   useLayoutEffect(() => {
     if (loading || !openScrollPendingRef.current) return
-    const pinOpenTail = () => {
-      const el = listRef.current
-      if (!el) return
-      el.scrollTop = el.scrollHeight
-      atBottomRef.current = true
-      setIsAtBottom(true)
-      setScrolledUpCount(0)
-      setNewMsgCount(0)
+
+    let alive = true
+    const run = () => {
+      if (alive) pinOpenTail()
     }
-    pinOpenTail()
-    requestAnimationFrame(pinOpenTail)
-    openScrollPendingRef.current = false
-  }, [loading, room.id])
+
+    run()
+    const raf1 = requestAnimationFrame(() => {
+      run()
+      requestAnimationFrame(run)
+    })
+    const t0 = window.setTimeout(run, 0)
+    const t1 = window.setTimeout(run, 50)
+    const tDone = window.setTimeout(() => {
+      run()
+      if (alive) openScrollPendingRef.current = false
+    }, 150)
+
+    return () => {
+      alive = false
+      cancelAnimationFrame(raf1)
+      window.clearTimeout(t0)
+      window.clearTimeout(t1)
+      window.clearTimeout(tDone)
+    }
+  }, [loading, room.id, messages.length, composerInsetPx, pinOpenTail])
 
   // ── Load older messages (prepend) ─────────────────────────────────────────
 
