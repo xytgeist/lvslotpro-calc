@@ -2,6 +2,31 @@
 
 ---
 
+## CRITICAL — PLATFORM GUARDS AND LAYOUT DEBUGGING
+
+### Never use negative platform checks as a gate
+
+> **NEVER use `!IS_ANDROID`, `!IS_IOS`, or any other negated platform constant as a way to target a specific platform.** `!IS_ANDROID` means "everything except Android" — it silently includes Windows, macOS, Linux, crawlers, tablets, and anything else that isn't Android. Always use the **positive** form: `IS_IOS`, `IS_ANDROID`, etc.
+
+Bad: `composerFocused && !IS_ANDROID ? { paddingTop: X } : undefined`
+Good: `composerFocused && IS_IOS ? { paddingTop: X } : undefined`
+
+`AGENT_RULE_POSITIVE_PLATFORM_GUARDS` — searchability token.
+
+### When a layout value shifts by exactly N px, grep for N first
+
+> If Ryan reports a layout jump of a specific pixel amount, **grep the codebase for that number before investigating scroll/RAF/ResizeObserver logic.** A shift of exactly 32px almost certainly means a constant named something like `*_PAD_PX` or `*_INSET_PX` is being applied. Find the constant, read its gate condition, and verify the gate is correct before doing anything else.
+
+`AGENT_RULE_GREP_PIXEL_CONSTANT` — searchability token.
+
+### Trust Ryan's platform statement immediately
+
+> When Ryan says "I'm on Chrome Windows" / "I'm on iOS" / "this is on localhost," **accept it as ground truth and immediately rule out any code path that cannot run on that platform.** Do not second-guess or silently assume a different device.
+
+`AGENT_RULE_TRUST_PLATFORM_CLAIM` — searchability token.
+
+---
+
 ## CRITICAL — READ BEFORE EDITING ANY EXISTING CODE
 
 > **DO NOT UNDER ANY CIRCUMSTANCES EDIT (ALREADY WRITTEN) CODE BEFORE PROPERLY CHECKING THAT IT WILL NOT NEGATIVELY IMPACT OR BREAK ANY OTHER CODE IN THE PROJECT.**

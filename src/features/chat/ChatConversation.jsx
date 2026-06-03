@@ -38,8 +38,6 @@ const PAGE_SIZE = 50
 const IS_ANDROID = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
 const IS_IOS =
   typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
-/** Extra grab area above composer for iOS keyboard dismiss (px). */
-const IOS_COMPOSER_DISMISS_PAD_PX = 32
 /** Show scroll-to-bottom when this many newer messages are off-screen. */
 const SCROLL_UP_MSG_THRESHOLD = 20
 /** Last message must sit this far below the composer top before we auto-scroll. */
@@ -859,7 +857,7 @@ export default function ChatConversation({
           })
 
           if (atBottomRef.current) {
-            requestAnimationFrame(() => pinListToTail({ force: true }))
+            pinTailAfterMutation()
           } else {
             setNewMsgCount((n) => n + 1)
           }
@@ -920,7 +918,7 @@ export default function ChatConversation({
           })
 
           if (atBottomRef.current) {
-            requestAnimationFrame(() => pinListToTail({ force: true }))
+            pinTailAfterMutation()
           } else {
             setNewMsgCount((n) => n + missed.length)
           }
@@ -1270,7 +1268,8 @@ export default function ChatConversation({
         composerFocusedRef.current = true
         openScrollPendingRef.current = false
         if (IS_IOS) pinIosKeyboardFrame()
-        else runTailPinFollow()
+        else if (IS_ANDROID) runTailPinFollow()
+        // Desktop: no keyboard raises, no scroll correction needed on focus.
       }
     }
 
@@ -1909,11 +1908,6 @@ export default function ChatConversation({
       >
         <div
           ref={composerTouchRef}
-          style={
-            composerFocused && !IS_ANDROID
-              ? { paddingTop: IOS_COMPOSER_DISMISS_PAD_PX }
-              : undefined
-          }
         >
           {typingUsers.length > 0 && isAtBottom && (
             <div className="pb-1 text-[12px] text-zinc-500">
