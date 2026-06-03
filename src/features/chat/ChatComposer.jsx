@@ -189,7 +189,7 @@ export default function ChatComposer({
     }))
     setImageSlots((prev) => [...prev, ...newSlots])
 
-    // Upload each file in parallel in the background
+    // Upload each file in parallel in the background (with up to 3 retries for network hiccups)
     files.forEach((file, i) => {
       const slot = newSlots[i]
       const promise = (async () => {
@@ -198,16 +198,20 @@ export default function ChatComposer({
           console.error('[ChatComposer] image prep failed', file.name, file.type, file.size, prepErr?.message || String(prepErr))
           throw prepErr || new Error('Prep failed')
         }
-        const { data: url, error: upErr } = await uploadLoungeFeedPostImage({
-          supabaseClient,
-          user: { id: viewerUserId },
-          file: ready,
-        })
-        if (upErr || !url) {
-          console.error('[ChatComposer] image upload failed', ready.name, ready.type, ready.size, upErr?.message || String(upErr))
-          throw upErr || new Error('Upload failed')
+        const MAX_ATTEMPTS = 3
+        let lastErr
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 800 * attempt))
+          const { data: url, error: upErr } = await uploadLoungeFeedPostImage({
+            supabaseClient,
+            user: { id: viewerUserId },
+            file: ready,
+          })
+          if (url) return url
+          lastErr = upErr
+          console.error(`[ChatComposer] image upload attempt ${attempt + 1} failed`, ready.name, upErr?.message || String(upErr))
         }
-        return url
+        throw lastErr || new Error('Upload failed')
       })()
 
       uploadPromisesRef.current.set(slot.id, promise)
