@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ChatLinkPreviewCard from '../../components/ChatLinkPreviewCard.jsx'
+import ChatMediaViewer from './ChatMediaViewer.jsx'
 import { attachLinkPreview } from '../../utils/loungeLinkPreviewApi.js'
 import { extractFirstUrlFromText, LinkifiedText, textIsOnlyUrls } from '../../utils/linkifyText.jsx'
 import ChatEmojiPicker, { saveRecentEmoji } from './ChatEmojiPicker'
@@ -141,6 +142,10 @@ function computeLayout(rect, isMine, { isDeleted = false, enableStar = false, en
  *     id: string,
  *     body: string,
  *     image_urls?: string[],
+ *     stream_video_uid?: string | null,
+ *     stream_poster_url?: string | null,
+ *     stream_video_width?: number | null,
+ *     stream_video_height?: number | null,
  *     sender_id: string,
  *     created_at: string,
  *     deleted_at?: string | null,
@@ -194,10 +199,11 @@ export default function ChatBubble({
   onLinkPreviewReady = null,
   receipt = null,
 }) {
-  const [menuOpen, setMenuOpen]           = useState(false)
+  const [menuOpen, setMenuOpen]             = useState(false)
   const [fullPickerOpen, setFullPickerOpen] = useState(false)
-  const [bubbleRect, setBubbleRect]       = useState(/** @type {DOMRect | null} */ (null))
-  const [compactBubble, setCompactBubble] = useState(true)
+  const [bubbleRect, setBubbleRect]         = useState(/** @type {DOMRect | null} */ (null))
+  const [compactBubble, setCompactBubble]   = useState(true)
+  const [mediaViewerIndex, setMediaViewerIndex] = useState(/** @type {number | null} */ (null))
 
   const longPressTimer = useRef(null)
   const bubbleRef      = useRef(null)
@@ -210,6 +216,7 @@ export default function ChatBubble({
     !isDeleted &&
     linkPreview &&
     imageUrlsEarly.length === 0 &&
+    !message.stream_video_uid &&
     textIsOnlyUrls(message.body || '')
   const showTextBubble = !isLinkPreviewOnly || isDeleted
   /** Caption + link card share one bubble (iMessage-style). */
@@ -395,6 +402,16 @@ export default function ChatBubble({
     : ''
 
   const imageUrls = Array.isArray(message.image_urls) ? message.image_urls.filter(Boolean) : []
+  const videoUid = message.stream_video_uid || null
+
+  // Build unified media list for the grid and viewer.
+  const allMedia = [
+    ...imageUrls.map((url) => ({ type: 'image', url })),
+    ...(videoUid
+      ? [{ type: 'video', videoUid, url: message.stream_poster_url || '', posterUrl: message.stream_poster_url || '' }]
+      : []),
+  ]
+  const hasMedia = allMedia.length > 0
 
   // Pill ends on one visual line of text; fixed radius when wrapped or media attached.
   useLayoutEffect(() => {
@@ -406,7 +423,7 @@ export default function ChatBubble({
     }
 
     const measure = () => {
-      if (imageUrls.length > 0 || linkPreviewInBubble) {
+      if (hasMedia || linkPreviewInBubble) {
         setCompactBubble(false)
         return
       }
@@ -432,10 +449,13 @@ export default function ChatBubble({
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [message.body, imageUrls.length, isLinkPreviewOnly, linkPreviewInBubble])
+  }, [message.body, hasMedia, isLinkPreviewOnly, linkPreviewInBubble])
 
   // Floating menu layout — computed fresh each render so it tracks the latest rect
   const layout = bubbleRect ? computeLayout(bubbleRect, isMine, { isDeleted, enableStar, enablePin }) : null
+
+  const openViewer = useCallback((idx) => setMediaViewerIndex(idx), [])
+  const closeViewer = useCallback(() => setMediaViewerIndex(null), [])
 
   return (
     <div
@@ -547,18 +567,8 @@ export default function ChatBubble({
                     />
                   </div>
                 )}
-                {imageUrls.length > 0 && (
-                  <div className={`mt-1.5 grid gap-1 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                    {imageUrls.map((url) => (
-                      <img
-                        key={url}
-                        src={url}
-                        alt=""
-                        className="max-h-56 w-full rounded-xl object-cover"
-                        loading="lazy"
-                      />
-                    ))}
-                  </div>
+                {hasMedia && !isDeleted && (
+                  <ChatMediaGrid media={allMedia} onOpen={openViewer} />
                 )}
                 {linkPreviewInBubble ? (
                   <ChatLinkPreviewCard preview={linkPreview} isMine={isMine} embedded />
@@ -821,6 +831,15 @@ export default function ChatBubble({
         />,
         document.body
       )}
+
+      {/* Media viewer */}
+      {mediaViewerIndex !== null && allMedia.length > 0 && (
+        <ChatMediaViewer
+          items={allMedia}
+          initialIndex={mediaViewerIndex}
+          onClose={closeViewer}
+        />
+      )}
     </div>
   )
 }
@@ -869,5 +888,70 @@ function PinIcon({ filled = false }) {
       <path d="M5 7h14v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V7z" />
       <path d="M9 3h6v4H9z" />
     </svg>
+  )
+}
+
+// ── WhatsApp-style media grid ──────────────────────────────────────────────
+
+const GRID_MAX_VISIBLE = 4
+
+/**
+ * @param {{ media: Array<{ type: string, url?: string, videoUid?: string, posterUrl?: string }>, onOpen: (index: number) => void }} props
+ */
+function ChatMediaGrid({ media, onOpen }) {
+  const visible = media.slice(0, GRID_MAX_VISIBLE)
+  const overflow = media.length - GRID_MAX_VISIBLE
+
+  // Layout classes based on count
+  const count = visible.length
+
+  return (
+    <div className={`mt-1.5 overflow-hidden rounded-xl ${count === 1 ? '' : 'grid gap-0.5'} ${count === 2 ? 'grid-cols-2' : count >= 3 ? 'grid-cols-2' : ''}`}>
+      {visible.map((item, i) => {
+        const isLastVisible = i === GRID_MAX_VISIBLE - 1
+        const showOverlay = isLastVisible && overflow > 0
+
+        // 3-item layout: first image spans full width
+        const spanFull = count === 3 && i === 0
+
+        return (
+          <button
+            key={item.videoUid || item.url || i}
+            type="button"
+            onClick={() => onOpen(i)}
+            className={`relative block overflow-hidden bg-zinc-900 touch-manipulation active:opacity-80 ${spanFull ? 'col-span-2' : ''}`}
+            style={{ aspectRatio: spanFull ? '2/1' : '1/1' }}
+            aria-label={item.type === 'video' ? 'Play video' : `View image ${i + 1}`}
+          >
+            {item.type === 'video' ? (
+              <>
+                {item.posterUrl ? (
+                  <img src={item.posterUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="h-full w-full bg-zinc-800" />
+                )}
+                {/* Play button overlay */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="grid h-12 w-12 place-items-center rounded-full bg-black/50">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white" aria-hidden>
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <img src={item.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+            )}
+
+            {/* +N overflow badge on the last visible tile */}
+            {showOverlay && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <span className="text-[22px] font-bold text-white">+{overflow}</span>
+              </div>
+            )}
+          </button>
+        )
+      })}
+    </div>
   )
 }

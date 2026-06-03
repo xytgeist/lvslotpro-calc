@@ -6,9 +6,18 @@ import {
   scheduleLoungeComposerTextareaFocus,
 } from '../lounge/loungeDockComposeFocus.js'
 import KlipyGifPicker from '../lounge/KlipyGifPicker.jsx'
+import LoungeVideoCropModal from '../lounge/LoungeVideoCropModal.jsx'
+import {
+  requestCfStreamDirectUpload,
+  uploadVideoToCfStreamDirectUrlWithProgress,
+  deleteCfStreamOrphanAsset,
+  cfStreamPosterUrl,
+  probeVideoFileDisplaySize,
+  captureVideoFilePosterObjectUrl,
+} from '../../utils/loungeVideoUpload.js'
 
 const MAX_BODY   = 4000
-const MAX_IMAGES = 4
+const MAX_IMAGES = 9
 /** Matches Tailwind `h-10` on the + button (40px border-box). */
 const COMPOSER_ROW_H = 40
 const COMPOSER_MAX_H = 160
@@ -23,7 +32,7 @@ const COMPOSER_EXPANDED_RADIUS_PX = 20
  *   viewerUserId: string,
  *   replyTarget: { id: string, body: string, reply_to_preview?: string | null, image_urls?: string[] } | null,
  *   onClearReply: () => void,
- *   onSend: (opts: { body: string, imageUrls: string[], replyToMessageId: string | null }) => Promise<void>,
+ *   onSend: (opts: { body: string, imageUrls: string[], streamVideoUid: string | null, streamPosterUrl: string | null, streamVideoWidth: number | null, streamVideoHeight: number | null, replyToMessageId: string | null }) => Promise<void>,
  *   onTyping: (displayName: string) => void,
  *   viewerDisplayName?: string,
  *   disabled?: boolean,
@@ -54,26 +63,33 @@ export default function ChatComposer({
   /** footerHost: no textarea in DOM until tap — matches lounge reply collapsed pill (iOS keyboard). */
   const [composerActive, setComposerActive] = useState(!footerHost)
 
-  const textareaRef  = useRef(null)
-  const inputWrapRef = useRef(null)
-  const fileInputRef = useRef(null)
-  const plusBtnRef   = useRef(null)
+  // Video state
+  const [cropModalFile, setCropModalFile]   = useState(/** @type {File|null} */ (null))
+  const [videoUploadProgress, setVideoUploadProgress] = useState(/** @type {number|null} */ (null))
+  const [videoMeta, setVideoMeta] = useState(/** @type {{ uid: string, posterUrl: string, localPoster: string|null, width: number|null, height: number|null }|null} */ (null))
+  const videoAbortRef = useRef(/** @type {AbortController|null} */ (null))
 
-  const hasContent = body.trim().length > 0 || images.length > 0
-  const canSend    = !disabled && !sending && !uploading && hasContent
+  const textareaRef    = useRef(null)
+  const inputWrapRef   = useRef(null)
+  const fileInputRef   = useRef(null)
+  const videoInputRef  = useRef(null)
+  const plusBtnRef     = useRef(null)
+
+  const hasContent = body.trim().length > 0 || images.length > 0 || videoMeta !== null
+  const canSend    = !disabled && !sending && !uploading && !videoUploadProgress && hasContent
 
   useEffect(() => {
     if (!footerHost) setComposerActive(true)
   }, [footerHost])
 
   useEffect(() => {
-    if (!replyTarget && images.length === 0) return
+    if (!replyTarget && images.length === 0 && !videoMeta) return
     if (footerHost) {
       flushSync(() => setComposerActive(true))
     } else {
       setComposerActive(true)
     }
-  }, [replyTarget, images.length, footerHost])
+  }, [replyTarget, images.length, videoMeta, footerHost])
 
   const activateAndFocusComposer = useCallback(() => {
     if (disabled) return
@@ -90,12 +106,12 @@ export default function ChatComposer({
   const maybeCollapseComposer = useCallback(() => {
     if (!footerHost) return
     window.setTimeout(() => {
-      if (body.trim() || images.length > 0 || replyTarget || plusOpen) return
+      if (body.trim() || images.length > 0 || videoMeta || replyTarget || plusOpen) return
       const ae = document.activeElement
       if (textareaRef.current && ae === textareaRef.current) return
       setComposerActive(false)
     }, 220)
-  }, [body, footerHost, images.length, plusOpen, replyTarget])
+  }, [body, footerHost, images.length, videoMeta, plusOpen, replyTarget])
 
   // Single line: lock wrapper to h-10 (same as +). Grow only when text wraps.
   useLayoutEffect(() => {
@@ -182,13 +198,93 @@ export default function ChatComposer({
 
   const removeImage = (url) => setImages((prev) => prev.filter((u) => u !== url))
 
+  const handleVideoPick = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (videoInputRef.current) videoInputRef.current.value = ''
+    setPlusOpen(false)
+    setCropModalFile(file)
+  }
+
+  const handleCropCancel = () => setCropModalFile(null)
+
+  const handleCropConfirm = useCallback(async (result) => {
+    // LoungeVideoCropModal with intent='detail' returns a File directly.
+    const trimmedFile = result instanceof File ? result : null
+    setCropModalFile(null)
+    if (!trimmedFile) return
+
+    setUploadErr('')
+    setVideoUploadProgress(0)
+
+    const abortCtrl = new AbortController()
+    videoAbortRef.current = abortCtrl
+
+    try {
+      // Probe dimensions + capture local poster in parallel.
+      const [dims, localPoster] = await Promise.all([
+        probeVideoFileDisplaySize(trimmedFile),
+        captureVideoFilePosterObjectUrl(trimmedFile, { signal: abortCtrl.signal }).catch(() => null),
+      ])
+
+      if (abortCtrl.signal.aborted) return
+
+      // Mint a CF Stream direct-upload URL.
+      const { uploadURL, uid } = await requestCfStreamDirectUpload(supabaseClient)
+
+      if (abortCtrl.signal.aborted) {
+        void deleteCfStreamOrphanAsset(supabaseClient, uid)
+        return
+      }
+
+      // Upload with progress.
+      await uploadVideoToCfStreamDirectUrlWithProgress(uploadURL, trimmedFile, {
+        signal: abortCtrl.signal,
+        onProgress: (r) => setVideoUploadProgress(Math.round(r * 100)),
+      })
+
+      setVideoMeta({
+        uid,
+        posterUrl: cfStreamPosterUrl(uid),
+        localPoster,
+        width: dims?.width ?? null,
+        height: dims?.height ?? null,
+      })
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+      setUploadErr(e?.message || 'Video upload failed.')
+    } finally {
+      setVideoUploadProgress(null)
+      videoAbortRef.current = null
+    }
+  }, [supabaseClient])
+
+  const removeVideo = useCallback(() => {
+    if (videoMeta?.localPoster) URL.revokeObjectURL(videoMeta.localPoster)
+    videoAbortRef.current?.abort()
+    videoAbortRef.current = null
+    setVideoMeta(null)
+    setVideoUploadProgress(null)
+  }, [videoMeta])
+
   const handleSend = useCallback(async () => {
     if (!canSend) return
     // Snapshot before clearing so the send payload is correct
-    const snapshot = { body: body.trim(), imageUrls: images, replyToMessageId: replyTarget?.id ?? null }
+    const snapshot = {
+      body: body.trim(),
+      imageUrls: images,
+      streamVideoUid:    videoMeta?.uid    ?? null,
+      streamPosterUrl:   videoMeta?.posterUrl ?? null,
+      streamVideoWidth:  videoMeta?.width  ?? null,
+      streamVideoHeight: videoMeta?.height ?? null,
+      replyToMessageId: replyTarget?.id ?? null,
+    }
     // Clear immediately — don't wait for the network round-trip
     setBody('')
     setImages([])
+    // Dispose local poster blob URL now that we have the CF poster URL
+    if (videoMeta?.localPoster) URL.revokeObjectURL(videoMeta.localPoster)
+    setVideoMeta(null)
     onClearReply()
     // Keep the keyboard open by refocusing the now-empty textarea
     try {
@@ -202,7 +298,7 @@ export default function ChatComposer({
     } finally {
       setSending(false)
     }
-  }, [canSend, body, images, replyTarget, onSend, onClearReply])
+  }, [canSend, body, images, videoMeta, replyTarget, onSend, onClearReply])
 
   const handleKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -311,6 +407,44 @@ export default function ChatComposer({
         </div>
       )}
 
+      {/* Video preview strip */}
+      {(videoMeta || videoUploadProgress !== null) && (
+        <div className="chat-header-glass mb-1 flex items-center gap-3 rounded-2xl px-3 py-2">
+          <div className="relative shrink-0">
+            {videoMeta?.localPoster ? (
+              <img src={videoMeta.localPoster} alt="" className="h-16 w-16 rounded-xl object-cover" />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-zinc-800">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="text-zinc-500">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" />
+                </svg>
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            {videoUploadProgress !== null ? (
+              <>
+                <div className="mb-1.5 text-[12px] text-zinc-400">Uploading… {videoUploadProgress}%</div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-zinc-700">
+                  <div className="h-full rounded-full bg-cyan-500 transition-all" style={{ width: `${videoUploadProgress}%` }} />
+                </div>
+              </>
+            ) : (
+              <div className="text-[12px] text-zinc-400">Video ready</div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={removeVideo}
+            aria-label="Remove video"
+            className="shrink-0 rounded-full p-1 text-zinc-500 touch-manipulation hover:text-zinc-300"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {uploadErr && (
         <div className="px-1 pb-1 text-[12px] text-rose-400">{uploadErr}</div>
       )}
@@ -335,6 +469,7 @@ export default function ChatComposer({
 
         {/* Hidden file inputs */}
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImagePick} />
+        <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoPick} />
 
         {/* Textarea + inline send button */}
         <div
@@ -408,7 +543,7 @@ export default function ChatComposer({
             {/* Add Media */}
             <button
               type="button"
-              disabled={disabled || uploading || images.length >= MAX_IMAGES}
+              disabled={disabled || uploading || images.length >= MAX_IMAGES || videoMeta !== null || videoUploadProgress !== null}
               onClick={() => fileInputRef.current?.click()}
               className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
             >
@@ -418,6 +553,22 @@ export default function ChatComposer({
                 <polyline points="21 15 16 10 5 21" />
               </svg>
               Add Media
+            </button>
+
+            <div className="mx-4 h-px bg-white/10" />
+
+            {/* Video */}
+            <button
+              type="button"
+              disabled={disabled || uploading || videoMeta !== null || videoUploadProgress !== null || images.length > 0}
+              onClick={() => videoInputRef.current?.click()}
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="shrink-0">
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" />
+              </svg>
+              Video
             </button>
 
             <div className="mx-4 h-px bg-white/10" />
@@ -467,6 +618,15 @@ export default function ChatComposer({
         onPick={handleKlipyGifPick}
         supabaseClient={supabaseClient}
       />
+
+      {cropModalFile && (
+        <LoungeVideoCropModal
+          file={cropModalFile}
+          intent="detail"
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   )
 }

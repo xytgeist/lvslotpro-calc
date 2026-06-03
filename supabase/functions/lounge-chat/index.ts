@@ -237,8 +237,12 @@ Deno.serve(async (req) => {
       ? body.image_urls
           .map((u) => String(u).trim())
           .filter(Boolean)
-          .slice(0, 4)
+          .slice(0, 9)
       : []
+    const streamVideoUid   = body?.stream_video_uid   ? String(body.stream_video_uid).trim()   : null
+    const streamPosterUrl  = body?.stream_poster_url  ? String(body.stream_poster_url).trim()  : null
+    const streamVideoWidth  = Number.isFinite(Number(body?.stream_video_width))  ? Math.round(Number(body.stream_video_width))  : null
+    const streamVideoHeight = Number.isFinite(Number(body?.stream_video_height)) ? Math.round(Number(body.stream_video_height)) : null
     const replyToId = body?.reply_to_message_id ? String(body.reply_to_message_id).trim() : null
     const idempotencyKey = typeof body?.idempotency_key === 'string'
       ? body.idempotency_key.trim().slice(0, 64) || null
@@ -246,7 +250,7 @@ Deno.serve(async (req) => {
     if (!roomId) {
       return json(400, { error: 'room_id is required.' })
     }
-    if (!text && imageUrls.length === 0) {
+    if (!text && imageUrls.length === 0 && !streamVideoUid) {
       return json(400, { error: 'Message cannot be empty.' })
     }
 
@@ -306,7 +310,7 @@ Deno.serve(async (req) => {
     if (replyToId) {
       const { data: orig } = await admin
         .from('chat_messages')
-        .select('room_id, body, image_urls, deleted_at, sender_id')
+        .select('room_id, body, image_urls, stream_video_uid, deleted_at, sender_id')
         .eq('id', replyToId)
         .maybeSingle()
       if (orig && orig.room_id === roomId && !orig.deleted_at) {
@@ -316,6 +320,8 @@ Deno.serve(async (req) => {
           replyToPreview = origBody.slice(0, 80) + (origBody.length > 80 ? '…' : '')
         } else if (Array.isArray(orig.image_urls) && orig.image_urls.length > 0) {
           replyToPreview = '[image]'
+        } else if (orig.stream_video_uid) {
+          replyToPreview = '[video]'
         }
       }
     }
@@ -325,6 +331,10 @@ Deno.serve(async (req) => {
       sender_id: user.id,
       body: text,
       image_urls: imageUrls,
+      stream_video_uid:    streamVideoUid    || null,
+      stream_poster_url:   streamPosterUrl   || null,
+      stream_video_width:  streamVideoWidth  ?? null,
+      stream_video_height: streamVideoHeight ?? null,
       reply_to_message_id: replyToId || null,
       reply_to_preview: replyToPreview,
       reply_to_sender_id: replyToSenderId,
