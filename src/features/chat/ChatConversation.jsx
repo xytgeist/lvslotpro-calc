@@ -859,6 +859,16 @@ export default function ChatConversation({
 
           setMessages((prev) => {
             if (prev.some((m) => m.id === row.id)) return prev
+            // If this is our own message arriving via realtime, replace the
+            // optimistic placeholder in-place so there's never two bubbles.
+            if (row.sender_id === viewerUserId) {
+              const optIdx = prev.findLastIndex((m) => m.id.startsWith('opt-') && m.sender_id === viewerUserId)
+              if (optIdx !== -1) {
+                const next = [...prev]
+                next[optIdx] = { ...prev[optIdx], ...row, _finalizingMedia: false }
+                return next
+              }
+            }
             return [...prev, row]
           })
 
