@@ -552,6 +552,17 @@ export default function ChatConversation({
     setNewMsgCount(0)
   }, [])
 
+  /** Force tail pin after send or layout shift (images, link preview, composer inset). */
+  const pinTailAfterMutation = useCallback(() => {
+    const run = () => pinOpenTail()
+    run()
+    requestAnimationFrame(() => {
+      run()
+      requestAnimationFrame(run)
+    })
+    window.setTimeout(run, 50)
+  }, [pinOpenTail])
+
   // Land on the latest message when a conversation opens (after load + composer inset settle).
   useLayoutEffect(() => {
     if (loading || !openScrollPendingRef.current) return
@@ -989,9 +1000,7 @@ export default function ChatConversation({
       reply_to_sender_id: origMsg?.sender_id || null,
     }
     setMessages((prev) => [...prev, optimistic])
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => scrollToBottom('smooth'))
-    })
+    pinTailAfterMutation()
 
     try {
       const res = await chatSendMessage(supabaseClient, { roomId: room.id, body, imageUrls, replyToMessageId })
@@ -1006,21 +1015,22 @@ export default function ChatConversation({
               : m,
           )
         })
+        pinTailAfterMutation()
       }
       void refreshReadReceipts()
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
     }
-  }, [supabaseClient, room.id, viewerUserId, loadMessages, scrollToBottom, refreshReadReceipts])
+  }, [supabaseClient, room.id, viewerUserId, loadMessages, pinTailAfterMutation, refreshReadReceipts])
 
   const handleLinkPreviewReady = useCallback((messageId, preview) => {
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, link_preview: preview } : m)),
     )
     if (atBottomRef.current) {
-      requestAnimationFrame(() => pinListToTail({ force: true }))
+      pinTailAfterMutation()
     }
-  }, [pinListToTail])
+  }, [pinTailAfterMutation])
 
   const handleDelete = useCallback(async (messageId) => {
     await chatDeleteMessage(supabaseClient, messageId)
