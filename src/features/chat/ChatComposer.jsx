@@ -330,6 +330,9 @@ export default function ChatComposer({
   const openPlus = () => {
     const rect = plusBtnRef.current?.getBoundingClientRect()
     if (rect) setPlusRect(rect)
+    // Activate the composer so the hidden file inputs are mounted in the DOM,
+    // but do NOT focus the textarea — we don't want the keyboard to appear.
+    if (footerHost) flushSync(() => setComposerActive(true))
     setPlusOpen(true)
   }
 
