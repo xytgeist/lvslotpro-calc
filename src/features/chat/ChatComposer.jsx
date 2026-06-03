@@ -165,13 +165,12 @@ export default function ChatComposer({
   }
 
   const handleImagePick = async (e) => {
-    const files = Array.from(e.target.files || [])
+    let files = Array.from(e.target.files || [])
     if (!files.length) return
-    if (images.length + files.length > MAX_IMAGES) {
-      setUploadErr(`Max ${MAX_IMAGES} images per message.`)
-      return
-    }
-    setUploadErr('')
+    const remaining = MAX_IMAGES - images.length
+    const truncated = files.length > remaining
+    if (truncated) files = files.slice(0, remaining)
+    setUploadErr(truncated ? `Only the first ${remaining} image${remaining !== 1 ? 's' : ''} were added (max ${MAX_IMAGES}).` : '')
     setUploading(true)
     setPlusOpen(false)
     try {
@@ -321,11 +320,9 @@ export default function ChatComposer({
     // Clear immediately — don't wait for the network round-trip
     setBody('')
     setImages([])
-    // Dispose local poster blob URL now that we have the CF poster URL
     if (videoMeta?.localPoster) URL.revokeObjectURL(videoMeta.localPoster)
     setVideoMeta(null)
     onClearReply()
-    // Keep the keyboard open by refocusing the now-empty textarea
     try {
       textareaRef.current?.focus({ preventScroll: true })
     } catch {
@@ -335,8 +332,11 @@ export default function ChatComposer({
     try {
       await onSend(snapshot)
     } catch (err) {
+      // Restore content so the user can retry without losing their message
+      setBody(snapshot.body)
+      setImages(snapshot.imageUrls)
       const msg = err?.message || ''
-      if (msg.includes('image_urls_len') || msg.includes('image')) {
+      if (msg.includes('image_urls_len')) {
         setUploadErr(`Max ${MAX_IMAGES} images per message.`)
       } else {
         setUploadErr('Failed to send. Please try again.')
