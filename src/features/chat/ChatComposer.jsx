@@ -354,6 +354,7 @@ export default function ChatComposer({
             ref={plusBtnRef}
             type="button"
             disabled={disabled || uploading}
+            onPointerDown={(e) => e.preventDefault()}
             onClick={openPlus}
             aria-label="Attach media or GIF"
             className="chat-header-glass shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity disabled:opacity-40"
@@ -461,6 +462,7 @@ export default function ChatComposer({
           ref={plusBtnRef}
           type="button"
           disabled={disabled || uploading}
+          onPointerDown={(e) => e.preventDefault()}
           onClick={openPlus}
           aria-label="Attach media or GIF"
           className="chat-header-glass shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity disabled:opacity-40"
