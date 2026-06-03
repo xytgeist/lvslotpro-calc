@@ -18,6 +18,7 @@ import {
   chatGroupHeaderMembersBatch,
   enrichChatRoomRow,
   chatFetchRoomForViewer,
+  chatSetReadReceiptsEnabled,
 } from './chatApi.js'
 import { LOUNGE_CHAT_TOPIC_CHANNELS } from '../../utils/loungeChatConstants.js'
 import { loungeChatInvoke } from '../../utils/loungeChatApi.js'
@@ -50,6 +51,8 @@ export default function ChatTab({
 }) {
   const [viewerUserId, setViewerUserId] = useState('')
   const [viewerProfile, setViewerProfile] = useState(null)
+  const [viewerReadReceiptsEnabled, setViewerReadReceiptsEnabled] = useState(true)
+  const [readReceiptsToggleBusy, setReadReceiptsToggleBusy] = useState(false)
   const [rooms, setRooms] = useState(/** @type {any[]} */ ([]))
   const [roomsLoading, setRoomsLoading] = useState(true)
   const [roomsErr, setRoomsErr] = useState('')
@@ -146,12 +149,29 @@ export default function ChatTab({
       if (!uid) return
       const { data: prof } = await supabaseClient
         .from('profiles')
-        .select('user_id, handle, display_name, avatar_url')
+        .select('user_id, handle, display_name, avatar_url, chat_read_receipts_enabled')
         .eq('user_id', uid)
         .maybeSingle()
-      if (prof) setViewerProfile(prof)
+      if (prof) {
+        setViewerProfile(prof)
+        setViewerReadReceiptsEnabled(prof.chat_read_receipts_enabled !== false)
+      }
     })()
   }, [supabaseClient])
+
+  const handleViewerReadReceiptsChange = useCallback(async (enabled) => {
+    if (!viewerUserId || !supabaseClient) return
+    setReadReceiptsToggleBusy(true)
+    try {
+      await chatSetReadReceiptsEnabled(supabaseClient, viewerUserId, enabled)
+      setViewerReadReceiptsEnabled(enabled)
+      setViewerProfile((prev) => (prev ? { ...prev, chat_read_receipts_enabled: enabled } : prev))
+    } catch (e) {
+      setActionErr(e?.message || 'Could not update read receipts.')
+    } finally {
+      setReadReceiptsToggleBusy(false)
+    }
+  }, [viewerUserId, supabaseClient])
 
   // ── Load conversation list ────────────────────────────────────────────────
 
@@ -516,6 +536,9 @@ export default function ChatTab({
           setRooms((prev) => prev.map((r) => r.id === activeRoomId ? { ...r, ...patch } : r))
           setHydratedOpenRoom((prev) => prev?.id === activeRoomId ? { ...prev, ...patch } : prev)
         }}
+        viewerReadReceiptsEnabled={viewerReadReceiptsEnabled}
+        onViewerReadReceiptsEnabledChange={handleViewerReadReceiptsChange}
+        readReceiptsBusy={readReceiptsToggleBusy}
       />
     )
   }

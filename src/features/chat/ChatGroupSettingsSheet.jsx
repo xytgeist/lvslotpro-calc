@@ -22,6 +22,7 @@ import {
   ChatGroupPinnedSheet,
   ChatGroupSearchSheet,
 } from './ChatGroupAuxSheets.jsx'
+import { SectionLabel, SettingsGroup, SettingsToggleRow } from './chatSettingsUi.jsx'
 
 const OWNER_MEMBER_MUTE_OPTS = [
   { label: '5 minutes', minutes: 5 },
@@ -52,6 +53,9 @@ const SELF_MUTE_OPTS = [
  *   onLeftGroup: () => void,
  *   onJumpToMessage?: (messageId: string) => void,
  *   onPinsChanged?: () => void,
+ *   viewerReadReceiptsEnabled?: boolean,
+ *   onViewerReadReceiptsEnabledChange?: ((enabled: boolean) => void | Promise<void>) | null,
+ *   readReceiptsBusy?: boolean,
  * }} props
  */
 export default function ChatGroupSettingsSheet({
@@ -65,6 +69,9 @@ export default function ChatGroupSettingsSheet({
   onLeftGroup,
   onJumpToMessage,
   onPinsChanged,
+  viewerReadReceiptsEnabled = true,
+  onViewerReadReceiptsEnabledChange = null,
+  readReceiptsBusy = false,
 }) {
   const isOwner = chatIsGroupOwner(room, viewerUserId)
 
@@ -516,6 +523,18 @@ export default function ChatGroupSettingsSheet({
           )}
         </div>
 
+        {/* ── Privacy ───────────────────────────────────────────── */}
+        <SectionLabel>Privacy</SectionLabel>
+        <SettingsGroup>
+          <SettingsToggleRow
+            label="Read receipts"
+            hint="When off, you won't send or see read receipts."
+            enabled={viewerReadReceiptsEnabled}
+            busy={readReceiptsBusy}
+            onToggle={() => onViewerReadReceiptsEnabledChange?.(!viewerReadReceiptsEnabled)}
+          />
+        </SettingsGroup>
+
         {/* ── Notifications ─────────────────────────────────────── */}
         <SectionLabel>Notifications</SectionLabel>
         <SettingsGroup>
@@ -770,22 +789,6 @@ export default function ChatGroupSettingsSheet({
 }
 
 /* ── Primitives ───────────────────────────────────────────────────── */
-
-function SectionLabel({ children }) {
-  return (
-    <p className="mx-4 mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-      {children}
-    </p>
-  )
-}
-
-function SettingsGroup({ children }) {
-  return (
-    <div className="mx-4 overflow-hidden rounded-2xl bg-zinc-900/60">
-      {children}
-    </div>
-  )
-}
 
 function SettingsRow({ icon, label, value, valueHighlight, badge, onPress, dim = false }) {
   const Tag = onPress ? 'button' : 'div'

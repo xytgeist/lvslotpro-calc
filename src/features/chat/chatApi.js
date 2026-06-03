@@ -82,6 +82,19 @@ export function chatRemoveReaction(supabase, messageId, emoji) {
 }
 
 /**
+ * Per-user reaction rows for attribution sheet.
+ * @param {SupabaseClient} supabase
+ * @param {string} messageId
+ */
+export async function chatMessageReactionsPage(supabase, messageId) {
+  const { data, error } = await supabase.rpc('chat_message_reactions_page', {
+    p_message_id: messageId,
+  })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+/**
  * Mark the latest read message in a room.
  * @param {SupabaseClient} supabase
  * @param {string} roomId
@@ -89,6 +102,52 @@ export function chatRemoveReaction(supabase, messageId, emoji) {
  */
 export function chatUpdateLastRead(supabase, roomId, messageId) {
   return loungeChatInvoke(supabase, { action: 'update_last_read', room_id: roomId, message_id: messageId })
+}
+
+/**
+ * Peer read positions for delivered/read UI (respects mutual read-receipt privacy).
+ * @param {SupabaseClient} supabase
+ * @param {string} roomId
+ * @returns {Promise<{ viewer_receipts_enabled: boolean, members: import('./chatReceiptStatus.js').ChatPeerReadState[] }>}
+ */
+export async function chatRoomReadReceipts(supabase, roomId) {
+  const { data, error } = await supabase.rpc('chat_room_read_receipts', { p_room_id: roomId })
+  if (error) throw new Error(error.message)
+  const payload = data && typeof data === 'object' ? data : {}
+  return {
+    viewer_receipts_enabled: payload.viewer_receipts_enabled !== false,
+    members: Array.isArray(payload.members) ? payload.members : [],
+  }
+}
+
+/**
+ * @param {SupabaseClient} supabase
+ * @param {string} userId
+ */
+export async function chatFetchReadReceiptsEnabled(supabase, userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('chat_read_receipts_enabled')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) {
+    if (/chat_read_receipts_enabled/i.test(error.message || '')) return true
+    throw new Error(error.message)
+  }
+  return data?.chat_read_receipts_enabled !== false
+}
+
+/**
+ * @param {SupabaseClient} supabase
+ * @param {string} userId
+ * @param {boolean} enabled
+ */
+export async function chatSetReadReceiptsEnabled(supabase, userId, enabled) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ chat_read_receipts_enabled: enabled })
+    .eq('user_id', userId)
+  if (error) throw new Error(error.message)
 }
 
 async function chatInboxRpc(supabase, fn, params) {

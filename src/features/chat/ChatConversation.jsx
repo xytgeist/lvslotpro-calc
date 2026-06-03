@@ -1,9 +1,11 @@
 import { createPortal } from 'react-dom'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import ChatBubble from './ChatBubble.jsx'
 import ChatComposer from './ChatComposer.jsx'
 import ChatGroupHeaderStack from './ChatGroupHeaderStack.jsx'
 import ChatGroupSettingsSheet from './ChatGroupSettingsSheet.jsx'
+import ChatDmInfoSheet from './ChatDmInfoSheet.jsx'
+import ChatMessageReactionsSheet from './ChatMessageReactionsSheet.jsx'
 import {
   chatSendMessage,
   chatDeleteMessage,
@@ -22,7 +24,9 @@ import {
   chatUnpinMessage,
   chatMessagesWindow,
   chatIsGroupOwner,
+  chatRoomReadReceipts,
 } from './chatApi.js'
+import { findLastOwnMessageId, getMessageReceiptStatus } from './chatReceiptStatus.js'
 import { subscribeToTyping } from './chatTypingBroadcast.js'
 import { notifyLoungeDockSuppress } from '../lounge/loungeDockSuppressRegistry.js'
 import { useLoungeKeyboardOverlapPx, LOUNGE_IOS_KEYBOARD_SMOOTH_MS, loungeComposerFooterPaddingBottom, useLoungeIosSafeBottomPx } from '../lounge/useLoungeKeyboardOverlapPx.js'
@@ -113,6 +117,9 @@ async function fetchPage(supabaseClient, roomId, { beforeCreatedAt = null, befor
  *   onBack: () => void,
  *   onViewProfile?: ((userId: string) => void) | null,
  *   onRoomUpdated?: ((patch: Record<string, unknown>) => void) | null,
+ *   viewerReadReceiptsEnabled?: boolean,
+ *   onViewerReadReceiptsEnabledChange?: ((enabled: boolean) => void | Promise<void>) | null,
+ *   readReceiptsBusy?: boolean,
  * }} props
  */
 export default function ChatConversation({
@@ -125,6 +132,9 @@ export default function ChatConversation({
   onBack,
   onViewProfile = null,
   onRoomUpdated = null,
+  viewerReadReceiptsEnabled = true,
+  onViewerReadReceiptsEnabledChange = null,
+  readReceiptsBusy = false,
 }) {
   const [messages, setMessages] = useState(/** @type {any[]} */ ([]))
   // Aggregated reactions per message: { [messageId]: { emoji, count, viewerReacted }[] }
@@ -152,6 +162,12 @@ export default function ChatConversation({
   const [starredIds, setStarredIds] = useState(() => new Set())
   const [pinnedIds, setPinnedIds] = useState(() => new Set())
   const [highlightMessageId, setHighlightMessageId] = useState(/** @type {string | null} */ (null))
+  const [peerReadStates, setPeerReadStates] = useState(/** @type {import('./chatReceiptStatus.js').ChatPeerReadState[]} */ ([]))
+  const [dmInfoOpen, setDmInfoOpen] = useState(false)
+  const [reactionsDetailMessageId, setReactionsDetailMessageId] = useState(/** @type {string | null} */ (null))
+  const [reactionsDetailReload, setReactionsDetailReload] = useState(0)
+  const reactionsDetailMessageIdRef = useRef(reactionsDetailMessageId)
+  reactionsDetailMessageIdRef.current = reactionsDetailMessageId
 
   // DOM refs
   const listRef = useRef(null)
@@ -204,6 +220,9 @@ export default function ChatConversation({
 
   // Realtime first-subscribe flag — used to distinguish initial connect from reconnect.
   const realtimeSubscribedOnceRef = useRef(false)
+  const loadReactionsForMessagesRef = useRef(/** @type {(ids: string[]) => Promise<void>} */ (async () => {}))
+  const reactionRealtimeTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null))
+  const reactionRealtimePendingRef = useRef(/** @type {Set<string>} */ (new Set()))
 
   useLayoutEffect(() => {
     if (didPrependRef.current && listRef.current) {
@@ -223,6 +242,28 @@ export default function ChatConversation({
   }
   const isGroupRoom = activeRoom.kind === 'group'
   const isGroupOwner = chatIsGroupOwner(activeRoom, viewerUserId)
+  const showReadReceipts = activeRoom.kind === 'dm' || isGroupRoom
+  const lastOwnMessageId = useMemo(
+    () => findLastOwnMessageId(messages, viewerUserId),
+    [messages, viewerUserId],
+  )
+
+  const refreshReadReceipts = useCallback(async () => {
+    if (!showReadReceipts || !room.id) return
+    try {
+      const res = await chatRoomReadReceipts(supabaseClient, room.id)
+      setPeerReadStates(res.members)
+    } catch {
+      // RPC missing until migration applied — ignore.
+    }
+  }, [showReadReceipts, room.id, supabaseClient])
+
+  useEffect(() => {
+    if (!showReadReceipts) return undefined
+    void refreshReadReceipts()
+    const id = window.setInterval(() => { void refreshReadReceipts() }, 4000)
+    return () => window.clearInterval(id)
+  }, [showReadReceipts, refreshReadReceipts])
 
   useEffect(() => {
     setRoomMeta({ ...room })
@@ -319,19 +360,22 @@ export default function ChatConversation({
     })
     setReactions((prev) => {
       const next = { ...prev }
+      const byMessage = new Map()
       for (const r of data || []) {
-        if (!next[r.message_id]) next[r.message_id] = []
-        const idx = next[r.message_id].findIndex((x) => x.emoji === r.emoji)
-        const entry = { emoji: r.emoji, count: Number(r.reaction_count), viewerReacted: Boolean(r.viewer_reacted) }
-        if (idx === -1) {
-          next[r.message_id] = [...next[r.message_id], entry]
-        } else {
-          next[r.message_id] = next[r.message_id].map((x, i) => i === idx ? entry : x)
-        }
+        if (!byMessage.has(r.message_id)) byMessage.set(r.message_id, [])
+        byMessage.get(r.message_id).push({
+          emoji: r.emoji,
+          count: Number(r.reaction_count),
+          viewerReacted: Boolean(r.viewer_reacted),
+        })
+      }
+      for (const id of ids) {
+        next[id] = byMessage.get(id) || []
       }
       return next
     })
   }, [supabaseClient, viewerUserId])
+  loadReactionsForMessagesRef.current = loadReactionsForMessages
 
   const jumpToMessage = useCallback(async (messageId) => {
     if (!messageId) return
@@ -659,6 +703,37 @@ export default function ChatConversation({
   // ── Realtime subscription + reconnect gap recovery ────────────────────────
 
   useEffect(() => {
+    const flushReactionRefresh = () => {
+      reactionRealtimeTimerRef.current = null
+      const ids = [...reactionRealtimePendingRef.current]
+      reactionRealtimePendingRef.current.clear()
+      if (ids.length === 0) return
+      void loadReactionsForMessagesRef.current(ids)
+      const detailId = reactionsDetailMessageIdRef.current
+      if (detailId && ids.includes(detailId)) {
+        setReactionsDetailReload((n) => n + 1)
+      }
+    }
+
+    const scheduleReactionRefresh = (messageId) => {
+      reactionRealtimePendingRef.current.add(messageId)
+      if (reactionRealtimeTimerRef.current != null) {
+        clearTimeout(reactionRealtimeTimerRef.current)
+      }
+      reactionRealtimeTimerRef.current = setTimeout(flushReactionRefresh, 120)
+    }
+
+    const onReactionChange = (payload) => {
+      const row = payload.new || payload.old
+      if (!row?.message_id) return
+      if (row.user_id === viewerUserId) return
+      const messageId = row.message_id
+      const inThread = messagesRef.current.some((m) => m.id === messageId)
+      const detailOpen = reactionsDetailMessageIdRef.current === messageId
+      if (!inThread && !detailOpen) return
+      scheduleReactionRefresh(messageId)
+    }
+
     const ch = supabaseClient
       .channel(`chat-messages-${room.id}`)
       .on(
@@ -695,6 +770,16 @@ export default function ChatConversation({
           if (!row?.id) return
           setMessages((prev) => prev.map((m) => m.id === row.id ? { ...m, ...row } : m))
         }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_message_reactions' },
+        onReactionChange,
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chat_message_reactions' },
+        onReactionChange,
       )
       .subscribe(async (status) => {
         if (status !== 'SUBSCRIBED') return
@@ -741,10 +826,15 @@ export default function ChatConversation({
         }
       })
     return () => {
+      if (reactionRealtimeTimerRef.current != null) {
+        clearTimeout(reactionRealtimeTimerRef.current)
+        reactionRealtimeTimerRef.current = null
+      }
+      reactionRealtimePendingRef.current.clear()
       supabaseClient.removeChannel(ch)
       realtimeSubscribedOnceRef.current = false
     }
-  }, [supabaseClient, room.id])
+  }, [supabaseClient, room.id, viewerUserId])
 
   // ── Typing broadcast ──────────────────────────────────────────────────────
 
@@ -882,10 +972,11 @@ export default function ChatConversation({
           )
         })
       }
+      void refreshReadReceipts()
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
     }
-  }, [supabaseClient, room.id, viewerUserId, loadMessages, scrollToBottom])
+  }, [supabaseClient, room.id, viewerUserId, loadMessages, scrollToBottom, refreshReadReceipts])
 
   const handleLinkPreviewReady = useCallback((messageId, preview) => {
     setMessages((prev) =>
@@ -945,6 +1036,19 @@ export default function ChatConversation({
       })
     })
   }, [supabaseClient])
+
+  const toggleMessageReaction = useCallback((messageId, emoji) => {
+    const list = reactions[messageId] || []
+    const existing = list.find((r) => r.emoji === emoji)
+    if (existing?.viewerReacted) {
+      void handleRemoveReaction(messageId, emoji)
+    } else {
+      void handleAddReaction(messageId, emoji)
+    }
+    if (reactionsDetailMessageId === messageId) {
+      setReactionsDetailReload((n) => n + 1)
+    }
+  }, [reactions, handleAddReaction, handleRemoveReaction, reactionsDetailMessageId])
 
   const handleToggleMute = useCallback(async () => {
     if (muted) {
@@ -1423,13 +1527,12 @@ export default function ChatConversation({
               {activeRoom.kind === 'dm' ? (
                 <button
                   type="button"
-                  onClick={() => peerUserId && onViewProfile?.(peerUserId)}
-                  disabled={!peerUserId || !onViewProfile}
+                  onClick={() => setDmInfoOpen(true)}
                   className="chat-header-glass -mt-1 flex items-center gap-1 rounded-full px-4 py-1.5 touch-manipulation transition-opacity active:opacity-75"
-                  aria-label={peerUserId ? `View ${headerDisplayName}'s profile` : undefined}
+                  aria-label="Chat info"
                 >
                   <span className="text-[16px] font-bold text-zinc-50">{headerDisplayName}</span>
-                  {peerUserId && <span className="text-[15px] font-normal text-zinc-300">›</span>}
+                  <span className="text-[15px] font-normal text-zinc-300">›</span>
                 </button>
               ) : (
                 <button
@@ -1621,8 +1724,20 @@ export default function ChatConversation({
                       onDeleteMessage={handleDelete}
                       onAddReaction={handleAddReaction}
                       onRemoveReaction={handleRemoveReaction}
+                      reactionPillInteractive={isGroupRoom}
+                      onOpenReactionsDetail={
+                        isGroupRoom ? () => setReactionsDetailMessageId(msg.id) : undefined
+                      }
                       supabaseClient={supabaseClient}
                       onLinkPreviewReady={handleLinkPreviewReady}
+                      receipt={getMessageReceiptStatus({
+                        message: msg,
+                        viewerUserId,
+                        roomKind: activeRoom.kind,
+                        viewerReceiptsEnabled: viewerReadReceiptsEnabled,
+                        peerReadStates,
+                        showOnThisMessage: msg.id === lastOwnMessageId,
+                      })}
                     />
                   </div>
                 )
@@ -1700,6 +1815,42 @@ export default function ChatConversation({
       </div>
       </div>
 
+      {activeRoom.kind === 'dm' ? (
+        <ChatDmInfoSheet
+          open={dmInfoOpen}
+          onClose={() => setDmInfoOpen(false)}
+          supabaseClient={supabaseClient}
+          room={activeRoom}
+          peerDisplayName={headerDisplayName}
+          peerAvatarUrl={headerAvatar}
+          peerHandle={peerProfile?.handle || activeRoom.peer_handle || null}
+          peerUserId={peerUserId}
+          onViewProfile={onViewProfile}
+          onRoomUpdated={(patch) => {
+            setRoomMeta((prev) => ({ ...prev, ...patch }))
+            onRoomUpdated?.(patch)
+          }}
+          viewerReadReceiptsEnabled={viewerReadReceiptsEnabled}
+          onViewerReadReceiptsEnabledChange={async (enabled) => {
+            await onViewerReadReceiptsEnabledChange?.(enabled)
+            await refreshReadReceipts()
+          }}
+          readReceiptsBusy={readReceiptsBusy}
+        />
+      ) : null}
+
+      <ChatMessageReactionsSheet
+        open={Boolean(reactionsDetailMessageId)}
+        messageId={reactionsDetailMessageId}
+        onClose={() => setReactionsDetailMessageId(null)}
+        supabaseClient={supabaseClient}
+        viewerUserId={viewerUserId}
+        reloadToken={reactionsDetailReload}
+        onToggleReaction={(emoji) => {
+          if (reactionsDetailMessageId) toggleMessageReaction(reactionsDetailMessageId, emoji)
+        }}
+      />
+
       {isGroupRoom ? (
         <ChatGroupSettingsSheet
           open={groupSettingsOpen}
@@ -1715,6 +1866,12 @@ export default function ChatConversation({
           onLeftGroup={onBack}
           onJumpToMessage={jumpToMessage}
           onPinsChanged={refreshPinnedIds}
+          viewerReadReceiptsEnabled={viewerReadReceiptsEnabled}
+          onViewerReadReceiptsEnabledChange={async (enabled) => {
+            await onViewerReadReceiptsEnabledChange?.(enabled)
+            await refreshReadReceipts()
+          }}
+          readReceiptsBusy={readReceiptsBusy}
         />
       ) : null}
     </div>

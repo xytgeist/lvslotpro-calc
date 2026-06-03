@@ -47,11 +47,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 - [ ] **Conversation list** — Chat tab loads; DMs + topic channels sorted unread-first; unread dot appears for rooms with messages newer than `last_read_at`.
 - [ ] **Send/receive** — Send a message in a DM; confirm Realtime INSERT appends it; second device receives it.
 - [ ] **Reply** — Long-press a bubble, tap Reply; reply quote strip shows in composer; sent message has `reply_to_preview` rendered above bubble.
-- [ ] **Reactions** — Long-press bubble; tap emoji; reaction row appears; second device sees it via Realtime.
+- [ ] **Reactions** — Long-press bubble; tap emoji; reaction row appears; **second device sees pill + attribution sheet update live via Realtime** (groups: tap pill emoji to toggle; tap pill → Reactions sheet). Apply **`20260606140000_chat_message_reactions_page.sql`** + **`20260606150000_chat_message_reactions_realtime.sql`** on test first.
 - [ ] **Typing indicator** — Type in composer; other device shows "X is typing…" for ~3.5 s.
 - [ ] **Delete message** — Long-press own message, tap Delete; bubble shows "This message was deleted".
 - [ ] **Mute** — Bell icon in conversation header; pick duration; confirm `muted_until` persists.
 - [ ] **Read receipts** — Scroll to bottom of conversation; `update_last_read` fires; unread dot clears on list refresh.
+- [ ] **Delivered / Read labels** — Own latest message shows **Delivered** after send; **Read** after peer opens thread (DM) or all receipt-enabled members read (group). Toggle **Read receipts** in **Chat info** (DM pill) or **Group info** (group pill) under **Privacy** — labels hide and peer stops seeing your read position. Apply **`20260606120000_chat_read_receipts.sql`** on test first.
 - [ ] **Image attach** — Tap image icon in composer; select a photo; uploads to R2; appears in bubble.
 - [ ] **Profile → Message** — Tap Message on a profile; confirm chat tab opens and DM conversation is active.
 - [ ] **Dock panel** — Dock chat panel shows list-only; tapping a room navigates to the full Chat tab.
@@ -610,6 +611,9 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-06: **Chat reactions Realtime (code on `test`):** migration **`20260606150000_chat_message_reactions_realtime.sql`** — publication + **`REPLICA IDENTITY`** for DELETE payloads. Client: live pill counts + silent attribution sheet refresh when others react. **Apply with `20260606140000` on test before smoke.**
+- 2026-06-06: **Chat group tap-to-react + attribution sheet (code on `test`):** migration **`20260606140000_chat_message_reactions_page.sql`** — RPC **`chat_message_reactions_page`**. Client: group messages — tap emoji on pill to toggle your reaction; tap pill → **`ChatMessageReactionsSheet`** (filter chips + member list). **Apply migration on test before smoke.**
+- 2026-06-06: **Chat read receipts (code on `test`):** migration **`20260606120000_chat_read_receipts.sql`** — **`profiles.chat_read_receipts_enabled`** (default on; mutual privacy); RPC **`chat_room_read_receipts`**. Client: **Delivered** / **Read** on latest own message (DM + group); **Read receipts** toggle under **Privacy** in **Chat info** (DM pill) and **Group info** (group pill). **Apply migration on test before smoke.**
 - 2026-06-05: **Group delete lifecycle:** migration **`20260605120000_chat_group_delete.sql`** — `AFTER DELETE` trigger removes empty **`kind = 'group'`** rooms (leave, owner remove member, last person out); RPC **`chat_delete_group`** (creator or **`role = admin`**) deletes room for everyone. Client: **`ChatGroupSettingsSheet`** → **Delete Group for Everyone** (owner/admin) + **Leave Group**. Commit **`10f9a0e`**. **Apply migration on test before smoke.**
 - 2026-06-05: **Lounge layout-test removed:** deleted **`loungeLayoutTestPost.js`**; Chat tab **Layout test** button + **`AppShell`** / **`SocialFeed`** fake DM post-detail harness removed (keyboard debug only).
 - 2026-06-05: **Lounge caption bare-domain links:** **`loungeCaption.jsx`** uses **`splitTextWithLinks`** (`linkifyText.jsx`) so `x.com`-style URLs match chat link colors in feed/detail captions.

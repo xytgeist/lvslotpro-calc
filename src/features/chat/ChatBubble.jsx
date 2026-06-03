@@ -4,15 +4,16 @@ import ChatLinkPreviewCard from '../../components/ChatLinkPreviewCard.jsx'
 import { attachLinkPreview } from '../../utils/loungeLinkPreviewApi.js'
 import { extractFirstUrlFromText, LinkifiedText, textIsOnlyUrls } from '../../utils/linkifyText.jsx'
 import ChatEmojiPicker, { saveRecentEmoji } from './ChatEmojiPicker'
+import ChatReceiptLabel from './ChatReceiptLabel.jsx'
 import LoungeFlameIcon from '../lounge/LoungeFlameIcon'
 
 const QUICK_REACTIONS = ['👍','❤️','😂','🔥','😮','😢','🎉','😍','👏','💯','🙏','🤣']
 
 const IS_IOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
 
-/** SVG chip art inset in 24×24 viewBox (~75% fill) — slightly larger than emoji em-square. */
-const REACTION_CHIP_CLASS = 'h-6 w-6 shrink-0'
-const QUICK_CHIP_CLASS = 'h-7 w-7 shrink-0'
+/** Reaction pill chip 20px, nudged down to optically align with 16px emoji glyphs. */
+const REACTION_CHIP_CLASS = 'block h-5 w-5 shrink-0 translate-y-px'
+const QUICK_CHIP_CLASS = 'h-[23px] w-[23px] shrink-0'
 
 /**
  * Frosted-glass style shared by the floating menus.
@@ -156,6 +157,8 @@ function computeLayout(rect, isMine, { isDeleted = false, enableStar = false, en
  *   onDeleteMessage: (messageId: string) => void,
  *   onAddReaction: (messageId: string, emoji: string) => void,
  *   onRemoveReaction: (messageId: string, emoji: string) => void,
+ *   reactionPillInteractive?: boolean,
+ *   onOpenReactionsDetail?: () => void,
  *   hideSenderInfo?: boolean,
  *   enableStar?: boolean,
  *   isStarred?: boolean,
@@ -163,6 +166,7 @@ function computeLayout(rect, isMine, { isDeleted = false, enableStar = false, en
  *   enablePin?: boolean,
  *   isPinned?: boolean,
  *   onTogglePin?: (messageId: string, pinned: boolean) => void,
+ *   receipt?: import('./chatReceiptStatus.js').ChatMessageReceipt | null,
  * }} props
  */
 export default function ChatBubble({
@@ -176,6 +180,8 @@ export default function ChatBubble({
   onDeleteMessage,
   onAddReaction,
   onRemoveReaction,
+  reactionPillInteractive = false,
+  onOpenReactionsDetail = null,
   hideSenderInfo = false,
   isGroupStart = true,
   enableStar = false,
@@ -186,6 +192,7 @@ export default function ChatBubble({
   onTogglePin,
   supabaseClient = null,
   onLinkPreviewReady = null,
+  receipt = null,
 }) {
   const [menuOpen, setMenuOpen]           = useState(false)
   const [fullPickerOpen, setFullPickerOpen] = useState(false)
@@ -355,6 +362,24 @@ export default function ChatBubble({
     }
     closeMenu()
   }, [reactionGroups, onRemoveReaction, onAddReaction, message.id, closeMenu])
+
+  const renderReactionGlyph = (emoji, { chip = false } = {}) => {
+    if (emoji === '❤️') {
+      return (
+        <LoungeFlameIcon
+          liked
+          className={chip ? REACTION_CHIP_CLASS : 'block h-[18px] w-[18px] shrink-0 translate-y-px'}
+        />
+      )
+    }
+    return (
+      <span className={chip ? 'text-[16px] leading-none' : 'text-[18px] leading-none'}>{emoji}</span>
+    )
+  }
+
+  const openReactionsDetail = useCallback(() => {
+    onOpenReactionsDetail?.()
+  }, [onOpenReactionsDetail])
 
   const handleCopy = useCallback(() => {
     if (message.body) {
@@ -566,20 +591,65 @@ export default function ChatBubble({
             </div>
           )}
 
+          {isMine && receipt && !isDeleted ? (
+            <div className={`mt-0.5 flex select-none pointer-events-none ${isMine ? 'justify-end pr-1' : 'justify-start pl-1'}`}>
+              <ChatReceiptLabel receipt={receipt} />
+            </div>
+          ) : null}
+
           {/* Reaction pill — combined, overlaps bubble bottom */}
           {reactions.length > 0 && (() => {
             const totalCount = reactions.reduce((sum, r) => sum + r.count, 0)
+            const sorted = [...reactions].sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji))
             return (
               <div className={`-mt-3 relative z-10 flex px-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                <div className="reaction-pill flex items-center gap-1 rounded-full px-2.5 py-1">
-                  {reactions.map((r) => (
-                    r.emoji === '❤️'
-                      ? <LoungeFlameIcon key={r.emoji} liked className={REACTION_CHIP_CLASS} />
-                      : <span key={r.emoji} className="text-[16px] leading-none">{r.emoji}</span>
+                <div
+                  className={`reaction-pill flex items-center gap-0.5 rounded-full py-1 ${
+                    reactionPillInteractive ? 'cursor-pointer pl-2 pr-1.5' : 'gap-1 px-2.5'
+                  }`}
+                  onClick={reactionPillInteractive ? openReactionsDetail : undefined}
+                  onKeyDown={reactionPillInteractive ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openReactionsDetail()
+                    }
+                  } : undefined}
+                  role={reactionPillInteractive ? 'button' : undefined}
+                  tabIndex={reactionPillInteractive ? 0 : undefined}
+                  aria-label={reactionPillInteractive ? `See all ${totalCount} reactions` : undefined}
+                >
+                  {sorted.map((r) => (
+                    reactionPillInteractive ? (
+                      <button
+                        key={r.emoji}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleReaction(r.emoji)
+                        }}
+                        aria-label={r.viewerReacted ? `Remove ${r.emoji} reaction` : `React with ${r.emoji}`}
+                        aria-pressed={r.viewerReacted}
+                        className="inline-flex items-center gap-0.5 rounded-full bg-transparent px-1.5 py-0.5 touch-manipulation transition-opacity active:opacity-70"
+                      >
+                        {renderReactionGlyph(r.emoji, { chip: true })}
+                        {r.count > 1 ? (
+                          <span className="text-[11px] font-semibold leading-none text-zinc-400">{r.count}</span>
+                        ) : null}
+                      </button>
+                    ) : (
+                      <span key={r.emoji} className="inline-flex items-center gap-0.5 px-0.5">
+                        {renderReactionGlyph(r.emoji, { chip: true })}
+                      </span>
+                    )
                   ))}
-                  {totalCount >= 2 && (
+                  {!reactionPillInteractive && totalCount >= 2 ? (
                     <span className="ml-0.5 text-[12px] font-semibold leading-none text-zinc-400">{totalCount}</span>
-                  )}
+                  ) : null}
+                  {reactionPillInteractive && totalCount >= 2 ? (
+                    <span className="pointer-events-none ml-0.5 pr-1 text-[12px] font-semibold leading-none text-zinc-400">
+                      {totalCount}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             )

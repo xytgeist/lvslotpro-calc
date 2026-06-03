@@ -2302,6 +2302,13 @@ html.light .reaction-pill {
   background: #e4e4e7;
   border: 1px solid #fff;
 }
+.reaction-pill button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
 
 /* Entire chat surface — no text selection anywhere, no iOS magnifier/callout. */
 [data-chat-feature] {
