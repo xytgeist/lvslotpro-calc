@@ -927,10 +927,7 @@ function ChatMediaGrid({ media, onOpen }) {
   const count = visible.length
 
   return (
-    <div
-      className={`overflow-hidden ${count === 1 ? '' : 'grid gap-0.5'} ${count === 2 ? 'grid-cols-2' : count >= 3 ? 'grid-cols-2' : ''}`}
-      style={{ borderRadius: 13 }}
-    >
+    <div className={`overflow-hidden rounded-[13px] ${count === 1 ? '' : 'grid gap-0.5'} ${count === 2 ? 'grid-cols-2' : count >= 3 ? 'grid-cols-2' : ''}`}>
       {visible.map((item, i) => {
         const isLastVisible = i === GRID_MAX_VISIBLE - 1
         const showOverlay = isLastVisible && overflow > 0
