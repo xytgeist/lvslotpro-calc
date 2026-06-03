@@ -43,7 +43,7 @@ const IOS_COMPOSER_DISMISS_PAD_PX = 32
 /** Show scroll-to-bottom when this many newer messages are off-screen. */
 const SCROLL_UP_MSG_THRESHOLD = 20
 /** Last message must sit this far below the composer top before we auto-scroll. */
-const COMPOSER_SCROLL_GAP_PX = 20
+const COMPOSER_SCROLL_GAP_PX = 8
 /** Message stack shorter than this gap under the composer viewport → treat as "fits" (no push). */
 const LIST_CONTENT_FITS_GAP_PX = 24
 /** iOS keyboard dismiss: wait for viewport settle, then one smooth list scroll. */
@@ -729,8 +729,14 @@ export default function ChatConversation({
   /** Force tail pin after send or layout shift (images, link preview). Delegates to keyboard follow when focused. */
   const pinTailAfterMutation = useCallback(() => {
     if (isComposerKeyboardActive()) {
-      if (IS_IOS) pinIosKeyboardFrame()
-      else runTailPinFollow()
+      if (IS_IOS) {
+        pinIosKeyboardFrame()
+        // Synchronous call above runs with the old DOM (before React commits the new bubble).
+        // One RAF ensures we also pin after the commit so the bubble isn't hidden behind the composer.
+        requestAnimationFrame(() => pinListToTail({ force: true }))
+      } else {
+        runTailPinFollow()
+      }
       return
     }
     const run = () => pinListToTail({ force: true })
