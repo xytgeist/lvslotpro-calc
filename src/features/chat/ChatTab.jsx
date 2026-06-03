@@ -57,6 +57,7 @@ export default function ChatTab({
   const [roomsLoading, setRoomsLoading] = useState(true)
   const [roomsErr, setRoomsErr] = useState('')
   const [activeRoomId, setActiveRoomId] = useState(/** @type {string | null} */ (null))
+  const [iosResumeCount, setIosResumeCount] = useState(0)
   const [tab, setTab] = useState(/** @type {'inbox' | 'topics'} */ ('inbox'))
   const [actionErr, setActionErr] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
@@ -86,6 +87,18 @@ export default function ChatTab({
   const profilesCacheRef = useRef({})
 
   const subscriberOk = Boolean(hasActiveSubscription || isStaff)
+
+  // On iOS, app resume with the keyboard open can corrupt the visual viewport layout.
+  // Force a full remount of the conversation by bumping the key.
+  useEffect(() => {
+    const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    if (!isIos || !activeRoomId) return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setIosResumeCount((n) => n + 1)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [activeRoomId])
 
   // Inbox: block native text selection during long-press (same approach as ChatConversation).
   useEffect(() => {
@@ -525,7 +538,7 @@ export default function ChatTab({
     const otherUnreadCount = rooms.filter((r) => r.id !== activeRoomId && r.hasUnread).length
     return (
       <ChatConversation
-        key={activeRoomId}
+        key={`${activeRoomId}-${iosResumeCount}`}
         supabaseClient={supabaseClient}
         room={room}
         viewerUserId={viewerUserId}

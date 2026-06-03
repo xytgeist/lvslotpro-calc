@@ -1305,22 +1305,6 @@ export default function ChatConversation({
     }
   }, [runTailPinFollow, pinIosKeyboardFrame])
 
-  // iOS can corrupt the visual viewport layout when the app is backgrounded with the
-  // keyboard open (header pushed off-screen, messages misplaced on resume).
-  // Fix: blur → re-focus the active composer input so iOS re-raises the keyboard from
-  // a clean state, then re-pin the tail.
-  useEffect(() => {
-    if (!IS_IOS) return
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible') return
-      const active = composerBarRef.current?.querySelector('textarea, input')
-      if (active && document.activeElement === active) active.blur()
-      requestAnimationFrame(() => pinListToTail({ force: true }))
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [pinListToTail])
-
   useEffect(() => {
     const prev = kbOverlapPrevRef.current
     kbOverlapPrevRef.current = kbOverlapPx
