@@ -472,6 +472,13 @@ export default function ChatBubble({
             )}
           </div>
 
+          {/* Starred indicator — small amber star under the trailing bubble corner */}
+          {isStarred && !isDeleted && (
+            <div className={`-mt-1 flex select-none pointer-events-none ${isMine ? 'justify-end pr-2.5' : 'justify-start pl-2.5'}`}>
+              <span className="text-[10px] leading-none text-amber-400" aria-label="Starred">★</span>
+            </div>
+          )}
+
           {/* Reaction pill — combined, overlaps bubble bottom */}
           {reactions.length > 0 && (() => {
             const totalCount = reactions.reduce((sum, r) => sum + r.count, 0)
