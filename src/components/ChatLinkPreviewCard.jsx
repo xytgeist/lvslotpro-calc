@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  accentLuminance,
   bubbleAccentBackground,
   extractAccentFromImageUrl,
   resolvePreviewAccent,
@@ -60,8 +61,15 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
 
   const branded = Boolean(accentBg)
   const cardStyle = accentBg ? { backgroundColor: accentBg } : undefined
-  const titleClass = branded ? 'text-white' : 'text-zinc-100'
-  const domainClass = branded ? 'text-white/75' : 'text-zinc-400'
+
+  // Use inline styles for branded text so the light-mode .text-white override
+  // (which flips text-white → near-black on elements without a bg- class) can't win.
+  const accentLum = accentBg ? accentLuminance(accentBg) : 0
+  const textOnAccent = accentLum > 0.35 ? '#18181b' : '#ffffff'
+  const titleStyle = branded ? { color: textOnAccent } : undefined
+  const domainStyle = branded ? { color: textOnAccent, opacity: 0.75 } : undefined
+  const titleClass = branded ? '' : 'text-zinc-100'
+  const domainClass = branded ? '' : 'text-zinc-400'
 
   const open = () => {
     try {
@@ -121,10 +129,10 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
           loading="lazy"
         />
         <div className={footerClass} style={footerBg}>
-          <div className={`line-clamp-2 text-[14px] font-semibold leading-snug ${titleClass}`}>
+          <div className={`line-clamp-2 text-[14px] font-semibold leading-snug ${titleClass}`} style={titleStyle}>
             {title}
           </div>
-          <div className={`mt-0.5 truncate text-[12px] ${domainClass}`}>{hostname}</div>
+          <div className={`mt-0.5 truncate text-[12px] ${domainClass}`} style={domainStyle}>{hostname}</div>
         </div>
       </button>
     )
@@ -143,10 +151,10 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
       aria-label={`Open link: ${title}`}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className={`line-clamp-2 text-[14px] font-semibold leading-snug ${titleClass}`}>
+        <div className={`line-clamp-2 text-[14px] font-semibold leading-snug ${titleClass}`} style={titleStyle}>
           {title}
         </div>
-        <div className={`truncate text-[12px] ${domainClass}`}>{hostname}</div>
+        <div className={`truncate text-[12px] ${domainClass}`} style={domainStyle}>{hostname}</div>
       </div>
       {preview.favicon_url ? (
         <img
