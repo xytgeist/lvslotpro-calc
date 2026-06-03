@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { uploadLoungeFeedPostImage } from '../../utils/communityFeedPost.js'
+import { prepareLoungeFeedImageForUpload } from '../../utils/compressImageForUpload.js'
 import {
   focusLoungeComposerCaption,
   scheduleLoungeComposerTextareaFocus,
@@ -174,13 +175,19 @@ export default function ChatComposer({
     setUploading(true)
     setPlusOpen(false)
     try {
-      const results = await Promise.allSettled(
-        files.map((f) => uploadLoungeFeedPostImage({ supabaseClient, user: { id: viewerUserId }, file: f }))
-      )
-      const urls = results
-        .filter((r) => r.status === 'fulfilled' && r.value?.data)
-        .map((r) => r.value.data)
-      const failCount = results.length - urls.length
+      const urls = []
+      let failCount = 0
+      for (const f of files) {
+        const { file: ready, error: prepErr } = await prepareLoungeFeedImageForUpload(f)
+        if (prepErr || !ready) { failCount++; continue }
+        const { data: url, error: upErr } = await uploadLoungeFeedPostImage({
+          supabaseClient,
+          user: { id: viewerUserId },
+          file: ready,
+        })
+        if (upErr || !url) { failCount++; continue }
+        urls.push(url)
+      }
       if (!urls.length) throw new Error('Image upload failed.')
       setImages((prev) => [...prev, ...urls].slice(0, MAX_IMAGES))
       if (failCount > 0) setUploadErr(`${failCount} image${failCount > 1 ? 's' : ''} failed to upload.`)
