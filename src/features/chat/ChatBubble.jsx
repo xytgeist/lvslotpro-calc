@@ -545,10 +545,10 @@ export default function ChatBubble({
               WebkitTouchCallout: 'none',
               touchAction: 'pan-y',
               borderRadius: compactBubble ? '9999px' : BUBBLE_EXPANDED_RADIUS_PX,
-              // Slightly square the tail corner so the CSS triangle attaches flush
+              // Zero the tail corner so the SVG tail attaches flush
               ...(isGroupStart && !isDeleted && !compactBubble && {
-                borderTopRightRadius: isMine ? 4 : undefined,
-                borderTopLeftRadius:  isMine ? undefined : 4,
+                borderBottomRightRadius: isMine ? 0 : undefined,
+                borderBottomLeftRadius:  isMine ? undefined : 0,
               }),
               backgroundColor: isMine && !isDeleted ? '#3b82f6' : undefined,
               boxShadow: isStarred && !isDeleted
@@ -557,23 +557,20 @@ export default function ChatBubble({
               transition: 'box-shadow 0.2s ease',
             }}
           >
-            {/* Top-corner ear — first message in a sender run only */}
+            {/* iMessage-style tail — first message in a sender run only */}
             {isGroupStart && !isDeleted && (
-              <div
+              <svg
                 className="absolute pointer-events-none"
-                style={isMine ? {
-                  top: 0, right: -7,
-                  width: 8, height: 14,
-                  backgroundColor: '#3b82f6',
-                  borderRadius: '0 10px 10px 0',
-                } : {
-                  top: 0, left: -7,
-                  width: 8, height: 14,
-                  backgroundColor: 'rgba(39,39,42,0.9)',
-                  borderRadius: '10px 0 0 10px',
-                }}
+                style={isMine ? { bottom: 0, right: 0, overflow: 'visible' } : { bottom: 0, left: 0, overflow: 'visible' }}
+                width="12" height="16"
                 aria-hidden
-              />
+              >
+                {isMine ? (
+                  <path d="M12 16 L12 28 C20 28 22 20 12 16 Z" fill="#3b82f6" />
+                ) : (
+                  <path d="M0 16 L0 28 C-8 28 -10 20 0 16 Z" fill="rgba(39,39,42,0.9)" />
+                )}
+              </svg>
             )}
 
             {isDeleted ? (
