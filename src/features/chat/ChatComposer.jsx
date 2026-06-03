@@ -179,13 +179,21 @@ export default function ChatComposer({
       let failCount = 0
       for (const f of files) {
         const { file: ready, error: prepErr } = await prepareLoungeFeedImageForUpload(f)
-        if (prepErr || !ready) { failCount++; continue }
+        if (prepErr || !ready) {
+          console.error('[ChatComposer] image prep failed', f.name, f.type, f.size, prepErr)
+          failCount++
+          continue
+        }
         const { data: url, error: upErr } = await uploadLoungeFeedPostImage({
           supabaseClient,
           user: { id: viewerUserId },
           file: ready,
         })
-        if (upErr || !url) { failCount++; continue }
+        if (upErr || !url) {
+          console.error('[ChatComposer] image upload failed', ready.name, ready.type, ready.size, upErr)
+          failCount++
+          continue
+        }
         urls.push(url)
       }
       if (!urls.length) throw new Error('Image upload failed.')
