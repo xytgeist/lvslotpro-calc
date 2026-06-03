@@ -1305,16 +1305,24 @@ export default function ChatConversation({
     }
   }, [runTailPinFollow, pinIosKeyboardFrame])
 
-  // iOS can silently push document.scrollY > 0 while the keyboard is open and the
-  // app is backgrounded, which shoves the fixed header off-screen on resume.
-  // Reset the root scroll and re-pin when the tab becomes visible again.
+  // iOS can corrupt the visual viewport layout when the app is backgrounded with the
+  // keyboard open (header pushed off-screen, messages misplaced on resume).
+  // Fix: blur → re-focus the active composer input so iOS re-raises the keyboard from
+  // a clean state, then re-pin the tail.
   useEffect(() => {
     if (!IS_IOS) return
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
-      window.scrollTo({ left: 0, top: 0, behavior: 'instant' })
-      window.visualViewport?.scrollTo?.({ left: 0, top: 0, behavior: 'instant' })
-      requestAnimationFrame(() => pinListToTail({ force: true }))
+      const active = composerBarRef.current?.querySelector('textarea, input')
+      if (active && document.activeElement === active) {
+        active.blur()
+        setTimeout(() => {
+          active.focus({ preventScroll: true })
+          requestAnimationFrame(() => pinListToTail({ force: true }))
+        }, 50)
+      } else {
+        requestAnimationFrame(() => pinListToTail({ force: true }))
+      }
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
