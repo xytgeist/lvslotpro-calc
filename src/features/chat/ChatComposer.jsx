@@ -421,7 +421,7 @@ export default function ChatComposer({
             Message…
           </button>
         </div>
-        {plusOpen && createPortal(<PlusMenu />, document.body)}
+        {plusOpen && createPortal(PlusMenu(), document.body)}
       </div>
     )
   }
@@ -591,7 +591,7 @@ export default function ChatComposer({
       </div>
 
       {/* Plus modal — portaled above button */}
-      {plusOpen && createPortal(<PlusMenu />, document.body)}
+      {plusOpen && createPortal(PlusMenu(), document.body)}
 
       <KlipyGifPicker
         open={gifPickerOpen}
