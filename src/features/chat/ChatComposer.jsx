@@ -13,7 +13,9 @@ import {
   deleteCfStreamOrphanAsset,
   cfStreamPosterUrl,
   probeVideoFileDisplaySize,
+  probeVideoFileDurationSeconds,
   captureVideoFilePosterObjectUrl,
+  LOUNGE_VIDEO_MAX_SECONDS,
 } from '../../utils/loungeVideoUpload.js'
 
 const MAX_BODY   = 4000
@@ -198,14 +200,6 @@ export default function ChatComposer({
 
   const removeImage = (url) => setImages((prev) => prev.filter((u) => u !== url))
 
-  const handleVideoPick = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (videoInputRef.current) videoInputRef.current.value = ''
-    setPlusOpen(false)
-    setCropModalFile(file)
-  }
-
   const handleCropCancel = () => setCropModalFile(null)
 
   const handleCropConfirm = useCallback(async (result) => {
@@ -266,6 +260,28 @@ export default function ChatComposer({
     setVideoMeta(null)
     setVideoUploadProgress(null)
   }, [videoMeta])
+
+  const handleVideoPick = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (videoInputRef.current) videoInputRef.current.value = ''
+    setPlusOpen(false)
+    setUploadErr('')
+
+    // Only open the trimmer if the clip exceeds the limit — skip it for short videos.
+    let duration = NaN
+    try {
+      duration = await probeVideoFileDurationSeconds(file)
+    } catch {
+      // Probe failed — let the crop modal handle it so the user can still trim if needed.
+    }
+
+    if (Number.isFinite(duration) && duration <= LOUNGE_VIDEO_MAX_SECONDS) {
+      void handleCropConfirm(file)
+    } else {
+      setCropModalFile(file)
+    }
+  }, [handleCropConfirm])
 
   const handleSend = useCallback(async () => {
     if (!canSend) return
