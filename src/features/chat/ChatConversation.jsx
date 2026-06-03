@@ -728,10 +728,16 @@ export default function ChatConversation({
   const pinTailAfterMutation = useCallback(() => {
     if (isComposerKeyboardActive()) {
       if (IS_IOS) {
+        // Sync call anchors the frame before React commits the new bubble.
         pinIosKeyboardFrame()
-        // Synchronous call above runs with the old DOM (before React commits the new bubble).
-        // One RAF ensures we also pin after the commit so the bubble isn't hidden behind the composer.
-        requestAnimationFrame(() => pinListToTail({ force: true }))
+        // Then chase with the same multi-ping pattern used for the keyboard-down path,
+        // so later frames (after iOS layout settles) also land the tail correctly.
+        const run = () => pinListToTail({ force: true })
+        requestAnimationFrame(() => {
+          run()
+          requestAnimationFrame(run)
+        })
+        window.setTimeout(run, 50)
       } else {
         runTailPinFollow()
       }
