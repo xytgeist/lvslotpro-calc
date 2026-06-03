@@ -169,6 +169,9 @@ export default function ChatConversation({
   const tailPinFollowUntilRef = useRef(0)
   const kbOverlapPrevRef = useRef(0)
   const kbClosingRef = useRef(false)
+  /** Bottom inset for the scroll list — matches floating transparent composer height. */
+  const [composerInsetPx, setComposerInsetPx] = useState(72)
+  const openScrollPendingRef = useRef(true)
   const [composerFocused, setComposerFocused] = useState(false)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(IS_IOS)
   const kbOverlapPx = useLoungeKeyboardOverlapPx(true, { smooth: IS_IOS, smoothMs: LOUNGE_IOS_KEYBOARD_SMOOTH_MS })
@@ -479,14 +482,26 @@ export default function ChatConversation({
 
   useEffect(() => { void loadMessages() }, [loadMessages])
 
-  // Scroll to bottom once initial load resolves
   useEffect(() => {
-    if (!loading) {
-      scrollToBottom('instant')
+    openScrollPendingRef.current = true
+  }, [room.id])
+
+  // Always land on the latest message when a conversation opens (or reloads to live end).
+  useLayoutEffect(() => {
+    if (loading || !openScrollPendingRef.current) return
+    const pinOpenTail = () => {
+      const el = listRef.current
+      if (!el) return
+      el.scrollTop = el.scrollHeight
       atBottomRef.current = true
       setIsAtBottom(true)
+      setScrolledUpCount(0)
+      setNewMsgCount(0)
     }
-  }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
+    pinOpenTail()
+    requestAnimationFrame(pinOpenTail)
+    openScrollPendingRef.current = false
+  }, [loading, room.id])
 
   // ── Load older messages (prepend) ─────────────────────────────────────────
 
@@ -582,9 +597,9 @@ export default function ChatConversation({
   const scrollToBottom = useCallback((behavior = 'instant', { force = false } = {}) => {
     const el = listRef.current
     if (!el) return
-    if (!force && (listContentFitsInView() || !contentExtendsBelowComposer())) return
+    if (!force && listContentFitsInView()) return
     el.scrollTo({ top: el.scrollHeight, behavior })
-  }, [contentExtendsBelowComposer, listContentFitsInView])
+  }, [listContentFitsInView])
 
   /** Pin tail above composer when keyboard resizes the list (iOS + Android). */
   const pinListToTail = useCallback(({ force = false } = {}) => {
@@ -778,6 +793,7 @@ export default function ChatConversation({
     setNewMsgCount(0)
     setScrolledUpCount(0)
     if (hasNewerRef.current) {
+      openScrollPendingRef.current = true
       void loadMessages()
     } else {
       atBottomRef.current = true
@@ -823,6 +839,7 @@ export default function ChatConversation({
         hasNewerRef.current = false
         setHasNewer(false)
         setNewMsgCount(0)
+        openScrollPendingRef.current = true
         void loadMessages().then(resolve)
       })
     }
@@ -874,7 +891,10 @@ export default function ChatConversation({
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, link_preview: preview } : m)),
     )
-  }, [])
+    if (atBottomRef.current) {
+      requestAnimationFrame(() => pinListToTail({ force: true }))
+    }
+  }, [pinListToTail])
 
   const handleDelete = useCallback(async (messageId) => {
     await chatDeleteMessage(supabaseClient, messageId)
@@ -1076,7 +1096,12 @@ export default function ChatConversation({
   useEffect(() => {
     const composer = composerBarRef.current
     if (!composer) return undefined
+    const syncInset = () => {
+      setComposerInsetPx(composer.offsetHeight + COMPOSER_SCROLL_GAP_PX)
+    }
+    syncInset()
     const ro = new ResizeObserver(() => {
+      syncInset()
       if (!composer.querySelector('textarea:focus, input:focus')) return
       if (IS_IOS) runTailPinFollow()
       else pinListToTail({ force: true })
@@ -1551,7 +1576,7 @@ export default function ChatConversation({
           onTouchEnd={handleSwipeTouchEnd}
           onTouchCancel={handleSwipeTouchEnd}
           className="h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3"
-          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop }}
+          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop, paddingBottom: composerInsetPx }}
         >
           {loadingMore && (
             <div className="py-2 text-center text-[12px] text-zinc-600">Loading older messages…</div>
@@ -1566,7 +1591,7 @@ export default function ChatConversation({
               No messages yet. Say hi! 👋
             </div>
           ) : (
-            <div ref={translateLayerRef} className="pb-2 will-change-transform select-none" style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+            <div ref={translateLayerRef} className="flex min-h-full flex-col justify-end pb-2 will-change-transform select-none" style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
               {messages.map((msg, idx) => {
                 const prev = idx > 0 ? messages[idx - 1] : null
                 const isGroupStart = !prev || prev.sender_id !== msg.sender_id
@@ -1605,12 +1630,11 @@ export default function ChatConversation({
             </div>
           )}
         </div>
-      </div>
 
       <div
         ref={composerBarRef}
         data-chat-composer-host
-        className="relative z-20 shrink-0 bg-zinc-950/95 px-3 pt-2.5 pb-0 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/80"
+        className="absolute inset-x-0 bottom-0 z-20 bg-transparent px-3 pt-2.5 pb-0"
         style={{ paddingBottom: composerPadBottom }}
       >
         {(newMsgCount > 0 || hasNewer || scrolledUpCount >= SCROLL_UP_MSG_THRESHOLD) && (
@@ -1672,6 +1696,7 @@ export default function ChatConversation({
             footerHost
           />
         </div>
+      </div>
       </div>
       </div>
 
