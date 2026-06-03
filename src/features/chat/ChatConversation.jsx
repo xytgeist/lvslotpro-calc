@@ -112,6 +112,7 @@ async function fetchPage(supabaseClient, roomId, { beforeCreatedAt = null, befor
  *   profilesById: Record<string, { display_name?: string | null, handle?: string | null, avatar_url?: string | null }>,
  *   onBack: () => void,
  *   onViewProfile?: ((userId: string) => void) | null,
+ *   onRoomUpdated?: ((patch: Record<string, unknown>) => void) | null,
  * }} props
  */
 export default function ChatConversation({
@@ -123,6 +124,7 @@ export default function ChatConversation({
   otherUnreadCount = 0,
   onBack,
   onViewProfile = null,
+  onRoomUpdated = null,
 }) {
   const [messages, setMessages] = useState(/** @type {any[]} */ ([]))
   // Aggregated reactions per message: { [messageId]: { emoji, count, viewerReacted }[] }
@@ -1662,7 +1664,10 @@ export default function ChatConversation({
           room={activeRoom}
           viewerUserId={viewerUserId}
           headerMembers={groupHeaderMembers}
-          onRoomUpdated={(patch) => setRoomMeta((prev) => ({ ...prev, ...patch }))}
+          onRoomUpdated={(patch) => {
+            setRoomMeta((prev) => ({ ...prev, ...patch }))
+            onRoomUpdated?.(patch)
+          }}
           onLeftGroup={onBack}
           onJumpToMessage={jumpToMessage}
           onPinsChanged={refreshPinnedIds}

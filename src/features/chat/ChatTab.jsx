@@ -506,6 +506,10 @@ export default function ChatTab({
         profilesById={profilesById}
         otherUnreadCount={otherUnreadCount}
         onBack={() => { setActiveRoomId(null); setHydratedOpenRoom(null); void loadRooms() }}
+        onRoomUpdated={(patch) => {
+          setRooms((prev) => prev.map((r) => r.id === activeRoomId ? { ...r, ...patch } : r))
+          setHydratedOpenRoom((prev) => prev?.id === activeRoomId ? { ...prev, ...patch } : prev)
+        }}
       />
     )
   }
