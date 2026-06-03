@@ -46,9 +46,9 @@ const SCROLL_UP_MSG_THRESHOLD = 20
 const COMPOSER_SCROLL_GAP_PX = 8
 /** Message stack shorter than this gap under the composer viewport → treat as "fits" (no push). */
 const LIST_CONTENT_FITS_GAP_PX = 24
-/** iOS keyboard dismiss: wait for viewport settle + lerp to finish, then one smooth list scroll. */
-const IOS_KEYBOARD_DISMISS_SCROLL_SETTLE_MS = 180
-const IOS_KEYBOARD_DISMISS_SCROLL_MAX_WAIT_MS = 520
+/** iOS keyboard dismiss: wait for viewport settle, then one smooth list scroll. */
+const IOS_KEYBOARD_DISMISS_SCROLL_SETTLE_MS = 100
+const IOS_KEYBOARD_DISMISS_SCROLL_MAX_WAIT_MS = 420
 /** Tail-pin rAF follow while iOS keyboard animates open/closed. */
 const IOS_KEYBOARD_TAIL_PIN_MS = 380
 
@@ -718,18 +718,11 @@ export default function ChatConversation({
     tailPinFollowRafRef.current = requestAnimationFrame(tick)
   }, [pinListToTail])
 
-  /** iOS smooth overlap: one layout-synced pin per displayed keyboard px (open + close). */
+  /** iOS smooth overlap: one layout-synced pin per displayed keyboard px (open only). */
   const pinIosKeyboardFrame = useCallback(() => {
     if (!IS_IOS) return
-    // Keep pinning while either the display lerp OR the keyboard is logically open.
-    // Using kbTargetRef alone killed the pin immediately on dismiss even while
-    // kbOverlapPx (the smoothed display) was still animating.
-    const displayOverlap = kbOverlapRef.current
-    const targetOverlap = kbTargetRef.current
-    const safeBottom = iosSafeBottomRef.current
-    const stillAnimating = displayOverlap > safeBottom + 0.5
-    const keyboardLogicallyOpen = isComposerKeyboardActive() || targetOverlap > safeBottom + 2
-    if (!stillAnimating && !keyboardLogicallyOpen) return
+    if (kbClosingRef.current) return  // composerPadBottom lerp handles dismiss on its own
+    if (!isComposerKeyboardActive() && kbTargetRef.current <= iosSafeBottomRef.current + 0.5) return
     pinListToTail({ force: true })
   }, [pinListToTail, isComposerKeyboardActive])
 
@@ -1303,14 +1296,16 @@ export default function ChatConversation({
 
   useEffect(() => {
     const prev = kbOverlapPrevRef.current
-    kbOverlapPrevRef.current = kbOverlapTargetPx
-    kbClosingRef.current = kbOverlapTargetPx < prev - 2
-    if (kbOverlapTargetPx <= iosSafeBottomPx + 0.5) {
+    kbOverlapPrevRef.current = kbOverlapPx
+    kbClosingRef.current = kbOverlapPx < prev - 2
+    if (kbOverlapPx <= iosSafeBottomPx + 0.5) {
       kbClosingRef.current = false
       return undefined
     }
+    // Pin tail while keyboard opens; composerPadBottom lerp alone handles dismiss.
+    if (kbOverlapPx > prev + 2) runTailPinFollow()
     return undefined
-  }, [iosSafeBottomPx, kbOverlapTargetPx])
+  }, [iosSafeBottomPx, kbOverlapPx, runTailPinFollow])
 
   useEffect(() => {
     const composer = composerBarRef.current
