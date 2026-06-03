@@ -29,7 +29,7 @@ import {
 import { findLastOwnMessageId, getMessageReceiptStatus } from './chatReceiptStatus.js'
 import { subscribeToTyping } from './chatTypingBroadcast.js'
 import { notifyLoungeDockSuppress } from '../lounge/loungeDockSuppressRegistry.js'
-import { useLoungeKeyboardOverlapPx, loungeComposerFooterPaddingBottom, useLoungeIosSafeBottomPx } from '../lounge/useLoungeKeyboardOverlapPx.js'
+import { useLoungeKeyboardOverlapPx, LOUNGE_IOS_KEYBOARD_SMOOTH_MS, loungeComposerFooterPaddingBottom, useLoungeIosSafeBottomPx } from '../lounge/useLoungeKeyboardOverlapPx.js'
 
 // Glass styles are defined in index.css as .chat-header-glass / .chat-menu-glass
 // with html.light overrides — do not use inline styles for these.
@@ -189,9 +189,14 @@ export default function ChatConversation({
   const openScrollPendingRef = useRef(true)
   const [composerFocused, setComposerFocused] = useState(false)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(IS_IOS)
-  const kbOverlapPx = useLoungeKeyboardOverlapPx(true)
+  const { overlapPx: kbOverlapPx, targetPx: kbOverlapTargetPx } = useLoungeKeyboardOverlapPx(true, {
+    smooth: IS_IOS,
+    smoothMs: LOUNGE_IOS_KEYBOARD_SMOOTH_MS,
+  })
   const kbOverlapRef = useRef(kbOverlapPx)
   kbOverlapRef.current = kbOverlapPx
+  const kbTargetRef = useRef(kbOverlapTargetPx)
+  kbTargetRef.current = kbOverlapTargetPx
   const iosSafeBottomRef = useRef(iosSafeBottomPx)
   iosSafeBottomRef.current = iosSafeBottomPx
   const composerFocusedRef = useRef(composerFocused)
@@ -690,7 +695,7 @@ export default function ChatConversation({
     if (composerFocusedRef.current) return true
     const tag = document.activeElement?.tagName
     if (tag === 'TEXTAREA' || tag === 'INPUT') return true
-    return kbOverlapRef.current > iosSafeBottomRef.current + 2
+    return kbTargetRef.current > iosSafeBottomRef.current + 2
   }, [])
 
   /** iOS: pin each animation frame while keyboard slides; Android: one snap. */
@@ -713,10 +718,18 @@ export default function ChatConversation({
     tailPinFollowRafRef.current = requestAnimationFrame(tick)
   }, [pinListToTail])
 
+  /** iOS smooth overlap: one layout-synced pin per displayed keyboard px (open + close). */
+  const pinIosKeyboardFrame = useCallback(() => {
+    if (!IS_IOS) return
+    if (!isComposerKeyboardActive() && kbTargetRef.current <= iosSafeBottomRef.current + 0.5) return
+    pinListToTail({ force: true })
+  }, [pinListToTail, isComposerKeyboardActive])
+
   /** Force tail pin after send or layout shift (images, link preview). Delegates to keyboard follow when focused. */
   const pinTailAfterMutation = useCallback(() => {
     if (isComposerKeyboardActive()) {
-      runTailPinFollow()
+      if (IS_IOS) pinIosKeyboardFrame()
+      else runTailPinFollow()
       return
     }
     const run = () => pinListToTail({ force: true })
@@ -726,7 +739,7 @@ export default function ChatConversation({
       requestAnimationFrame(run)
     })
     window.setTimeout(run, 50)
-  }, [pinListToTail, isComposerKeyboardActive, runTailPinFollow])
+  }, [pinListToTail, isComposerKeyboardActive, runTailPinFollow, pinIosKeyboardFrame])
 
   // Land on the latest message once when a conversation finishes loading (not on every new row).
   useLayoutEffect(() => {
@@ -1249,7 +1262,8 @@ export default function ChatConversation({
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
         composerFocusedRef.current = true
         openScrollPendingRef.current = false
-        runTailPinFollow()
+        if (IS_IOS) pinIosKeyboardFrame()
+        else runTailPinFollow()
       }
     }
 
@@ -1264,9 +1278,9 @@ export default function ChatConversation({
 
     const vv = window.visualViewport
     const onVvChange = () => {
-      if (IS_IOS && kbClosingRef.current) return
       if (!composerFocusedRef.current && !composer.querySelector('textarea:focus, input:focus')) return
-      runTailPinFollow()
+      if (IS_IOS) pinIosKeyboardFrame()
+      else runTailPinFollow()
     }
     vv?.addEventListener('resize', onVvChange)
     vv?.addEventListener('scroll', onVvChange)
@@ -1277,20 +1291,18 @@ export default function ChatConversation({
       vv?.removeEventListener('resize', onVvChange)
       vv?.removeEventListener('scroll', onVvChange)
     }
-  }, [runTailPinFollow])
+  }, [runTailPinFollow, pinIosKeyboardFrame])
 
   useEffect(() => {
     const prev = kbOverlapPrevRef.current
-    kbOverlapPrevRef.current = kbOverlapPx
-    kbClosingRef.current = kbOverlapPx < prev - 2
-    if (kbOverlapPx <= iosSafeBottomPx + 0.5) {
+    kbOverlapPrevRef.current = kbOverlapTargetPx
+    kbClosingRef.current = kbOverlapTargetPx < prev - 2
+    if (kbOverlapTargetPx <= iosSafeBottomPx + 0.5) {
       kbClosingRef.current = false
       return undefined
     }
-    // Tail-pin only while keyboard is opening — dismiss uses overlap lerp + safe-area floor.
-    if (kbOverlapPx > prev + 2) runTailPinFollow()
     return undefined
-  }, [iosSafeBottomPx, kbOverlapPx, runTailPinFollow])
+  }, [iosSafeBottomPx, kbOverlapTargetPx])
 
   useEffect(() => {
     const composer = composerBarRef.current
@@ -1301,32 +1313,18 @@ export default function ChatConversation({
     syncInset()
     const ro = new ResizeObserver(() => {
       syncInset()
-      if (IS_IOS && kbClosingRef.current) return
-      if (!composer.querySelector('textarea:focus, input:focus')) return
-      if (IS_IOS) runTailPinFollow()
+      if (!composer.querySelector('textarea:focus, input:focus') && !composerFocusedRef.current) return
+      if (IS_IOS) pinIosKeyboardFrame()
       else pinListToTail({ force: true })
     })
     ro.observe(composer)
     return () => ro.disconnect()
-  }, [pinListToTail, runTailPinFollow])
+  }, [pinListToTail, pinIosKeyboardFrame])
 
-  // iOS: pin before paint while keyboard opens — composer is in-flow (post-detail pattern).
+  // iOS: tail rides the smoothed overlap lerp — one pin per displayed px (open + close).
   useLayoutEffect(() => {
-    if (!IS_IOS) return
-    const prev = kbOverlapPrevRef.current
-    if (kbOverlapPx < prev - 2) return
-    if (!isComposerKeyboardActive()) return
-    runTailPinFollow()
-  }, [composerFocused, kbOverlapPx, iosSafeBottomPx, composerInsetPx, runTailPinFollow, isComposerKeyboardActive])
-
-  // footerHost mounts the textarea after tap — stagger pins through keyboard slide-in.
-  useEffect(() => {
-    if (!IS_IOS || !composerFocused) return undefined
-    const timers = [50, 120, 220, 340, 480].map((ms) => window.setTimeout(() => runTailPinFollow(), ms))
-    return () => {
-      for (const id of timers) window.clearTimeout(id)
-    }
-  }, [composerFocused, runTailPinFollow])
+    pinIosKeyboardFrame()
+  }, [kbOverlapPx, kbOverlapTargetPx, composerFocused, composerInsetPx, pinIosKeyboardFrame])
 
   // resizes-content: when the keyboard opens/closes the list height changes — pin tail.
   useEffect(() => {
@@ -1345,12 +1343,10 @@ export default function ChatConversation({
       if (growing && preservedGap != null) {
         container.scrollTop = container.scrollHeight - container.clientHeight - preservedGap
       } else if (shrinking && (atBottomRef.current || inputFocused)) {
-        if (IS_IOS && kbClosingRef.current) { /* overlap + safe-area floor on dismiss */ }
-        else if (IS_IOS) runTailPinFollow()
+        if (IS_IOS) pinIosKeyboardFrame()
         else pinListToTail({ force: true })
       } else if (growing && (atBottomRef.current || inputFocused)) {
-        if (IS_IOS && kbClosingRef.current) { /* avoid overshoot while keyboard closes */ }
-        else if (IS_IOS) runTailPinFollow()
+        if (IS_IOS) pinIosKeyboardFrame()
         else pinListToTail({ force: true })
       } else if (IS_ANDROID && contentExtendsBelowComposer()) {
         if (growing || (shrinking && (atBottomRef.current || inputFocused))) {
@@ -1361,7 +1357,7 @@ export default function ChatConversation({
     })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [contentExtendsBelowComposer, pinListToTail, runTailPinFollow])
+  }, [contentExtendsBelowComposer, pinListToTail, pinIosKeyboardFrame])
 
   // Android: swipe-down dismiss on message list — lock scroll at tail + preserve position.
   // iOS: messages scroll freely; dismiss only from composer strip (see below).

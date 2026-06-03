@@ -39,6 +39,8 @@ export function useLoungeIosSafeBottomPx(active = LOUNGE_IOS) {
  * visualViewport keyboard overlap — same formula as Lounge post-detail reply composer.
  *
  * @param {boolean} active
+ * @returns {{ overlapPx: number, targetPx: number, displayPx: number }}
+ *   overlapPx — use for footer padding (smoothed on iOS when smooth is on).
  * @param {{ smooth?: boolean, smoothMs?: number }} [options]
  *   smooth — ease displayed px toward the live target (iOS chat polish).
  */
@@ -119,5 +121,6 @@ export function useLoungeKeyboardOverlapPx(active = true, options = {}) {
     }
   }, [active, targetPx, smooth, smoothMs])
 
-  return smooth ? displayPx : targetPx
+  const overlapPx = smooth ? displayPx : targetPx
+  return { overlapPx, targetPx, displayPx: overlapPx }
 }
