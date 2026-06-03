@@ -552,18 +552,20 @@ export default function ChatBubble({
               transition: 'box-shadow 0.2s ease',
             }}
           >
-            {/* Tail — only on media bubbles, positioned outside the border */}
+            {/* Tail — covers the corner arc + extends beyond the bubble edge */}
             {hasMedia && !isDeleted && (
               <svg
                 className="absolute bottom-0 pointer-events-none"
-                style={isMine ? { right: -8 } : { left: -8 }}
-                width="9" height="14" viewBox="0 0 9 14"
+                style={isMine ? { right: 0, overflow: 'visible' } : { left: 0, overflow: 'visible' }}
+                width="20" height="18"
                 aria-hidden
               >
                 {isMine ? (
-                  <path d="M0 0 C0 8 9 11 9 14 L0 14 Z" fill="#3b82f6" />
+                  /* Fills the bottom-right corner arc area and curves into a tail pointing right */
+                  <path d="M20 2 L28 20 L20 18 L4 18 A16 16 0 0 1 20 2 Z" fill="#3b82f6" />
                 ) : (
-                  <path d="M9 0 C9 8 0 11 0 14 L9 14 Z" fill="rgba(39,39,42,0.9)" />
+                  /* Mirror for left side */
+                  <path d="M0 2 L-8 20 L0 18 L16 18 A16 16 0 0 0 0 2 Z" fill="rgba(39,39,42,0.9)" />
                 )}
               </svg>
             )}
@@ -925,7 +927,10 @@ function ChatMediaGrid({ media, onOpen }) {
   const count = visible.length
 
   return (
-    <div className={`overflow-hidden rounded-[13px] ${count === 1 ? '' : 'grid gap-0.5'} ${count === 2 ? 'grid-cols-2' : count >= 3 ? 'grid-cols-2' : ''}`}>
+    <div
+      className={`overflow-hidden ${count === 1 ? '' : 'grid gap-0.5'} ${count === 2 ? 'grid-cols-2' : count >= 3 ? 'grid-cols-2' : ''}`}
+      style={{ borderRadius: 13 }}
+    >
       {visible.map((item, i) => {
         const isLastVisible = i === GRID_MAX_VISIBLE - 1
         const showOverlay = isLastVisible && overflow > 0
