@@ -1300,12 +1300,14 @@ export default function ChatConversation({
     kbClosingRef.current = kbOverlapPx < prev - 2
     if (kbOverlapPx <= iosSafeBottomPx + 0.5) {
       kbClosingRef.current = false
+      // Lerp just landed — fire one tail pin to snap messages above settled composer.
+      if (prev > iosSafeBottomPx + 0.5) pinListToTail({ force: true })
       return undefined
     }
     // Pin tail while keyboard opens; composerPadBottom lerp alone handles dismiss.
     if (kbOverlapPx > prev + 2) runTailPinFollow()
     return undefined
-  }, [iosSafeBottomPx, kbOverlapPx, runTailPinFollow])
+  }, [iosSafeBottomPx, kbOverlapPx, runTailPinFollow, pinListToTail])
 
   useEffect(() => {
     const composer = composerBarRef.current
@@ -1585,11 +1587,7 @@ export default function ChatConversation({
   const listPaddingTop = useRichHeader
     ? 'calc(env(safe-area-inset-top, 0px) + 11rem)'
     : 'calc(env(safe-area-inset-top, 0px) + 4.5rem)'
-  const composerPadBottom = IS_IOS
-    ? kbOverlapPx > 0.5
-      ? `${Math.round(kbOverlapPx)}px`
-      : `${iosSafeBottomPx}px`
-    : loungeComposerFooterPaddingBottom(kbOverlapPx, iosSafeBottomPx, { ios: false })
+  const composerPadBottom = loungeComposerFooterPaddingBottom(kbOverlapPx, iosSafeBottomPx)
 
   return (
     <div
