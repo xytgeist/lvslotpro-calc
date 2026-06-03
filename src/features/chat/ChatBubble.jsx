@@ -375,12 +375,6 @@ export default function ChatBubble({
         WebkitTouchCallout: 'none',
         WebkitUserSelect: 'none',
         userSelect: 'none',
-        ...(isStarred && !isDeleted ? {
-          backgroundColor: 'rgba(251,191,36,0.045)',
-          borderRadius: '16px',
-          marginInline: '-6px',
-          paddingInline: '6px',
-        } : {}),
       }}
     >
       <div className={`flex items-end gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -456,7 +450,7 @@ export default function ChatBubble({
               borderRadius: compactBubble ? '9999px' : BUBBLE_EXPANDED_RADIUS_PX,
               backgroundColor: isMine && !isDeleted ? '#3b82f6' : undefined,
               boxShadow: isStarred && !isDeleted
-                ? '0 0 0 1.5px rgba(251,191,36,0.55)'
+                ? '0 0 0 1.5px rgba(251,191,36,0.6), 0 0 12px 3px rgba(251,191,36,0.18)'
                 : undefined,
               transition: 'box-shadow 0.2s ease',
             }}
@@ -488,8 +482,8 @@ export default function ChatBubble({
 
           {/* Starred indicator — small amber star under the trailing bubble corner */}
           {isStarred && !isDeleted && (
-            <div className={`-mt-1 flex select-none pointer-events-none ${isMine ? 'justify-end pr-2.5' : 'justify-start pl-2.5'}`}>
-              <span className="text-[10px] leading-none text-amber-400" aria-label="Starred">★</span>
+            <div className={`-mt-1 flex select-none pointer-events-none ${isMine ? 'justify-end pr-2' : 'justify-start pl-2'}`}>
+              <span className="text-[15px] leading-none text-amber-400" style={{ filter: 'drop-shadow(0 0 4px rgba(251,191,36,0.7))' }} aria-label="Starred">★</span>
             </div>
           )}
 
