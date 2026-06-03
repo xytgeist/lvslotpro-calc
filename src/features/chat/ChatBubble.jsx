@@ -561,11 +561,11 @@ export default function ChatBubble({
                 aria-hidden
               >
                 {isMine ? (
-                  /* Fills the bottom-right corner arc area and curves into a tail pointing right */
-                  <path d="M20 2 L28 20 L20 18 L4 18 A16 16 0 0 1 20 2 Z" fill="#3b82f6" />
+                  /* Telegram-style tail: fills corner arc, smooth concave outer edge curves right then to tip */
+                  <path d="M20 2 C30 4 30 16 26 18 L4 18 A16 16 0 0 1 20 2 Z" fill="#3b82f6" />
                 ) : (
                   /* Mirror for left side */
-                  <path d="M0 2 L-8 20 L0 18 L16 18 A16 16 0 0 0 0 2 Z" fill="rgba(39,39,42,0.9)" />
+                  <path d="M0 2 C-10 4 -10 16 -6 18 L16 18 A16 16 0 0 0 0 2 Z" fill="rgba(39,39,42,0.9)" />
                 )}
               </svg>
             )}
