@@ -543,27 +543,16 @@ export default function ChatConversation({
   }, [room.id])
 
   const pinOpenTail = useCallback(() => {
-    const el = listRef.current
-    if (!el) return
-    el.scrollTop = el.scrollHeight
+    const list = listRef.current
+    if (!list) return
+    list.scrollTop = list.scrollHeight
     atBottomRef.current = true
     setIsAtBottom(true)
     setScrolledUpCount(0)
     setNewMsgCount(0)
   }, [])
 
-  /** Force tail pin after send or layout shift (images, link preview, composer inset). */
-  const pinTailAfterMutation = useCallback(() => {
-    const run = () => pinOpenTail()
-    run()
-    requestAnimationFrame(() => {
-      run()
-      requestAnimationFrame(run)
-    })
-    window.setTimeout(run, 50)
-  }, [pinOpenTail])
-
-  // Land on the latest message when a conversation opens (after load + composer inset settle).
+  // Land on the latest message when a conversation opens (after load settles).
   useLayoutEffect(() => {
     if (loading || !openScrollPendingRef.current) return
 
@@ -591,7 +580,7 @@ export default function ChatConversation({
       window.clearTimeout(t1)
       window.clearTimeout(tDone)
     }
-  }, [loading, room.id, messages.length, composerInsetPx, pinOpenTail])
+  }, [loading, room.id, messages.length, pinOpenTail])
 
   // ── Load older messages (prepend) ─────────────────────────────────────────
 
@@ -691,23 +680,52 @@ export default function ChatConversation({
     el.scrollTo({ top: el.scrollHeight, behavior })
   }, [listContentFitsInView])
 
-  /** Pin tail above composer when keyboard resizes the list (iOS + Android). */
+  /** Pin tail above the floating composer — scroll max, then nudge if last bubble overlaps composer top. */
   const pinListToTail = useCallback(({ force = false } = {}) => {
     const list = listRef.current
+    const composer = composerBarRef.current
     if (!list) return
     const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80
     const tag = document.activeElement?.tagName
     const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
     if (!force && !atBottomRef.current && !nearBottom && !inputFocused) return
+
     list.scrollTop = list.scrollHeight
+
+    if (composer) {
+      const nodes = list.querySelectorAll('[data-chat-message-id]')
+      const last = nodes[nodes.length - 1]
+      if (last) {
+        const composerTop = composer.getBoundingClientRect().top
+        const lastBottom = last.getBoundingClientRect().bottom
+        const overflow = lastBottom - (composerTop - COMPOSER_SCROLL_GAP_PX)
+        if (overflow > 0.5) {
+          list.scrollTop += overflow
+        }
+      }
+    }
+
+    atBottomRef.current = true
+    setIsAtBottom(true)
+    setScrolledUpCount(0)
+    setNewMsgCount(0)
   }, [])
+
+  /** Force tail pin after send or layout shift (images, link preview, composer inset). */
+  const pinTailAfterMutation = useCallback(() => {
+    const run = () => pinListToTail({ force: true })
+    run()
+    requestAnimationFrame(() => {
+      run()
+      requestAnimationFrame(run)
+    })
+    window.setTimeout(run, 50)
+  }, [pinListToTail])
 
   /** iOS: pin each animation frame while keyboard slides; Android: one snap. */
   const runTailPinFollow = useCallback(() => {
-    if (!IS_IOS) {
-      pinListToTail({ force: true })
-      return
-    }
+    pinListToTail({ force: true })
+    if (!IS_IOS) return
     tailPinFollowUntilRef.current = performance.now() + IOS_KEYBOARD_TAIL_PIN_MS
     if (tailPinFollowRafRef.current) return
 
@@ -1258,6 +1276,15 @@ export default function ChatConversation({
     ro.observe(composer)
     return () => ro.disconnect()
   }, [pinListToTail, runTailPinFollow])
+
+  // iOS: keep the latest bubble above the composer while the keyboard animates.
+  useEffect(() => {
+    if (!IS_IOS) return undefined
+    const keyboardOpen = kbOverlapPx > iosSafeBottomPx + 2
+    if (!composerFocused && !keyboardOpen) return undefined
+    runTailPinFollow()
+    return undefined
+  }, [composerFocused, kbOverlapPx, iosSafeBottomPx, composerInsetPx, runTailPinFollow])
 
   // resizes-content: when the keyboard opens/closes the list height changes — pin tail.
   useEffect(() => {
