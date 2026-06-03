@@ -553,10 +553,10 @@ export default function ChatBubble({
                 return `${r}px ${r}px ${rBR}px ${rBL}px`
               })(),
               backgroundColor: isMine && !isDeleted ? '#3b82f6' : undefined,
-              boxShadow: isStarred && !isDeleted
-                ? '0 0 0 1.5px rgba(251,191,36,0.6), 0 0 12px 3px rgba(251,191,36,0.18)'
+              filter: isStarred && !isDeleted
+                ? 'drop-shadow(0 0 10px rgba(251,191,36,0.45))'
                 : undefined,
-              transition: 'box-shadow 0.2s ease',
+              transition: 'filter 0.2s ease',
             }}
           >
 
