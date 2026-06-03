@@ -444,6 +444,25 @@ GRANT EXECUTE ON FUNCTION public.chat_room_shared_links(uuid, int, boolean) TO a
 GRANT EXECUTE ON FUNCTION public.chat_messages_window(uuid, uuid, int) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_rooms_for_user(uuid) TO authenticated, anon;
 
+-- ── Realtime publication — include chat_rooms so UPDATE events propagate ──────
+-- Members have a SELECT RLS policy on chat_rooms so they only receive events
+-- for rooms they belong to. Required for group photo/name/description changes
+-- to appear immediately on all members' screens.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime' AND puballtables = true
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND tablename = 'chat_rooms'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_rooms;
+    END IF;
+  END IF;
+END $$;
+
 -- ── Reload PostgREST schema cache ─────────────────────────────────────────────
 
 NOTIFY pgrst, 'reload schema';

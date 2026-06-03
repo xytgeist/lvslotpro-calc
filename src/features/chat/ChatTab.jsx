@@ -213,10 +213,13 @@ export default function ChatTab({
     void loadRooms()
   }, [loadRooms])
 
-  // ── Realtime — refresh inbox when any new message arrives ────────────────
-  // postgres_changes is filtered by RLS, so only messages in rooms the viewer
-  // is a member of come through. On any INSERT we reload the room list so the
-  // unread dot / bold preview / timestamp update without the user going back.
+  // ── Realtime — refresh inbox on new messages + group room updates ───────────
+  // postgres_changes is filtered by RLS, so only rows the viewer can SELECT
+  // come through.
+  // • chat_messages INSERT  → refresh unread badge, preview, timestamp
+  // • chat_rooms UPDATE     → refresh group photo / name / description for all
+  //   members immediately (requires chat_rooms in supabase_realtime publication
+  //   — migration 20260603160000_chat_group_full_repair.sql adds it)
   useEffect(() => {
     if (!supabaseClient || !viewerUserId) return
     const channel = supabaseClient
@@ -224,6 +227,11 @@ export default function ChatTab({
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        () => { void loadRooms() },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_rooms' },
         () => { void loadRooms() },
       )
       .subscribe()
