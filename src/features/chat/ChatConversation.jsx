@@ -42,7 +42,6 @@ const IS_IOS =
 const IOS_COMPOSER_DISMISS_PAD_PX = 32
 /** Show scroll-to-bottom when this many newer messages are off-screen. */
 const SCROLL_UP_MSG_THRESHOLD = 20
-const JUMP_BTN_ABOVE_COMPOSER_PX = 8
 /** Last message must sit this far below the composer top before we auto-scroll. */
 const COMPOSER_SCROLL_GAP_PX = 8
 /** Message stack shorter than this gap under the composer viewport → treat as "fits" (no push). */
@@ -51,7 +50,7 @@ const LIST_CONTENT_FITS_GAP_PX = 24
 const IOS_KEYBOARD_DISMISS_SCROLL_SETTLE_MS = 100
 const IOS_KEYBOARD_DISMISS_SCROLL_MAX_WAIT_MS = 420
 /** Tail-pin rAF follow while iOS keyboard animates open/closed. */
-const IOS_KEYBOARD_TAIL_PIN_MS = 240
+const IOS_KEYBOARD_TAIL_PIN_MS = 380
 
 /**
  * Max messages kept in the DOM at any time.
@@ -639,28 +638,44 @@ export default function ChatConversation({
     return lastBottom > composerTop - COMPOSER_SCROLL_GAP_PX
   }, [listContentFitsInView])
 
-  /** Pin tail above the floating composer — scroll max, then nudge if last bubble overlaps composer top. */
+  /** Pin tail above the composer — scroll max, then nudge if the last bubble sits below the visible band. */
   const pinListToTail = useCallback(({ force = false } = {}) => {
     const list = listRef.current
-    const composer = composerBarRef.current
     if (!list) return
     const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80
     const tag = document.activeElement?.tagName
     const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
     if (!force && !atBottomRef.current && !nearBottom && !inputFocused) return
 
-    list.scrollTop = list.scrollHeight
+    const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight)
+    list.scrollTop = maxScroll
 
-    if (composer) {
-      const nodes = list.querySelectorAll('[data-chat-message-id]')
-      const last = nodes[nodes.length - 1]
-      if (last) {
+    const nodes = list.querySelectorAll('[data-chat-message-id]')
+    const last = nodes[nodes.length - 1]
+    if (last) {
+      const listRect = list.getBoundingClientRect()
+      let targetBottom = listRect.bottom - COMPOSER_SCROLL_GAP_PX
+
+      const composer = composerBarRef.current
+      if (composer) {
         const composerTop = composer.getBoundingClientRect().top
-        const lastBottom = last.getBoundingClientRect().bottom
-        const overflow = lastBottom - (composerTop - COMPOSER_SCROLL_GAP_PX)
-        if (overflow > 0.5) {
-          list.scrollTop += overflow
+        if (Number.isFinite(composerTop)) {
+          targetBottom = Math.min(targetBottom, composerTop - COMPOSER_SCROLL_GAP_PX)
         }
+      }
+
+      // iOS: fixed shells can outrun the keyboard — anchor to the visual viewport band.
+      if (IS_IOS && inputFocused && typeof window !== 'undefined') {
+        const vv = window.visualViewport
+        if (vv) {
+          const viewportBottom = vv.offsetTop + vv.height - COMPOSER_SCROLL_GAP_PX
+          targetBottom = Math.min(targetBottom, viewportBottom)
+        }
+      }
+
+      const overflow = last.getBoundingClientRect().bottom - targetBottom
+      if (overflow > 0.5) {
+        list.scrollTop = Math.min(list.scrollTop + overflow, list.scrollHeight)
       }
     }
 
@@ -1232,24 +1247,35 @@ export default function ChatConversation({
 
     const onFocusIn = (e) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+        composerFocusedRef.current = true
         openScrollPendingRef.current = false
         runTailPinFollow()
       }
     }
 
+    const onFocusOut = () => {
+      requestAnimationFrame(() => {
+        composerFocusedRef.current = Boolean(composer.querySelector('textarea:focus, input:focus'))
+      })
+    }
+
     composer.addEventListener('focusin', onFocusIn, true)
+    composer.addEventListener('focusout', onFocusOut, true)
 
     const vv = window.visualViewport
-    const onVvResize = () => {
+    const onVvChange = () => {
       if (IS_IOS && kbClosingRef.current) return
-      if (!composer.querySelector('textarea:focus, input:focus')) return
+      if (!composerFocusedRef.current && !composer.querySelector('textarea:focus, input:focus')) return
       runTailPinFollow()
     }
-    vv?.addEventListener('resize', onVvResize)
+    vv?.addEventListener('resize', onVvChange)
+    vv?.addEventListener('scroll', onVvChange)
 
     return () => {
       composer.removeEventListener('focusin', onFocusIn, true)
-      vv?.removeEventListener('resize', onVvResize)
+      composer.removeEventListener('focusout', onFocusOut, true)
+      vv?.removeEventListener('resize', onVvChange)
+      vv?.removeEventListener('scroll', onVvChange)
     }
   }, [runTailPinFollow])
 
@@ -1284,16 +1310,23 @@ export default function ChatConversation({
     return () => ro.disconnect()
   }, [pinListToTail, runTailPinFollow])
 
-  // iOS: pin before paint while keyboard opens — smoothed overlap was lagging composer
-  // padding so pinListToTail read a stale rect (no raise on open, jump on close).
+  // iOS: pin before paint while keyboard opens — composer is in-flow (post-detail pattern).
   useLayoutEffect(() => {
     if (!IS_IOS) return
     const prev = kbOverlapPrevRef.current
     if (kbOverlapPx < prev - 2) return
-    const keyboardOpen = kbOverlapPx > iosSafeBottomPx + 2
-    if (!composerFocused && !keyboardOpen) return
+    if (!isComposerKeyboardActive()) return
     runTailPinFollow()
-  }, [composerFocused, kbOverlapPx, iosSafeBottomPx, composerInsetPx, runTailPinFollow])
+  }, [composerFocused, kbOverlapPx, iosSafeBottomPx, composerInsetPx, runTailPinFollow, isComposerKeyboardActive])
+
+  // footerHost mounts the textarea after tap — stagger pins through keyboard slide-in.
+  useEffect(() => {
+    if (!IS_IOS || !composerFocused) return undefined
+    const timers = [50, 120, 220, 340, 480].map((ms) => window.setTimeout(() => runTailPinFollow(), ms))
+    return () => {
+      for (const id of timers) window.clearTimeout(id)
+    }
+  }, [composerFocused, runTailPinFollow])
 
   // resizes-content: when the keyboard opens/closes the list height changes — pin tail.
   useEffect(() => {
@@ -1748,7 +1781,7 @@ export default function ChatConversation({
         </div>
       )}
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
           className="chat-top-gradient pointer-events-none absolute inset-x-0 top-0 z-10"
           style={{ height: listPaddingTop }}
@@ -1761,8 +1794,8 @@ export default function ChatConversation({
           onTouchMove={handleSwipeTouchMove}
           onTouchEnd={handleSwipeTouchEnd}
           onTouchCancel={handleSwipeTouchEnd}
-          className="h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3"
-          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop, paddingBottom: composerInsetPx }}
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3 pb-2"
+          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop }}
         >
           {loadingMore && (
             <div className="py-2 text-center text-[12px] text-zinc-600">Loading older messages…</div>
@@ -1829,17 +1862,8 @@ export default function ChatConversation({
           )}
         </div>
 
-      <div
-        ref={composerBarRef}
-        data-chat-composer-host
-        className="absolute inset-x-0 bottom-0 z-20 bg-transparent px-3 pt-2.5 pb-0"
-        style={{ paddingBottom: composerPadBottom }}
-      >
         {(newMsgCount > 0 || hasNewer || scrolledUpCount >= SCROLL_UP_MSG_THRESHOLD) && (
-          <div
-            className="absolute inset-x-0 bottom-full flex justify-center pointer-events-none"
-            style={{ paddingBottom: JUMP_BTN_ABOVE_COMPOSER_PX }}
-          >
+          <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center">
             <button
               type="button"
               onClick={goToLatest}
@@ -1868,6 +1892,14 @@ export default function ChatConversation({
             </button>
           </div>
         )}
+      </div>
+
+      <div
+        ref={composerBarRef}
+        data-chat-composer-host
+        className="relative z-20 shrink-0 bg-transparent px-3 pt-2.5 pb-0"
+        style={{ paddingBottom: composerPadBottom }}
+      >
         <div
           ref={composerTouchRef}
           style={
@@ -1894,7 +1926,6 @@ export default function ChatConversation({
             footerHost
           />
         </div>
-      </div>
       </div>
       </div>
 
