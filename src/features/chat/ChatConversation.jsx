@@ -42,7 +42,6 @@ const IS_IOS =
 const IOS_COMPOSER_DISMISS_PAD_PX = 32
 /** Show scroll-to-bottom when this many newer messages are off-screen. */
 const SCROLL_UP_MSG_THRESHOLD = 20
-const JUMP_BTN_ABOVE_COMPOSER_PX = 8
 /** Last message must sit this far below the composer top before we auto-scroll. */
 const COMPOSER_SCROLL_GAP_PX = 8
 /** Message stack shorter than this gap under the composer viewport → treat as "fits" (no push). */
@@ -1778,7 +1777,7 @@ export default function ChatConversation({
         </div>
       )}
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
           className="chat-top-gradient pointer-events-none absolute inset-x-0 top-0 z-10"
           style={{ height: listPaddingTop }}
@@ -1791,7 +1790,7 @@ export default function ChatConversation({
           onTouchMove={handleSwipeTouchMove}
           onTouchEnd={handleSwipeTouchEnd}
           onTouchCancel={handleSwipeTouchEnd}
-          className="h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3 pb-2"
           style={{ touchAction: 'pan-y', paddingTop: listPaddingTop, paddingBottom: composerInsetPx }}
         >
           {loadingMore && (
@@ -1859,71 +1858,73 @@ export default function ChatConversation({
           )}
         </div>
 
-        <div
-          ref={composerBarRef}
-          data-chat-composer-host
-          className="absolute inset-x-0 bottom-0 z-20 bg-transparent px-3 pt-2.5 pb-0"
-          style={{ paddingBottom: composerPadBottom }}
-        >
-          {(newMsgCount > 0 || hasNewer || scrolledUpCount >= SCROLL_UP_MSG_THRESHOLD) && (
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-full flex justify-center"
-              style={{ paddingBottom: JUMP_BTN_ABOVE_COMPOSER_PX }}
+        {(newMsgCount > 0 || hasNewer || scrolledUpCount >= SCROLL_UP_MSG_THRESHOLD) && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center">
+            <button
+              type="button"
+              onClick={goToLatest}
+              aria-label={
+                newMsgCount > 0
+                  ? `${newMsgCount} new message${newMsgCount === 1 ? '' : 's'}`
+                  : hasNewer
+                    ? 'Jump to latest messages'
+                    : 'Scroll to bottom'
+              }
+              className={`chat-header-glass pointer-events-auto touch-manipulation transition-transform active:scale-95 active:opacity-70 ${
+                newMsgCount > 0 || hasNewer
+                  ? 'rounded-full px-4 py-2 text-[13px] font-semibold text-cyan-300'
+                  : 'flex h-10 w-10 items-center justify-center rounded-full text-zinc-100'
+              }`}
             >
-              <button
-                type="button"
-                onClick={goToLatest}
-                aria-label={
-                  newMsgCount > 0
-                    ? `${newMsgCount} new message${newMsgCount === 1 ? '' : 's'}`
-                    : hasNewer
-                      ? 'Jump to latest messages'
-                      : 'Scroll to bottom'
-                }
-                className={`chat-header-glass pointer-events-auto touch-manipulation transition-transform active:scale-95 active:opacity-70 ${
-                  newMsgCount > 0 || hasNewer
-                    ? 'rounded-full px-4 py-2 text-[13px] font-semibold text-cyan-300'
-                    : 'flex h-10 w-10 items-center justify-center rounded-full text-zinc-100'
-                }`}
-              >
-                {newMsgCount > 0 ? (
-                  `↓ ${newMsgCount} new message${newMsgCount === 1 ? '' : 's'}`
-                ) : hasNewer ? (
-                  '↓ Jump to latest'
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                )}
-              </button>
+              {newMsgCount > 0 ? (
+                `↓ ${newMsgCount} new message${newMsgCount === 1 ? '' : 's'}`
+              ) : hasNewer ? (
+                '↓ Jump to latest'
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div
+        ref={composerBarRef}
+        data-chat-composer-host
+        className="relative z-20 shrink-0 px-3 pt-2.5 pb-0"
+        style={{
+          paddingBottom: composerPadBottom,
+          marginTop: -composerInsetPx,
+          background: 'transparent',
+        }}
+      >
+        <div
+          ref={composerTouchRef}
+          style={
+            composerFocused && !IS_ANDROID
+              ? { paddingTop: IOS_COMPOSER_DISMISS_PAD_PX }
+              : undefined
+          }
+        >
+          {typingUsers.length > 0 && isAtBottom && (
+            <div className="pb-1 text-[12px] text-zinc-500">
+              {typingUsers.length === 1
+                ? `${typingUsers[0].displayName} is typing…`
+                : `${typingUsers.map((u) => u.displayName).join(', ')} are typing…`}
             </div>
           )}
-          <div
-            ref={composerTouchRef}
-            style={
-              composerFocused && !IS_ANDROID
-                ? { paddingTop: IOS_COMPOSER_DISMISS_PAD_PX }
-                : undefined
-            }
-          >
-            {typingUsers.length > 0 && isAtBottom && (
-              <div className="pb-1 text-[12px] text-zinc-500">
-                {typingUsers.length === 1
-                  ? `${typingUsers[0].displayName} is typing…`
-                  : `${typingUsers.map((u) => u.displayName).join(', ')} are typing…`}
-              </div>
-            )}
-            <ChatComposer
-              supabaseClient={supabaseClient}
-              viewerUserId={viewerUserId}
-              replyTarget={replyTarget}
-              onClearReply={() => setReplyTarget(null)}
-              onSend={handleSend}
-              onTyping={(name) => typingRef.current?.(name)}
-              viewerDisplayName={viewerDisplayName}
-              footerHost
-            />
-          </div>
+          <ChatComposer
+            supabaseClient={supabaseClient}
+            viewerUserId={viewerUserId}
+            replyTarget={replyTarget}
+            onClearReply={() => setReplyTarget(null)}
+            onSend={handleSend}
+            onTyping={(name) => typingRef.current?.(name)}
+            viewerDisplayName={viewerDisplayName}
+            footerHost
+          />
         </div>
       </div>
       </div>
