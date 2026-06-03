@@ -5,6 +5,7 @@ import {
   focusLoungeComposerCaption,
   scheduleLoungeComposerTextareaFocus,
 } from '../lounge/loungeDockComposeFocus.js'
+import KlipyGifPicker from '../lounge/KlipyGifPicker.jsx'
 
 const MAX_BODY   = 4000
 const MAX_IMAGES = 4
@@ -47,6 +48,7 @@ export default function ChatComposer({
   const [uploadErr, setUploadErr] = useState('')
   const [sending, setSending]     = useState(false)
   const [plusOpen, setPlusOpen]   = useState(false)
+  const [gifPickerOpen, setGifPickerOpen] = useState(false)
   const [plusRect, setPlusRect]   = useState(/** @type {DOMRect|null} */ (null))
   const [expanded, setExpanded]     = useState(false)
   /** footerHost: no textarea in DOM until tap — matches lounge reply collapsed pill (iOS keyboard). */
@@ -55,7 +57,6 @@ export default function ChatComposer({
   const textareaRef  = useRef(null)
   const inputWrapRef = useRef(null)
   const fileInputRef = useRef(null)
-  const gifInputRef  = useRef(null)
   const plusBtnRef   = useRef(null)
 
   const hasContent = body.trim().length > 0 || images.length > 0
@@ -165,27 +166,18 @@ export default function ChatComposer({
     }
   }
 
-  const handleGifPick = async (e) => {
-    const files = Array.from(e.target.files || [])
-    if (!files.length) return
-    if (images.length + files.length > MAX_IMAGES) {
+  const handleKlipyGifPick = ({ gifUrl }) => {
+    const url = String(gifUrl || '').trim()
+    if (!url) return
+    if (images.length >= MAX_IMAGES) {
       setUploadErr(`Max ${MAX_IMAGES} images per message.`)
       return
     }
     setUploadErr('')
-    setUploading(true)
     setPlusOpen(false)
-    try {
-      const uploaded = await Promise.all(
-        files.map((f) => uploadLoungeFeedPostImage(supabaseClient, f, viewerUserId))
-      )
-      setImages((prev) => [...prev, ...uploaded.map((u) => u.publicUrl)].slice(0, MAX_IMAGES))
-    } catch (err) {
-      setUploadErr(err?.message || 'GIF upload failed.')
-    } finally {
-      setUploading(false)
-      if (gifInputRef.current) gifInputRef.current.value = ''
-    }
+    setGifPickerOpen(false)
+    setImages((prev) => [...prev, url].slice(0, MAX_IMAGES))
+    if (footerHost) setComposerActive(true)
   }
 
   const removeImage = (url) => setImages((prev) => prev.filter((u) => u !== url))
@@ -343,7 +335,6 @@ export default function ChatComposer({
 
         {/* Hidden file inputs */}
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImagePick} />
-        <input ref={gifInputRef}  type="file" accept="image/gif" multiple className="hidden" onChange={handleGifPick} />
 
         {/* Textarea + inline send button */}
         <div
@@ -421,7 +412,7 @@ export default function ChatComposer({
               onClick={() => fileInputRef.current?.click()}
               className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="shrink-0">
                 <rect x="3" y="3" width="18" height="18" rx="3" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
@@ -435,13 +426,33 @@ export default function ChatComposer({
             <button
               type="button"
               disabled={disabled || uploading || images.length >= MAX_IMAGES}
-              onClick={() => gifInputRef.current?.click()}
+              onClick={() => {
+                setPlusOpen(false)
+                setGifPickerOpen(true)
+              }}
               className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                <rect x="2" y="6" width="20" height="12" rx="3" />
-                <path d="M10 12h2v2h-2v-2zM10 10v2" strokeLinecap="round"/>
-                <path d="M14 10v4M7 10v2h2" strokeLinecap="round"/>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+                <rect
+                  x="3"
+                  y="3"
+                  width="18"
+                  height="18"
+                  rx="3"
+                  fill="currentColor"
+                  fillOpacity="0.14"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                />
+                <text
+                  x="12"
+                  y="15.2"
+                  textAnchor="middle"
+                  fill="currentColor"
+                  style={{ fontSize: '6.5px', fontWeight: 800, fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}
+                >
+                  GIF
+                </text>
               </svg>
               GIF
             </button>
@@ -449,6 +460,13 @@ export default function ChatComposer({
         </>,
         document.body
       )}
+
+      <KlipyGifPicker
+        open={gifPickerOpen}
+        onClose={() => setGifPickerOpen(false)}
+        onPick={handleKlipyGifPick}
+        supabaseClient={supabaseClient}
+      />
     </div>
   )
 }
