@@ -18,8 +18,10 @@ import {
   LOUNGE_VIDEO_MAX_SECONDS,
 } from '../../utils/loungeVideoUpload.js'
 
-const MAX_BODY   = 4000
-const MAX_IMAGES = 9
+const MAX_BODY            = 4000
+const MAX_IMAGES          = 9
+const SWIPE_DISMISS_PX    = 40   // drag distance to trigger dismiss
+const SWIPE_THROW_SCALE   = 4    // how far the tile flies on dismiss
 /** Matches Tailwind `h-10` on the + button (40px border-box). */
 const COMPOSER_ROW_H = 40
 const COMPOSER_MAX_H = 160
@@ -410,17 +412,9 @@ export default function ChatComposer({
       {images.length > 0 && (
         <div className="chat-header-glass mb-1 flex gap-2 overflow-x-auto rounded-2xl px-3 py-2">
           {images.map((url) => (
-            <div key={url} className="relative shrink-0">
+            <SwipeAwayTile key={url} onDismiss={() => removeImage(url)}>
               <img src={url} alt="" className="h-16 w-16 rounded-xl object-cover" />
-              <button
-                type="button"
-                onClick={() => removeImage(url)}
-                aria-label="Remove image"
-                className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text-[11px] text-zinc-300 shadow touch-manipulation"
-              >
-                ×
-              </button>
-            </div>
+            </SwipeAwayTile>
           ))}
         </div>
       )}
@@ -428,7 +422,7 @@ export default function ChatComposer({
       {/* Video preview strip */}
       {(videoMeta || videoUploadProgress !== null) && (
         <div className="chat-header-glass mb-1 flex items-center gap-3 rounded-2xl px-3 py-2">
-          <div className="relative shrink-0">
+          <SwipeAwayTile onDismiss={removeVideo}>
             {videoMeta?.localPoster ? (
               <img src={videoMeta.localPoster} alt="" className="h-16 w-16 rounded-xl object-cover" />
             ) : (
@@ -439,7 +433,7 @@ export default function ChatComposer({
                 </svg>
               </div>
             )}
-          </div>
+          </SwipeAwayTile>
           <div className="min-w-0 flex-1">
             {videoUploadProgress !== null ? (
               <>
@@ -452,14 +446,6 @@ export default function ChatComposer({
               <div className="text-[12px] text-zinc-400">Video ready</div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={removeVideo}
-            aria-label="Remove video"
-            className="shrink-0 rounded-full p-1 text-zinc-500 touch-manipulation hover:text-zinc-300"
-          >
-            ×
-          </button>
         </div>
       )}
 
@@ -645,6 +631,81 @@ export default function ChatComposer({
           onConfirm={handleCropConfirm}
         />
       )}
+    </div>
+  )
+}
+
+// ── SwipeAwayTile ────────────────────────────────────────────────────────────
+// Wraps a composer thumbnail; drag any direction > SWIPE_DISMISS_PX to dismiss.
+// Vertical drag doesn't block the parent horizontal scroll because we only
+// preventDefault on moves that are more vertical than horizontal.
+
+function SwipeAwayTile({ children, onDismiss }) {
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [out, setOut]       = useState(false)
+  const startRef  = useRef(null)
+  const dragging  = useRef(false)
+
+  const dist = (x, y) => Math.sqrt(x * x + y * y)
+
+  const onTouchStart = (e) => {
+    startRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    dragging.current = false
+    setOut(false)
+    setOffset({ x: 0, y: 0 })
+  }
+
+  const onTouchMove = (e) => {
+    if (!startRef.current) return
+    const dx = e.touches[0].clientX - startRef.current.x
+    const dy = e.touches[0].clientY - startRef.current.y
+    // Only take over the gesture when vertical movement exceeds horizontal.
+    if (!dragging.current) {
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
+        dragging.current = true
+      } else {
+        return
+      }
+    }
+    e.preventDefault()
+    setOffset({ x: dx * 0.65, y: dy * 0.65 })
+  }
+
+  const onTouchEnd = () => {
+    if (!startRef.current) return
+    const { x, y } = offset
+    if (dist(x, y) >= SWIPE_DISMISS_PX * 0.65) {
+      setOut(true)
+      setOffset({ x: x * SWIPE_THROW_SCALE, y: y * SWIPE_THROW_SCALE })
+      setTimeout(onDismiss, 200)
+    } else {
+      setOffset({ x: 0, y: 0 })
+    }
+    startRef.current = null
+    dragging.current = false
+  }
+
+  const opacity = out
+    ? 0
+    : Math.max(0, 1 - dist(offset.x, offset.y) / (SWIPE_DISMISS_PX * 2))
+
+  return (
+    <div
+      className="relative shrink-0 touch-manipulation"
+      style={{
+        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        opacity,
+        transition: out || dragging.current
+          ? 'transform 0.2s ease-in, opacity 0.2s ease-in'
+          : 'transform 0.25s ease-out, opacity 0.25s ease-out',
+        willChange: 'transform, opacity',
+      }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
+    >
+      {children}
     </div>
   )
 }
