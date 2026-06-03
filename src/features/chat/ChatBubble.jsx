@@ -166,6 +166,7 @@ function computeLayout(rect, isMine, { isDeleted = false, enableStar = false, en
  *   onOpenReactionsDetail?: () => void,
  *   hideSenderInfo?: boolean,
  *   isGroupEnd?: boolean,
+ *   isFinalizingMedia?: boolean,
  *   enableStar?: boolean,
  *   isStarred?: boolean,
  *   onToggleStar?: (messageId: string, starred: boolean) => void,
@@ -191,6 +192,7 @@ export default function ChatBubble({
   hideSenderInfo = false,
   isGroupStart = true,
   isGroupEnd = true,
+  isFinalizingMedia = false,
   enableStar = false,
   isStarred = false,
   onToggleStar,
@@ -577,7 +579,14 @@ export default function ChatBubble({
                   </div>
                 )}
                 {hasMedia && !isDeleted && (
-                  <ChatMediaGrid media={allMedia} onOpen={openViewer} />
+                  <div className="relative">
+                    <ChatMediaGrid media={allMedia} onOpen={openViewer} />
+                    {isFinalizingMedia && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-[13px] bg-black/30">
+                        <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      </div>
+                    )}
+                  </div>
                 )}
                 {linkPreviewInBubble ? (
                   <div className={hasMedia ? 'px-3 pb-2' : ''}>

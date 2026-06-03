@@ -1029,7 +1029,7 @@ export default function ChatConversation({
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const handleSend = useCallback(async ({ body, imageUrls, streamVideoUid = null, streamPosterUrl = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
+  const handleSend = useCallback(async ({ body, imageUrls, previewUrls, pendingUploads, streamVideoUid = null, streamPosterUrl = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
     // If user is viewing history, jump to live end before sending
     if (hasNewerRef.current) {
       await new Promise((resolve) => {
@@ -1049,11 +1049,16 @@ export default function ChatConversation({
       : origMsg?.stream_video_uid ? '[video]'
       : origMsg?.image_urls?.length > 0 ? '[image]' : null
 
+    const hasPending = Array.isArray(pendingUploads) && pendingUploads.length > 0
+    // Use local blob preview URLs immediately; real URLs arrive once uploads finish
+    const displayUrls = (previewUrls?.length ? previewUrls : imageUrls) || []
+
     const tempId = `opt-${Date.now()}`
     const optimistic = {
       id: tempId,
       body,
-      image_urls: imageUrls,
+      image_urls: displayUrls,
+      _finalizingMedia: hasPending,
       stream_video_uid:    streamVideoUid    || null,
       stream_poster_url:   streamPosterUrl   || null,
       stream_video_width:  streamVideoWidth  ?? null,
@@ -1069,7 +1074,18 @@ export default function ChatConversation({
     pinTailAfterMutation()
 
     try {
-      const res = await chatSendMessage(supabaseClient, { roomId: room.id, body, imageUrls, streamVideoUid, streamPosterUrl, streamVideoWidth, streamVideoHeight, replyToMessageId })
+      // Wait for any still-uploading images before making the server call
+      let finalImageUrls = imageUrls || []
+      if (hasPending) {
+        const pendingResults = await Promise.all(pendingUploads)
+        finalImageUrls = [...(imageUrls || []), ...pendingResults]
+        // Update optimistic with real URLs while we wait for server response
+        setMessages((prev) => prev.map((m) =>
+          m.id === tempId ? { ...m, image_urls: finalImageUrls, _finalizingMedia: false } : m
+        ))
+      }
+
+      const res = await chatSendMessage(supabaseClient, { roomId: room.id, body, imageUrls: finalImageUrls, streamVideoUid, streamPosterUrl, streamVideoWidth, streamVideoHeight, replyToMessageId })
       if (res?.message_id) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === res.message_id)) {
@@ -1077,7 +1093,7 @@ export default function ChatConversation({
           }
           return prev.map((m) =>
             m.id === tempId
-              ? { ...optimistic, id: res.message_id, link_preview: res.link_preview || null }
+              ? { ...optimistic, id: res.message_id, image_urls: finalImageUrls, _finalizingMedia: false, link_preview: res.link_preview || null }
               : m,
           )
         })
@@ -1847,6 +1863,7 @@ export default function ChatConversation({
                       hideSenderInfo={activeRoom.kind === 'dm'}
                       isGroupStart={isGroupStart}
                       isGroupEnd={isGroupEnd}
+                      isFinalizingMedia={Boolean(msg._finalizingMedia)}
                       enableStar={isGroupRoom}
                       isStarred={starredIds.has(msg.id)}
                       onToggleStar={handleToggleStar}

@@ -57,8 +57,13 @@ export default function ChatComposer({
   footerHost = false,
 }) {
   const [body, setBody]           = useState('')
-  const [images, setImages]       = useState(/** @type {string[]} */ ([]))
-  const [uploading, setUploading] = useState(false)
+  /**
+   * Each slot: { id: string, localUrl: string, remoteUrl: string|null }
+   * localUrl is a blob: URL for immediate preview; remoteUrl is the R2 URL once uploaded.
+   */
+  const [imageSlots, setImageSlots] = useState(/** @type {Array<{id:string,localUrl:string,remoteUrl:string|null}>} */ ([]))
+  /** Map<slotId, Promise<string>> — resolves to remoteUrl when upload finishes. */
+  const uploadPromisesRef = useRef(/** @type {Map<string,Promise<string>>} */ (new Map()))
   const [uploadErr, setUploadErr] = useState('')
   const [sending, setSending]     = useState(false)
   const [plusOpen, setPlusOpen]   = useState(false)
@@ -80,21 +85,21 @@ export default function ChatComposer({
   const videoInputRef  = useRef(null)
   const plusBtnRef     = useRef(null)
 
-  const hasContent = body.trim().length > 0 || images.length > 0 || videoMeta !== null
-  const canSend    = !disabled && !sending && !uploading && !videoUploadProgress && hasContent
+  const hasContent = body.trim().length > 0 || imageSlots.length > 0 || videoMeta !== null
+  const canSend    = !disabled && !sending && !videoUploadProgress && hasContent
 
   useEffect(() => {
     if (!footerHost) setComposerActive(true)
   }, [footerHost])
 
   useEffect(() => {
-    if (!replyTarget && images.length === 0 && !videoMeta) return
+    if (!replyTarget && imageSlots.length === 0 && !videoMeta) return
     if (footerHost) {
       flushSync(() => setComposerActive(true))
     } else {
       setComposerActive(true)
     }
-  }, [replyTarget, images.length, videoMeta, footerHost])
+  }, [replyTarget, imageSlots.length, videoMeta, footerHost])
 
   const activateAndFocusComposer = useCallback(() => {
     if (disabled) return
@@ -111,7 +116,7 @@ export default function ChatComposer({
   const maybeCollapseComposer = useCallback(() => {
     if (!footerHost) return
     window.setTimeout(() => {
-      if (body.trim() || images.length > 0 || videoMeta || replyTarget || plusOpen) return
+      if (body.trim() || imageSlots.length > 0 || videoMeta || replyTarget || plusOpen) return
       const ae = document.activeElement
       if (textareaRef.current && ae === textareaRef.current) return
       setComposerActive(false)
@@ -164,24 +169,34 @@ export default function ChatComposer({
     onTyping(viewerDisplayName)
   }
 
-  const handleImagePick = async (e) => {
+  const handleImagePick = (e) => {
     let files = Array.from(e.target.files || [])
+    if (fileInputRef.current) fileInputRef.current.value = ''
     if (!files.length) return
-    const remaining = MAX_IMAGES - images.length
+    const remaining = MAX_IMAGES - imageSlots.length
+    if (remaining <= 0) return
     const truncated = files.length > remaining
     if (truncated) files = files.slice(0, remaining)
     setUploadErr(truncated ? `Only the first ${remaining} image${remaining !== 1 ? 's' : ''} were added (max ${MAX_IMAGES}).` : '')
-    setUploading(true)
     setPlusOpen(false)
-    try {
-      const urls = []
-      let failCount = 0
-      for (const f of files) {
-        const { file: ready, error: prepErr } = await prepareLoungeFeedImageForUpload(f)
+    if (footerHost) flushSync(() => setComposerActive(true))
+
+    // Create slots with local blob URLs immediately for instant preview
+    const newSlots = files.map((file) => ({
+      id: crypto.randomUUID(),
+      localUrl: URL.createObjectURL(file),
+      remoteUrl: null,
+    }))
+    setImageSlots((prev) => [...prev, ...newSlots])
+
+    // Upload each file in parallel in the background
+    files.forEach((file, i) => {
+      const slot = newSlots[i]
+      const promise = (async () => {
+        const { file: ready, error: prepErr } = await prepareLoungeFeedImageForUpload(file)
         if (prepErr || !ready) {
-          console.error('[ChatComposer] image prep failed', f.name, f.type, f.size, prepErr)
-          failCount++
-          continue
+          console.error('[ChatComposer] image prep failed', file.name, file.type, file.size, prepErr?.message || String(prepErr))
+          throw prepErr || new Error('Prep failed')
         }
         const { data: url, error: upErr } = await uploadLoungeFeedPostImage({
           supabaseClient,
@@ -189,21 +204,23 @@ export default function ChatComposer({
           file: ready,
         })
         if (upErr || !url) {
-          console.error('[ChatComposer] image upload failed', ready.name, ready.type, ready.size, upErr)
-          failCount++
-          continue
+          console.error('[ChatComposer] image upload failed', ready.name, ready.type, ready.size, upErr?.message || String(upErr))
+          throw upErr || new Error('Upload failed')
         }
-        urls.push(url)
-      }
-      if (!urls.length) throw new Error('Image upload failed.')
-      setImages((prev) => [...prev, ...urls].slice(0, MAX_IMAGES))
-      if (failCount > 0) setUploadErr(`${failCount} image${failCount > 1 ? 's' : ''} failed to upload.`)
-    } catch (err) {
-      setUploadErr(err?.message || 'Image upload failed.')
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
+        return url
+      })()
+
+      uploadPromisesRef.current.set(slot.id, promise)
+
+      promise.then((remoteUrl) => {
+        setImageSlots((prev) => prev.map((s) => s.id === slot.id ? { ...s, remoteUrl } : s))
+      }).catch(() => {
+        setImageSlots((prev) => prev.filter((s) => s.id !== slot.id))
+        URL.revokeObjectURL(slot.localUrl)
+        uploadPromisesRef.current.delete(slot.id)
+        setUploadErr('One or more images failed to upload.')
+      })
+    })
   }
 
   const handleKlipyGifPick = ({ gifUrl }) => {
@@ -220,7 +237,14 @@ export default function ChatComposer({
     if (footerHost) setComposerActive(true)
   }
 
-  const removeImage = (url) => setImages((prev) => prev.filter((u) => u !== url))
+  const removeSlot = (slotId) => {
+    setImageSlots((prev) => {
+      const slot = prev.find((s) => s.id === slotId)
+      if (slot) URL.revokeObjectURL(slot.localUrl)
+      uploadPromisesRef.current.delete(slotId)
+      return prev.filter((s) => s.id !== slotId)
+    })
+  }
 
   const handleCropCancel = () => setCropModalFile(null)
 
@@ -307,19 +331,35 @@ export default function ChatComposer({
 
   const handleSend = useCallback(async () => {
     if (!canSend) return
-    // Snapshot before clearing so the send payload is correct
+
+    // Snapshot slots before clearing
+    const slotsSnapshot = [...imageSlots]
+    const readyUrls    = slotsSnapshot.filter((s) => s.remoteUrl).map((s) => s.remoteUrl)
+    const previewUrls  = slotsSnapshot.map((s) => s.localUrl)
+    const pendingSlots = slotsSnapshot.filter((s) => !s.remoteUrl)
+    const pendingUploads = pendingSlots
+      .map((s) => uploadPromisesRef.current.get(s.id))
+      .filter(Boolean)
+
     const snapshot = {
       body: body.trim(),
-      imageUrls: images,
+      imageUrls: readyUrls,
+      previewUrls,
+      pendingUploads,
       streamVideoUid:    videoMeta?.uid    ?? null,
       streamPosterUrl:   videoMeta?.posterUrl ?? null,
       streamVideoWidth:  videoMeta?.width  ?? null,
       streamVideoHeight: videoMeta?.height ?? null,
       replyToMessageId: replyTarget?.id ?? null,
     }
-    // Clear immediately — don't wait for the network round-trip
+
+    // Clear immediately
     setBody('')
-    setImages([])
+    setImageSlots((prev) => {
+      prev.forEach((s) => URL.revokeObjectURL(s.localUrl))
+      return []
+    })
+    uploadPromisesRef.current.clear()
     if (videoMeta?.localPoster) URL.revokeObjectURL(videoMeta.localPoster)
     setVideoMeta(null)
     onClearReply()
@@ -332,19 +372,12 @@ export default function ChatComposer({
     try {
       await onSend(snapshot)
     } catch (err) {
-      // Restore content so the user can retry without losing their message
-      setBody(snapshot.body)
-      setImages(snapshot.imageUrls)
       const msg = err?.message || ''
-      if (msg.includes('image_urls_len')) {
-        setUploadErr(`Max ${MAX_IMAGES} images per message.`)
-      } else {
-        setUploadErr('Failed to send. Please try again.')
-      }
+      setUploadErr(msg.includes('image_urls_len') ? `Max ${MAX_IMAGES} images per message.` : 'Failed to send. Please try again.')
     } finally {
       setSending(false)
     }
-  }, [canSend, body, images, videoMeta, replyTarget, onSend, onClearReply])
+  }, [canSend, body, imageSlots, videoMeta, replyTarget, onSend, onClearReply])
 
   const handleKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -378,7 +411,7 @@ export default function ChatComposer({
       <div className="chat-menu-glass overflow-hidden rounded-2xl" style={plusMenuStyle}>
         <button
           type="button"
-          disabled={disabled || uploading || images.length >= MAX_IMAGES || videoMeta !== null || videoUploadProgress !== null}
+          disabled={disabled || imageSlots.length >= MAX_IMAGES || videoMeta !== null || videoUploadProgress !== null}
           onClick={() => { setPlusOpen(false); fileInputRef.current?.click() }}
           className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
         >
@@ -394,7 +427,7 @@ export default function ChatComposer({
 
         <button
           type="button"
-          disabled={disabled || uploading || videoMeta !== null || videoUploadProgress !== null || images.length > 0}
+          disabled={disabled || videoMeta !== null || videoUploadProgress !== null || imageSlots.length > 0}
           onClick={() => { setPlusOpen(false); videoInputRef.current?.click() }}
           className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
         >
@@ -409,7 +442,7 @@ export default function ChatComposer({
 
         <button
           type="button"
-          disabled={disabled || uploading || images.length >= MAX_IMAGES}
+          disabled={disabled || imageSlots.length >= MAX_IMAGES}
           onClick={() => { setPlusOpen(false); setGifPickerOpen(true) }}
           className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
         >
@@ -430,7 +463,7 @@ export default function ChatComposer({
           <button
             ref={plusBtnRef}
             type="button"
-            disabled={disabled || uploading}
+            disabled={disabled}
             onPointerDown={(e) => e.preventDefault()}
             onClick={openPlus}
             aria-label="Attach media or GIF"
@@ -487,19 +520,21 @@ export default function ChatComposer({
         </div>
       )}
 
-      {/* Image preview strip */}
-      {(images.length > 0 || uploading) && (
+      {/* Image preview strip — slots appear immediately with local blob URLs */}
+      {imageSlots.length > 0 && (
         <div className="chat-header-glass mb-1 flex items-center gap-2 overflow-x-auto rounded-2xl px-3 py-2">
-          {images.map((url) => (
-            <SwipeAwayTile key={url} onDismiss={() => removeImage(url)}>
-              <img src={url} alt="" className="h-16 w-16 rounded-xl object-cover" />
+          {imageSlots.map((slot) => (
+            <SwipeAwayTile key={slot.id} onDismiss={() => removeSlot(slot.id)}>
+              <div className="relative h-16 w-16">
+                <img src={slot.localUrl} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                {!slot.remoteUrl && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/40">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  </div>
+                )}
+              </div>
             </SwipeAwayTile>
           ))}
-          {uploading && (
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-zinc-800">
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-            </div>
-          )}
         </div>
       )}
 
@@ -544,7 +579,7 @@ export default function ChatComposer({
         <button
           ref={plusBtnRef}
           type="button"
-          disabled={disabled || uploading}
+          disabled={disabled}
           onPointerDown={(e) => e.preventDefault()}
           onClick={openPlus}
           aria-label="Attach media or GIF"
