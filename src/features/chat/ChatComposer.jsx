@@ -309,6 +309,75 @@ export default function ChatComposer({
     }
   }, [enqueueImageFiles])
 
+  // ── Long-press "Paste" menu (Android: clipboard images are grayed out for <input>/<textarea>,
+  //    but navigator.clipboard.read() via a button tap bypasses the OS restriction entirely)
+  const [pasteMenuPos, setPasteMenuPos] = useState(/** @type {{x:number,y:number}|null} */ (null))
+  const longPressTimerRef  = useRef(null)
+  const longPressOriginRef = useRef(/** @type {{x:number,y:number}|null} */ (null))
+  const lastPointerTypeRef = useRef('mouse')
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+
+  const handleComposerPointerDown = useCallback((e) => {
+    lastPointerTypeRef.current = e.pointerType
+    if (e.pointerType === 'mouse') return
+    const { clientX, clientY } = e
+    longPressOriginRef.current = { x: clientX, y: clientY }
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = null
+      setPasteMenuPos({ x: clientX, y: clientY })
+    }, 500)
+  }, [])
+
+  const handleComposerPointerMove = useCallback((e) => {
+    if (!longPressOriginRef.current) return
+    const dx = e.clientX - longPressOriginRef.current.x
+    const dy = e.clientY - longPressOriginRef.current.y
+    if (dx * dx + dy * dy > 64) cancelLongPress()
+  }, [cancelLongPress])
+
+  // Dismiss paste menu on any tap outside it
+  useEffect(() => {
+    if (!pasteMenuPos) return
+    const dismiss = () => setPasteMenuPos(null)
+    window.addEventListener('pointerdown', dismiss, { capture: true })
+    return () => window.removeEventListener('pointerdown', dismiss, { capture: true })
+  }, [pasteMenuPos])
+
+  const handlePasteButton = useCallback(async () => {
+    setPasteMenuPos(null)
+    if (!navigator.clipboard?.read) return
+    try {
+      const clipItems = await navigator.clipboard.read()
+      const imageFiles = []
+      let plainText = ''
+      for (const item of clipItems) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type)
+            const ext = type.split('/')[1]?.replace('jpeg', 'jpg') || 'png'
+            imageFiles.push(new File([blob], `paste.${ext}`, { type }))
+          } else if (type === 'text/plain' && !plainText) {
+            plainText = await item.getType(type).then((b) => b.text()).catch(() => '')
+          }
+        }
+      }
+      if (imageFiles.length) {
+        enqueueImageFiles(imageFiles)
+      } else if (plainText) {
+        textareaRef.current?.focus()
+        document.execCommand('insertText', false, plainText.slice(0, MAX_BODY))
+      }
+    } catch {
+      // Permission denied or clipboard API unavailable — silently ignore
+    }
+  }, [enqueueImageFiles])
+
   const handleKlipyGifPick = ({ gifUrl }) => {
     const url = String(gifUrl || '').trim()
     if (!url) return
@@ -727,6 +796,11 @@ export default function ChatComposer({
             onInput={handleBodyInput}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
+            onPointerDown={handleComposerPointerDown}
+            onPointerMove={handleComposerPointerMove}
+            onPointerUp={cancelLongPress}
+            onPointerCancel={cancelLongPress}
+            onContextMenu={(e) => { if (lastPointerTypeRef.current !== 'mouse') e.preventDefault() }}
             onBlur={maybeCollapseComposer}
             onFocus={
               footerHost
@@ -797,6 +871,30 @@ export default function ChatComposer({
           onCancel={handleCropCancel}
           onConfirm={handleCropConfirm}
         />
+      )}
+
+      {/* Long-press paste menu — touch only, Android clipboard image bypass */}
+      {pasteMenuPos && createPortal(
+        <div
+          className="fixed z-[200] flex items-center rounded-full overflow-hidden shadow-xl"
+          style={{
+            left: pasteMenuPos.x,
+            top: pasteMenuPos.y - 52,
+            transform: 'translateX(-50%)',
+            animation: 'chat-paste-menu-in 120ms ease-out both',
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={handlePasteButton}
+            className="px-5 py-2 text-sm font-medium text-white bg-zinc-700 active:bg-zinc-600 select-none touch-manipulation"
+          >
+            Paste
+          </button>
+        </div>,
+        document.body,
       )}
     </div>
   )
