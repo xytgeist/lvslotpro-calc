@@ -70,8 +70,9 @@ export default function ChatComposer({
   /** footerHost: no textarea in DOM until tap — matches lounge reply collapsed pill (iOS keyboard). */
   const [composerActive, setComposerActive] = useState(!footerHost)
 
-  // Video state
-  const [cropModalFile, setCropModalFile] = useState(/** @type {File|null} */ (null))
+  // Video state — for the trim modal we store { file, knownDurationSec? } so the modal
+  // can skip re-probing duration and we can pass knownDurationSec to LoungeVideoCropModal.
+  const [cropModalFile, setCropModalFile] = useState(/** @type {{ file: File, knownDurationSec?: number }|null} */ (null))
   /**
    * Rich upload status shown in the composer strip while a video is uploading.
    * Null when no upload is in progress.
@@ -430,39 +431,90 @@ export default function ChatComposer({
   const handleCropCancel = () => setCropModalFile(null)
 
   const handleCropConfirm = useCallback(async (result) => {
-    // LoungeVideoCropModal with intent='detail' returns a File directly.
-    const trimmedFile = result instanceof File ? result : null
+    // Modal closes immediately regardless of path.
     setCropModalFile(null)
-    if (!trimmedFile) return
+
+    const isTrimJob = result?.type === 'composerTrimJob'
+    if (!isTrimJob && !(result instanceof File)) return
 
     setUploadErr('')
+    // Abort any previous in-flight job before starting a new one.
+    videoAbortRef.current?.abort()
+    videoAbortRef.current = null
     setVideoMeta(null)
-    setVideoUploadStatus({ progress: 0, status: 'Reading video…', detail: '', attempt: 1 })
 
     const abortCtrl = new AbortController()
     videoAbortRef.current = abortCtrl
 
-    // Start poster capture + dimension probe in parallel with encode.
-    let dims = null
-    let localPoster = null
-    const posterCapturePromise = Promise.all([
-      probeVideoFileDisplaySize(trimmedFile).catch(() => null),
-      captureVideoFilePosterObjectUrl(trimmedFile, { signal: abortCtrl.signal }).catch(() => null),
-    ]).then(([d, p]) => {
-      dims = d
-      localPoster = p
+    // Trim jobs: the modal captured a poster frame before confirming — show it in the
+    // strip immediately so the UI is live the instant the modal closes.
+    const earlyPoster = isTrimJob ? (result.posterUrl ?? null) : null
+    if (earlyPoster) {
+      setVideoMeta({
+        videoUrl: null,
+        posterUrl: null,
+        localPoster: earlyPoster,
+        width: result.intrinsicWidth ?? null,
+        height: result.intrinsicHeight ?? null,
+      })
+    }
+
+    setVideoUploadStatus({
+      progress: 0.02,
+      status: isTrimJob ? 'Trimming video…' : 'Encoding video…',
+      detail: '',
+      attempt: 1,
     })
 
+    // Direct files (≤60s): capture poster + dims in parallel with encoding.
+    let localPoster = earlyPoster
+    let dims = isTrimJob ? { width: result.intrinsicWidth, height: result.intrinsicHeight } : null
+    let posterCapture = null
+    if (!isTrimJob) {
+      posterCapture = Promise.all([
+        probeVideoFileDisplaySize(result).catch(() => null),
+        captureVideoFilePosterObjectUrl(result, { signal: abortCtrl.signal }).catch(() => null),
+      ]).then(([d, p]) => { dims = d; localPoster = p })
+    }
+
     try {
-      // Encode with chat-optimised settings (max 720p, CRF 30, 900 kbps, 64k audio).
-      // Encodes occupy 0–55% of progress; R2 upload occupies 55–98%.
-      setVideoUploadStatus({ progress: 0.02, status: 'Encoding video…', detail: '', attempt: 1 })
-      const { encodeVideoForChat } = await import('../../utils/loungeVideoFfmpegTrim.js')
-      const encodedFile = await encodeVideoForChat(trimmedFile, {
+      const { trimVideoFileToMp4, encodeVideoForChat } = await import('../../utils/loungeVideoFfmpegTrim.js')
+
+      // STEP 1 (trim path only): trim — progress 2→40%.
+      let fileForEncode = isTrimJob ? null : result
+      if (isTrimJob) {
+        const trimmed = await trimVideoFileToMp4(
+          result.sourceFile,
+          result.startSec,
+          result.endSec,
+          {
+            cropIn: result.cropPx,
+            iw: result.intrinsicWidth,
+            ih: result.intrinsicHeight,
+            onProgress: (r) => {
+              setVideoUploadStatus({
+                progress: 0.02 + r * 0.38,
+                status: 'Trimming video…',
+                detail: `${Math.round(r * 100)}%`,
+                attempt: 1,
+              })
+            },
+            signal: abortCtrl.signal,
+          },
+        )
+        if (abortCtrl.signal.aborted) return
+        fileForEncode = trimmed
+      }
+
+      // STEP 2: encode — trim path: 40→78%, direct path: 2→55%.
+      const encStart = isTrimJob ? 0.40 : 0.02
+      const encRange = isTrimJob ? 0.38 : 0.53
+      setVideoUploadStatus({ progress: encStart, status: 'Encoding video…', detail: '', attempt: 1 })
+      const encodedFile = await encodeVideoForChat(fileForEncode, {
         signal: abortCtrl.signal,
         onProgress: (r) => {
           setVideoUploadStatus({
-            progress: 0.02 + r * 0.53,
+            progress: encStart + r * encRange,
             status: 'Encoding video…',
             detail: `${Math.round(r * 100)}%`,
             attempt: 1,
@@ -471,11 +523,11 @@ export default function ChatComposer({
       })
 
       if (abortCtrl.signal.aborted) return
+      if (posterCapture) await posterCapture
 
-      await posterCapturePromise
-
-      // Upload encoded video and poster to R2 in parallel.
-      setVideoUploadStatus({ progress: 0.56, status: 'Uploading…', detail: '', attempt: 1 })
+      // STEP 3: upload video + poster to R2 in parallel — trim: 78→98%, direct: 56→98%.
+      const uploadStart = isTrimJob ? 0.78 : 0.56
+      setVideoUploadStatus({ progress: uploadStart, status: 'Uploading…', detail: '', attempt: 1 })
       const [videoUrl, posterPublicUrl] = await Promise.all([
         uploadChatVideoToR2(supabaseClient, encodedFile, { signal: abortCtrl.signal }),
         localPoster
@@ -493,8 +545,10 @@ export default function ChatComposer({
       setVideoUploadStatus(null)
       videoAbortRef.current = null
     } catch (e) {
-      if (e?.name === 'AbortError') return
+      if (e?.name === 'AbortError') return  // removeVideo already cleaned up state
       setVideoUploadStatus(null)
+      // Revoke the early poster blob we set before processing started.
+      if (earlyPoster) { try { URL.revokeObjectURL(earlyPoster) } catch { /* ignore */ } }
       setVideoMeta(null)
       videoAbortRef.current = null
       setUploadErr(e?.message || 'Video upload failed.')
@@ -527,7 +581,7 @@ export default function ChatComposer({
     if (Number.isFinite(duration) && duration <= LOUNGE_VIDEO_MAX_SECONDS) {
       void handleCropConfirm(file)
     } else {
-      setCropModalFile(file)
+      setCropModalFile({ file, knownDurationSec: Number.isFinite(duration) ? duration : undefined })
     }
   }, [handleCropConfirm])
 
@@ -926,8 +980,9 @@ export default function ChatComposer({
 
       {cropModalFile && (
         <LoungeVideoCropModal
-          file={cropModalFile}
-          intent="detail"
+          file={cropModalFile.file}
+          knownDurationSec={cropModalFile.knownDurationSec}
+          intent="composer"
           onCancel={handleCropCancel}
           onConfirm={handleCropConfirm}
         />
