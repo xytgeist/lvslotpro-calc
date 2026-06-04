@@ -860,12 +860,13 @@ export default function ChatConversation({
           setMessages((prev) => {
             if (prev.some((m) => m.id === row.id)) return prev
             // If this is our own message arriving via realtime, replace the
-            // optimistic placeholder in-place so there's never two bubbles.
+            // optimistic placeholder in-place keeping _key stable so React
+            // never unmounts/remounts the bubble.
             if (row.sender_id === viewerUserId) {
               const optIdx = prev.findLastIndex((m) => m.id.startsWith('opt-') && m.sender_id === viewerUserId)
               if (optIdx !== -1) {
                 const next = [...prev]
-                next[optIdx] = { ...prev[optIdx], ...row, _finalizingMedia: false }
+                next[optIdx] = { ...row, _key: prev[optIdx]._key, _finalizingMedia: false }
                 return next
               }
             }
@@ -1066,6 +1067,7 @@ export default function ChatConversation({
     const tempId = `opt-${Date.now()}`
     const optimistic = {
       id: tempId,
+      _key: tempId,   // stable React key — never changes even after server confirmation
       body,
       image_urls: displayUrls,
       _finalizingMedia: hasPending,
@@ -1091,7 +1093,7 @@ export default function ChatConversation({
         finalImageUrls = [...(imageUrls || []), ...pendingResults]
         // Update optimistic with real URLs while we wait for server response
         setMessages((prev) => prev.map((m) =>
-          m.id === tempId ? { ...m, image_urls: finalImageUrls, _finalizingMedia: false } : m
+          m.id === tempId ? { ...m, image_urls: finalImageUrls, _finalizingMedia: false } : m   // _key preserved via spread
         ))
       }
 
@@ -1099,11 +1101,13 @@ export default function ChatConversation({
       if (res?.message_id) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === res.message_id)) {
-            return prev.filter((m) => m.id !== tempId)
+            // Realtime already swapped the optimistic in-place — nothing to do
+            return prev
           }
+          // Update the optimistic in-place with the real id, keeping _key stable
           return prev.map((m) =>
             m.id === tempId
-              ? { ...optimistic, id: res.message_id, image_urls: finalImageUrls, _finalizingMedia: false, link_preview: res.link_preview || null }
+              ? { ...m, id: res.message_id, image_urls: finalImageUrls, _finalizingMedia: false, link_preview: res.link_preview || null }
               : m,
           )
         })
@@ -1859,7 +1863,7 @@ export default function ChatConversation({
                 const topMargin = idx === 0 ? 0 : isGroupStart ? 12 : 2
                 return (
                   <div
-                    key={msg.id}
+                    key={msg._key || msg.id}
                     style={{ marginTop: topMargin }}
                     className={highlightMessageId === msg.id ? 'rounded-2xl ring-2 ring-cyan-500/60 ring-offset-2 ring-offset-zinc-950' : undefined}
                   >
