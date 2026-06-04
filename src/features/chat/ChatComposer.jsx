@@ -550,7 +550,7 @@ export default function ChatComposer({
       <div className="chat-menu-glass overflow-hidden rounded-2xl" style={plusMenuStyle}>
         <button
           type="button"
-          disabled={disabled || imageSlots.length >= MAX_IMAGES || videoMeta !== null || videoUploadStatus !== null}
+          disabled={disabled || imageSlots.length >= MAX_IMAGES}
           onClick={() => { setPlusOpen(false); fileInputRef.current?.click() }}
           className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
         >
@@ -566,7 +566,7 @@ export default function ChatComposer({
 
         <button
           type="button"
-          disabled={disabled || videoMeta !== null || videoUploadStatus !== null || imageSlots.length > 0}
+          disabled={disabled || imageSlots.length > 0}
           onClick={() => { setPlusOpen(false); videoInputRef.current?.click() }}
           className="flex w-full items-center gap-3 px-4 py-3.5 text-[15px] font-semibold text-zinc-100 touch-manipulation transition-colors active:bg-white/10 disabled:opacity-40"
         >
