@@ -362,6 +362,9 @@ export default function ChatComposer({
     // Capture blob URLs to revoke AFTER send completes (optimistic message needs them until replaced)
     const blobUrlsToRevoke = slotsSnapshot.map((s) => s.localUrl)
 
+    // Only refocus the textarea if it was already focused (keyboard already up)
+    const wasTextareaFocused = document.activeElement === textareaRef.current
+
     // Clear composer immediately
     setBody('')
     setImageSlots([])
@@ -369,10 +372,12 @@ export default function ChatComposer({
     if (videoMeta?.localPoster) URL.revokeObjectURL(videoMeta.localPoster)
     setVideoMeta(null)
     onClearReply()
-    try {
-      textareaRef.current?.focus({ preventScroll: true })
-    } catch {
-      textareaRef.current?.focus()
+    if (wasTextareaFocused) {
+      try {
+        textareaRef.current?.focus({ preventScroll: true })
+      } catch {
+        textareaRef.current?.focus()
+      }
     }
     setSending(true)
     try {
