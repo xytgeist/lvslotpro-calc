@@ -118,7 +118,18 @@ export function prefetchFfmpegCore() {
 export async function encodeVideoForChat(file, opts = {}) {
   const { onProgress, signal } = opts
 
-  const ffmpeg = await getFfmpeg()
+  const TAG = '[chat-video-encode]'
+  console.log(TAG, 'start', { name: file.name, sizeMb: +(file.size / 1e6).toFixed(2), type: file.type })
+
+  let ffmpeg
+  try {
+    ffmpeg = await getFfmpeg()
+    console.log(TAG, 'ffmpeg ready')
+  } catch (loadErr) {
+    console.error(TAG, 'ffmpeg load failed', String(loadErr))
+    throw loadErr
+  }
+
   const extMatch = /\.[a-z0-9]+$/i.exec(file.name || '')
   const ext = extMatch ? extMatch[0].toLowerCase() : '.mp4'
   const inName = `chat_in${ext}`
@@ -131,7 +142,15 @@ export async function encodeVideoForChat(file, opts = {}) {
   }
   ffmpeg.on('progress', onProg)
 
-  const { inputPath, mode } = await installTrimInput(ffmpeg, file, inName)
+  let mode, inputPath
+  try {
+    ;({ inputPath, mode } = await installTrimInput(ffmpeg, file, inName))
+    console.log(TAG, 'input mounted', { mode, inputPath })
+  } catch (mountErr) {
+    ffmpeg.off('progress', onProg)
+    console.error(TAG, 'input mount failed', String(mountErr))
+    throw mountErr
+  }
 
   // Clean up any stale output from a previous failed run.
   try { await ffmpeg.deleteFile(outName) } catch { /* ignore */ }
@@ -153,10 +172,16 @@ export async function encodeVideoForChat(file, opts = {}) {
   const mux = ['-movflags', '+faststart', '-y', outName]
 
   const args = [...demuxLogging, ...input, ...video, ...videoFilters, ...audio, ...mux]
+  console.log(TAG, 'exec args', args.join(' '))
 
+  let code
   try {
-    const code = await ffmpeg.exec(args, undefined, { signal })
-    if (code !== 0) throw new Error('Chat video encoding failed.')
+    code = await ffmpeg.exec(args, undefined, { signal })
+    console.log(TAG, 'exec done', { code })
+    if (code !== 0) throw new Error(`Chat video encoding failed (exit ${code}).`)
+  } catch (execErr) {
+    console.error(TAG, 'exec error', String(execErr))
+    throw execErr
   } finally {
     ffmpeg.off('progress', onProg)
     await uninstallTrimInput(ffmpeg, mode, inName)
@@ -166,6 +191,8 @@ export async function encodeVideoForChat(file, opts = {}) {
   try { await ffmpeg.deleteFile(outName) } catch { /* ignore */ }
 
   const buf = data instanceof Uint8Array ? data : new Uint8Array(data)
+  console.log(TAG, 'encoded', { outSizeMb: +(buf.byteLength / 1e6).toFixed(2) })
+
   const base = String(file.name || 'video')
     .replace(/\.[^.]+$/, '')
     .replace(/[^\w-]+/g, '_')
