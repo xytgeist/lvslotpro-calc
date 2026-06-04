@@ -1362,22 +1362,22 @@ export default function ChatConversation({
         try {
           const { trimVideoFileToMp4, encodeVideoForChat } = await import('../../utils/loungeVideoFfmpegTrim.js')
 
-          let fileForEncode
+          let readyFile
           if (isTrimJob) {
+            // trimVideoFileToMp4 already outputs CRF-27 H.264 + 128k AAC — no second encode needed.
             updateVideoPrepJob(jobId, { status: 'trimming', progress: 0.02 })
-            fileForEncode = await trimVideoFileToMp4(
+            readyFile = await trimVideoFileToMp4(
               spec.sourceFile, spec.startSec, spec.endSec,
               {
                 cropIn: spec.cropPx,
                 iw: spec.intrinsicWidth,
                 ih: spec.intrinsicHeight,
-                onProgress: (r) => updateVideoPrepJob(jobId, { progress: 0.02 + r * 0.38 }),
+                onProgress: (r) => updateVideoPrepJob(jobId, { progress: 0.02 + r * 0.75 }),
                 signal: abortCtrl.signal,
               },
             )
           } else {
             // Direct file: capture poster + dims in parallel while encoding starts.
-            fileForEncode = spec
             Promise.all([
               probeVideoFileDisplaySize(spec).catch(() => null),
               captureVideoFilePosterObjectUrl(spec, { signal: abortCtrl.signal }).catch(() => null),
@@ -1389,23 +1389,17 @@ export default function ChatConversation({
                 height: dims?.height ?? null,
               })
             })
+            updateVideoPrepJob(jobId, { status: 'encoding', progress: 0.02 })
+            readyFile = await encodeVideoForChat(spec, {
+              signal: abortCtrl.signal,
+              onProgress: (r) => updateVideoPrepJob(jobId, { progress: 0.02 + r * 0.75 }),
+            })
           }
 
           if (abortCtrl.signal.aborted) { removeVideoPrepJob(jobId); return }
 
-          const encStart = isTrimJob ? 0.40 : 0.02
-          const encRange = isTrimJob ? 0.38 : 0.53
-          updateVideoPrepJob(jobId, { status: 'encoding', progress: encStart })
-
-          const encodedFile = await encodeVideoForChat(fileForEncode, {
-            signal: abortCtrl.signal,
-            onProgress: (r) => updateVideoPrepJob(jobId, { progress: encStart + r * encRange }),
-          })
-
-          if (abortCtrl.signal.aborted) { removeVideoPrepJob(jobId); return }
-
-          // Encoding done — launch upload+send detached so the queue is free for the next job.
-          void uploadAndSendVideoPrepJob(jobId, encodedFile)
+          // Trim/encode done — launch upload+send detached so the queue is free for the next job.
+          void uploadAndSendVideoPrepJob(jobId, readyFile)
         } catch (e) {
           if (e?.name === 'AbortError') { removeVideoPrepJob(jobId); return }
           updateVideoPrepJob(jobId, { status: 'error', errorMessage: e?.message || 'Encoding failed.' })
