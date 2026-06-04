@@ -163,9 +163,6 @@ export async function uploadEncodedVideoToCfStreamWithRetries({
         }
         throw e
       }
-      if (pendingUid) {
-        await deleteCfStreamOrphanAsset(supabaseClient, pendingUid)
-      }
       lastErr = e instanceof Error ? e : new Error(String(e))
       report(
         0.42,
@@ -173,8 +170,19 @@ export async function uploadEncodedVideoToCfStreamWithRetries({
         'Ether goblins ate your shit...trying again...',
         attempt,
       )
+      // Do NOT delete the CF asset on intermediate failures.
+      // tus-js-client stores the TUS URL fingerprint in localStorage; the next attempt
+      // will resume from the last ACK'd byte rather than re-uploading the whole file.
+      // This is critical on iOS where background network drops can happen at 98%+.
+      // The CF upload URL stays valid for 6 hours; the orphan purge cron handles
+      // any assets that are truly abandoned after all attempts fail.
+      if (attempt >= COMPOSER_VIDEO_PREP_MAX_ATTEMPTS && pendingUid) {
+        await deleteCfStreamOrphanAsset(supabaseClient, pendingUid)
+      }
       if (attempt < COMPOSER_VIDEO_PREP_MAX_ATTEMPTS) {
-        await sleep(500 + attempt * 350)
+        // Back off long enough for iOS to return to foreground after a background drop.
+        // Old: 500 + attempt*350 ms (max ~2s). New: ramps from 4s to 16s.
+        await sleep(2000 + attempt * 3500)
       }
     }
   }

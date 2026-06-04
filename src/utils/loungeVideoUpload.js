@@ -1072,7 +1072,9 @@ export function uploadVideoToCfStreamResumableTus(supabaseClient, file, options 
       const upload = new Upload(file, {
         endpoint,
         chunkSize,
-        retryDelays: [0, 1000, 3000, 5000, 8000],
+        // Longer delays give iOS background-dropped connections time to recover
+        // before tus gives up and fires onError (which triggers the outer retry).
+        retryDelays: [0, 2000, 5000, 10000, 20000, 30000],
         storeFingerprintForResuming: true,
         removeFingerprintOnSuccess: true,
         metadata: {
