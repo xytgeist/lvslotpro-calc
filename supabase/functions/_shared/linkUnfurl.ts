@@ -39,6 +39,20 @@ function trimTrailingPunct(raw: string) {
   return raw.replace(TRAILING_PUNCT_RE, '')
 }
 
+/** Decode common HTML entities so scraped OG text renders as plain text. */
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;/g, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+}
+
 function isEmailLocalPart(text: string, index: number) {
   if (index <= 0) return false
   const at = text.lastIndexOf('@', index - 1)
@@ -321,16 +335,19 @@ export async function unfurlUrl(
   if (isPrivateOrBlockedHost(parsed.hostname)) return null
 
   const html = await fetchHtmlSafe(parsed.href)
-  const title = titleFromHtml(html) || parsed.hostname
-  const description =
-    metaContent(html, 'og:description') || metaContent(html, 'description', 'name') || null
+  const title = decodeHtmlEntities(titleFromHtml(html) || parsed.hostname)
+  const description = (() => {
+    const raw = metaContent(html, 'og:description') || metaContent(html, 'description', 'name')
+    return raw ? decodeHtmlEntities(raw) : null
+  })()
   const imageRaw =
     metaContent(html, 'og:image') ||
     metaContent(html, 'twitter:image', 'name') ||
     metaContent(html, 'twitter:image:src', 'name')
   const image_url = resolveMaybeRelative(parsed.href, imageRaw) || null
-  const site_name =
-    metaContent(html, 'og:site_name') || parsed.hostname.replace(/^www\./i, '')
+  const site_name = decodeHtmlEntities(
+    metaContent(html, 'og:site_name') || parsed.hostname.replace(/^www\./i, ''),
+  )
 
   const preview: LinkPreviewPayload = {
     url: key,
