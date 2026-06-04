@@ -126,8 +126,8 @@ export default function ChatGroupSettingsSheet({
       setStarred([])
     }
     try {
-      const pins = await chatPinnedMessagesPage(supabaseClient, room.id, 1)
-      setPinnedCount(pins.length > 0 ? pins[0]?._total ?? pins.length : 0)
+      const pins = await chatPinnedMessagesPage(supabaseClient, room.id, 50)
+      setPinnedCount(pins.length)
     } catch {
       setPinnedCount(0)
     }
@@ -302,32 +302,7 @@ export default function ChatGroupSettingsSheet({
                 onClick={() => avatarInputRef.current?.click()}
                 className="text-[13px] font-semibold text-cyan-400 touch-manipulation active:opacity-70 disabled:opacity-40"
               >
-                {busy ? 'Uploading…' : room.avatar_url ? 'Change photo or GIF' : 'Set photo or GIF'}
-              </button>
-              {room.avatar_url ? (
-                <>
-                  <span className="text-zinc-700">·</span>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    className="text-[13px] font-medium text-zinc-500 touch-manipulation active:text-zinc-300 disabled:opacity-40"
-                    onClick={async () => {
-                      setBusy(true)
-                      setErr('')
-                      try {
-                        await chatUpdateGroup(supabaseClient, { roomId: room.id, avatarUrl: '' })
-                        onRoomUpdated({ avatar_url: null })
-                      } catch (ex) {
-                        setErr(ex?.message || 'Could not remove photo.')
-                      } finally {
-                        setBusy(false)
-                      }
-                    }}
-                  >
-                    Remove
-                  </button>
-                </>
-              ) : null}
+                {busy ? 'Uploading…' : room.avatar_url ? 'Change photo' : 'Set photo'}
             </div>
           ) : null}
 
@@ -386,6 +361,7 @@ export default function ChatGroupSettingsSheet({
           <SettingsRow
             icon={<IconPin />}
             label="Pinned messages"
+            badge={pinnedCount > 0 ? String(pinnedCount) : null}
             onPress={() => setAuxView('pinned')}
           />
           <SettingsRow

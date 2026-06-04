@@ -1930,10 +1930,10 @@ export default function ChatConversation({
                   <div
                     key={msg._key || msg.id}
                     style={{ marginTop: topMargin }}
-                    className={highlightMessageId === msg.id ? 'rounded-2xl ring-2 ring-cyan-500/60 ring-offset-2 ring-offset-zinc-950' : undefined}
                   >
                     <ChatBubble
                       message={msg}
+                      highlighted={highlightMessageId === msg.id}
                       senderLabel={senderLabel(msg.sender_id)}
                       senderAvatarUrl={senderAvatarUrl(msg.sender_id)}
                       isMine={msg.sender_id === viewerUserId}

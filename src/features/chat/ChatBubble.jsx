@@ -174,6 +174,7 @@ function computeLayout(rect, isMine, { isDeleted = false, enableStar = false, en
  *   isPinned?: boolean,
  *   onTogglePin?: (messageId: string, pinned: boolean) => void,
  *   receipt?: import('./chatReceiptStatus.js').ChatMessageReceipt | null,
+ *   highlighted?: boolean,
  * }} props
  */
 export default function ChatBubble({
@@ -202,6 +203,7 @@ export default function ChatBubble({
   supabaseClient = null,
   onLinkPreviewReady = null,
   receipt = null,
+  highlighted = false,
 }) {
   const [menuOpen, setMenuOpen]             = useState(false)
   const [fullPickerOpen, setFullPickerOpen] = useState(false)
@@ -232,6 +234,11 @@ export default function ChatBubble({
   const showTextBubble = !isLinkPreviewOnly || isDeleted
   /** Caption + link card share one bubble (iMessage-style). */
   const linkPreviewInBubble = Boolean(linkPreview && showTextBubble && !isDeleted)
+
+  const bubbleHighlightStyle =
+    highlighted && !isDeleted
+      ? { boxShadow: '0 0 0 2px rgba(34,211,238,0.65), 0 0 14px rgba(34,211,238,0.45)' }
+      : undefined
 
   useEffect(() => {
     if (!supabaseClient || !message?.id || String(message.id).startsWith('opt-')) return
@@ -561,6 +568,7 @@ export default function ChatBubble({
                 return `${r}px ${r}px ${rBR}px ${rBL}px`
               })(),
               backgroundColor: isMine && !isDeleted ? '#3b82f6' : undefined,
+              ...bubbleHighlightStyle,
               filter: isStarred && !isDeleted
                 ? 'drop-shadow(0 0 10px rgba(251,191,36,0.45))'
                 : undefined,
@@ -632,7 +640,7 @@ export default function ChatBubble({
               onPointerCancel={isLinkPreviewOnly ? cancelLongPress : undefined}
               onPointerLeave={isLinkPreviewOnly ? cancelLongPress : undefined}
               onContextMenu={isLinkPreviewOnly ? (e) => e.preventDefault() : undefined}
-              style={isLinkPreviewOnly ? { WebkitTouchCallout: 'none', userSelect: 'none' } : undefined}
+              style={isLinkPreviewOnly ? { WebkitTouchCallout: 'none', userSelect: 'none', ...bubbleHighlightStyle } : undefined}
             >
               <ChatLinkPreviewCard preview={linkPreview} isMine={isMine} />
             </div>
