@@ -133,19 +133,22 @@ export async function encodeVideoForChat(file, opts = {}) {
 
   const { inputPath, mode } = await installTrimInput(ffmpeg, file, inName)
 
+  // Clean up any stale output from a previous failed run.
+  try { await ffmpeg.deleteFile(outName) } catch { /* ignore */ }
+
   /**
    * Chat encode groups:
    * - Demux / logging: -hide_banner -loglevel error -analyzeduration 1500000 -probesize 5242880
    * - Input: -i <path>
    * - Video: H.264 ultrafast, CRF 30, 900 kbps cap, yuv420p
-   * - Video filter: scale height to min(720, original) — width keeps aspect (-2 = nearest even)
+   * - Video filter: fit within 1280×720 box (handles portrait + landscape; no expression evaluator needed)
    * - Audio: AAC 64 kbps
    * - Mux: +faststart for instant web playback
    */
   const demuxLogging = ['-hide_banner', '-loglevel', 'error', '-analyzeduration', '1500000', '-probesize', '5242880']
   const input = ['-i', inputPath]
   const video = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '30', '-maxrate', '900k', '-bufsize', '1800k', '-pix_fmt', 'yuv420p']
-  const videoFilters = ['-vf', 'scale=-2:min(720,ih)']
+  const videoFilters = ['-vf', 'scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2']
   const audio = ['-c:a', 'aac', '-b:a', '64k']
   const mux = ['-movflags', '+faststart', '-y', outName]
 
