@@ -193,10 +193,17 @@ export default function ChatComposer({
     }))
     setImageSlots((prev) => [...prev, ...newSlots])
 
-    // Upload files with bounded concurrency (max 4 at a time) and up to 5 retries.
-    // Concurrency cap prevents hammering the edge-function presign endpoint when
-    // many images are selected at once, which caused spurious failures not seen
-    // on lounge posts (where users rarely pick more than a few images).
+    // Create a deferred promise for EVERY slot immediately — before the concurrency
+    // queue starts uploading — so handleSend can capture ALL pending promises even
+    // if some uploads haven't started yet when the user taps Send.
+    const resolvers = files.map((_, i) => {
+      let resolve, reject
+      const promise = new Promise((res, rej) => { resolve = res; reject = rej })
+      uploadPromisesRef.current.set(newSlots[i].id, promise)
+      return { resolve, reject }
+    })
+
+    // Upload with bounded concurrency (max 4 at a time) and up to 5 retries each.
     const UPLOAD_CONCURRENCY = 4
     const MAX_ATTEMPTS = 5
     let activeUploads = 0
@@ -207,9 +214,10 @@ export default function ChatComposer({
         const i = queueIdx++
         const file = files[i]
         const slot = newSlots[i]
+        const { resolve, reject } = resolvers[i]
         activeUploads++
 
-        const promise = (async () => {
+        const doUpload = async () => {
           const { file: ready, error: prepErr } = await prepareLoungeFeedImageForUpload(file)
           if (prepErr || !ready) {
             console.error('[ChatComposer] image prep failed', file.name, prepErr?.message ?? prepErr)
@@ -228,19 +236,18 @@ export default function ChatComposer({
               lastErr = upErr
               console.error(`[ChatComposer] upload attempt ${attempt + 1}/${MAX_ATTEMPTS} failed`, ready.name, upErr?.message ?? upErr)
             } catch (e) {
-              // Catches throws (e.g. presign edge-fn errors) so all retries are exhausted
               lastErr = e
               console.error(`[ChatComposer] upload attempt ${attempt + 1}/${MAX_ATTEMPTS} threw`, ready.name, e?.message ?? e)
             }
           }
           throw lastErr || new Error('Upload failed after max retries')
-        })()
+        }
 
-        uploadPromisesRef.current.set(slot.id, promise)
-
-        promise.then((remoteUrl) => {
+        doUpload().then((remoteUrl) => {
+          resolve(remoteUrl)
           setImageSlots((prev) => prev.map((s) => s.id === slot.id ? { ...s, remoteUrl } : s))
-        }).catch(() => {
+        }).catch((e) => {
+          reject(e)
           setImageSlots((prev) => prev.filter((s) => s.id !== slot.id))
           URL.revokeObjectURL(slot.localUrl)
           uploadPromisesRef.current.delete(slot.id)

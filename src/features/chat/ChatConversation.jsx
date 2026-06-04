@@ -1142,10 +1142,14 @@ export default function ChatConversation({
       }
       void refreshReadReceipts()
 
-      // Background: finish pending uploads then patch image_urls on the server
+      // Background: finish pending uploads then patch image_urls on the server.
+      // allSettled (not all) so a single failed upload doesn't discard the rest.
       if (hasImages && messageId) {
-        Promise.all(allPendingUploads).then(async (pendingResults) => {
-          const finalUrls = [...readyUrls, ...pendingResults]
+        Promise.allSettled(allPendingUploads).then(async (results) => {
+          const successUrls = results
+            .filter((r) => r.status === 'fulfilled' && typeof r.value === 'string')
+            .map((r) => r.value)
+          const finalUrls = [...readyUrls, ...successUrls]
           setMessages((prev) => prev.map((m) =>
             (m.id === messageId || m.id === tempId)
               ? { ...m, image_urls: finalUrls.length ? finalUrls : m.image_urls, _finalizingMedia: false }
@@ -1159,11 +1163,6 @@ export default function ChatConversation({
           } catch (e) {
             console.error('[Chat] image_urls patch failed', e?.message)
           }
-        }).catch((e) => {
-          console.error('[Chat] upload(s) failed after send', e?.message)
-          setMessages((prev) => prev.map((m) =>
-            (m.id === messageId || m.id === tempId) ? { ...m, _finalizingMedia: false } : m
-          ))
         })
       }
     } catch (err) {
