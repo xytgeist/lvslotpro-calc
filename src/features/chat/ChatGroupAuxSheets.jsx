@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   chatIsGroupOwner,
@@ -8,6 +8,11 @@ import {
   chatSearchMessages,
   chatUnpinMessage,
 } from './chatApi.js'
+import ChatSharedLinkCard, {
+  groupSharedLinksByMonth,
+  sharedLinkMatchesQuery,
+} from './ChatSharedLinkCard.jsx'
+import { textIsOnlyUrls } from '../../utils/linkifyText.jsx'
 
 /**
  * @param {{
@@ -226,6 +231,59 @@ const MEDIA_TABS = [
   { id: 'docs', label: 'Docs' },
 ]
 
+/** @param {string | null | undefined} bodyPreview */
+function linkMessageFooter(bodyPreview) {
+  const t = String(bodyPreview || '').trim()
+  if (!t || textIsOnlyUrls(t)) return null
+  return t
+}
+
+/**
+ * @param {any[]} items
+ * @param {string} query
+ * @param {string} [itemLabel]
+ */
+function SharedLinksList({ items, query, onJumpToMessage, onBack, itemLabel = 'links' }) {
+  const filtered = useMemo(
+    () => items.filter((item) => sharedLinkMatchesQuery(item, query)),
+    [items, query],
+  )
+  const groups = useMemo(() => groupSharedLinksByMonth(filtered), [filtered])
+
+  if (filtered.length === 0) {
+    return (
+      <p className="text-[13px] text-zinc-500">
+        {query.trim() ? `No matching ${itemLabel}.` : `No ${itemLabel} found.`}
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {groups.map((group) => (
+        <section key={group.label}>
+          <h2 className="mb-2 text-[15px] font-semibold text-zinc-100">{group.label}</h2>
+          <ul className="space-y-2.5">
+            {group.items.map((item, i) => (
+              <li key={`${item.message_id}-${item.url}-${i}`}>
+                <ChatSharedLinkCard
+                  url={item.url}
+                  linkPreview={item.link_preview}
+                  bodyPreview={linkMessageFooter(item.body_preview) || 'View message'}
+                  onViewMessage={() => {
+                    onJumpToMessage(item.message_id)
+                    onBack()
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
+}
+
 /**
  * @param {{
  *   open: boolean,
@@ -243,9 +301,13 @@ export function ChatGroupMediaSheet({ open, onBack, supabaseClient, roomId, onJu
   const [loading, setLoading] = useState(false)
   const [loadErr, setLoadErr] = useState('')
   const [linksErr, setLinksErr] = useState('')
+  const [linkSearch, setLinkSearch] = useState('')
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setLinkSearch('')
+      return
+    }
     setLoading(true)
     setLoadErr('')
     setLinksErr('')
@@ -265,7 +327,7 @@ export function ChatGroupMediaSheet({ open, onBack, supabaseClient, roomId, onJu
     })()
   }, [open, roomId, supabaseClient])
 
-  const rows = tab === 'media' ? media : tab === 'links' ? links : docs
+  const showLinkSearch = tab === 'links' || tab === 'docs'
 
   return (
     <AuxSheetShell open={open} title="Media, links & docs" onBack={onBack}>
@@ -285,6 +347,29 @@ export function ChatGroupMediaSheet({ open, onBack, supabaseClient, roomId, onJu
           </button>
         ))}
       </div>
+      {showLinkSearch ? (
+        <div className="relative mb-4">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="7" />
+            <line x1="16.5" y1="16.5" x2="21" y2="21" />
+          </svg>
+          <input
+            value={linkSearch}
+            onChange={(e) => setLinkSearch(e.target.value)}
+            placeholder="Search"
+            className="w-full rounded-xl border border-zinc-700/80 bg-zinc-900 py-2.5 pl-9 pr-3 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:border-cyan-500/50 focus:outline-none"
+          />
+        </div>
+      ) : null}
       {loadErr && tab === 'media' ? (
         <p className="text-[13px] text-rose-400">{loadErr}</p>
       ) : linksErr && tab !== 'media' ? (
@@ -311,40 +396,30 @@ export function ChatGroupMediaSheet({ open, onBack, supabaseClient, roomId, onJu
             ))}
           </div>
         )
-      ) : rows.length === 0 ? (
-        <p className="text-[13px] text-zinc-500">
-          {tab === 'docs' ? 'No document links found.' : 'No links found.'}
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {rows.map((item, i) => (
-            <li key={`${item.message_id}-${item.url}-${i}`} className="rounded-xl bg-zinc-900/80 px-3 py-2">
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block break-all text-[13px] font-medium text-cyan-400 touch-manipulation"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {item.url}
-              </a>
-              {item.body_preview ? (
-                <p className="mt-1 line-clamp-2 text-[12px] text-zinc-500">{item.body_preview}</p>
-              ) : null}
-              <button
-                type="button"
-                className="mt-2 text-[12px] font-semibold text-zinc-400 touch-manipulation active:text-zinc-200"
-                onClick={() => {
-                  onJumpToMessage(item.message_id)
-                  onBack()
-                }}
-              >
-                View in chat
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      ) : tab === 'links' ? (
+        links.length === 0 ? (
+          <p className="text-[13px] text-zinc-500">No links found.</p>
+        ) : (
+          <SharedLinksList
+            items={links}
+            query={linkSearch}
+            onJumpToMessage={onJumpToMessage}
+            onBack={onBack}
+          />
+        )
+      ) : tab === 'docs' ? (
+        docs.length === 0 ? (
+          <p className="text-[13px] text-zinc-500">No document links found.</p>
+        ) : (
+          <SharedLinksList
+            items={docs}
+            query={linkSearch}
+            itemLabel="documents"
+            onJumpToMessage={onJumpToMessage}
+            onBack={onBack}
+          />
+        )
+      ) : null}
     </AuxSheetShell>
   )
 }
