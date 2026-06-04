@@ -303,6 +303,7 @@ export default function ChatGroupSettingsSheet({
                 className="text-[13px] font-semibold text-cyan-400 touch-manipulation active:opacity-70 disabled:opacity-40"
               >
                 {busy ? 'Uploading…' : room.avatar_url ? 'Change photo' : 'Set photo'}
+              </button>
             </div>
           ) : null}
 
