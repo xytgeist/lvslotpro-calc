@@ -123,14 +123,26 @@ export default function ChatComposer({
     }, 220)
   }, [body, footerHost, imageSlots.length, videoMeta, plusOpen, replyTarget])
 
-  // Auto-grow: contenteditable grows naturally; we just track single vs multi-line
-  // for the wrapper shape and send-button positioning.
+  // Auto-grow: measure the contenteditable's natural (unclipped) scroll height.
+  // When expanded the element has py-2.5 (20px vertical padding), so 1 line = 40px —
+  // we use a threshold above that to detect genuine multi-line content.
+  // When collapsed the element has h-full (40px) with line-height:40px, so 2 lines = 80px.
   useLayoutEffect(() => {
     if (footerHost && !composerActive) return
     const el = textareaRef.current
     const wrap = inputWrapRef.current
     if (!el) return
-    const isMultiLine = body.includes('\n') || el.scrollHeight > COMPOSER_ROW_H + 4
+
+    // Measure unclipped height: temporarily lift height constraint so scrollHeight
+    // reflects content, not the forced h-full size.
+    const savedH = el.style.height
+    el.style.height = 'auto'
+    const scrollH = el.scrollHeight
+    el.style.height = savedH
+
+    // expanded py-2.5 adds 20px padding → 1 line = ~40px, 2 lines = ~60px.
+    // Use 50px as threshold so any genuine second line of text triggers expand.
+    const isMultiLine = body.includes('\n') || scrollH > 50
     setExpanded(isMultiLine)
     if (wrap) {
       if (isMultiLine) {
@@ -821,9 +833,9 @@ export default function ChatComposer({
                   }
                 : undefined
             }
-            className={`chat-composer-ce box-border w-full bg-transparent py-0 pl-4 text-[16px] text-zinc-100 outline-none ${
+            className={`chat-composer-ce box-border w-full bg-transparent pl-4 text-[16px] text-zinc-100 outline-none ${
               disabled ? 'opacity-50 pointer-events-none' : ''
-            } ${expanded ? 'leading-5' : 'h-full'}`}
+            } ${expanded ? 'leading-5 py-2.5' : 'h-full py-0'}`}
             style={{
               maxHeight: COMPOSER_MAX_H,
               overflowY: expanded ? 'auto' : 'hidden',
