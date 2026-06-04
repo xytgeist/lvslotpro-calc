@@ -10,7 +10,7 @@ const PULL_DISMISS_VELOCITY     = 0.4 // px/ms
  * Pull down past the top to dismiss, or tap ×.
  *
  * @param {{
- *   items: Array<{ type: 'image' | 'video', url?: string, videoUid?: string, posterUrl?: string }>,
+ *   items: Array<{ type: 'image' | 'video', url?: string, videoUid?: string | null, videoUrl?: string | null, posterUrl?: string }>,
  *   initialIndex?: number,
  *   onClose: () => void,
  * }} props
@@ -158,7 +158,7 @@ export default function ChatMediaViewer({ items, initialIndex = 0, onClose }) {
         >
           {items.map((item, i) => (
             <div
-              key={item.videoUid || item.url || i}
+              key={item.videoUid || item.videoUrl || item.url || i}
               data-media-item={i}
               className="flex h-full w-full items-center justify-center"
               style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
@@ -170,6 +170,15 @@ export default function ChatMediaViewer({ items, initialIndex = 0, onClose }) {
                   allow="autoplay; fullscreen; picture-in-picture"
                   allowFullScreen
                   title="Video"
+                />
+              ) : item.type === 'video' && item.videoUrl ? (
+                <video
+                  src={item.videoUrl}
+                  poster={item.posterUrl || undefined}
+                  controls
+                  playsInline
+                  autoPlay={i === activeIdx}
+                  className="max-h-full max-w-full"
                 />
               ) : (
                 <img

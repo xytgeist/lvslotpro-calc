@@ -1129,7 +1129,7 @@ export default function ChatConversation({
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const handleSend = useCallback(async ({ body, imageUrls, previewUrls, pendingUploads, streamVideoUid = null, streamPosterUrl = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
+  const handleSend = useCallback(async ({ body, imageUrls, previewUrls, pendingUploads, videoUrl = null, streamVideoUid = null, streamPosterUrl = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
     // If user is viewing history, jump to live end before sending
     if (hasNewerRef.current) {
       await new Promise((resolve) => {
@@ -1146,7 +1146,7 @@ export default function ChatConversation({
       : null
     const replyPreview = origMsg?.body
       ? origMsg.body.slice(0, 80) + (origMsg.body.length > 80 ? '…' : '')
-      : origMsg?.stream_video_uid ? '[video]'
+      : (origMsg?.stream_video_uid || origMsg?.video_url) ? '[video]'
       : origMsg?.image_urls?.length > 0 ? '[image]' : null
 
     const allPendingUploads = Array.isArray(pendingUploads) && pendingUploads.length > 0
@@ -1165,6 +1165,7 @@ export default function ChatConversation({
       body,
       image_urls: displayUrls,
       _finalizingMedia: hasImages,
+      video_url:           videoUrl          || null,
       stream_video_uid:    streamVideoUid    || null,
       stream_poster_url:   streamPosterUrl   || null,
       stream_video_width:  streamVideoWidth  ?? null,
@@ -1183,7 +1184,7 @@ export default function ChatConversation({
         roomId: room.id, body,
         imageUrls: [],
         hasPendingImages: hasImages,
-        streamVideoUid, streamPosterUrl, streamVideoWidth, streamVideoHeight, replyToMessageId,
+        videoUrl, streamVideoUid, streamPosterUrl, streamVideoWidth, streamVideoHeight, replyToMessageId,
       })
       const messageId = res?.message_id
       if (messageId) {

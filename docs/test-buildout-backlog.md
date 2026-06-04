@@ -404,6 +404,12 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
   - **Test validation:** Ryan **PASSED** on **test** (2026-05-19): image post + delete on **`media-test.lvslotpro.com`**; CORS includes **`Cache-Control`**. **Legacy migration PASSED:** **68** objects → R2 (**27** posts, **12** comments). **Cache-Control backfill PASSED:** **69** objects **`public, max-age=31536000, immutable`**. External Klipy **`gif_url`** unchanged. **Stream tile posters (new uploads):** WebP on R2 via **`prepareLoungeFeedImageForUpload`** — **PASSED** @ **`93dcc3f`**. **Open (deferred):** **`/cdn-cgi/image/`** after Pro on **`lvslotpro.com`**.
   - Production replay: `production-rollout-checklist.md` §2 + §4; add **`media.lvslotpro.com`** (or prod media subdomain) + prod secrets when promoting.
 
+- [ ] **`lounge-chat-r2-video-upload`** (chat video MP4 → **Cloudflare R2** direct upload). Clone of `lounge-cf-r2-direct-upload` accepting **`video/mp4`** only; reuses all `_shared/loungeCfR2.ts` helpers. Requires same R2 secrets as existing image upload function (no new secrets needed).
+  - **Deploy:** `supabase functions deploy lounge-chat-r2-video-upload` on **test** first.
+  - **Also:** redeploy **`lounge-chat`** (now imports `loungeCfR2DeleteObject` to clean up R2 video + poster on `delete_message`; also accepts `video_url` on `send_message`).
+  - **Migration:** run **`20260608000000_chat_messages_video_url.sql`** on test before client deploy (adds `video_url TEXT` column; rebuilds `chat_messages_page` + `chat_messages_window` RPCs to include it).
+  - **Smoke (test):** send a video in chat — progress bar encodes then uploads; bubble appears immediately with poster; tap bubble → native `<video>` plays; delete message → R2 objects removed. Legacy `stream_video_uid` messages still render via CF iframe unchanged.
+
 - [ ] Function-by-function smoke notes captured  
   - Change: Record minimal expected input/output for each function.
   - Source: function `README.md` files
@@ -955,8 +961,33 @@ Items are ordered by priority. ✅ = implemented. 🔜 = next. ⏳ = deferred (m
 
 **Test smoke (Ryan):** send 1 image, 4 images, 12 images; verify bubble never shrinks during upload; verify delivered images match sent; verify other device sees images after patch. **Redeploy `lounge-chat` on prod when promoting.**
 
+### ✅ Chat R2 video pipeline (2026-06-04, code pending deploy)
+
+| Item | What was done |
+|---|---|
+| **New encode function** | `encodeVideoForChat()` in `src/utils/loungeVideoFfmpegTrim.js` — same ffmpeg.wasm singleton as trim; max 720p height (`scale=-2:min(720,ih)`), CRF 30, 900 kbps cap, 64 kbps AAC, `+faststart`. Produces ≈5 MB for a 60s 1080p clip (vs 50-100 MB raw). |
+| **New Edge function** | `supabase/functions/lounge-chat-r2-video-upload` — presigned PUT URL for `video/mp4`; clone of `lounge-cf-r2-direct-upload`, reuses all `_shared/loungeCfR2.ts` helpers, no new secrets. |
+| **Migration** | `20260608000000_chat_messages_video_url.sql` — adds `video_url TEXT` to `chat_messages`; rebuilds `chat_messages_page` + `chat_messages_window` to include it. |
+| **lounge-chat Edge** | Imports `loungeCfR2DeleteObject` + `loungeCfR2ParseObjectKeyFromPublicUrl`. `send_message` accepts `video_url`; `delete_message` best-effort-deletes R2 video and R2 poster (if from our domain) in addition to CF Stream cleanup. `reply_to_preview` now checks `video_url` as well as `stream_video_uid`. |
+| **ChatComposer** | `handleCropConfirm` replaces TUS/CF Stream pipeline: lazy-import `encodeVideoForChat`, then parallel R2 upload of video + poster via `src/utils/chatVideoR2Upload.js`. No manifest poll, no `waitForCfStreamManifestReady`. `videoMeta` now carries `videoUrl` (not `uid`). |
+| **chatApi** | `chatSendMessage` gains `videoUrl` param forwarded as `video_url`. |
+| **ChatConversation** | `handleSend` accepts `videoUrl`; optimistic message includes `video_url`; `reply_to_preview` checks both `stream_video_uid` and `video_url`. |
+| **ChatBubble** | `compactBubble` init checks `message.video_url`; `allMedia` includes `videoUrl` alongside `videoUid`; `isLinkPreviewOnly` excludes `video_url` messages. |
+| **ChatMediaViewer** | New `<video>` branch: when `item.videoUrl` is set and `item.videoUid` is null, renders native HTML5 `<video controls playsInline>` instead of CF iframe. |
+| **Backward compat** | All existing `stream_video_uid` messages render via CF Stream iframe unchanged. New messages set `video_url` and leave `stream_video_uid = null`. |
+
+**Deploy steps (test):**
+1. Run `supabase/migrations/20260608000000_chat_messages_video_url.sql` in SQL editor.
+2. `supabase functions deploy lounge-chat-r2-video-upload`
+3. `supabase functions deploy lounge-chat`
+4. Deploy client (Vercel test).
+
+**Test smoke:** send a ≤60s video in chat; verify strip shows encode % → upload; bubble appears with poster; tap → native video plays; delete message → confirm R2 objects gone from dashboard.
+
 ### 🔜 Next priorities (chat)
 
+- Apply `20260608000000_chat_messages_video_url.sql` on test.
+- Deploy `lounge-chat-r2-video-upload` + redeploy `lounge-chat` on test.
 - Ryan sign-off on link-preview + group-delete smoke after migrations/Edge deploy on test.
 
 ### ⏳ Deferred (monitor, implement when triggered)

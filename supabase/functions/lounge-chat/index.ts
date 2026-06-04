@@ -1,5 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { attachLinkPreviewToEntity } from '../_shared/linkUnfurl.ts'
+import {
+  loungeCfR2DeleteObject,
+  loungeCfR2ParseObjectKeyFromPublicUrl,
+  readLoungeCfR2Config,
+} from '../_shared/loungeCfR2.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -311,6 +316,7 @@ Deno.serve(async (req) => {
     const streamPosterUrl  = body?.stream_poster_url  ? String(body.stream_poster_url).trim()  : null
     const streamVideoWidth  = Number.isFinite(Number(body?.stream_video_width))  ? Math.round(Number(body.stream_video_width))  : null
     const streamVideoHeight = Number.isFinite(Number(body?.stream_video_height)) ? Math.round(Number(body.stream_video_height)) : null
+    const videoUrl = body?.video_url ? String(body.video_url).trim() : null
     const replyToId = body?.reply_to_message_id ? String(body.reply_to_message_id).trim() : null
     const hasPendingImages = Boolean(body?.has_pending_images)
     const idempotencyKey = typeof body?.idempotency_key === 'string'
@@ -319,7 +325,7 @@ Deno.serve(async (req) => {
     if (!roomId) {
       return json(400, { error: 'room_id is required.' })
     }
-    if (!text && imageUrls.length === 0 && !streamVideoUid && !hasPendingImages) {
+    if (!text && imageUrls.length === 0 && !streamVideoUid && !videoUrl && !hasPendingImages) {
       return json(400, { error: 'Message cannot be empty.' })
     }
 
@@ -379,7 +385,7 @@ Deno.serve(async (req) => {
     if (replyToId) {
       const { data: orig } = await admin
         .from('chat_messages')
-        .select('room_id, body, image_urls, stream_video_uid, deleted_at, sender_id')
+        .select('room_id, body, image_urls, stream_video_uid, video_url, deleted_at, sender_id')
         .eq('id', replyToId)
         .maybeSingle()
       if (orig && orig.room_id === roomId && !orig.deleted_at) {
@@ -389,7 +395,7 @@ Deno.serve(async (req) => {
           replyToPreview = origBody.slice(0, 80) + (origBody.length > 80 ? '…' : '')
         } else if (Array.isArray(orig.image_urls) && orig.image_urls.length > 0) {
           replyToPreview = '[image]'
-        } else if (orig.stream_video_uid) {
+        } else if (orig.stream_video_uid || orig.video_url) {
           replyToPreview = '[video]'
         }
       }
@@ -404,6 +410,7 @@ Deno.serve(async (req) => {
       stream_poster_url:   streamPosterUrl   || null,
       stream_video_width:  streamVideoWidth  ?? null,
       stream_video_height: streamVideoHeight ?? null,
+      video_url:           videoUrl          || null,
       reply_to_message_id: replyToId || null,
       reply_to_preview: replyToPreview,
       reply_to_sender_id: replyToSenderId,
@@ -461,7 +468,7 @@ Deno.serve(async (req) => {
 
     const { data: msg, error: mErr } = await admin
       .from('chat_messages')
-      .select('id, room_id, sender_id, deleted_at, stream_video_uid')
+      .select('id, room_id, sender_id, deleted_at, stream_video_uid, stream_poster_url, video_url')
       .eq('id', messageId)
       .maybeSingle()
     if (mErr || !msg) return json(404, { error: 'Message not found.' })
@@ -487,6 +494,19 @@ Deno.serve(async (req) => {
           { method: 'DELETE', headers: { Authorization: `Bearer ${cfToken}` } },
         ).catch(() => { /* best-effort — don't block the delete response */ })
       }
+    }
+
+    // Best-effort R2 cleanup for direct-upload videos and posters.
+    const r2Cfg = readLoungeCfR2Config()
+    if (r2Cfg) {
+      const videoR2Url = String((msg as { video_url?: string | null }).video_url || '').trim()
+      const posterR2Url = String((msg as { stream_poster_url?: string | null }).stream_poster_url || '').trim()
+      const deleteR2 = async (publicUrl: string) => {
+        const key = loungeCfR2ParseObjectKeyFromPublicUrl(r2Cfg, publicUrl)
+        if (key) await loungeCfR2DeleteObject(r2Cfg, key).catch(() => { /* best-effort */ })
+      }
+      if (videoR2Url) void deleteR2(videoR2Url)
+      if (posterR2Url) void deleteR2(posterR2Url)
     }
 
     return json(200, { ok: true })

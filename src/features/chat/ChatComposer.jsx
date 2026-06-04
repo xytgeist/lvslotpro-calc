@@ -9,17 +9,12 @@ import {
 import KlipyGifPicker from '../lounge/KlipyGifPicker.jsx'
 import LoungeVideoCropModal from '../lounge/LoungeVideoCropModal.jsx'
 import {
-  deleteCfStreamOrphanAsset,
-  cfStreamPosterUrl,
   probeVideoFileDisplaySize,
   probeVideoFileDurationSeconds,
   captureVideoFilePosterObjectUrl,
   LOUNGE_VIDEO_MAX_SECONDS,
 } from '../../utils/loungeVideoUpload.js'
-import {
-  encodeComposerVideoFileFromSpec,
-  uploadEncodedVideoToCfStreamWithRetries,
-} from '../lounge/loungeComposerVideoPrep.js'
+import { uploadChatVideoToR2, uploadChatPosterToR2 } from '../../utils/chatVideoR2Upload.js'
 
 const MAX_BODY            = 4000
 const MAX_IMAGES          = 12
@@ -39,7 +34,7 @@ const COMPOSER_EXPANDED_RADIUS_PX = 20
  *   viewerUserId: string,
  *   replyTarget: { id: string, body: string, reply_to_preview?: string | null, image_urls?: string[] } | null,
  *   onClearReply: () => void,
- *   onSend: (opts: { body: string, imageUrls: string[], streamVideoUid: string | null, streamPosterUrl: string | null, streamVideoWidth: number | null, streamVideoHeight: number | null, replyToMessageId: string | null }) => Promise<void>,
+ *   onSend: (opts: { body: string, imageUrls: string[], videoUrl: string | null, streamPosterUrl: string | null, streamVideoWidth: number | null, streamVideoHeight: number | null, replyToMessageId: string | null }) => Promise<void>,
  *   onTyping: (displayName: string) => void,
  *   viewerDisplayName?: string,
  *   disabled?: boolean,
@@ -82,7 +77,7 @@ export default function ChatComposer({
    * Null when no upload is in progress.
    */
   const [videoUploadStatus, setVideoUploadStatus] = useState(/** @type {{ progress: number, status: string, detail: string, attempt: number }|null} */ (null))
-  const [videoMeta, setVideoMeta] = useState(/** @type {{ uid: string, posterUrl: string, localPoster: string|null, width: number|null, height: number|null }|null} */ (null))
+  const [videoMeta, setVideoMeta] = useState(/** @type {{ videoUrl: string, posterUrl: string|null, localPoster: string|null, width: number|null, height: number|null }|null} */ (null))
   const videoAbortRef = useRef(/** @type {AbortController|null} */ (null))
 
   const textareaRef    = useRef(null)
@@ -447,7 +442,7 @@ export default function ChatComposer({
     const abortCtrl = new AbortController()
     videoAbortRef.current = abortCtrl
 
-    // Start poster capture + dimension probe in parallel with encode/upload.
+    // Start poster capture + dimension probe in parallel with encode.
     let dims = null
     let localPoster = null
     const posterCapturePromise = Promise.all([
@@ -459,29 +454,38 @@ export default function ChatComposer({
     })
 
     try {
-      const encodedFile = await encodeComposerVideoFileFromSpec({
+      // Encode with chat-optimised settings (max 720p, CRF 30, 900 kbps, 64k audio).
+      // Encodes occupy 0–55% of progress; R2 upload occupies 55–98%.
+      setVideoUploadStatus({ progress: 0.02, status: 'Encoding video…', detail: '', attempt: 1 })
+      const { encodeVideoForChat } = await import('../../utils/loungeVideoFfmpegTrim.js')
+      const encodedFile = await encodeVideoForChat(trimmedFile, {
         signal: abortCtrl.signal,
-        spec: { kind: 'direct', file: trimmedFile },
-        onProgress: ({ progress, status, detail, attempt }) => {
-          setVideoUploadStatus({ progress, status, detail: detail || '', attempt })
+        onProgress: (r) => {
+          setVideoUploadStatus({
+            progress: 0.02 + r * 0.53,
+            status: 'Encoding video…',
+            detail: `${Math.round(r * 100)}%`,
+            attempt: 1,
+          })
         },
       })
 
       if (abortCtrl.signal.aborted) return
 
-      const { streamVideoUid: uid } = await uploadEncodedVideoToCfStreamWithRetries({
-        supabaseClient,
-        signal: abortCtrl.signal,
-        uploadFile: encodedFile,
-        onProgress: ({ progress, status, detail, attempt }) => {
-          setVideoUploadStatus({ progress, status, detail: detail || '', attempt })
-        },
-      })
-
       await posterCapturePromise
+
+      // Upload encoded video and poster to R2 in parallel.
+      setVideoUploadStatus({ progress: 0.56, status: 'Uploading…', detail: '', attempt: 1 })
+      const [videoUrl, posterPublicUrl] = await Promise.all([
+        uploadChatVideoToR2(supabaseClient, encodedFile, { signal: abortCtrl.signal }),
+        localPoster
+          ? uploadChatPosterToR2(supabaseClient, localPoster).catch(() => null)
+          : Promise.resolve(null),
+      ])
+
       setVideoMeta({
-        uid,
-        posterUrl: cfStreamPosterUrl(uid),
+        videoUrl,
+        posterUrl: posterPublicUrl || null,
         localPoster,
         width: dims?.width ?? null,
         height: dims?.height ?? null,
@@ -544,7 +548,7 @@ export default function ChatComposer({
       imageUrls: readyUrls,
       previewUrls,
       pendingUploads,
-      streamVideoUid:    videoMeta?.uid    ?? null,
+      videoUrl:          videoMeta?.videoUrl  ?? null,
       streamPosterUrl:   videoMeta?.posterUrl ?? null,
       streamVideoWidth:  videoMeta?.width  ?? null,
       streamVideoHeight: videoMeta?.height ?? null,

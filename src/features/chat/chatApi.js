@@ -39,13 +39,14 @@ function newIdempotencyKey() {
  * Generates an idempotency key per call so automatic retries and rapid
  * double-taps don't produce duplicate messages.
  * @param {SupabaseClient} supabase
- * @param {{ roomId: string, body: string, imageUrls?: string[], streamVideoUid?: string | null, streamPosterUrl?: string | null, streamVideoWidth?: number | null, streamVideoHeight?: number | null, replyToMessageId?: string | null }} opts
+ * @param {{ roomId: string, body: string, imageUrls?: string[], videoUrl?: string | null, streamVideoUid?: string | null, streamPosterUrl?: string | null, streamVideoWidth?: number | null, streamVideoHeight?: number | null, replyToMessageId?: string | null }} opts
  */
 export function chatSendMessage(supabase, {
   roomId,
   body,
   imageUrls = [],
   hasPendingImages = false,
+  videoUrl = null,
   streamVideoUid = null,
   streamPosterUrl = null,
   streamVideoWidth = null,
@@ -58,6 +59,7 @@ export function chatSendMessage(supabase, {
     body,
     image_urls: imageUrls,
     has_pending_images: hasPendingImages || undefined,
+    video_url:           videoUrl         || undefined,
     stream_video_uid:    streamVideoUid    || undefined,
     stream_poster_url:   streamPosterUrl   || undefined,
     stream_video_width:  streamVideoWidth  ?? undefined,

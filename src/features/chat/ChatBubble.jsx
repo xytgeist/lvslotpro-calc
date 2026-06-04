@@ -212,7 +212,7 @@ export default function ChatBubble({
   // never resizes on mount — only single-line plain-text starts as a pill.
   // Also start expanded when _finalizingMedia so in-flight uploads never collapse the bubble.
   const [compactBubble, setCompactBubble] = useState(() => {
-    if (message.image_urls?.length || message.stream_video_uid || message._finalizingMedia) return false
+    if (message.image_urls?.length || message.stream_video_uid || message.video_url || message._finalizingMedia) return false
     if (message.body?.includes('\n')) return false
     return true
   })
@@ -230,6 +230,7 @@ export default function ChatBubble({
     linkPreview &&
     imageUrlsEarly.length === 0 &&
     !message.stream_video_uid &&
+    !message.video_url &&
     textIsOnlyUrls(message.body || '')
   const showTextBubble = !isLinkPreviewOnly || isDeleted
   /** Caption + link card share one bubble (iMessage-style). */
@@ -421,12 +422,19 @@ export default function ChatBubble({
 
   const imageUrls = Array.isArray(message.image_urls) ? message.image_urls.filter(Boolean) : []
   const videoUid = message.stream_video_uid || null
+  const videoUrl = message.video_url || null
 
   // Build unified media list for the grid and viewer.
   const allMedia = [
     ...imageUrls.map((url) => ({ type: 'image', url })),
-    ...(videoUid
-      ? [{ type: 'video', videoUid, url: message.stream_poster_url || '', posterUrl: message.stream_poster_url || '' }]
+    ...(videoUid || videoUrl
+      ? [{
+          type: 'video',
+          videoUid: videoUid || null,
+          videoUrl: videoUrl || null,
+          url: message.stream_poster_url || '',
+          posterUrl: message.stream_poster_url || '',
+        }]
       : []),
   ]
   const hasMedia = allMedia.length > 0

@@ -107,6 +107,72 @@ export function prefetchFfmpegCore() {
 }
 
 /**
+ * Re-encode a full video file to a chat-optimised MP4.
+ * Targets ≤ 720p height, H.264 CRF 30, 900 kbps bitrate cap, 64 kbps AAC audio.
+ * Produces roughly 5 MB for a 60-second 1080p source (vs 50-100 MB raw pass-through).
+ *
+ * @param {File} file
+ * @param {{ onProgress?: (ratio01: number) => void, signal?: AbortSignal }} [opts]
+ * @returns {Promise<File>}
+ */
+export async function encodeVideoForChat(file, opts = {}) {
+  const { onProgress, signal } = opts
+
+  const ffmpeg = await getFfmpeg()
+  const extMatch = /\.[a-z0-9]+$/i.exec(file.name || '')
+  const ext = extMatch ? extMatch[0].toLowerCase() : '.mp4'
+  const inName = `chat_in${ext}`
+  const outName = 'chat_out.mp4'
+
+  const onProg = ({ progress }) => {
+    if (typeof onProgress !== 'function') return
+    const p = typeof progress === 'number' ? progress : 0
+    onProgress(p <= 1 ? p : p / 100)
+  }
+  ffmpeg.on('progress', onProg)
+
+  const { inputPath, mode } = await installTrimInput(ffmpeg, file, inName)
+
+  /**
+   * Chat encode groups:
+   * - Demux / logging: -hide_banner -loglevel error -analyzeduration 1500000 -probesize 5242880
+   * - Input: -i <path>
+   * - Video: H.264 ultrafast, CRF 30, 900 kbps cap, yuv420p
+   * - Video filter: scale height to min(720, original) — width keeps aspect (-2 = nearest even)
+   * - Audio: AAC 64 kbps
+   * - Mux: +faststart for instant web playback
+   */
+  const demuxLogging = ['-hide_banner', '-loglevel', 'error', '-analyzeduration', '1500000', '-probesize', '5242880']
+  const input = ['-i', inputPath]
+  const video = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '30', '-maxrate', '900k', '-bufsize', '1800k', '-pix_fmt', 'yuv420p']
+  const videoFilters = ['-vf', 'scale=-2:min(720,ih)']
+  const audio = ['-c:a', 'aac', '-b:a', '64k']
+  const mux = ['-movflags', '+faststart', '-y', outName]
+
+  const args = [...demuxLogging, ...input, ...video, ...videoFilters, ...audio, ...mux]
+
+  try {
+    const code = await ffmpeg.exec(args, undefined, { signal })
+    if (code !== 0) throw new Error('Chat video encoding failed.')
+  } finally {
+    ffmpeg.off('progress', onProg)
+    await uninstallTrimInput(ffmpeg, mode, inName)
+  }
+
+  const data = await ffmpeg.readFile(outName)
+  try { await ffmpeg.deleteFile(outName) } catch { /* ignore */ }
+
+  const buf = data instanceof Uint8Array ? data : new Uint8Array(data)
+  const base = String(file.name || 'video')
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^\w-]+/g, '_')
+    .slice(0, 80)
+  const outFile = new File([buf], `${base || 'clip'}-chat.mp4`, { type: 'video/mp4' })
+  if (typeof onProgress === 'function') onProgress(1)
+  return outFile
+}
+
+/**
  * Re-encode a segment to MP4 (browser-safe).
  *
  * @param {File} file
