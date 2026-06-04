@@ -208,8 +208,9 @@ export default function ChatBubble({
   const [bubbleRect, setBubbleRect]         = useState(/** @type {DOMRect | null} */ (null))
   // Start expanded immediately for media/link-preview/multi-line so the bubble
   // never resizes on mount — only single-line plain-text starts as a pill.
+  // Also start expanded when _finalizingMedia so in-flight uploads never collapse the bubble.
   const [compactBubble, setCompactBubble] = useState(() => {
-    if (message.image_urls?.length || message.stream_video_uid) return false
+    if (message.image_urls?.length || message.stream_video_uid || message._finalizingMedia) return false
     if (message.body?.includes('\n')) return false
     return true
   })
@@ -433,7 +434,7 @@ export default function ChatBubble({
     }
 
     const measure = () => {
-      if (hasMedia || linkPreviewInBubble) {
+      if (hasMedia || linkPreviewInBubble || isFinalizingMedia) {
         setCompactBubble(false)
         return
       }
@@ -459,7 +460,7 @@ export default function ChatBubble({
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [message.body, hasMedia, isLinkPreviewOnly, linkPreviewInBubble])
+  }, [message.body, hasMedia, isLinkPreviewOnly, linkPreviewInBubble, isFinalizingMedia])
 
   // Floating menu layout — computed fresh each render so it tracks the latest rect
   const layout = bubbleRect ? computeLayout(bubbleRect, isMine, { isDeleted, enableStar, enablePin }) : null

@@ -359,8 +359,9 @@ export default function ChatComposer({
       replyToMessageId: replyTarget?.id ?? null,
     }
 
-    // Capture blob URLs to revoke AFTER send completes (optimistic message needs them until replaced)
-    const blobUrlsToRevoke = slotsSnapshot.map((s) => s.localUrl)
+    // Blob URLs are passed to ChatConversation as previewUrls and stay live in the
+    // chat bubble until real R2 URLs replace them. ChatConversation revokes them
+    // after upload completion so we do NOT revoke here.
 
     // Only refocus the textarea if it was already focused (keyboard already up)
     const wasTextareaFocused = document.activeElement === textareaRef.current
@@ -387,8 +388,6 @@ export default function ChatComposer({
       setUploadErr(msg.includes('image_urls_len') ? `Max ${MAX_IMAGES} images per message.` : 'Failed to send. Please try again.')
     } finally {
       setSending(false)
-      // Safe to revoke now — optimistic message has been replaced with real R2 URLs
-      blobUrlsToRevoke.forEach((u) => URL.revokeObjectURL(u))
     }
   }, [canSend, body, imageSlots, videoMeta, replyTarget, onSend, onClearReply])
 
