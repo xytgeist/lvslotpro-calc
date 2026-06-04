@@ -679,6 +679,7 @@ export default function ChatComposer({
         {/* Textarea + inline send button */}
         <div
           ref={inputWrapRef}
+          onPaste={handlePaste}
           className={`chat-header-glass relative flex flex-1 items-center overflow-hidden ${expanded ? '' : 'h-10'}`}
           style={{ borderRadius: expanded ? COMPOSER_EXPANDED_RADIUS_PX : '9999px' }}
         >
@@ -688,7 +689,6 @@ export default function ChatComposer({
             onChange={handleBodyChange}
             onKeyDown={handleKeyDown}
             onBlur={maybeCollapseComposer}
-            onPaste={handlePaste}
             onFocus={
               footerHost
                 ? (e) => {
