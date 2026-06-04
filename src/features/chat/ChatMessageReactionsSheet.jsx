@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import LoungeFlameIcon from '../lounge/LoungeFlameIcon.jsx'
 import { chatMessageReactionsPage } from './chatApi.js'
+
+const DISMISS_THRESHOLD_PX = 80
+const DISMISS_VELOCITY = 0.4
 
 const REACTION_CHIP_CLASS = 'block h-5 w-5 shrink-0 translate-y-px'
 const FILTER_EMOJI_CLASS = 'text-[18px] leading-none'
@@ -30,6 +33,10 @@ export default function ChatMessageReactionsSheet({
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [filterEmoji, setFilterEmoji] = useState(/** @type {string | null} */ (null))
+  const [dragY, setDragY] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const dragRef = useRef({ active: false, startY: 0, lastY: 0, lastT: 0, velocity: 0 })
+  const scrollRef = useRef(/** @type {HTMLDivElement | null} */ (null))
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!messageId) return
@@ -51,7 +58,8 @@ export default function ChatMessageReactionsSheet({
   }, [messageId, supabaseClient])
 
   useEffect(() => {
-    if (!open || !messageId) return
+    if (!open) { setDragY(0); setDragging(false); dragRef.current.active = false; return }
+    if (!messageId) return
     setFilterEmoji(null)
     void load({ silent: false })
   }, [open, messageId, load])
@@ -80,6 +88,41 @@ export default function ChatMessageReactionsSheet({
   const totalCount = rows.length
   const title = totalCount === 1 ? '1 Reaction' : `${totalCount} Reactions`
 
+  const onSheetPointerDown = useCallback((e) => {
+    if (e.button !== undefined && e.button !== 0) return
+    const scrollEl = scrollRef.current
+    if (scrollEl && scrollEl.scrollTop > 4) return
+    dragRef.current = { active: true, startY: e.clientY, lastY: e.clientY, lastT: Date.now(), velocity: 0 }
+    setDragging(true)
+    setDragY(0)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [])
+
+  const onSheetPointerMove = useCallback((e) => {
+    const d = dragRef.current
+    if (!d.active) return
+    const now = Date.now()
+    const dt = Math.max(1, now - d.lastT)
+    d.velocity = (e.clientY - d.lastY) / dt
+    d.lastY = e.clientY
+    d.lastT = now
+    setDragY(Math.max(0, e.clientY - d.startY))
+  }, [])
+
+  const onSheetPointerUp = useCallback(() => {
+    const d = dragRef.current
+    if (!d.active) return
+    d.active = false
+    setDragging(false)
+    const currentDragY = Math.max(0, d.lastY - d.startY)
+    if (currentDragY > DISMISS_THRESHOLD_PX || d.velocity > DISMISS_VELOCITY) {
+      setDragY(0)
+      onClose()
+    } else {
+      setDragY(0)
+    }
+  }, [onClose])
+
   if (typeof document === 'undefined' || !open || !messageId) return null
 
   return createPortal(
@@ -90,8 +133,16 @@ export default function ChatMessageReactionsSheet({
     >
       <div
         className="flex max-h-[min(70dvh,520px)] flex-col rounded-t-2xl border-t border-zinc-700/60 bg-zinc-950 shadow-2xl"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
+        style={{
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+          transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
+          transition: dragging ? 'none' : 'transform 0.22s ease',
+        }}
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={onSheetPointerDown}
+        onPointerMove={onSheetPointerMove}
+        onPointerUp={onSheetPointerUp}
+        onPointerCancel={onSheetPointerUp}
       >
         <div className="flex justify-center pt-2.5 pb-1">
           <div className="h-1 w-10 rounded-full bg-zinc-700" />
@@ -121,7 +172,7 @@ export default function ChatMessageReactionsSheet({
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2">
           {loading ? (
             <div className="py-10 text-center text-[14px] text-zinc-500">Loading…</div>
           ) : err ? (
