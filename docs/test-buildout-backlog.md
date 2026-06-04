@@ -617,6 +617,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-04: **Chat R2 video pipeline smoke — Ryan sign-off:** encode + R2 upload + bubble render confirmed working on iPhone (iOS 18.7 Safari). 102 MB .mov → 6.6 MB MP4 in ~36 s; video landed in chat bubble; native `<video>` playback. Fix applied: `scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2` (ffmpeg.wasm in this build does not have expression evaluator for filter args — `min(720,ih)` caused instant exit). Commits `37a5865` (filter fix) + `c805610` (debug logging). **Deploy `lounge-chat-r2-video-upload` + `lounge-chat` + migration `20260608000000` on test before promoting to prod.**
 - 2026-06-07: **Group info Links tab fix (code on `test`):** migration **`20260607150000_chat_shared_links_fix_v2.sql`** — `chat_room_shared_links` now unions `link_preview->>'url'`, all `https?://` body matches, and bare-domain body matches (prior fix blocked fallback when `link_preview` was set without `url`). Client: **`ChatGroupAuxSheets.jsx`** loads media/links/docs independently so links RPC errors surface on the Links/Docs tabs. **Apply migration on test before smoke** (also supersedes **`20260607140000`** if that was applied).
 - 2026-06-06: **Chat reactions Realtime (code on `test`):** migration **`20260606150000_chat_message_reactions_realtime.sql`** — publication + **`REPLICA IDENTITY`** for DELETE payloads. Client: live pill counts + silent attribution sheet refresh when others react. **Apply with `20260606140000` on test before smoke.**
 - 2026-06-06: **Chat group tap-to-react + attribution sheet (code on `test`):** migration **`20260606140000_chat_message_reactions_page.sql`** — RPC **`chat_message_reactions_page`**. Client: group messages — tap emoji on pill to toggle your reaction; tap pill → **`ChatMessageReactionsSheet`** (filter chips + member list). **Apply migration on test before smoke.**
@@ -961,11 +962,11 @@ Items are ordered by priority. ✅ = implemented. 🔜 = next. ⏳ = deferred (m
 
 **Test smoke (Ryan):** send 1 image, 4 images, 12 images; verify bubble never shrinks during upload; verify delivered images match sent; verify other device sees images after patch. **Redeploy `lounge-chat` on prod when promoting.**
 
-### ✅ Chat R2 video pipeline (2026-06-04, code pending deploy)
+### ✅ Chat R2 video pipeline (2026-06-04, code `c805610`)
 
 | Item | What was done |
 |---|---|
-| **New encode function** | `encodeVideoForChat()` in `src/utils/loungeVideoFfmpegTrim.js` — same ffmpeg.wasm singleton as trim; max 720p height (`scale=-2:min(720,ih)`), CRF 30, 900 kbps cap, 64 kbps AAC, `+faststart`. Produces ≈5 MB for a 60s 1080p clip (vs 50-100 MB raw). |
+| **New encode function** | `encodeVideoForChat()` in `src/utils/loungeVideoFfmpegTrim.js` — same ffmpeg.wasm singleton as trim; fits within 1280×720 box (`scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2` — no expression evaluator required, handles portrait + landscape), CRF 30, 900 kbps cap, 64 kbps AAC, `+faststart`. Confirmed 102 MB .mov → 6.6 MB MP4 (~94% reduction) in ~36 s on iPhone. |
 | **New Edge function** | `supabase/functions/lounge-chat-r2-video-upload` — presigned PUT URL for `video/mp4`; clone of `lounge-cf-r2-direct-upload`, reuses all `_shared/loungeCfR2.ts` helpers, no new secrets. |
 | **Migration** | `20260608000000_chat_messages_video_url.sql` — adds `video_url TEXT` to `chat_messages`; rebuilds `chat_messages_page` + `chat_messages_window` to include it. |
 | **lounge-chat Edge** | Imports `loungeCfR2DeleteObject` + `loungeCfR2ParseObjectKeyFromPublicUrl`. `send_message` accepts `video_url`; `delete_message` best-effort-deletes R2 video and R2 poster (if from our domain) in addition to CF Stream cleanup. `reply_to_preview` now checks `video_url` as well as `stream_video_uid`. |
@@ -986,8 +987,7 @@ Items are ordered by priority. ✅ = implemented. 🔜 = next. ⏳ = deferred (m
 
 ### 🔜 Next priorities (chat)
 
-- Apply `20260608000000_chat_messages_video_url.sql` on test.
-- Deploy `lounge-chat-r2-video-upload` + redeploy `lounge-chat` on test.
+- Promote R2 video pipeline to prod: run `20260608000000` migration + deploy `lounge-chat-r2-video-upload` + redeploy `lounge-chat` on prod.
 - Ryan sign-off on link-preview + group-delete smoke after migrations/Edge deploy on test.
 
 ### ⏳ Deferred (monitor, implement when triggered)
