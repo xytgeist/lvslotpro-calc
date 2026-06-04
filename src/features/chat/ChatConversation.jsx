@@ -1129,7 +1129,7 @@ export default function ChatConversation({
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const handleSend = useCallback(async ({ body, imageUrls, previewUrls, pendingUploads, pendingVideoUpload = null, streamVideoUid = null, streamPosterUrl = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
+  const handleSend = useCallback(async ({ body, imageUrls, previewUrls, pendingUploads, pendingVideoUpload = null, streamVideoUid = null, streamPosterUrl = null, localVideoPoster = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
     // If user is viewing history, jump to live end before sending
     if (hasNewerRef.current) {
       await new Promise((resolve) => {
@@ -1167,7 +1167,8 @@ export default function ChatConversation({
       image_urls: displayUrls,
       _finalizingMedia: hasImages || hasPendingVideo,
       stream_video_uid:    streamVideoUid    || null,
-      stream_poster_url:   streamPosterUrl   || null,
+      // Use local blob poster during optimistic phase; real CF URL arrives via Realtime.
+      stream_poster_url:   localVideoPoster  || streamPosterUrl || null,
       stream_video_width:  streamVideoWidth  ?? null,
       stream_video_height: streamVideoHeight ?? null,
       sender_id: viewerUserId,

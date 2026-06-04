@@ -1006,7 +1006,7 @@ function ChatMediaGrid({ media, onOpen }) {
             {item.type === 'video' ? (
               <>
                 {item.posterUrl ? (
-                  <img src={item.posterUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <ChatMediaImage src={item.posterUrl} className="h-full w-full object-cover" />
                 ) : (
                   <div className="h-full w-full bg-zinc-800" />
                 )}

@@ -580,6 +580,7 @@ export default function ChatComposer({
       pendingVideoUpload,
       streamVideoUid:    videoMeta?.uid    ?? null,
       streamPosterUrl:   videoMeta?.posterUrl ?? null,
+      localVideoPoster:  videoMeta?.localPoster ?? null,
       streamVideoWidth:  videoMeta?.width  ?? null,
       streamVideoHeight: videoMeta?.height ?? null,
       replyToMessageId: replyTarget?.id ?? null,
