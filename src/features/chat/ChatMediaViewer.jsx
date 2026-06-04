@@ -19,6 +19,17 @@ export default function ChatMediaViewer({ items, initialIndex = 0, onClose }) {
   const scrollRef    = useRef(null)
   const [activeIdx, setActiveIdx] = useState(Math.min(initialIndex, items.length - 1))
 
+  // Force a black theme-color while open so the iOS status bar doesn't show
+  // the light-mode page background (white) bleeding into the safe-area strip.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]')
+    const prev = meta?.getAttribute('content') ?? null
+    meta?.setAttribute('content', '#000000')
+    return () => {
+      if (prev !== null) meta?.setAttribute('content', prev)
+    }
+  }, [])
+
   // Pull-to-dismiss state
   const [pullY, setPullY]         = useState(0)
   const [dismissing, setDismissing] = useState(false)
