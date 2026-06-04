@@ -935,37 +935,43 @@ function PinIcon({ filled = false }) {
 
 // ── Circular upload-progress ring ─────────────────────────────────────────
 
-const RING_R  = 20          // SVG circle radius
-const RING_C  = 2 * Math.PI * RING_R  // circumference ≈ 125.7
+const RING_R  = 28          // SVG circle radius
+const RING_C  = 2 * Math.PI * RING_R  // circumference ≈ 175.9
 
 /**
- * Centered scrim + circular progress ring shown over a video tile while the
- * upload is in flight.  Mimics the iOS download-progress indicator: the ring
- * fills clockwise as `progress` goes 0→1, with a small percentage label inside.
+ * Centered scrim + glowing circular progress ring shown over a video tile while
+ * the upload is in flight.  The arc fills clockwise as `progress` goes 0→1.
  */
 function VideoUploadRing({ progress }) {
   const pct    = Math.max(0, Math.min(1, progress))
   const offset = RING_C * (1 - pct)
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[13px] bg-black/35">
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[13px] bg-black/40">
       {/* -rotate-90 so the fill starts at 12 o'clock */}
-      <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90" aria-hidden>
+      <svg width="80" height="80" viewBox="0 0 72 72" className="-rotate-90" aria-hidden>
         {/* Track */}
-        <circle cx="28" cy="28" r={RING_R} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="3.5" />
-        {/* Progress arc */}
+        <circle cx="36" cy="36" r={RING_R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="4.5" />
+        {/* Progress arc — glowing cyan */}
         <circle
-          cx="28" cy="28" r={RING_R}
+          cx="36" cy="36" r={RING_R}
           fill="none"
           stroke="#22d3ee"
-          strokeWidth="3.5"
+          strokeWidth="4.5"
           strokeLinecap="round"
           strokeDasharray={RING_C}
           strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 0.35s ease' }}
+          style={{
+            transition: 'stroke-dashoffset 0.35s ease',
+            filter: 'drop-shadow(0 0 6px rgba(34,211,238,0.9))',
+          }}
         />
       </svg>
-      <span className="absolute text-[12px] font-semibold tabular-nums text-white" style={{ lineHeight: 1 }}>
-        {Math.round(pct * 100)}
+      {/* Upright label — sibling of the rotated SVG, unaffected by its rotation */}
+      <span
+        className="absolute font-bold tabular-nums text-white"
+        style={{ fontSize: 15, lineHeight: 1, textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
+      >
+        {Math.round(pct * 100)}%
       </span>
     </div>
   )
