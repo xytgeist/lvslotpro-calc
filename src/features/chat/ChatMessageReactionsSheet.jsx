@@ -18,6 +18,7 @@ const FILTER_EMOJI_CLASS = 'text-[18px] leading-none'
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
  *   viewerUserId: string,
  *   viewerProfile?: { display_name?: string | null, handle?: string | null, avatar_url?: string | null } | null,
+ *   viewerReactionLimit?: number,
  *   onToggleReaction: (emoji: string) => void,
  *   reloadToken?: number,
  * }} props
@@ -29,6 +30,7 @@ export default function ChatMessageReactionsSheet({
   supabaseClient,
   viewerUserId,
   viewerProfile = null,
+  viewerReactionLimit = 3,
   onToggleReaction,
   reloadToken = 0,
 }) {
@@ -96,6 +98,8 @@ export default function ChatMessageReactionsSheet({
     () => new Set(rows.filter((r) => r.user_id === viewerUserId).map((r) => r.emoji)),
     [rows, viewerUserId],
   )
+
+  const atLimit = viewerReactedEmojis.size >= viewerReactionLimit
 
   const handleToggleReaction = useCallback((emoji) => {
     // Optimistic update so the modal reflects the change instantly
@@ -189,26 +193,35 @@ export default function ChatMessageReactionsSheet({
             </div>
 
             {/* Reaction pills: + opens picker, emoji pills toggle your reaction */}
-            <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-none">
+            <div className="flex flex-wrap gap-2 px-4 py-3">
               <button
                 type="button"
-                onClick={() => setEmojiPickerOpen(true)}
-                className="inline-flex shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/8 px-3 py-1.5 touch-manipulation active:bg-white/15"
-                aria-label="Add reaction"
+                onClick={() => !atLimit && setEmojiPickerOpen(true)}
+                disabled={atLimit}
+                className={`inline-flex min-w-[4.5rem] shrink-0 items-center justify-center rounded-full border px-3 py-1.5 touch-manipulation transition-opacity ${
+                  atLimit
+                    ? 'border-white/8 bg-white/4 opacity-35 cursor-not-allowed'
+                    : 'border-white/15 bg-white/8 active:bg-white/15'
+                }`}
+                aria-label={atLimit ? `Reaction limit reached (${viewerReactionLimit} max)` : 'Add reaction'}
               >
                 <AddReactionIcon />
               </button>
               {emojiSummaries.map(({ emoji, count }) => {
                 const iReacted = viewerReactedEmojis.has(emoji)
+                const isDisabled = !iReacted && atLimit
                 return (
                   <button
                     key={emoji}
                     type="button"
-                onClick={() => handleToggleReaction(emoji)}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 touch-manipulation transition-colors ${
+                    onClick={() => !isDisabled && handleToggleReaction(emoji)}
+                    disabled={isDisabled}
+                    className={`inline-flex min-w-[4.5rem] shrink-0 items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 touch-manipulation transition-colors ${
                       iReacted
                         ? 'border-cyan-500/50 bg-cyan-500/15'
-                        : 'border-white/15 bg-white/8 active:bg-white/15'
+                        : isDisabled
+                          ? 'border-white/8 bg-white/4 opacity-35 cursor-not-allowed'
+                          : 'border-white/15 bg-white/8 active:bg-white/15'
                     }`}
                     aria-label={iReacted ? `Remove ${emoji} reaction` : `React with ${emoji}`}
                     aria-pressed={iReacted}

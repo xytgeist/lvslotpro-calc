@@ -538,7 +538,6 @@ export default function ChatBubble({
             onPointerCancel={cancelLongPress}
             onPointerLeave={cancelLongPress}
             onContextMenu={(e) => e.preventDefault()}
-            onSelectStart={(e) => e.preventDefault()}
             className={`chat-bubble-surface relative select-none text-[16px] leading-snug transition-opacity ${
               hasMedia && !isDeleted ? 'p-[3px]' : 'px-3 py-2'
             } ${
@@ -633,7 +632,6 @@ export default function ChatBubble({
               onPointerCancel={isLinkPreviewOnly ? cancelLongPress : undefined}
               onPointerLeave={isLinkPreviewOnly ? cancelLongPress : undefined}
               onContextMenu={isLinkPreviewOnly ? (e) => e.preventDefault() : undefined}
-              onSelectStart={isLinkPreviewOnly ? (e) => e.preventDefault() : undefined}
               style={isLinkPreviewOnly ? { WebkitTouchCallout: 'none', userSelect: 'none' } : undefined}
             >
               <ChatLinkPreviewCard preview={linkPreview} isMine={isMine} />
@@ -654,7 +652,7 @@ export default function ChatBubble({
             return (
               <div className={`-mt-3 relative z-10 flex px-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`reaction-pill flex items-center gap-0 rounded-full py-1 px-2 ${
+                  className={`reaction-pill flex flex-wrap items-center gap-0 rounded-2xl py-1 px-2 max-w-[min(75vw,320px)] ${
                     reactionPillInteractive ? 'cursor-pointer' : ''
                   }`}
                   onClick={reactionPillInteractive ? openReactionsDetail : undefined}

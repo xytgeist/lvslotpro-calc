@@ -168,6 +168,7 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
           alt=""
           className={`h-10 w-10 shrink-0 rounded-lg object-cover ${branded ? 'bg-white/15' : 'bg-zinc-700/80'}`}
           loading="lazy"
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
         />
       ) : null}
     </button>

@@ -1049,7 +1049,7 @@ export default function AppShell({
         <div
           key="lounge-keepalive"
           className={tab === 'home' ? 'contents min-h-0' : 'hidden'}
-          aria-hidden={tab !== 'home'}
+          inert={tab !== 'home'}
         >
           <SocialFeed
             supabaseClient={supabaseClient}

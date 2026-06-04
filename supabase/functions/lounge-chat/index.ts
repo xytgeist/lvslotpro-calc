@@ -483,10 +483,23 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (!mem) return json(403, { error: 'Not a member of this room.' })
 
+    // Pre-flight: enforce 3-reaction limit (trigger is the authoritative guard)
+    const { count: existingCount } = await admin
+      .from('chat_message_reactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('message_id', messageId)
+      .eq('user_id', user.id)
+    if ((existingCount ?? 0) >= 3) {
+      return json(400, { error: 'reaction_limit_exceeded' })
+    }
+
     const { error: rErr } = await admin
       .from('chat_message_reactions')
       .upsert({ message_id: messageId, user_id: user.id, emoji }, { onConflict: 'message_id,user_id,emoji', ignoreDuplicates: true })
-    if (rErr) return json(400, { error: rErr.message })
+    if (rErr) {
+      if (rErr.message?.includes('reaction_limit_exceeded')) return json(400, { error: 'reaction_limit_exceeded' })
+      return json(400, { error: rErr.message })
+    }
     return json(200, { ok: true })
   }
 

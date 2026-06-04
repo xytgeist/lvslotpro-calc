@@ -41,6 +41,7 @@ const IS_IOS =
   typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
 /** Show scroll-to-bottom when this many newer messages are off-screen. */
 const SCROLL_UP_MSG_THRESHOLD = 20
+const REACTION_LIMIT = 3
 /** Last message must sit this far below the composer top before we auto-scroll. */
 const COMPOSER_SCROLL_GAP_PX = 8
 /** Message stack shorter than this gap under the composer viewport → treat as "fits" (no push). */
@@ -1195,6 +1196,12 @@ export default function ChatConversation({
   }, [supabaseClient])
 
   const handleAddReaction = useCallback(async (messageId, emoji) => {
+    const list = reactions[messageId] || []
+    const alreadyReacted = list.find((r) => r.emoji === emoji)?.viewerReacted
+    const viewerCount = list.filter((r) => r.viewerReacted).length
+    // Bail silently if already at limit (and this isn't toggling an existing reaction)
+    if (!alreadyReacted && viewerCount >= REACTION_LIMIT) return
+
     setReactions((prev) => {
       const list = prev[messageId] || []
       const existing = list.find((r) => r.emoji === emoji)
@@ -2069,6 +2076,7 @@ export default function ChatConversation({
         supabaseClient={supabaseClient}
         viewerUserId={viewerUserId}
         viewerProfile={viewerProfile}
+        viewerReactionLimit={REACTION_LIMIT}
         reloadToken={reactionsDetailReload}
         onToggleReaction={(emoji) => {
           if (reactionsDetailMessageId) toggleMessageReaction(reactionsDetailMessageId, emoji)
