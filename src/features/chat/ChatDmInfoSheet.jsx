@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   chatMuteRoom,
   chatPinnedMessagesPage,
@@ -60,9 +60,15 @@ export default function ChatDmInfoSheet({
   const [auxView, setAuxView] = useState(/** @type {null | 'search' | 'pinned' | 'media' | 'starred'} */ (null))
   const [starred, setStarred] = useState(/** @type {any[]} */ ([]))
   const [pinnedCount, setPinnedCount] = useState(0)
+  const scrollBodyRef = useRef(null)
+  const heroTitleRef = useRef(null)
+  const topChromeRef = useRef(null)
+  const titleRevealRafRef = useRef(0)
+  const [titleBarReveal, setTitleBarReveal] = useState(0)
 
   const muted = chatRoomIsMuted(room.muted_until)
   const initial = (peerDisplayName || '?').replace(/^@/, '')[0]?.toUpperCase() || '?'
+  const contactDisplayName = String(peerDisplayName || 'Member').trim() || 'Member'
 
   const reloadCounts = useCallback(async () => {
     if (!room?.id) return
@@ -86,6 +92,50 @@ export default function ChatDmInfoSheet({
     setAuxView(null)
     void reloadCounts()
   }, [open, reloadCounts])
+
+  const updateTitleBarReveal = useCallback(() => {
+    const hero = heroTitleRef.current
+    const chrome = topChromeRef.current
+    if (!hero || !chrome) {
+      setTitleBarReveal(0)
+      return
+    }
+    const chromeBottom = chrome.getBoundingClientRect().bottom
+    const heroRect = hero.getBoundingClientRect()
+    const overlap = chromeBottom - heroRect.top
+    const heroH = Math.max(heroRect.height, 1)
+    setTitleBarReveal(Math.max(0, Math.min(1, overlap / heroH)))
+  }, [])
+
+  useEffect(() => {
+    if (!open) return undefined
+    setTitleBarReveal(0)
+    if (scrollBodyRef.current) scrollBodyRef.current.scrollTop = 0
+
+    const queueReveal = () => {
+      if (titleRevealRafRef.current) return
+      titleRevealRafRef.current = window.requestAnimationFrame(() => {
+        titleRevealRafRef.current = 0
+        updateTitleBarReveal()
+      })
+    }
+
+    queueReveal()
+    const el = scrollBodyRef.current
+    if (!el) return undefined
+    el.addEventListener('scroll', queueReveal, { passive: true })
+    window.addEventListener('resize', queueReveal)
+    return () => {
+      el.removeEventListener('scroll', queueReveal)
+      window.removeEventListener('resize', queueReveal)
+      if (titleRevealRafRef.current) window.cancelAnimationFrame(titleRevealRafRef.current)
+    }
+  }, [open, updateTitleBarReveal, contactDisplayName])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    updateTitleBarReveal()
+  }, [open, contactDisplayName, updateTitleBarReveal])
 
   if (typeof document === 'undefined' || !open) return null
 
@@ -112,28 +162,53 @@ export default function ChatDmInfoSheet({
     onClose()
   }
 
+  const scrollTopInset = 'calc(env(safe-area-inset-top, 0px) + 3.75rem)'
+
   return (
     <>
       {createPortal(
         <div className="fixed inset-0 z-[95] flex flex-col bg-zinc-950" data-chat-feature>
+          {/* Fixed glass chrome — back + scroll-reveal title */}
           <div
-            className="flex shrink-0 items-center gap-3 border-b border-zinc-800/60 px-3 pb-3"
+            ref={topChromeRef}
+            className="pointer-events-none absolute inset-x-0 top-0 z-20"
             style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}
           >
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 touch-manipulation active:bg-zinc-800"
-              aria-label="Close"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <h1 className="flex-1 text-[17px] font-semibold text-zinc-100">Chat info</h1>
+            <div className="relative flex items-center justify-between gap-2 px-3 pb-3">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Back"
+                className="chat-header-glass pointer-events-auto relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+
+              <p
+                className="pointer-events-none absolute inset-x-14 top-0 h-10 truncate text-center text-[17px] font-semibold leading-10 text-zinc-100"
+                style={{ opacity: titleBarReveal }}
+                aria-hidden={titleBarReveal < 0.08}
+              >
+                {contactDisplayName}
+              </p>
+
+              <div className="h-10 w-10 shrink-0" aria-hidden />
+            </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-10">
+          {/* Scroll body — content slides under fixed chrome + top fade */}
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div
+              className="chat-info-top-fade pointer-events-none absolute inset-x-0 top-0 z-10"
+              style={{ height: scrollTopInset }}
+            />
+            <div
+              ref={scrollBodyRef}
+              className="min-h-0 h-full overflow-y-auto overscroll-y-contain pb-10"
+              style={{ paddingTop: scrollTopInset }}
+            >
             {err ? (
               <div className="mx-4 mt-3 rounded-xl border border-rose-500/30 bg-rose-950/30 px-3 py-2.5 text-[13px] text-rose-300">
                 {err}
@@ -152,7 +227,12 @@ export default function ChatDmInfoSheet({
                   {initial}
                 </div>
               )}
-              <h2 className="mt-3 text-center text-[20px] font-bold text-zinc-50">{peerDisplayName}</h2>
+              <h2
+                ref={heroTitleRef}
+                className="mt-3 text-center text-[20px] font-bold text-zinc-50"
+              >
+                {contactDisplayName}
+              </h2>
               {peerHandle ? (
                 <p className="mt-0.5 text-[14px] text-zinc-500">@{peerHandle.replace(/^@/, '')}</p>
               ) : null}
@@ -229,6 +309,7 @@ export default function ChatDmInfoSheet({
                 </span>
               </button>
             </SettingsGroup>
+          </div>
           </div>
         </div>,
         document.body,

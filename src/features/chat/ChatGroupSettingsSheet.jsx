@@ -313,12 +313,8 @@ export default function ChatGroupSettingsSheet({
           </button>
 
           <p
-            className="pointer-events-none absolute inset-x-14 truncate text-center text-[17px] font-semibold text-zinc-100"
-            style={{
-              top: '50%',
-              transform: 'translateY(-50%)',
-              opacity: titleBarReveal,
-            }}
+            className="pointer-events-none absolute inset-x-14 top-0 h-10 truncate text-center text-[17px] font-semibold leading-10 text-zinc-100"
+            style={{ opacity: titleBarReveal }}
             aria-hidden={titleBarReveal < 0.08}
           >
             {groupDisplayName}
