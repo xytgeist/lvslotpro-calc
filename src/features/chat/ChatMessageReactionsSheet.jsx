@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import LoungeFlameIcon from '../lounge/LoungeFlameIcon.jsx'
+import ChatEmojiPicker from './ChatEmojiPicker'
 import { chatMessageReactionsPage } from './chatApi.js'
 
 const DISMISS_THRESHOLD_PX = 80
@@ -32,7 +33,7 @@ export default function ChatMessageReactionsSheet({
   const [rows, setRows] = useState(/** @type {any[]} */ ([]))
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
-  const [filterEmoji, setFilterEmoji] = useState(/** @type {string | null} */ (null))
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
   const [ready, setReady] = useState(false)
   const [dragY, setDragY] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -63,13 +64,13 @@ export default function ChatMessageReactionsSheet({
   useEffect(() => {
     if (!open) {
       setReady(false)
+      setEmojiPickerOpen(false)
       setDragY(0)
       setDragging(false)
       dragRef.current.active = false
       return
     }
     if (!messageId) return
-    setFilterEmoji(null)
     void load({ silent: false })
   }, [open, messageId, load])
 
@@ -89,10 +90,10 @@ export default function ChatMessageReactionsSheet({
       .sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji))
   }, [rows])
 
-  const filteredRows = useMemo(() => {
-    if (!filterEmoji) return rows
-    return rows.filter((r) => r.emoji === filterEmoji)
-  }, [rows, filterEmoji])
+  const viewerReactedEmojis = useMemo(
+    () => new Set(rows.filter((r) => r.user_id === viewerUserId).map((r) => r.emoji)),
+    [rows, viewerUserId],
+  )
 
   const totalCount = rows.length
   const title = totalCount === 1 ? '1 Reaction' : `${totalCount} Reactions`
@@ -134,130 +135,118 @@ export default function ChatMessageReactionsSheet({
 
   if (typeof document === 'undefined' || !open || !messageId || !ready) return null
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[120] flex flex-col justify-end bg-black/50"
-      data-chat-feature
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[min(70dvh,520px)] flex-col rounded-t-2xl border-t border-zinc-700/60 bg-zinc-950 shadow-2xl"
-        style={{
-          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
-          transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
-          transition: dragging ? 'none' : 'transform 0.22s ease',
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={onSheetPointerDown}
-        onPointerMove={onSheetPointerMove}
-        onPointerUp={onSheetPointerUp}
-        onPointerCancel={onSheetPointerUp}
-      >
-        <div className="flex justify-center pt-2.5 pb-1">
-          <div className="h-1 w-10 rounded-full bg-zinc-700" />
-        </div>
+  return (
+    <>
+      {createPortal(
+        <div
+          className="fixed inset-0 z-[120] flex flex-col justify-end bg-black/50"
+          data-chat-feature
+          onClick={onClose}
+        >
+          <div
+            className="flex max-h-[min(70dvh,520px)] flex-col rounded-t-2xl border-t border-zinc-700/60 bg-zinc-950 shadow-2xl"
+            style={{
+              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+              transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
+              transition: dragging ? 'none' : 'transform 0.22s ease',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={onSheetPointerDown}
+            onPointerMove={onSheetPointerMove}
+            onPointerUp={onSheetPointerUp}
+            onPointerCancel={onSheetPointerUp}
+          >
+            <div className="flex justify-center pt-2.5 pb-1">
+              <div className="h-1 w-10 rounded-full bg-zinc-700" />
+            </div>
 
-        <div className="border-b border-zinc-800/80 px-4 pb-3 pt-1 text-center">
-          <h2 className="text-[17px] font-semibold text-zinc-100">{title}</h2>
-        </div>
+            <div className="border-b border-zinc-800/80 px-4 pb-3 pt-1 text-center">
+              <h2 className="text-[17px] font-semibold text-zinc-100">{title}</h2>
+            </div>
 
-        {emojiSummaries.length > 1 ? (
-          <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-none">
-            <FilterChip
-              active={filterEmoji === null}
-              onClick={() => setFilterEmoji(null)}
-              label={`All ${totalCount}`}
-            />
-            {emojiSummaries.map(({ emoji, count }) => (
-              <FilterChip
-                key={emoji}
-                active={filterEmoji === emoji}
-                onClick={() => setFilterEmoji((cur) => (cur === emoji ? null : emoji))}
+            {/* Reaction pills: + opens picker, emoji pills toggle your reaction */}
+            <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setEmojiPickerOpen(true)}
+                className="inline-flex shrink-0 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-900/80 px-3 py-1.5 text-[18px] leading-none touch-manipulation active:bg-zinc-800"
+                aria-label="Add reaction"
               >
-                <ReactionGlyph emoji={emoji} liked />
-                <span className="text-[13px] font-semibold text-zinc-300">{count}</span>
-              </FilterChip>
-            ))}
-          </div>
-        ) : null}
-
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2">
-          {loading ? (
-            <div className="py-10 text-center text-[14px] text-zinc-500">Loading…</div>
-          ) : err ? (
-            <div className="mx-2 py-8 text-center text-[14px] text-rose-300">{err}</div>
-          ) : filteredRows.length === 0 ? (
-            <div className="py-10 text-center text-[14px] text-zinc-500">No reactions yet.</div>
-          ) : (
-            <ul className="divide-y divide-zinc-800/70">
-              {filteredRows.map((row) => {
-                const isViewer = row.user_id === viewerUserId
-                const label = isViewer
-                  ? 'You'
-                  : row.display_name || (row.handle ? `@${row.handle}` : 'Member')
-                const sub = !isViewer && row.display_name && row.handle
-                  ? `@${row.handle.replace(/^@/, '')}`
-                  : null
+                +
+              </button>
+              {emojiSummaries.map(({ emoji, count }) => {
+                const iReacted = viewerReactedEmojis.has(emoji)
                 return (
-                  <li key={`${row.user_id}-${row.emoji}-${row.created_at}`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isViewer) onToggleReaction(row.emoji)
-                      }}
-                      disabled={!isViewer}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left touch-manipulation ${
-                        isViewer ? 'active:bg-zinc-800/80' : 'cursor-default'
-                      }`}
-                    >
-                      {row.avatar_url ? (
-                        <img
-                          src={row.avatar_url}
-                          alt=""
-                          className="h-11 w-11 shrink-0 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-zinc-700 text-[15px] font-bold text-zinc-300">
-                          {(label.replace(/^@/, '')[0] || '?').toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[15px] font-semibold text-zinc-100">{label}</div>
-                        {sub ? (
-                          <div className="truncate text-[13px] text-zinc-500">{sub}</div>
-                        ) : null}
-                      </div>
-                      <ReactionGlyph emoji={row.emoji} liked className="shrink-0" />
-                    </button>
-                  </li>
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onToggleReaction(emoji)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 touch-manipulation transition-colors ${
+                      iReacted
+                        ? 'border-cyan-500/50 bg-cyan-500/15'
+                        : 'border-zinc-700/80 bg-zinc-900/80 active:bg-zinc-800'
+                    }`}
+                    aria-label={iReacted ? `Remove ${emoji} reaction` : `React with ${emoji}`}
+                    aria-pressed={iReacted}
+                  >
+                    <ReactionGlyph emoji={emoji} liked={iReacted} />
+                    <span className="text-[13px] font-semibold text-zinc-300">{count}</span>
+                  </button>
                 )
               })}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
-  )
-}
+            </div>
 
-function FilterChip({ active, onClick, children, label }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 touch-manipulation transition-colors ${
-        active
-          ? 'border-cyan-500/50 bg-cyan-500/15'
-          : 'border-zinc-700/80 bg-zinc-900/80 active:bg-zinc-800'
-      }`}
-    >
-      {label ? (
-        <span className="text-[13px] font-semibold text-zinc-200">{label}</span>
-      ) : (
-        children
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2">
+              {loading ? (
+                <div className="py-10 text-center text-[14px] text-zinc-500">Loading…</div>
+              ) : err ? (
+                <div className="mx-2 py-8 text-center text-[14px] text-rose-300">{err}</div>
+              ) : rows.length === 0 ? (
+                <div className="py-10 text-center text-[14px] text-zinc-500">No reactions yet.</div>
+              ) : (
+                <ul className="divide-y divide-zinc-800/70">
+                  {rows.map((row) => {
+                    const isViewer = row.user_id === viewerUserId
+                    const label = isViewer
+                      ? 'You'
+                      : row.display_name || (row.handle ? `@${row.handle}` : 'Member')
+                    const sub = !isViewer && row.display_name && row.handle
+                      ? `@${row.handle.replace(/^@/, '')}`
+                      : null
+                    return (
+                      <li key={`${row.user_id}-${row.emoji}-${row.created_at}`}>
+                        <div className="flex w-full items-center gap-3 px-3 py-3">
+                          {row.avatar_url ? (
+                            <img src={row.avatar_url} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+                          ) : (
+                            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-zinc-700 text-[15px] font-bold text-zinc-300">
+                              {(label.replace(/^@/, '')[0] || '?').toUpperCase()}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[15px] font-semibold text-zinc-100">{label}</div>
+                            {sub ? <div className="truncate text-[13px] text-zinc-500">{sub}</div> : null}
+                          </div>
+                          <ReactionGlyph emoji={row.emoji} liked className="shrink-0" />
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
-    </button>
+      {emojiPickerOpen && createPortal(
+        <ChatEmojiPicker
+          onSelect={(emoji) => { onToggleReaction(emoji); setEmojiPickerOpen(false) }}
+          onClose={() => setEmojiPickerOpen(false)}
+        />,
+        document.body,
+      )}
+    </>
   )
 }
 
