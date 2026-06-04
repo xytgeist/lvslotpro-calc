@@ -936,8 +936,10 @@ function PinIcon({ filled = false }) {
 // ── Circular upload-progress ring ─────────────────────────────────────────
 
 // SVG uses a 1:1 coordinate space (no viewBox scaling) for simplicity.
-const RING_R  = 39          // SVG circle radius (px)
-const RING_C  = 2 * Math.PI * RING_R  // circumference ≈ 245.0
+// RING_R is tuned so the arc's inner edge sits ~1 px outside the wheel image edge.
+// Wheel: 65 px → radius 32.5 px. Inner edge = RING_R − strokeWidth/2 = 33.5 → RING_R = 36.
+const RING_R  = 36          // SVG circle radius (px)
+const RING_C  = 2 * Math.PI * RING_R  // circumference ≈ 226.2
 
 /**
  * Centered scrim + circular progress ring shown over a video tile while the
@@ -954,19 +956,19 @@ function VideoUploadRing({ progress }) {
         {/* Progress ring — 1:1 SVG, rotated so arc starts at 12 o'clock */}
         <svg width="100" height="100" viewBox="0 0 100 100" className="absolute inset-0 -rotate-90" aria-hidden>
           {/* Track */}
-          <circle cx="50" cy="50" r={RING_R} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="5.5" />
-          {/* Progress arc — black with a white glow so it reads on the dark scrim */}
+          <circle cx="50" cy="50" r={RING_R} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="5" />
+          {/* Progress arc — white */}
           <circle
             cx="50" cy="50" r={RING_R}
             fill="none"
-            stroke="#000000"
-            strokeWidth="5.5"
+            stroke="#ffffff"
+            strokeWidth="5"
             strokeLinecap="round"
             strokeDasharray={RING_C}
             strokeDashoffset={offset}
             style={{
               transition: 'stroke-dashoffset 0.35s ease',
-              filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.85)) drop-shadow(0 0 2px rgba(255,255,255,1))',
+              filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.6))',
             }}
           />
         </svg>
