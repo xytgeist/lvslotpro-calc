@@ -8,6 +8,9 @@
 
 begin;
 
+-- Drop first so we can freely change parameter defaults / volatility
+DROP FUNCTION IF EXISTS public.chat_rooms_for_user(uuid);
+
 CREATE OR REPLACE FUNCTION public.chat_rooms_for_user(p_user_id uuid)
 RETURNS TABLE (
   id                     uuid,
