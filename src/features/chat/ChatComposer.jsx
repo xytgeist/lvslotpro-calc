@@ -261,15 +261,39 @@ export default function ChatComposer({
     enqueueImageFiles(files)
   }
 
-  const handlePaste = useCallback((e) => {
+  const handlePaste = useCallback(async (e) => {
+    // Path 1: standard paste event — works on iOS and desktop Chrome
     const items = Array.from(e.clipboardData?.items || [])
     const imageFiles = items
       .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
       .map((item) => item.getAsFile())
       .filter(Boolean)
-    if (!imageFiles.length) return
-    e.preventDefault()
-    enqueueImageFiles(imageFiles)
+    if (imageFiles.length) {
+      e.preventDefault()
+      enqueueImageFiles(imageFiles)
+      return
+    }
+
+    // Path 2: Clipboard API fallback — needed for Android Chrome where native-app
+    // images aren't exposed through clipboardData.items.
+    // Chrome will prompt for "clipboard-read" permission on first use.
+    if (!navigator.clipboard?.read) return
+    try {
+      const clipItems = await navigator.clipboard.read()
+      const files = []
+      for (const item of clipItems) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type)
+            const ext = type.split('/')[1]?.replace('jpeg', 'jpg') || 'png'
+            files.push(new File([blob], `paste.${ext}`, { type }))
+          }
+        }
+      }
+      if (files.length) enqueueImageFiles(files)
+    } catch {
+      // Permission denied or API not available — silently ignore
+    }
   }, [enqueueImageFiles])
 
   const handleKlipyGifPick = ({ gifUrl }) => {
