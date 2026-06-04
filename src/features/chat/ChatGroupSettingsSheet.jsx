@@ -289,6 +289,8 @@ export default function ChatGroupSettingsSheet({
     ? `Until ${new Date(room.muted_until).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
     : 'Off'
 
+  const scrollTopInset = 'calc(env(safe-area-inset-top, 0px) + 3.75rem)'
+
   const settingsPortal = open ? createPortal(
     <div className="fixed inset-0 z-[95] flex flex-col bg-zinc-950" data-chat-feature>
 
@@ -350,12 +352,17 @@ export default function ChatGroupSettingsSheet({
         </div>
       </div>
 
-      {/* Scroll body — content slides under fixed chrome */}
-      <div
-        ref={scrollBodyRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-10"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3.75rem)' }}
-      >
+      {/* Scroll body — content slides under fixed chrome + top fade */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div
+          className="chat-info-top-fade pointer-events-none absolute inset-x-0 top-0 z-10"
+          style={{ height: scrollTopInset }}
+        />
+        <div
+          ref={scrollBodyRef}
+          className="min-h-0 h-full overflow-y-auto overscroll-y-contain pb-10"
+          style={{ paddingTop: scrollTopInset }}
+        >
 
         {err ? (
           <div className="mx-4 mt-3 rounded-xl border border-rose-500/30 bg-rose-950/30 px-3 py-2.5 text-[13px] text-rose-300">
@@ -679,6 +686,7 @@ export default function ChatGroupSettingsSheet({
             Leave Group
           </button>
         </div>
+      </div>
       </div>
     </div>,
     document.body,

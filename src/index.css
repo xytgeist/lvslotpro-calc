@@ -2401,6 +2401,44 @@ html.light .chat-top-gradient {
   );
 }
 
+/* Group / DM info sheets — soft top fade with minimal blur */
+.chat-info-top-fade {
+  backdrop-filter: blur(2px) saturate(120%);
+  -webkit-backdrop-filter: blur(2px) saturate(120%);
+  background: linear-gradient(
+    to bottom,
+    rgba(3, 7, 18, 0.52)   0%,
+    rgba(3, 7, 18, 0.46)  12%,
+    rgba(3, 7, 18, 0.38)  24%,
+    rgba(3, 7, 18, 0.30)  36%,
+    rgba(3, 7, 18, 0.22)  47%,
+    rgba(3, 7, 18, 0.14)  57%,
+    rgba(3, 7, 18, 0.08)  67%,
+    rgba(3, 7, 18, 0.04)  76%,
+    rgba(3, 7, 18, 0.015) 86%,
+    rgba(3, 7, 18, 0.004) 94%,
+    transparent           100%
+  );
+}
+html.light .chat-info-top-fade {
+  backdrop-filter: blur(2px) saturate(110%);
+  -webkit-backdrop-filter: blur(2px) saturate(110%);
+  background: linear-gradient(
+    to bottom,
+    rgba(245, 246, 252, 0.52)   0%,
+    rgba(245, 246, 252, 0.46)  12%,
+    rgba(245, 246, 252, 0.38)  24%,
+    rgba(245, 246, 252, 0.30)  36%,
+    rgba(245, 246, 252, 0.22)  47%,
+    rgba(245, 246, 252, 0.14)  57%,
+    rgba(245, 246, 252, 0.08)  67%,
+    rgba(245, 246, 252, 0.04)  76%,
+    rgba(245, 246, 252, 0.015) 86%,
+    rgba(245, 246, 252, 0.004) 94%,
+    transparent                100%
+  );
+}
+
 .chat-menu-glass {
   background: rgba(20, 22, 40, 0.25);
   backdrop-filter: blur(24px) saturate(180%);
