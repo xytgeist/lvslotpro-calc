@@ -174,6 +174,12 @@ export default function ChatGroupSettingsSheet({
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file || !isOwner) return
+    const isGif = file.type === 'image/gif'
+    const maxBytes = isGif ? 8 * 1024 * 1024 : 10 * 1024 * 1024
+    if (file.size > maxBytes) {
+      setErr(isGif ? 'GIF must be under 8 MB.' : 'Image must be under 10 MB.')
+      return
+    }
     setBusy(true)
     setErr('')
     try {
@@ -281,7 +287,7 @@ export default function ChatGroupSettingsSheet({
                 onClick={() => avatarInputRef.current?.click()}
                 className="text-[13px] font-semibold text-cyan-400 touch-manipulation active:opacity-70 disabled:opacity-40"
               >
-                {busy ? 'Uploading…' : room.avatar_url ? 'Change photo' : 'Set group photo'}
+                {busy ? 'Uploading…' : room.avatar_url ? 'Change photo or GIF' : 'Set photo or GIF'}
               </button>
               {room.avatar_url ? (
                 <>
