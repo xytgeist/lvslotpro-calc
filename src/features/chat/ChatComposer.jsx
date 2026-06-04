@@ -84,20 +84,6 @@ export default function ChatComposer({
   const [videoUploadStatus, setVideoUploadStatus] = useState(/** @type {{ progress: number, status: string, detail: string, attempt: number }|null} */ (null))
   const [videoMeta, setVideoMeta] = useState(/** @type {{ uid: string, posterUrl: string, localPoster: string|null, width: number|null, height: number|null }|null} */ (null))
   const videoAbortRef = useRef(/** @type {AbortController|null} */ (null))
-  /** Resolves when the background upload (post-send) is complete or has failed. */
-  const videoUploadPromiseRef = useRef(/** @type {Promise<void>|null} */ (null))
-  /**
-   * Monotonically-increasing counter.  Each new encode/upload run captures the current
-   * value as `myGen`.  All state-setter calls inside that run are gated on
-   * `videoUploadGenRef.current === myGen`, so Send (which increments the counter) silences
-   * the old closure without aborting the upload promise itself.
-   */
-  const videoUploadGenRef = useRef(0)
-  /**
-   * Progress bus for the current upload.  Set in handleCropConfirm, read in handleSend.
-   * ChatConversation subscribes to it to relay progress into the chat bubble.
-   */
-  const videoCurrentBusRef = useRef(/** @type {{ subscribe: (fn: Function) => void }|null} */ (null))
 
   const textareaRef    = useRef(null)
   const inputWrapRef   = useRef(null)
@@ -106,10 +92,8 @@ export default function ChatComposer({
   const plusBtnRef     = useRef(null)
 
   const hasContent = body.trim().length > 0 || imageSlots.length > 0 || videoMeta !== null
-  // Block send only while upload is running AND we don't yet have a uid (encoding / first tus chunk).
-  // Once uid is minted (videoMeta set) the send button unlocks — upload continues in background.
   const videoUploading = videoUploadStatus !== null
-  const canSend = !disabled && !sending && hasContent && !(videoUploading && videoMeta === null)
+  const canSend = !disabled && !sending && hasContent && !videoUploading
 
   useEffect(() => {
     if (!footerHost) setComposerActive(true)
@@ -458,25 +442,7 @@ export default function ChatComposer({
 
     setUploadErr('')
     setVideoMeta(null)
-    videoUploadPromiseRef.current = null
-
-    // Each upload run gets its own generation number.  All composer state-setter
-    // calls below are gated on this value.  handleSend increments the counter to
-    // silence these callbacks without aborting the upload itself.
-    const myGen = ++videoUploadGenRef.current
-
-    // Helpers that only fire if this upload run is still the active one.
-    const guardStatus = (s) => { if (videoUploadGenRef.current === myGen) setVideoUploadStatus(s) }
-    const guardMeta   = (m) => { if (videoUploadGenRef.current === myGen) setVideoMeta(m) }
-
-    // Progress bus: ChatConversation subscribes after Send to relay % into the bubble.
-    const progressListeners = []
-    const progressBus = { subscribe: (fn) => progressListeners.push(fn) }
-    videoCurrentBusRef.current = progressBus
-
-    const notifyProgress = (s) => progressListeners.forEach((fn) => fn(s))
-
-    guardStatus({ progress: 0, status: 'Reading video…', detail: '', attempt: 1 })
+    setVideoUploadStatus({ progress: 0, status: 'Reading video…', detail: '', attempt: 1 })
 
     const abortCtrl = new AbortController()
     videoAbortRef.current = abortCtrl
@@ -492,70 +458,49 @@ export default function ChatComposer({
       localPoster = p
     })
 
-    const uploadPromise = (async () => {
-      try {
-        const encodedFile = await encodeComposerVideoFileFromSpec({
-          signal: abortCtrl.signal,
-          spec: { kind: 'direct', file: trimmedFile },
-          onProgress: ({ progress, status, detail, attempt }) => {
-            const s = { progress, status, detail: detail || '', attempt }
-            guardStatus(s)
-            notifyProgress(s)
-          },
-        })
+    try {
+      const encodedFile = await encodeComposerVideoFileFromSpec({
+        signal: abortCtrl.signal,
+        spec: { kind: 'direct', file: trimmedFile },
+        onProgress: ({ progress, status, detail, attempt }) => {
+          setVideoUploadStatus({ progress, status, detail: detail || '', attempt })
+        },
+      })
 
-        if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError')
+      if (abortCtrl.signal.aborted) return
 
-        // skipManifestWait: chat doesn't need to block on CF encoding.
-        const { streamVideoUid: uid } = await uploadEncodedVideoToCfStreamWithRetries({
-          supabaseClient,
-          signal: abortCtrl.signal,
-          uploadFile: encodedFile,
-          skipManifestWait: true,
-          onProgress: ({ progress, status, detail, attempt }) => {
-            const s = { progress, status, detail: detail || '', attempt }
-            guardStatus(s)
-            notifyProgress(s)
-          },
-          onStreamUidAvailable: (id) => {
-            guardMeta({
-              uid: id,
-              posterUrl: cfStreamPosterUrl(id),
-              localPoster,
-              width: dims?.width ?? null,
-              height: dims?.height ?? null,
-            })
-          },
-        })
+      const { streamVideoUid: uid } = await uploadEncodedVideoToCfStreamWithRetries({
+        supabaseClient,
+        signal: abortCtrl.signal,
+        uploadFile: encodedFile,
+        onProgress: ({ progress, status, detail, attempt }) => {
+          setVideoUploadStatus({ progress, status, detail: detail || '', attempt })
+        },
+      })
 
-        await posterCapturePromise
-        guardMeta({
-          uid,
-          posterUrl: cfStreamPosterUrl(uid),
-          localPoster,
-          width: dims?.width ?? null,
-          height: dims?.height ?? null,
-        })
-        guardStatus(null)
-        notifyProgress({ progress: 1, status: 'Done', detail: '', attempt: 1 })
-      } catch (e) {
-        if (e?.name === 'AbortError') return
-        guardStatus(null)
-        guardMeta(null)
-        videoAbortRef.current = null
-        if (videoUploadGenRef.current === myGen) setUploadErr(e?.message || 'Video upload failed.')
-      }
-    })()
-
-    videoUploadPromiseRef.current = uploadPromise
-    await uploadPromise
+      await posterCapturePromise
+      setVideoMeta({
+        uid,
+        posterUrl: cfStreamPosterUrl(uid),
+        localPoster,
+        width: dims?.width ?? null,
+        height: dims?.height ?? null,
+      })
+      setVideoUploadStatus(null)
+      videoAbortRef.current = null
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+      setVideoUploadStatus(null)
+      setVideoMeta(null)
+      videoAbortRef.current = null
+      setUploadErr(e?.message || 'Video upload failed.')
+    }
   }, [supabaseClient])
 
   const removeVideo = useCallback(() => {
     if (videoMeta?.localPoster) URL.revokeObjectURL(videoMeta.localPoster)
     videoAbortRef.current?.abort()
     videoAbortRef.current = null
-    videoUploadPromiseRef.current = null
     setVideoMeta(null)
     setVideoUploadStatus(null)
   }, [videoMeta])
@@ -594,23 +539,13 @@ export default function ChatComposer({
       .map((s) => uploadPromisesRef.current.get(s.id))
       .filter(Boolean)
 
-    // Snapshot everything before clearing.
-    // pendingVideoUpload is the raw Promise — it resolves/rejects regardless of the
-    // gen counter, so ChatConversation can still await it to clear _finalizingMedia.
-    const pendingVideoUpload = videoUploadStatus !== null ? videoUploadPromiseRef.current : null
-    // videoProgressBus lets ChatConversation subscribe to live % updates after Send.
-    const videoProgressBus = pendingVideoUpload ? videoCurrentBusRef.current : null
-
     const snapshot = {
       body: body.trim(),
       imageUrls: readyUrls,
       previewUrls,
       pendingUploads,
-      pendingVideoUpload,
-      videoProgressBus,
       streamVideoUid:    videoMeta?.uid    ?? null,
       streamPosterUrl:   videoMeta?.posterUrl ?? null,
-      localVideoPoster:  videoMeta?.localPoster ?? null,
       streamVideoWidth:  videoMeta?.width  ?? null,
       streamVideoHeight: videoMeta?.height ?? null,
       replyToMessageId: replyTarget?.id ?? null,
@@ -619,22 +554,18 @@ export default function ChatComposer({
     // Only refocus if already focused (keyboard already up)
     const wasTextareaFocused = document.activeElement === textareaRef.current
 
-    // Increment generation — silences the running upload's guardStatus / guardMeta
-    // callbacks so they no longer write back into the composer UI.  The upload
-    // Promise itself is unaffected and keeps running; ChatConversation holds the ref.
-    videoUploadGenRef.current++
-    videoCurrentBusRef.current = null
+    // Video is fully encoded before send — revoke the local poster blob.
+    if (videoMeta?.localPoster) {
+      try { URL.revokeObjectURL(videoMeta.localPoster) } catch { /* ignore */ }
+    }
 
     // Clear composer immediately.
-    // NOTE: do NOT revoke localPoster here — it was passed as stream_poster_url on the
-    // optimistic message and ChatMediaImage needs it until the CF URL loads.
     setBody('')
     if (textareaRef.current) textareaRef.current.innerText = ''
     setImageSlots([])
     uploadPromisesRef.current.clear()
     setVideoMeta(null)
     setVideoUploadStatus(null)
-    videoUploadPromiseRef.current = null
     onClearReply()
     if (wasTextareaFocused) {
       try {
@@ -652,7 +583,7 @@ export default function ChatComposer({
     } finally {
       setSending(false)
     }
-  }, [canSend, body, imageSlots, videoMeta, videoUploadStatus, replyTarget, onSend, onClearReply])
+  }, [canSend, body, imageSlots, videoMeta, replyTarget, onSend, onClearReply])
 
   const handleKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -867,9 +798,6 @@ export default function ChatComposer({
                     style={{ width: `${Math.round(videoUploadStatus.progress * 100)}%` }}
                   />
                 </div>
-                {videoMeta !== null && (
-                  <div className="mt-1 text-[11px] text-cyan-400">Ready to send ↑ upload continues</div>
-                )}
               </>
             ) : (
               <div className="text-[12px] text-zinc-400">Video ready</div>

@@ -947,11 +947,6 @@ export default function ChatConversation({
                   // preview URLs so the media grid never disappears mid-upload.
                   image_urls: row.image_urls?.length > 0 ? row.image_urls : existing.image_urls,
                   _finalizingMedia: existing._finalizingMedia,
-                  // Keep any live progress tracking fields from the optimistic message.
-                  _videoUploadProgress: existing._videoUploadProgress,
-                  // Keep the local blob poster until ChatMediaImage swaps it for the
-                  // CF URL once that URL becomes reachable (CF may still be processing).
-                  stream_poster_url: existing.stream_poster_url || row.stream_poster_url || null,
                 }
                 return next
               }
@@ -1134,7 +1129,7 @@ export default function ChatConversation({
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const handleSend = useCallback(async ({ body, imageUrls, previewUrls, pendingUploads, pendingVideoUpload = null, videoProgressBus = null, streamVideoUid = null, streamPosterUrl = null, localVideoPoster = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
+  const handleSend = useCallback(async ({ body, imageUrls, previewUrls, pendingUploads, streamVideoUid = null, streamPosterUrl = null, streamVideoWidth = null, streamVideoHeight = null, replyToMessageId }) => {
     // If user is viewing history, jump to live end before sending
     if (hasNewerRef.current) {
       await new Promise((resolve) => {
@@ -1160,7 +1155,6 @@ export default function ChatConversation({
     const displayUrls = (previewUrls?.length ? previewUrls : imageUrls) || []
     const readyUrls   = imageUrls || []
     const hasImages   = displayUrls.length > 0
-    const hasPendingVideo = pendingVideoUpload != null
 
     // One optimistic placeholder for all message types.
     // _key is set to tempId and NEVER changes — React never unmounts the bubble.
@@ -1170,10 +1164,9 @@ export default function ChatConversation({
       _key: tempId,
       body,
       image_urls: displayUrls,
-      _finalizingMedia: hasImages || hasPendingVideo,
+      _finalizingMedia: hasImages,
       stream_video_uid:    streamVideoUid    || null,
-      // Use local blob poster during optimistic phase; real CF URL arrives via Realtime.
-      stream_poster_url:   localVideoPoster  || streamPosterUrl || null,
+      stream_poster_url:   streamPosterUrl   || null,
       stream_video_width:  streamVideoWidth  ?? null,
       stream_video_height: streamVideoHeight ?? null,
       sender_id: viewerUserId,
@@ -1185,18 +1178,6 @@ export default function ChatConversation({
     }])
     pinTailAfterMutation()
 
-    // Subscribe to video upload progress immediately so the bubble shows live %.
-    // We use a mutable ref-like object so the subscription can target the real
-    // messageId once chatSendMessage resolves (before that, tempId is used).
-    const activeMsgId = { current: tempId }
-    if (hasPendingVideo && videoProgressBus) {
-      videoProgressBus.subscribe(({ progress }) => {
-        setMessages((prev) => prev.map((m) =>
-          m.id === activeMsgId.current ? { ...m, _videoUploadProgress: progress } : m
-        ))
-      })
-    }
-
     try {
       const res = await chatSendMessage(supabaseClient, {
         roomId: room.id, body,
@@ -1206,7 +1187,6 @@ export default function ChatConversation({
       })
       const messageId = res?.message_id
       if (messageId) {
-        activeMsgId.current = messageId
         setMessages((prev) => {
           if (prev.some((m) => m.id === messageId)) {
             // Realtime INSERT already swapped our optimistic in-place — nothing to do
@@ -1243,46 +1223,6 @@ export default function ChatConversation({
         })
       }
 
-      // Background: await video upload completion — then poll for CF encoding readiness
-      // before clearing _finalizingMedia so the user can't tap into an unready video.
-      if (hasPendingVideo && messageId && pendingVideoUpload) {
-        const clearVideoProgress = (extra = {}) => {
-          setMessages((prev) => prev.map((m) =>
-            (m.id === messageId || m.id === tempId) && m.stream_video_uid
-              ? { ...m, _finalizingMedia: false, _videoUploadProgress: undefined, ...extra }
-              : m
-          ))
-        }
-        Promise.resolve(pendingVideoUpload).then(async () => {
-          // TUS upload done — drop the progress ring (% goes away) but keep the
-          // _finalizingMedia overlay (generic spinner) while Cloudflare encodes.
-          setMessages((prev) => prev.map((m) =>
-            (m.id === messageId || m.id === tempId)
-              ? { ...m, _videoUploadProgress: undefined }
-              : m
-          ))
-
-          // Poll the CF poster thumbnail URL — it 404s until encoding is done.
-          if (streamVideoUid) {
-            const posterUrl = `https://videodelivery.net/${streamVideoUid}/thumbnails/thumbnail.jpg?height=200&fit=crop`
-            const MAX_POLL = 40  // ≤ ~5 min total
-            for (let i = 0; i < MAX_POLL; i++) {
-              try {
-                const res = await fetch(posterUrl, { method: 'HEAD', cache: 'no-cache' })
-                if (res.ok) break
-              } catch { /* network hiccup — keep polling */ }
-              if (i < MAX_POLL - 1) {
-                await new Promise((r) => setTimeout(r, Math.min(10_000, 3000 + i * 1500)))
-              }
-            }
-          }
-
-          clearVideoProgress()
-        }).catch((e) => {
-          console.error('[Chat] video upload failed after send', e?.message)
-          clearVideoProgress({ _videoUploadFailed: true })
-        })
-      }
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
       throw err
