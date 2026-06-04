@@ -946,9 +946,14 @@ const GRID_MAX_VISIBLE = 4
 
 /**
  * Displays an image while seamlessly transitioning from a blob preview URL to
- * a permanent R2 URL.  The blob stays visible until the R2 image has fully
- * loaded in a hidden Image(), then the src swaps — zero blank flash.
- * The blob URL is revoked only after the swap.
+ * a permanent URL (R2, CF thumbnails, etc.).  The blob stays visible until the
+ * remote image has fully loaded in a hidden Image(), then the src swaps — zero
+ * blank flash.  The blob URL is revoked only after a successful swap.
+ *
+ * On load error the swap does NOT happen; instead we retry with exponential
+ * backoff (2 s → 4 s → 8 s → 16 s → 30 s).  This keeps the blob visible while
+ * Cloudflare finishes generating the poster thumbnail, and prevents the "broken
+ * image → layout collapse" issue for slow-processing videos.
  */
 function ChatMediaImage({ src, className }) {
   const [displaySrc, setDisplaySrc] = useState(src)
@@ -964,24 +969,43 @@ function ChatMediaImage({ src, className }) {
       return
     }
 
-    // Real URL arriving — preload off-screen, swap only when ready
-    const img = new window.Image()
-    img.onload = () => {
-      const old = displaySrcRef.current
-      displaySrcRef.current = src
-      setDisplaySrc(src)
-      if (old?.startsWith('blob:')) {
-        try { URL.revokeObjectURL(old) } catch { /* ignore */ }
-      }
-    }
-    img.onerror = () => {
-      // Load failed but swap anyway so we don't stay on revoked blob forever
-      displaySrcRef.current = src
-      setDisplaySrc(src)
-    }
-    img.src = src
+    // Remote URL arriving — preload off-screen; retry on failure.
+    let cancelled = false
+    let retryTimer = null
+    let attempt = 0
+    const MAX_RETRIES = 5
 
-    return () => { img.onload = null; img.onerror = null }
+    const tryLoad = () => {
+      if (cancelled) return
+      const img = new window.Image()
+      img.onload = () => {
+        if (cancelled) return
+        const old = displaySrcRef.current
+        displaySrcRef.current = src
+        setDisplaySrc(src)
+        if (old?.startsWith('blob:')) {
+          try { URL.revokeObjectURL(old) } catch { /* ignore */ }
+        }
+      }
+      img.onerror = () => {
+        if (cancelled) return
+        if (attempt < MAX_RETRIES) {
+          attempt++
+          // Exponential backoff: 2s, 4s, 8s, 16s, 30s
+          const delay = Math.min(2000 * Math.pow(2, attempt - 1), 30_000)
+          retryTimer = setTimeout(tryLoad, delay)
+        }
+        // On max retries keep current displaySrc — never show a broken image.
+      }
+      img.src = src
+    }
+
+    tryLoad()
+
+    return () => {
+      cancelled = true
+      clearTimeout(retryTimer)
+    }
   }, [src])
 
   return <img src={displaySrc} alt="" className={className} />

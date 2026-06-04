@@ -947,6 +947,11 @@ export default function ChatConversation({
                   // preview URLs so the media grid never disappears mid-upload.
                   image_urls: row.image_urls?.length > 0 ? row.image_urls : existing.image_urls,
                   _finalizingMedia: existing._finalizingMedia,
+                  // Keep any live progress tracking fields from the optimistic message.
+                  _videoUploadProgress: existing._videoUploadProgress,
+                  // Keep the local blob poster until ChatMediaImage swaps it for the
+                  // CF URL once that URL becomes reachable (CF may still be processing).
+                  stream_poster_url: existing.stream_poster_url || row.stream_poster_url || null,
                 }
                 return next
               }
