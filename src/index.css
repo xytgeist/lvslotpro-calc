@@ -65,6 +65,12 @@ html.light [data-chat-feature] .chat-bubble-surface.text-white * {
   color: #ffffff !important;
 }
 
+/* Light mode: incoming tail must match the remapped bg-zinc-800/90 bubble color.
+   The SVG fill attribute is hardcoded for dark mode; CSS fill overrides it in light. */
+html.light [data-chat-feature] .chat-bubble-tail-incoming {
+  fill: rgba(228, 228, 231, 0.9);
+}
+
 /* Edge scroll shell: dark = gray-950 canvas (#030712); light = remapped zinc-950 (#fafafa) */
 html:not(.light) [data-edge-scroll-shell] {
   background-color: #030712 !important;

@@ -609,7 +609,7 @@ export default function ChatBubble({
                 style={{ bottom: 0, left: 0, overflow: 'visible', width: 12, height: 12 }}
                 aria-hidden
               >
-                <path d="M0 12 L0 0 Q0 12 -12 12 Z" fill="rgba(39,39,42,0.9)" />
+                <path className="chat-bubble-tail-incoming" d="M0 12 L0 0 Q0 12 -12 12 Z" fill="rgba(39,39,42,0.9)" />
               </svg>
             )}
             {isMine && isGroupEnd && !isDeleted && (
