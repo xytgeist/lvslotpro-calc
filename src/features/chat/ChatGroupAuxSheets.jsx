@@ -242,29 +242,26 @@ export function ChatGroupMediaSheet({ open, onBack, supabaseClient, roomId, onJu
   const [docs, setDocs] = useState(/** @type {any[]} */ ([]))
   const [loading, setLoading] = useState(false)
   const [loadErr, setLoadErr] = useState('')
+  const [linksErr, setLinksErr] = useState('')
 
   useEffect(() => {
     if (!open) return
     setLoading(true)
     setLoadErr('')
+    setLinksErr('')
     void (async () => {
-      try {
-        const [m, l, d] = await Promise.all([
-          chatRoomSharedMedia(supabaseClient, roomId),
-          chatRoomSharedLinks(supabaseClient, roomId, { docsOnly: false }),
-          chatRoomSharedLinks(supabaseClient, roomId, { docsOnly: true }),
-        ])
-        setMedia(m)
-        setLinks(l)
-        setDocs(d)
-      } catch (e) {
-        setMedia([])
-        setLinks([])
-        setDocs([])
-        setLoadErr(e?.message || 'Failed to load.')
-      } finally {
-        setLoading(false)
-      }
+      const mediaP = chatRoomSharedMedia(supabaseClient, roomId)
+        .then((m) => { setMedia(m); return m })
+        .catch((e) => { setMedia([]); setLoadErr(e?.message || 'Failed to load media.'); return [] })
+      const linksP = chatRoomSharedLinks(supabaseClient, roomId, { docsOnly: false })
+        .then((l) => { setLinks(l); return l })
+        .catch((e) => { setLinks([]); setLinksErr(e?.message || 'Failed to load links.'); return [] })
+      const docsP = chatRoomSharedLinks(supabaseClient, roomId, { docsOnly: true })
+        .then((d) => { setDocs(d); return d })
+        .catch((e) => { setDocs([]); setLinksErr((prev) => prev || e?.message || 'Failed to load docs.'); return [] })
+
+      await Promise.all([mediaP, linksP, docsP])
+      setLoading(false)
     })()
   }, [open, roomId, supabaseClient])
 
@@ -288,8 +285,10 @@ export function ChatGroupMediaSheet({ open, onBack, supabaseClient, roomId, onJu
           </button>
         ))}
       </div>
-      {loadErr ? (
+      {loadErr && tab === 'media' ? (
         <p className="text-[13px] text-rose-400">{loadErr}</p>
+      ) : linksErr && tab !== 'media' ? (
+        <p className="text-[13px] text-rose-400">{linksErr}</p>
       ) : loading ? (
         <p className="text-[13px] text-zinc-500">Loading…</p>
       ) : tab === 'media' ? (
