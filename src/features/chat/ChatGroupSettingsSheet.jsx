@@ -276,7 +276,7 @@ export default function ChatGroupSettingsSheet({
           {/* Avatar */}
           <div>
             {isOwner && (
-              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={onPickAvatar} />
+              <input ref={avatarInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickAvatar} />
             )}
             <ChatGroupHeaderStack
               groupAvatarUrl={room.avatar_url}

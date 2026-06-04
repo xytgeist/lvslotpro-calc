@@ -1929,6 +1929,7 @@ export default function LoungeProfileFullScreen({
                       ref={avatarInputRef}
                       type="file"
                       accept="image/*"
+                      multiple
                       className="hidden"
                       onChange={(ev) => onPickAvatar(ev)}
                     />
