@@ -187,6 +187,9 @@ export default function ChatConversation({
   /** Bottom inset for the scroll list — matches floating transparent composer height. */
   const [composerInsetPx, setComposerInsetPx] = useState(72)
   const openScrollPendingRef = useRef(true)
+  /** When set, open/tail pin handlers must not scroll to the latest message. */
+  const pendingJumpMessageIdRef = useRef(/** @type {string | null} */ (null))
+  const jumpScrollTimersRef = useRef(/** @type {number[]} */ ([]))
   const [composerFocused, setComposerFocused] = useState(false)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(IS_IOS)
   const { overlapPx: kbOverlapPx, targetPx: kbOverlapTargetPx } = useLoungeKeyboardOverlapPx(true, {
@@ -352,12 +355,37 @@ export default function ChatConversation({
   }, [isGroupOwner, supabaseClient, room.id])
 
   const scrollMessageIntoView = useCallback((messageId) => {
-    requestAnimationFrame(() => {
+    if (!messageId) return
+    for (const id of jumpScrollTimersRef.current) window.clearTimeout(id)
+    jumpScrollTimersRef.current = []
+
+    pendingJumpMessageIdRef.current = messageId
+    openScrollPendingRef.current = false
+    atBottomRef.current = false
+    setIsAtBottom(false)
+
+    const run = () => {
       const el = listRef.current?.querySelector(`[data-chat-message-id="${messageId}"]`)
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-      setHighlightMessageId(messageId)
-      window.setTimeout(() => setHighlightMessageId(null), 2000)
-    })
+    }
+
+    setHighlightMessageId(messageId)
+    const schedule = (fn, ms) => {
+      const id = window.setTimeout(fn, ms)
+      jumpScrollTimersRef.current.push(id)
+    }
+
+    run()
+    requestAnimationFrame(run)
+    schedule(run, 80)
+    schedule(run, 250)
+    schedule(run, 500)
+    schedule(() => {
+      if (pendingJumpMessageIdRef.current === messageId) {
+        pendingJumpMessageIdRef.current = null
+      }
+    }, 650)
+    schedule(() => setHighlightMessageId(null), 2000)
   }, [])
 
   // ── Reaction loader ───────────────────────────────────────────────────────
@@ -390,6 +418,7 @@ export default function ChatConversation({
   const jumpToMessage = useCallback(async (messageId) => {
     if (!messageId) return
     setGroupSettingsOpen(false)
+    openScrollPendingRef.current = false
     const inDom = messagesRef.current.some((m) => m.id === messageId)
     if (inDom) {
       scrollMessageIntoView(messageId)
@@ -412,7 +441,7 @@ export default function ChatConversation({
       if (ordered.length > 0) {
         await loadReactionsForMessages(ordered.map((m) => m.id))
       }
-      requestAnimationFrame(() => scrollMessageIntoView(messageId))
+      scrollMessageIntoView(messageId)
     } catch (e) {
       setError(e?.message || 'Could not open that message.')
     } finally {
@@ -539,6 +568,9 @@ export default function ChatConversation({
   // Reset thread state when switching rooms so we never scroll stale messages or skip open-tail pin.
   useEffect(() => {
     openScrollPendingRef.current = true
+    pendingJumpMessageIdRef.current = null
+    for (const id of jumpScrollTimersRef.current) window.clearTimeout(id)
+    jumpScrollTimersRef.current = []
     setLoading(true)
     setError('')
     setMessages([])
@@ -645,6 +677,7 @@ export default function ChatConversation({
 
   /** Pin tail above the composer — scroll max, then nudge if the last bubble sits below the visible band. */
   const pinListToTail = useCallback(({ force = false } = {}) => {
+    if (pendingJumpMessageIdRef.current) return
     const list = listRef.current
     if (!list) return
     const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80
@@ -756,7 +789,7 @@ export default function ChatConversation({
 
   // Land on the latest message once when a conversation finishes loading (not on every new row).
   useLayoutEffect(() => {
-    if (loading || !openScrollPendingRef.current) return
+    if (loading || !openScrollPendingRef.current || pendingJumpMessageIdRef.current) return
 
     let alive = true
     const run = () => {
@@ -793,7 +826,7 @@ export default function ChatConversation({
   // Scroll to bottom whenever messages finish loading (initial open + reload-to-latest).
   // Retry at multiple intervals to catch image/layout settling on mobile.
   useEffect(() => {
-    if (loading) return
+    if (loading || pendingJumpMessageIdRef.current) return
     const t1 = window.setTimeout(() => pinListToTail({ force: true }), 80)
     const t2 = window.setTimeout(() => pinListToTail({ force: true }), 250)
     const t3 = window.setTimeout(() => pinListToTail({ force: true }), 500)
