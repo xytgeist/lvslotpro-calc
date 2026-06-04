@@ -789,6 +789,22 @@ export default function ChatConversation({
     if (tailPinFollowRafRef.current) cancelAnimationFrame(tailPinFollowRafRef.current)
   }, [])
 
+  // Scroll to bottom whenever messages finish loading (initial open + reload-to-latest).
+  useEffect(() => {
+    if (loading) return
+    const t = window.setTimeout(() => pinListToTail({ force: true }), 80)
+    return () => window.clearTimeout(t)
+  }, [loading, pinListToTail])
+
+  // Scroll to bottom when the user returns to the app with this chat open.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') pinListToTail({ force: true })
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [pinListToTail])
+
   const measureScrolledUpCount = useCallback(() => {
     const list = listRef.current
     if (!list) return 0
