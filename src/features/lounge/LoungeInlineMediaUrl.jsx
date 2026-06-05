@@ -197,8 +197,9 @@ export function LoungeImageLightbox({
       aria-label={multi ? `Image ${idx + 1} of ${list.length}` : 'Full image'}
     >
       <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col justify-between">
+        <div className="media-lightbox-status-bar-blend" aria-hidden />
         <div
-          className={`pointer-events-auto flex shrink-0 items-center justify-between gap-2 ${LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD} pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]`}
+          className={`pointer-events-auto relative z-[1] flex shrink-0 items-center justify-between gap-2 ${LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD} pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]`}
           data-lounge-lightbox-top-chrome
           data-lounge-lightbox-no-swipe
         >

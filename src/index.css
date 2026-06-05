@@ -815,17 +815,41 @@ html.light [data-lounge-media-lightbox]:not([data-lounge-image-lightbox]) .text-
 html.light [data-lounge-image-lightbox] {
   background-color: #fafafa !important;
 }
-/* Top bar + carousel — chat-header-glass tokens (see html.light .chat-header-glass) */
+/* Top bar + carousel — white icons on glass pills (light shell + status-bar fade) */
 html.light [data-lounge-image-lightbox] [data-lounge-lightbox-top-chrome] .chat-header-glass,
 html.light [data-lounge-image-lightbox] [data-lounge-lightbox-carousel] .chat-header-glass,
 html.light [data-chat-image-lightbox] .chat-header-glass {
-  color: #52525b;
+  color: #ffffff !important;
 }
 html.light [data-lounge-image-lightbox] [data-lounge-lightbox-carousel] .text-zinc-200 {
   color: #52525b !important;
   background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+/*
+ * Light-mode image lightboxes — fade #fff into #fafafa under the iOS status bar.
+ * Solid white for one safe-area band, then linear fade over the next (2× inset tall).
+ */
+.media-lightbox-status-bar-blend {
+  display: none;
+}
+html.light [data-chat-image-lightbox] .media-lightbox-status-bar-blend,
+html.light [data-lounge-image-lightbox] .media-lightbox-status-bar-blend {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(env(safe-area-inset-top, 0px) * 2);
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    #ffffff 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
 }
 /* Interaction row — transparent pill shells (glyph colors unchanged below) */
 html.light [data-lounge-image-lightbox] [data-lounge-post-interaction-bar] [class*='bg-black'] {
