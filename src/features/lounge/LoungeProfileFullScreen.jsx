@@ -366,7 +366,10 @@ export function ProfileReplyRow({ item, postCardProps, onOpenProfileReply, profi
                 <div
                   className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} line-clamp-4 text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}
                 >
-                  {renderRichCaption(postCaption)}
+                  {renderRichCaption(postCaption, {
+                    onMentionClick: pp.onMentionClick,
+                    onHashtagClick: pp.onHashtagClick,
+                  })}
                 </div>
               ) : null}
               {feedCommentRowHasMedia(post) ? (

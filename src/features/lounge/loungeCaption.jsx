@@ -67,7 +67,11 @@ export function renderRichCaption(
           <button
             key={`rk-m-${rkRef.current++}`}
             type="button"
-            onClick={(e) => onMentionClick(handle, e)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onMentionClick(handle, e)
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
             className={`${mentionClassName} touch-manipulation [-webkit-tap-highlight-color:transparent]`}
           >
             @{handle}
@@ -98,7 +102,11 @@ export function renderRichCaption(
           <button
             key={`rk-h-${rkRef.current++}`}
             type="button"
-            onClick={(e) => onHashtagClick(tag, e)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onHashtagClick(tag, e)
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
             className={`${hashtagClassName} touch-manipulation [-webkit-tap-highlight-color:transparent]`}
           >
             {tag}

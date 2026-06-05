@@ -162,17 +162,26 @@ export default function LoungeStreamVideoLightboxChrome({
           </button>
           {caption ? (
             typeof onCaptionClick === 'function' ? (
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={(e) => {
+                  if (e.target instanceof Element && e.target.closest('button, a')) return
                   e.stopPropagation()
                   if (openProfileGateIfNeeded?.()) return
                   onCaptionClick()
                 }}
-                className={`mt-1 line-clamp-2 w-full text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS} touch-manipulation hover:opacity-90 [-webkit-tap-highlight-color:transparent]`}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  if (e.target instanceof Element && e.target.closest('button, a')) return
+                  e.preventDefault()
+                  if (openProfileGateIfNeeded?.()) return
+                  onCaptionClick()
+                }}
+                className={`mt-1 line-clamp-2 w-full text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS} touch-manipulation cursor-pointer hover:opacity-90 [-webkit-tap-highlight-color:transparent]`}
               >
                 {renderRichCaption(caption, { onMentionClick, onHashtagClick })}
-              </button>
+              </div>
             ) : (
               <div className={`mt-1 line-clamp-2 text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS}`}>
                 {renderRichCaption(caption, { onMentionClick, onHashtagClick })}

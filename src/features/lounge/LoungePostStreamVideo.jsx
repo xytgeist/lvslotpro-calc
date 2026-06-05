@@ -95,6 +95,8 @@ const CF_POSTER_RETRY_MAX = 32
 
 /** Hold HLS attach briefly after ring exit so flinger ring flicker does not reload media. */
 const RING_HLS_DETACH_HOLD_MS = 700
+/** Post detail / comment: keep HLS after a brief active demotion so slow encodes reach metadata. */
+const ACTIVE_HLS_GRACE_MS = 3200
 /** Feed/embed: attach HLS when a small fraction is visible (was 0.32 — felt slow). */
 const LAZY_ATTACH_IO_THRESHOLD = 0.04
 /** Prefetch into the scroll root so the winner can start loading before fully on screen. */
@@ -808,6 +810,53 @@ export default function LoungePostStreamVideo({
     overlay: heroOverlayZIndex,
   } = useMemo(() => resolveLoungeHeroStackZIndexes(lightboxPortalClass), [lightboxPortalClass])
   const [ringHlsHeld, setRingHlsHeld] = useState(false)
+  const activeHlsGraceEligible =
+    variant === 'detail' || variant === 'commentInline'
+  const [activeHlsGraceHeld, setActiveHlsGraceHeld] = useState(false)
+  const activeHlsGraceEndTimerRef = useRef(0)
+  useEffect(() => {
+    if (!coordinatorActive || !lazyStream || !feedAutoplayEnabled || !activeHlsGraceEligible) {
+      setActiveHlsGraceHeld(false)
+      if (activeHlsGraceEndTimerRef.current) {
+        window.clearTimeout(activeHlsGraceEndTimerRef.current)
+        activeHlsGraceEndTimerRef.current = 0
+      }
+      return undefined
+    }
+    if (isActive) {
+      setActiveHlsGraceHeld(true)
+      if (activeHlsGraceEndTimerRef.current) {
+        window.clearTimeout(activeHlsGraceEndTimerRef.current)
+        activeHlsGraceEndTimerRef.current = 0
+      }
+      return undefined
+    }
+    if (!activeHlsGraceHeld) return undefined
+    const v = videoRef.current
+    if (v && v.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      setActiveHlsGraceHeld(false)
+      return undefined
+    }
+    if (activeHlsGraceEndTimerRef.current) return undefined
+    activeHlsGraceEndTimerRef.current = window.setTimeout(() => {
+      activeHlsGraceEndTimerRef.current = 0
+      setActiveHlsGraceHeld(false)
+    }, ACTIVE_HLS_GRACE_MS)
+    return () => {
+      if (activeHlsGraceEndTimerRef.current) {
+        window.clearTimeout(activeHlsGraceEndTimerRef.current)
+        activeHlsGraceEndTimerRef.current = 0
+      }
+    }
+  }, [
+    activeHlsGraceEligible,
+    activeHlsGraceHeld,
+    coordinatorActive,
+    feedAutoplayEnabled,
+    isActive,
+    lazyStream,
+    streamAttachKey,
+  ])
   useEffect(() => {
     if (!coordinatorActive || !lazyStream) {
       setRingHlsHeld(false)
@@ -848,8 +897,8 @@ export default function LoungePostStreamVideo({
   const heroOrLightbox = heroExpanded || lightboxOpen
   const hlsAttachEnabled =
     attachStream &&
-    (heroOrLightbox || isActive || ringHlsCacheHeld) &&
-    !(ringWarmPrefetch && !hasDecodedStreamMetadata && !heroOrLightbox)
+    (heroOrLightbox || isActive || activeHlsGraceHeld || ringHlsCacheHeld) &&
+    !(ringWarmPrefetch && !hasDecodedStreamMetadata && !heroOrLightbox && !activeHlsGraceHeld)
 
   /** Handoff away: non-coordinated tiles reset local mute when they lose active. */
   useEffect(() => {
@@ -1645,9 +1694,31 @@ export default function LoungePostStreamVideo({
     [feedAutoplayClientId, videoDebugEnabled],
   )
 
+  const prevIsActiveForPromoteRef = useRef(false)
+  useEffect(() => {
+    if (!coordinatorActive || !lazyStream || !feedAutoplayEnabled) {
+      prevIsActiveForPromoteRef.current = false
+      return undefined
+    }
+    const rose = isActive && !prevIsActiveForPromoteRef.current
+    prevIsActiveForPromoteRef.current = isActive
+    if (!rose || lightboxOpenRef.current) return undefined
+    const v = videoRef.current
+    if (v && v.readyState < HTMLMediaElement.HAVE_METADATA) {
+      bumpStreamAttach('active-promote')
+    }
+    return undefined
+  }, [bumpStreamAttach, coordinatorActive, feedAutoplayEnabled, isActive, lazyStream])
+
   /** Active tile stuck at rs=0 — retry HLS attach (iOS often starves when prefetch neighbors hold decoders). */
   useEffect(() => {
-    if (!coordinatorActive || !lazyStream || !feedAutoplayEnabled || !isActive || !hlsAttachEnabled) {
+    if (
+      !coordinatorActive ||
+      !lazyStream ||
+      !feedAutoplayEnabled ||
+      (!isActive && !activeHlsGraceHeld) ||
+      !hlsAttachEnabled
+    ) {
       return undefined
     }
     if (lightboxOpen || tileRatio <= 0) return undefined
@@ -1655,7 +1726,8 @@ export default function LoungePostStreamVideo({
     if (!v || v.readyState >= HTMLMediaElement.HAVE_METADATA) return undefined
     let cancelled = false
     const tid = window.setTimeout(() => {
-      if (cancelled || lightboxOpenRef.current || !isActiveRef.current) return
+      if (cancelled || lightboxOpenRef.current) return
+      if (!isActiveRef.current && !activeHlsGraceHeld) return
       const el = videoRef.current
       if (!el || el.readyState >= HTMLMediaElement.HAVE_METADATA) return
       bumpStreamAttach('active-hls-stall')
@@ -1665,6 +1737,7 @@ export default function LoungePostStreamVideo({
       window.clearTimeout(tid)
     }
   }, [
+    activeHlsGraceHeld,
     bumpStreamAttach,
     coordinatorActive,
     feedAutoplayEnabled,
@@ -1727,6 +1800,7 @@ export default function LoungePostStreamVideo({
       attachStream,
       hlsAttachEnabled,
       ringHlsHeld,
+      activeHlsGraceHeld,
       ringWarmPrefetch,
       flingerMode,
       heroLocked,
@@ -1760,6 +1834,7 @@ export default function LoungePostStreamVideo({
       lightboxOpen,
       mountStreamVideo,
       ringHlsHeld,
+      activeHlsGraceHeld,
       ringWarmPrefetch,
       showStreamRetry,
       streamAttachKey,

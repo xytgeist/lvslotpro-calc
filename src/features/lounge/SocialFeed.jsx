@@ -9894,7 +9894,9 @@ export default function SocialFeed({
 
   /** Open a profile by handle string — used when a viewer taps an @mention in a caption or comment. */
   const openProfileByHandle = useCallback(
-    async (handle) => {
+    async (handle, e) => {
+      e?.stopPropagation?.()
+      e?.preventDefault?.()
       if (!handle) return
       if (openProfileGateIfNeeded()) return
       const cleanHandle = handle.startsWith('@') ? handle.slice(1) : handle
@@ -9970,7 +9972,9 @@ export default function SocialFeed({
 
   /** Open the search panel pre-filtered by a tapped #hashtag. */
   const openSearchByHashtag = useCallback(
-    (tag) => {
+    (tag, e) => {
+      e?.stopPropagation?.()
+      e?.preventDefault?.()
       if (loungeFeedBrowseMode === 'anonymous' || loungeReadOnly) {
         onRequireAuth?.()
         return
@@ -9981,6 +9985,17 @@ export default function SocialFeed({
       setLoungeDockPanel('search')
     },
     [loungeFeedBrowseMode, loungeReadOnly, onRequireAuth],
+  )
+
+  const loungePostDetailRichCaptionOpts = useMemo(
+    () => ({
+      hashtagClassName: 'font-semibold text-cyan-300',
+      linkClassName:
+        'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
+      onMentionClick: openProfileByHandle,
+      onHashtagClick: openSearchByHashtag,
+    }),
+    [openProfileByHandle, openSearchByHashtag],
   )
 
   const onProfileScreenUpdated = useCallback((next) => {
@@ -11655,11 +11670,7 @@ export default function SocialFeed({
                         loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
                       } ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
                     >
-                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail), {
-                        hashtagClassName: 'font-semibold text-cyan-300',
-                        linkClassName:
-                          'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
-                      })}
+                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail), loungePostDetailRichCaptionOpts)}
                     </div>
                   ) : null}
                   {loungePostDetail.link_preview ? (
@@ -11711,11 +11722,10 @@ export default function SocialFeed({
                       postAgeLabel={postAgeLabel}
                     />
                     <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
-                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail.reposted_post), {
-                        hashtagClassName: 'font-semibold text-cyan-300',
-                        linkClassName:
-                          'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
-                      })}
+                      {renderRichCaption(
+                        feedPostDisplayCaption(loungePostDetail.reposted_post),
+                        loungePostDetailRichCaptionOpts,
+                      )}
                     </div>
                     <LoungePostFeedImagesAndGif
                       post={loungePostDetail.reposted_post}
@@ -11771,11 +11781,7 @@ export default function SocialFeed({
                         loungePostDetail.game_slug ? 'mt-1.5' : 'mt-4'
                       } ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
                     >
-                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail), {
-                        hashtagClassName: 'font-semibold text-cyan-300',
-                        linkClassName:
-                          'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
-                      })}
+                      {renderRichCaption(feedPostDisplayCaption(loungePostDetail), loungePostDetailRichCaptionOpts)}
                     </div>
                   ) : null}
                   {loungePostDetail.link_preview ? (
@@ -13646,7 +13652,7 @@ export default function SocialFeed({
                                   postAgeLabel={postAgeLabel}
                                 />
                                 <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
-                                  {renderRichCaption(feedPostDisplayCaption(orig))}
+                                  {renderRichCaption(feedPostDisplayCaption(orig), loungePostDetailRichCaptionOpts)}
                                 </div>
                                 <LoungePostFeedImagesAndGif
                                   post={orig}
