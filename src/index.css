@@ -815,29 +815,11 @@ html.light [data-lounge-media-lightbox]:not([data-lounge-image-lightbox]) .text-
 html.light [data-lounge-image-lightbox] {
   background-color: #fafafa !important;
 }
-/* Top bar: back, Follow, ⋯ — grey icons, fully transparent pills */
-html.light [data-lounge-image-lightbox] [data-lounge-lightbox-top-chrome] button {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border-color: transparent !important;
+/* Top bar + carousel — chat-header-glass tokens (see html.light .chat-header-glass) */
+html.light [data-lounge-image-lightbox] [data-lounge-lightbox-top-chrome] .chat-header-glass,
+html.light [data-lounge-image-lightbox] [data-lounge-lightbox-carousel] .chat-header-glass,
+html.light [data-chat-image-lightbox] .chat-header-glass {
   color: #52525b;
-}
-html.light [data-lounge-image-lightbox] [data-lounge-lightbox-top-chrome] button:hover,
-html.light [data-lounge-image-lightbox] [data-lounge-lightbox-top-chrome] button:active {
-  background: transparent !important;
-}
-/* Carousel prev/next + pager */
-html.light [data-lounge-image-lightbox] [data-lounge-lightbox-carousel] button {
-  border-color: transparent !important;
-  background: transparent !important;
-  color: #52525b;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none;
-}
-html.light [data-lounge-image-lightbox] [data-lounge-lightbox-carousel] button:hover {
-  background: transparent !important;
 }
 html.light [data-lounge-image-lightbox] [data-lounge-lightbox-carousel] .text-zinc-200 {
   color: #52525b !important;
@@ -855,17 +837,6 @@ html.light [data-lounge-image-lightbox] [data-lounge-post-interaction-bar] [clas
 html.light [data-lounge-image-lightbox] [data-lounge-post-interaction-bar] [class*='bg-black']:active {
   background-color: transparent !important;
 }
-/* Chat image lightbox — transparent back pill (chat-header-glass) */
-html.light [data-chat-image-lightbox] .chat-header-glass {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border-color: transparent !important;
-}
-html.light [data-chat-image-lightbox] .chat-header-glass:hover,
-html.light [data-chat-image-lightbox] .chat-header-glass:active {
-  background: transparent !important;
-}
 /* Footer gradient + idle interaction glyphs (pill overlay) */
 html.light [data-lounge-image-lightbox] [data-lounge-image-lightbox-footer] {
   background: linear-gradient(
@@ -877,7 +848,7 @@ html.light [data-lounge-image-lightbox] [data-lounge-image-lightbox-footer] {
 }
 html.light [data-lounge-image-lightbox] [data-lounge-post-interaction-bar] .text-zinc-200,
 html.light [data-lounge-image-lightbox] [data-lounge-post-interaction-bar] .text-zinc-500 {
-  color: #71717a !important;
+  color: #52525b !important;
 }
 html.light [data-lounge-image-lightbox] [data-lounge-post-interaction-bar] .text-white {
   color: #52525b !important;

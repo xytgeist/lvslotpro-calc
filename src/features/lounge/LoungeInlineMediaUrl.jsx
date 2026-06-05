@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD,
-  LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS,
+  LOUNGE_IMAGE_LIGHTBOX_TOP_BTN_CLASS,
+  LOUNGE_IMAGE_LIGHTBOX_CAROUSEL_BTN_CLASS,
 } from './LoungeStreamVideoLightboxChrome.jsx'
 import { useLoungeLightboxImageZoom } from './loungeLightboxImageZoom.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
@@ -208,7 +209,7 @@ export function LoungeImageLightbox({
               onClose()
             }}
             aria-label="Back"
-            className={LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS}
+            className={LOUNGE_IMAGE_LIGHTBOX_TOP_BTN_CLASS}
           >
             <span className="text-[22px] leading-none" aria-hidden>
               ←
@@ -257,7 +258,7 @@ export function LoungeImageLightbox({
                   e.stopPropagation()
                   goPrev()
                 }}
-                className="absolute left-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-zinc-600/80 bg-black/40 text-zinc-100 shadow-lg backdrop-blur-[2px] hover:bg-black/55 sm:left-2 sm:h-12 sm:w-12 [-webkit-tap-highlight-color:transparent]"
+                className={`absolute left-1 top-1/2 z-10 -translate-y-1/2 sm:left-2 ${LOUNGE_IMAGE_LIGHTBOX_CAROUSEL_BTN_CLASS} [-webkit-tap-highlight-color:transparent]`}
                 data-lounge-lightbox-no-swipe
               >
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -271,7 +272,7 @@ export function LoungeImageLightbox({
                   e.stopPropagation()
                   goNext()
                 }}
-                className="absolute right-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-zinc-600/80 bg-black/40 text-zinc-100 shadow-lg backdrop-blur-[2px] hover:bg-black/55 sm:right-2 sm:h-12 sm:w-12 [-webkit-tap-highlight-color:transparent]"
+                className={`absolute right-1 top-1/2 z-10 -translate-y-1/2 sm:right-2 ${LOUNGE_IMAGE_LIGHTBOX_CAROUSEL_BTN_CLASS} [-webkit-tap-highlight-color:transparent]`}
                 data-lounge-lightbox-no-swipe
               >
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>

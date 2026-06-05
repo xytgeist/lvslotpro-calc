@@ -2,6 +2,8 @@ import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import LoungePostRowMenu from './LoungePostRowMenu.jsx'
 import LoungeStreamVideoLightboxChrome, {
   LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS,
+  LOUNGE_IMAGE_LIGHTBOX_TOP_BTN_CLASS,
+  LOUNGE_IMAGE_LIGHTBOX_TOP_FOLLOW_BTN_CLASS,
   LoungeStreamLightboxFollowButton,
 } from './LoungeStreamVideoLightboxChrome.jsx'
 import { mergeLightboxDismissOnQuoteRepost } from './loungeLightboxFooterDismissQuote.js'
@@ -244,7 +246,7 @@ export function buildLoungeStreamLightboxChrome(hostEntity, mediaPost, dismissLi
 /**
  * Top-bar Follow — `landscapeOnly` hides in portrait (Stream video uses author row there).
  */
-function buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, { landscapeOnly = false } = {}) {
+function buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, { landscapeOnly = false, topBarBtnClass } = {}) {
   const host = hostEntity ?? mediaPost
   const media = mediaPost ?? host
   const { displayEntity } = loungeStreamLightboxMediaSource(host, media)
@@ -255,6 +257,7 @@ function buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, { landscape
       viewerFollowingUserIds={ctx.viewerFollowingUserIds}
       onFollowUser={ctx.onFollowUser}
       placement="topBar"
+      topBarBtnClass={topBarBtnClass}
     />
   )
   if (landscapeOnly) {
@@ -270,7 +273,10 @@ export function buildLoungeStreamLightboxTopBarExtra(hostEntity, mediaPost, ctx)
 
 /** Image/GIF lightbox top bar — always beside ⋯. */
 export function buildLoungeImageLightboxTopBarExtra(hostEntity, mediaPost, ctx) {
-  return buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, { landscapeOnly: false })
+  return buildLoungeLightboxFollowTopBar(hostEntity, mediaPost, ctx, {
+    landscapeOnly: false,
+    topBarBtnClass: LOUNGE_IMAGE_LIGHTBOX_TOP_FOLLOW_BTN_CLASS,
+  })
 }
 
 function loungeStreamLightboxCommentMenuState(hostComment, ctx, { countAutoplayForVisibility = true } = {}) {
@@ -298,6 +304,7 @@ function loungeStreamLightboxCommentMenuState(hostComment, ctx, { countAutoplayF
 export function buildLoungeStreamLightboxMenu(hostEntity, ctx, options = {}) {
   const showAutoplayToggle =
     options.showAutoplayToggle !== false && typeof ctx.onFeedVideoAutoplayChange === 'function'
+  const menuButtonClassName = options.menuButtonClassName ?? LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS
   const host = hostEntity
   if (!host) return null
 
@@ -325,7 +332,7 @@ export function buildLoungeStreamLightboxMenu(hostEntity, ctx, options = {}) {
         showAutoplayToggle={showAutoplayToggle}
         feedVideoAutoplayEnabled={ctx.feedVideoAutoplayEnabled}
         onFeedVideoAutoplayChange={ctx.onFeedVideoAutoplayChange}
-        menuButtonClassName={LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS}
+        menuButtonClassName={menuButtonClassName}
       />
     )
   }
@@ -365,14 +372,17 @@ export function buildLoungeStreamLightboxMenu(hostEntity, ctx, options = {}) {
       showAutoplayToggle={showAutoplayToggle}
       feedVideoAutoplayEnabled={ctx.feedVideoAutoplayEnabled}
       onFeedVideoAutoplayChange={ctx.onFeedVideoAutoplayChange}
-      menuButtonClassName={LOUNGE_HERO_LIGHTBOX_TOP_BTN_CLASS}
+      menuButtonClassName={menuButtonClassName}
     />
   )
 }
 
 /** Image/GIF lightbox ⋯ menu — same as Stream minus autoplay toggle. */
 export function buildLoungeImageLightboxMenu(hostEntity, ctx) {
-  return buildLoungeStreamLightboxMenu(hostEntity, ctx, { showAutoplayToggle: false })
+  return buildLoungeStreamLightboxMenu(hostEntity, ctx, {
+    showAutoplayToggle: false,
+    menuButtonClassName: LOUNGE_IMAGE_LIGHTBOX_TOP_BTN_CLASS,
+  })
 }
 
 /**
