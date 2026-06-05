@@ -10624,13 +10624,14 @@ export default function SocialFeed({
                       loading={mentionComposer.loading}
                       onSelect={(p) => mentionComposer.onMentionSelect(p, setPostText, composerFieldRef.current)}
                       anchorRef={mentionComposerAnchorRef}
-                    />
-                    <LoungePostCategoryPillPicker
-                      value={composerCategoryPills}
-                      onChange={setComposerCategoryPills}
-                      disabled={postBusy}
+                      caretFieldRef={composerFieldRef}
                     />
                   </div>
+                  <LoungePostCategoryPillPicker
+                    value={composerCategoryPills}
+                    onChange={setComposerCategoryPills}
+                    disabled={postBusy}
+                  />
                   {(() => {
                     const gifUrl = String(composerMediaUrl || '').trim()
                     const imageUrls = composerImageItems.map((x) => x.preview)
@@ -12678,6 +12679,7 @@ export default function SocialFeed({
                           loading={mentionDetailComment.loading}
                           onSelect={(p) => mentionDetailComment.onMentionSelect(p, setLoungeDetailCommentDraft, loungeDetailCommentFieldRef.current)}
                           anchorRef={mentionDetailCommentAnchorRef}
+                          caretFieldRef={loungeDetailCommentFieldRef}
                         />
                         </div>
                         <input
@@ -13352,6 +13354,7 @@ export default function SocialFeed({
                               loading={mentionQuoteRepost.loading}
                               onSelect={(p) => mentionQuoteRepost.onMentionSelect(p, setQuoteRepostDraft, quoteRepostFieldRef.current)}
                               anchorRef={mentionQuoteRepostAnchorRef}
+                              caretFieldRef={quoteRepostFieldRef}
                             />
                             </div>
                             <LoungePostCategoryPillPicker

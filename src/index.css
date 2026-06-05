@@ -1421,9 +1421,9 @@ html.light .lounge-dock-item-circle {
   color: #27272a;
 }
 
-/* Composer media/GIF icon buttons — no box, just the glyph in gray */
+/* Composer media/GIF icon buttons — match Post button blue in light mode */
 html.light .lounge-media-toolbar .text-sky-400 {
-  color: #71717a !important;
+  color: #2563eb !important;
 }
 html.light .lounge-media-toolbar svg rect {
   fill-opacity: 0 !important;
@@ -1844,12 +1844,15 @@ html.light .guide-lock-glitch__tv-snow-canvas {
   opacity: 0.55;
 }
 
-/* Composer media/GIF icon buttons — gray, no visible background box in light mode */
-html.light .lounge-media-toolbar .text-sky-400,
-html.light .lounge-media-toolbar .text-sky-400:hover,
-html.light .lounge-media-toolbar .hover\:text-sky-300:hover,
+/* Composer media/GIF icon buttons — Post button blue in light mode */
+html.light .lounge-media-toolbar .text-sky-400 {
+  color: #2563eb !important;
+}
+html.light .lounge-media-toolbar .hover\:text-sky-300:hover {
+  color: #1d4ed8 !important;
+}
 html.light .lounge-media-toolbar .active\:text-sky-200:active {
-  color: #71717a !important;
+  color: #1e40af !important;
 }
 
 /*

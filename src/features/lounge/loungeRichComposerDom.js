@@ -304,6 +304,32 @@ export function insertPlainTextAtSelection(root, text) {
   sel.addRange(range)
 }
 
+/** Client rect for the current selection caret inside a composer root. */
+export function getComposerCaretClientRect(root) {
+  if (!root || typeof window === 'undefined') return null
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || !sel.anchorNode || !root.contains(sel.anchorNode)) return null
+
+  const range = sel.getRangeAt(0)
+  const rects = range.getClientRects()
+  if (rects.length > 0) {
+    const r = rects[rects.length - 1]
+    return { top: r.top, left: r.left, bottom: r.bottom, right: r.right }
+  }
+
+  const clone = range.cloneRange()
+  clone.collapse(true)
+  const marker = document.createElement('span')
+  marker.textContent = '\u200b'
+  try {
+    clone.insertNode(marker)
+    const mr = marker.getBoundingClientRect()
+    return { top: mr.top, left: mr.left, bottom: mr.bottom, right: mr.right }
+  } finally {
+    marker.remove()
+  }
+}
+
 export function isRichComposerElement(el) {
   return Boolean(el?.isContentEditable)
 }

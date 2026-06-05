@@ -1,11 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { profileAvatarToneClass, profileAvatarInitials } from '../profiles/profileGate'
+import { getComposerCaretClientRect, isRichComposerElement } from './loungeRichComposerDom.js'
 
 /**
  * Autocomplete dropdown for @mention suggestions.
  * Renders into document.body via portal (escapes any overflow:hidden ancestor).
- * Opens below the anchor by default; flips above if it would overflow the viewport bottom.
+ * Opens below the caret when `caretFieldRef` is set; otherwise below the anchor.
+ * Flips above if it would overflow the viewport bottom.
  *
  * Props:
  *   suggestions  – array of profile rows { user_id, handle, display_name, avatar_url }
@@ -13,6 +15,7 @@ import { profileAvatarToneClass, profileAvatarInitials } from '../profiles/profi
  *   loading      – show a loading shimmer
  *   onSelect     – (profile) => void
  *   anchorRef    – ref to the element to position relative to (the relative wrapper div)
+ *   caretFieldRef – optional contenteditable composer root; dropdown anchors to caret
  *   zIndex       – CSS z-index value (number, default 9999)
  */
 export default function LoungeMentionDropdown({
@@ -21,26 +24,43 @@ export default function LoungeMentionDropdown({
   loading = false,
   onSelect,
   anchorRef,
+  caretFieldRef,
   zIndex = 9999,
 }) {
   const ref = useRef(null)
   const [pos, setPos] = useState(null) // { top, left, width } fixed coords
 
-  // Position the portal dropdown relative to the anchor after each render.
-  // useLayoutEffect fires before paint — no visible flash.
   useLayoutEffect(() => {
     if (!anchorRef?.current || !ref.current) return
-    const anchor = anchorRef.current.getBoundingClientRect()
-    const dropH = ref.current.offsetHeight
-    const gap = 4
-    const spaceBelow = window.innerHeight - anchor.bottom - gap
-    const openUp = spaceBelow < dropH && anchor.top > dropH + gap
-    setPos({
-      left: anchor.left,
-      width: anchor.width,
-      top: openUp ? anchor.top - dropH - gap : anchor.bottom + gap,
-    })
-  }, [suggestions.length, loading, anchorRef])
+
+    const updatePos = () => {
+      if (!anchorRef?.current || !ref.current) return
+      const anchor = anchorRef.current.getBoundingClientRect()
+      const field = caretFieldRef?.current
+      const caret =
+        field && isRichComposerElement(field) ? getComposerCaretClientRect(field) : null
+      const dropH = ref.current.offsetHeight
+      const gap = 4
+      const anchorTop = caret ? caret.bottom : anchor.bottom
+      const anchorLeft = caret ? caret.left : anchor.left
+      const flipTop = caret ? caret.top : anchor.top
+      const spaceBelow = window.innerHeight - anchorTop - gap
+      const openUp = spaceBelow < dropH && flipTop > dropH + gap
+      setPos({
+        left: Math.max(anchor.left, Math.min(anchorLeft, anchor.right - 120)),
+        width: anchor.width,
+        top: openUp ? flipTop - dropH - gap : anchorTop + gap,
+      })
+    }
+
+    updatePos()
+    window.addEventListener('resize', updatePos)
+    window.addEventListener('scroll', updatePos, true)
+    return () => {
+      window.removeEventListener('resize', updatePos)
+      window.removeEventListener('scroll', updatePos, true)
+    }
+  }, [suggestions.length, loading, activeIndex, anchorRef, caretFieldRef])
 
   // Scroll the active row into view
   useEffect(() => {
