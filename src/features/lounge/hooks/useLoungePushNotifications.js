@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import useWebPushNotifications from '../../offers/hooks/useWebPushNotifications.js'
-import { iosPwaInstallRequired } from '../../../utils/pwaNotificationPrompt.js'
+import {
+  consumePwaNotifEnablePending,
+  iosPwaInstallRequired,
+} from '../../../utils/pwaNotificationPrompt.js'
 import {
   readLoungePushNotificationsEnabled,
   subscribeLoungePushNotificationsEnabled,
@@ -59,6 +62,14 @@ export default function useLoungePushNotifications({ supabaseClient, viewerUserI
     if (!viewerUserId) return
     void syncLocalState()
   }, [viewerUserId, syncLocalState])
+
+  /** iOS PWA first-run prompt grants OS permission — register Lounge push on this device. */
+  useEffect(() => {
+    if (!viewerUserId || iosPwaInstallRequired() || isBusy) return
+    if (!consumePwaNotifEnablePending(viewerUserId)) return
+    writeLoungePushNotificationsEnabled(true)
+    void enable()
+  }, [viewerUserId, enable, isBusy])
 
   /** Pref off but device still subscribed (e.g. stale state) — tear down subscription. */
   useEffect(() => {

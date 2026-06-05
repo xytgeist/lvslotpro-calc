@@ -33,6 +33,7 @@ import { syncLoungeFeedVideoDebugFromUrl } from '../../utils/loungeFeedVideoDebu
 import LoungeAppSplash from '../../components/LoungeAppSplash.jsx'
 import { useLoungeColdBootSplash } from '../lounge/useLoungeColdBootSplash.js'
 import { shouldShowLoungeColdBootSplash } from '../../utils/loungeColdBootSplash.js'
+import { Z_APP_ALERT } from '../../constants/appZIndex.js'
 import LoungeActivityInAppToast from '../lounge/LoungeActivityInAppToast.jsx'
 import {
   loungeActivityInAppPayloadFromMessage,
@@ -319,49 +320,8 @@ export default function AppShell({
     []
   )
 
-  /** One-time iOS Home Screen (PWA) notification opt-in — first auth in standalone only. */
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!isIosDevice() || !isStandalonePwa()) return
-
-    const {
-      data: { subscription },
-    } = supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (!isPwaNotifPromptAuthEvent(event)) return
-      const userId = session?.user?.id
-      if (!userId || hasSeenPwaNotifPrompt(userId) || iosPwaNotifPromptInFlightRef.current) return
-      const permission = window.Notification?.permission
-      if (permission === 'granted' || permission === 'denied') {
-        markPwaNotifPromptSeen(userId)
-        return
-      }
-
-      iosPwaNotifPromptInFlightRef.current = true
-      markPwaNotifPromptSeen(userId)
-
-      void (async () => {
-        try {
-          const shouldEnable = await showGlobalConfirm({
-            title: 'Enable Notifications',
-            message: 'Allow notifications for this Home Screen app now?',
-            confirmLabel: 'Enable',
-            cancelLabel: 'Not now',
-          })
-          if (!shouldEnable) return
-          const nextPermission = await window.Notification?.requestPermission?.()
-          if (nextPermission === 'granted') {
-            setPwaNotifEnablePending(userId)
-          }
-        } catch {
-          // User can enable later from Offers.
-        } finally {
-          iosPwaNotifPromptInFlightRef.current = false
-        }
-      })()
-    })
-
-    return () => subscription.unsubscribe()
-  }, [showGlobalConfirm, supabaseClient])
+  /** User id queued for one-time iOS PWA notification opt-in (shown after member UI + splash settle). */
+  const [pwaNotifPromptUserId, setPwaNotifPromptUserId] = useState(null)
 
   const hydrateCommunityPosts = useCallback(
     async (rows, depth = 0) => {
@@ -1040,6 +1000,69 @@ export default function AppShell({
     browseMode,
   })
 
+  /** Queue iOS Home Screen (PWA) notification opt-in on first auth — do not show until UI is stable. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!isIosDevice() || !isStandalonePwa()) return
+
+    const {
+      data: { subscription },
+    } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (!isPwaNotifPromptAuthEvent(event)) return
+      const userId = session?.user?.id
+      if (!userId || hasSeenPwaNotifPrompt(userId) || iosPwaNotifPromptInFlightRef.current) return
+      const permission = window.Notification?.permission
+      if (permission === 'granted' || permission === 'denied') {
+        markPwaNotifPromptSeen(userId)
+        if (permission === 'granted') {
+          setPwaNotifEnablePending(userId)
+        }
+        return
+      }
+      setPwaNotifPromptUserId(userId)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabaseClient])
+
+  /** Show queued PWA notification prompt only after signed-in member UI + cold-boot splash finish. */
+  useEffect(() => {
+    if (!pwaNotifPromptUserId) return
+    if (browseMode !== 'member' || !authSessionReady || splashVisible) return
+    if (iosPwaNotifPromptInFlightRef.current) return
+
+    const userId = pwaNotifPromptUserId
+    const settleMs = 450
+    const timer = window.setTimeout(() => {
+      if (iosPwaNotifPromptInFlightRef.current) return
+      iosPwaNotifPromptInFlightRef.current = true
+      setPwaNotifPromptUserId(null)
+
+      void (async () => {
+        try {
+          const shouldEnable = await showGlobalConfirm({
+            title: 'Enable Notifications',
+            message: 'Allow notifications for this Home Screen app now?',
+            confirmLabel: 'Enable',
+            cancelLabel: 'Not now',
+          })
+          markPwaNotifPromptSeen(userId)
+          if (!shouldEnable) return
+          const nextPermission = await window.Notification?.requestPermission?.()
+          if (nextPermission === 'granted') {
+            setPwaNotifEnablePending(userId)
+          }
+        } catch {
+          markPwaNotifPromptSeen(userId)
+        } finally {
+          iosPwaNotifPromptInFlightRef.current = false
+        }
+      })()
+    }, settleMs)
+
+    return () => window.clearTimeout(timer)
+  }, [pwaNotifPromptUserId, browseMode, authSessionReady, splashVisible, showGlobalConfirm])
+
   const homeSuspenseFallback =
     tab === 'home' ? <div className="min-h-dvh w-full bg-zinc-950" aria-hidden /> : null
 
@@ -1396,7 +1419,8 @@ export default function AppShell({
 
       {globalConfirmState.open ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 flex items-center justify-center bg-black/60 p-4"
+          style={{ zIndex: Z_APP_ALERT }}
           onClick={() => closeGlobalConfirm(false)}
         >
           <div
