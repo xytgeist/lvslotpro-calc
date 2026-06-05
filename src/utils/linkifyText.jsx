@@ -55,7 +55,7 @@ export function extractFirstUrlFromText(text) {
   return null
 }
 
-export function splitTextWithLinks(text) {
+export function splitTextWithLinks(text, { trimTrailing = true } = {}) {
   if (!text) return [{ type: 'text', value: '' }]
   const segments = []
   const re = new RegExp(URL_RE.source, URL_RE.flags)
@@ -67,9 +67,9 @@ export function splitTextWithLinks(text) {
       segments.push({ type: 'text', value: text.slice(last, match.index) })
     }
     const raw = match[0]
-    const display = trimTrailingPunct(raw)
-    const href = safeHttpHref(raw)
-    const trailing = raw.slice(display.length)
+    const display = trimTrailing ? trimTrailingPunct(raw) : raw
+    const href = safeHttpHref(trimTrailing ? raw : display)
+    const trailing = trimTrailing ? raw.slice(display.length) : ''
     if (href) {
       segments.push({ type: 'link', value: display, href })
     } else {

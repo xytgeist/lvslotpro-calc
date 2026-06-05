@@ -1,4 +1,4 @@
-import { hrefForUrlDisplay, trimUrlTrail } from './loungeCaption.jsx'
+import { splitTextWithLinks } from '../../utils/linkifyText.jsx'
 
 const MENTION_CLASS = 'font-medium text-orange-400'
 const HASHTAG_CLASS = 'font-semibold text-cyan-400'
@@ -51,22 +51,14 @@ export function buildRichComposerHtml(text) {
   const s = String(text ?? '')
   if (!s) return ''
   const out = []
-  let last = 0
-  const urlRe = /https?:\/\/[^\s<>"']+|www\.[^\s<>"']+/gi
-  let um
-  while ((um = urlRe.exec(s)) !== null) {
-    const raw = um[0]
-    const display = trimUrlTrail(raw)
-    const href = hrefForUrlDisplay(display)
-    if (um.index > last) appendHashtagHtml(out, s.slice(last, um.index), COMPOSER_MENTION_OPTS)
-    if (href) {
-      out.push(wrapSpan(LINK_CLASS, escapeHtml(display || raw)))
-    } else {
-      appendHashtagHtml(out, display || raw, COMPOSER_MENTION_OPTS)
+  // Same URL rules as feed captions; never trim trailing `.` while typing (e.g. www.ebay.com).
+  for (const seg of splitTextWithLinks(s, { trimTrailing: false })) {
+    if (seg.type === 'link' && seg.href) {
+      out.push(wrapSpan(LINK_CLASS, escapeHtml(seg.value)))
+    } else if (seg.value) {
+      appendHashtagHtml(out, seg.value, COMPOSER_MENTION_OPTS)
     }
-    last = um.index + raw.length
   }
-  if (last < s.length) appendHashtagHtml(out, s.slice(last), COMPOSER_MENTION_OPTS)
   return out.join('')
 }
 
