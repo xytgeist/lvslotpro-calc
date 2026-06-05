@@ -170,6 +170,11 @@ export default function LoungeDockSlidePanels({
   settingsHasActiveSubscription = false,
   settingsSupabaseClient = null,
   onSettingsEditProfile,
+  /** Parent captures panel scroller for navigation return stack. */
+  panelScrollRefOut = null,
+  /** Restore scroll after caption navigation return. */
+  restorePanelScrollTop = null,
+  onPanelScrollRestored = null,
 }) {
   const panelRef = useRef(null)
   const panelScrollRef = useRef(null)
@@ -223,6 +228,21 @@ export default function LoungeDockSlidePanels({
   const [passwordResetBusy, setPasswordResetBusy] = useState(false)
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
   const [passwordResetError, setPasswordResetError] = useState('')
+
+  useEffect(() => {
+    if (panelScrollRefOut) panelScrollRefOut.current = panelScrollRef.current
+  }, [openPanel, panelScrollRefOut])
+
+  useLayoutEffect(() => {
+    if (restorePanelScrollTop == null) return
+    const el = panelScrollRef.current
+    if (!el) return
+    el.scrollTop = restorePanelScrollTop
+    requestAnimationFrame(() => {
+      if (panelScrollRef.current) panelScrollRef.current.scrollTop = restorePanelScrollTop
+      onPanelScrollRestored?.()
+    })
+  }, [openPanel, onPanelScrollRestored, restorePanelScrollTop])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

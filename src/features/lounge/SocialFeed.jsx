@@ -174,6 +174,11 @@ import {
 import { pauseAllLoungeStreamInlineVideos } from '../../utils/loungeStreamInlineVideoControl.js'
 import LoungeProfileFullScreen from './LoungeProfileFullScreen'
 import {
+  createLoungeNavReturnStack,
+  popLoungeNavReturnFrame,
+  pushLoungeNavReturnFrame,
+} from './loungeNavReturnStack.js'
+import {
   fetchLoungeProfilePosts,
   fetchLoungeProfileRow,
   loadLoungeProfileScreenPostsRemainder,
@@ -583,8 +588,17 @@ export default function SocialFeed({
   const closeProfileModalRef = useRef(() => {})
   /** `finalizeProfileModalClose` is defined later; dock compose dismisses profile without animation wait. */
   const finalizeProfileModalCloseRef = useRef(() => {})
-  /** When profile opens from dock search/notifications, back restores that panel. */
+  /** When profile opens from dock search/notifications, back restores that panel. @deprecated — use loungeNavReturnStackRef */
   const profileReturnDockPanelRef = useRef(null)
+  const loungeNavReturnStackRef = useRef(createLoungeNavReturnStack())
+  const loungeNavRestoringRef = useRef(false)
+  const loungeNavSearchReturnPendingRef = useRef(false)
+  const profileNavSnapshotRef = useRef({ tab: 'posts', scrollTop: 0 })
+  const loungeDockPanelScrollRef = useRef(null)
+  const restoreLoungeNavFrameRef = useRef(async () => {})
+  const pushLoungeNavReturnContextRef = useRef(() => {})
+  const [profileNavRestore, setProfileNavRestore] = useState(null)
+  const [dockPanelScrollRestore, setDockPanelScrollRestore] = useState(null)
   const [profileModalLoading, setProfileModalLoading] = useState(false)
   const [profileModalErr, setProfileModalErr] = useState('')
   const [profileModalData, setProfileModalData] = useState(null)
@@ -5413,6 +5427,18 @@ export default function SocialFeed({
     } catch {
       // ignore
     }
+    if (loungeNavRestoringRef.current || loungeNavSearchReturnPendingRef.current) {
+      return
+    }
+    if (profileModalOpen || profileOverlayStack.length > 0) {
+      return
+    }
+    const navFrame = popLoungeNavReturnFrame(loungeNavReturnStackRef.current)
+    if (navFrame) {
+      requestAnimationFrame(() => {
+        void restoreLoungeNavFrameRef.current(navFrame)
+      })
+    }
   }, [
     cancelLoungeDetailCommentEditMediaPrep,
     cancelLoungeDetailEditMediaPrep,
@@ -5420,6 +5446,8 @@ export default function SocialFeed({
     loungeDetailCommentBackgroundUploadInFlight,
     loungeDetailCommentEditBackgroundUploadInFlight,
     loungeDetailEditBackgroundUploadInFlight,
+    profileModalOpen,
+    profileOverlayStack.length,
   ])
 
   const closeLoungePostDetail = useCallback(() => {
@@ -5504,6 +5532,11 @@ export default function SocialFeed({
         if (opts?.focusCommentId) {
           loungeCommentDetailDirectEntryAnimateRef.current = true
         }
+      }
+      if (opts?.restoreCommentPathIds?.length) {
+        const path = opts.restoreCommentPathIds.map(String).filter(Boolean)
+        setLoungeCommentDetailPathIds(path)
+        loungeCommentDetailDirectEntryDepthRef.current = path.length
       }
       setLoungeDetailCommentDraft('')
       setLoungeDetailCommentErr('')
@@ -5908,12 +5941,13 @@ export default function SocialFeed({
         }
       }
       if (!postRow) return
+      pushLoungeNavReturnContextRef.current()
       if (commentId) {
         await openDirectCommentPostDetail(postRow, commentId, { focusComposer })
       } else {
         openLoungePostDetail(
           postRow,
-          focusComposer ? { focusCommentComposer: true } : undefined,
+          focusComposer ? { focusCommentComposer: true, skipNavCapture: true } : { skipNavCapture: true },
         )
       }
     },
@@ -6066,9 +6100,10 @@ export default function SocialFeed({
   const onLoungeDockOpenPostFromSearch = useCallback(
     (post) => {
       if (!post?.id) return
-      openLoungePostDetail(post, {})
+      pushLoungeNavReturnContextRef.current()
+      openLoungePostDetail(post, { skipNavCapture: true })
     },
-    [openLoungePostDetail]
+    [openLoungePostDetail],
   )
 
   useEffect(() => {
@@ -9540,6 +9575,25 @@ export default function SocialFeed({
     setProfileModalVisible(true)
     setLoungeProfileDockReveal(1)
     setProfileStackAboveStreamLightbox(false)
+    if (loungeNavRestoringRef.current) {
+      setProfileModalStartEditing(false)
+      setProfileModalFollowListTab(null)
+      setProfileModalHighlightFollowerIds([])
+      return
+    }
+    if (loungeNavSearchReturnPendingRef.current) {
+      setProfileModalStartEditing(false)
+      setProfileModalFollowListTab(null)
+      setProfileModalHighlightFollowerIds([])
+      return
+    }
+    const navFrame = popLoungeNavReturnFrame(loungeNavReturnStackRef.current)
+    if (navFrame) {
+      requestAnimationFrame(() => {
+        void restoreLoungeNavFrameRef.current(navFrame)
+      })
+      return
+    }
     const returnPanel = profileReturnDockPanelRef.current
     profileReturnDockPanelRef.current = null
     if (returnPanel === 'notifications' || returnPanel === 'search' || returnPanel === 'settings') {
@@ -9821,41 +9875,219 @@ export default function SocialFeed({
     setProfileOverlayStack((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev))
   }, [])
 
+  const captureLoungeNavReturnContext = useCallback(() => {
+    if (loungePostDetail?.id) {
+      return {
+        kind: 'postDetail',
+        post: loungePostDetail,
+        commentPathIds: [...loungeCommentDetailPathIds],
+        scrollTop: loungePostDetailScrollRef.current?.scrollTop ?? 0,
+        aboveProfile: loungePostDetailAboveProfile,
+      }
+    }
+    if (profileModalOpen && profileModalData?.user_id) {
+      const snap = profileNavSnapshotRef.current ?? { tab: 'posts', scrollTop: 0 }
+      return {
+        kind: 'profile',
+        userId: profileModalData.user_id,
+        tab: snap.tab,
+        scrollTop: snap.scrollTop,
+        profileStub: profileModalData,
+      }
+    }
+    if (loungeDockPanel === 'search') {
+      return {
+        kind: 'search',
+        query: loungeDockSearchQuery,
+        scrollTop: loungeDockPanelScrollRef.current?.scrollTop ?? 0,
+      }
+    }
+    if (loungeDockPanel === 'notifications' || loungeDockPanel === 'settings' || loungeDockPanel === 'chat') {
+      return {
+        kind: 'dock',
+        panel: loungeDockPanel,
+        scrollTop: loungeDockPanelScrollRef.current?.scrollTop ?? 0,
+      }
+    }
+    return {
+      kind: 'feed',
+      scrollTop: loungeFeedScrollRef.current?.scrollTop ?? 0,
+    }
+  }, [
+    loungeCommentDetailPathIds,
+    loungeDockPanel,
+    loungeDockSearchQuery,
+    loungePostDetail,
+    loungePostDetailAboveProfile,
+    profileModalData,
+    profileModalOpen,
+  ])
+
+  const pushLoungeNavReturnContext = useCallback(() => {
+    if (loungeNavRestoringRef.current) return
+    pushLoungeNavReturnFrame(loungeNavReturnStackRef.current, captureLoungeNavReturnContext())
+  }, [captureLoungeNavReturnContext])
+
+  const restoreLoungeNavFrame = useCallback(
+    async (frame) => {
+      if (!frame) return
+      loungeNavRestoringRef.current = true
+      try {
+        switch (frame.kind) {
+          case 'feed': {
+            setLoungeDockPanel(null)
+            setProfileOverlayStack([])
+            if (loungePostDetail?.id) finalizeLoungePostDetailClose()
+            if (profileModalOpen) finalizeProfileModalClose()
+            await new Promise((resolve) => requestAnimationFrame(resolve))
+            const el = loungeFeedScrollRef.current
+            if (el) el.scrollTop = frame.scrollTop
+            break
+          }
+          case 'profile': {
+            setLoungeDockPanel(null)
+            setProfileOverlayStack([])
+            if (loungePostDetail?.id) finalizeLoungePostDetailClose()
+            setProfileNavRestore({ tab: frame.tab, scrollTop: frame.scrollTop })
+            await openProfileModal(
+              { user_id: frame.userId, ...(frame.profileStub || {}) },
+              { skipNavCapture: true },
+            )
+            break
+          }
+          case 'postDetail': {
+            setLoungeDockPanel(null)
+            setProfileOverlayStack([])
+            if (profileModalOpen) finalizeProfileModalClose()
+            setLoungePostDetailAboveProfile(frame.aboveProfile)
+            openLoungePostDetail(frame.post, {
+              skipNavCapture: true,
+              restoreCommentPathIds: frame.commentPathIds,
+            })
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+            const el = loungePostDetailScrollRef.current
+            if (el) el.scrollTop = frame.scrollTop
+            break
+          }
+          case 'search': {
+            if (loungePostDetail?.id) finalizeLoungePostDetailClose()
+            if (profileModalOpen) finalizeProfileModalClose()
+            setProfileOverlayStack([])
+            setDockPanelScrollRestore(frame.scrollTop)
+            setLoungeDockSearchQuery(frame.query)
+            setLoungeDockSearchQueryVersion((v) => v + 1)
+            setLoungeDockPanel('search')
+            break
+          }
+          case 'dock': {
+            if (loungePostDetail?.id) finalizeLoungePostDetailClose()
+            if (profileModalOpen) finalizeProfileModalClose()
+            setProfileOverlayStack([])
+            setDockPanelScrollRestore(frame.scrollTop)
+            if (frame.panel === 'search') {
+              setLoungeDockSearchQuery(frame.searchQuery || '')
+              setLoungeDockSearchQueryVersion((v) => v + 1)
+            }
+            setLoungeDockPanel(frame.panel)
+            break
+          }
+          default:
+            break
+        }
+      } finally {
+        loungeNavRestoringRef.current = false
+      }
+    },
+    [
+      finalizeLoungePostDetailClose,
+      finalizeProfileModalClose,
+      loungePostDetail?.id,
+      openLoungePostDetail,
+      openProfileModal,
+      profileModalOpen,
+    ],
+  )
+
+  useEffect(() => {
+    restoreLoungeNavFrameRef.current = restoreLoungeNavFrame
+  }, [restoreLoungeNavFrame])
+
+  useEffect(() => {
+    pushLoungeNavReturnContextRef.current = pushLoungeNavReturnContext
+  }, [pushLoungeNavReturnContext])
+
   /** Open another member's profile from a post/comment row (`user_id` + optional `author_profile`). */
   const openAuthorProfile = useCallback(
     (entity, opts) => {
       const stub = profileEntityStub(entity)
       if (!stub?.user_id) return
       if (openProfileGateIfNeeded()) return
-      if (profileModalOpen) {
+      if (profileModalOpen || profileOverlayStack.length > 0) {
         pushProfileOverlay(entity)
         return
+      }
+      if (!opts?.skipNavCapture && !opts?.fromPublicLink) {
+        pushLoungeNavReturnContext()
       }
       void openProfileModal(
         {
           user_id: stub.user_id,
           ...stub,
         },
-        { returnDockPanel: opts?.returnDockPanel ?? null },
+        {
+          skipNavCapture: true,
+          returnDockPanel: opts?.returnDockPanel ?? null,
+        },
       )
     },
-    [openProfileGateIfNeeded, openProfileModal, profileEntityStub, profileModalOpen, pushProfileOverlay],
+    [
+      openProfileGateIfNeeded,
+      openProfileModal,
+      profileEntityStub,
+      profileModalOpen,
+      profileOverlayStack.length,
+      pushLoungeNavReturnContext,
+      pushProfileOverlay,
+    ],
   )
+
+  const onLoungeDockPanelClose = useCallback(() => {
+    setChatDockInitialPeerUserId(null)
+    setLoungeSettingsFocusSection(null)
+    if (loungeNavSearchReturnPendingRef.current && loungeDockPanel === 'search') {
+      loungeNavSearchReturnPendingRef.current = false
+      const frame = popLoungeNavReturnFrame(loungeNavReturnStackRef.current)
+      setLoungeDockPanel(null)
+      if (frame) {
+        requestAnimationFrame(() => {
+          void restoreLoungeNavFrameRef.current(frame)
+        })
+      }
+      return
+    }
+    setLoungeDockPanel(null)
+  }, [loungeDockPanel])
+
+  const onProfileNavRestoreApplied = useCallback(() => {
+    setProfileNavRestore(null)
+  }, [])
+
+  const onDockPanelScrollRestored = useCallback(() => {
+    setDockPanelScrollRestore(null)
+  }, [])
 
   const onLoungeDockOpenProfileFromSearch = useCallback(
     (entity) => {
       if (!entity?.user_id) return
-      openAuthorProfile(entity, {
-        returnDockPanel: loungeDockPanel === 'search' ? 'search' : null,
-      })
+      openAuthorProfile(entity)
     },
-    [loungeDockPanel, openAuthorProfile],
+    [openAuthorProfile],
   )
 
   const onLoungeOpenProfileFromNotifications = useCallback(
     (entity) => {
       if (!entity?.user_id) return
-      openAuthorProfile(entity, { returnDockPanel: 'notifications' })
+      openAuthorProfile(entity)
     },
     [openAuthorProfile],
   )
@@ -9864,31 +10096,39 @@ export default function SocialFeed({
     ({ highlightUserIds = [] } = {}) => {
       if (!composerUserId) return
       if (openProfileGateIfNeeded()) return
+      pushLoungeNavReturnContext()
       void openProfileModal(
         {
           user_id: composerUserId,
           author_profile: composerUserProfile,
         },
         {
-          returnDockPanel: 'notifications',
+          skipNavCapture: true,
           openFollowListTab: 'followers',
           highlightFollowerUserIds: highlightUserIds,
         },
       )
     },
-    [composerUserId, composerUserProfile, openProfileGateIfNeeded, openProfileModal],
+    [
+      composerUserId,
+      composerUserProfile,
+      openProfileGateIfNeeded,
+      openProfileModal,
+      pushLoungeNavReturnContext,
+    ],
   )
 
   const onLoungeSettingsEditProfile = useCallback(() => {
     if (!composerUserId || loungeReadOnly) return
     if (openProfileGateIfNeeded()) return
+    pushLoungeNavReturnContext()
     setLoungeDockPanel(null)
     void openProfileModal(
       {
         user_id: composerUserId,
         author_profile: composerUserProfile,
       },
-      { returnDockPanel: 'settings', startEditing: true },
+      { skipNavCapture: true, startEditing: true },
     )
   }, [
     composerUserId,
@@ -9896,6 +10136,7 @@ export default function SocialFeed({
     loungeReadOnly,
     openProfileGateIfNeeded,
     openProfileModal,
+    pushLoungeNavReturnContext,
   ])
 
   /** Open a profile by handle string — used when a viewer taps an @mention in a caption or comment. */
@@ -9913,11 +10154,27 @@ export default function SocialFeed({
           .ilike('handle', cleanHandle)
           .maybeSingle()
         if (data?.user_id) {
-          void openProfileModal({ user_id: data.user_id, author_profile: data })
+          if (profileModalOpen || profileOverlayStack.length > 0) {
+            pushProfileOverlay({ user_id: data.user_id, author_profile: data })
+            return
+          }
+          pushLoungeNavReturnContext()
+          void openProfileModal(
+            { user_id: data.user_id, author_profile: data },
+            { skipNavCapture: true },
+          )
         }
       } catch {}
     },
-    [openProfileGateIfNeeded, openProfileModal, supabaseClient],
+    [
+      openProfileGateIfNeeded,
+      openProfileModal,
+      profileModalOpen,
+      profileOverlayStack.length,
+      pushLoungeNavReturnContext,
+      pushProfileOverlay,
+      supabaseClient,
+    ],
   )
 
   useEffect(() => {
@@ -9985,12 +10242,30 @@ export default function SocialFeed({
         onRequireAuth?.()
         return
       }
+      pushLoungeNavReturnContext()
+      loungeNavSearchReturnPendingRef.current = true
       const q = tag.startsWith('#') ? tag.slice(1) : tag
+      if (loungePostDetail?.id) {
+        finalizeLoungePostDetailClose()
+      }
+      if (profileModalOpen) {
+        closeProfileModal()
+      }
+      setProfileOverlayStack([])
       setLoungeDockSearchQuery(q)
       setLoungeDockSearchQueryVersion((v) => v + 1)
       setLoungeDockPanel('search')
     },
-    [loungeFeedBrowseMode, loungeReadOnly, onRequireAuth],
+    [
+      closeProfileModal,
+      finalizeLoungePostDetailClose,
+      loungeFeedBrowseMode,
+      loungePostDetail?.id,
+      loungeReadOnly,
+      onRequireAuth,
+      profileModalOpen,
+      pushLoungeNavReturnContext,
+    ],
   )
 
   const openLoungePostById = useCallback(
@@ -10012,7 +10287,12 @@ export default function SocialFeed({
           setCommunityPosts((prev) => (prev.some((p) => p.id === postRow.id) ? prev : [postRow, ...prev]))
         }
       }
-      if (postRow) openLoungePostDetail(postRow, { fromPublicLink: opts.fromPublicLink === true })
+      if (postRow) {
+        openLoungePostDetail(postRow, {
+          fromPublicLink: opts.fromPublicLink === true,
+          skipNavCapture: opts.skipNavCapture === true,
+        })
+      }
     },
     [communityPosts, hydrateCommunityPosts, openLoungePostDetail, setCommunityPosts, supabaseClient],
   )
@@ -10025,7 +10305,8 @@ export default function SocialFeed({
       if (!url) return
       const postId = parseLoungePostIdFromUrl(url)
       if (postId) {
-        void openLoungePostById(postId, { fromPublicLink: true })
+        pushLoungeNavReturnContext()
+        void openLoungePostById(postId, { skipNavCapture: true })
         return
       }
       const handle = parseLoungeProfileHandleFromUrl(url)
@@ -10046,7 +10327,7 @@ export default function SocialFeed({
         /* */
       }
     },
-    [openLoungePostById, openProfileByHandle, onOpenGuideCard],
+    [openLoungePostById, openProfileByHandle, onOpenGuideCard, pushLoungeNavReturnContext],
   )
 
   const openLinkPreview = useCallback(
@@ -11805,11 +12086,24 @@ export default function SocialFeed({
                         variant="detail"
                       />
                     ) : loungePostDetail.reposted_post ? (
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       data-lounge-original-embed
                       aria-label="View original post"
-                      onClick={() => void openLoungePostDetail(loungePostDetail.reposted_post)}
+                      onClick={(e) => {
+                        if (e.target instanceof Element && e.target.closest('button, a')) {
+                          e.stopPropagation()
+                          return
+                        }
+                        void openLoungePostDetail(loungePostDetail.reposted_post)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter' && e.key !== ' ') return
+                        if (e.target !== e.currentTarget) return
+                        e.preventDefault()
+                        void openLoungePostDetail(loungePostDetail.reposted_post)
+                      }}
                       className="mt-3 w-full cursor-pointer rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/80 active:bg-zinc-800/50"
                     >
                     <LoungeQuoteRepostEmbedAuthorMeta
@@ -11866,7 +12160,7 @@ export default function SocialFeed({
                         </div>
                       </button>
                     ) : null}
-                    </button>
+                    </div>
                     ) : null}
                   </div>
                 </>
@@ -13114,11 +13408,10 @@ export default function SocialFeed({
           key={loungeDockPanel === 'search' ? `search-${loungeDockSearchQueryVersion}` : loungeDockPanel}
           initialSearchQuery={loungeDockPanel === 'search' ? loungeDockSearchQuery : ''}
           openPanel={loungeDockPanel}
-          onClose={() => {
-            setChatDockInitialPeerUserId(null)
-            setLoungeSettingsFocusSection(null)
-            setLoungeDockPanel(null)
-          }}
+          onClose={onLoungeDockPanelClose}
+          panelScrollRefOut={loungeDockPanelScrollRef}
+          restorePanelScrollTop={dockPanelScrollRestore}
+          onPanelScrollRestored={onDockPanelScrollRestored}
           communityPosts={communityPosts}
           viewportTitleTopPx={loungeFeedViewportTopPx}
           titleBarNavSlot={titleBarNavSlot}
@@ -13230,6 +13523,9 @@ export default function SocialFeed({
           requestOwnProfileEditing={profileModalStartEditing}
           requestFollowListTab={profileModalFollowListTab}
           highlightFollowerUserIds={profileModalHighlightFollowerIds}
+          navSnapshotRef={profileNavSnapshotRef}
+          navRestore={profileNavRestore}
+          onNavRestoreApplied={onProfileNavRestoreApplied}
         />
       ) : null}
 

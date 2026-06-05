@@ -486,6 +486,11 @@ export default function LoungeProfileFullScreen({
   requestFollowListTab = null,
   /** Follower user ids to glow briefly on the Followers tab. */
   highlightFollowerUserIds = [],
+  /** Parent reads `{ tab, scrollTop }` for caption navigation return stack. */
+  navSnapshotRef = null,
+  /** One-shot restore after caption @/# navigation (tab + scroll). */
+  navRestore = null,
+  onNavRestoreApplied = null,
 }) {
   const [tab, setTab] = useState('posts')
   const [adminRoleBusy, setAdminRoleBusy] = useState(false)
@@ -554,6 +559,36 @@ export default function LoungeProfileFullScreen({
       setFollowListTab(requestFollowListTab)
     }
   }, [isOwnProfile, open, profileUserId, requestFollowListTab])
+
+  const navRestoreAppliedRef = useRef(false)
+  useLayoutEffect(() => {
+    if (!open || !navRestore || navRestoreAppliedRef.current) return
+    navRestoreAppliedRef.current = true
+    if (navRestore.tab) setTab(navRestore.tab)
+    const top = navRestore.scrollTop
+    const applyScroll = () => {
+      const el = profileBodyScrollRef.current
+      if (el && typeof top === 'number') el.scrollTop = top
+    }
+    applyScroll()
+    requestAnimationFrame(() => requestAnimationFrame(applyScroll))
+    onNavRestoreApplied?.()
+  }, [navRestore, onNavRestoreApplied, open])
+
+  useEffect(() => {
+    if (!open) navRestoreAppliedRef.current = false
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !navSnapshotRef) return
+    const el = profileBodyScrollRef.current
+    const sync = () => {
+      navSnapshotRef.current = { tab, scrollTop: el?.scrollTop ?? 0 }
+    }
+    sync()
+    el?.addEventListener('scroll', sync, { passive: true })
+    return () => el?.removeEventListener('scroll', sync)
+  }, [navSnapshotRef, open, tab])
 
   const profilePostRowPerfStyle = useMemo(() => loungeFeedPostRowPerfStyle(), [])
 
