@@ -1031,6 +1031,15 @@ html:not(.light) .lounge-category-pill.border {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
+/* Lounge YouTube embed — light-mode attribution footer only (video stays dark). */
+html.light [data-lounge-youtube-embed] [data-lounge-youtube-embed-footer] {
+  background-color: #f4f4f5;
+  border-top-color: rgba(228, 228, 231, 0.95);
+}
+html.light [data-lounge-youtube-embed] [data-lounge-youtube-embed-footer] .text-zinc-300 {
+  color: #52525b !important;
+}
+
 /* display + selected chip tokens → tribe fill */
 .lounge-pill-row .bg-amber-500\/10,
 .lounge-pill-row .bg-amber-500\/20,

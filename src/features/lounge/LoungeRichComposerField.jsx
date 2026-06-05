@@ -5,6 +5,7 @@ import {
   plainTextFromComposerRoot,
   syncComposerHtml,
 } from './loungeRichComposerDom.js'
+import { LOUNGE_CAPTION_MAX } from '../../utils/loungeCommentLimits.js'
 import { LOUNGE_RICH_COMPOSER_VARIANTS } from './loungeRichComposerVariants.js'
 
 /**
@@ -15,7 +16,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   {
     value = '',
     onChange,
-    maxLength = 280,
+    maxLength = LOUNGE_CAPTION_MAX,
     variant = 'feed',
     className = '',
     ariaLabel = 'Lounge post caption',

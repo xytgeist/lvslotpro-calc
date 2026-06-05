@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { renderRichCaption } from './loungeCaption'
+import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import {
@@ -163,7 +163,7 @@ export default function LoungeSearchCommentResultRow({
 
           {comment?.body ? (
             <div className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}>
-              {renderRichCaption(comment.body, richCaptionOpts)}
+              <LoungeExpandableRichCaption text={comment.body} captionOpts={richCaptionOpts} />
             </div>
           ) : null}
 

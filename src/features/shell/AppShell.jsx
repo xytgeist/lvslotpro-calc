@@ -5,6 +5,7 @@ import { feedPostDisplayCaption } from '../../utils/communityFeedPost'
 import { isLoungePostShareId, isLoungeProfileHandleSlug, parseLoungeProfilePathHandle } from '../../utils/loungeSharePost'
 import {
   fetchLoungeFollowingAuthorIds,
+  filterLoungeFeedTimelinePosts,
   LOUNGE_FEED_SCOPE_ALL,
   LOUNGE_FEED_SCOPE_FOLLOWING,
   loungeFeedCursorFromPageLast,
@@ -536,7 +537,7 @@ export default function AppShell({
       const hasMore = list.length > COMMUNITY_FEED_PAGE_SIZE
       const pageRows = hasMore ? list.slice(0, COMMUNITY_FEED_PAGE_SIZE) : list
       const pageLast = pageRows.at(-1) || null
-      const merged = [...(pinnedRows || []), ...pageRows]
+      const merged = filterLoungeFeedTimelinePosts([...(pinnedRows || []), ...pageRows])
       const deduped = merged.filter((row, idx, arr) => arr.findIndex((x) => x.id === row.id) === idx)
       const hydrated = await hydrateCommunityPosts(deduped)
 
@@ -641,7 +642,7 @@ export default function AppShell({
       const hasMore = list.length > COMMUNITY_FEED_PAGE_SIZE
       const pageRows = hasMore ? list.slice(0, COMMUNITY_FEED_PAGE_SIZE) : list
       const pageLast = pageRows.at(-1) || null
-      const hydrated = await hydrateCommunityPosts(pageRows)
+      const hydrated = await hydrateCommunityPosts(filterLoungeFeedTimelinePosts(pageRows))
 
       setCommunityPosts((prev) => [
         ...prev,

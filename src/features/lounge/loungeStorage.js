@@ -1,3 +1,4 @@
+import { LOUNGE_CAPTION_MAX } from '../../utils/loungeCommentLimits.js'
 import { normalizeLoungePostCategoryPills } from '../../utils/loungePostCategoryPills.js'
 
 /** Lounge composer: last loaded profile for this browser (validated against session user id). */
@@ -103,7 +104,7 @@ export function readLoungeComposerDraft() {
     if (!raw) return null
     const o = JSON.parse(raw)
     if (!o || typeof o !== 'object') return null
-    const postText = typeof o.postText === 'string' ? o.postText.slice(0, 280) : ''
+    const postText = typeof o.postText === 'string' ? o.postText.slice(0, LOUNGE_CAPTION_MAX) : ''
     const composerExpanded = o.composerExpanded === true
     const composerMediaUrl =
       typeof o.composerMediaUrl === 'string' ? o.composerMediaUrl.trim().slice(0, 2048) : ''
@@ -127,7 +128,7 @@ export function persistLoungeComposerDraft(text, expanded, hasLocalMedia, mediaU
     sessionStorage.setItem(
       LOUNGE_COMPOSER_DRAFT_KEY,
       JSON.stringify({
-        postText: String(text || '').slice(0, 280),
+        postText: String(text || '').slice(0, LOUNGE_CAPTION_MAX),
         composerExpanded: expanded === true,
         ...(hasUrl ? { composerMediaUrl: url.slice(0, 2048) } : {}),
       })
@@ -173,8 +174,49 @@ export function writeLoungeComposerLastCategoryPills(pills) {
   }
 }
 
+export const LOUNGE_CATEGORY_PILL_USAGE_KEY = 'loungeCategoryPillUsage:v1'
+
+/** @returns {Record<string, number>} slug → pick count */
+export function readLoungeCategoryPillUsageCounts() {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(LOUNGE_CATEGORY_PILL_USAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const out = {}
+    for (const [key, val] of Object.entries(parsed)) {
+      const slug = String(key || '').trim()
+      const n = Number(val)
+      if (!slug || !Number.isFinite(n) || n <= 0) continue
+      out[slug] = Math.round(n)
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+/** Increment usage counts when the member selects tribes (compose toggle or successful post). */
+export function bumpLoungeCategoryPillUsage(slugs) {
+  if (typeof window === 'undefined') return
+  const list = normalizeLoungePostCategoryPills(slugs)
+  if (!list.length) return
+  try {
+    const counts = readLoungeCategoryPillUsageCounts()
+    for (const slug of list) {
+      counts[slug] = (counts[slug] || 0) + 1
+    }
+    window.localStorage.setItem(LOUNGE_CATEGORY_PILL_USAGE_KEY, JSON.stringify(counts))
+  } catch {
+    // ignore
+  }
+}
+
 /** After a successful compose / quote / post-edit submit, remember tribes for the next post. */
 export function persistLoungeComposerLastCategoryPillsFromSubmit(snapshot) {
   if (!snapshot || !Object.prototype.hasOwnProperty.call(snapshot, 'categoryPills')) return
-  writeLoungeComposerLastCategoryPills(snapshot.categoryPills)
+  const pills = normalizeLoungePostCategoryPills(snapshot.categoryPills)
+  writeLoungeComposerLastCategoryPills(pills)
+  bumpLoungeCategoryPillUsage(pills)
 }

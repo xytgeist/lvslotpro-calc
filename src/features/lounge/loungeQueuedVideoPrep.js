@@ -90,7 +90,11 @@ export async function resolveLoungeSubmissionVideoPrep({
     try {
       return await handoff.promise
     } catch (e) {
-      if (e?.name === 'AbortError') throw e
+      if (e?.name === 'AbortError') {
+        if (snapshot?.videoPrepSpec) return runFromSpec(snapshot.videoPrepSpec)
+        if (snapshot?.videoFile instanceof File) return runFromFile(snapshot.videoFile)
+        throw e
+      }
       if (snapshot?.videoPrepSpec) return runFromSpec(snapshot.videoPrepSpec)
       if (snapshot?.videoFile instanceof File) return runFromFile(snapshot.videoFile)
       throw e

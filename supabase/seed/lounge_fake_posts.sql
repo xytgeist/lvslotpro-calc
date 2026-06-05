@@ -63,7 +63,7 @@ inserted as (
         when 4 then 'Logging a sample post to validate pagination and counts.'
         else 'Synthetic lounge seed post for UI and query testing.'
       end,
-      280
+      1000
     ),
     now() - ((sr.seq_no * 7 + (row_number() over ()) * 3) || ' minutes')::interval,
     (sr.seq_no * 3) % 28,

@@ -18,6 +18,9 @@ export type LinkPreviewPayload = {
   lounge_post_id: string | null
   /** Brand tint for compact link pills (theme-color, domain map, or client favicon sample). */
   accent_color: string | null
+  /** Inline embed hint for clients (e.g. YouTube). */
+  embed_kind?: 'youtube' | null
+  youtube_video_id?: string | null
 }
 
 const DOMAIN_ACCENT: Record<string, string> = {
@@ -114,6 +117,42 @@ function hostnameDomainKey(hostname: string): string {
   const parts = h.split('.').filter(Boolean)
   if (parts.length >= 2) return parts.slice(-2).join('.')
   return h
+}
+
+const YT_ID_RE = /^[\w-]{11}$/
+
+function parseYouTubeVideoId(url: string): string | null {
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase()
+    if (host === 'youtu.be') {
+      const id = u.pathname.slice(1).split('/')[0]?.split('?')[0]
+      return id && YT_ID_RE.test(id) ? id : null
+    }
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+      const fromWatch = u.searchParams.get('v')
+      if (fromWatch && YT_ID_RE.test(fromWatch)) return fromWatch
+      for (const re of [/^\/shorts\/([\w-]{11})/, /^\/embed\/([\w-]{11})/, /^\/live\/([\w-]{11})/, /^\/v\/([\w-]{11})/]) {
+        const m = u.pathname.match(re)
+        if (m?.[1] && YT_ID_RE.test(m[1])) return m[1]
+      }
+    }
+  } catch {
+    /* */
+  }
+  return null
+}
+
+function withYouTubeEmbedFields(preview: LinkPreviewPayload): LinkPreviewPayload {
+  const videoId = parseYouTubeVideoId(preview.url)
+  if (!videoId) return preview
+  return {
+    ...preview,
+    embed_kind: 'youtube',
+    youtube_video_id: videoId,
+    site_name: preview.site_name || 'YouTube',
+    layout: preview.image_url ? 'rich' : preview.layout,
+  }
 }
 
 function normalizeAccentHex(raw: string): string | null {
@@ -309,7 +348,7 @@ export async function unfurlUrl(
     .eq('url_normalized', key)
     .maybeSingle()
   if (cached?.preview && typeof cached.preview === 'object') {
-    return cached.preview as LinkPreviewPayload
+    return withYouTubeEmbedFields(cached.preview as LinkPreviewPayload)
   }
 
   const loungePostId = parseLoungePostId(url)
@@ -349,7 +388,7 @@ export async function unfurlUrl(
     metaContent(html, 'og:site_name') || parsed.hostname.replace(/^www\./i, ''),
   )
 
-  const preview: LinkPreviewPayload = {
+  const preview = withYouTubeEmbedFields({
     url: key,
     title: title.slice(0, 380) || null,
     description: description ? description.slice(0, 500) : null,
@@ -359,7 +398,7 @@ export async function unfurlUrl(
     layout: image_url ? 'rich' : 'compact',
     lounge_post_id: null,
     accent_color: accentForHost(parsed.hostname, html),
-  }
+  })
 
   await admin.from('link_preview_cache').upsert({
     url_normalized: key,

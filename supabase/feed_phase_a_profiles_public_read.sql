@@ -183,7 +183,7 @@ alter table public.community_feed_posts
 alter table public.community_feed_posts
   add column if not exists comment_count integer not null default 0;
 
--- Canonical v1 text field (280 chars). Legacy `title`/`body` removed after backfill.
+-- Canonical v1 text field (1000 chars). Legacy `title`/`body` removed after backfill.
 alter table public.community_feed_posts
   add column if not exists caption text;
 
@@ -205,7 +205,7 @@ begin
         nullif(trim(title), ''),
         ''
       ),
-      280
+      1000
     )
     where caption is null;
   else
@@ -227,14 +227,14 @@ alter table public.community_feed_posts
 
 alter table public.community_feed_posts
   add constraint community_feed_posts_caption_len_check
-  check (char_length(caption) <= 280);
+  check (char_length(caption) <= 1000);
 
 alter table public.community_feed_posts drop column if exists body;
 alter table public.community_feed_posts drop column if exists title;
 
 comment on column public.community_feed_posts.hidden_at is 'When set, post is withheld from public feed (moderation).';
 comment on column public.community_feed_posts.pinned is 'Staff: at most two visible pinned posts (trigger trg_community_feed_posts_max_two_pins).';
-comment on column public.community_feed_posts.caption is 'Canonical feed caption (<= 280 chars).';
+comment on column public.community_feed_posts.caption is 'Canonical feed caption (<= 1000 chars).';
 
 -- Touch edited_at when caption changes.
 create or replace function public.community_feed_posts_touch_edited_at()

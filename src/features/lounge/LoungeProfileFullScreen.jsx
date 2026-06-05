@@ -27,7 +27,7 @@ import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungePostInteractionBar from './LoungePostInteractionBar.jsx'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
-import { renderRichCaption } from './loungeCaption'
+import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import {
   LOUNGE_FEED_AVATAR_CLASS,
   LOUNGE_FEED_CAPTION_TEXT_CLASS,
@@ -368,13 +368,16 @@ export function ProfileReplyRow({ item, postCardProps, onOpenProfileReply, profi
               </button>
               {postCaption ? (
                 <div
-                  className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} line-clamp-4 text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}
+                  className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}
                 >
-                  {renderRichCaption(postCaption, {
-                    onMentionClick: pp.onMentionClick,
-                    onHashtagClick: pp.onHashtagClick,
-                    onLinkClick: pp.onLinkClick,
-                  })}
+                  <LoungeExpandableRichCaption
+                    text={postCaption}
+                    captionOpts={{
+                      onMentionClick: pp.onMentionClick,
+                      onHashtagClick: pp.onHashtagClick,
+                      onLinkClick: pp.onLinkClick,
+                    }}
+                  />
                 </div>
               ) : null}
               {feedCommentRowHasMedia(post) ? (

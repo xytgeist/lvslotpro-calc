@@ -19,6 +19,7 @@ function profilePostsQuery(supabaseClient, userId) {
     .select(PROFILE_POST_SELECT)
     .eq('user_id', userId)
     .is('hidden_at', null)
+    .is('thread_root_id', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
 }

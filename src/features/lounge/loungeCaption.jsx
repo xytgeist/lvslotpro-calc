@@ -1,5 +1,20 @@
 import { appendHighlightedPlainText, loungeSearchHighlightTerms } from '../../utils/loungeSearchHighlight.jsx'
 import { splitTextWithLinks } from '../../utils/linkifyText.jsx'
+import { LOUNGE_CAPTION_DISPLAY_MAX } from '../../utils/loungeCommentLimits.js'
+
+/** @returns {{ text: string, isTruncated: boolean }} */
+export function truncateCaptionForDisplay(raw, maxLen = LOUNGE_CAPTION_DISPLAY_MAX) {
+  const s = String(raw ?? '')
+  const max = Math.max(1, maxLen)
+  if (s.length <= max) return { text: s, isTruncated: false }
+  let cut = max
+  const slice = s.slice(0, max)
+  const lastSpace = slice.lastIndexOf(' ')
+  const lastNewline = slice.lastIndexOf('\n')
+  const breakAt = Math.max(lastSpace, lastNewline)
+  if (breakAt > max * 0.6) cut = breakAt
+  return { text: s.slice(0, cut).trimEnd(), isTruncated: true }
+}
 
 /** Strip trailing punctuation often pasted after URLs in prose. */
 export function trimUrlTrail(url) {

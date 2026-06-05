@@ -36,7 +36,11 @@ import {
   NEON_BLUE_ITEM_GLOW_IDLE,
   NEON_BLUE_ITEM_GLOW_PAGE_ACTIVE,
 } from '../utils/loungeDockFabGlow.js'
-import { Z_LOUNGE_DOCK_ABOVE_SLIDE_PANEL, Z_LOUNGE_DOCK_VIEWPORT } from '../constants/appZIndex.js'
+import {
+  Z_LOUNGE_DOCK_ABOVE_DETAIL_PROFILE,
+  Z_LOUNGE_DOCK_ABOVE_SLIDE_PANEL,
+  Z_LOUNGE_DOCK_VIEWPORT,
+} from '../constants/appZIndex.js'
 
 const HOME_ITEM_ID = 'home'
 /** Compact FAB + home chip (search/notifications/settings/chat panels, or any non-feed screen). */
@@ -58,7 +62,7 @@ const BACKDROP_PAN_THRESHOLD_PX = 12
 /** Scroll-hide: below this `reveal` the FAB is treated as gone (no idle dim). */
 const FAB_REVEAL_VISIBLE = 0.12
 /** After this idle window the FAB shrinks to {@link FAB_COMPACT_VISUAL_PX} and snaps to the bottom corner on its side. */
-const FAB_COMPACT_PIP_MS = 3_000
+const FAB_COMPACT_PIP_MS = 5_000
 const FAB_COMPACT_VISUAL_PX = 30
 /** Visible FAB dims to half opacity after this long without interaction. */
 const FAB_IDLE_DIM_MS = 10_000
@@ -260,6 +264,13 @@ export default function LoungeDockArcCarouselPrototype({
   enableFabCompactPip = true,
   /** Raise above `LoungeDockSlidePanels` (z-99) on search / notifications / settings. */
   stackAboveSlidePanel = false,
+  /** Raise above post detail / profile shells (z 98–102) while keeping below detail media lightbox (103+). */
+  stackAboveDetailOrProfile = false,
+  /**
+   * Post / comment detail: after {@link FAB_COMPACT_PIP_MS} idle, Edge L shrinks in place;
+   * wheel shrinks and flies to the Edge L corner slot ({@link loungeDockFabCornerPosition} raised).
+   */
+  fabDetailShellCompact = false,
 }) {
   const panelCompactChrome = panelChrome != null && PANEL_CHROME_PANELS.has(panelChrome)
   const isCornerL = menuLayout === 'cornerL'
@@ -622,18 +633,23 @@ export default function LoungeDockArcCarouselPrototype({
   const fabRenderPos = useMemo(() => {
     if (!fabPos) return null
     if (!fabCompactActive || open || repositioning) return fabPos
+    /** Edge L on detail shell: shrink at the corner slot, no flight. */
+    if (fabDetailShellCompact && isCornerL) return fabPos
     return loungeDockFabCornerPosition(
       viewport.width,
       viewport.height,
       LOUNGE_DOCK_FAB_SIZE_PX,
       fabCompactAlignLeft,
       totalBottomObstaclePx,
+      fabDetailShellCompact ? { raised: true } : undefined,
     )
   }, [
     fabPos,
     fabCompactActive,
     open,
     repositioning,
+    fabDetailShellCompact,
+    isCornerL,
     fabCompactAlignLeft,
     viewport.width,
     viewport.height,
@@ -831,6 +847,22 @@ export default function LoungeDockArcCarouselPrototype({
   useEffect(() => {
     fabCompactPipRef.current = fabCompactPip
   }, [fabCompactPip])
+
+  /** Post / comment detail: start full-size, then arm the standard 3s compact timer. */
+  useEffect(() => {
+    if (!fabDetailShellCompact) return undefined
+    setFabCompactPip(false)
+    clearFabCompactTimer()
+    if (!open && !repositioning) {
+      armFabCompactTimer()
+    }
+    return () => clearFabCompactTimer()
+  }, [fabDetailShellCompact, open, repositioning, armFabCompactTimer, clearFabCompactTimer])
+
+  useEffect(() => {
+    if (fabDetailShellCompact) return
+    setFabCompactPip(false)
+  }, [fabDetailShellCompact])
 
   useEffect(() => {
     if (!open) {
@@ -1181,18 +1213,27 @@ export default function LoungeDockArcCarouselPrototype({
         const cur = fabPosRef.current
         const cx = cur.left + LOUNGE_DOCK_FAB_SIZE_PX / 2
         const alignLeft = cx < viewport.width / 2
-        const cornerPos = loungeDockFabCornerPosition(
-          viewport.width,
-          viewport.height,
-          LOUNGE_DOCK_FAB_SIZE_PX,
-          alignLeft,
-          totalBottomObstaclePx,
-        )
-        setFabExpandFromPip({
-          cornerPos,
-          anchor: loungeDockCompactPipFabVisualCenter(cornerPos, alignLeft),
-          alignLeft,
-        })
+        if (fabDetailShellCompact && isCornerL) {
+          setFabExpandFromPip({
+            cornerPos: cur,
+            anchor: loungeDockCompactPipFabVisualCenter(cur, alignLeft),
+            alignLeft,
+          })
+        } else {
+          const cornerPos = loungeDockFabCornerPosition(
+            viewport.width,
+            viewport.height,
+            LOUNGE_DOCK_FAB_SIZE_PX,
+            alignLeft,
+            totalBottomObstaclePx,
+            fabDetailShellCompact ? { raised: true } : undefined,
+          )
+          setFabExpandFromPip({
+            cornerPos,
+            anchor: loungeDockCompactPipFabVisualCenter(cornerPos, alignLeft),
+            alignLeft,
+          })
+        }
         setPipWheelItemsDeferred(true)
       }
       pipWasCompactRef.current = false
@@ -1212,6 +1253,8 @@ export default function LoungeDockArcCarouselPrototype({
       totalBottomObstaclePx,
       expandMenu,
       enableFabCompactPip,
+      fabDetailShellCompact,
+      isCornerL,
     ],
   )
 
@@ -1500,9 +1543,17 @@ export default function LoungeDockArcCarouselPrototype({
 
   if (items.length === 0 || !fabPos || fabCenterX == null || fabCenterY == null) return null
 
-  const dockLayerZIndex = stackAboveSlidePanel
-    ? Z_LOUNGE_DOCK_ABOVE_SLIDE_PANEL
-    : Z_LOUNGE_DOCK_VIEWPORT
+  const fabCompactScaleOriginClass = fabShowCompactScale
+    ? (fabExpandFromPip?.alignLeft ?? fabCompactAlignLeft)
+      ? 'origin-bottom-left'
+      : 'origin-bottom-right'
+    : ''
+
+  const dockLayerZIndex = stackAboveDetailOrProfile
+    ? Z_LOUNGE_DOCK_ABOVE_DETAIL_PROFILE
+    : stackAboveSlidePanel
+      ? Z_LOUNGE_DOCK_ABOVE_SLIDE_PANEL
+      : Z_LOUNGE_DOCK_VIEWPORT
 
   const pickerOffset =
     menuExpanded && spinEnabled
@@ -1751,11 +1802,7 @@ export default function LoungeDockArcCarouselPrototype({
               ? 'z-20'
               : 'z-[25]'
         } ${
-          fabShowCompactScale
-            ? (fabExpandFromPip?.alignLeft ?? fabCompactAlignLeft)
-              ? 'origin-bottom-left'
-              : 'origin-bottom-right'
-            : ''
+          fabCompactScaleOriginClass
         } ${
           fabCompactActive && !open && !fabExpandFromPip
             ? ''

@@ -1,6 +1,6 @@
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
 import { LOUNGE_FEED_AVATAR_CLASS, LOUNGE_FEED_META_ROW_CLASS } from './loungeFeedAvatar.js'
-import { renderRichCaption } from './loungeCaption'
+import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 
 /** Stream video hero overlay only — hardcoded light text (survives html.light zinc + text-white flips). */
 const LOUNGE_LIGHTBOX_DISPLAY_NAME_CLASS =
@@ -179,13 +179,19 @@ export default function LoungeStreamVideoLightboxChrome({
                   if (openProfileGateIfNeeded?.()) return
                   onCaptionClick()
                 }}
-                className={`mt-1 line-clamp-2 w-full text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS} touch-manipulation cursor-pointer hover:opacity-90 [-webkit-tap-highlight-color:transparent]`}
+                className={`mt-1 w-full text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS} touch-manipulation cursor-pointer hover:opacity-90 [-webkit-tap-highlight-color:transparent]`}
               >
-                {renderRichCaption(caption, { onMentionClick, onHashtagClick, onLinkClick })}
+                <LoungeExpandableRichCaption
+                  text={caption}
+                  captionOpts={{ onMentionClick, onHashtagClick, onLinkClick }}
+                />
               </div>
             ) : (
-              <div className={`mt-1 line-clamp-2 text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS}`}>
-                {renderRichCaption(caption, { onMentionClick, onHashtagClick, onLinkClick })}
+              <div className={`mt-1 text-left text-[14px] leading-snug ${LOUNGE_LIGHTBOX_CAPTION_CLASS}`}>
+                <LoungeExpandableRichCaption
+                  text={caption}
+                  captionOpts={{ onMentionClick, onHashtagClick, onLinkClick }}
+                />
               </div>
             )
           ) : null}

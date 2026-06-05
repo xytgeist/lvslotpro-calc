@@ -108,6 +108,34 @@ export function loungePostCategoryPillOptions() {
   }))
 }
 
+/**
+ * Compose picker order: selected first, then most-used slugs, then catalog order.
+ *
+ * @param {string[]} selected
+ * @param {Record<string, number>} [usageCounts]
+ * @returns {{ slug: string, label: string }[]}
+ */
+export function loungePostCategoryPillOptionsForPicker(selected = [], usageCounts = {}) {
+  const selectedSet = new Set(
+    (Array.isArray(selected) ? selected : [])
+      .map((s) => resolveCategoryPillSlug(s))
+      .filter(Boolean),
+  )
+  const slugIndex = (slug) => {
+    const i = LOUNGE_POST_CATEGORY_PILL_SLUGS.indexOf(slug)
+    return i >= 0 ? i : 999
+  }
+  return loungePostCategoryPillOptions().sort((a, b) => {
+    const aSel = selectedSet.has(a.slug) ? 1 : 0
+    const bSel = selectedSet.has(b.slug) ? 1 : 0
+    if (bSel !== aSel) return bSel - aSel
+    const aUse = Number(usageCounts[a.slug]) || 0
+    const bUse = Number(usageCounts[b.slug]) || 0
+    if (bUse !== aUse) return bUse - aUse
+    return slugIndex(a.slug) - slugIndex(b.slug)
+  })
+}
+
 /** Human label for a stored slug; falls back to the slug. */
 export function loungePostCategoryPillLabel(slug) {
   const resolved = resolveCategoryPillSlug(slug)

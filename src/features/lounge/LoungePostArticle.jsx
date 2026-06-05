@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { feedPostDisplayCaption, isQuoteRepostPost, quoteRepostOriginalUnavailable } from '../../utils/communityFeedPost'
 import { displayPostCategoryPills } from '../../utils/loungePostCategoryPills.js'
-import { renderRichCaption } from './loungeCaption'
+import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
 import { textIsOnlyUrls } from '../../utils/linkifyText.jsx'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
@@ -12,6 +12,7 @@ import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableE
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
+import { loungePostIsThreadRoot, loungePostThreadPartCount } from '../../utils/loungePostThreadApi.js'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
   LOUNGE_FEED_AVATAR_CLASS,
@@ -428,7 +429,7 @@ export default function LoungePostArticle({
                 onClick={captionOpensDetail ? onCaptionAreaClick : undefined}
                 className={captionBlockClass}
               >
-                {renderRichCaption(rc.body, richCaptionOpts)}
+                <LoungeExpandableRichCaption text={rc.body} captionOpts={richCaptionOpts} />
               </div>
             ) : null}
             <LoungeLinkPreviewBlock preview={rc?.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
@@ -451,7 +452,10 @@ export default function LoungePostArticle({
                 onClick={captionOpensDetail ? onCaptionAreaClick : undefined}
                 className={captionBlockClass}
               >
-                {renderRichCaption(feedPostDisplayCaption(displayPost), richCaptionOpts)}
+                <LoungeExpandableRichCaption
+                  text={feedPostDisplayCaption(displayPost)}
+                  captionOpts={richCaptionOpts}
+                />
               </div>
             ) : null}
             <LoungeLinkPreviewBlock preview={displayPost.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
@@ -477,7 +481,7 @@ export default function LoungePostArticle({
                 onClick={captionOpensDetail ? onCaptionAreaClick : undefined}
                 className={captionBlockClass}
               >
-                {renderRichCaption(feedPostDisplayCaption(post), richCaptionOpts)}
+                <LoungeExpandableRichCaption text={feedPostDisplayCaption(post)} captionOpts={richCaptionOpts} />
               </div>
             ) : null}
             <LoungeLinkPreviewBlock preview={post.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
@@ -508,8 +512,11 @@ export default function LoungePostArticle({
                 postAgeLabel={postAgeLabel}
                 onDisplayNameClick={(e) => onEmbeddedAuthorProfile(e, post.reposted_post)}
               />
-              <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 line-clamp-4 whitespace-pre-wrap break-words">
-                {renderRichCaption(feedPostDisplayCaption(post.reposted_post), richCaptionOpts)}
+              <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 whitespace-pre-wrap break-words">
+                <LoungeExpandableRichCaption
+                  text={feedPostDisplayCaption(post.reposted_post)}
+                  captionOpts={richCaptionOpts}
+                />
               </div>
               <LoungePostFeedImagesAndGif
                 post={post.reposted_post}
@@ -550,6 +557,36 @@ export default function LoungePostArticle({
                 </button>
               ) : null}
             </div>
+            ) : post.reposted_comment ? (
+            <div
+              role="button"
+              tabIndex={0}
+              data-lounge-original-embed
+              aria-label="View original comment"
+              className="mt-2 w-full cursor-pointer rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/80 active:bg-zinc-800/50"
+            >
+              <LoungeQuoteRepostEmbedAuthorMeta
+                post={post.reposted_comment}
+                displayNameFor={displayNameFor}
+                handleFor={handleFor}
+                postAgeLabel={postAgeLabel}
+              />
+              {String(post.reposted_comment.body || '').trim() ? (
+                <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 whitespace-pre-wrap break-words">
+                  <LoungeExpandableRichCaption
+                    text={String(post.reposted_comment.body || '').trim()}
+                    captionOpts={richCaptionOpts}
+                  />
+                </div>
+              ) : null}
+              <LoungePostFeedImagesAndGif
+                post={post.reposted_comment}
+                variant="embed"
+                feedAutoplayRowId={post.id}
+                firstMarginTopClass="mt-2"
+                {...mediaLightboxProps}
+              />
+            </div>
             ) : null}
           </>
         ) : (
@@ -562,7 +599,14 @@ export default function LoungePostArticle({
                 onClick={captionOpensDetail ? onCaptionAreaClick : undefined}
                 className={captionBlockClass}
               >
-                {renderRichCaption(feedPostDisplayCaption(post), richCaptionOpts)}
+                <LoungeExpandableRichCaption text={feedPostDisplayCaption(post)} captionOpts={richCaptionOpts} />
+              </div>
+            ) : null}
+            {loungePostIsThreadRoot(post) ? (
+              <div
+                className={`${showCaptionText(post) ? 'mt-1' : LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-[13px] font-semibold text-cyan-400/90`}
+              >
+                Thread · {loungePostThreadPartCount(post)} parts
               </div>
             ) : null}
             <LoungeLinkPreviewBlock preview={post.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
@@ -570,7 +614,7 @@ export default function LoungePostArticle({
               post={post}
               variant="feed"
               firstMarginTopClass={
-                showCaptionText(post) || post.link_preview
+                showCaptionText(post) || post.link_preview || loungePostIsThreadRoot(post)
                   ? LOUNGE_FEED_MEDIA_AFTER_CAPTION_TOP_CLASS
                   : LOUNGE_FEED_MEDIA_ONLY_TOP_CLASS
               }

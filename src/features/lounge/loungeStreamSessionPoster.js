@@ -45,19 +45,27 @@ export function releaseLoungeStreamSessionPoster(uid) {
   byUid.delete(id)
 }
 
-/** Blob URLs on a submit snapshot that must stay alive until the background job finishes. */
-export function loungeSubmitSnapshotBlobUrls(snapshot) {
-  /** @type {Set<string>} */
-  const urls = new Set()
-  if (!snapshot) return urls
-  const poster = String(snapshot.sessionStreamPosterBlobUrl || '').trim()
+function collectSubmitSnapshotBlobUrlsFromPart(part, urls) {
+  if (!part || typeof part !== 'object') return
+  const poster = String(part.sessionStreamPosterBlobUrl || '').trim()
   if (poster.startsWith('blob:')) urls.add(poster)
-  const restore = snapshot.videoPrepSlotRestore
+  const restore = part.videoPrepSlotRestore
   if (restore && typeof restore === 'object') {
     const po = String(restore.posterUrl || '').trim()
     const pr = String(restore.preview || '').trim()
     if (po.startsWith('blob:')) urls.add(po)
     if (pr.startsWith('blob:')) urls.add(pr)
+  }
+}
+
+/** Blob URLs on a submit snapshot that must stay alive until the background job finishes. */
+export function loungeSubmitSnapshotBlobUrls(snapshot) {
+  /** @type {Set<string>} */
+  const urls = new Set()
+  if (!snapshot) return urls
+  collectSubmitSnapshotBlobUrlsFromPart(snapshot, urls)
+  if (Array.isArray(snapshot.threadParts)) {
+    for (const part of snapshot.threadParts) collectSubmitSnapshotBlobUrlsFromPart(part, urls)
   }
   return urls
 }

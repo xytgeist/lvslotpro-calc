@@ -10,6 +10,7 @@ import {
   isLoungeSupabaseFeedMediaUrl,
   uploadLoungeFeedPostImageToCfR2,
 } from './loungeCfImageMedia.js'
+import { LOUNGE_CAPTION_MAX } from './loungeCommentLimits.js'
 import { normalizeLoungePostCategoryPills } from './loungePostCategoryPills.js'
 
 export { isLoungeCfR2MediaUrl, isLoungeHostedFeedMediaUrl, isLoungeSupabaseFeedMediaUrl } from './loungeCfImageMedia.js'
@@ -21,9 +22,10 @@ export function feedPostDisplayCaption(row) {
   return ''
 }
 
-/** Quote repost feed row (not plain post/comment repost). */
+/** Quote repost feed row (post or comment target; not plain repost). */
 export function isQuoteRepostPost(post) {
-  if (!post || post.is_plain_repost === true || post.repost_of_comment_id) return false
+  if (!post || post.is_plain_repost === true) return false
+  if (post.repost_of_comment_id) return true
   return Boolean(post.repost_of_post_id || post.repost_target_unavailable === true)
 }
 
@@ -32,6 +34,7 @@ export function quoteRepostOriginalUnavailable(post) {
   if (!isQuoteRepostPost(post)) return false
   if (post.repost_target_unavailable === true) return true
   if (post.repost_of_post_id && !post.reposted_post) return true
+  if (post.repost_of_comment_id && !post.reposted_comment) return true
   return false
 }
 
@@ -155,11 +158,11 @@ export function feedPostMediaUpdatePayload({ imageUrls, gifUrl }) {
   }
 }
 
-/** Normalized caption for insert/update (trim, max 280). */
+/** Normalized caption for insert/update (trim, max {@link LOUNGE_CAPTION_MAX}). */
 export function normalizeFeedCaption(caption) {
   return String(caption ?? '')
     .trim()
-    .slice(0, 280)
+    .slice(0, LOUNGE_CAPTION_MAX)
 }
 
 function attachCategoryPills(out, categoryPills) {
@@ -196,6 +199,12 @@ export function communityFeedPostInsertPayload({
   isApGuidePost,
   /** Snapshot of the guide hero URL at post time (null = static fallback). */
   guideThumbnailUrl,
+  /** Thread continuation: points at root post id; omit on standalone / root inserts. */
+  threadRootId,
+  /** 0 = root/standalone; 1+ = continuation index. */
+  threadPartIndex = 0,
+  /** Total parts including root (set on root row when threading). */
+  threadPartCount = 1,
 }) {
   const cap = normalizeFeedCaption(caption)
   const gt = String(gameTitle ?? '').trim()
@@ -204,9 +213,13 @@ export function communityFeedPostInsertPayload({
       caption: cap,
       game_title: gt,
       game_slug: gameSlug || null,
+      thread_part_index: Math.max(0, Number(threadPartIndex) || 0),
+      thread_part_count: Math.max(1, Number(threadPartCount) || 1),
     },
     categoryPills,
   )
+  const rootId = threadRootId != null ? String(threadRootId).trim() : ''
+  if (rootId) out.thread_root_id = rootId
   if (pinned === true) out.pinned = true
   const sv = streamVideoUid != null ? String(streamVideoUid).trim() : ''
   if (sv) {
@@ -331,6 +344,63 @@ export function communityFeedCommentRepostInsertPayload({ originalCommentId, cat
     },
     categoryPills,
   )
+}
+
+/**
+ * Quote repost of a comment: new feed row with caption + media + link to the original comment.
+ */
+export function communityFeedCommentQuoteRepostInsertPayload({
+  caption,
+  originalCommentId,
+  mediaUrl,
+  gifUrl,
+  imageUrls,
+  streamVideoUid,
+  streamPosterUrl,
+  streamVideoWidth,
+  streamVideoHeight,
+  categoryPills,
+}) {
+  const cap = normalizeFeedCaption(caption)
+  const out = attachCategoryPills(
+    {
+      caption: cap,
+      game_title: '',
+      game_slug: null,
+      repost_of_comment_id: originalCommentId,
+      is_plain_repost: false,
+    },
+    categoryPills,
+  )
+  const sv = streamVideoUid != null ? String(streamVideoUid).trim() : ''
+  if (sv) {
+    out.stream_video_uid = sv
+    out.media_url = null
+    out.gif_url = null
+    out.image_urls = []
+    const pu = streamPosterUrl != null ? String(streamPosterUrl).trim() : ''
+    if (pu) out.stream_poster_url = pu
+    const w = Number(streamVideoWidth)
+    const h = Number(streamVideoHeight)
+    if (Number.isFinite(w) && Number.isFinite(h) && w >= 2 && h >= 2) {
+      out.stream_video_width = Math.round(w)
+      out.stream_video_height = Math.round(h)
+    }
+    return out
+  }
+  const imgs = Array.isArray(imageUrls)
+    ? imageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
+    : []
+  if (imgs.length > 0) {
+    out.image_urls = imgs
+    out.media_url = imgs[0]
+  } else {
+    const mu = mediaUrl != null ? String(mediaUrl).trim() : ''
+    if (mu) out.media_url = mu
+  }
+  const gu = gifUrl != null ? String(gifUrl).trim() : ''
+  if (gu) out.gif_url = gu
+  return out
 }
 
 const LOUNGE_FEED_MEDIA_BUCKET = 'lounge-feed'

@@ -1280,7 +1280,43 @@ function sleepWithAbort(ms, signal) {
 }
 
 /**
- * Poll until HLS manifest is reachable (encoding finished).
+ * Probe Cloudflare Stream readiness via thumbnail load (no CORS — safe on localhost dev).
+ * @param {string} uid
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<boolean>}
+ */
+function probeCfStreamThumbnailReady(uid, signal) {
+  const poster = cfStreamPosterUrl(uid, 360)
+  if (!poster || typeof Image === 'undefined') return Promise.resolve(false)
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve(false)
+      return
+    }
+    const img = new Image()
+    let settled = false
+    const finish = (ok) => {
+      if (settled) return
+      settled = true
+      img.onload = null
+      img.onerror = null
+      signal?.removeEventListener('abort', onAbort)
+      resolve(ok)
+    }
+    const onAbort = () => finish(false)
+    signal?.addEventListener('abort', onAbort)
+    img.onload = () => {
+      finish(img.naturalWidth > 0 && img.naturalHeight > 0)
+    }
+    img.onerror = () => finish(false)
+    img.decoding = 'async'
+    img.src = `${poster}&time=0s&poll=${Date.now()}`
+  })
+}
+
+/**
+ * Poll until Stream playback assets are ready (encoding finished).
+ * Uses thumbnail `Image` load — not HLS `fetch` — so localhost dev is not blocked by videodelivery.net CORS.
  * @param {string} uid
  * @param {{ timeoutMs?: number, intervalMs?: number, signal?: AbortSignal, onPoll?: (args: { elapsed: number }) => void, onUploadDiagnostic?: (detail: string) => void }} [options]
  */
@@ -1290,10 +1326,9 @@ export async function waitForCfStreamManifestReady(uid, options = {}) {
   const signal = options.signal
   const onUploadDiagnostic =
     typeof options.onUploadDiagnostic === 'function' ? options.onUploadDiagnostic : undefined
-  const manifest = cfStreamManifestUrl(uid)
-  if (!manifest) throw new Error('Missing video id.')
+  const id = String(uid || '').trim()
+  if (!id) throw new Error('Missing video id.')
   const start = typeof performance !== 'undefined' ? performance.now() : Date.now()
-  let lastPollHttpStatus = /** @type {number | null} */ (null)
   let lastPollError = ''
   while (true) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -1302,14 +1337,13 @@ export async function waitForCfStreamManifestReady(uid, options = {}) {
     if (elapsed > timeoutMs) {
       logLoungeVideoUploadTelemetry(
         {
-          phase: 'cf_stream_manifest_poll',
+          phase: 'cf_stream_playback_poll',
           outcome: 'timeout',
           elapsedMs: Math.round(elapsed),
           timeoutMs,
           intervalMs,
-          lastPollHttpStatus,
           lastPollError: lastPollError.slice(0, 300),
-          videoUidPrefix: String(uid || '').trim().slice(0, 8),
+          videoUidPrefix: id.slice(0, 8),
         },
         onUploadDiagnostic,
       )
@@ -1317,24 +1351,13 @@ export async function waitForCfStreamManifestReady(uid, options = {}) {
     }
     options.onPoll?.({ elapsed })
     try {
-      const res = await fetch(manifest, {
-        method: 'GET',
-        cache: 'no-store',
-        credentials: 'omit',
-        signal,
-      })
-      lastPollHttpStatus = res.status
+      if (await probeCfStreamThumbnailReady(id, signal)) return true
       lastPollError = ''
-      if (res.ok) {
-        const txt = await res.text()
-        if (txt.includes('#EXTM3U')) return true
-      }
     } catch (e) {
       if (e && typeof e === 'object' && 'name' in e && /** @type {{ name?: string }} */ (e).name === 'AbortError') {
         throw e
       }
       lastPollError = e instanceof Error ? e.message : String(e)
-      // network hiccup — retry until timeout
     }
     await sleepWithAbort(intervalMs, signal)
   }

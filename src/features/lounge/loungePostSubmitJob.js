@@ -1,7 +1,9 @@
 import { prepareLoungeFeedImageForUpload } from '../../utils/compressImageForUpload'
 import {
+  communityFeedCommentQuoteRepostInsertPayload,
   communityFeedPostInsertPayload,
   communityFeedQuoteRepostInsertPayload,
+  normalizeFeedCaption,
   uploadLoungeFeedPostImage,
 } from '../../utils/communityFeedPost'
 import {
@@ -16,13 +18,224 @@ import {
 } from '../../utils/loungeVideoUpload'
 import { fetchLoungeStreamPosterFileFromSnapshot } from './loungeStreamSessionPoster.js'
 import { normalizeLoungePostCategoryPills } from '../../utils/loungePostCategoryPills.js'
+import { feedCommentThreadPartInsertPayload } from '../../utils/communityFeedComment.js'
 import { attachLinkPreview } from '../../utils/loungeLinkPreviewApi.js'
+import { resolveLoungeSubmissionVideoPrep } from './loungeQueuedVideoPrep.js'
+
+async function uploadLoungeThreadPartImageFiles({
+  supabaseClient,
+  user,
+  imageFiles,
+  existingImageUrls,
+  signal,
+  onProgress,
+  progressBase,
+  progressSpan,
+  label,
+}) {
+  const uploadedUrls = Array.isArray(existingImageUrls)
+    ? existingImageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
+    : []
+  const files = Array.isArray(imageFiles) ? imageFiles : []
+  const total = uploadedUrls.length + files.length
+  for (let i = 0; i < files.length; i += 1) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+    const file = files[i]
+    if (typeof onProgress === 'function') {
+      onProgress({
+        progress: progressBase + ((uploadedUrls.length + i + 1) / Math.max(1, total)) * progressSpan,
+        status: label,
+        detail: `${uploadedUrls.length + i + 1} of ${total}`,
+      })
+    }
+    const { file: ready, error: cErr } = await prepareLoungeFeedImageForUpload(file)
+    if (cErr) throw new Error(cErr.message)
+    const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
+      supabaseClient,
+      user,
+      file: ready,
+    })
+    if (upErr) throw new Error(upErr.message || 'Could not upload image.')
+    if (!upUrl) throw new Error('Could not upload image.')
+    uploadedUrls.push(upUrl)
+  }
+  return uploadedUrls
+}
+
+/**
+ * Resolve Stream video + poster for a thread part (parts 2+; sequential caller).
+ *
+ * @returns {Promise<{ streamVideoUid: string, streamPosterPublicUrl: string, streamVideoWidthOut: number, streamVideoHeightOut: number, pendingUid: string | null } | null>}
+ */
+async function resolveThreadPartStreamVideoForInsert({
+  part,
+  supabaseClient,
+  user,
+  signal,
+  onProgress,
+  onUploadDiagnostic,
+  progressBase,
+  progressSpan,
+  label,
+}) {
+  const preUid = String(part?.streamVideoUid ?? '').trim()
+  const videoFile = part?.videoFile instanceof File ? part.videoFile : null
+  const hasVideo =
+    Boolean(preUid) ||
+    Boolean(videoFile) ||
+    Boolean(part?.videoPrepSpec) ||
+    part?.awaitingThreadPartVideoPrepJobId != null ||
+    Boolean(part?._capturedPrepHandoff)
+  if (!hasVideo) return null
+
+  const report = (progress, status, detail = '') => {
+    if (typeof onProgress !== 'function') return
+    const st = String(status || label || '').trim()
+    const prefixed =
+      label && st && !st.startsWith(String(label)) ? `${label} · ${st}` : st || String(label || '')
+    onProgress({
+      progress: progressBase + progress * progressSpan,
+      status: prefixed,
+      detail: detail ? String(detail) : '',
+    })
+  }
+
+  let streamVideoUid = ''
+  let pendingCfUploadUid = preUid || null
+
+  const prepSnap = {
+    streamVideoUid: preUid || null,
+    videoFile,
+    videoPrepSpec: part?.videoPrepSpec ?? null,
+    awaitingComposerVideoPrepJobId: part?.awaitingThreadPartVideoPrepJobId ?? null,
+    _capturedPrepHandoff: part?._capturedPrepHandoff ?? null,
+    sessionStreamPosterBlobUrl: part?.sessionStreamPosterBlobUrl ?? null,
+    videoPrepSlotRestore: part?.videoPrepSlotRestore ?? null,
+  }
+
+  if (preUid) {
+    streamVideoUid = preUid
+    report(0.2, label, 'Checking playback')
+    await waitForCfStreamManifestReady(preUid, {
+      signal,
+      onUploadDiagnostic,
+      onPoll: ({ elapsed }) => {
+        const cap = 120_000
+        const t = Math.min(1, elapsed / cap)
+        report(0.2 + t * 0.5, label, `${Math.round(elapsed / 1000)}s`)
+      },
+    })
+  } else {
+    report(0.05, label, 'Preparing video')
+    const out = await resolveLoungeSubmissionVideoPrep({
+      snapshot: prepSnap,
+      supabaseClient,
+      signal,
+      onProgress: (info) => report(0.05 + (info.progress ?? 0) * 0.55, info.status, info.detail),
+      onUploadDiagnostic,
+    })
+    streamVideoUid = String(out.streamVideoUid || '').trim()
+    pendingCfUploadUid = streamVideoUid || null
+    if (!streamVideoUid) throw new Error('Could not upload thread video.')
+    report(0.65, label, 'Checking playback')
+    await waitForCfStreamManifestReady(streamVideoUid, {
+      signal,
+      onUploadDiagnostic,
+      onPoll: ({ elapsed }) => {
+        const cap = 120_000
+        const t = Math.min(1, elapsed / cap)
+        report(0.65 + t * 0.25, label, `${Math.round(elapsed / 1000)}s`)
+      },
+    })
+  }
+
+  let streamPosterPublicUrl = ''
+  let streamVideoWidthOut = 0
+  let streamVideoHeightOut = 0
+  const fileProbe =
+    (videoFile instanceof File ? videoFile : null) ||
+    (part?.videoFile instanceof File ? part.videoFile : null)
+  if (fileProbe) {
+    const dim = await probeVideoFileDisplaySize(fileProbe)
+    if (dim) {
+      streamVideoWidthOut = dim.width
+      streamVideoHeightOut = dim.height
+    }
+  }
+
+  let posterFile = await fetchLoungeStreamPosterFileFromSnapshot(
+    { sessionStreamPosterBlobUrl: part?.sessionStreamPosterBlobUrl ?? null },
+    streamVideoUid,
+    signal,
+  )
+  if (!posterFile && fileProbe) {
+    const obj = await captureVideoFilePosterObjectUrl(fileProbe)
+    if (obj) {
+      try {
+        const res = await fetch(obj)
+        const blob = await res.blob()
+        URL.revokeObjectURL(obj)
+        if (blob?.size) posterFile = new File([blob], 'stream-poster.jpg', { type: 'image/jpeg' })
+      } catch {
+        try {
+          URL.revokeObjectURL(obj)
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  if (posterFile) {
+    report(0.92, label, 'Uploading preview')
+    const { file: readyPoster, error: posterPrepErr } = await prepareLoungeFeedImageForUpload(posterFile)
+    if (posterPrepErr) throw new Error(posterPrepErr.message)
+    const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
+      supabaseClient,
+      user,
+      file: readyPoster,
+    })
+    if (upErr) throw new Error(upErr.message || 'Could not upload video preview image.')
+    if (!upUrl) throw new Error('Could not upload video preview image.')
+    streamPosterPublicUrl = upUrl
+  }
+
+  return {
+    streamVideoUid,
+    streamPosterPublicUrl,
+    streamVideoWidthOut,
+    streamVideoHeightOut,
+    pendingUid: pendingCfUploadUid,
+  }
+}
 
 /** Mirrors `SocialFeed` so insert failures surface the same copy. */
 const LOUNGE_MAX_PINNED_ALERT =
   'The maximum number of pinned posts is two. Unpin a post to pin this one.'
 
+/** @returns {number} Multi-part thread size, or 0 when not a thread. */
+export function loungeSubmissionSnapshotThreadPartCount(snapshot) {
+  if (!snapshot) return 0
+  if (Array.isArray(snapshot.threadParts) && snapshot.threadParts.length > 1) {
+    return snapshot.threadParts.length
+  }
+  if (Array.isArray(snapshot.threadCaptions) && snapshot.threadCaptions.length > 1) {
+    return snapshot.threadCaptions.length
+  }
+  return 0
+}
+
 /** True when a background Lounge post/comment job includes Stream video (not images/GIF-only). */
+function loungeThreadPartSnapshotHasVideo(part) {
+  if (!part || typeof part !== 'object') return false
+  if (String(part.streamVideoUid ?? '').trim()) return true
+  if (part.videoFile instanceof File) return true
+  if (part.videoPrepSpec) return true
+  if (part.awaitingThreadPartVideoPrepJobId != null) return true
+  if (part._capturedPrepHandoff) return true
+  return false
+}
+
 export function loungeSubmissionSnapshotIncludesVideo(snapshot) {
   if (!snapshot) return false
   if (String(snapshot.streamVideoUid || '').trim()) return true
@@ -32,6 +245,9 @@ export function loungeSubmissionSnapshotIncludesVideo(snapshot) {
   if (snapshot.awaitingDetailCommentVideoPrepJobId != null) return true
   if (snapshot.awaitingDetailEditVideoPrepJobId != null) return true
   if (snapshot.awaitingDetailCommentEditVideoPrepJobId != null) return true
+  if (Array.isArray(snapshot.threadParts) && snapshot.threadParts.some(loungeThreadPartSnapshotHasVideo)) {
+    return true
+  }
   return false
 }
 
@@ -40,6 +256,7 @@ export function loungeSubmissionSnapshotIncludesVideo(snapshot) {
  * @property {string} caption
  * @property {string} gifOnlyUrl
  * @property {File[]} imageFiles
+ * @property {string[] | null | undefined} [existingImageUrls] Already-uploaded image URLs (from server draft restore).
  * @property {File | null} videoFile
  * @property {string | null} [streamVideoUid] When set, video already uploaded to Cloudflare Stream (composer prep).
  * @property {number | null | undefined} [awaitingComposerVideoPrepJobId] When set, post job awaits in-flight video prep for this job id (composer or quote repost; see `quoteRepostOfPostId`).
@@ -50,6 +267,9 @@ export function loungeSubmissionSnapshotIncludesVideo(snapshot) {
  * @property {boolean} isStaffPoster
  * @property {string | null | undefined} [quoteRepostOfPostId] When set, insert a quote repost row instead of a normal post.
  * @property {string[] | null | undefined} [categoryPills] Optional audience category slugs (0–3).
+ * @property {string | null | undefined} [savedDraftId] Server draft row to delete after successful publish.
+ * @property {string[] | null | undefined} [threadCaptions] Ordered caption parts (root + continuations); legacy text-only.
+ * @property {Array<{ body: string, gifUrl?: string, imageFiles?: File[], existingImageUrls?: string[] }> | null | undefined} [threadParts] Full thread parts with per-section media.
  */
 
 /**
@@ -71,21 +291,11 @@ export async function executeLoungeCommunityPostSubmission({
   rateLimitMessage,
   onUploadDiagnostic,
 }) {
-  const report = (progress, status, detail = '') => {
-    if (typeof onProgress !== 'function') return
-    onProgress({
-      progress: Math.max(0, Math.min(1, progress)),
-      status: String(status || ''),
-      detail: detail ? String(detail) : '',
-    })
-  }
-
   const throwIfAborted = () => {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
   }
 
   throwIfAborted()
-  report(0.02, 'Checking session', '')
 
   const {
     data: { session },
@@ -98,16 +308,123 @@ export async function executeLoungeCommunityPostSubmission({
     caption,
     gifOnlyUrl,
     imageFiles,
+    existingImageUrls: snapshotExistingImageUrls,
     videoFile,
     streamVideoUid: preUploadedUid,
     wantsPin,
     isStaffPoster,
     quoteRepostOfPostId,
+    quoteRepostOfCommentId,
     categoryPills,
+    threadCaptions: snapshotThreadCaptions,
+    threadParts: snapshotThreadParts,
   } = snapshot
   const quoteParentId = quoteRepostOfPostId != null ? String(quoteRepostOfPostId).trim() : ''
+  const quoteCommentParentId =
+    quoteRepostOfCommentId != null ? String(quoteRepostOfCommentId).trim() : ''
+  const threadParts = Array.isArray(snapshotThreadParts) && snapshotThreadParts.length > 0
+    ? snapshotThreadParts.map((part) => ({
+        body: normalizeFeedCaption(part?.body),
+        gifUrl: String(part?.gifUrl ?? part?.gifOnlyUrl ?? '').trim(),
+        imageFiles: Array.isArray(part?.imageFiles)
+          ? part.imageFiles.filter((f) => f instanceof File)
+          : [],
+        existingImageUrls: Array.isArray(part?.existingImageUrls)
+          ? part.existingImageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
+          : [],
+        videoFile: part?.videoFile instanceof File ? part.videoFile : null,
+        streamVideoUid: String(part?.streamVideoUid ?? '').trim(),
+        videoPrepSpec: part?.videoPrepSpec ?? null,
+        awaitingThreadPartVideoPrepJobId: part?.awaitingThreadPartVideoPrepJobId ?? null,
+        sessionStreamPosterBlobUrl: part?.sessionStreamPosterBlobUrl ?? null,
+        videoPrepSlotRestore: part?.videoPrepSlotRestore ?? null,
+        _capturedPrepHandoff: part?._capturedPrepHandoff ?? null,
+      }))
+    : Array.isArray(snapshotThreadCaptions)
+      ? snapshotThreadCaptions.map((t) => ({
+          body: normalizeFeedCaption(t),
+          gifUrl: '',
+          imageFiles: [],
+          existingImageUrls: [],
+          videoFile: null,
+          streamVideoUid: '',
+          videoPrepSpec: null,
+          awaitingThreadPartVideoPrepJobId: null,
+          sessionStreamPosterBlobUrl: null,
+          videoPrepSlotRestore: null,
+          _capturedPrepHandoff: null,
+        })).filter((p) => p.body)
+      : []
+  if (quoteParentId && quoteCommentParentId) {
+    throw new Error('Quote repost target must be a post or a comment, not both.')
+  }
+  if (quoteCommentParentId && threadParts.length > 1) {
+    throw new Error('Quote reposts cannot be part of a thread.')
+  }
+  if (quoteParentId && threadParts.length > 1) {
+    throw new Error('Quote reposts cannot be part of a thread.')
+  }
+  const threadPartTotal = threadParts.length
+
+  const threadPartStatus = (partNum, status) => {
+    const st = String(status || '').trim()
+    if (!st) return ''
+    if (/^Part \d+/.test(st)) return st
+    return partNum != null && partNum > 0 ? `Part ${partNum} · ${st}` : st
+  }
+
+  const report = (progressOrInfo, status, detail = '', threadProgress = null) => {
+    if (typeof onProgress !== 'function') return
+    let progress = progressOrInfo
+    let stRaw = status
+    let det = detail
+    let tp = threadProgress
+    if (progressOrInfo && typeof progressOrInfo === 'object' && typeof progressOrInfo.progress === 'number') {
+      progress = progressOrInfo.progress
+      stRaw = progressOrInfo.status
+      det = progressOrInfo.detail
+      tp = null
+    }
+    tp = tp && typeof tp === 'object' ? tp : null
+    const activePart =
+      tp && typeof tp.threadPartActive === 'number'
+        ? tp.threadPartActive
+        : threadPartTotal > 1 && !quoteParentId && !quoteCommentParentId
+          ? 1
+          : null
+    let st = String(stRaw || '')
+    if (activePart != null && st) {
+      st = threadPartStatus(activePart, st)
+    }
+    const payload = {
+      progress: Math.max(0, Math.min(1, progress)),
+      status: st,
+      detail: det ? String(det) : '',
+    }
+    if (tp) {
+      if (typeof tp.threadPartPublished === 'number') {
+        payload.threadPartPublished = tp.threadPartPublished
+      }
+      if (typeof tp.threadPartTotal === 'number') {
+        payload.threadPartTotal = tp.threadPartTotal
+      }
+      if (typeof tp.threadPartActive === 'number') {
+        payload.threadPartActive = tp.threadPartActive
+      }
+    } else if (threadPartTotal > 1 && activePart != null) {
+      payload.threadPartTotal = threadPartTotal
+      payload.threadPartActive = activePart
+    }
+    onProgress(payload)
+  }
+
+  report(0.02, 'Checking session', '')
+
   const preUid = String(preUploadedUid || '').trim()
   const hasVideo = Boolean(videoFile) || Boolean(preUid)
+  const preUploadedImageUrls = Array.isArray(snapshotExistingImageUrls)
+    ? snapshotExistingImageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
+    : []
   const nImg = Array.isArray(imageFiles) ? imageFiles.length : 0
 
   if (hasVideo && gifOnlyUrl) {
@@ -115,7 +432,7 @@ export async function executeLoungeCommunityPostSubmission({
   }
 
   throwIfAborted()
-  report(0.05, 'Preparing post', '')
+  report(0.05, 'Preparing post', '', threadPartTotal > 1 ? { threadPartTotal, threadPartActive: 1 } : null)
 
   let streamVideoUid = ''
   /** Set when direct upload URL is minted; cleared only after DB insert succeeds. Used to delete CF orphans on any failure. */
@@ -232,13 +549,18 @@ export async function executeLoungeCommunityPostSubmission({
     }
 
     throwIfAborted()
-    const uploadedUrls = []
+    const uploadedUrls = [...preUploadedImageUrls]
     for (let i = 0; i < nImg; i += 1) {
       throwIfAborted()
       const file = imageFiles[i]
       const base = hasVideo ? 0.1 : 0.08
       const span = hasVideo ? 0.2 : 0.82
-      report(base + ((i + 1) / nImg) * span, 'Uploading images', `${i + 1} of ${nImg}`)
+      const totalImg = preUploadedImageUrls.length + nImg
+      report(
+        base + ((preUploadedImageUrls.length + i + 1) / Math.max(1, totalImg)) * span,
+        'Uploading images',
+        `${preUploadedImageUrls.length + i + 1} of ${totalImg}`,
+      )
       const { file: ready, error: cErr } = await prepareLoungeFeedImageForUpload(file)
       if (cErr) throw new Error(cErr.message)
       const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
@@ -252,10 +574,47 @@ export async function executeLoungeCommunityPostSubmission({
     }
 
     throwIfAborted()
-    report(0.9, quoteParentId ? 'Publishing quote repost' : 'Publishing post', 'Inserting into community feed…')
+    report(
+      0.9,
+      quoteParentId || quoteCommentParentId ? 'Publishing quote repost' : 'Publishing post',
+      'Inserting into community feed…',
+    )
 
     let insertPayload
-    if (quoteParentId) {
+    if (quoteCommentParentId) {
+      if (streamVideoUid) {
+        insertPayload = communityFeedCommentQuoteRepostInsertPayload({
+          caption,
+          originalCommentId: quoteCommentParentId,
+          streamVideoUid,
+          streamPosterUrl: streamPosterPublicUrl || undefined,
+          streamVideoWidth: streamVideoWidthOut || undefined,
+          streamVideoHeight: streamVideoHeightOut || undefined,
+          categoryPills,
+        })
+      } else if (uploadedUrls.length > 0) {
+        insertPayload = communityFeedCommentQuoteRepostInsertPayload({
+          caption,
+          originalCommentId: quoteCommentParentId,
+          imageUrls: uploadedUrls,
+          gifUrl: gifOnlyUrl || undefined,
+          categoryPills,
+        })
+      } else if (gifOnlyUrl) {
+        insertPayload = communityFeedCommentQuoteRepostInsertPayload({
+          caption,
+          originalCommentId: quoteCommentParentId,
+          gifUrl: gifOnlyUrl,
+          categoryPills,
+        })
+      } else {
+        insertPayload = communityFeedCommentQuoteRepostInsertPayload({
+          caption,
+          originalCommentId: quoteCommentParentId,
+          categoryPills,
+        })
+      }
+    } else if (quoteParentId) {
       if (streamVideoUid) {
         insertPayload = communityFeedQuoteRepostInsertPayload({
           caption,
@@ -352,6 +711,145 @@ export async function executeLoungeCommunityPostSubmission({
 
     insertSucceeded = true
     pendingCfUploadUid = null
+    const extraThreadParts = threadParts.slice(1)
+    if (insertedPost?.id && threadPartTotal > 1) {
+      report(0.88, `Part 1 of ${threadPartTotal} posted`, '', {
+        threadPartPublished: 1,
+        threadPartTotal,
+        threadPartActive: Math.min(2, threadPartTotal),
+      })
+    }
+    if (insertedPost?.id && extraThreadParts.length > 0) {
+      const totalParts = threadPartTotal
+      const userId = session.user.id
+      for (let i = 0; i < extraThreadParts.length; i += 1) {
+        throwIfAborted()
+        const part = extraThreadParts[i]
+        const partNum = i + 2
+        const partThreadProgress = {
+          threadPartTotal: totalParts,
+          threadPartActive: partNum,
+          threadPartPublished: partNum - 1,
+        }
+        const partProgress = (info) => report(info, undefined, undefined, partThreadProgress)
+        const partBody = String(part?.body ?? '').trim()
+        const partGif = String(part?.gifUrl ?? '').trim()
+        const partHasVideo =
+          Boolean(String(part?.streamVideoUid ?? '').trim()) ||
+          part?.videoFile instanceof File ||
+          Boolean(part?.videoPrepSpec) ||
+          part?.awaitingThreadPartVideoPrepJobId != null ||
+          Boolean(part?._capturedPrepHandoff)
+        if (partHasVideo && partGif) {
+          throw new Error(`Remove the GIF from thread post ${i + 2} before posting its video.`)
+        }
+        const partSpanBase = 0.91 + (i / Math.max(1, extraThreadParts.length)) * 0.08
+        const partSpan = 0.08 / Math.max(1, extraThreadParts.length)
+        let partPendingCfUid = null
+        try {
+          const streamOut = await resolveThreadPartStreamVideoForInsert({
+            part,
+            supabaseClient,
+            user: session.user,
+            signal,
+            onProgress: partProgress,
+            onUploadDiagnostic,
+            progressBase: partSpanBase,
+            progressSpan: partSpan * 0.72,
+            label: `Part ${partNum}`,
+          })
+          let partPayload
+          if (streamOut) {
+            partPendingCfUid = streamOut.pendingUid
+            partPayload = feedCommentThreadPartInsertPayload({
+              body: partBody,
+              threadPartIndex: i + 1,
+              streamVideoUid: streamOut.streamVideoUid,
+              streamPosterUrl: streamOut.streamPosterPublicUrl || undefined,
+              streamVideoWidth: streamOut.streamVideoWidthOut || undefined,
+              streamVideoHeight: streamOut.streamVideoHeightOut || undefined,
+            })
+          } else {
+            const partImageFiles = Array.isArray(part?.imageFiles)
+              ? part.imageFiles.filter((f) => f instanceof File)
+              : []
+            const partExistingUrls = Array.isArray(part?.existingImageUrls)
+              ? part.existingImageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
+              : []
+            const uploadedPartUrls = await uploadLoungeThreadPartImageFiles({
+              supabaseClient,
+              user: session.user,
+              imageFiles: partImageFiles,
+              existingImageUrls: partExistingUrls,
+              signal,
+              onProgress: partProgress,
+              progressBase: partSpanBase,
+              progressSpan: partSpan * 0.72,
+              label: `Uploading images`,
+            })
+            partPayload = feedCommentThreadPartInsertPayload({
+              body: partBody,
+              threadPartIndex: i + 1,
+              ...(uploadedPartUrls.length > 0
+                ? {
+                    imageUrls: uploadedPartUrls,
+                    gifUrl: partGif || undefined,
+                  }
+                : partGif
+                  ? { gifUrl: partGif }
+                  : {}),
+            })
+          }
+          const { data: insertedPart, error: partErr } = await supabaseClient
+            .from('feed_comments')
+            .insert({
+              post_id: insertedPost.id,
+              user_id: userId,
+              ...partPayload,
+            })
+            .select('id')
+            .single()
+          if (partErr) throw new Error(partErr.message || `Could not publish thread part ${i + 2}.`)
+          partPendingCfUid = null
+          const publishedPartCount = i + 2
+          const { error: countErr } = await supabaseClient
+            .from('community_feed_posts')
+            .update({ thread_part_count: publishedPartCount })
+            .eq('id', insertedPost.id)
+          if (countErr) {
+            throw new Error(countErr.message || `Could not update thread after part ${i + 2}.`)
+          }
+          if (insertedPart?.id && partBody) {
+            await attachLinkPreview(supabaseClient, {
+              entityType: 'feed_comment',
+              entityId: insertedPart.id,
+              text: partBody,
+            })
+          }
+          report(
+            0.88 + ((i + 1) / Math.max(1, extraThreadParts.length)) * 0.1,
+            `Part ${publishedPartCount} of ${totalParts} posted`,
+            '',
+            {
+              threadPartPublished: publishedPartCount,
+              threadPartTotal: totalParts,
+              threadPartActive: Math.min(publishedPartCount + 1, totalParts),
+            },
+          )
+        } catch (partUploadErr) {
+          if (partPendingCfUid) {
+            await deleteCfStreamOrphanAsset(supabaseClient, partPendingCfUid)
+          }
+          const partMsg =
+            (partUploadErr instanceof Error ? partUploadErr.message : String(partUploadErr || '')).trim() ||
+            `Could not publish thread part ${i + 2}.`
+          const err = new Error(`Thread part ${i + 2} of ${totalParts}: ${partMsg}`)
+          err.threadPublishedParts = i + 1
+          err.threadPublishedPostId = insertedPost?.id ? String(insertedPost.id) : null
+          throw err
+        }
+      }
+    }
     if (insertedPost?.id && caption?.trim()) {
       await attachLinkPreview(supabaseClient, {
         entityType: 'feed_post',

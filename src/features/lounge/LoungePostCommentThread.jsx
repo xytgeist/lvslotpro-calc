@@ -23,7 +23,7 @@ import {
 } from '../../utils/loungeFeedCommentSort.js'
 import { LOUNGE_COMMENT_BODY_MAX } from '../../utils/loungeCommentLimits.js'
 import LoungeRichComposerField from './LoungeRichComposerField.jsx'
-import { renderRichCaption } from './loungeCaption'
+import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
 import { textIsOnlyUrls } from '../../utils/linkifyText.jsx'
 import {
@@ -112,6 +112,7 @@ export function LoungeCommentCard({
   onHashtagClick,
   onLinkClick,
   onLinkPreviewOpen,
+  youtubeIframeLoading = 'lazy',
   avatarText,
   avatarToneClass,
   viewerFollowingUserIds,
@@ -159,7 +160,8 @@ export function LoungeCommentCard({
   const showCommentMenu = Boolean(
     !loungeReadOnly &&
       viewerUserId &&
-      (typeof onCommentMenuDelete === 'function' ||
+      (typeof onCommentMenuEdit === 'function' ||
+        typeof onCommentMenuDelete === 'function' ||
         typeof onCommentMenuBlock === 'function' ||
         typeof onCommentMenuReport === 'function'),
   )
@@ -237,10 +239,18 @@ export function LoungeCommentCard({
             <div
               className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}
             >
-              {renderRichCaption(bodyText, { onMentionClick, onHashtagClick, onLinkClick })}
+              <LoungeExpandableRichCaption
+                text={bodyText}
+                captionOpts={{ onMentionClick, onHashtagClick, onLinkClick }}
+              />
             </div>
           ) : null}
-          <LoungeLinkPreviewBlock preview={comment.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
+          <LoungeLinkPreviewBlock
+            preview={comment.link_preview}
+            className="mt-2"
+            onPreviewOpen={onLinkPreviewOpen}
+            youtubeIframeLoading={youtubeIframeLoading}
+          />
         </>
       )
     })()
@@ -328,7 +338,7 @@ export function LoungeCommentCard({
               <LoungePostRowMenu
                 menuAriaLabel="Comment options"
                 isOwn={menuIsOwn}
-                showEdit={false}
+                showEdit={menuIsOwn && typeof onCommentMenuEdit === 'function'}
                 deleteBusy={Boolean(busyDeletingCommentId && busyDeletingCommentId === comment.id)}
                 onEdit={() => onCommentMenuEdit?.(comment)}
                 onDelete={() => onCommentMenuDelete?.(comment)}
@@ -475,6 +485,7 @@ export default function LoungePostCommentThread({
   onHashtagClick,
   onLinkClick,
   onLinkPreviewOpen,
+  youtubeIframeLoading = 'lazy',
   avatarText,
   avatarToneClass,
   viewerFollowingUserIds,
@@ -497,6 +508,17 @@ export default function LoungePostCommentThread({
     () => feedCommentDescendantCountById(comments),
     [comments],
   )
+
+  const threadPartsSorted = useMemo(() => {
+    if (variant !== 'post') return []
+    return [...(comments || [])]
+      .filter((c) => c.is_thread_part && !c.parent_id)
+      .sort(
+        (a, b) =>
+          (Number(a.thread_part_index) || 0) - (Number(b.thread_part_index) || 0) ||
+          compareFeedCommentsChronologicalAsc(a, b, viewerPinnedCommentIds),
+      )
+  }, [comments, variant, viewerPinnedCommentIds])
 
   const rootsSorted = useMemo(() => {
     if (variant !== 'post') return []
@@ -600,6 +622,7 @@ export default function LoungePostCommentThread({
     onHashtagClick,
     onLinkClick,
     onLinkPreviewOpen,
+    youtubeIframeLoading,
     interactionStateFor,
     toggleInteraction,
     onPlainRepost,
@@ -641,6 +664,17 @@ export default function LoungePostCommentThread({
     onSharePost,
   }
 
+  const renderCommentRow = (comment) => (
+    <LoungeCommentCard
+      key={comment.id}
+      comment={comment}
+      navigable={Boolean(onOpenCommentThread)}
+      onOpenCommentThread={onOpenCommentThread}
+      descendantFallback={descendantCountByCommentId.get(comment.id) ?? 0}
+      {...cardProps}
+    />
+  )
+
   if (variant === 'commentDetailReplies') {
     if (!focusComment || !focusCommentId) {
       return <p className="mt-1 text-[14px] text-zinc-500">Could not load this comment.</p>
@@ -664,34 +698,38 @@ export default function LoungePostCommentThread({
     )
   }
 
-  if (rootsSorted.length === 0) {
+  const hasThreadParts = threadPartsSorted.length > 0
+  const hasRootComments = rootsSorted.length > 0 || orphanOpAuthorReplies.length > 0
+
+  if (!hasThreadParts && !hasRootComments) {
     return <p className="mt-1 text-[14px] text-zinc-500">No comments yet. Be the first.</p>
   }
 
   return (
-    <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
-      {rootsSorted.map((root) => (
-        <li key={root.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
-          <LoungeCommentCard
-            comment={root}
-            navigable={Boolean(onOpenCommentThread)}
-            onOpenCommentThread={onOpenCommentThread}
-            descendantFallback={descendantCountByCommentId.get(root.id) ?? 0}
-            {...cardProps}
-          />
-        </li>
-      ))}
-      {orphanOpAuthorReplies.map((c) => (
-        <li key={c.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
-          <LoungeCommentCard
-            comment={c}
-            navigable={Boolean(onOpenCommentThread)}
-            onOpenCommentThread={onOpenCommentThread}
-            descendantFallback={descendantCountByCommentId.get(c.id) ?? 0}
-            {...cardProps}
-          />
-        </li>
-      ))}
-    </ul>
+    <>
+      {hasThreadParts ? (
+        <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
+          {threadPartsSorted.map((part) => (
+            <li key={part.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
+              {renderCommentRow(part)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {hasRootComments ? (
+        <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
+          {rootsSorted.map((root) => (
+            <li key={root.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
+              {renderCommentRow(root)}
+            </li>
+          ))}
+          {orphanOpAuthorReplies.map((c) => (
+            <li key={c.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
+              {renderCommentRow(c)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
   )
 }

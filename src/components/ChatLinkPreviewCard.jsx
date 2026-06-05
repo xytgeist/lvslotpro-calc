@@ -5,6 +5,8 @@ import {
   extractAccentFromImageUrl,
   resolvePreviewAccent,
 } from '../utils/linkPreviewAccent.js'
+import { isYouTubeLinkPreview } from '../utils/youtubeEmbed.js'
+import YouTubeChatEmbed from './YouTubeChatEmbed.jsx'
 
 /**
  * iMessage-style link preview: rich card (og:image) or compact pill (favicon + title + domain).
@@ -50,6 +52,17 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
   }, [preview?.favicon_url, preview?.url, resolvedAccent])
 
   if (!preview?.url) return null
+
+  if (isYouTubeLinkPreview(preview)) {
+    return (
+      <YouTubeChatEmbed
+        preview={preview}
+        className={className}
+        isMine={isMine}
+        embedded={embedded}
+      />
+    )
+  }
 
   let hostname = preview.site_name || ''
   try {

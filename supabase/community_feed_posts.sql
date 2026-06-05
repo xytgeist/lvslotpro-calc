@@ -11,7 +11,7 @@ create table if not exists public.community_feed_posts (
   game_title text not null default '',
   caption text not null default '',
   created_at timestamptz not null default now(),
-  constraint community_feed_posts_caption_len_check check (char_length(caption) <= 280)
+  constraint community_feed_posts_caption_len_check check (char_length(caption) <= 1000)
 );
 
 create index if not exists community_feed_posts_created_idx

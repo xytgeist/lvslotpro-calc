@@ -6,8 +6,20 @@ import { loungeFeedPopularScore } from './loungeFeedPopularScore.js'
 export const LOUNGE_FEED_SCOPE_ALL = 'all'
 export const LOUNGE_FEED_SCOPE_FOLLOWING = 'following'
 
+/** Feed/profile timeline: only standalone + thread roots (never continuation post rows). */
+export function loungeFeedRowIsTimelineVisible(row) {
+  if (!row?.id) return false
+  const rootId = row.thread_root_id
+  return rootId == null || rootId === ''
+}
+
+/** @param {object[] | null | undefined} rows */
+export function filterLoungeFeedTimelinePosts(rows) {
+  return (rows || []).filter(loungeFeedRowIsTimelineVisible)
+}
+
 const COMMUNITY_FEED_SELECT =
-  'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url,link_preview'
+  'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url,link_preview,thread_root_id,thread_part_index,thread_part_count'
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
@@ -35,6 +47,7 @@ export function loungeFeedPinnedQuery(supabaseClient, scope, followingAuthorIds,
     .from('community_feed_posts')
     .select(COMMUNITY_FEED_SELECT)
     .eq('pinned', true)
+    .is('thread_root_id', null)
     .order('created_at', { ascending: false })
     .limit(2)
   if (scope === LOUNGE_FEED_SCOPE_FOLLOWING && followingAuthorIds) {

@@ -169,7 +169,7 @@ export function orderPostDetailRootComments({
   viewerPinnedCommentIds = [],
   sortMode = LOUNGE_DETAIL_COMMENT_SORT.RANKED,
 }) {
-  const list = (roots || []).filter((c) => c && !c.parent_id)
+  const list = (roots || []).filter((c) => c && !c.parent_id && !c.is_thread_part)
   const mode = SORT_VALUES.has(sortMode) ? sortMode : LOUNGE_DETAIL_COMMENT_SORT.RANKED
 
   if (mode === LOUNGE_DETAIL_COMMENT_SORT.CHRONOLOGICAL) {

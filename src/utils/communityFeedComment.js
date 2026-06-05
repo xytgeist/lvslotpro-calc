@@ -9,7 +9,7 @@ export { feedPostAuthorEditMediaSeed as feedCommentAuthorEditMediaSeed }
 export { feedPostImageUrls as feedCommentImageUrls }
 export { feedPostStreamVideoUid as feedCommentStreamVideoUid }
 
-/** Trimmed reply body (max 280). */
+/** Trimmed reply body (max {@link LOUNGE_COMMENT_BODY_MAX}). */
 export function normalizeFeedCommentBody(body) {
   return String(body ?? '')
     .trim()
@@ -172,8 +172,10 @@ export function feedCommentInsertPayload({
   mediaUrl,
   gifUrl,
   imageUrls,
+  isThreadPart = false,
+  threadPartIndex = null,
 }) {
-  return {
+  const out = {
     body: normalizeFeedCommentBody(body),
     ...feedCommentMediaInsertPayload({
       streamVideoUid,
@@ -185,4 +187,35 @@ export function feedCommentInsertPayload({
       imageUrls,
     }),
   }
+  if (isThreadPart) {
+    out.is_thread_part = true
+    out.thread_part_index = Math.max(1, Number(threadPartIndex) || 1)
+  }
+  return out
+}
+
+/** Root-level thread continuation row (part 2+). */
+export function feedCommentThreadPartInsertPayload({
+  body,
+  threadPartIndex,
+  streamVideoUid,
+  streamPosterUrl,
+  streamVideoWidth,
+  streamVideoHeight,
+  mediaUrl,
+  gifUrl,
+  imageUrls,
+}) {
+  return feedCommentInsertPayload({
+    body,
+    streamVideoUid,
+    streamPosterUrl,
+    streamVideoWidth,
+    streamVideoHeight,
+    mediaUrl,
+    gifUrl,
+    imageUrls,
+    isThreadPart: true,
+    threadPartIndex,
+  })
 }
