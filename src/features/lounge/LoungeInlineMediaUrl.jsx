@@ -8,6 +8,7 @@ import { useLoungeLightboxImageZoom } from './loungeLightboxImageZoom.js'
 import { useLoungeLightboxSwipeDismiss } from './loungeLightboxSwipeDismiss.js'
 import { notifyLoungeStreamLightboxOpen } from './loungeStreamLightboxRegistry.js'
 import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
+import MediaLightboxAmbientBackdrop from '../../components/MediaLightboxAmbientBackdrop.jsx'
 
 function normalizeUrlList(urls) {
   if (!Array.isArray(urls)) return []
@@ -51,6 +52,7 @@ export function LoungeImageLightbox({
 
   const current = list[idx] || ''
   const currentDisplaySrc = loungeFeedImageDeliveryUrl(current, 'lightbox')
+  const ambientDisplaySrc = loungeFeedImageDeliveryUrl(current, 'feed')
 
   const goPrev = useCallback(() => {
     setIdx((i) => (list.length <= 1 ? i : i <= 0 ? list.length - 1 : i - 1))
@@ -245,6 +247,7 @@ export function LoungeImageLightbox({
           ref={mediaContainerRef}
           className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2"
         >
+          <MediaLightboxAmbientBackdrop src={ambientDisplaySrc} />
           {multi ? (
             <div data-lounge-lightbox-carousel className="contents">
               <button
@@ -280,7 +283,7 @@ export function LoungeImageLightbox({
               </div>
             </div>
           ) : null}
-          <div className="inline-flex max-h-full max-w-full origin-center" style={mediaTransformStyle}>
+          <div className="relative z-[1] inline-flex max-h-full max-w-full origin-center" style={mediaTransformStyle}>
             <img
               ref={mediaImageRef}
               key={current}

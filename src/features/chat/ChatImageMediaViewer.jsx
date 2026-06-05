@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import MediaLightboxAmbientBackdrop from '../../components/MediaLightboxAmbientBackdrop.jsx'
 
 const PULL_DISMISS_THRESHOLD_PX = 80
 const PULL_DISMISS_VELOCITY     = 0.4 // px/ms
@@ -165,13 +166,14 @@ export default function ChatImageMediaViewer({ urls, initialIndex = 0, onClose }
             <div
               key={url || i}
               data-media-item={i}
-              className="flex h-full w-full items-center justify-center"
+              className="relative flex h-full w-full items-center justify-center overflow-hidden"
               style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
             >
+              <MediaLightboxAmbientBackdrop src={url} />
               <img
                 src={url}
                 alt=""
-                className="max-h-full max-w-full object-contain"
+                className="relative z-[1] max-h-full max-w-full object-contain"
                 draggable={false}
               />
             </div>
