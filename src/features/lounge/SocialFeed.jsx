@@ -584,8 +584,6 @@ export default function SocialFeed({
   })
   const [klipyPickerOpen, setKlipyPickerOpen] = useState(false)
   const [klipyPickerTarget, setKlipyPickerTarget] = useState('composer')
-  /** Moderator/admin: create this lounge post already pinned (only one pinned post globally). */
-  const [composerPinOnPost, setComposerPinOnPost] = useState(false)
   const [composerCategoryPills, setComposerCategoryPills] = useState(() => readLoungeComposerLastCategoryPills())
   /** Server draft id when composer content was loaded from or last saved to `lounge_post_drafts`. */
   const [loungeComposerActiveDraftId, setLoungeComposerActiveDraftId] = useState(null)
@@ -2741,7 +2739,6 @@ export default function SocialFeed({
       flushSync(() => {
         setLoungeComposerActiveDraftId(String(draft.id))
         setComposerCategoryPills(Array.isArray(draft.category_pills) ? draft.category_pills : [])
-        setComposerPinOnPost(false)
         const parts = loungePostDraftThreadParts(draft)
         setThreadComposeCaptions(parts)
         setThreadComposePartMedia(loungePostDraftThreadComposePartMedia(draft, parts.length))
@@ -2776,7 +2773,6 @@ export default function SocialFeed({
       setComposerMediaUrl(String(draft.gif_url || '').trim())
       setComposerCategoryPills(Array.isArray(draft.category_pills) ? draft.category_pills : [])
       setComposerImageItems(composerImageItemsFromDraftUrls(draft.image_urls))
-      setComposerPinOnPost(false)
       setLoungeComposerActiveDraftId(String(draft.id))
       composerExpandedRef.current = true
       composerFoldRevealRef.current = 1
@@ -2973,6 +2969,28 @@ export default function SocialFeed({
     ],
   )
 
+  const threadComposeCanSaveDraft = useMemo(() => {
+    if (postBusy) return false
+    if (loungePostDraftValidateComposePartsForSave(threadComposePartMedia)) return false
+    const rootPart = threadComposePartMedia[0] || emptyThreadComposePartMedia()
+    const gifUrl = String(rootPart.gifUrl || '').trim()
+    const part0Items = rootPart.imageItems || []
+    const existingImageUrls = part0Items
+      .map((it) => String(it.remoteUrl || '').trim())
+      .filter(Boolean)
+    const imageFiles = part0Items.map((it) => it.file).filter((f) => f instanceof File)
+    const threadCaptions = threadComposeCaptions.map((t) => String(t ?? ''))
+    return loungePostDraftHasContent({
+      threadCaptions,
+      gifUrl,
+      imageUrls: existingImageUrls,
+      imageFiles,
+      streamVideoUid: String(rootPart.videoSlot?.streamVideoUid || '').trim(),
+      rootVideoSlot: rootPart.videoSlot ?? null,
+      threadPartMedia: loungePostDraftThreadPartMediaInputFromCompose(threadComposePartMedia),
+    })
+  }, [postBusy, threadComposePartMedia, threadComposeCaptions])
+
   const persistThreadSubmissionSnapshotAsDraft = useCallback(
     async (snap, opts = {}) => {
       if (!snap) return { data: null, error: new Error('Nothing to save.') }
@@ -3051,7 +3069,6 @@ export default function SocialFeed({
       })
       setComposerVideoSlot(null)
       setComposerMediaUrl('')
-      setComposerPinOnPost(false)
       composerExpandedRef.current = false
       composerFoldRevealRef.current = 0
       setComposerFoldReveal(0)
@@ -8723,7 +8740,6 @@ export default function SocialFeed({
       return null
     })
     setComposerMediaUrl('')
-    setComposerPinOnPost(false)
     composerFoldedFromFeedScrollRef.current = false
     composerFoldRevealRef.current = 0
     setComposerFoldReveal(0)
@@ -8895,7 +8911,6 @@ export default function SocialFeed({
           }).map((it) => ({ ...it, id: newComposerImageId() })),
         )
       }
-      setComposerPinOnPost(Boolean(snap.wantsPin && snap.isStaffPoster))
       if (snapThread.length <= 1 && !(fromPartIndex > 0 && snapThreadParts?.[0])) {
         if (String(snap.streamVideoUid || '').trim()) {
           const vf = snap.videoFile
@@ -11214,7 +11229,7 @@ export default function SocialFeed({
         videoPrepSpec: specForSnap,
         videoPrepSlotRestore: trimRestore,
         sessionStreamPosterBlobUrl: sessionPosterBlob,
-        wantsPin: composerPinOnPost,
+        wantsPin: false,
         isStaffPoster,
         savedDraftId: loungeComposerActiveDraftIdRef.current,
         _capturedPrepHandoff:
@@ -11303,7 +11318,6 @@ export default function SocialFeed({
     clearComposerForPostAttempt,
     closeThreadComposeImmediate,
     composerCategoryPills,
-    composerPinOnPost,
     composerUserProfile?.avatar_url,
     composerUserProfile?.role,
     loungeComposerVideoPostBlocked,
@@ -11426,7 +11440,7 @@ export default function SocialFeed({
         videoPrepSpec: specForSnap,
         videoPrepSlotRestore: trimRestore,
         sessionStreamPosterBlobUrl: sessionPosterBlob,
-        wantsPin: composerPinOnPost,
+        wantsPin: false,
         isStaffPoster,
         savedDraftId: loungeComposerActiveDraftIdRef.current,
         // Capture prep handoff by reference so queued jobs don't race on the shared ref
@@ -11462,7 +11476,6 @@ export default function SocialFeed({
     composerCategoryPills,
     composerImageItems,
     composerMediaUrl,
-    composerPinOnPost,
     composerUserProfile?.avatar_url,
     composerUserProfile?.role,
     composerVideoSlot,
@@ -12981,7 +12994,6 @@ export default function SocialFeed({
                 })
                 cancelComposerMediaPrep()
                 setComposerMediaUrl('')
-                setComposerPinOnPost(false)
                 setPostErr('')
                 composerFoldedFromFeedScrollRef.current = false
                 composerFoldRevealRef.current = 0
@@ -13288,18 +13300,6 @@ export default function SocialFeed({
                   >
                     Drafts{loungeDraftCount > 0 ? ` (${loungeDraftCount})` : ''}
                   </button>
-                  {loungeViewerIsStaff ? (
-                    <label className="inline-flex cursor-pointer touch-manipulation select-none items-center gap-1 rounded-md border border-zinc-700/80 bg-zinc-900/50 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-400 [-webkit-tap-highlight-color:transparent] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan-500/40">
-                      <input
-                        type="checkbox"
-                        checked={composerPinOnPost}
-                        onChange={(e) => setComposerPinOnPost(e.target.checked)}
-                        className="h-3.5 w-3.5 shrink-0 rounded border-zinc-600 bg-zinc-900 text-cyan-600 focus:ring-0"
-                        aria-label="Pin this post to the top of the lounge"
-                      />
-                      <span className="whitespace-nowrap">Pin</span>
-                    </label>
-                  ) : null}
                   <LoungeComposerCharRing
                     len={postText.length}
                     max={LOUNGE_CAPTION_MAX}
@@ -13379,7 +13379,6 @@ export default function SocialFeed({
                     })
                     cancelComposerMediaPrep()
                     setComposerMediaUrl('')
-                    setComposerPinOnPost(false)
                     setPostErr('')
                     setLoungeComposerActiveDraftId(null)
                     composerFoldedFromFeedScrollRef.current = false
@@ -16321,6 +16320,8 @@ export default function SocialFeed({
         categoryPills={composerCategoryPills}
         onCategoryPillsChange={setComposerCategoryPills}
         onSubmit={submitThreadCompose}
+        onSaveDraft={saveThreadComposeAsServerDraft}
+        canSaveDraft={threadComposeCanSaveDraft}
         submitting={postBusy}
         error={threadComposeErr}
         composerUserProfile={composerUserProfile}
@@ -16335,9 +16336,6 @@ export default function SocialFeed({
         mentionComposer={mentionThreadCompose}
         mentionAnchorRef={threadComposeMentionAnchorRef}
         part0FieldRef={threadComposeFieldRef}
-        pinOnPost={composerPinOnPost}
-        onPinOnPostChange={setComposerPinOnPost}
-        showPinToggle={loungeViewerIsStaff}
         imageInputId={LOUNGE_THREAD_COMPOSE_IMAGE_INPUT_ID}
         videoInputId={LOUNGE_THREAD_COMPOSE_VIDEO_INPUT_ID}
         imageInputRef={threadComposeImageInputRef}

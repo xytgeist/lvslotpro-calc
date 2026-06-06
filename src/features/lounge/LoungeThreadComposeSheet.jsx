@@ -91,6 +91,8 @@ export default function LoungeThreadComposeSheet({
   categoryPills,
   onCategoryPillsChange,
   onSubmit,
+  onSaveDraft,
+  canSaveDraft = false,
   submitting = false,
   error = '',
   composerUserProfile,
@@ -105,9 +107,6 @@ export default function LoungeThreadComposeSheet({
   mentionComposer,
   mentionAnchorRef,
   part0FieldRef,
-  pinOnPost,
-  onPinOnPostChange,
-  showPinToggle = false,
   imageInputId,
   videoInputId,
   imageInputRef,
@@ -232,7 +231,7 @@ export default function LoungeThreadComposeSheet({
     const ro = new ResizeObserver(sync)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [open, captions.length, showPinToggle])
+  }, [open, captions.length])
 
   const handlePartFocus = useCallback(
     (partIdx) => {
@@ -276,7 +275,6 @@ export default function LoungeThreadComposeSheet({
     captions.every((t) => String(t || '').length <= LOUNGE_CAPTION_MAX)
 
   const activeLen = String(captions[activePartIndex] || '').length
-  const postAllLabel = captions.length > 1 ? 'Post all' : 'Post'
 
   return (
     <div
@@ -298,14 +296,16 @@ export default function LoungeThreadComposeSheet({
           Thread composer
         </h2>
         <div className="min-w-0 flex-1" aria-hidden />
-        <button
-          type="button"
-          disabled={!canPost}
-          onClick={() => void onSubmit()}
-          className="lounge-composer-post-btn min-h-9 shrink-0 touch-manipulation rounded-full px-4 py-1.5 text-[15px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {submitting ? 'Posting…' : postAllLabel}
-        </button>
+        {onSaveDraft ? (
+          <button
+            type="button"
+            disabled={submitting || !canSaveDraft}
+            onClick={() => void onSaveDraft()}
+            className="lounge-composer-post-text min-h-10 shrink-0 touch-manipulation rounded-full px-3 py-2 text-[15px] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Save
+          </button>
+        ) : null}
       </header>
 
       {error ? (
@@ -611,21 +611,21 @@ export default function LoungeThreadComposeSheet({
               </svg>
             </button>
           ) : null}
-          {showPinToggle ? (
-            <label className="inline-flex shrink-0 cursor-pointer touch-manipulation select-none items-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-semibold text-zinc-400 hover:bg-white/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan-500/40">
-              <input
-                type="checkbox"
-                checked={pinOnPost}
-                onChange={(e) => onPinOnPostChange?.(e.target.checked)}
-                disabled={submitting}
-                className="h-3.5 w-3.5 shrink-0 rounded border-zinc-600 bg-zinc-900 text-cyan-600 focus:ring-0"
-                aria-label="Pin this thread to the top of the lounge"
-              />
-              <span className="whitespace-nowrap">Pin</span>
-            </label>
-          ) : null}
           <div className="min-w-0 flex-1" aria-hidden />
-          <LoungeComposerCharRing len={activeLen} max={LOUNGE_CAPTION_MAX} />
+          <div className="flex shrink-0 items-center gap-2">
+            <LoungeComposerCharRing len={activeLen} max={LOUNGE_CAPTION_MAX} />
+            <div className="shrink-0 p-2">
+              <button
+                type="button"
+                disabled={!canPost}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void onSubmit()}
+                className="lounge-composer-post-btn min-h-7 shrink-0 touch-manipulation rounded-md px-2 py-0.5 text-[13px] font-bold leading-tight disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {submitting ? 'Posting…' : 'Post'}
+              </button>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
