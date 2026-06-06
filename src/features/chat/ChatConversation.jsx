@@ -30,6 +30,7 @@ import {
   chatRoomReadReceipts,
 } from './chatApi.js'
 import { findLastOwnMessageId, getMessageReceiptStatus } from './chatReceiptStatus.js'
+import { compareChatMessagesChronological, sortChatMessagesChronological } from './chatMessageTimeline.js'
 import {
   probeVideoFileDisplaySize,
   captureVideoFilePosterObjectUrl,
@@ -971,7 +972,22 @@ export default function ChatConversation({
           }
 
           setMessages((prev) => {
-            if (prev.some((m) => m.id === row.id)) return prev
+            const existingIdx = prev.findIndex((m) => m.id === row.id)
+            if (existingIdx !== -1) {
+              const existing = prev[existingIdx]
+              const next = [...prev]
+              next[existingIdx] = {
+                ...existing,
+                ...row,
+                _key: existing._key || row.id,
+                // Video prep inserts at pick time — keep that slot if server lags deploy.
+                created_at: existing.created_at || row.created_at,
+                image_urls: row.image_urls?.length > 0 ? row.image_urls : existing.image_urls,
+                _finalizingMedia: existing._finalizingMedia,
+              }
+              return next
+            }
+
             // Replace our optimistic placeholder in-place, keeping _key stable
             // so React never unmounts/remounts the bubble.
             if (row.sender_id === viewerUserId) {
@@ -989,9 +1005,28 @@ export default function ChatConversation({
                 }
                 return next
               }
+
+              const prepIdx = row.idempotency_key
+                ? prev.findIndex((m) => m._key === row.idempotency_key)
+                : -1
+              if (prepIdx !== -1) {
+                const existing = prev[prepIdx]
+                const next = [...prev]
+                next[prepIdx] = {
+                  ...row,
+                  _key: existing._key,
+                  created_at: existing.created_at || row.created_at,
+                }
+                return next
+              }
             }
-            return [...prev, row]
+
+            return sortChatMessagesChronological([...prev, row])
           })
+
+          if (row.idempotency_key) {
+            removeVideoPrepJob(row.idempotency_key)
+          }
 
           if (atBottomRef.current) {
             pinTailAfterMutation()
@@ -1059,7 +1094,7 @@ export default function ChatConversation({
           setMessages((prev) => {
             const existingIds = new Set(prev.map((m) => m.id))
             const fresh = missed.filter((r) => !existingIds.has(r.id))
-            return fresh.length > 0 ? [...prev, ...fresh] : prev
+            return fresh.length > 0 ? sortChatMessagesChronological([...prev, ...fresh]) : prev
           })
 
           if (atBottomRef.current) {
@@ -1310,7 +1345,8 @@ export default function ChatConversation({
       updateVideoPrepJob(jobId, { status: 'sending', progress: 0.98 })
 
       const currentJob = videoPrepJobsRef.current.find((j) => j.jobId === jobId)
-      await chatSendMessage(supabaseClient, {
+      const pickCreatedAt = currentJob?.createdAt || null
+      const res = await chatSendMessage(supabaseClient, {
         roomId: room.id,
         body: '',
         videoUrl,
@@ -1318,16 +1354,46 @@ export default function ChatConversation({
         streamVideoWidth: currentJob?.width ?? null,
         streamVideoHeight: currentJob?.height ?? null,
         idempotencyKey: jobId,
+        clientCreatedAt: pickCreatedAt,
       })
 
-      // Remove the fake bubble — the real message is on its way via Realtime.
+      const messageId = res?.message_id
       removeVideoPrepJob(jobId)
+
+      // Insert in timeline at pick time (not encode-complete time) so messages sent
+      // while processing stay below this bubble. Realtime dedupes by message id.
+      if (messageId && pickCreatedAt) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === messageId)) return prev
+          return sortChatMessagesChronological([
+            ...prev,
+            {
+              id: messageId,
+              _key: jobId,
+              body: '',
+              image_urls: [],
+              video_url: videoUrl,
+              stream_video_uid: null,
+              stream_poster_url: posterPublicUrl || null,
+              stream_video_width: currentJob?.width ?? null,
+              stream_video_height: currentJob?.height ?? null,
+              sender_id: viewerUserId,
+              created_at: pickCreatedAt,
+              deleted_at: null,
+              reply_to_message_id: null,
+              reply_to_preview: null,
+              reply_to_sender_id: null,
+            },
+          ])
+        })
+      }
+
       if (atBottomRef.current) pinTailAfterMutation()
     } catch (e) {
       if (e?.name === 'AbortError') { removeVideoPrepJob(jobId); return }
       updateVideoPrepJob(jobId, { status: 'error', errorMessage: e?.message || 'Upload failed.' })
     }
-  }, [supabaseClient, room.id, updateVideoPrepJob, removeVideoPrepJob, pinTailAfterMutation])
+  }, [supabaseClient, room.id, viewerUserId, updateVideoPrepJob, removeVideoPrepJob, pinTailAfterMutation])
 
   /**
    * Called when the composer hands off a confirmed video spec (File or composerTrimJob).
@@ -2183,9 +2249,7 @@ export default function ChatConversation({
                 }))
                 const allItems = videoPrepJobs.length === 0
                   ? messages
-                  : [...messages, ...fakeItems].sort(
-                      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-                    )
+                  : sortChatMessagesChronological([...messages, ...fakeItems])
 
                 return allItems.map((item, idx) => {
                   const prev = idx > 0 ? allItems[idx - 1] : null

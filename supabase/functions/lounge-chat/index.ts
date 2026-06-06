@@ -322,6 +322,9 @@ Deno.serve(async (req) => {
     const idempotencyKey = typeof body?.idempotency_key === 'string'
       ? body.idempotency_key.trim().slice(0, 64) || null
       : null
+    const clientCreatedAtRaw = typeof body?.client_created_at === 'string'
+      ? body.client_created_at.trim()
+      : ''
     if (!roomId) {
       return json(400, { error: 'room_id is required.' })
     }
@@ -401,6 +404,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    let messageCreatedAt: string | undefined
+    const hasVideoAttachment = Boolean(videoUrl || streamVideoUid)
+    if (hasVideoAttachment && idempotencyKey && clientCreatedAtRaw) {
+      const parsed = new Date(clientCreatedAtRaw)
+      const pickMs = parsed.getTime()
+      if (Number.isFinite(pickMs)) {
+        const nowMs = Date.now()
+        const maxAgeMs = 30 * 60 * 1000
+        if (pickMs <= nowMs && pickMs >= nowMs - maxAgeMs) {
+          messageCreatedAt = parsed.toISOString()
+        }
+      }
+    }
+
     const { data: inserted, error: sErr } = await admin.from('chat_messages').insert({
       room_id: roomId,
       sender_id: user.id,
@@ -415,6 +432,7 @@ Deno.serve(async (req) => {
       reply_to_preview: replyToPreview,
       reply_to_sender_id: replyToSenderId,
       idempotency_key: idempotencyKey,
+      ...(messageCreatedAt ? { created_at: messageCreatedAt } : {}),
     }).select('id').maybeSingle()
     if (sErr) {
       return json(400, { error: sErr.message })
