@@ -125,7 +125,9 @@ export default function LoungeThreadComposeSheet({
   const scrollRef = useRef(null)
   const toolbarRef = useRef(null)
   const partRowRefs = useRef({})
+  const activePartIndexRef = useRef(activePartIndex)
   const didUserActivatePartRef = useRef(false)
+  activePartIndexRef.current = activePartIndex
   const [toolbarHeightPx, setToolbarHeightPx] = useState(52)
   /** Only track keyboard overlap while a caption field is focused — avoids footer/scroll fights on open. */
   const [keyboardDockActive, setKeyboardDockActive] = useState(false)
@@ -225,6 +227,42 @@ export default function LoungeThreadComposeSheet({
     ro.observe(el)
     return () => ro.disconnect()
   }, [open, captions.length, kbOverlapPx])
+
+  /** Keep the active part tail above the options bar while the caption grows or media is added. */
+  useEffect(() => {
+    if (!open || !keyboardDockActive || activePartIndex < 0) return undefined
+    const row = partRowRefs.current[activePartIndex]
+    if (!row) return undefined
+
+    const followTail = () => scrollPartClearToolbarOverlap(activePartIndexRef.current)
+    followTail()
+
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(followTail)
+    })
+    ro.observe(row)
+    return () => ro.disconnect()
+  }, [activePartIndex, keyboardDockActive, open, scrollPartClearToolbarOverlap])
+
+  const notifyPartChange = useCallback(
+    (partIdx, next) => {
+      onChangePart?.(partIdx, next)
+      if (keyboardDockActive && partIdx === activePartIndexRef.current) {
+        scheduleScrollClearOverlap(partIdx)
+      }
+    },
+    [keyboardDockActive, onChangePart, scheduleScrollClearOverlap],
+  )
+
+  const tailFollowOnComposerInput = useCallback(
+    (partIdx, mentionPayload) => {
+      mentionComposer?.onCursorMove?.(mentionPayload)
+      if (keyboardDockActive && partIdx === activePartIndexRef.current) {
+        scheduleScrollClearOverlap(partIdx)
+      }
+    },
+    [keyboardDockActive, mentionComposer, scheduleScrollClearOverlap],
+  )
 
   const handlePartFocus = useCallback(
     (partIdx) => {
@@ -413,7 +451,7 @@ export default function LoungeThreadComposeSheet({
                         variant="feed"
                         autoGrow
                         value={partText}
-                        onChange={(next) => onChangePart(partIdx, next)}
+                        onChange={(next) => notifyPartChange(partIdx, next)}
                         onFocus={() => handlePartFocus(partIdx)}
                         maxLength={LOUNGE_CAPTION_MAX}
                         placeholder={
@@ -425,13 +463,13 @@ export default function LoungeThreadComposeSheet({
                         onKeyDown={(e) =>
                           mentionComposer?.onMentionKeyDown?.(
                             e,
-                            (next) => onChangePart(0, next),
+                            (next) => notifyPartChange(0, next),
                             getPartRef?.(0),
                           )
                         }
                         onKeyUp={mentionComposer?.onCursorMove}
                         onMouseUp={mentionComposer?.onCursorMove}
-                        onInput={mentionComposer?.onCursorMove}
+                        onInput={(payload) => tailFollowOnComposerInput(0, payload)}
                         onBlur={() => {
                           syncFocusLeftSheet()
                           window.setTimeout(() => mentionComposer?.clearMention?.(), 150)
@@ -444,7 +482,7 @@ export default function LoungeThreadComposeSheet({
                         onSelect={(p) =>
                           mentionComposer?.onMentionSelect?.(
                             p,
-                            (next) => onChangePart(0, next),
+                            (next) => notifyPartChange(0, next),
                             getPartRef?.(0),
                           )
                         }
@@ -458,9 +496,14 @@ export default function LoungeThreadComposeSheet({
                       variant="feed"
                       autoGrow
                       value={partText}
-                      onChange={(next) => onChangePart(partIdx, next)}
+                      onChange={(next) => notifyPartChange(partIdx, next)}
                       onFocus={() => handlePartFocus(partIdx)}
                       onBlur={syncFocusLeftSheet}
+                      onInput={() => {
+                        if (keyboardDockActive && partIdx === activePartIndexRef.current) {
+                          scheduleScrollClearOverlap(partIdx)
+                        }
+                      }}
                       maxLength={LOUNGE_CAPTION_MAX}
                       placeholder={
                         String(partText || '').trim() ? '' : 'Say more…'
