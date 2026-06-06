@@ -12,9 +12,7 @@ export default function LoungeMarketChartStrip({ post, onOpenChart, className = 
 
   return (
     <div
-      className={`mt-2 -mx-1 overflow-x-auto overscroll-x-contain [touch-action:pan-x] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
-      onClick={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
+      className={`mt-2 -mx-1 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
       <div className="flex snap-x snap-mandatory gap-2 px-1 pb-0.5">
         {embeds.map((embed) => {

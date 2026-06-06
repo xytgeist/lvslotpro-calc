@@ -48,6 +48,12 @@ export function loungeSearchRateLimitMessage(rawMessage) {
 export function loungeSearchErrorMessage(rawMessage) {
   const msg = String(rawMessage || '')
   if (/rate limit exceeded/i.test(msg)) return loungeSearchRateLimitMessage(msg)
+  if (/lounge_search_cashtag_posts|lounge_caption_has_cashtag|schema cache|PGRST202|42883/i.test(msg)) {
+    return 'Market post search is not available on this server yet. Apply migrations 20260609140000 and 20260609150000 on Supabase test.'
+  }
+  if (/LOUNGE_SEARCH_AUTH_REQUIRED|sign in to search/i.test(msg)) {
+    return 'Sign in to see Lounge posts for this symbol.'
+  }
   if (/timeout|query_canceled|57014|canceling statement/i.test(msg)) {
     return 'Search took too long. Try a shorter or more specific query.'
   }

@@ -16,9 +16,12 @@ import { loungeMarketBarsToSeries, loungeMarketChartTheme } from './loungeMarket
  *   className?: string,
  * }} props
  */
+const MINI_CHART_TAP_MOVE_PX = 12
+
 export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpen, className = '' }) {
   const hostRef = useRef(null)
   const chartRef = useRef(null)
+  const tapRef = useRef(/** @type {{ x: number, y: number, pointerId: number } | null} */ (null))
 
   const isRolling = embed?.kind === 'rolling'
   const quote = isRolling && rollingLive?.quote ? rollingLive.quote : embed?.quote
@@ -68,14 +71,39 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
 
   if (!embed?.display_symbol) return null
 
+  const onCardPointerDown = (e) => {
+    tapRef.current = { x: e.clientX, y: e.clientY, pointerId: e.pointerId }
+  }
+
+  const onCardPointerUp = (e) => {
+    const start = tapRef.current
+    tapRef.current = null
+    if (!start || start.pointerId !== e.pointerId) return
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+    if (dx * dx + dy * dy > MINI_CHART_TAP_MOVE_PX * MINI_CHART_TAP_MOVE_PX) return
+    e.stopPropagation()
+    onOpen?.()
+  }
+
+  const onCardPointerCancel = (e) => {
+    if (tapRef.current?.pointerId === e.pointerId) tapRef.current = null
+  }
+
   return (
-    <button
-      type="button"
-      onClick={(e) => {
+    <div
+      role="button"
+      tabIndex={0}
+      onPointerDown={onCardPointerDown}
+      onPointerUp={onCardPointerUp}
+      onPointerCancel={onCardPointerCancel}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
         e.stopPropagation()
         onOpen?.()
       }}
-      className={`relative flex w-[148px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border ${theme.cardBorder} ${theme.cardBg} p-2 text-left touch-manipulation active:opacity-90 ${className}`}
+      className={`relative flex w-[148px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border ${theme.cardBorder} ${theme.cardBg} p-2 text-left touch-pan-y cursor-pointer active:opacity-90 [-webkit-tap-highlight-color:transparent] ${className}`}
       data-lounge-market-chart-mini
       aria-label={`Open ${embed.display_symbol} chart`}
     >
@@ -100,8 +128,8 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
           {formatMarketChangePct(changePct)}
         </span>
       </div>
-      <div ref={hostRef} className="mt-1 h-[52px] w-full" />
-    </button>
+      <div ref={hostRef} className="pointer-events-none mt-1 h-[52px] w-full" aria-hidden />
+    </div>
   )
 }
 

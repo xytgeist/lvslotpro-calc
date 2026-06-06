@@ -28,7 +28,33 @@
 
 export const LOUNGE_MARKET_EMBED_MAX = 12
 
+/** Must match `lounge_search_cashtag_posts` tag validation. */
+export const MARKET_CASHTAG_RPC_RE = /^[A-Z][A-Z0-9.-]{0,14}$/
+
 const CASHTAG_RE = /\$([A-Za-z][A-Za-z0-9.-]{0,14})\b/g
+
+/**
+ * Ticker for `lounge_search_cashtag_posts` from a market embed row.
+ * @param {object | null | undefined} embed
+ */
+export function marketEmbedSearchCashtag(embed) {
+  const display = String(embed?.display_symbol || '').trim().toUpperCase()
+  if (MARKET_CASHTAG_RPC_RE.test(display)) return display
+  const sym = String(embed?.symbol || '').trim().toUpperCase()
+  if (MARKET_CASHTAG_RPC_RE.test(sym)) return sym
+  if (embed?.asset_class === 'crypto' || sym.includes(':')) {
+    const m = sym.match(/:([A-Z0-9]+)/)
+    if (m) {
+      let pair = m[1]
+      if (pair.endsWith('USDT')) pair = pair.slice(0, -4)
+      else if (pair.endsWith('USD')) pair = pair.slice(0, -3)
+      if (MARKET_CASHTAG_RPC_RE.test(pair)) return pair
+    }
+    const stripped = sym.replace(/^BINANCE:/, '').replace(/USDT$/, '').replace(/USD$/, '')
+    if (MARKET_CASHTAG_RPC_RE.test(stripped)) return stripped
+  }
+  return display
+}
 
 /** Match server `finnhubSymbolForAsset` for batch cache keys. */
 export function cashtagFinnhubSymbol(ticker, assetClass = 'stock') {

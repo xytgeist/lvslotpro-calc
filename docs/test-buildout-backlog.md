@@ -623,6 +623,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-06: **Lounge market modal posts + market embeds (code on `test`):** **`lounge_search_cashtag_posts`** now matches posts with **`market_embeds`** for the ticker (picker-only charts without `$TICKER` in caption) plus caption cashtags; modal surfaces RPC errors instead of silent empty. Migration **`20260609150000_lounge_search_cashtag_market_embeds.sql`** (requires **`20260609140000`**). **Apply both on test if modal Top/Latest is empty.**
 - 2026-06-06: **Lounge market chart light mode (code on `test`):** mini cards + modal sheet use **inverted zinc tokens** (`text-zinc-50`, `bg-zinc-950`) so titles/prices/news read on white; fixes washed-out `text-zinc-900` / dark mini cards from wrong literal light classes.
 - 2026-06-06: **Lounge market picker search enrich fix (code on `test`):** restore **Finnhub logo** fallback when Yahoo chart omits it; compute **% change** from `chartPreviousClose`; cap duplicate foreign listings (max 2 per root ticker). **Redeploy `lounge-market-data`.**
 - 2026-06-06: **Lounge market picker search sort (code on `test`):** `$AAPL` exact US stock ticker ranks first — removed crypto-first merge for 1–6 letter queries; relevance score deprioritizes Ondo/xStock/tokenized crypto. **Redeploy `lounge-market-data`.**
