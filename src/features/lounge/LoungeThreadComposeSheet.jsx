@@ -124,12 +124,9 @@ export default function LoungeThreadComposeSheet({
 }) {
   const scrollRef = useRef(null)
   const toolbarRef = useRef(null)
-  const partsStackRef = useRef(null)
   const partRowRefs = useRef({})
   const didUserActivatePartRef = useRef(false)
-  const scrollMetricsRef = useRef({ toolbarHeightPx: 52, kbOverlapPx: 0 })
   const [toolbarHeightPx, setToolbarHeightPx] = useState(52)
-  const [leadingSpacerPx, setLeadingSpacerPx] = useState(0)
   /** Only track keyboard overlap while a caption field is focused — avoids footer/scroll fights on open. */
   const [keyboardDockActive, setKeyboardDockActive] = useState(false)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(LOUNGE_IOS)
@@ -138,52 +135,29 @@ export default function LoungeThreadComposeSheet({
   })
   const footerPadBottom = loungeComposerFooterPaddingBottom(kbOverlapPx, iosSafeBottomPx)
 
-  scrollMetricsRef.current = { toolbarHeightPx, kbOverlapPx }
-
-  /** Scroll only enough to keep the active row above the docked toolbar + keyboard. */
-  const scrollPartAboveToolbar = useCallback((partIdx) => {
+  /** Scroll up only when a part row would sit under the fixed toolbar (footer lifts with keyboard). */
+  const scrollPartClearToolbarOverlap = useCallback((partIdx) => {
     const scrollEl = scrollRef.current
     const row = partRowRefs.current[partIdx]
-    if (!scrollEl || !row) return
+    const toolbar = toolbarRef.current
+    if (!scrollEl || !row || !toolbar) return
 
-    const scrollRect = scrollEl.getBoundingClientRect()
     const rowRect = row.getBoundingClientRect()
-    const toolbarTop = toolbarRef.current?.getBoundingClientRect?.()?.top
-    const visibleBottom =
-      typeof toolbarTop === 'number' && Number.isFinite(toolbarTop)
-        ? toolbarTop - THREAD_COMPOSE_SCROLL_GAP_PX
-        : scrollRect.bottom - THREAD_COMPOSE_SCROLL_GAP_PX
-    const minTop = scrollRect.top + THREAD_COMPOSE_SCROLL_GAP_PX
+    const visibleBottom = toolbar.getBoundingClientRect().top - THREAD_COMPOSE_SCROLL_GAP_PX
+    if (rowRect.bottom <= visibleBottom) return
 
-    let nextScrollTop = scrollEl.scrollTop
-    if (rowRect.bottom > visibleBottom) {
-      nextScrollTop += rowRect.bottom - visibleBottom
-    }
-
-    const scrollDelta = nextScrollTop - scrollEl.scrollTop
-    const projectedTop = rowRect.top - scrollDelta
-    if (projectedTop < minTop) {
-      nextScrollTop = scrollEl.scrollTop + (rowRect.top - minTop)
-    }
-
-    if (Math.abs(nextScrollTop - scrollEl.scrollTop) < 1) return
-    scrollEl.scrollTop = nextScrollTop
+    scrollEl.scrollTop += rowRect.bottom - visibleBottom
   }, [])
 
-  const scheduleScrollPin = useCallback(
-    (partIdx, { chase = false } = {}) => {
-      const run = () => scrollPartAboveToolbar(partIdx)
-      if (!chase) {
-        requestAnimationFrame(run)
-        return
-      }
-      run()
+  const scheduleScrollClearOverlap = useCallback(
+    (partIdx) => {
+      const run = () => scrollPartClearToolbarOverlap(partIdx)
       requestAnimationFrame(run)
       if (LOUNGE_IOS) {
         window.setTimeout(run, LOUNGE_IOS_KEYBOARD_SMOOTH_MS)
       }
     },
-    [scrollPartAboveToolbar],
+    [scrollPartClearToolbarOverlap],
   )
 
   const syncFocusLeftSheet = useCallback(() => {
@@ -203,7 +177,10 @@ export default function LoungeThreadComposeSheet({
     if (!open) {
       didUserActivatePartRef.current = false
       setKeyboardDockActive(false)
+      return
     }
+    const scrollEl = scrollRef.current
+    if (scrollEl) scrollEl.scrollTop = 0
   }, [open])
 
   useEffect(() => {
@@ -220,33 +197,23 @@ export default function LoungeThreadComposeSheet({
           // ignore
         }
       }
-      scheduleScrollPin(focusPartIndex, { chase: true })
       onFocusPartIndexConsumed?.()
     }, 40)
     return () => window.clearTimeout(id)
-  }, [focusPartIndex, getPartRef, onFocusPartIndexConsumed, open, scheduleScrollPin])
+  }, [focusPartIndex, getPartRef, onFocusPartIndexConsumed, open])
 
   useEffect(() => {
-    const scrollEl = scrollRef.current
-    const stackEl = partsStackRef.current
-    if (!scrollEl || !stackEl || !open) {
-      setLeadingSpacerPx(0)
-      return undefined
-    }
-    const sync = () => {
-      const available = scrollEl.clientHeight
-      const contentH = stackEl.offsetHeight
-      setLeadingSpacerPx(Math.max(0, available - contentH))
-    }
-    sync()
-    const ro = new ResizeObserver(sync)
-    ro.observe(scrollEl)
-    ro.observe(stackEl)
-    return () => {
-      ro.disconnect()
-      setLeadingSpacerPx(0)
-    }
-  }, [open, captions.length, kbOverlapPx, toolbarHeightPx])
+    if (!open || !keyboardDockActive || activePartIndex < 0) return undefined
+    scheduleScrollClearOverlap(activePartIndex)
+    return undefined
+  }, [
+    activePartIndex,
+    keyboardDockActive,
+    kbOverlapPx,
+    open,
+    scheduleScrollClearOverlap,
+    toolbarHeightPx,
+  ])
 
   useEffect(() => {
     const el = toolbarRef.current
@@ -263,9 +230,9 @@ export default function LoungeThreadComposeSheet({
       didUserActivatePartRef.current = true
       setKeyboardDockActive(true)
       onFocusPart?.(partIdx)
-      scheduleScrollPin(partIdx, { chase: false })
+      scheduleScrollClearOverlap(partIdx)
     },
-    [onFocusPart, scheduleScrollPin],
+    [onFocusPart, scheduleScrollClearOverlap],
   )
 
   const focusPart = useCallback(
@@ -283,10 +250,10 @@ export default function LoungeThreadComposeSheet({
             // ignore
           }
         }
-        scheduleScrollPin(partIdx, { chase: false })
+        scheduleScrollClearOverlap(partIdx)
       })
     },
-    [getPartRef, onFocusPart, scheduleScrollPin],
+    [getPartRef, onFocusPart, scheduleScrollClearOverlap],
   )
 
   if (!open) return null
@@ -350,11 +317,10 @@ export default function LoungeThreadComposeSheet({
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
         style={{
-          paddingBottom: `calc(${toolbarHeightPx}px + ${Math.round(kbOverlapPx)}px + 0.75rem)`,
+          paddingBottom: `calc(${toolbarHeightPx}px + 0.75rem)`,
         }}
       >
-        <div aria-hidden className="shrink-0" style={{ height: leadingSpacerPx }} />
-        <div ref={partsStackRef} className="space-y-0 pb-2">
+        <div className="space-y-0 pb-2">
           {captions.map((partText, partIdx) => {
             const partMedia = partsMedia[partIdx]
             const carouselUrls = threadComposePartCarouselUrls(partMedia)
