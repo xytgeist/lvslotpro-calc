@@ -4,6 +4,13 @@ import { formatLoungePostDetailWhen } from './loungeFormat.js'
 
 const END_PAD_PX = 3
 
+export const LOUNGE_THREAD_PART_NUMBER_BADGE_CLASS =
+  'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-bold tabular-nums text-zinc-400 ring-1 ring-zinc-700/90'
+
+/** Final thread part on post detail — red cap on the same gray pill as middle parts. */
+export const LOUNGE_THREAD_PART_NUMBER_BADGE_LAST_CLASS =
+  'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-bold tabular-nums text-lv-red ring-1 ring-lv-red/85'
+
 export function AvatarConnectorLine({ containerRef, topAvatarRef, bottomAvatarRef }) {
   const [line, setLine] = useState(null)
 

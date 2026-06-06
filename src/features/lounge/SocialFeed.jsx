@@ -156,7 +156,7 @@ import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFee
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
-import { textIsOnlyUrls } from '../../utils/linkifyText.jsx'
+import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
 import { COMMUNITY_FEED_SELECT } from '../../utils/loungeFeedScope.js'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
@@ -257,6 +257,8 @@ import { edgeLogoTitleBarClassName } from '../shell/titleBarLayout.js'
 import { useEdgeTitleBarReveal } from '../shell/edgeTitleBarRevealStore.js'
 import LoungePostDetailCommentSort from './LoungePostDetailCommentSort.jsx'
 import LoungePostDetailCommentHierarchy from './LoungePostDetailCommentHierarchy.jsx'
+import LoungePostThreadPartsHierarchy from './LoungePostThreadPartsHierarchy.jsx'
+import { feedThreadPartsFromComments, loungePostIsThreadRoot } from '../../utils/loungePostThreadApi.js'
 import { readLoungeDetailCommentSort } from '../../utils/loungeFeedCommentSort.js'
 import {
   readLoungeFeedVideoAutoplayEnabled,
@@ -315,10 +317,11 @@ const FEED_COMMENT_SELECT_COLS =
 
 function loungeDetailShowsCaption(row) {
   if (!row) return false
-  const c = feedPostDisplayCaption(row)
-  if (!c) return false
-  if (row.link_preview && textIsOnlyUrls(c)) return false
-  return true
+  return Boolean(bodyTextWithLinkPreview(feedPostDisplayCaption(row), row.link_preview))
+}
+
+function loungeDetailCaptionDisplayText(row) {
+  return bodyTextWithLinkPreview(feedPostDisplayCaption(row), row?.link_preview)
 }
 
 /** Root → focused comment ids for post-detail drill / comment-repost deep link. */
@@ -7229,6 +7232,18 @@ export default function SocialFeed({
     [loungeDetailComments],
   )
 
+  const loungeDetailThreadPartsSorted = useMemo(
+    () =>
+      loungeCommentDetailPathIds.length === 0
+        ? feedThreadPartsFromComments(loungeDetailComments, loungeDetailViewerPinnedCommentIds)
+        : [],
+    [loungeCommentDetailPathIds.length, loungeDetailComments, loungeDetailViewerPinnedCommentIds],
+  )
+
+  const loungePostDetailConnectorActive =
+    loungeCommentDetailPathIds.length > 0 ||
+    (loungePostIsThreadRoot(loungePostDetail) && loungeDetailThreadPartsSorted.length > 0)
+
   const loungeDetailCommentHierarchyFocusId = useMemo(
     () =>
       loungeCommentDetailPathIds.length > 0
@@ -13481,10 +13496,8 @@ export default function SocialFeed({
 
               <>
               <div
-                ref={
-                  loungeCommentDetailPathIds.length > 0 ? loungePostDetailCommentConnectorRef : undefined
-                }
-                className={loungeCommentDetailPathIds.length > 0 ? 'relative' : ''}
+                ref={loungePostDetailConnectorActive ? loungePostDetailCommentConnectorRef : undefined}
+                className={loungePostDetailConnectorActive ? 'relative' : ''}
               >
               <article
                 tabIndex={loungeCommentDetailPathIds.length > 0 ? 0 : undefined}
@@ -13748,7 +13761,7 @@ export default function SocialFeed({
                       } ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
                     >
                       <LoungeExpandableRichCaption
-                        text={feedPostDisplayCaption(loungePostDetail)}
+                        text={loungeDetailCaptionDisplayText(loungePostDetail)}
                         captionOpts={loungePostDetailRichCaptionOpts}
                       />
                     </div>
@@ -13819,12 +13832,19 @@ export default function SocialFeed({
                       handleFor={handleFor}
                       postAgeLabel={postAgeLabel}
                     />
-                    <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 whitespace-pre-wrap break-words">
-                      <LoungeExpandableRichCaption
-                        text={feedPostDisplayCaption(loungePostDetail.reposted_post)}
-                        captionOpts={loungePostDetailRichCaptionOpts}
-                      />
-                    </div>
+                    {loungeDetailCaptionDisplayText(loungePostDetail.reposted_post) ? (
+                      <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 whitespace-pre-wrap break-words">
+                        <LoungeExpandableRichCaption
+                          text={loungeDetailCaptionDisplayText(loungePostDetail.reposted_post)}
+                          captionOpts={loungePostDetailRichCaptionOpts}
+                        />
+                      </div>
+                    ) : null}
+                    <LoungeLinkPreviewBlock
+                      preview={loungePostDetail.reposted_post.link_preview}
+                      className="mt-2"
+                      onPreviewOpen={openLinkPreview}
+                    />
                     <LoungePostFeedImagesAndGif
                       post={loungePostDetail.reposted_post}
                       variant="embed"
@@ -13880,7 +13900,7 @@ export default function SocialFeed({
                       } ${loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}`}
                     >
                       <LoungeExpandableRichCaption
-                        text={feedPostDisplayCaption(loungePostDetail)}
+                        text={loungeDetailCaptionDisplayText(loungePostDetail)}
                         captionOpts={loungePostDetailRichCaptionOpts}
                       />
                     </div>
@@ -14349,6 +14369,71 @@ export default function SocialFeed({
                   </div>
                 )
               })()}
+
+              {loungeCommentDetailPathIds.length === 0 &&
+              !loungeDetailCommentsLoading &&
+              loungeDetailThreadPartsSorted.length > 0 ? (
+                <LoungePostThreadPartsHierarchy
+                  threadParts={loungeDetailThreadPartsSorted}
+                  connectorRootRef={loungePostDetailCommentConnectorRef}
+                  descendantCountByCommentId={loungeDetailDescendantCountByCommentId}
+                  onOpenCommentThread={openLoungeCommentDrillFromRoots}
+                  cardProps={{
+                    postAgeLabel,
+                    displayNameFor,
+                    handleFor,
+                    loungeReadOnly,
+                    viewerUserId: composerUserId,
+                    requireLoungeAuth,
+                    openProfileGateIfNeeded,
+                    onCommentReplyInteraction: onLoungeCommentReplyInteraction,
+                    interactionStateFor: interactionStateForComment,
+                    toggleInteraction: noopLoungeBarPostToggle,
+                    onPlainRepost: (p) => void addLoungeDetailCommentPlainRepost(p.id),
+                    onUndoPlainRepost: (p) => void undoLoungeDetailCommentPlainRepost(p.id),
+                    onQuoteRepost: openQuoteRepostComposerForComment,
+                    onRemoveQuoteRepost: openRemoveQuoteRepostForComment,
+                    toggleBookmark: noopLoungeBarPostToggle,
+                    bookmarkedByPost,
+                    onToggleCommentLike: toggleLoungeDetailCommentLike,
+                    onToggleCommentBookmark: toggleLoungeDetailCommentBookmark,
+                    getCommentBookmarked: getLoungeDetailCommentBookmarked,
+                    repostActionBusy: repostManageBusy,
+                    onAvatarClickProfile: openAuthorProfile,
+                    positionScrollRootRef: loungePostDetailScrollRef,
+                    onCommentMenuDelete: deleteLoungeDetailComment,
+                    onCommentMenuBlock: onCommentMenuBlockFromDetail,
+                    onCommentMenuReport: onCommentMenuReportFromDetail,
+                    onCommentMenuEdit: beginLoungeDetailCommentEdit,
+                    busyDeletingCommentId: loungeDetailCommentDeleteBusyId,
+                    commentEditSavePendingCommentId: loungeDetailCommentEditPendingCommentId,
+                    editingCommentId: loungeDetailCommentEditingId,
+                    commentEditDraft: loungeDetailCommentEditDraft,
+                    onCommentEditDraftChange: setLoungeDetailCommentEditDraft,
+                    onCommentEditSave: saveLoungeDetailCommentEdit,
+                    onCommentEditCancel: cancelLoungeDetailCommentEdit,
+                    commentEditBusy: loungeDetailCommentEditBusy,
+                    commentEditHasRemoteMedia: loungeDetailCommentEditHasMedia,
+                    commentEditMediaSlot: loungeDetailCommentEditMediaSlot,
+                    commentEditFieldRef: loungeDetailCommentEditFieldRef,
+                    commentEditVideoPostBlocked: loungeDetailCommentEditVideoPostBlocked,
+                    onMentionClick: openProfileByHandle,
+                    onHashtagClick: openSearchByHashtag,
+                    onLinkClick: openCaptionLink,
+                    onLinkPreviewOpen: openLinkPreview,
+                    youtubeIframeLoading: 'eager',
+                    lightboxPortalClass: loungeDetailMediaLightboxPortalClass,
+                    avatarText,
+                    avatarToneClass,
+                    viewerFollowingUserIds: loungeReadOnly ? null : loungeFollowingUserIds,
+                    onFollowUser: loungeReadOnly ? undefined : handleLoungeFollowUser,
+                    feedVideoAutoplayEnabled: loungeFeedVideoAutoplayEnabled,
+                    onFeedVideoAutoplayChange: onLoungeFeedVideoAutoplayChange,
+                    onStreamLightboxOpenDetail: openLoungeCommentStreamLightboxDetail,
+                    onSharePost: handleShareLoungePost,
+                  }}
+                />
+              ) : null}
 
               {loungeCommentDetailPathIds.length === 0 ? (
                 <div className={LOUNGE_FEED_POST_DETAIL_COMMENT_SORT_SECTION_CLASS}>
@@ -15406,9 +15491,10 @@ export default function SocialFeed({
                             const orig = quoteRepostModal.original
                             if (!orig?.id) return null
                             const quoteComment = quoteRepostModal.originalKind === 'comment'
-                            const embedCaption = quoteComment
-                              ? String(orig.body || '').trim()
-                              : feedPostDisplayCaption(orig)
+                            const embedCaption = bodyTextWithLinkPreview(
+                              quoteComment ? String(orig.body || '').trim() : feedPostDisplayCaption(orig),
+                              orig.link_preview,
+                            )
                             return (
                               <div
                                 role="figure"

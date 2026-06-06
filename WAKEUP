@@ -46,6 +46,7 @@ The agent should treat the following as **standing instructions for this session
   `supabase functions deploy lounge-cf-stream-delete-orphan --project-ref jtjgtucumuoswnbauxry`, and  
   `supabase functions deploy lounge-cf-stream-purge-pending-uploads --project-ref jtjgtucumuoswnbauxry`
 - **Lounge Stream (feed):** autoplay coordinator + **prefetch-band staging** + **hero expand** in **`LoungePostStreamVideo.jsx`** + **`LoungeFeedVideoAutoplayContext.jsx`** / **`loungeFeedVideoAutoplayStore.js`**; feed **40** posts/page in **`AppShell.jsx`**; quote repost **`z-[100]`** vs post detail **`z-[98]`** (profile sheet **`z-[97]`**) — see **`AGENTS.md`** quick anchors and **`docs/test-buildout-backlog.md`** smoke 11 / 14.
+- **Lounge post threads:** **`LoungeThreadComposeSheet.jsx`** + SQL **`20260608140000`**–**`190000`**; **`LoungeComposerMediaToolbar.jsx`** split image/video; smoke checklist **Lounge thread compose sheet UX** in backlog — see **Last session recap (Jun 8–9 2026)** below.
 - **Lounge FAB wheel (nav):** primary nav = **`LoungeDockArcCarouselPrototype`**; **`LoungeDockFooterBar`** disabled; long-press reposition + **1s** click-through guard; chip-heart likes + share in **⋯** menu — **`AGENTS.md`** anchors, roadmap Phase B FAB table, backlog smoke **§14** (test through commit **`2231883`**).
 - No prod writes / no commits / PR only: _[say which]_
 - Context: _[link, path, or "decision already in backlog heading …"]_
@@ -75,7 +76,40 @@ The agent should treat the following as **standing instructions for this session
 
 ---
 
-## Last session recap (Jun 2–5 2026, branch `test`) — PICK UP HERE
+## Last session recap (Jun 8–9 2026, branch `test`) — PICK UP HERE
+
+### Shipped on `test` (commits — code pushed; SQL may still need Ryan on test)
+
+| Commit | Area | Notes |
+|--------|------|-------|
+| **`8b7d1d2`** | **X-style thread compose** | Full-screen **`LoungeThreadComposeSheet`** — category pills, avatar connectors, part numbers, gray past parts. |
+| **`24dedcb`** | **Thread failure recovery** | Failed publish restores all part media; partial publish resume via submit-job snapshot. |
+| **`e31d72c`** | **Thread compose polish** | Glass header + keyboard toolbar; scroll pin active part; **`LoungeComposerMediaToolbar`** split image/video on all composers; media/GIF without keyboard in thread. |
+| **`ad8b0ca`** | **Load crash fix** | **`handleDetailCommentEditMediaInputChange`** TDZ — comment-edit media slot init order in **`SocialFeed.jsx`**. |
+| **`8b32619`** | **Empty feed → thread focus** | No caption → 2 parts, focus **part 1**; seeded caption → focus **part 2**. |
+
+**Earlier same sprint (Jun 8):** thread SQL **`20260608140000`**–**`190000`** — 320 cap, parts as **`feed_comments`**, drafts, feed timeline repair, per-part media, quote repost on parts; GIF dedupe, part edit menu, **`mediaPrep`** upload bar. See backlog Update log **2026-06-08** rows.
+
+### Apply on test Supabase (if not already)
+
+Run in order: **`20260608140000`** → **`20260608150000`** → **`20260608160000`** → **`20260608170000`** (then **refresh feed**) → **`20260608180000`** → **`20260608190000`**.
+
+### Smoke (pending Ryan sign-off)
+
+- Empty feed caption → **Start thread** → part 1 focused, part 2 visible; typed caption → focus part 2.
+- Keyboard up → add part / type / attach media → active part stays above toolbar.
+- Image / video / GIF in thread compose → picker opens, **keyboard stays down**.
+- Split image/video on feed, detail comment, quote, edit composers.
+- Fail mid-upload → **Retry** restores all part media.
+- Load Lounge — no white screen (comment-edit regression).
+
+**Key files:** `LoungeThreadComposeSheet.jsx`, `LoungeComposerMediaToolbar.jsx`, `SocialFeed.jsx`, `loungePostSubmitJob.js`, `loungeThreadComposeMedia.js`, `loungeThreadComposeVideoPrep.js`, `index.css`.
+
+**Docs:** **`docs/test-buildout-backlog.md`** (checkbox + Update log **2026-06-09**), **`docs/social-feed-roadmap.md`** (Phase D4), **`docs/frontend-architecture.md`**, **`AGENTS.md`**.
+
+---
+
+## Last session recap (Jun 2–5 2026, branch `test`)
 
 ### Shipped on `test` (commits — code pushed; SQL/Edge may still need Ryan on test)
 

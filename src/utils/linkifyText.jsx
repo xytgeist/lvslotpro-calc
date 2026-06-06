@@ -38,12 +38,36 @@ function safeHttpHref(raw) {
  * @param {string} text
  * @returns {{ type: 'text' | 'link', value: string, href?: string }[]}
  */
+/** Removes URL segments; collapses extra horizontal whitespace left behind. */
+export function textWithoutUrls(text) {
+  const out = splitTextWithLinks(String(text || ''))
+    .filter((seg) => seg.type === 'text')
+    .map((seg) => seg.value)
+    .join('')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return out
+}
+
+/**
+ * Caption/body for display when a link preview card is attached — strips URL text
+ * but keeps any other caption (e.g. "look at this" above a YouTube embed).
+ */
+export function bodyTextWithLinkPreview(text, linkPreview) {
+  const raw = String(text ?? '').trim()
+  if (!raw) return ''
+  if (!linkPreview) return raw
+  return textWithoutUrls(raw)
+}
+
 /** True when the string is only URL(s) and whitespace (hide duplicate text when showing a card). */
 export function textIsOnlyUrls(text) {
   const t = String(text || '').trim()
   if (!t) return false
-  const stripped = t.replace(URL_RE, '').trim()
-  return stripped.length === 0 && extractFirstUrlFromText(t) != null
+  return textWithoutUrls(t).length === 0 && extractFirstUrlFromText(t) != null
 }
 
 /** First http(s), www, or bare-domain URL in text (for link preview attach). */

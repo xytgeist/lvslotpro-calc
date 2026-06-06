@@ -13,7 +13,7 @@ import ChatSharedLinkCard, {
   groupSharedLinksByMonth,
   sharedLinkMatchesQuery,
 } from './ChatSharedLinkCard.jsx'
-import { textIsOnlyUrls } from '../../utils/linkifyText.jsx'
+import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
 
 /**
  * @param {{
@@ -235,10 +235,10 @@ const MEDIA_TABS = [
   { id: 'docs', label: 'Docs' },
 ]
 
-/** @param {string | null | undefined} bodyPreview */
-function linkMessageFooter(bodyPreview) {
-  const t = String(bodyPreview || '').trim()
-  if (!t || textIsOnlyUrls(t)) return null
+/** @param {string | null | undefined} bodyPreview @param {object | null | undefined} linkPreview */
+function linkMessageFooter(bodyPreview, linkPreview) {
+  const t = bodyTextWithLinkPreview(bodyPreview, linkPreview)
+  if (!t) return null
   return t
 }
 
@@ -273,7 +273,7 @@ function SharedLinksList({ items, query, onJumpToMessage, onBack, itemLabel = 'l
                 <ChatSharedLinkCard
                   url={item.url}
                   linkPreview={item.link_preview}
-                  bodyPreview={linkMessageFooter(item.body_preview) || 'View message'}
+                  bodyPreview={linkMessageFooter(item.body_preview, item.link_preview) || 'View message'}
                   onViewMessage={() => {
                     onJumpToMessage(item.message_id)
                     onBack()

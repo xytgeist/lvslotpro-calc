@@ -25,7 +25,7 @@ import { LOUNGE_COMMENT_BODY_MAX } from '../../utils/loungeCommentLimits.js'
 import LoungeRichComposerField from './LoungeRichComposerField.jsx'
 import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
-import { textIsOnlyUrls } from '../../utils/linkifyText.jsx'
+import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
 import {
   LOUNGE_FEED_CAPTION_TEXT_CLASS,
   LOUNGE_FEED_CAPTION_TOP_CLASS,
@@ -105,6 +105,8 @@ export function LoungeCommentCard({
   showDetailTimestamp = false,
   detailTimestampLabel = '',
   avatarButtonRef = null,
+  /** Thread part rail owns the avatar column (`LoungePostThreadPartsHierarchy`). */
+  hideAvatar = false,
   hideInteractionBar = false,
   lightboxPortalClass = 'z-[100]',
   repostMenuPortalClass = 'z-[48]',
@@ -230,12 +232,11 @@ export function LoungeCommentCard({
     </div>
   ) : (
     (() => {
-      const bodyText = String(comment.body || '').trim()
-      const hideBody = bodyText && comment.link_preview && textIsOnlyUrls(bodyText)
+      const bodyText = bodyTextWithLinkPreview(comment.body, comment.link_preview)
       if (!bodyText && !comment.link_preview) return null
       return (
         <>
-          {bodyText && !hideBody ? (
+          {bodyText ? (
             <div
               className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left ${LOUNGE_FEED_CAPTION_TEXT_CLASS} text-zinc-200`}
             >
@@ -277,37 +278,7 @@ export function LoungeCommentCard({
       />
     ) : null
 
-  const metaRow = (
-    <div className="flex items-start gap-3">
-      <button
-        ref={avatarButtonRef}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          if (openProfileGateIfNeeded?.()) return
-          onAvatarClickProfile?.(comment)
-        }}
-        className={`${LOUNGE_FEED_POST_DETAIL_COMMENT_AVATAR_CLASS} flex items-center justify-center touch-manipulation hover:border-zinc-600 [-webkit-tap-highlight-color:transparent]`}
-        aria-label={`Open profile for ${displayName}`}
-      >
-        {profile?.avatar_url ? (
-          <img
-            src={profile.avatar_url}
-            alt=""
-            className="h-full w-full rounded-full object-cover"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <span
-            className={`flex h-full w-full items-center justify-center font-bold text-white ${profileAvatarToneClass(
-              profile?.user_id || profile?.handle || comment?.user_id || 'member',
-            )}`}
-          >
-            {profileAvatarInitials(profile?.display_name, profile?.handle)}
-          </span>
-        )}
-      </button>
+  const commentBodyColumn = (
       <div className="min-w-0 flex-1">
         {commentDeletePending ? (
           <LoungeFeedPendingStatusRow className="mb-1">Deleting reply…</LoungeFeedPendingStatusRow>
@@ -380,6 +351,42 @@ export function LoungeCommentCard({
           />
         ) : null}
       </div>
+  )
+
+  const metaRow = hideAvatar ? (
+    commentBodyColumn
+  ) : (
+    <div className="flex items-start gap-3">
+      <button
+        ref={avatarButtonRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          if (openProfileGateIfNeeded?.()) return
+          onAvatarClickProfile?.(comment)
+        }}
+        className={`${LOUNGE_FEED_POST_DETAIL_COMMENT_AVATAR_CLASS} flex items-center justify-center touch-manipulation hover:border-zinc-600 [-webkit-tap-highlight-color:transparent]`}
+        aria-label={`Open profile for ${displayName}`}
+      >
+        {profile?.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt=""
+            className="h-full w-full rounded-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <span
+            className={`flex h-full w-full items-center justify-center font-bold text-white ${profileAvatarToneClass(
+              profile?.user_id || profile?.handle || comment?.user_id || 'member',
+            )}`}
+          >
+            {profileAvatarInitials(profile?.display_name, profile?.handle)}
+          </span>
+        )}
+      </button>
+      {commentBodyColumn}
     </div>
   )
 
@@ -508,17 +515,6 @@ export default function LoungePostCommentThread({
     () => feedCommentDescendantCountById(comments),
     [comments],
   )
-
-  const threadPartsSorted = useMemo(() => {
-    if (variant !== 'post') return []
-    return [...(comments || [])]
-      .filter((c) => c.is_thread_part && !c.parent_id)
-      .sort(
-        (a, b) =>
-          (Number(a.thread_part_index) || 0) - (Number(b.thread_part_index) || 0) ||
-          compareFeedCommentsChronologicalAsc(a, b, viewerPinnedCommentIds),
-      )
-  }, [comments, variant, viewerPinnedCommentIds])
 
   const rootsSorted = useMemo(() => {
     if (variant !== 'post') return []
@@ -698,38 +694,24 @@ export default function LoungePostCommentThread({
     )
   }
 
-  const hasThreadParts = threadPartsSorted.length > 0
   const hasRootComments = rootsSorted.length > 0 || orphanOpAuthorReplies.length > 0
 
-  if (!hasThreadParts && !hasRootComments) {
+  if (!hasRootComments) {
     return <p className="mt-1 text-[14px] text-zinc-500">No comments yet. Be the first.</p>
   }
 
   return (
-    <>
-      {hasThreadParts ? (
-        <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
-          {threadPartsSorted.map((part) => (
-            <li key={part.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
-              {renderCommentRow(part)}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {hasRootComments ? (
-        <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
-          {rootsSorted.map((root) => (
-            <li key={root.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
-              {renderCommentRow(root)}
-            </li>
-          ))}
-          {orphanOpAuthorReplies.map((c) => (
-            <li key={c.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
-              {renderCommentRow(c)}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </>
+    <ul className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_CLASS}>
+      {rootsSorted.map((root) => (
+        <li key={root.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
+          {renderCommentRow(root)}
+        </li>
+      ))}
+      {orphanOpAuthorReplies.map((c) => (
+        <li key={c.id} className={LOUNGE_FEED_POST_DETAIL_COMMENT_LIST_ITEM_CLASS}>
+          {renderCommentRow(c)}
+        </li>
+      ))}
+    </ul>
   )
 }

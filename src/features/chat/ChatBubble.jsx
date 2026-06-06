@@ -3,7 +3,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import ChatLinkPreviewCard from '../../components/ChatLinkPreviewCard.jsx'
 import ChatMediaViewer from './ChatMediaViewer.jsx'
 import { attachLinkPreview } from '../../utils/loungeLinkPreviewApi.js'
-import { extractFirstUrlFromText, LinkifiedText, textIsOnlyUrls } from '../../utils/linkifyText.jsx'
+import {
+  bodyTextWithLinkPreview,
+  extractFirstUrlFromText,
+  LinkifiedText,
+  textIsOnlyUrls,
+} from '../../utils/linkifyText.jsx'
 import ChatEmojiPicker, { saveRecentEmoji } from './ChatEmojiPicker'
 import ChatReceiptLabel from './ChatReceiptLabel.jsx'
 import LoungeFlameIcon from '../lounge/LoungeFlameIcon'
@@ -223,7 +228,8 @@ export default function ChatBubble({
   const isDeleted      = Boolean(message.deleted_at)
   const linkPreview    = message.link_preview || null
   const imageUrlsEarly = Array.isArray(message.image_urls) ? message.image_urls.filter(Boolean) : []
-  const showBodyText   = message.body && !(linkPreview && textIsOnlyUrls(message.body))
+  const displayBody    = bodyTextWithLinkPreview(message.body, linkPreview)
+  const showBodyText   = Boolean(displayBody)
   /** URL-only message with a card — skip the empty text bubble (iMessage shows just the card). */
   const isLinkPreviewOnly =
     !isDeleted &&
@@ -591,7 +597,7 @@ export default function ChatBubble({
                 {showBodyText && (
                   <div className={`chat-bubble-body whitespace-pre-wrap break-words ${hasMedia ? 'px-[13px] pt-2 pb-1' : ''}`}>
                     <LinkifiedText
-                      text={message.body}
+                      text={displayBody}
                       linkClassName={
                         isMine && !isDeleted
                           ? 'underline decoration-white/60 underline-offset-2 hover:decoration-white'
