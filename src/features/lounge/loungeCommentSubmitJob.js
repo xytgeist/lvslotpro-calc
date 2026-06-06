@@ -14,6 +14,20 @@ import {
 import { fetchLoungeStreamPosterFileFromSnapshot } from './loungeStreamSessionPoster.js'
 import { attachLinkPreview } from '../../utils/loungeLinkPreviewApi.js'
 
+function formatFeedCommentPersistenceError(message, fallback = 'Could not post reply.') {
+  const msg = String(message || '')
+  if (/feed_comments_body_len/i.test(msg)) {
+    return (
+      'Media-only replies need Supabase migration 20260608180000_feed_comments_thread_part_media_body.sql ' +
+      '(allows GIF/image/video with no caption). Apply on test in the SQL editor, then Retry.'
+    )
+  }
+  if (/media_url|gif_url|image_urls|stream_video_uid|stream_poster_url|stream_video_width|stream_video_height|comment_count|schema cache/i.test(msg)) {
+    return 'Reply needs the latest feed_comments migrations on Supabase (media + comment_count).'
+  }
+  return msg || fallback
+}
+
 /**
  * Uploads media and inserts `feed_comments`.
  *
@@ -239,13 +253,7 @@ export async function executeLoungeCommentSubmission({
       .single()
 
     if (error) {
-      const msg = String(error.message || '')
-      if (/media_url|gif_url|image_urls|stream_video_uid|stream_poster_url|stream_video_width|stream_video_height|comment_count|schema cache/i.test(msg)) {
-        throw new Error(
-          'Reply needs the latest feed_comments migrations on Supabase (media + comment_count).',
-        )
-      }
-      throw new Error(msg || 'Could not post reply.')
+      throw new Error(formatFeedCommentPersistenceError(error.message))
     }
 
     insertSucceeded = true
@@ -505,16 +513,10 @@ export async function executeLoungeCommentUpdate({
       .maybeSingle()
 
     if (error) {
-      const msg = String(error.message || '')
       if (error.code === '42501') {
         throw new Error('You do not have permission to edit this reply.')
       }
-      if (/media_url|gif_url|image_urls|stream_video_uid|stream_poster_url|stream_video_width|stream_video_height|comment_count|schema cache/i.test(msg)) {
-        throw new Error(
-          'Reply needs the latest feed_comments migrations on Supabase (media + comment_count).',
-        )
-      }
-      throw new Error(msg || 'Could not save edit.')
+      throw new Error(formatFeedCommentPersistenceError(error.message, 'Could not save edit.'))
     }
     if (!data?.id) {
       throw new Error('Could not save edit.')

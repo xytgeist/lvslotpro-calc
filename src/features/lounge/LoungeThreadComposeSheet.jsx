@@ -10,6 +10,7 @@ import {
   threadComposePartCarouselUrls,
   threadComposePartHasContent,
 } from '../../utils/loungeThreadComposeMedia.js'
+import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
 import {
   LOUNGE_IOS,
   LOUNGE_IOS_KEYBOARD_SMOOTH_MS,
@@ -22,56 +23,6 @@ import {
 const THREAD_COMPOSE_SCROLL_GAP_PX = 10
 
 const AVATAR_RAIL_W = 'w-12 sm:w-[3.3rem]'
-
-function ThreadComposeCharRing({ len, max, counterClass }) {
-  const n = Math.max(0, Number(len) || 0)
-  const r = 8
-  const c = 2 * Math.PI * r
-  const pct = Math.min(1, n / max)
-  const offset = c * (1 - pct)
-  const strokeClass =
-    n >= max
-      ? 'stroke-red-500'
-      : n >= max - 5
-        ? 'stroke-orange-400'
-        : n >= max - 15
-          ? 'stroke-yellow-400'
-          : 'stroke-cyan-500/70'
-
-  return (
-    <div
-      className={`relative flex h-7 w-7 shrink-0 items-center justify-center ${counterClass(n)}`}
-      aria-label={`${n} of ${max} characters`}
-      title={`${n}/${max}`}
-    >
-      <svg width="28" height="28" viewBox="0 0 28 28" className="-rotate-90" aria-hidden>
-        <circle
-          cx="14"
-          cy="14"
-          r={r}
-          fill="none"
-          className="stroke-zinc-600/80"
-          strokeWidth="2"
-        />
-        <circle
-          cx="14"
-          cy="14"
-          r={r}
-          fill="none"
-          className={strokeClass}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 0.15s ease' }}
-        />
-      </svg>
-      {n >= max - 15 ? (
-        <span className="absolute text-[9px] font-bold tabular-nums leading-none">{max - n}</span>
-      ) : null}
-    </div>
-  )
-}
 
 function ThreadComposeAvatar({
   composerUserProfile,
@@ -142,7 +93,6 @@ export default function LoungeThreadComposeSheet({
   onSubmit,
   submitting = false,
   error = '',
-  charCounterClass,
   composerUserProfile,
   composerUserId,
   composerAuthResolved,
@@ -313,7 +263,7 @@ export default function LoungeThreadComposeSheet({
           type="button"
           disabled={!canPost}
           onClick={() => void onSubmit()}
-          className="min-h-9 shrink-0 touch-manipulation rounded-full bg-cyan-600 px-4 py-1.5 text-[15px] font-bold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="lounge-composer-post-btn min-h-9 shrink-0 touch-manipulation rounded-full px-4 py-1.5 text-[15px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? 'Posting…' : postAllLabel}
         </button>
@@ -632,11 +582,7 @@ export default function LoungeThreadComposeSheet({
             </label>
           ) : null}
           <div className="min-w-0 flex-1" aria-hidden />
-          <ThreadComposeCharRing
-            len={activeLen}
-            max={LOUNGE_CAPTION_MAX}
-            counterClass={charCounterClass}
-          />
+          <LoungeComposerCharRing len={activeLen} max={LOUNGE_CAPTION_MAX} />
         </div>
       </footer>
     </div>

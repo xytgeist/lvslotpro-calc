@@ -159,6 +159,7 @@ import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
 import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
 import { COMMUNITY_FEED_SELECT } from '../../utils/loungeFeedScope.js'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
+import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
 import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
@@ -450,15 +451,6 @@ function clearHiddenFileInputs(...elements) {
       // ignore
     }
   }
-}
-
-/** Caption length → counter color (yellow near max, orange closer, red at max). */
-function loungeCharCounterClass(len) {
-  const n = typeof len === 'number' ? len : 0
-  if (n >= LOUNGE_CAPTION_MAX) return 'font-semibold text-red-500'
-  if (n >= LOUNGE_CAPTION_MAX - 5) return 'font-semibold text-orange-400'
-  if (n >= LOUNGE_CAPTION_MAX - 15) return 'font-semibold text-yellow-400'
-  return 'text-zinc-500'
 }
 
 /** External GIF URL field: at most one URL (e.g. Klipy); reject pasted multi-URL strings. */
@@ -12654,18 +12646,11 @@ export default function SocialFeed({
         {loungeReadOnly ? null : (
         <div
           className={`relative shrink-0 border-b border-zinc-600/65 bg-zinc-700/55 px-3 ${
-            composerExpanded ? 'pt-3 pb-2.5' : 'py-3'
+            composerExpanded ? 'pt-3 pb-1.5' : 'py-3'
           }`}
         >
         {composerExpanded && composerFoldReveal > 0.14 ? (
-          <div className="absolute right-3 top-3 z-10 flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={openLoungeDraftsSheet}
-              className="touch-manipulation rounded-md px-1 py-0.5 text-[13px] font-semibold text-zinc-400 hover:text-zinc-200 [-webkit-tap-highlight-color:transparent]"
-            >
-              Drafts{loungeDraftCount > 0 ? ` (${loungeDraftCount})` : ''}
-            </button>
+          <div className="absolute right-3 top-3 z-10">
             <button
               type="button"
               onClick={() => {
@@ -12779,7 +12764,7 @@ export default function SocialFeed({
                 }}
               >
                 <div className="mt-0.5 flex min-h-[6.5rem] flex-col">
-                  <div ref={mentionComposerAnchorRef} className="pr-28">
+                  <div ref={mentionComposerAnchorRef} className="pr-8">
                     <LoungeRichComposerField
                       ref={composerFieldRef}
                       variant="feed"
@@ -12805,11 +12790,6 @@ export default function SocialFeed({
                       caretFieldRef={composerFieldRef}
                     />
                   </div>
-                  <LoungePostCategoryPillPicker
-                    value={composerCategoryPills}
-                    onChange={setComposerCategoryPills}
-                    disabled={postBusy}
-                  />
                   {(() => {
                     const gifUrl = String(composerMediaUrl || '').trim()
                     const imageUrls = composerImageItems.map((x) => x.preview)
@@ -12925,8 +12905,14 @@ export default function SocialFeed({
             className="will-change-[opacity]"
             style={{ opacity: Math.min(1, 0.2 + 0.8 * composerFoldReveal) }}
           >
+            <LoungePostCategoryPillPicker
+              value={composerCategoryPills}
+              onChange={setComposerCategoryPills}
+              disabled={postBusy}
+              className="mb-3"
+            />
             <div
-              className="mx-auto mt-1 h-px w-[90%] bg-zinc-700/85"
+              className="mx-auto h-px w-[90%] bg-zinc-700/85"
               role="presentation"
               aria-hidden
             />
@@ -12951,7 +12937,7 @@ export default function SocialFeed({
             />
             <div
               data-lounge-fab-obstacle
-              className="lounge-media-toolbar mt-1 flex w-full items-center gap-2 pr-2 pt-1.5 pb-1"
+              className="lounge-media-toolbar mt-0.5 flex w-full items-center gap-1.5 pr-1 py-0.5"
             >
               <LoungeComposerMediaToolbar
                 variant="feed"
@@ -12964,11 +12950,11 @@ export default function SocialFeed({
               <button
                 type="button"
                 onClick={() => openThreadComposeSheet()}
-                className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1.5 text-sky-400 hover:text-sky-300 active:text-sky-200 [-webkit-tap-highlight-color:transparent]"
+                className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 [-webkit-tap-highlight-color:transparent]"
                 title="Start a thread"
                 aria-label="Start a thread"
               >
-                <svg className="h-8 w-8" viewBox="0 0 20 20" fill="none" aria-hidden>
+                <svg className="h-7 w-7" viewBox="0 0 20 20" fill="none" aria-hidden>
                   <rect
                     x="3.75"
                     y="3.75"
@@ -12988,10 +12974,17 @@ export default function SocialFeed({
                   />
                 </svg>
               </button>
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                <div className="inline-flex shrink-0 items-center gap-2 py-0.5">
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+                <div className="inline-flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={openLoungeDraftsSheet}
+                    className="shrink-0 touch-manipulation rounded-md px-1 py-0.5 text-[12px] font-semibold text-zinc-400 hover:text-zinc-200 [-webkit-tap-highlight-color:transparent]"
+                  >
+                    Drafts{loungeDraftCount > 0 ? ` (${loungeDraftCount})` : ''}
+                  </button>
                   {loungeViewerIsStaff ? (
-                    <label className="inline-flex cursor-pointer touch-manipulation select-none items-center gap-1.5 rounded-md border border-zinc-700/80 bg-zinc-900/50 px-2 py-1 text-[11px] font-semibold text-zinc-400 [-webkit-tap-highlight-color:transparent] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan-500/40">
+                    <label className="inline-flex cursor-pointer touch-manipulation select-none items-center gap-1 rounded-md border border-zinc-700/80 bg-zinc-900/50 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-400 [-webkit-tap-highlight-color:transparent] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan-500/40">
                       <input
                         type="checkbox"
                         checked={composerPinOnPost}
@@ -13002,12 +12995,11 @@ export default function SocialFeed({
                       <span className="whitespace-nowrap">Pin</span>
                     </label>
                   ) : null}
-                  <span
-                    className={`shrink-0 text-[12px] tabular-nums ${loungeCharCounterClass(postText.length)}`}
+                  <LoungeComposerCharRing
+                    len={postText.length}
+                    max={LOUNGE_CAPTION_MAX}
                     aria-live="polite"
-                  >
-                    {postText.length}/{LOUNGE_CAPTION_MAX}
-                  </span>
+                  />
                   <button
                     type="button"
                     onClick={() => void submitLoungePost()}
@@ -13021,7 +13013,7 @@ export default function SocialFeed({
                         composerImageItems.length === 0 &&
                         !composerVideoSlot)
                     }
-                    className="min-h-8 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-2 py-1 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    className="lounge-composer-post-btn min-h-7 shrink-0 touch-manipulation rounded-md px-2 py-0.5 text-[13px] font-bold leading-tight disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {postBusy ? 'Posting…' : 'Post'}
                   </button>
@@ -14031,7 +14023,7 @@ export default function SocialFeed({
                           {...loungeFileInputMediaPickerHandlers('detailEdit')}
                           onChange={(e) => handleDetailEditMediaInputChange(e, 'video')}
                         />
-                        <div className="lounge-media-toolbar mb-1 flex w-full items-center gap-1.5 pr-2 pb-1 pt-1.5">
+                        <div className="lounge-media-toolbar mb-0.5 flex w-full items-center gap-1.5 pr-1 py-0.5">
                           <LoungeComposerMediaToolbar
                             variant="feed"
                             imageInputId={LOUNGE_DETAIL_EDIT_IMAGE_INPUT_ID}
@@ -14041,12 +14033,11 @@ export default function SocialFeed({
                             onOpenGifPicker={() => openKlipyPicker('detailEdit')}
                           />
                           <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                            <span
-                              className={`shrink-0 text-[12px] tabular-nums ${loungeCharCounterClass(loungeDetailDraftCaption.length)}`}
+                            <LoungeComposerCharRing
+                              len={loungeDetailDraftCaption.length}
+                              max={LOUNGE_CAPTION_MAX}
                               aria-live="polite"
-                            >
-                              {loungeDetailDraftCaption.length}/{LOUNGE_CAPTION_MAX}
-                            </span>
+                            />
                             <button
                               type="button"
                               onClick={() => void saveLoungeDetailCaption()}
@@ -14861,12 +14852,11 @@ export default function SocialFeed({
                             onOpenGifPicker={() => openKlipyPicker('detailComment')}
                           />
                           <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-                            <span
-                              className={`shrink-0 text-[12px] tabular-nums ${loungeCharCounterClass(loungeDetailCommentDraft.length)}`}
+                            <LoungeComposerCharRing
+                              len={loungeDetailCommentDraft.length}
+                              max={LOUNGE_COMMENT_BODY_MAX}
                               aria-live="polite"
-                            >
-                              {loungeDetailCommentDraft.length}/{LOUNGE_COMMENT_BODY_MAX}
-                            </span>
+                            />
                             <button
                               type="button"
                               onClick={() => void submitLoungeDetailComment()}
@@ -15424,8 +15414,8 @@ export default function SocialFeed({
                           </div>
                         </div>
                       </div>
-                        <div className="lounge-media-toolbar mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-zinc-700/70 pt-1.5 pb-1">
-                          <div className="flex h-10 shrink-0 items-center justify-center gap-1.5">
+                        <div className="lounge-media-toolbar mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-zinc-700/70 py-0.5">
+                          <div className="flex shrink-0 items-center justify-center gap-1.5">
                             <LoungeComposerMediaToolbar
                               variant="feed"
                               imageInputId={LOUNGE_QUOTE_REPOST_IMAGE_INPUT_ID}
@@ -15444,11 +15434,7 @@ export default function SocialFeed({
                             />
                           </div>
                         <div className="flex min-w-0 grow basis-[min(100%,14rem)] flex-wrap items-center justify-end gap-2">
-                          <span
-                            className={`shrink-0 text-[12px] tabular-nums ${loungeCharCounterClass(quoteRepostDraft.length)}`}
-                          >
-                            {quoteRepostDraft.length}/{LOUNGE_CAPTION_MAX}
-                          </span>
+                          <LoungeComposerCharRing len={quoteRepostDraft.length} max={LOUNGE_CAPTION_MAX} />
                           <button
                             type="button"
                             disabled={
@@ -16016,7 +16002,6 @@ export default function SocialFeed({
         onSubmit={submitThreadCompose}
         submitting={postBusy}
         error={threadComposeErr}
-        charCounterClass={loungeCharCounterClass}
         composerUserProfile={composerUserProfile}
         composerUserId={composerUserId}
         composerAuthResolved={composerAuthResolved}

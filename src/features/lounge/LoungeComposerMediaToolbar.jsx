@@ -31,9 +31,9 @@ export function LoungeComposerMediaVideoIcon({ className = 'h-8 w-8', filled = t
     <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
       <rect
         x="3.75"
-        y="5.25"
+        y="3.75"
         width="12.5"
-        height="9.5"
+        height="12.5"
         rx="2"
         fill={filled ? 'currentColor' : 'none'}
         fillOpacity={filled ? 0.14 : undefined}
@@ -41,7 +41,7 @@ export function LoungeComposerMediaVideoIcon({ className = 'h-8 w-8', filled = t
         strokeWidth="1.35"
       />
       <path
-        d="M8.35 8.1v3.8l3.65-1.9-3.65-1.9z"
+        d="M8.5 7.35v5.3l4.25-2.65-4.25-2.65z"
         fill="currentColor"
         stroke="currentColor"
         strokeWidth="0.35"
@@ -94,19 +94,14 @@ export default function LoungeComposerMediaToolbar({
   className = '',
 }) {
   const isThread = variant === 'thread'
-  const isCompact = variant === 'compact'
-  const iconClass = isThread ? 'h-[26px] w-[26px]' : isCompact ? 'h-7 w-7' : 'h-8 w-8'
+  const iconClass = isThread ? 'h-[26px] w-[26px]' : 'h-7 w-7'
   const filled = !isThread
   const labelClass = isThread
     ? `flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full p-2 text-cyan-600 hover:text-cyan-500 active:text-cyan-400 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]${disabled ? ' pointer-events-none opacity-45' : ''}`
-    : isCompact
-      ? `flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]${disabled ? ' pointer-events-none opacity-45' : ''}`
-      : `flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-md p-1.5 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]${disabled ? ' pointer-events-none opacity-45' : ''}`
+    : `flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]${disabled ? ' pointer-events-none opacity-45' : ''}`
   const gifBtnClass = isThread
     ? 'flex shrink-0 touch-manipulation items-center justify-center rounded-full p-2 text-cyan-600 hover:text-cyan-500 active:text-cyan-400 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]'
-    : isCompact
-      ? 'flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]'
-      : 'flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1.5 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]'
+    : 'flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]'
 
   const preventFocusSteal = (e) => e.preventDefault()
 

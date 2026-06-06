@@ -22,6 +22,7 @@ import {
   stabilizeCommentListOrder,
 } from '../../utils/loungeFeedCommentSort.js'
 import { LOUNGE_COMMENT_BODY_MAX } from '../../utils/loungeCommentLimits.js'
+import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
 import LoungeRichComposerField from './LoungeRichComposerField.jsx'
 import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
@@ -42,14 +43,6 @@ import {
   LOUNGE_FEED_POST_DETAIL_COMMENT_INTERACTIONS_CLASS,
   LOUNGE_FEED_POST_CARD_MENU_ANCHOR_CLASS,
 } from './loungeFeedAvatar.js'
-
-function loungeCharCounterClass(len) {
-  const n = typeof len === 'number' ? len : 0
-  if (n >= LOUNGE_COMMENT_BODY_MAX) return 'font-semibold text-red-500'
-  if (n >= LOUNGE_COMMENT_BODY_MAX - 5) return 'font-semibold text-orange-400'
-  if (n >= LOUNGE_COMMENT_BODY_MAX - 15) return 'font-semibold text-yellow-400'
-  return 'text-zinc-500'
-}
 
 /**
  * Meta row matches `LoungePostArticle`: name, badges, handle · time (left); ⋯ menu on the right.
@@ -225,9 +218,10 @@ export function LoungeCommentCard({
         >
           {commentEditBusy ? 'Saving…' : 'Save'}
         </button>
-        <span className="text-[12px] tabular-nums text-zinc-500">
-          {String(commentEditDraft || '').length}/{LOUNGE_COMMENT_BODY_MAX}
-        </span>
+        <LoungeComposerCharRing
+          len={String(commentEditDraft || '').length}
+          max={LOUNGE_COMMENT_BODY_MAX}
+        />
       </div>
     </div>
   ) : (

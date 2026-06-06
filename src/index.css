@@ -1430,6 +1430,22 @@ html.light .lounge-dock-item-circle {
   color: #27272a;
 }
 
+/* Feed composer Post — dark mode matches dock menu FAB (#06cefc); light mode unchanged below */
+.lounge-composer-post-btn {
+  background-color: #06cefc;
+  color: #ffffff;
+}
+.lounge-composer-post-btn:hover:not(:disabled) {
+  background-color: #51dff9;
+}
+html.light .lounge-composer-post-btn {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+html.light .lounge-composer-post-btn:hover:not(:disabled) {
+  background-color: #3b82f6 !important;
+}
+
 /* Composer media/GIF icon buttons — match Post button blue in light mode */
 html.light .lounge-media-toolbar .text-sky-400 {
   color: #2563eb !important;

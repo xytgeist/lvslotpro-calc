@@ -21,6 +21,7 @@ export default function LoungePostCategoryPillPicker({
   hint = 'Optional — helps interested members find your post.',
   /** When true, show one row (most-used first) with a caret to expand the rest. */
   collapsibleSingleRow = true,
+  className = '',
 }) {
   const uncapped = maxPills == null
   const optionCount = loungePostCategoryPillOptionsForPicker().length
@@ -90,7 +91,7 @@ export default function LoungePostCategoryPillPicker({
   const showExpandToggle = collapsibleSingleRow && (hasHiddenRows || expanded)
 
   return (
-    <div className="mt-2">
+    <div className={`mt-2 ${className}`.trim()}>
       {hint ? (
         <p className="mb-1.5 text-[11px] leading-snug text-zinc-500">{hint}</p>
       ) : null}
