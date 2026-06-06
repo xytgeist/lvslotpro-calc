@@ -118,7 +118,6 @@ import {
   executeLoungeCommunityPostUpdate,
   loungeSubmissionSnapshotIncludesVideo,
   loungeSubmissionSnapshotThreadPartCount,
-  sliceThreadSubmissionSnapshotForResume,
 } from './loungePostSubmitJob'
 import {
   executeLoungeCommentSubmission,
@@ -8685,13 +8684,11 @@ export default function SocialFeed({
   )
 
   const restoreThreadAfterUploadFailure = useCallback(
-    (snap, publishedParts = 0, resumePostId = null) => {
+    (snap) => {
       if (!snap) return null
-      const fromIdx = publishedParts > 0 ? publishedParts : 0
-      restoreComposerFromSnapshot(snap, { fromPartIndex: fromIdx })
-      const retrySnap = sliceThreadSubmissionSnapshotForResume(snap, publishedParts, resumePostId)
-      loungePostSnapshotRef.current = retrySnap
-      return retrySnap
+      restoreComposerFromSnapshot(snap, { fromPartIndex: 0 })
+      loungePostSnapshotRef.current = snap
+      return snap
     },
     [restoreComposerFromSnapshot],
   )
@@ -9209,18 +9206,12 @@ export default function SocialFeed({
         }
       } catch (e) {
         if (e?.name === 'AbortError') return
-        const publishedParts = typeof e?.threadPublishedParts === 'number' ? e.threadPublishedParts : 0
-        const resumePostId = e?.threadPublishedPostId ? String(e.threadPublishedPostId) : null
         if (threadTotal > 1) {
-          restoreThreadAfterUploadFailure(snap, publishedParts, resumePostId)
+          restoreThreadAfterUploadFailure(snap)
           setThreadComposeErr(
-            publishedParts > 0
-              ? `Parts 1–${publishedParts} were published. Remaining parts restored with media — tap Retry or edit below.`
-              : 'Upload failed — your thread is restored with media. Tap Retry or edit before posting again.',
+            'Could not post thread — all parts are still here with your media. Tap Retry or edit before posting again.',
           )
-          void persistThreadSubmissionSnapshotAsDraft(snap, {
-            fromPartIndex: publishedParts > 0 ? publishedParts : 0,
-          }).then(({ data }) => {
+          void persistThreadSubmissionSnapshotAsDraft(snap, { fromPartIndex: 0 }).then(({ data }) => {
             if (data) void refreshLoungeDraftCount()
           })
         } else {
@@ -10176,17 +10167,11 @@ export default function SocialFeed({
         if (type === 'post' || type === 'quote') {
           const threadTotal = loungeSubmissionSnapshotThreadPartCount(snapshot)
           if (threadTotal > 1) {
-            const publishedParts = typeof e?.threadPublishedParts === 'number' ? e.threadPublishedParts : 0
-            const resumePostId = e?.threadPublishedPostId ? String(e.threadPublishedPostId) : null
-            restoreThreadAfterUploadFailure(snapshot, publishedParts, resumePostId)
+            restoreThreadAfterUploadFailure(snapshot)
             setThreadComposeErr(
-              publishedParts > 0
-                ? `Parts 1–${publishedParts} were published. Remaining parts restored with media — tap Retry or edit below.`
-                : 'Upload failed — your thread is restored with media. Tap Retry or edit before posting again.',
+              'Could not post thread — all parts are still here with your media. Tap Retry or edit before posting again.',
             )
-            void persistThreadSubmissionSnapshotAsDraft(snapshot, {
-              fromPartIndex: publishedParts > 0 ? publishedParts : 0,
-            }).then(({ data }) => {
+            void persistThreadSubmissionSnapshotAsDraft(snapshot, { fromPartIndex: 0 }).then(({ data }) => {
               if (data) void refreshLoungeDraftCount()
             })
             loungePostJobRunningRef.current = false
@@ -10556,12 +10541,8 @@ export default function SocialFeed({
         restoreQuoteFromSnapshot(snap, { skipVideo: true })
         setQuoteRepostErr('Draft saved. Re-add photos or video if you had any.')
       } else if (loungeSubmissionSnapshotThreadPartCount(snap) > 1 || snap.threadResumePostId) {
-        const fromIdx =
-          typeof snap.threadResumePartOffset === 'number' && snap.threadResumePartOffset > 0
-            ? snap.threadResumePartOffset
-            : 0
-        restoreComposerFromSnapshot(snap, { fromPartIndex: fromIdx })
-        void persistThreadSubmissionSnapshotAsDraft(snap, { fromPartIndex: fromIdx }).then(({ data }) => {
+        restoreComposerFromSnapshot(snap, { fromPartIndex: 0 })
+        void persistThreadSubmissionSnapshotAsDraft(snap, { fromPartIndex: 0 }).then(({ data }) => {
           if (data) {
             setLoungeComposerActiveDraftId(data.id)
             void refreshLoungeDraftCount()

@@ -209,6 +209,223 @@ async function resolveThreadPartStreamVideoForInsert({
   }
 }
 
+/**
+ * Upload / resolve media for one thread continuation part (no DB insert).
+ *
+ * @returns {Promise<{ partPayload: object, partBody: string, pendingUid: string | null }>}
+ */
+async function prepareThreadPartPayload({
+  part,
+  threadPartIndex,
+  partNum,
+  totalParts,
+  supabaseClient,
+  user,
+  signal,
+  onProgress,
+  onUploadDiagnostic,
+  progressBase,
+  progressSpan,
+}) {
+  const partBody = String(part?.body ?? '').trim()
+  const partGif = String(part?.gifUrl ?? '').trim()
+  const partHasVideo =
+    Boolean(String(part?.streamVideoUid ?? '').trim()) ||
+    part?.videoFile instanceof File ||
+    Boolean(part?.videoPrepSpec) ||
+    part?.awaitingThreadPartVideoPrepJobId != null ||
+    Boolean(part?._capturedPrepHandoff)
+  if (partHasVideo && partGif) {
+    throw new Error(`Remove the GIF from thread post ${partNum} before posting its video.`)
+  }
+
+  const partThreadProgress = {
+    threadPartTotal: totalParts,
+    threadPartActive: partNum,
+    threadPartPublished: partNum - 1,
+  }
+  const partProgress = (info) => {
+    if (typeof onProgress === 'function') onProgress(info, undefined, undefined, partThreadProgress)
+  }
+
+  const streamOut = await resolveThreadPartStreamVideoForInsert({
+    part,
+    supabaseClient,
+    user,
+    signal,
+    onProgress: partProgress,
+    onUploadDiagnostic,
+    progressBase,
+    progressSpan: progressSpan * 0.72,
+    label: `Preparing part ${partNum} of ${totalParts}`,
+  })
+
+  let partPayload
+  let pendingUid = null
+  if (streamOut) {
+    pendingUid = streamOut.pendingUid
+    partPayload = feedCommentThreadPartInsertPayload({
+      body: partBody,
+      threadPartIndex,
+      streamVideoUid: streamOut.streamVideoUid,
+      streamPosterUrl: streamOut.streamPosterPublicUrl || undefined,
+      streamVideoWidth: streamOut.streamVideoWidthOut || undefined,
+      streamVideoHeight: streamOut.streamVideoHeightOut || undefined,
+    })
+  } else {
+    const partImageFiles = Array.isArray(part?.imageFiles)
+      ? part.imageFiles.filter((f) => f instanceof File)
+      : []
+    const partExistingUrls = Array.isArray(part?.existingImageUrls)
+      ? part.existingImageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
+      : []
+    const uploadedPartUrls = await uploadLoungeThreadPartImageFiles({
+      supabaseClient,
+      user,
+      imageFiles: partImageFiles,
+      existingImageUrls: partExistingUrls,
+      signal,
+      onProgress: partProgress,
+      progressBase,
+      progressSpan: progressSpan * 0.72,
+      label: `Preparing part ${partNum} of ${totalParts}`,
+    })
+    partPayload = feedCommentThreadPartInsertPayload({
+      body: partBody,
+      threadPartIndex,
+      ...(uploadedPartUrls.length > 0
+        ? {
+            imageUrls: uploadedPartUrls,
+            gifUrl: partGif || undefined,
+          }
+        : partGif
+          ? { gifUrl: partGif }
+          : {}),
+    })
+  }
+
+  return { partPayload, partBody, pendingUid }
+}
+
+/** Prepare media for thread parts 2+ before any feed row is inserted. */
+async function prepareAllThreadContinuationParts({
+  parts,
+  indexOffset,
+  totalParts,
+  supabaseClient,
+  user,
+  signal,
+  onProgress,
+  onUploadDiagnostic,
+}) {
+  const prepared = []
+  const pendingUids = []
+  const prepStart = 0.45
+  const prepEnd = 0.82
+  const spanPerPart = (prepEnd - prepStart) / Math.max(1, parts.length)
+
+  try {
+    for (let i = 0; i < parts.length; i += 1) {
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+      const partNum = indexOffset + i + 1
+      const out = await prepareThreadPartPayload({
+        part: parts[i],
+        threadPartIndex: indexOffset + i,
+        partNum,
+        totalParts,
+        supabaseClient,
+        user,
+        signal,
+        onProgress,
+        onUploadDiagnostic,
+        progressBase: prepStart + i * spanPerPart,
+        progressSpan: spanPerPart,
+      })
+      if (out.pendingUid) pendingUids.push(out.pendingUid)
+      prepared.push({ partPayload: out.partPayload, partBody: out.partBody })
+    }
+  } catch (prepErr) {
+    for (const uid of pendingUids) {
+      await deleteCfStreamOrphanAsset(supabaseClient, uid)
+    }
+    const partNum = indexOffset + prepared.length + 1
+    const partMsg =
+      (prepErr instanceof Error ? prepErr.message : String(prepErr || '')).trim() ||
+      `Could not prepare thread part ${partNum}.`
+    throw new Error(`Thread part ${partNum} of ${totalParts}: ${partMsg}`)
+  }
+
+  return { prepared, pendingUids }
+}
+
+/** Insert pre-uploaded thread parts and set final thread_part_count (caller rolls back on failure). */
+async function insertPreparedThreadParts({
+  postId,
+  preparedParts,
+  indexOffset,
+  totalParts,
+  supabaseClient,
+  userId,
+  signal,
+  onProgress,
+}) {
+  for (let i = 0; i < preparedParts.length; i += 1) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+    const partNum = indexOffset + i + 1
+    const { partPayload, partBody } = preparedParts[i]
+    const { data: insertedPart, error: partErr } = await supabaseClient
+      .from('feed_comments')
+      .insert({
+        post_id: postId,
+        user_id: userId,
+        ...partPayload,
+      })
+      .select('id')
+      .single()
+    if (partErr) {
+      throw new Error(partErr.message || `Could not publish thread part ${partNum}.`)
+    }
+    if (insertedPart?.id && partBody) {
+      await attachLinkPreview(supabaseClient, {
+        entityType: 'feed_comment',
+        entityId: insertedPart.id,
+        text: partBody,
+      })
+    }
+    if (typeof onProgress === 'function') {
+      onProgress(
+        0.84 + ((i + 1) / Math.max(1, preparedParts.length)) * 0.12,
+        `Posting part ${partNum} of ${totalParts}`,
+        '',
+        {
+          threadPartPublished: partNum,
+          threadPartTotal: totalParts,
+          threadPartActive: Math.min(partNum + 1, totalParts),
+        },
+      )
+    }
+  }
+
+  const { error: countErr } = await supabaseClient
+    .from('community_feed_posts')
+    .update({ thread_part_count: totalParts })
+    .eq('id', postId)
+  if (countErr) {
+    throw new Error(countErr.message || 'Could not finalize thread.')
+  }
+}
+
+async function rollbackFailedThreadPublish({ supabaseClient, rootPostId, streamUids }) {
+  if (rootPostId) {
+    await supabaseClient.from('community_feed_posts').delete().eq('id', rootPostId)
+  }
+  const uids = Array.isArray(streamUids) ? streamUids : []
+  for (const uid of uids) {
+    const id = String(uid || '').trim()
+    if (id) await deleteCfStreamOrphanAsset(supabaseClient, id)
+  }
+}
+
 /** Mirrors `SocialFeed` so insert failures surface the same copy. */
 const LOUNGE_MAX_PINNED_ALERT =
   'The maximum number of pinned posts is two. Unpin a post to pin this one.'
@@ -415,12 +632,11 @@ export async function executeLoungeCommunityPostSubmission({
   }
   const threadPartTotal = threadParts.length
   const threadResumePostId = String(snapshot.threadResumePostId || '').trim()
-  const threadResumePartOffset = Math.max(0, Number(snapshot.threadResumePartOffset) || 0)
-  const threadOriginalPartTotal =
-    Number(snapshot.threadOriginalPartTotal) > 0
-      ? Number(snapshot.threadOriginalPartTotal)
-      : threadPartTotal
-  const isThreadResume = Boolean(threadResumePostId) && threadPartTotal >= 1
+  if (threadResumePostId) {
+    throw new Error(
+      'This thread draft was saved after a partial publish. Delete the incomplete post on your profile, then post the full thread again.',
+    )
+  }
 
   const threadPartStatus = (partNum, status) => {
     const st = String(status || '').trim()
@@ -494,157 +710,13 @@ export async function executeLoungeCommunityPostSubmission({
   /** Set when direct upload URL is minted; cleared only after DB insert succeeds. Used to delete CF orphans on any failure. */
   let pendingCfUploadUid = null
   let insertSucceeded = false
-
-  /** @param {string} postId @param {typeof threadParts} parts @param {number} indexOffset @param {number} totalParts */
-  async function publishThreadPartsAsComments(postId, parts, indexOffset, totalParts) {
-    const userId = session.user.id
-    for (let i = 0; i < parts.length; i += 1) {
-      throwIfAborted()
-      const part = parts[i]
-      const partNum = indexOffset + i + 1
-      const partThreadProgress = {
-        threadPartTotal: totalParts,
-        threadPartActive: partNum,
-        threadPartPublished: partNum - 1,
-      }
-      const partProgress = (info) => report(info, undefined, undefined, partThreadProgress)
-      const partBody = String(part?.body ?? '').trim()
-      const partGif = String(part?.gifUrl ?? '').trim()
-      const partHasVideo =
-        Boolean(String(part?.streamVideoUid ?? '').trim()) ||
-        part?.videoFile instanceof File ||
-        Boolean(part?.videoPrepSpec) ||
-        part?.awaitingThreadPartVideoPrepJobId != null ||
-        Boolean(part?._capturedPrepHandoff)
-      if (partHasVideo && partGif) {
-        throw new Error(`Remove the GIF from thread post ${partNum} before posting its video.`)
-      }
-      const partSpanBase = 0.91 + (i / Math.max(1, parts.length)) * 0.08
-      const partSpan = 0.08 / Math.max(1, parts.length)
-      let partPendingCfUid = null
-      try {
-        const streamOut = await resolveThreadPartStreamVideoForInsert({
-          part,
-          supabaseClient,
-          user: session.user,
-          signal,
-          onProgress: partProgress,
-          onUploadDiagnostic,
-          progressBase: partSpanBase,
-          progressSpan: partSpan * 0.72,
-          label: `Part ${partNum}`,
-        })
-        let partPayload
-        if (streamOut) {
-          partPendingCfUid = streamOut.pendingUid
-          partPayload = feedCommentThreadPartInsertPayload({
-            body: partBody,
-            threadPartIndex: indexOffset + i,
-            streamVideoUid: streamOut.streamVideoUid,
-            streamPosterUrl: streamOut.streamPosterPublicUrl || undefined,
-            streamVideoWidth: streamOut.streamVideoWidthOut || undefined,
-            streamVideoHeight: streamOut.streamVideoHeightOut || undefined,
-          })
-        } else {
-          const partImageFiles = Array.isArray(part?.imageFiles)
-            ? part.imageFiles.filter((f) => f instanceof File)
-            : []
-          const partExistingUrls = Array.isArray(part?.existingImageUrls)
-            ? part.existingImageUrls.map((u) => String(u ?? '').trim()).filter(Boolean)
-            : []
-          const uploadedPartUrls = await uploadLoungeThreadPartImageFiles({
-            supabaseClient,
-            user: session.user,
-            imageFiles: partImageFiles,
-            existingImageUrls: partExistingUrls,
-            signal,
-            onProgress: partProgress,
-            progressBase: partSpanBase,
-            progressSpan: partSpan * 0.72,
-            label: `Uploading images`,
-          })
-          partPayload = feedCommentThreadPartInsertPayload({
-            body: partBody,
-            threadPartIndex: indexOffset + i,
-            ...(uploadedPartUrls.length > 0
-              ? {
-                  imageUrls: uploadedPartUrls,
-                  gifUrl: partGif || undefined,
-                }
-              : partGif
-                ? { gifUrl: partGif }
-                : {}),
-          })
-        }
-        const { data: insertedPart, error: partErr } = await supabaseClient
-          .from('feed_comments')
-          .insert({
-            post_id: postId,
-            user_id: userId,
-            ...partPayload,
-          })
-          .select('id')
-          .single()
-        if (partErr) throw new Error(partErr.message || `Could not publish thread part ${partNum}.`)
-        partPendingCfUid = null
-        const publishedPartCount = partNum
-        const { error: countErr } = await supabaseClient
-          .from('community_feed_posts')
-          .update({ thread_part_count: publishedPartCount })
-          .eq('id', postId)
-        if (countErr) {
-          throw new Error(countErr.message || `Could not update thread after part ${partNum}.`)
-        }
-        if (insertedPart?.id && partBody) {
-          await attachLinkPreview(supabaseClient, {
-            entityType: 'feed_comment',
-            entityId: insertedPart.id,
-            text: partBody,
-          })
-        }
-        report(
-          0.88 + ((i + 1) / Math.max(1, parts.length)) * 0.1,
-          `Part ${publishedPartCount} of ${totalParts} posted`,
-          '',
-          {
-            threadPartPublished: publishedPartCount,
-            threadPartTotal: totalParts,
-            threadPartActive: Math.min(publishedPartCount + 1, totalParts),
-          },
-        )
-      } catch (partUploadErr) {
-        if (partPendingCfUid) {
-          await deleteCfStreamOrphanAsset(supabaseClient, partPendingCfUid)
-        }
-        const partMsg =
-          (partUploadErr instanceof Error ? partUploadErr.message : String(partUploadErr || '')).trim() ||
-          `Could not publish thread part ${partNum}.`
-        const err = new Error(`Thread part ${partNum} of ${totalParts}: ${partMsg}`)
-        err.threadPublishedParts = indexOffset + i
-        err.threadPublishedPostId = postId
-        throw err
-      }
-    }
-  }
+  let rootPostId = null
+  /** @type {string[]} Stream UIDs uploaded for continuation parts before publish (orphan cleanup on failure). */
+  let continuationPendingUids = []
+  /** @type {Array<{ partPayload: object, partBody: string }>} */
+  let preparedContinuationParts = []
 
   try {
-    if (isThreadResume) {
-      insertSucceeded = true
-      report(0.05, 'Resuming thread', `Continuing on existing post…`, {
-        threadPartTotal: threadOriginalPartTotal,
-        threadPartActive: threadResumePartOffset + 1,
-        threadPartPublished: threadResumePartOffset,
-      })
-      await publishThreadPartsAsComments(
-        threadResumePostId,
-        threadParts,
-        threadResumePartOffset,
-        threadOriginalPartTotal,
-      )
-      report(1, 'Finishing', '')
-      return
-    }
-
     if (hasVideo && preUid) {
       streamVideoUid = preUid
       pendingCfUploadUid = preUid
@@ -778,11 +850,42 @@ export async function executeLoungeCommunityPostSubmission({
       uploadedUrls.push(upUrl)
     }
 
+    const extraThreadParts = threadParts.slice(1)
+    if (extraThreadParts.length > 0) {
+      throwIfAborted()
+      report(0.72, 'Preparing thread', `Parts 2–${threadPartTotal}`, {
+        threadPartTotal,
+        threadPartActive: 2,
+        threadPartPublished: 0,
+      })
+      const prepOut = await prepareAllThreadContinuationParts({
+        parts: extraThreadParts,
+        indexOffset: 1,
+        totalParts: threadPartTotal,
+        supabaseClient,
+        user: session.user,
+        signal,
+        onProgress: report,
+        onUploadDiagnostic,
+      })
+      preparedContinuationParts = prepOut.prepared
+      continuationPendingUids = prepOut.pendingUids
+    }
+
     throwIfAborted()
     report(
-      0.9,
-      quoteParentId || quoteCommentParentId ? 'Publishing quote repost' : 'Publishing post',
-      'Inserting into community feed…',
+      0.86,
+      quoteParentId || quoteCommentParentId
+        ? 'Publishing quote repost'
+        : preparedContinuationParts.length > 0
+          ? 'Publishing thread'
+          : 'Publishing post',
+      preparedContinuationParts.length > 0
+        ? 'Posting all parts…'
+        : 'Inserting into community feed…',
+      preparedContinuationParts.length > 0
+        ? { threadPartTotal, threadPartActive: 1, threadPartPublished: 0 }
+        : null,
     )
 
     let insertPayload
@@ -914,31 +1017,67 @@ export async function executeLoungeCommunityPostSubmission({
       throw new Error(msg || 'Could not post right now.')
     }
 
+    rootPostId = insertedPost?.id ? String(insertedPost.id) : null
     insertSucceeded = true
     pendingCfUploadUid = null
-    const extraThreadParts = threadParts.slice(1)
-    if (insertedPost?.id && threadPartTotal > 1) {
-      report(0.88, `Part 1 of ${threadPartTotal} posted`, '', {
-        threadPartPublished: 1,
-        threadPartTotal,
-        threadPartActive: Math.min(2, threadPartTotal),
+
+    const rootStreamUid = String(streamVideoUid || '').trim()
+    try {
+      if (rootPostId && preparedContinuationParts.length > 0) {
+        await insertPreparedThreadParts({
+          postId: rootPostId,
+          preparedParts: preparedContinuationParts,
+          indexOffset: 1,
+          totalParts: threadPartTotal,
+          supabaseClient,
+          userId: session.user.id,
+          signal,
+          onProgress: report,
+        })
+        continuationPendingUids = []
+      }
+      if (rootPostId && caption?.trim()) {
+        await attachLinkPreview(supabaseClient, {
+          entityType: 'feed_post',
+          entityId: rootPostId,
+          text: caption,
+        })
+      }
+      report(1, 'Finishing', '')
+    } catch (publishErr) {
+      const rollbackUids = [
+        rootStreamUid,
+        ...continuationPendingUids,
+      ].filter((uid, idx, arr) => uid && arr.indexOf(uid) === idx)
+      await rollbackFailedThreadPublish({
+        supabaseClient,
+        rootPostId,
+        streamUids: rollbackUids,
       })
+      rootPostId = null
+      insertSucceeded = false
+      continuationPendingUids = []
+      const partMsg =
+        (publishErr instanceof Error ? publishErr.message : String(publishErr || '')).trim() ||
+        'Could not publish thread.'
+      throw new Error(partMsg)
     }
-    if (insertedPost?.id && extraThreadParts.length > 0) {
-      const totalParts = threadPartTotal
-      await publishThreadPartsAsComments(insertedPost.id, extraThreadParts, 1, totalParts)
-    }
-    if (insertedPost?.id && caption?.trim()) {
-      await attachLinkPreview(supabaseClient, {
-        entityType: 'feed_post',
-        entityId: insertedPost.id,
-        text: caption,
-      })
-    }
-    report(1, 'Finishing', '')
   } catch (e) {
-    if (pendingCfUploadUid && !insertSucceeded) {
-      await deleteCfStreamOrphanAsset(supabaseClient, pendingCfUploadUid)
+    if (!insertSucceeded) {
+      const orphanUids = [
+        pendingCfUploadUid,
+        ...continuationPendingUids,
+      ].filter((uid, idx, arr) => uid && arr.indexOf(uid) === idx)
+      for (const uid of orphanUids) {
+        await deleteCfStreamOrphanAsset(supabaseClient, uid)
+      }
+      if (rootPostId) {
+        await rollbackFailedThreadPublish({
+          supabaseClient,
+          rootPostId,
+          streamUids: String(streamVideoUid || '').trim() ? [String(streamVideoUid)] : [],
+        })
+      }
     }
     throw e
   }
