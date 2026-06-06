@@ -300,6 +300,11 @@ import {
   threadPartImagePreviewBlobUrlsFromMedia,
 } from '../../utils/loungeThreadComposeMedia.js'
 import {
+  buildThreadDraftCaptionsWithMediaMarkers,
+  stripDraftMediaMarkersFromCaption,
+  threadDraftGifDisplayName,
+} from '../../utils/loungeThreadComposeDraftMediaMarkers.js'
+import {
   createThreadComposeVideoPrepController,
   LOUNGE_THREAD_COMPOSE_VIDEO_CROP_MODE,
   threadComposePartVideoSnapshotFields,
@@ -2173,8 +2178,29 @@ export default function SocialFeed({
     ],
   )
 
+  const removeThreadPartDraftMediaMarkers = useCallback((partIdx, names) => {
+    const list = (Array.isArray(names) ? names : [names])
+      .map((n) => String(n || '').trim())
+      .filter(Boolean)
+    if (!list.length) return
+    setThreadComposeCaptions((prev) =>
+      prev.map((cap, j) =>
+        j === partIdx ? stripDraftMediaMarkersFromCaption(cap, list) : cap,
+      ),
+    )
+  }, [])
+
   const startThreadComposePartVideoPrepFromSpec = useCallback(
     (partIdx, spec, slotBase) => {
+      const videoName =
+        spec?.file instanceof File
+          ? spec.file.name
+          : spec?.sourceFile instanceof File
+            ? spec.sourceFile.name
+            : slotBase?.file instanceof File
+              ? slotBase.file.name
+              : 'video'
+      removeThreadPartDraftMediaMarkers(partIdx, [videoName])
       setThreadComposePartMedia((prev) =>
         prev.map((row, j) => {
           if (j !== partIdx) return row
@@ -2190,7 +2216,7 @@ export default function SocialFeed({
         prepError: '',
       })
     },
-    [disposeComposerVideoMedia],
+    [disposeComposerVideoMedia, removeThreadPartDraftMediaMarkers],
   )
 
   const startComposerVideoPrepFromSpec = useCallback(
@@ -2729,6 +2755,7 @@ export default function SocialFeed({
       }
       if (openProfileGateIfNeeded()) return null
       const stripVideos = opts.stripVideos === true
+      const mediaBeforeSave = threadComposePartMedia
       let mediaForSave = threadComposePartMedia
       if (threadComposePartMedia.some((part) => threadComposePartHasVideo(part))) {
         if (!stripVideos) return null
@@ -2750,7 +2777,10 @@ export default function SocialFeed({
         .map((it) => String(it.remoteUrl || '').trim())
         .filter(Boolean)
       const imageFiles = part0Items.map((it) => it.file).filter((f) => f instanceof File)
-      const threadCaptions = threadComposeCaptions.map((t) => String(t ?? ''))
+      const threadCaptions = buildThreadDraftCaptionsWithMediaMarkers(
+        threadComposeCaptions.map((t) => String(t ?? '')),
+        mediaBeforeSave,
+      )
       if (
         !loungePostDraftHasContent({
           threadCaptions,
@@ -2793,7 +2823,10 @@ export default function SocialFeed({
               imageItems: composerImageItemsFromDraftUrls(data.image_urls),
               gifUrl: String(data.gif_url || '').trim(),
             }
-            return [rootMedia, ...parts.slice(1).map((_, i) => prev[i + 1] || emptyThreadComposePartMedia())]
+            return [
+              rootMedia,
+              ...parts.slice(1).map(() => emptyThreadComposePartMedia()),
+            ]
           })
         }
         await refreshLoungeDraftCount()
@@ -4608,6 +4641,7 @@ export default function SocialFeed({
             setThreadComposeErr('Remove the video before adding a GIF to this post.')
             return
           }
+          removeThreadPartDraftMediaMarkers(activeIdx, [threadDraftGifDisplayName(u)])
           setThreadComposePartMedia((prev) =>
             prev.map((row, j) => (j === activeIdx ? { ...row, gifUrl: u } : row)),
           )
@@ -4647,6 +4681,7 @@ export default function SocialFeed({
       cancelLoungeDetailCommentEditMediaPrep,
       cancelLoungeDetailEditMediaPrep,
       endLoungeDetailCommentMediaSession,
+      removeThreadPartDraftMediaMarkers,
       restoreLoungeComposerCaptionAfterMediaPick,
     ],
   )
@@ -7935,6 +7970,10 @@ export default function SocialFeed({
         }
         endLoungeComposerMediaPicker('composer')
         restoreLoungeComposerCaptionAfterMediaPick('composer', () => {
+          removeThreadPartDraftMediaMarkers(
+            activeIdx,
+            files.map((f) => String(f.name || '').trim()).filter(Boolean),
+          )
           setThreadComposePartMedia((prev) =>
             prev.map((row, j) => (j === activeIdx ? { ...row, imageItems: next } : row)),
           )
@@ -7986,6 +8025,7 @@ export default function SocialFeed({
       cancelThreadComposePartVideo,
       endLoungeComposerMediaPicker,
       queueLoungeVideoOrCrop,
+      removeThreadPartDraftMediaMarkers,
       restoreLoungeComposerCaptionAfterMediaPick,
       setLoungeImageLimitDialog,
     ],

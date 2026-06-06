@@ -2,6 +2,7 @@ import { prepareLoungeFeedImageForUpload } from './compressImageForUpload.js'
 import { uploadLoungeFeedPostImage } from './communityFeedPost.js'
 import { LOUNGE_CAPTION_MAX, LOUNGE_POST_THREAD_MAX_PARTS } from './loungeCommentLimits.js'
 import { normalizeLoungePostCategoryPills } from './loungePostCategoryPills.js'
+import { buildThreadDraftCaptionsWithSnapshotMediaMarkers } from './loungeThreadComposeDraftMediaMarkers.js'
 
 export const LOUNGE_POST_DRAFTS_MAX = 20
 export const LOUNGE_POST_DRAFTS_MAX_IMAGES = 6
@@ -89,13 +90,19 @@ export function loungePostDraftPayloadFromSubmissionSnapshot(snapshot, opts = {}
   if (!snapshot || typeof snapshot !== 'object') return null
   const fromIdx = Math.max(0, Number(opts.fromPartIndex) || 0)
   let threadCaptions = []
+  let snapshotParts = null
   if (Array.isArray(snapshot.threadParts) && snapshot.threadParts.length > 1) {
+    snapshotParts = snapshot.threadParts
     threadCaptions = snapshot.threadParts.map((p) => String(p?.body ?? ''))
   } else if (Array.isArray(snapshot.threadCaptions) && snapshot.threadCaptions.length > 1) {
     threadCaptions = snapshot.threadCaptions.map((t) => String(t ?? ''))
   }
   if (threadCaptions.length > 1 && fromIdx > 0) {
     threadCaptions = threadCaptions.slice(fromIdx)
+    if (snapshotParts) snapshotParts = snapshotParts.slice(fromIdx)
+  }
+  if (threadCaptions.length > 1 && snapshotParts) {
+    threadCaptions = buildThreadDraftCaptionsWithSnapshotMediaMarkers(threadCaptions, snapshotParts)
   }
   const rootPart =
     Array.isArray(snapshot.threadParts) && snapshot.threadParts.length > 0
