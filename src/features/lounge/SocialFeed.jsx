@@ -404,6 +404,8 @@ const LOUNGE_COMPOSER_IMAGE_INPUT_ID = 'lounge-composer-image-input'
 const LOUNGE_COMPOSER_VIDEO_INPUT_ID = 'lounge-composer-video-input'
 const LOUNGE_DETAIL_COMMENT_IMAGE_INPUT_ID = 'lounge-detail-comment-image-input'
 const LOUNGE_DETAIL_COMMENT_VIDEO_INPUT_ID = 'lounge-detail-comment-video-input'
+/** Scroll padding under floating post-detail reply footer (matches chat composer gap). */
+const LOUNGE_DETAIL_COMMENT_FOOTER_SCROLL_GAP_PX = 8
 const LOUNGE_DETAIL_EDIT_IMAGE_INPUT_ID = 'lounge-detail-edit-image-input'
 const LOUNGE_DETAIL_EDIT_VIDEO_INPUT_ID = 'lounge-detail-edit-video-input'
 const LOUNGE_COMMENT_EDIT_IMAGE_INPUT_ID = 'lounge-comment-edit-image-input'
@@ -741,6 +743,7 @@ export default function SocialFeed({
   const [loungeDetailRepostMenuOpen, setLoungeDetailRepostMenuOpen] = useState(false)
   const loungeDetailRepostMenuRef = useRef(null)
   const loungePostDetailScrollRef = useRef(null)
+  const loungeDetailCommentFooterRef = useRef(null)
   const loungePostDetailPostAvatarRef = useRef(null)
   const loungePostDetailCommentConnectorRef = useRef(null)
   const loungeDetailCommentFieldRef = useRef(null)
@@ -807,6 +810,8 @@ export default function SocialFeed({
   const [loungeDetailCommentDiscardPromptOpen, setLoungeDetailCommentDiscardPromptOpen] = useState(false)
   /** iOS / visualViewport: lift footer above software keyboard. */
   const [loungeDetailCommentKbOverlapPx, setLoungeDetailCommentKbOverlapPx] = useState(0)
+  /** Bottom inset for post-detail scroll so content clears the floating reply footer. */
+  const [loungeDetailCommentFooterInsetPx, setLoungeDetailCommentFooterInsetPx] = useState(72)
   const [loungeDetailCommentImageItems, setLoungeDetailCommentImageItems] = useState([])
   const [loungeDetailCommentMediaUrl, setLoungeDetailCommentMediaUrl] = useState('')
   const [loungeDetailCommentVideoSlot, setLoungeDetailCommentVideoSlot] = useState(null)
@@ -1579,6 +1584,32 @@ export default function SocialFeed({
       setLoungeDetailCommentKbOverlapPx(0)
     }
   }, [loungePostDetail, loungeReadOnly])
+
+  useEffect(() => {
+    if (!loungePostDetail || loungeReadOnly) {
+      setLoungeDetailCommentFooterInsetPx(72)
+      return undefined
+    }
+    const footer = loungeDetailCommentFooterRef.current
+    if (!footer) return undefined
+    const syncInset = () => {
+      setLoungeDetailCommentFooterInsetPx(
+        footer.offsetHeight + LOUNGE_DETAIL_COMMENT_FOOTER_SCROLL_GAP_PX,
+      )
+    }
+    syncInset()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncInset) : null
+    ro?.observe(footer)
+    return () => ro?.disconnect()
+  }, [
+    loungePostDetail?.id,
+    loungeReadOnly,
+    loungeDetailCommentComposerExpanded,
+    loungeDetailCommentKbOverlapPx,
+    loungeDetailCommentErr,
+    loungeDetailCommentImageItems.length,
+    loungeDetailCommentVideoSlot,
+  ])
 
   useLayoutEffect(() => {
     if (!loungeDetailEditing) return
@@ -13732,10 +13763,15 @@ export default function SocialFeed({
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
               ref={loungePostDetailScrollRef}
               className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+              style={
+                loungeReadOnly
+                  ? undefined
+                  : { paddingBottom: loungeDetailCommentFooterInsetPx }
+              }
             >
               <LoungeFeedVideoAutoplayProvider
                 scrollRootRef={loungePostDetailScrollRef}
@@ -14897,18 +14933,26 @@ export default function SocialFeed({
             </div>
             {!loungeReadOnly ? (
               <div
+                ref={loungeDetailCommentFooterRef}
                 data-lounge-detail-comment-host
-                className="lounge-detail-comment-footer-glass relative z-20 shrink-0 px-3 pt-2.5 pb-0"
-                style={{
-                  // Keyboard open: `visualViewport` overlap already clears the keyboard — do not add
-                  // `env(safe-area-inset-bottom)` here; iOS often keeps ~34px inset while the keyboard is up,
-                  // which stacked under overlap and left a large dead band above the keys.
-                  paddingBottom:
-                    loungeDetailCommentKbOverlapPx > 0
-                      ? `${loungeDetailCommentKbOverlapPx}px`
-                      : `max(0.625rem, env(safe-area-inset-bottom))`,
-                }}
+                className="pointer-events-none absolute inset-x-0 bottom-0 z-20"
               >
+                <div
+                  className="lounge-detail-comment-footer-gradient pointer-events-none absolute inset-x-0 bottom-full h-14"
+                  aria-hidden
+                />
+                <div
+                  className="lounge-detail-comment-footer-glass pointer-events-auto px-3 pt-2.5 pb-0"
+                  style={{
+                    // Keyboard open: `visualViewport` overlap already clears the keyboard — do not add
+                    // `env(safe-area-inset-bottom)` here; iOS often keeps ~34px inset while the keyboard is up,
+                    // which stacked under overlap and left a large dead band above the keys.
+                    paddingBottom:
+                      loungeDetailCommentKbOverlapPx > 0
+                        ? `${loungeDetailCommentKbOverlapPx}px`
+                        : `max(0.625rem, env(safe-area-inset-bottom))`,
+                  }}
+                >
                 {loungeDetailCommentErr ? (
                   <div className="mb-1 rounded-xl border border-rose-500/45 bg-rose-950/25 px-2.5 py-1.5 text-[13px] leading-snug text-rose-200">
                     {loungeDetailCommentErr}
@@ -15180,6 +15224,7 @@ export default function SocialFeed({
                     })()}
                   </button>
                 )}
+                </div>
               </div>
             ) : null}
             </div>

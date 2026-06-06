@@ -2725,6 +2725,30 @@ html.light.platform-android .lounge-detail-comment-footer-glass {
     rgba(248, 249, 253, 0.91);
 }
 
+/* Feather scroll content into the floating post-detail reply footer. */
+.lounge-detail-comment-footer-gradient {
+  background: linear-gradient(
+    to top,
+    rgba(3, 7, 18, 0.78)   0%,
+    rgba(3, 7, 18, 0.60)  18%,
+    rgba(3, 7, 18, 0.38)  40%,
+    rgba(3, 7, 18, 0.18)  62%,
+    rgba(3, 7, 18, 0.06)  82%,
+    transparent           100%
+  );
+}
+html.light .lounge-detail-comment-footer-gradient {
+  background: linear-gradient(
+    to top,
+    rgba(245, 246, 252, 0.78)   0%,
+    rgba(245, 246, 252, 0.58)  18%,
+    rgba(245, 246, 252, 0.36)  40%,
+    rgba(245, 246, 252, 0.16)  62%,
+    rgba(245, 246, 252, 0.05)  82%,
+    transparent                 100%
+  );
+}
+
 /* Inbox long-press menu — extra translucency so the list shows through (portaled). */
 .chat-room-menu-glass {
   background: rgba(20, 22, 40, 0.12);
