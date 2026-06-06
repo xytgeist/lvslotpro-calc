@@ -355,7 +355,10 @@ async function prepareThreadPartPayload({
   return { partPayload, partBody, pendingUid }
 }
 
-/** Prepare media for thread parts 2+ before any feed row is inserted. */
+/**
+ * Prepare media for thread parts 2+ before any feed row is inserted.
+ * Video parts prep/upload in parallel (same idea as parallel queued post jobs).
+ */
 async function prepareAllThreadContinuationParts({
   parts,
   indexOffset,
@@ -366,51 +369,140 @@ async function prepareAllThreadContinuationParts({
   onProgress,
   onUploadDiagnostic,
 }) {
-  const prepared = []
-  const pendingUids = []
+  if (!Array.isArray(parts) || parts.length === 0) {
+    return { prepared: [], pendingUids: [] }
+  }
+
   const prepStart = 0.45
   const prepEnd = 0.82
   const spanPerPart = (prepEnd - prepStart) / Math.max(1, parts.length)
+  const batchAc = new AbortController()
+  const onParentAbort = () => batchAc.abort()
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+  signal.addEventListener('abort', onParentAbort, { once: true })
 
-  try {
-    for (let i = 0; i < parts.length; i += 1) {
-      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-      const partNum = indexOffset + i + 1
-      const out = await prepareThreadPartPayload({
-        part: parts[i],
-        threadPartIndex: indexOffset + i,
-        partNum,
-        totalParts,
-        supabaseClient,
-        user,
-        signal,
-        onProgress,
-        onUploadDiagnostic,
-        progressBase: prepStart + i * spanPerPart,
-        progressSpan: spanPerPart,
-      })
-      if (out.pendingUid) pendingUids.push(out.pendingUid)
-      prepared.push({ partPayload: out.partPayload, partBody: out.partBody })
-    }
-  } catch (prepErr) {
-    for (const uid of pendingUids) {
-      await deleteCfStreamOrphanAsset(supabaseClient, uid)
-    }
-    const partNum = indexOffset + prepared.length + 1
-    const partMsg =
-      (prepErr instanceof Error ? prepErr.message : String(prepErr || '')).trim() ||
-      `Could not prepare thread part ${partNum}.`
-    const err = new Error(`Thread part ${partNum} of ${totalParts}: ${partMsg}`)
-    console.warn('[lounge-thread-submit]', {
-      phase: 'prepare',
-      partNum,
-      totalParts,
-      message: partMsg,
-    })
-    throw err
+  const partFraction = new Array(parts.length).fill(0)
+  const partStatusText = new Array(parts.length).fill('')
+
+  const reportAggregate = () => {
+    if (typeof onProgress !== 'function') return
+    const avg = partFraction.reduce((sum, f) => sum + f, 0) / parts.length
+    const progress = prepStart + avg * (prepEnd - prepStart)
+    const inFlight = partFraction
+      .map((f, i) => (f > 0 && f < 0.995 ? indexOffset + i + 1 : null))
+      .filter((n) => n != null)
+    const activePart = inFlight[0] ?? indexOffset + parts.length
+    const detail = partStatusText.filter(Boolean).slice(0, 2).join(' · ')
+    const rangeEnd = indexOffset + parts.length
+    onProgress(
+      {
+        progress,
+        status:
+          parts.length > 1
+            ? `Preparing parts ${indexOffset + 1}–${rangeEnd} (parallel)`
+            : `Preparing part ${activePart} of ${totalParts}`,
+        detail,
+      },
+      undefined,
+      undefined,
+      {
+        threadPartTotal: totalParts,
+        threadPartActive: activePart,
+        threadPartPublished: 0,
+      },
+    )
   }
 
-  return { prepared, pendingUids }
+  const tasks = parts.map((part, i) => {
+    const partNum = indexOffset + i + 1
+    const localBase = prepStart + i * spanPerPart
+    const partOnProgress = (info) => {
+      if (!info || typeof info !== 'object') return
+      const p = typeof info.progress === 'number' ? info.progress : 0
+      partFraction[i] =
+        spanPerPart > 0 ? Math.max(0, Math.min(1, (p - localBase) / spanPerPart)) : 1
+      const st = String(info.status || '').trim()
+      if (st) {
+        partStatusText[i] = st.startsWith('Part ') ? st : `Part ${partNum}: ${st}`
+      }
+      reportAggregate()
+    }
+
+    return prepareThreadPartPayload({
+      part,
+      threadPartIndex: indexOffset + i,
+      partNum,
+      totalParts,
+      supabaseClient,
+      user,
+      signal: batchAc.signal,
+      onProgress: partOnProgress,
+      onUploadDiagnostic,
+      progressBase: localBase,
+      progressSpan: spanPerPart,
+    })
+      .then((out) => {
+        partFraction[i] = 1
+        partStatusText[i] = `Part ${partNum}: ready`
+        reportAggregate()
+        return { i, partNum, out }
+      })
+      .catch((prepErr) => {
+        batchAc.abort()
+        throw { partNum, prepErr }
+      })
+  })
+
+  const pendingUids = []
+  try {
+    const settled = await Promise.allSettled(tasks)
+    /** @type {Array<{ partPayload: object, partBody: string } | undefined>} */
+    const prepared = new Array(parts.length)
+    let failPartNum = 0
+    let failErr = null
+
+    for (let j = 0; j < settled.length; j += 1) {
+      const result = settled[j]
+      if (result.status === 'fulfilled') {
+        const { i, out } = result.value
+        prepared[i] = { partPayload: out.partPayload, partBody: out.partBody }
+        if (out.pendingUid) pendingUids.push(out.pendingUid)
+      } else if (!failErr) {
+        const reason = result.reason
+        failErr =
+          reason && typeof reason === 'object' && reason.prepErr != null ? reason.prepErr : reason
+        failPartNum =
+          reason && typeof reason === 'object' && typeof reason.partNum === 'number'
+            ? reason.partNum
+            : indexOffset + j + 1
+      }
+    }
+
+    if (failErr) {
+      for (const uid of pendingUids) {
+        await deleteCfStreamOrphanAsset(supabaseClient, uid)
+      }
+      const partMsg =
+        (failErr instanceof Error ? failErr.message : String(failErr || '')).trim() ||
+        `Could not prepare thread part ${failPartNum}.`
+      const err = new Error(`Thread part ${failPartNum} of ${totalParts}: ${partMsg}`)
+      console.warn('[lounge-thread-submit]', {
+        phase: 'prepare',
+        partNum: failPartNum,
+        totalParts,
+        parallel: true,
+        message: partMsg,
+      })
+      throw err
+    }
+
+    return {
+      prepared: prepared.map((row) => row),
+      pendingUids,
+    }
+  } finally {
+    signal.removeEventListener('abort', onParentAbort)
+  }
 }
 
 /** Insert pre-uploaded thread parts and set final thread_part_count (caller rolls back on failure). */
@@ -771,6 +863,32 @@ export async function executeLoungeCommunityPostSubmission({
   /** @type {Array<{ partPayload: object, partBody: string }>} */
   let preparedContinuationParts = []
 
+  const extraThreadParts = threadParts.slice(1)
+  /** @type {Promise<{ prepared: Array<{ partPayload: object, partBody: string }>, pendingUids: string[] }> | null} */
+  let continuationPrepPromise = null
+  if (
+    extraThreadParts.length > 0 &&
+    threadPartTotal > 1 &&
+    !quoteParentId &&
+    !quoteCommentParentId
+  ) {
+    report(0.42, 'Preparing thread', `Parts 2–${threadPartTotal} (parallel)`, {
+      threadPartTotal,
+      threadPartActive: 2,
+      threadPartPublished: 0,
+    })
+    continuationPrepPromise = prepareAllThreadContinuationParts({
+      parts: extraThreadParts,
+      indexOffset: 1,
+      totalParts: threadPartTotal,
+      supabaseClient,
+      user: session.user,
+      signal,
+      onProgress: report,
+      onUploadDiagnostic,
+    })
+  }
+
   try {
     if (hasVideo && preUid) {
       streamVideoUid = preUid
@@ -905,24 +1023,9 @@ export async function executeLoungeCommunityPostSubmission({
       uploadedUrls.push(upUrl)
     }
 
-    const extraThreadParts = threadParts.slice(1)
-    if (extraThreadParts.length > 0) {
+    if (continuationPrepPromise) {
       throwIfAborted()
-      report(0.72, 'Preparing thread', `Parts 2–${threadPartTotal}`, {
-        threadPartTotal,
-        threadPartActive: 2,
-        threadPartPublished: 0,
-      })
-      const prepOut = await prepareAllThreadContinuationParts({
-        parts: extraThreadParts,
-        indexOffset: 1,
-        totalParts: threadPartTotal,
-        supabaseClient,
-        user: session.user,
-        signal,
-        onProgress: report,
-        onUploadDiagnostic,
-      })
+      const prepOut = await continuationPrepPromise
       preparedContinuationParts = prepOut.prepared
       continuationPendingUids = prepOut.pendingUids
     }
@@ -1118,6 +1221,18 @@ export async function executeLoungeCommunityPostSubmission({
       throw new Error(partMsg)
     }
   } catch (e) {
+    if (!insertSucceeded && continuationPrepPromise) {
+      try {
+        const prepOut = await continuationPrepPromise
+        for (const uid of prepOut.pendingUids) {
+          if (uid && !continuationPendingUids.includes(uid)) {
+            continuationPendingUids.push(uid)
+          }
+        }
+      } catch {
+        // Parallel prep already deleted its own orphans before throwing.
+      }
+    }
     if (!insertSucceeded) {
       const orphanUids = [
         pendingCfUploadUid,

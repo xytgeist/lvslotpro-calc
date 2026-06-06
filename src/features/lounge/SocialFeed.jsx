@@ -541,6 +541,8 @@ export default function SocialFeed({
   const [threadComposeActivePartIndex, setThreadComposeActivePartIndex] = useState(0)
   const [threadComposeErr, setThreadComposeErr] = useState('')
   const [threadComposeDiscardOpen, setThreadComposeDiscardOpen] = useState(false)
+  /** @type {'discard' | 'draftVideoWarn'} */
+  const [threadComposeDiscardStep, setThreadComposeDiscardStep] = useState('discard')
   const [threadComposeFocusPartIndex, setThreadComposeFocusPartIndex] = useState(null)
   const threadComposeFieldRef = useRef(null)
   const threadComposePartRefMap = useRef({})
@@ -2679,18 +2681,30 @@ export default function SocialFeed({
   )
 
   const saveThreadComposeAsServerDraft = useCallback(
-    async () => {
+    async (opts = {}) => {
       if (loungeReadOnly) {
         requireLoungeAuth()
         return null
       }
       if (openProfileGateIfNeeded()) return null
+      const stripVideos = opts.stripVideos === true
+      let mediaForSave = threadComposePartMedia
       if (threadComposePartMedia.some((part) => threadComposePartHasVideo(part))) {
-        setThreadComposeErr('Remove all videos before saving a draft — video must be re-added after restore.')
-        return null
+        if (!stripVideos) return null
+        for (let i = 0; i < threadComposePartMedia.length; i += 1) {
+          threadComposeVideoPrepControllerRef.current?.cancel(i)
+          disposeComposerVideoMedia(threadComposePartMedia[i]?.videoSlot ?? null)
+        }
+        threadComposeVideoPrepControllerRef.current?.reset()
+        mediaForSave = threadComposePartMedia.map((part) => ({
+          ...part,
+          videoSlot: null,
+          videoPrepHud: null,
+        }))
+        setThreadComposePartMedia(mediaForSave)
       }
-      const gifUrl = String((threadComposePartMedia[0] || emptyThreadComposePartMedia()).gifUrl || '').trim()
-      const part0Items = (threadComposePartMedia[0] || emptyThreadComposePartMedia()).imageItems || []
+      const gifUrl = String((mediaForSave[0] || emptyThreadComposePartMedia()).gifUrl || '').trim()
+      const part0Items = (mediaForSave[0] || emptyThreadComposePartMedia()).imageItems || []
       const existingImageUrls = part0Items
         .map((it) => String(it.remoteUrl || '').trim())
         .filter(Boolean)
@@ -2752,6 +2766,7 @@ export default function SocialFeed({
     [
       composerCategoryPills,
       composerImageItemsFromDraftUrls,
+      disposeComposerVideoMedia,
       threadComposePartMedia,
       loungeReadOnly,
       openProfileGateIfNeeded,
@@ -2759,7 +2774,6 @@ export default function SocialFeed({
       requireLoungeAuth,
       supabaseClient,
       threadComposeCaptions,
-      threadComposePartMedia,
     ],
   )
 
@@ -10683,6 +10697,7 @@ export default function SocialFeed({
     threadComposePartRefMap.current = {}
     setThreadComposeErr('')
     setThreadComposeDiscardOpen(false)
+    setThreadComposeDiscardStep('discard')
     try {
       clearHiddenFileInputs(threadComposeImageInputRef.current, threadComposeVideoInputRef.current)
     } catch {
@@ -10752,6 +10767,7 @@ export default function SocialFeed({
         (part) => threadComposePartHasMedia(part) || threadComposePartHasVideo(part),
       )
     if (hasText || hasMedia) {
+      setThreadComposeDiscardStep('discard')
       setThreadComposeDiscardOpen(true)
       return
     }
@@ -16068,52 +16084,109 @@ export default function SocialFeed({
           className="fixed inset-0 z-[99] flex items-center justify-center bg-black/45 px-4 p-6 backdrop-blur-[3px]"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="thread-compose-discard-title"
+          aria-labelledby={
+            threadComposeDiscardStep === 'draftVideoWarn'
+              ? 'thread-compose-draft-video-title'
+              : 'thread-compose-discard-title'
+          }
         >
           <button
             type="button"
             className="absolute inset-0 cursor-default touch-manipulation bg-transparent"
             aria-label="Close"
-            onClick={() => setThreadComposeDiscardOpen(false)}
+            onClick={() => {
+              if (threadComposeDiscardStep === 'draftVideoWarn') {
+                setThreadComposeDiscardStep('discard')
+                return
+              }
+              setThreadComposeDiscardOpen(false)
+              setThreadComposeDiscardStep('discard')
+            }}
           />
           <div className="relative z-10 w-full max-w-sm rounded-2xl border border-zinc-700/85 bg-zinc-950/90 p-4 shadow-2xl backdrop-blur-md">
-            <h2 id="thread-compose-discard-title" className="text-[17px] font-bold text-white">
-              Discard thread?
-            </h2>
-            <p className="mt-2 text-[14px] leading-snug text-zinc-400">
-              Your thread text and any attached media will be cleared.
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-              <button
-                type="button"
-                className="order-3 min-h-11 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation sm:order-1"
-                onClick={() => {
-                  setThreadComposeDiscardOpen(false)
-                  void saveThreadComposeAsServerDraft().then((data) => {
-                    if (data) closeThreadComposeImmediate({ skipRestoreFeedText: true })
-                  })
-                }}
-              >
-                Save draft
-              </button>
-              <button
-                type="button"
-                className="order-2 min-h-11 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation sm:order-2"
-                onClick={() => {
-                  setThreadComposeDiscardOpen(false)
-                  closeThreadComposeImmediate()
-                }}
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                className="order-1 min-h-11 rounded-xl bg-cyan-600 px-4 text-[15px] font-semibold text-white hover:bg-cyan-500 touch-manipulation sm:order-3"
-                onClick={() => setThreadComposeDiscardOpen(false)}
-              >
-                Keep writing
-              </button>
-            </div>
+            {threadComposeDiscardStep === 'draftVideoWarn' ? (
+              <>
+                <h2 id="thread-compose-draft-video-title" className="text-[17px] font-bold text-white">
+                  Save draft without videos?
+                </h2>
+                <p className="mt-2 text-[14px] leading-snug text-zinc-400">
+                  Videos will be removed when saving this draft. You&apos;ll have to re-add them after you restore it.
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    className="min-h-11 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation"
+                    onClick={() => setThreadComposeDiscardStep('discard')}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="min-h-11 rounded-xl bg-cyan-600 px-4 text-[15px] font-semibold text-white hover:bg-cyan-500 touch-manipulation"
+                    onClick={() => {
+                      setThreadComposeDiscardOpen(false)
+                      setThreadComposeDiscardStep('discard')
+                      setThreadComposeErr('')
+                      void saveThreadComposeAsServerDraft({ stripVideos: true }).then((data) => {
+                        if (data) closeThreadComposeImmediate({ skipRestoreFeedText: true })
+                      })
+                    }}
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 id="thread-compose-discard-title" className="text-[17px] font-bold text-white">
+                  Discard thread?
+                </h2>
+                <p className="mt-2 text-[14px] leading-snug text-zinc-400">
+                  Your thread text and any attached media will be cleared.
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                  <button
+                    type="button"
+                    className="order-3 min-h-11 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation sm:order-1"
+                    onClick={() => {
+                      if (threadComposePartMedia.some((part) => threadComposePartHasVideo(part))) {
+                        setThreadComposeErr('')
+                        setThreadComposeDiscardStep('draftVideoWarn')
+                        return
+                      }
+                      setThreadComposeDiscardOpen(false)
+                      setThreadComposeDiscardStep('discard')
+                      void saveThreadComposeAsServerDraft().then((data) => {
+                        if (data) closeThreadComposeImmediate({ skipRestoreFeedText: true })
+                      })
+                    }}
+                  >
+                    Save draft
+                  </button>
+                  <button
+                    type="button"
+                    className="order-2 min-h-11 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation sm:order-2"
+                    onClick={() => {
+                      setThreadComposeDiscardOpen(false)
+                      setThreadComposeDiscardStep('discard')
+                      closeThreadComposeImmediate()
+                    }}
+                  >
+                    Discard
+                  </button>
+                  <button
+                    type="button"
+                    className="order-1 min-h-11 rounded-xl bg-cyan-600 px-4 text-[15px] font-semibold text-white hover:bg-cyan-500 touch-manipulation sm:order-3"
+                    onClick={() => {
+                      setThreadComposeDiscardOpen(false)
+                      setThreadComposeDiscardStep('discard')
+                    }}
+                  >
+                    Keep writing
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}
