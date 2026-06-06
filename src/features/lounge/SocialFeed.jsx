@@ -11083,6 +11083,18 @@ export default function SocialFeed({
     closeThreadComposeImmediate()
   }, [closeThreadComposeImmediate, threadComposeCaptions, threadComposePartMedia])
 
+  const discardThreadCompose = useCallback(() => {
+    closeThreadComposeImmediate({ skipRestoreFeedText: true })
+    setPostText('')
+    setPostErr('')
+    clearLoungeComposerDraft()
+    composerFoldedFromFeedScrollRef.current = false
+    composerFoldRevealRef.current = 0
+    setComposerFoldReveal(0)
+    composerExpandedRef.current = false
+    setComposerExpanded(false)
+  }, [closeThreadComposeImmediate])
+
   const submitThreadCompose = useCallback(async () => {
     setThreadComposeErr('')
     const normalizedParts = normalizeThreadComposePartsForSubmit(
@@ -16428,7 +16440,7 @@ export default function SocialFeed({
                     className="order-2 min-h-11 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation sm:order-2"
                     onClick={() => {
                       setThreadComposeDiscardOpen(false)
-                      closeThreadComposeImmediate()
+                      discardThreadCompose()
                     }}
                   >
                     Discard
