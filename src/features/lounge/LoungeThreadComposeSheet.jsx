@@ -14,6 +14,7 @@ import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
 import {
   LOUNGE_IOS,
   LOUNGE_IOS_KEYBOARD_SMOOTH_MS,
+  readLoungeKeyboardOverlapPx,
   useLoungeIosSafeBottomPx,
   useLoungeKeyboardOverlapPx,
 } from './useLoungeKeyboardOverlapPx.js'
@@ -127,18 +128,23 @@ export default function LoungeThreadComposeSheet({
 }) {
   const scrollRef = useRef(null)
   const toolbarRef = useRef(null)
+  const footerHostRef = useRef(null)
   const partRowRefs = useRef({})
   const activePartIndexRef = useRef(activePartIndex)
   const didUserActivatePartRef = useRef(false)
   const kbOverlapPrevRef = useRef(0)
   const keyboardDockActiveRef = useRef(false)
+  const keyboardDockRecoveryRafRef = useRef(0)
+  const iosSafeBottomRef = useRef(10)
   activePartIndexRef.current = activePartIndex
   const [toolbarHeightPx, setToolbarHeightPx] = useState(52)
+  const [footerDockPx, setFooterDockPx] = useState(0)
   /** Caption focus — drives tail-follow while typing; keyboard lift uses visualViewport whenever open. */
   const [keyboardDockActive, setKeyboardDockActive] = useState(false)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(LOUNGE_IOS)
+  iosSafeBottomRef.current = iosSafeBottomPx
   const { overlapPx: kbOverlapPx } = useLoungeKeyboardOverlapPx(open, { smooth: false })
-  const keyboardUp = kbOverlapPx > iosSafeBottomPx + 0.5
+  const keyboardUp = footerDockPx > iosSafeBottomPx + 0.5 || kbOverlapPx > iosSafeBottomPx + 0.5
   keyboardDockActiveRef.current = keyboardDockActive
   const activePartMediaTailKey = useMemo(() => {
     const m = partsMedia[activePartIndex]
@@ -146,10 +152,44 @@ export default function LoungeThreadComposeSheet({
     const urls = threadComposePartCarouselUrls(m)
     return `${activePartIndex}:${urls.length}:${urls.join('\0')}:${m.videoSlot ? 'v' : ''}`
   }, [activePartIndex, partsMedia])
-  /** Match post-detail reply footer: overlap-only when keys are up (no safe-area stack). */
-  const footerHostPadBottom = keyboardUp
-    ? `${Math.round(kbOverlapPx)}px`
-    : `max(0.625rem, env(safe-area-inset-bottom))`
+  const footerDockBottomPx =
+    footerDockPx > iosSafeBottomPx + 0.5 ? Math.round(footerDockPx) : 0
+  const footerHostPadBottom =
+    footerDockPx > iosSafeBottomPx + 0.5
+      ? '0px'
+      : 'max(0.625rem, env(safe-area-inset-bottom))'
+
+  /** Apply footer lift immediately on the DOM — React state alone lags iOS after media-pick refocus. */
+  const applyThreadFooterKeyboardDock = useCallback(() => {
+    const overlap = readLoungeKeyboardOverlapPx()
+    const el = footerHostRef.current
+    const safe = iosSafeBottomRef.current
+    if (el) {
+      if (overlap > safe + 0.5) {
+        el.style.bottom = `${Math.round(overlap)}px`
+        el.style.paddingBottom = '0px'
+      } else {
+        el.style.bottom = '0px'
+        el.style.paddingBottom = ''
+      }
+    }
+    setFooterDockPx((prev) => (Math.abs(prev - overlap) > 0.25 ? overlap : prev))
+    return overlap
+  }, [])
+
+  /** iOS often withholds visualViewport overlap until the thread scroller moves (manual scroll-up fix). */
+  const nudgeThreadScrollForIosKeyboardDock = useCallback(() => {
+    const scrollEl = scrollRef.current
+    if (!scrollEl || !LOUNGE_IOS) return
+    scrollEl.scrollTop = 0
+    void scrollEl.offsetHeight
+    if (scrollEl.scrollHeight > scrollEl.clientHeight + 1) {
+      scrollEl.scrollTop = 1
+      void scrollEl.offsetHeight
+    }
+    scrollEl.scrollTop = 0
+    void scrollEl.offsetHeight
+  }, [])
 
   /** Nudge scroll until the part row tail clears the options bar, or no more overlap remains. */
   const pinThreadPartTail = useCallback((partIdx, { maxPasses = 8 } = {}) => {
@@ -186,12 +226,47 @@ export default function LoungeThreadComposeSheet({
     [pinThreadPartTail],
   )
 
+  const kickThreadKeyboardDockRecovery = useCallback(
+    (partIdx) => {
+      applyThreadFooterKeyboardDock()
+      if (!LOUNGE_IOS) return
+
+      cancelAnimationFrame(keyboardDockRecoveryRafRef.current)
+      nudgeThreadScrollForIosKeyboardDock()
+      applyThreadFooterKeyboardDock()
+
+      const start = performance.now()
+      const tick = () => {
+        const overlap = applyThreadFooterKeyboardDock()
+        if (overlap > iosSafeBottomRef.current + 0.5) {
+          pinThreadPartTail(partIdx, { maxPasses: 8 })
+        }
+        if (performance.now() - start < 1400) {
+          keyboardDockRecoveryRafRef.current = requestAnimationFrame(tick)
+        } else {
+          keyboardDockRecoveryRafRef.current = 0
+        }
+      }
+      keyboardDockRecoveryRafRef.current = requestAnimationFrame(tick)
+
+      for (const ms of THREAD_KB_REOPEN_PIN_MS) {
+        window.setTimeout(() => {
+          applyThreadFooterKeyboardDock()
+          pinThreadPartTail(partIdx, { maxPasses: 12 })
+        }, ms)
+      }
+    },
+    [applyThreadFooterKeyboardDock, nudgeThreadScrollForIosKeyboardDock, pinThreadPartTail],
+  )
+
   const syncFocusLeftSheet = useCallback(() => {
     window.setTimeout(() => {
       const active = document.activeElement
       if (
         active &&
-        (scrollRef.current?.contains(active) || toolbarRef.current?.contains(active))
+        (scrollRef.current?.contains(active) ||
+          footerHostRef.current?.contains(active) ||
+          toolbarRef.current?.contains(active))
       ) {
         return
       }
@@ -204,6 +279,9 @@ export default function LoungeThreadComposeSheet({
     if (!open) {
       didUserActivatePartRef.current = false
       setKeyboardDockActive(false)
+      cancelAnimationFrame(keyboardDockRecoveryRafRef.current)
+      keyboardDockRecoveryRafRef.current = 0
+      setFooterDockPx(0)
       return
     }
     const scrollEl = scrollRef.current
@@ -239,6 +317,8 @@ export default function LoungeThreadComposeSheet({
     const prev = kbOverlapPrevRef.current
     kbOverlapPrevRef.current = kbOverlapPx
     if (kbOverlapPx > prev + 2) {
+      applyThreadFooterKeyboardDock()
+      kickThreadKeyboardDockRecovery(activePartIndex)
       schedulePinThreadPartTail(activePartIndex, { extended: true })
     } else if (keyboardUp) {
       schedulePinThreadPartTail(activePartIndex)
@@ -247,12 +327,20 @@ export default function LoungeThreadComposeSheet({
   }, [
     activePartIndex,
     iosSafeBottomPx,
+    applyThreadFooterKeyboardDock,
     kbOverlapPx,
     keyboardUp,
+    kickThreadKeyboardDockRecovery,
     open,
     schedulePinThreadPartTail,
     toolbarHeightPx,
   ])
+
+  useLayoutEffect(() => {
+    if (!open) return undefined
+    applyThreadFooterKeyboardDock()
+    return undefined
+  }, [applyThreadFooterKeyboardDock, kbOverlapPx, open])
 
   useLayoutEffect(() => {
     if (!open || activePartIndex < 0 || !keyboardUp) return undefined
@@ -328,28 +416,33 @@ export default function LoungeThreadComposeSheet({
     const scrollEl = scrollRef.current
     if (!scrollEl) return undefined
     const onThreadScroll = () => {
+      applyThreadFooterKeyboardDock()
       if (!keyboardDockActiveRef.current && !keyboardUp) return
       pinThreadPartTail(activePartIndexRef.current, { maxPasses: 8 })
     }
     scrollEl.addEventListener('scroll', onThreadScroll, { passive: true })
     return () => scrollEl.removeEventListener('scroll', onThreadScroll)
-  }, [keyboardUp, open, pinThreadPartTail])
+  }, [applyThreadFooterKeyboardDock, keyboardUp, open, pinThreadPartTail])
 
   useEffect(() => {
     if (!open) return undefined
     const vv = typeof window !== 'undefined' ? window.visualViewport : null
     if (!vv) return undefined
     const onVvChange = () => {
-      if (!keyboardDockActiveRef.current && kbOverlapPx <= iosSafeBottomPx + 0.5) return
+      applyThreadFooterKeyboardDock()
+      if (!keyboardDockActiveRef.current && readLoungeKeyboardOverlapPx() <= iosSafeBottomRef.current + 0.5) {
+        return
+      }
       pinThreadPartTail(activePartIndexRef.current, { maxPasses: 8 })
     }
+    onVvChange()
     vv.addEventListener('resize', onVvChange)
     vv.addEventListener('scroll', onVvChange)
     return () => {
       vv.removeEventListener('resize', onVvChange)
       vv.removeEventListener('scroll', onVvChange)
     }
-  }, [iosSafeBottomPx, kbOverlapPx, open, pinThreadPartTail])
+  }, [applyThreadFooterKeyboardDock, open, pinThreadPartTail])
 
   const shouldTailFollowPart = useCallback(
     (partIdx) =>
@@ -379,9 +472,10 @@ export default function LoungeThreadComposeSheet({
       keyboardDockActiveRef.current = true
       setKeyboardDockActive(true)
       onFocusPart?.(partIdx)
+      kickThreadKeyboardDockRecovery(partIdx)
       schedulePinThreadPartTail(partIdx, { extended: true })
     },
-    [onFocusPart, schedulePinThreadPartTail],
+    [kickThreadKeyboardDockRecovery, onFocusPart, schedulePinThreadPartTail],
   )
 
   const focusPart = useCallback(
@@ -400,10 +494,11 @@ export default function LoungeThreadComposeSheet({
             // ignore
           }
         }
+        kickThreadKeyboardDockRecovery(partIdx)
         schedulePinThreadPartTail(partIdx, { extended: true })
       })
     },
-    [getPartRef, onFocusPart, schedulePinThreadPartTail],
+    [getPartRef, kickThreadKeyboardDockRecovery, onFocusPart, schedulePinThreadPartTail],
   )
 
   if (!open) return null
@@ -705,8 +800,12 @@ export default function LoungeThreadComposeSheet({
       </div>
 
       <footer
-        className="absolute inset-x-0 bottom-0 z-[2] px-2 pt-1"
-        style={{ paddingBottom: footerHostPadBottom }}
+        ref={footerHostRef}
+        className="fixed inset-x-0 z-[99] px-2 pt-1"
+        style={{
+          bottom: footerDockBottomPx,
+          paddingBottom: footerHostPadBottom,
+        }}
       >
         <input
           id={imageInputId}
