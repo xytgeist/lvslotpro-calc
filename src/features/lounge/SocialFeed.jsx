@@ -14959,7 +14959,7 @@ export default function SocialFeed({
                   </div>
                 ) : null}
                 {loungeDetailCommentComposerExpanded ? (
-                  <div className="chat-header-glass relative shrink-0 rounded-2xl px-2.5 pt-2 pb-1">
+                  <div className="lounge-detail-comment-composer-glass relative shrink-0 rounded-2xl px-2.5 pt-2 pb-1">
                     <button
                       type="button"
                       onClick={requestDismissLoungeDetailCommentComposer}
@@ -15200,7 +15200,7 @@ export default function SocialFeed({
                       if (openProfileGateIfNeeded()) return
                       expandAndFocusLoungeDetailCommentComposer()
                     }}
-                    className="chat-header-glass flex min-h-10 w-full touch-manipulation items-center rounded-full px-3 py-2 text-left text-[15px] leading-tight text-zinc-500 [-webkit-tap-highlight-color:transparent] active:opacity-80"
+                    className="lounge-detail-comment-composer-glass flex min-h-10 w-full touch-manipulation items-center rounded-full px-3 py-2 text-left text-[15px] leading-tight text-zinc-500 [-webkit-tap-highlight-color:transparent] active:opacity-80"
                   >
                     {(() => {
                       const firstLine = String(loungeDetailCommentDraft || '')
