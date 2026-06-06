@@ -1,5 +1,7 @@
 /** Light/dark colors for TradingView Lightweight Charts in Lounge. */
 
+import { ColorType } from 'lightweight-charts'
+
 export function loungeMarketChartIsLight() {
   return typeof document !== 'undefined' && document.documentElement.classList.contains('light')
 }
@@ -10,7 +12,7 @@ export function loungeMarketChartTheme(isLight = loungeMarketChartIsLight()) {
   // surface/text class tokens as dark mode — they invert to readable light UI.
   return {
     layout: {
-      background: { color: 'transparent' },
+      background: { type: ColorType.Solid, color: 'transparent' },
       textColor: isLight ? '#71717a' : '#a1a1aa',
     },
     grid: {

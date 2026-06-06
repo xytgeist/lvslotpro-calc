@@ -300,6 +300,22 @@ export function formatMarketPrice(price) {
   }
 }
 
+/** Whole-dollar USD for compact chart axis ticks. @param {number} price */
+export function formatMarketPriceWhole(price) {
+  const v = Number(price)
+  if (!Number.isFinite(v)) return '—'
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(v)
+  } catch {
+    return `$${Math.round(v).toLocaleString()}`
+  }
+}
+
 /** @param {number} pct */
 export function formatMarketChangePct(pct) {
   const v = Number(pct)
