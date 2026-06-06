@@ -116,13 +116,38 @@ function fitMarketChartTimeScale(chart) {
   chart.timeScale().applyOptions({ rightOffset: 0, rightOffsetPixels: 0, fixRightEdge: true })
 }
 
-/** Pointer scrub on the plot — no pan/zoom; drives crosshair + header quote. */
-function bindMarketChartScrubPointer(el, chart, area) {
+/** Last series value at or before crosshair time. */
+function priceAtSeriesTime(barPoints, time) {
+  if (!barPoints?.length || time == null) return null
+  const ts = typeof time === 'number' ? time : null
+  if (ts == null) return null
+  let match = barPoints[0]
+  for (const point of barPoints) {
+    if (point.time <= ts) match = point
+    else break
+  }
+  return Number(match.value)
+}
+
+/** Scrub quote vs first bar in the active timeframe. */
+function scrubQuoteFromBarPoints(barPoints, price) {
+  if (!Number.isFinite(price)) return null
+  const firstPrice = Number(barPoints[0]?.value)
+  if (Number.isFinite(firstPrice) && firstPrice > 0) {
+    const change = price - firstPrice
+    return { price, change, change_pct: (change / firstPrice) * 100 }
+  }
+  return { price }
+}
+
+/** Pointer scrub on the plot — no pan/zoom; updates header quote from series data. */
+function bindMarketChartScrubPointer(el, chart, area, barPoints, onScrub) {
   const clearScrub = () => {
     chart.clearCrosshairPosition()
+    onScrub(null)
   }
 
-  const scrubFromClient = (clientX, clientY) => {
+  const applyScrubAt = (clientX, clientY) => {
     const rect = el.getBoundingClientRect()
     const x = clientX - rect.left
     const y = clientY - rect.top
@@ -130,29 +155,39 @@ function bindMarketChartScrubPointer(el, chart, area) {
       clearScrub()
       return
     }
-    const price = area.coordinateToPrice(y)
     const time = chart.timeScale().coordinateToTime(x)
-    if (price == null || time == null || !Number.isFinite(price)) {
+    let price = priceAtSeriesTime(barPoints, time)
+    if (!Number.isFinite(price) && barPoints.length) {
+      price =
+        x <= 0
+          ? Number(barPoints[0].value)
+          : Number(barPoints[barPoints.length - 1].value)
+    }
+    if (!Number.isFinite(price)) {
       clearScrub()
       return
     }
-    chart.setCrosshairPosition(price, time, area)
+    const crosshairTime = time ?? barPoints[barPoints.length - 1]?.time
+    if (crosshairTime != null) {
+      chart.setCrosshairPosition(price, crosshairTime, area)
+    }
+    onScrub(scrubQuoteFromBarPoints(barPoints, price))
   }
 
   const onPointerDown = (e) => {
     e.stopPropagation()
     el.setPointerCapture(e.pointerId)
-    scrubFromClient(e.clientX, e.clientY)
+    applyScrubAt(e.clientX, e.clientY)
   }
 
   const onPointerMove = (e) => {
     if (el.hasPointerCapture(e.pointerId)) {
       e.stopPropagation()
-      scrubFromClient(e.clientX, e.clientY)
+      applyScrubAt(e.clientX, e.clientY)
       return
     }
     if (e.pointerType === 'mouse' && e.buttons === 0) {
-      scrubFromClient(e.clientX, e.clientY)
+      applyScrubAt(e.clientX, e.clientY)
     }
   }
 
@@ -173,18 +208,19 @@ function bindMarketChartScrubPointer(el, chart, area) {
     }
   }
 
-  el.addEventListener('pointerdown', onPointerDown)
-  el.addEventListener('pointermove', onPointerMove)
-  el.addEventListener('pointerup', onPointerEnd)
-  el.addEventListener('pointercancel', onPointerEnd)
-  el.addEventListener('pointerleave', onPointerLeave)
+  const opts = { capture: true }
+  el.addEventListener('pointerdown', onPointerDown, opts)
+  el.addEventListener('pointermove', onPointerMove, opts)
+  el.addEventListener('pointerup', onPointerEnd, opts)
+  el.addEventListener('pointercancel', onPointerEnd, opts)
+  el.addEventListener('pointerleave', onPointerLeave, opts)
 
   return () => {
-    el.removeEventListener('pointerdown', onPointerDown)
-    el.removeEventListener('pointermove', onPointerMove)
-    el.removeEventListener('pointerup', onPointerEnd)
-    el.removeEventListener('pointercancel', onPointerEnd)
-    el.removeEventListener('pointerleave', onPointerLeave)
+    el.removeEventListener('pointerdown', onPointerDown, opts)
+    el.removeEventListener('pointermove', onPointerMove, opts)
+    el.removeEventListener('pointerup', onPointerEnd, opts)
+    el.removeEventListener('pointercancel', onPointerEnd, opts)
+    el.removeEventListener('pointerleave', onPointerLeave, opts)
   }
 }
 
@@ -259,6 +295,7 @@ export default function LoungeMarketChartModal({
   const [postsErr, setPostsErr] = useState('')
   /** Crosshair scrub overrides header quote until pointer leaves the chart. */
   const [scrubQuote, setScrubQuote] = useState(/** @type {{ price: number, change?: number, change_pct?: number } | null} */ (null))
+  const [scrubAxisCurrent, setScrubAxisCurrent] = useState(/** @type {{ price: number, y: number } | null} */ (null))
   const [priceAxisLabels, setPriceAxisLabels] = useState(
     /** @type {{ high: { price: number, y: number } | null, current: { price: number, y: number } | null, low: { price: number, y: number } | null }} */ ({
       high: null,
@@ -476,10 +513,14 @@ export default function LoungeMarketChartModal({
 
   useEffect(() => {
     setScrubQuote(null)
+    setScrubAxisCurrent(null)
   }, [activeIdx, timeframeIdx, series])
 
   useEffect(() => {
-    if (!open) setScrubQuote(null)
+    if (!open) {
+      setScrubQuote(null)
+      setScrubAxisCurrent(null)
+    }
   }, [open])
 
   const quote = series?.quote || active?.quote
@@ -528,8 +569,8 @@ export default function LoungeMarketChartModal({
         fixRightEdge: true,
       },
       crosshair: {
-        vertLine: { labelVisible: false },
-        horzLine: { labelVisible: false },
+        vertLine: { visible: true, labelVisible: false },
+        horzLine: { visible: false, labelVisible: false },
       },
     })
     const barPoints = loungeMarketBarsToSeries(series?.bars || active?.bars || [])
@@ -567,32 +608,17 @@ export default function LoungeMarketChartModal({
     refreshChartOverlays()
     requestAnimationFrame(refreshChartOverlays)
 
-    const firstPrice = barPoints[0]?.value
-
-    chart.subscribeCrosshairMove((param) => {
-      if (!param.point || param.time == null) {
-        setScrubQuote(null)
-        return
+    const unbindScrub = bindMarketChartScrubPointer(el, chart, area, barPoints, (quoteAtPoint) => {
+      setScrubQuote(quoteAtPoint)
+      if (quoteAtPoint?.price != null) {
+        const axisY = area.priceToCoordinate(quoteAtPoint.price)
+        setScrubAxisCurrent(
+          axisY != null ? { price: quoteAtPoint.price, y: Math.round(axisY) } : null,
+        )
+      } else {
+        setScrubAxisCurrent(null)
       }
-      const hit = param.seriesData.get(area)
-      const price = Number(hit?.value)
-      if (!Number.isFinite(price)) {
-        setScrubQuote(null)
-        return
-      }
-      if (Number.isFinite(firstPrice) && firstPrice > 0) {
-        const change = price - firstPrice
-        setScrubQuote({
-          price,
-          change,
-          change_pct: (change / firstPrice) * 100,
-        })
-        return
-      }
-      setScrubQuote({ price })
     })
-
-    const unbindScrub = bindMarketChartScrubPointer(el, chart, area)
 
     chartRef.current = chart
     let resizeRaf = 0
@@ -620,6 +646,7 @@ export default function LoungeMarketChartModal({
       priceAxisLabelsRef.current = { high: null, current: null, low: null }
       setPriceAxisLabels({ high: null, current: null, low: null })
       setScrubQuote(null)
+      setScrubAxisCurrent(null)
     }
   }, [open, series, chartUp, isLight, active?.symbol])
 
@@ -636,6 +663,7 @@ export default function LoungeMarketChartModal({
   const sheetTransform = sheetClosing || sheetDragY > 0 ? `translate3d(0, ${sheetDragY}px, 0)` : undefined
   const sheetTransition =
     sheetClosing || (!sheetDragging && sheetDragY === 0) ? 'transform 0.22s ease' : 'none'
+  const axisCurrentLabel = scrubAxisCurrent ?? priceAxisLabels.current
 
   return createPortal(
     <div
@@ -746,12 +774,12 @@ export default function LoungeMarketChartModal({
                   {formatMarketPrice(priceAxisLabels.high.price)}
                 </div>
               ) : null}
-              {priceAxisLabels.current ? (
+              {axisCurrentLabel ? (
                 <div
-                  className={`absolute right-0 -translate-y-1/2 whitespace-nowrap pr-0.5 text-[10px] font-semibold tabular-nums ${chartUp ? 'text-lv-green' : 'text-lv-red'}`}
-                  style={{ top: priceAxisLabels.current.y }}
+                  className={`absolute right-0 -translate-y-1/2 whitespace-nowrap pr-0.5 text-[10px] font-semibold tabular-nums ${displayUp ? 'text-lv-green' : 'text-lv-red'}`}
+                  style={{ top: axisCurrentLabel.y }}
                 >
-                  {formatMarketPrice(priceAxisLabels.current.price)}
+                  {formatMarketPrice(axisCurrentLabel.price)}
                 </div>
               ) : null}
               {priceAxisLabels.low ? (

@@ -81,7 +81,10 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
     if (!start || start.pointerId !== e.pointerId) return
     const dx = e.clientX - start.x
     const dy = e.clientY - start.y
-    if (dx * dx + dy * dy > MINI_CHART_TAP_MOVE_PX * MINI_CHART_TAP_MOVE_PX) return
+    const distSq = dx * dx + dy * dy
+    if (distSq > MINI_CHART_TAP_MOVE_PX * MINI_CHART_TAP_MOVE_PX) return
+    // Horizontal swipe on the strip — scroll, don't open modal.
+    if (Math.abs(dx) > Math.abs(dy)) return
     e.stopPropagation()
     onOpen?.()
   }
@@ -103,7 +106,7 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
         e.stopPropagation()
         onOpen?.()
       }}
-      className={`relative flex w-[148px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border ${theme.cardBorder} ${theme.cardBg} p-2 text-left touch-pan-y cursor-pointer active:opacity-90 [-webkit-tap-highlight-color:transparent] ${className}`}
+      className={`relative flex w-[148px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border ${theme.cardBorder} ${theme.cardBg} p-2 text-left [touch-action:pan-x_pan-y] cursor-pointer active:opacity-90 [-webkit-tap-highlight-color:transparent] ${className}`}
       data-lounge-market-chart-mini
       aria-label={`Open ${embed.display_symbol} chart`}
     >
