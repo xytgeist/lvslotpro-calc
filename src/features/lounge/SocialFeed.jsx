@@ -157,6 +157,9 @@ import {
   parseLoungeProfileHandleFromUrl,
 } from './loungeCaptionLink.js'
 import { useMentionState } from './loungeMentionAutocomplete'
+import { marketSymbolDedupeKey, useCashtagState } from './loungeCashtagAutocomplete.js'
+import LoungeCashtagDropdown from './LoungeCashtagDropdown.jsx'
+import LoungeComposerMarketSymbolPills from './LoungeComposerMarketSymbolPills.jsx'
 import LoungeMentionDropdown from './LoungeMentionDropdown'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
@@ -164,6 +167,7 @@ import LoungePostArticle from './LoungePostArticle'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
 import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
 import { COMMUNITY_FEED_SELECT } from '../../utils/loungeFeedScope.js'
+import { normalizeMarketEmbeds, LOUNGE_MARKET_EMBED_MAX, extractCashtagsFromCaption } from '../../utils/loungeMarketCaptionParse.js'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
 import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
@@ -218,6 +222,10 @@ import {
   releaseLoungeStreamSessionPoster,
 } from './loungeStreamSessionPoster.js'
 import KlipyGifPicker from './KlipyGifPicker.jsx'
+import LoungeMarketChartModal from './LoungeMarketChartModal.jsx'
+import LoungeMarketChartStrip from './LoungeMarketChartStrip.jsx'
+import { LoungeMarketFeedProvider } from './LoungeMarketFeedContext.jsx'
+import LoungeMarketSymbolPickerSheet from './LoungeMarketSymbolPickerSheet.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import TitleBarStatusLine from '../../components/TitleBarStatusLine.jsx'
 // LOUNGE_DOCK_FOOTER_BAR_DISABLED — classic dock icon row (FAB wheel is primary nav). Re-enable import + JSX below to restore.
@@ -584,6 +592,15 @@ export default function SocialFeed({
   })
   const [klipyPickerOpen, setKlipyPickerOpen] = useState(false)
   const [klipyPickerTarget, setKlipyPickerTarget] = useState('composer')
+  const [marketPickerOpen, setMarketPickerOpen] = useState(false)
+  const [marketPickerTarget, setMarketPickerTarget] = useState(/** @type {'composer' | 'detailEdit'} */ ('composer'))
+  const [composerMarketSymbols, setComposerMarketSymbols] = useState([])
+  const [loungeDetailEditMarketSymbols, setLoungeDetailEditMarketSymbols] = useState([])
+  const [marketChartModal, setMarketChartModal] = useState({
+    open: false,
+    embeds: [],
+    focusSymbol: null,
+  })
   const [composerCategoryPills, setComposerCategoryPills] = useState(() => readLoungeComposerLastCategoryPills())
   /** Server draft id when composer content was loaded from or last saved to `lounge_post_drafts`. */
   const [loungeComposerActiveDraftId, setLoungeComposerActiveDraftId] = useState(null)
@@ -980,6 +997,7 @@ export default function SocialFeed({
   const mentionDetailCommentAnchorRef = useRef(null)
   const mentionQuoteRepostAnchorRef = useRef(null)
   const loungeDetailEditFieldRef = useRef(null)
+  const loungeDetailEditCashtagAnchorRef = useRef(null)
   const loungeDetailEditImageInputRef = useRef(null)
   const loungeDetailEditVideoInputRef = useRef(null)
   const loungeFeedScrollRef = useRef(null)
@@ -1102,6 +1120,37 @@ export default function SocialFeed({
     threadComposeCaptions[0] ?? '',
     supabaseClient,
     threadComposeOpen && !loungeReadOnly,
+  )
+
+  const appendComposerMarketSymbol = useCallback((row) => {
+    setComposerMarketSymbols((prev) => {
+      const key = marketSymbolDedupeKey(row)
+      if (!row?.symbol || prev.some((s) => marketSymbolDedupeKey(s) === key)) return prev
+      if (prev.length >= LOUNGE_MARKET_EMBED_MAX) return prev
+      return [...prev, row]
+    })
+  }, [])
+
+  const appendDetailEditMarketSymbol = useCallback((row) => {
+    setLoungeDetailEditMarketSymbols((prev) => {
+      const key = marketSymbolDedupeKey(row)
+      if (!row?.symbol || prev.some((s) => marketSymbolDedupeKey(s) === key)) return prev
+      if (prev.length >= LOUNGE_MARKET_EMBED_MAX) return prev
+      return [...prev, row]
+    })
+  }, [])
+
+  const cashtagComposer = useCashtagState(
+    postText,
+    supabaseClient,
+    !loungeReadOnly,
+    appendComposerMarketSymbol,
+  )
+  const cashtagDetailEdit = useCashtagState(
+    loungeDetailDraftCaption,
+    supabaseClient,
+    Boolean(loungeDetailEditing && !loungeReadOnly),
+    appendDetailEditMarketSymbol,
   )
 
   const chatDockIsStaff = Boolean(isStaff || loungeViewerIsStaff)
@@ -1514,6 +1563,29 @@ export default function SocialFeed({
     },
     [beginLoungeDetailCommentMediaSession, blurLoungeComposerCaptionForTarget, openProfileGateIfNeeded],
   )
+
+  const openMarketPicker = useCallback(
+    (target) => {
+      if (openProfileGateIfNeeded()) return
+      setMarketPickerTarget(target)
+      setMarketPickerOpen(true)
+    },
+    [openProfileGateIfNeeded],
+  )
+
+  const openMarketChartModal = useCallback(({ embed, embeds }) => {
+    const list = Array.isArray(embeds) && embeds.length ? embeds : embed ? [embed] : []
+    if (!list.length) return
+    setMarketChartModal({
+      open: true,
+      embeds: list,
+      focusSymbol: embed?.display_symbol || embed?.symbol || list[0]?.display_symbol || null,
+    })
+  }, [])
+
+  const closeMarketChartModal = useCallback(() => {
+    setMarketChartModal({ open: false, embeds: [], focusSymbol: null })
+  }, [])
 
   const expandAndFocusLoungeDetailCommentComposer = useCallback(({ skipScrollToTop = false } = {}) => {
     if (!skipScrollToTop) scrollLoungePostDetailToTopInstant()
@@ -3521,6 +3593,7 @@ export default function SocialFeed({
       return null
     })
     setLoungeDetailEditKeepStreamUid(null)
+    setLoungeDetailEditMarketSymbols([])
     try {
       clearHiddenFileInputs(loungeDetailEditImageInputRef.current, loungeDetailEditVideoInputRef.current)
     } catch {
@@ -6497,6 +6570,7 @@ export default function SocialFeed({
       setLoungeDetailEditMediaUrl('')
       setLoungeDetailEditKeepStreamUid(null)
       setLoungeDetailEditVideoSlot(null)
+      setLoungeDetailEditMarketSymbols([])
       setLoungePostDetailMenuOpen(false)
       setLoungeDetailRepostMenuOpen(false)
       const directOpen =
@@ -6560,6 +6634,18 @@ export default function SocialFeed({
         setLoungeDetailEditMediaUrl(String(seed.gifUrl || '').trim())
         setLoungeDetailEditKeepStreamUid(feedPostStreamVideoUid(post) || null)
         setLoungeDetailEditCategoryPills(displayPostCategoryPills(post))
+        setLoungeDetailEditMarketSymbols(
+          normalizeMarketEmbeds(post.market_embeds).map((e) => ({
+            symbol: e.symbol,
+            asset_class: e.asset_class,
+            display_symbol: e.display_symbol,
+            name: e.name,
+            exchange: e.exchange,
+            logo_url: e.logo_url,
+            market_cap: e.market_cap,
+            currency: e.currency,
+          })),
+        )
         setLoungeDetailEditing(true)
       }
       const reduce =
@@ -7571,7 +7657,10 @@ export default function SocialFeed({
     const hasVideo = hasNewVideo || Boolean(keepStream)
     const hasImages = loungeDetailEditImageItems.length > 0 || loungeDetailEditImageUrls.length > 0
     const hasMedia = hasImages || Boolean(gifOnlyUrl) || hasVideo
-    if (!cap && !hasMedia) {
+    const hasMarket =
+      loungeDetailEditMarketSymbols.length > 0 ||
+      extractCashtagsFromCaption(cap).length > 0
+    if (!cap && !hasMedia && !hasMarket) {
       setLoungeDetailEditErr('Write a caption or attach media before saving.')
       return
     }
@@ -7620,6 +7709,7 @@ export default function SocialFeed({
       awaitingDetailEditVideoPrepJobId: awaiting,
       videoPrepSpec: specForSnap,
       _capturedPrepHandoff: loungeDetailEditVideoPrepHandoffRef.current ?? null,
+      marketSymbols: loungeDetailEditMarketSymbols,
     }
 
     const preserveVideoPrep = snapshot.awaitingDetailEditVideoPrepJobId != null
@@ -7653,6 +7743,7 @@ export default function SocialFeed({
     loungeDetailEditImageItems,
     loungeDetailEditImageUrls,
     loungeDetailEditKeepStreamUid,
+    loungeDetailEditMarketSymbols,
     loungeDetailEditMediaUrl,
     loungeDetailEditVideoPostBlocked,
     loungePostDetail,
@@ -8740,6 +8831,7 @@ export default function SocialFeed({
       return null
     })
     setComposerMediaUrl('')
+    setComposerMarketSymbols([])
     composerFoldedFromFeedScrollRef.current = false
     composerFoldRevealRef.current = 0
     setComposerFoldReveal(0)
@@ -9838,6 +9930,8 @@ export default function SocialFeed({
                 stream_poster_url: data.stream_poster_url,
                 stream_video_width: data.stream_video_width,
                 stream_video_height: data.stream_video_height,
+                link_preview: data.link_preview,
+                market_embeds: data.market_embeds,
               }
             : p,
         ),
@@ -9856,6 +9950,8 @@ export default function SocialFeed({
               stream_poster_url: data.stream_poster_url,
               stream_video_width: data.stream_video_width,
               stream_video_height: data.stream_video_height,
+              link_preview: data.link_preview,
+              market_embeds: data.market_embeds,
             }
           : prev,
       )
@@ -9874,6 +9970,8 @@ export default function SocialFeed({
                 stream_poster_url: data.stream_poster_url,
                 stream_video_width: data.stream_video_width,
                 stream_video_height: data.stream_video_height,
+                link_preview: data.link_preview,
+                market_embeds: data.market_embeds,
               }
             : p,
         ),
@@ -10807,6 +10905,7 @@ export default function SocialFeed({
         setLoungeDetailEditMediaUrl(String(editSnap.gifOnlyUrl || ''))
         setLoungeDetailEditImageUrls(Array.isArray(editSnap.remoteImageUrls) ? editSnap.remoteImageUrls : [])
         setLoungeDetailEditCategoryPills(Array.isArray(editSnap.categoryPills) ? editSnap.categoryPills : [])
+        setLoungeDetailEditMarketSymbols(Array.isArray(editSnap.marketSymbols) ? editSnap.marketSymbols : [])
         setLoungeDetailEditKeepStreamUid(
           String(editSnap.previousStreamUid || editSnap.streamVideoUid || '').trim() || null,
         )
@@ -11366,7 +11465,8 @@ export default function SocialFeed({
     const hasGif = gifCheck.value.length > 0
     const hasImages = composerImageItems.length > 0
     const hasVideo = composerVideoSlot != null
-    if (!caption && !hasGif && !hasImages && !hasVideo) return
+    const hasMarket = composerMarketSymbols.length > 0 || extractCashtagsFromCaption(caption).length > 0
+    if (!caption && !hasGif && !hasImages && !hasVideo && !hasMarket) return
     if (caption.length > LOUNGE_CAPTION_MAX) {
       setPostErr(`Caption must be ${LOUNGE_CAPTION_MAX} characters or fewer.`)
       return
@@ -11473,6 +11573,7 @@ export default function SocialFeed({
         // Capture prep handoff by reference so queued jobs don't race on the shared ref
         _capturedPrepHandoff: composerVideoPrepHandoffRef.current ?? null,
         categoryPills: composerCategoryPills,
+        marketSymbols: composerMarketSymbols,
       }
     } finally {
       setPostBusy(false)
@@ -11502,6 +11603,7 @@ export default function SocialFeed({
     clearComposerForPostAttempt,
     composerCategoryPills,
     composerImageItems,
+    composerMarketSymbols,
     composerMediaUrl,
     composerUserProfile?.avatar_url,
     composerUserProfile?.role,
@@ -12864,11 +12966,18 @@ export default function SocialFeed({
     />
   ) : null
 
+  const loungeMarketFeedPosts = useMemo(() => {
+    if (!loungePostDetail?.id) return communityPosts
+    if (communityPosts.some((p) => p.id === loungePostDetail.id)) return communityPosts
+    return [loungePostDetail, ...communityPosts]
+  }, [communityPosts, loungePostDetail])
+
   return (
     <div
       className={`mx-auto flex h-dvh max-h-dvh min-h-0 w-full max-w-2xl flex-col overflow-hidden bg-zinc-950 pt-[max(0px,env(safe-area-inset-top))] pb-0`}
     >
       <LoungeStreamLightboxProvider ctx={loungeStreamLightboxCtx}>
+      <LoungeMarketFeedProvider supabaseClient={supabaseClient} posts={loungeMarketFeedPosts}>
       {quoteRepostQueuedToast ? (
         <div
           role="status"
@@ -13118,20 +13227,55 @@ export default function SocialFeed({
                       placeholder="Are ya winning, son?"
                       ariaLabel="Lounge post caption"
                       onKeyDown={(e) => {
+                        if (cashtagComposer.onCashtagKeyDown(e, setPostText, composerFieldRef.current)) return
                         mentionComposer.onMentionKeyDown(e, setPostText, composerFieldRef.current)
                       }}
-                      onKeyUp={mentionComposer.onCursorMove}
-                      onMouseUp={mentionComposer.onCursorMove}
-                      onInput={mentionComposer.onCursorMove}
-                      onBlur={() => window.setTimeout(() => mentionComposer.clearMention(), 150)}
+                      onKeyUp={(e) => {
+                        cashtagComposer.onCursorMove(e)
+                        mentionComposer.onCursorMove(e)
+                      }}
+                      onMouseUp={(e) => {
+                        cashtagComposer.onCursorMove(e)
+                        mentionComposer.onCursorMove(e)
+                      }}
+                      onInput={(e) => {
+                        cashtagComposer.onCursorMove(e)
+                        mentionComposer.onCursorMove(e)
+                      }}
+                      onBlur={() =>
+                        window.setTimeout(() => {
+                          cashtagComposer.clearCashtag()
+                          mentionComposer.clearMention()
+                        }, 150)
+                      }
                     />
-                    <LoungeMentionDropdown
-                      suggestions={mentionComposer.suggestions}
-                      activeIndex={mentionComposer.activeIndex}
-                      loading={mentionComposer.loading}
-                      onSelect={(p) => mentionComposer.onMentionSelect(p, setPostText, composerFieldRef.current)}
-                      anchorRef={mentionComposerAnchorRef}
-                      caretFieldRef={composerFieldRef}
+                    {cashtagComposer.isOpen ? (
+                      <LoungeCashtagDropdown
+                        open
+                        query={cashtagComposer.cashtag?.query ?? ''}
+                        suggestions={cashtagComposer.suggestions}
+                        activeIndex={cashtagComposer.activeIndex}
+                        loading={cashtagComposer.loading}
+                        onSelect={(row) =>
+                          cashtagComposer.onCashtagSelect(row, setPostText, composerFieldRef.current)
+                        }
+                        anchorRef={mentionComposerAnchorRef}
+                        caretFieldRef={composerFieldRef}
+                      />
+                    ) : (
+                      <LoungeMentionDropdown
+                        suggestions={mentionComposer.suggestions}
+                        activeIndex={mentionComposer.activeIndex}
+                        loading={mentionComposer.loading}
+                        onSelect={(p) => mentionComposer.onMentionSelect(p, setPostText, composerFieldRef.current)}
+                        anchorRef={mentionComposerAnchorRef}
+                        caretFieldRef={composerFieldRef}
+                      />
+                    )}
+                    <LoungeComposerMarketSymbolPills
+                      symbols={composerMarketSymbols}
+                      onChange={setComposerMarketSymbols}
+                      className="mt-1.5"
                     />
                   </div>
                   {(() => {
@@ -13290,6 +13434,7 @@ export default function SocialFeed({
                 onImagePointerDown={() => beginLoungeComposerMediaPicker('composer')}
                 onVideoPointerDown={() => beginLoungeComposerMediaPicker('composer')}
                 onOpenGifPicker={() => openKlipyPicker('composer')}
+                onOpenMarketPicker={() => openMarketPicker('composer')}
               />
               <button
                 type="button"
@@ -13344,7 +13489,9 @@ export default function SocialFeed({
                       (!postText.trim() &&
                         !String(composerMediaUrl || '').trim() &&
                         composerImageItems.length === 0 &&
-                        !composerVideoSlot)
+                        !composerVideoSlot &&
+                        composerMarketSymbols.length === 0 &&
+                        extractCashtagsFromCaption(postText).length === 0)
                     }
                     className="lounge-composer-post-btn min-h-7 shrink-0 touch-manipulation rounded-md px-2 py-0.5 text-[13px] font-bold leading-tight disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -13612,6 +13759,7 @@ export default function SocialFeed({
                   feedVideoAutoplayEnabled={loungeFeedVideoAutoplayEnabled}
                   onFeedVideoAutoplayChange={onLoungeFeedVideoAutoplayChange}
                   onOpenGuideCard={onOpenGuideCard}
+                  onOpenMarketChart={openMarketChartModal}
                 />
               </article>
             ))}
@@ -13961,7 +14109,7 @@ export default function SocialFeed({
                       />
                     </svg>
                   </button>
-                  <div className="pr-8">
+                  <div ref={loungeDetailEditCashtagAnchorRef} className="pr-8">
                     <LoungeRichComposerField
                       ref={loungeDetailEditFieldRef}
                       variant="detailEdit"
@@ -13972,6 +14120,42 @@ export default function SocialFeed({
                       placeholder="Are ya winning, son?"
                       ariaLabel="Edit caption"
                       disabled={loungeDetailEditBusy}
+                      onKeyDown={(e) => {
+                        if (
+                          cashtagDetailEdit.onCashtagKeyDown(
+                            e,
+                            setLoungeDetailDraftCaption,
+                            loungeDetailEditFieldRef.current,
+                          )
+                        ) {
+                          return
+                        }
+                      }}
+                      onKeyUp={cashtagDetailEdit.onCursorMove}
+                      onMouseUp={cashtagDetailEdit.onCursorMove}
+                      onInput={cashtagDetailEdit.onCursorMove}
+                      onBlur={() => window.setTimeout(() => cashtagDetailEdit.clearCashtag(), 150)}
+                    />
+                    <LoungeCashtagDropdown
+                      open={cashtagDetailEdit.isOpen}
+                      query={cashtagDetailEdit.cashtag?.query ?? ''}
+                      suggestions={cashtagDetailEdit.suggestions}
+                      activeIndex={cashtagDetailEdit.activeIndex}
+                      loading={cashtagDetailEdit.loading}
+                      onSelect={(row) =>
+                        cashtagDetailEdit.onCashtagSelect(
+                          row,
+                          setLoungeDetailDraftCaption,
+                          loungeDetailEditFieldRef.current,
+                        )
+                      }
+                      anchorRef={loungeDetailEditCashtagAnchorRef}
+                      caretFieldRef={loungeDetailEditFieldRef}
+                    />
+                    <LoungeComposerMarketSymbolPills
+                      symbols={loungeDetailEditMarketSymbols}
+                      onChange={setLoungeDetailEditMarketSymbols}
+                      className="mt-1.5"
                     />
                     {loungeDetailEditErr ? (
                       <div className="mt-2 rounded-xl border border-rose-500/45 bg-rose-950/25 px-3 py-2 text-[14px] leading-tight text-rose-200">
@@ -14110,6 +14294,14 @@ export default function SocialFeed({
                   <div
                     className={loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}
                   >
+                    <LoungeMarketChartStrip
+                      post={loungePostDetail}
+                      onOpenChart={(embed, embeds) => openMarketChartModal({ embed, embeds })}
+                    />
+                  </div>
+                  <div
+                    className={loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}
+                  >
                     <LoungePostFeedImagesAndGif
                       post={loungePostDetail}
                       variant="detail"
@@ -14173,6 +14365,11 @@ export default function SocialFeed({
                       preview={loungePostDetail.reposted_post.link_preview}
                       className="mt-2"
                       onPreviewOpen={openLinkPreview}
+                    />
+                    <LoungeMarketChartStrip
+                      post={loungePostDetail.reposted_post}
+                      className="mt-2"
+                      onOpenChart={(embed, embeds) => openMarketChartModal({ embed, embeds })}
                     />
                     <LoungePostFeedImagesAndGif
                       post={loungePostDetail.reposted_post}
@@ -14246,6 +14443,14 @@ export default function SocialFeed({
                       />
                     </div>
                   ) : null}
+                  <div
+                    className={loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}
+                  >
+                    <LoungeMarketChartStrip
+                      post={loungePostDetail}
+                      onOpenChart={(embed, embeds) => openMarketChartModal({ embed, embeds })}
+                    />
+                  </div>
                   <div
                     className={loungeCommentDetailPathIds.length > 0 ? LOUNGE_COMMENT_DETAIL_THREAD_PAD : ''}
                   >
@@ -14368,6 +14573,7 @@ export default function SocialFeed({
                             onImagePointerDown={() => beginLoungeComposerMediaPicker('detailEdit')}
                             onVideoPointerDown={() => beginLoungeComposerMediaPicker('detailEdit')}
                             onOpenGifPicker={() => openKlipyPicker('detailEdit')}
+                            onOpenMarketPicker={() => openMarketPicker('detailEdit')}
                           />
                           <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
                             <LoungeComposerCharRing
@@ -14385,7 +14591,8 @@ export default function SocialFeed({
                                   loungeDetailEditImageUrls.length === 0 &&
                                   !String(loungeDetailEditMediaUrl || '').trim() &&
                                   !loungeDetailEditVideoSlot &&
-                                  !loungeDetailEditKeepStreamUid)
+                                  !loungeDetailEditKeepStreamUid &&
+                                  loungeDetailEditMarketSymbols.length === 0)
                               }
                               className="min-h-8 shrink-0 touch-manipulation rounded-md bg-cyan-600 px-2 py-1 text-[14px] font-bold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40 [-webkit-tap-highlight-color:transparent]"
                             >
@@ -15879,6 +16086,27 @@ export default function SocialFeed({
         supabaseClient={supabaseClient}
       />
 
+      <LoungeMarketSymbolPickerSheet
+        open={marketPickerOpen}
+        onClose={() => setMarketPickerOpen(false)}
+        caption={marketPickerTarget === 'detailEdit' ? loungeDetailDraftCaption : postText}
+        selected={marketPickerTarget === 'detailEdit' ? loungeDetailEditMarketSymbols : composerMarketSymbols}
+        onChange={
+          marketPickerTarget === 'detailEdit' ? setLoungeDetailEditMarketSymbols : setComposerMarketSymbols
+        }
+        supabaseClient={supabaseClient}
+      />
+
+      <LoungeMarketChartModal
+        open={marketChartModal.open}
+        embeds={marketChartModal.embeds}
+        focusSymbol={marketChartModal.focusSymbol}
+        supabaseClient={supabaseClient}
+        hydratePosts={hydrateCommunityPosts}
+        onOpenPost={openLoungePostDetail}
+        onClose={closeMarketChartModal}
+      />
+
       {loungeImageLimitDialog && typeof document !== 'undefined'
         ? createPortal(
             <div
@@ -16530,6 +16758,7 @@ export default function SocialFeed({
           </div>
         </div>
       ) : null}
+      </LoungeMarketFeedProvider>
       </LoungeStreamLightboxProvider>
     </div>
   )

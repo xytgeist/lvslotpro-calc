@@ -3,6 +3,7 @@ import { feedPostDisplayCaption, isQuoteRepostPost, quoteRepostOriginalUnavailab
 import { displayPostCategoryPills } from '../../utils/loungePostCategoryPills.js'
 import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
+import LoungeMarketChartStrip from './LoungeMarketChartStrip.jsx'
 import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
 import { LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
@@ -121,6 +122,8 @@ export default function LoungePostArticle({
   onLinkClick,
   /** Tap link preview card (prefers `lounge_post_id` when present). */
   onLinkPreviewOpen,
+  /** Tap a market mini chart → full-screen modal. */
+  onOpenMarketChart,
 }) {
   const ro = loungeReadOnly
 
@@ -129,6 +132,14 @@ export default function LoungePostArticle({
     captionDisplayText(row ? feedPostDisplayCaption(row) : '', row?.link_preview)
   const showCaptionText = (raw, linkPreview) => Boolean(captionDisplayText(raw, linkPreview))
   const showPostCaption = (row) => Boolean(postCaptionDisplayText(row))
+  const renderMarketStrip = (row, className = 'mt-2') =>
+    row ? (
+      <LoungeMarketChartStrip
+        post={row}
+        className={className}
+        onOpenChart={(embed, embeds) => onOpenMarketChart?.({ embed, embeds, post: row })}
+      />
+    ) : null
 
   // ── Plain repost type detection ──────────────────────────────────────────
   const isPlainPostRepost = post?.is_plain_repost === true && post?.reposted_post != null
@@ -461,6 +472,7 @@ export default function LoungePostArticle({
               </div>
             ) : null}
             <LoungeLinkPreviewBlock preview={displayPost.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
+            {renderMarketStrip(displayPost)}
             <LoungePostFeedImagesAndGif
               post={displayPost}
               variant="feed"
@@ -487,6 +499,7 @@ export default function LoungePostArticle({
               </div>
             ) : null}
             <LoungeLinkPreviewBlock preview={post.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
+            {renderMarketStrip(post)}
             <LoungePostFeedImagesAndGif
               post={post}
               variant="feed"
@@ -527,6 +540,7 @@ export default function LoungePostArticle({
                 className="mt-2"
                 onPreviewOpen={onLinkPreviewOpen}
               />
+              {renderMarketStrip(post.reposted_post, 'mt-2')}
               <LoungePostFeedImagesAndGif
                 post={post.reposted_post}
                 variant="embed"
@@ -624,6 +638,7 @@ export default function LoungePostArticle({
               </div>
             ) : null}
             <LoungeLinkPreviewBlock preview={post.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
+            {renderMarketStrip(post)}
             <LoungePostFeedImagesAndGif
               post={post}
               variant="feed"

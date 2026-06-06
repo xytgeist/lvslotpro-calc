@@ -1,0 +1,128 @@
+/**
+ * Invoke `lounge-market-data` Edge function with the caller's session JWT.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {Record<string, unknown>} payload Must include `action`.
+ */
+export async function loungeMarketInvoke(supabase, payload) {
+  let {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.access_token) return { error: 'You must be signed in for market charts.' }
+
+  const nowSecs = Math.floor(Date.now() / 1000)
+  if (!session.expires_at || session.expires_at - nowSecs < 60) {
+    const { data: refreshed } = await supabase.auth.refreshSession()
+    if (refreshed?.session?.access_token) session = refreshed.session
+  }
+
+  const { data, error } = await supabase.functions.invoke('lounge-market-data', {
+    body: payload,
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  })
+
+  if (error) {
+    let message = error.message || 'Market request failed.'
+    try {
+      const ctx = error.context
+      if (ctx && typeof ctx.json === 'function') {
+        const body = await ctx.json()
+        if (body?.error) message = String(body.error)
+      }
+    } catch {
+      /* ignore parse errors */
+    }
+    return { error: message }
+  }
+
+  if (data && typeof data === 'object' && data.error) {
+    return { error: String(data.error) }
+  }
+  return data
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} query
+ */
+export async function loungeMarketSearch(supabase, query) {
+  const data = await loungeMarketInvoke(supabase, { action: 'search', query })
+  if (!data || data.error) return []
+  return Array.isArray(data.results) ? data.results : []
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ symbol: string, asset_class: 'stock'|'crypto' }} symbol
+ */
+export async function loungeMarketPreview(supabase, symbol) {
+  const data = await loungeMarketInvoke(supabase, { action: 'preview', ...symbol })
+  if (!data || data.error) return null
+  return data.preview ?? null
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ postId: string, caption: string, symbols: Array<{ symbol: string, asset_class: string }> }} opts
+ */
+export async function attachMarketEmbedsToPost(supabase, { postId, caption, symbols }) {
+  if (!postId) return null
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : undefined
+  const data = await loungeMarketInvoke(supabase, {
+    action: 'attach',
+    post_id: postId,
+    caption,
+    symbols: Array.isArray(symbols) ? symbols : [],
+    ...(origin ? { origin } : {}),
+  })
+  if (!data || data.error) {
+    return { error: String(data?.error || 'Could not attach market charts.') }
+  }
+  return {
+    embeds: data.embeds ?? [],
+    ...(Array.isArray(data.warnings) && data.warnings.length ? { warnings: data.warnings } : {}),
+  }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {Array<{ symbol: string, asset_class: string }>} symbols
+ */
+export async function loungeMarketBatchRolling(supabase, symbols) {
+  if (!symbols?.length) return {}
+  const data = await loungeMarketInvoke(supabase, { action: 'batch_rolling', symbols })
+  if (!data || data.error) return {}
+  return data.quotes && typeof data.quotes === 'object' ? data.quotes : {}
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ symbol: string, asset_class: string, kind?: string, window_key?: string }} opts
+ */
+export async function loungeMarketModalSeries(supabase, opts) {
+  const data = await loungeMarketInvoke(supabase, {
+    action: 'modal_series',
+    symbol: opts.symbol,
+    asset_class: opts.asset_class,
+    kind: opts.kind || 'rolling',
+    window_key: opts.window_key || '24h',
+  })
+  if (!data || data.error) return null
+  return data
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ symbol: string, asset_class: string }} opts
+ */
+export async function loungeMarketModalNews(supabase, opts) {
+  const data = await loungeMarketInvoke(supabase, {
+    action: 'modal_news',
+    symbol: opts.symbol,
+    asset_class: opts.asset_class,
+  })
+  if (!data || data.error) return null
+  return data.news ?? null
+}

@@ -11,7 +11,7 @@
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const POST_SELECT =
-  'id,caption,user_id,like_count,comment_count,stream_poster_url,media_url,image_urls,gif_url'
+  'id,caption,user_id,like_count,comment_count,stream_poster_url,media_url,image_urls,gif_url,market_embeds'
 
 function escapeAttr(s) {
   return String(s ?? '')
@@ -45,7 +45,30 @@ function loungeOgImageDeliveryUrl(storedUrl) {
   }
 }
 
+function normalizeMarketEmbeds(raw) {
+  if (!raw) return []
+  let arr = raw
+  if (typeof raw === 'string') {
+    try {
+      arr = JSON.parse(raw)
+    } catch {
+      return []
+    }
+  }
+  return Array.isArray(arr) ? arr.filter(Boolean) : []
+}
+
 function pickOgImage(post, origin) {
+  const embeds = normalizeMarketEmbeds(post.market_embeds)
+  if (embeds.length) {
+    const first = embeds[0]
+    const stored = String(first?.og_image_url || '').trim()
+    if (/^https?:\/\//i.test(stored)) return stored
+    const sym = String(first?.display_symbol || first?.symbol || '').trim()
+    if (sym && post?.id) {
+      return `${origin}/api/lounge-market-og?postId=${encodeURIComponent(post.id)}&symbol=${encodeURIComponent(sym)}`
+    }
+  }
   for (const key of ['stream_poster_url', 'media_url', 'gif_url']) {
     const u = String(post[key] || '').trim()
     if (/^https?:\/\//i.test(u)) return loungeOgImageDeliveryUrl(u)

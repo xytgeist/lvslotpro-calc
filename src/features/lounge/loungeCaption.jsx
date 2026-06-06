@@ -1,19 +1,38 @@
 import { appendHighlightedPlainText, loungeSearchHighlightTerms } from '../../utils/loungeSearchHighlight.jsx'
 import { splitTextWithLinks } from '../../utils/linkifyText.jsx'
-import { LOUNGE_CAPTION_DISPLAY_MAX } from '../../utils/loungeCommentLimits.js'
+import { LOUNGE_CAPTION_DISPLAY_MAX, LOUNGE_CAPTION_DISPLAY_MAX_LINES } from '../../utils/loungeCommentLimits.js'
+import { marketCashtagColorClass } from '../../utils/loungeMarketCaptionParse.js'
 
 /** @returns {{ text: string, isTruncated: boolean }} */
-export function truncateCaptionForDisplay(raw, maxLen = LOUNGE_CAPTION_DISPLAY_MAX) {
+export function truncateCaptionForDisplay(
+  raw,
+  maxLen = LOUNGE_CAPTION_DISPLAY_MAX,
+  maxLines = LOUNGE_CAPTION_DISPLAY_MAX_LINES,
+) {
   const s = String(raw ?? '')
   const max = Math.max(1, maxLen)
-  if (s.length <= max) return { text: s, isTruncated: false }
+  const lineCap = Math.max(1, maxLines)
+
+  let text = s
+  let isTruncated = false
+
+  const lines = s.split(/\r?\n/)
+  if (lines.length > lineCap) {
+    text = lines.slice(0, lineCap).join('\n').trimEnd()
+    isTruncated = true
+  }
+
+  if (text.length <= max) {
+    return { text, isTruncated }
+  }
+
   let cut = max
-  const slice = s.slice(0, max)
+  const slice = text.slice(0, max)
   const lastSpace = slice.lastIndexOf(' ')
   const lastNewline = slice.lastIndexOf('\n')
   const breakAt = Math.max(lastSpace, lastNewline)
   if (breakAt > max * 0.6) cut = breakAt
-  return { text: s.slice(0, cut).trimEnd(), isTruncated: true }
+  return { text: text.slice(0, cut).trimEnd(), isTruncated: true }
 }
 
 /** Strip trailing punctuation often pasted after URLs in prose. */
@@ -37,7 +56,7 @@ export function hrefForUrlDisplay(display) {
 
 /**
  * Lounge caption: `http(s)://…` and `www.…` links (opens new tab), Unicode `#tags`, and `@handles`.
- * @param {{ hashtagClassName?: string, linkClassName?: string, mentionClassName?: string, highlightQuery?: string, highlightClassName?: string, onMentionClick?: (handle: string, e: MouseEvent) => void, onHashtagClick?: (tag: string, e: MouseEvent) => void, onLinkClick?: (href: string, e: MouseEvent) => void }} [opts]
+ * @param {{ hashtagClassName?: string, linkClassName?: string, mentionClassName?: string, cashtagQuotesByTicker?: Record<string, { change_pct?: number }>, highlightQuery?: string, highlightClassName?: string, onMentionClick?: (handle: string, e: MouseEvent) => void, onHashtagClick?: (tag: string, e: MouseEvent) => void, onLinkClick?: (href: string, e: MouseEvent) => void, onCashtagClick?: (ticker: string, e: MouseEvent) => void }} [opts]
  */
 export function renderRichCaption(
   text,
@@ -45,11 +64,13 @@ export function renderRichCaption(
     hashtagClassName = 'font-semibold text-cyan-400',
     linkClassName = 'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words',
     mentionClassName = 'font-medium text-orange-400',
+    cashtagQuotesByTicker = null,
     highlightQuery = '',
     highlightClassName,
     onMentionClick = null,
     onHashtagClick = null,
     onLinkClick = null,
+    onCashtagClick = null,
   } = {}
 ) {
   const s = String(text ?? '')
@@ -105,13 +126,52 @@ export function renderRichCaption(
     if (last < fragment.length) pushPlain(fragment.slice(last))
   }
 
+  const pushCashtagParsed = (fragment) => {
+    if (!fragment) return
+    let last = 0
+    const re = /\$([A-Za-z][A-Za-z0-9.-]{0,14})\b/g
+    let m
+    while ((m = re.exec(fragment)) !== null) {
+      if (m.index > last) pushMentionParsed(fragment.slice(last, m.index))
+      const ticker = String(m[1] || '').trim()
+      const tickerKey = ticker.toUpperCase()
+      const changePct = cashtagQuotesByTicker?.[tickerKey]?.change_pct
+      const cashtagClassName = marketCashtagColorClass(changePct)
+      const label = `$${ticker}`
+      if (onCashtagClick) {
+        out.push(
+          <button
+            key={`rk-c-${rkRef.current++}`}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCashtagClick(tickerKey, e)
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`${cashtagClassName} touch-manipulation [-webkit-tap-highlight-color:transparent]`}
+          >
+            {label}
+          </button>,
+        )
+      } else {
+        out.push(
+          <span key={`rk-c-${rkRef.current++}`} className={cashtagClassName}>
+            {label}
+          </span>,
+        )
+      }
+      last = m.index + m[0].length
+    }
+    if (last < fragment.length) pushMentionParsed(fragment.slice(last))
+  }
+
   const pushHashtagParsed = (fragment) => {
     if (!fragment) return
     let last = 0
     const re = /#(?:[\p{L}\p{N}_-]+)/gu
     let m
     while ((m = re.exec(fragment)) !== null) {
-      if (m.index > last) pushMentionParsed(fragment.slice(last, m.index))
+      if (m.index > last) pushCashtagParsed(fragment.slice(last, m.index))
       const tag = m[0]
       if (onHashtagClick) {
         out.push(
@@ -137,7 +197,7 @@ export function renderRichCaption(
       }
       last = m.index + m[0].length
     }
-    if (last < fragment.length) pushMentionParsed(fragment.slice(last))
+    if (last < fragment.length) pushCashtagParsed(fragment.slice(last))
   }
 
   for (const seg of splitTextWithLinks(s)) {

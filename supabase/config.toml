@@ -17,6 +17,9 @@ verify_jwt = true
 [functions.lounge-link-unfurl]
 verify_jwt = true
 
+[functions.lounge-market-data]
+verify_jwt = true
+
 # Invoked from pg_net on activity_events INSERT; shared secret header (see migration + README).
 [functions.lounge-send-activity-push]
 verify_jwt = false

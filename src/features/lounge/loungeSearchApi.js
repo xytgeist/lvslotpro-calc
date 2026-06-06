@@ -162,4 +162,36 @@ export async function hydrateLoungeSearchCommentResults(supabaseClient, hydrateP
     .filter(Boolean)
 }
 
+/**
+ * Strict literal $TICKER post search for market chart modal (no fuzzy pg_trgm).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} cashtag Ticker without `$`, e.g. `AMD`
+ * @param {{ sort?: string, limit?: number, offset?: number }} [opts]
+ */
+export async function loungeSearchCashtagPosts(supabaseClient, cashtag, opts = {}) {
+  const tag = String(cashtag || '').trim()
+  if (!tag) {
+    return { posts: [], pagination: { postsHasMore: false } }
+  }
+  const { sort = LOUNGE_SEARCH_SORT.ENGAGEMENT, limit = LOUNGE_SEARCH_PAGE.POSTS, offset = 0 } = opts
+
+  const { data, error } = await supabaseClient.rpc('lounge_search_cashtag_posts', {
+    p_cashtag: tag,
+    p_sort: sort,
+    p_limit: limit,
+    p_offset: offset,
+  })
+  if (error) throw error
+
+  const payload = data && typeof data === 'object' ? data : {}
+  const pagination = payload.pagination && typeof payload.pagination === 'object' ? payload.pagination : {}
+
+  return {
+    posts: Array.isArray(payload.posts) ? payload.posts : [],
+    pagination: {
+      postsHasMore: pagination.posts_has_more === true,
+    },
+  }
+}
+
 export { SEARCH_DEBOUNCE_MS }

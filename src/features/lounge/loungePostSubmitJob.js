@@ -20,6 +20,8 @@ import { fetchLoungeStreamPosterFileFromSnapshot } from './loungeStreamSessionPo
 import { normalizeLoungePostCategoryPills } from '../../utils/loungePostCategoryPills.js'
 import { feedCommentThreadPartInsertPayload } from '../../utils/communityFeedComment.js'
 import { attachLinkPreview } from '../../utils/loungeLinkPreviewApi.js'
+import { attachMarketEmbedsToPost } from '../../utils/loungeMarketApi.js'
+import { extractCashtagsFromCaption } from '../../utils/loungeMarketCaptionParse.js'
 import { resolveLoungeSubmissionVideoPrep } from './loungeQueuedVideoPrep.js'
 
 async function uploadLoungeThreadPartImageFiles({
@@ -573,6 +575,53 @@ async function rollbackFailedThreadPublish({ supabaseClient, rootPostId, streamU
   }
 }
 
+async function syncMarketEmbedsAfterPostSave(supabaseClient, { postId, caption, marketSymbols }) {
+  const id = String(postId || '').trim()
+  if (!id) return null
+  const cap = String(caption || '')
+  const pickerSymbols = Array.isArray(marketSymbols)
+    ? marketSymbols
+        .map((row) => ({
+          symbol: String(row?.symbol || '').trim(),
+          asset_class: String(row?.asset_class || 'stock').trim() === 'crypto' ? 'crypto' : 'stock',
+          display_symbol: String(row?.display_symbol || '').trim(),
+        }))
+        .filter((row) => row.symbol)
+    : []
+  if (!pickerSymbols.length && !extractCashtagsFromCaption(cap).length) {
+    const { error } = await supabaseClient.from('community_feed_posts').update({ market_embeds: [] }).eq('id', id)
+    if (error) {
+      const msg = String(error.message || '')
+      if (/market_embeds|schema cache/i.test(msg)) {
+        throw new Error(
+          'Market charts need migration 20260609120000_lounge_market_embeds.sql applied on this Supabase project.',
+        )
+      }
+      throw new Error(msg || 'Could not clear market charts.')
+    }
+    return []
+  }
+  const result = await attachMarketEmbedsToPost(supabaseClient, {
+    postId: id,
+    caption: cap,
+    symbols: pickerSymbols,
+  })
+  if (!result || result.error) {
+    const msg = String(result?.error || 'Could not attach market charts.')
+    if (/market_embeds|schema cache/i.test(msg)) {
+      throw new Error(
+        'Market charts need migration 20260609120000_lounge_market_embeds.sql applied on this Supabase project.',
+      )
+    }
+    console.warn('[lounge] market chart attach failed; post saved without charts:', msg)
+    return []
+  }
+  if (Array.isArray(result.warnings) && result.warnings.length) {
+    console.warn('[lounge] market chart attach partial:', result.warnings.join('; '))
+  }
+  return result.embeds ?? []
+}
+
 /** Mirrors `SocialFeed` so insert failures surface the same copy. */
 const LOUNGE_MAX_PINNED_ALERT =
   'The maximum number of pinned posts is two. Unpin a post to pin this one.'
@@ -680,6 +729,7 @@ export function loungeSubmissionSnapshotIncludesVideo(snapshot) {
  * @property {boolean} isStaffPoster
  * @property {string | null | undefined} [quoteRepostOfPostId] When set, insert a quote repost row instead of a normal post.
  * @property {string[] | null | undefined} [categoryPills] Optional audience category slugs (0–3).
+ * @property {Array<{ symbol: string, asset_class: string }> | null | undefined} [marketSymbols] Picker-selected symbols (max 12).
  * @property {string | null | undefined} [savedDraftId] Server draft row to delete after successful publish.
  * @property {string[] | null | undefined} [threadCaptions] Ordered caption parts (root + continuations); legacy text-only.
  * @property {Array<{ body: string, gifUrl?: string, imageFiles?: File[], existingImageUrls?: string[] }> | null | undefined} [threadParts] Full thread parts with per-section media.
@@ -731,6 +781,7 @@ export async function executeLoungeCommunityPostSubmission({
     categoryPills,
     threadCaptions: snapshotThreadCaptions,
     threadParts: snapshotThreadParts,
+    marketSymbols,
   } = snapshot
   const quoteParentId = quoteRepostOfPostId != null ? String(quoteRepostOfPostId).trim() : ''
   const quoteCommentParentId =
@@ -1220,6 +1271,13 @@ export async function executeLoungeCommunityPostSubmission({
         'Could not publish thread.'
       throw new Error(partMsg)
     }
+    if (rootPostId) {
+      await syncMarketEmbedsAfterPostSave(supabaseClient, {
+        postId: rootPostId,
+        caption,
+        marketSymbols,
+      })
+    }
   } catch (e) {
     if (!insertSucceeded && continuationPrepPromise) {
       try {
@@ -1254,7 +1312,7 @@ export async function executeLoungeCommunityPostSubmission({
 }
 
 const POST_UPDATE_SELECT =
-  'id,caption,edited_at,category_pills,image_urls,media_url,gif_url,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,link_preview'
+  'id,caption,edited_at,category_pills,image_urls,media_url,gif_url,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,link_preview,market_embeds'
 
 /**
  * Uploads new media and updates an existing `community_feed_posts` row (author edit).
@@ -1555,13 +1613,23 @@ export async function executeLoungeCommunityPostUpdate({
         text: caption,
       })
     }
+    const marketEmbeds = await syncMarketEmbedsAfterPostSave(supabaseClient, {
+      postId,
+      caption,
+      marketSymbols: snapshot?.marketSymbols,
+    })
     if (previousStreamUid && streamVideoUid && previousStreamUid !== streamVideoUid) {
       await deleteCfStreamOrphanAsset(supabaseClient, previousStreamUid)
     } else if (previousStreamUid && !streamVideoUid && clearStream) {
       await deleteCfStreamOrphanAsset(supabaseClient, previousStreamUid)
     }
     report(1, 'Done', '')
-    return linkPreview ? { ...data, link_preview: linkPreview } : data
+    const merged = {
+      ...data,
+      ...(linkPreview ? { link_preview: linkPreview } : {}),
+      market_embeds: marketEmbeds ?? [],
+    }
+    return merged
   } catch (e) {
     if (pendingCfUploadUid && !updateSucceeded) {
       await deleteCfStreamOrphanAsset(supabaseClient, pendingCfUploadUid)
