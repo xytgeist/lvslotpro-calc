@@ -138,8 +138,8 @@ export default function LoungeThreadComposeSheet({
 
   scrollMetricsRef.current = { toolbarHeightPx, kbOverlapPx }
 
-  /** Keep part row above the fixed toolbar + keyboard overlap (chat-style tail pin). */
-  const scrollPartAboveToolbar = useCallback((partIdx, { pinTail = false } = {}) => {
+  /** Scroll only enough to keep the active row above the docked toolbar + keyboard. */
+  const scrollPartAboveToolbar = useCallback((partIdx) => {
     const scrollEl = scrollRef.current
     const row = partRowRefs.current[partIdx]
     if (!scrollEl || !row) return
@@ -152,24 +152,23 @@ export default function LoungeThreadComposeSheet({
     const minTop = scrollRect.top + THREAD_COMPOSE_SCROLL_GAP_PX
 
     let nextScrollTop = scrollEl.scrollTop
-    if (pinTail || partIdx >= captions.length - 1) {
+    if (rowRect.bottom > visibleBottom) {
       nextScrollTop += rowRect.bottom - visibleBottom
-    } else {
-      if (rowRect.bottom > visibleBottom) {
-        nextScrollTop += rowRect.bottom - visibleBottom
-      }
-      if (rowRect.top < minTop) {
-        nextScrollTop += rowRect.top - minTop
-      }
+    }
+
+    const scrollDelta = nextScrollTop - scrollEl.scrollTop
+    const projectedTop = rowRect.top - scrollDelta
+    if (projectedTop < minTop) {
+      nextScrollTop = scrollEl.scrollTop + (rowRect.top - minTop)
     }
 
     if (Math.abs(nextScrollTop - scrollEl.scrollTop) < 1) return
     scrollEl.scrollTop = nextScrollTop
-  }, [captions.length])
+  }, [])
 
   const scheduleScrollPin = useCallback(
-    (partIdx, { pinTail = false, chase = false } = {}) => {
-      const run = () => scrollPartAboveToolbar(partIdx, { pinTail })
+    (partIdx, { chase = false } = {}) => {
+      const run = () => scrollPartAboveToolbar(partIdx)
       if (!chase) {
         requestAnimationFrame(run)
         return
@@ -217,11 +216,24 @@ export default function LoungeThreadComposeSheet({
           // ignore
         }
       }
-      scheduleScrollPin(focusPartIndex, { pinTail: true, chase: true })
+      scheduleScrollPin(focusPartIndex, { chase: true })
       onFocusPartIndexConsumed?.()
     }, 40)
     return () => window.clearTimeout(id)
   }, [focusPartIndex, getPartRef, onFocusPartIndexConsumed, open, scheduleScrollPin])
+
+  useEffect(() => {
+    if (!open || !keyboardDockActive || activePartIndex < 0) return undefined
+    scheduleScrollPin(activePartIndex, { chase: true })
+    return undefined
+  }, [
+    activePartIndex,
+    keyboardDockActive,
+    kbOverlapPx,
+    open,
+    scheduleScrollPin,
+    toolbarHeightPx,
+  ])
 
   useEffect(() => {
     const el = toolbarRef.current
@@ -238,12 +250,9 @@ export default function LoungeThreadComposeSheet({
       didUserActivatePartRef.current = true
       setKeyboardDockActive(true)
       onFocusPart?.(partIdx)
-      scheduleScrollPin(partIdx, {
-        pinTail: partIdx >= captions.length - 1,
-        chase: false,
-      })
+      scheduleScrollPin(partIdx, { chase: false })
     },
-    [captions.length, onFocusPart, scheduleScrollPin],
+    [onFocusPart, scheduleScrollPin],
   )
 
   const focusPart = useCallback(
@@ -261,7 +270,7 @@ export default function LoungeThreadComposeSheet({
             // ignore
           }
         }
-        scheduleScrollPin(partIdx, { pinTail: true, chase: false })
+        scheduleScrollPin(partIdx, { chase: false })
       })
     },
     [getPartRef, onFocusPart, scheduleScrollPin],
@@ -331,7 +340,8 @@ export default function LoungeThreadComposeSheet({
           paddingBottom: `calc(${toolbarHeightPx}px + ${Math.round(kbOverlapPx)}px + 0.75rem)`,
         }}
       >
-        <div className="space-y-0 pb-2">
+        <div className="flex min-h-full flex-col justify-end pb-2">
+          <div className="space-y-0">
           {captions.map((partText, partIdx) => {
             const partMedia = partsMedia[partIdx]
             const carouselUrls = threadComposePartCarouselUrls(partMedia)
@@ -556,6 +566,7 @@ export default function LoungeThreadComposeSheet({
               </div>
             )
           })}
+          </div>
         </div>
       </div>
 
