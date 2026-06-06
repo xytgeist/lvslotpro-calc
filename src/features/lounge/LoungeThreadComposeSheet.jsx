@@ -199,20 +199,9 @@ export default function LoungeThreadComposeSheet({
   }, [open, captions.length, showPinToggle])
 
   useLayoutEffect(() => {
-    if (!open || activePartIndex < 0) return
-    chaseScrollPartAboveToolbar(activePartIndex, { pinTail: true })
-  }, [activePartIndex, captions.length, chaseScrollPartAboveToolbar, kbOverlapPx, open, toolbarHeightPx])
-
-  useEffect(() => {
-    if (!open || activePartIndex < 0 || typeof ResizeObserver === 'undefined') return undefined
-    const row = partRowRefs.current[activePartIndex]
-    if (!row) return undefined
-    const ro = new ResizeObserver(() => {
-      chaseScrollPartAboveToolbar(activePartIndex, { pinTail: true })
-    })
-    ro.observe(row)
-    return () => ro.disconnect()
-  }, [activePartIndex, chaseScrollPartAboveToolbar, open, captions.length])
+    if (!open || activePartIndex < 0 || submitting) return
+    chaseScrollPartAboveToolbar(activePartIndex, { pinTail: activePartIndex >= captions.length - 1 })
+  }, [activePartIndex, captions.length, chaseScrollPartAboveToolbar, open, submitting])
 
   const focusPart = useCallback(
     (partIdx) => {

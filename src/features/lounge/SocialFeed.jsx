@@ -118,6 +118,7 @@ import {
   executeLoungeCommunityPostUpdate,
   loungeSubmissionSnapshotIncludesVideo,
   loungeSubmissionSnapshotThreadPartCount,
+  sanitizeLoungeThreadSnapshotForVideoRetry,
 } from './loungePostSubmitJob'
 import {
   executeLoungeCommentSubmission,
@@ -8686,9 +8687,10 @@ export default function SocialFeed({
   const restoreThreadAfterUploadFailure = useCallback(
     (snap) => {
       if (!snap) return null
-      restoreComposerFromSnapshot(snap, { fromPartIndex: 0 })
-      loungePostSnapshotRef.current = snap
-      return snap
+      const retrySnap = sanitizeLoungeThreadSnapshotForVideoRetry(snap)
+      restoreComposerFromSnapshot(retrySnap, { fromPartIndex: 0 })
+      loungePostSnapshotRef.current = retrySnap
+      return retrySnap
     },
     [restoreComposerFromSnapshot],
   )
@@ -9206,14 +9208,22 @@ export default function SocialFeed({
         }
       } catch (e) {
         if (e?.name === 'AbortError') return
+        const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Unknown error'
+        if (msg === LOUNGE_MAX_PINNED_ALERT && typeof window !== 'undefined') window.alert(LOUNGE_MAX_PINNED_ALERT)
         if (threadTotal > 1) {
-          restoreThreadAfterUploadFailure(snap)
+          const retrySnap = restoreThreadAfterUploadFailure(snap)
+          const detail = msg !== 'Unknown error' ? msg : ''
           setThreadComposeErr(
-            'Could not post thread — all parts are still here with your media. Tap Retry or edit before posting again.',
+            detail
+              ? `Could not post thread — ${detail} Your full thread is still here; fix or tap Post all again.`
+              : 'Could not post thread — all parts are still here with your media. Tap Post all again or edit below.',
           )
-          void persistThreadSubmissionSnapshotAsDraft(snap, { fromPartIndex: 0 }).then(({ data }) => {
-            if (data) void refreshLoungeDraftCount()
-          })
+          void persistThreadSubmissionSnapshotAsDraft(retrySnap || snap, { fromPartIndex: 0 }).then(
+            ({ data }) => {
+              if (data) void refreshLoungeDraftCount()
+            },
+          )
+          setLoungePostUploadBar(null)
         } else {
           const failUid = String(snap.streamVideoUid || '').trim()
           const hadSessionPoster =
@@ -9223,19 +9233,18 @@ export default function SocialFeed({
             releaseLoungeStreamSessionPoster(failUid)
           }
           loungePostSnapshotRef.current = snap
+          setLoungePostUploadFailureDetails({
+            kind: 'post',
+            phase: loungePostUploadLastPhaseRef.current || '(no step recorded)',
+            message: msg,
+          })
+          setLoungePostUploadFailedOpen(true)
         }
-        const msg = (e instanceof Error ? e.message : String(e || '')).trim() || 'Unknown error'
-        if (msg === LOUNGE_MAX_PINNED_ALERT && typeof window !== 'undefined') window.alert(LOUNGE_MAX_PINNED_ALERT)
-        setLoungePostUploadFailureDetails({
-          kind: 'post',
-          phase: loungePostUploadLastPhaseRef.current || '(no step recorded)',
-          message: msg,
-        })
-        setLoungePostUploadFailedOpen(true)
       } finally {
         loungePostAbortRef.current = null
         loungePostJobRunningRef.current = false
         bumpLoungeSubmitInFlight(-1)
+        if (threadTotal > 1) setLoungePostUploadBar(null)
       }
     },
     [bumpNotificationInteractionRefreshIfOpen, loadCommunityFeed, rateLimitMessage, refreshLoungeDraftCount, refreshLoungePostInteractions, supabaseClient, bumpLoungeSubmitInFlight, applyLoungePostSubmitUploadProgress, persistThreadSubmissionSnapshotAsDraft, restoreThreadAfterUploadFailure],
@@ -10167,17 +10176,25 @@ export default function SocialFeed({
         if (type === 'post' || type === 'quote') {
           const threadTotal = loungeSubmissionSnapshotThreadPartCount(snapshot)
           if (threadTotal > 1) {
-            restoreThreadAfterUploadFailure(snapshot)
+            const retrySnap = restoreThreadAfterUploadFailure(snapshot)
+            const detail = msg !== 'Could not post right now.' ? msg : ''
             setThreadComposeErr(
-              'Could not post thread — all parts are still here with your media. Tap Retry or edit before posting again.',
+              detail
+                ? `Could not post thread — ${detail} Your full thread is still here; fix or tap Post all again.`
+                : 'Could not post thread — all parts are still here with your media. Tap Post all again or edit below.',
             )
-            void persistThreadSubmissionSnapshotAsDraft(snapshot, { fromPartIndex: 0 }).then(({ data }) => {
-              if (data) void refreshLoungeDraftCount()
-            })
+            void persistThreadSubmissionSnapshotAsDraft(retrySnap || snapshot, { fromPartIndex: 0 }).then(
+              ({ data }) => {
+                if (data) void refreshLoungeDraftCount()
+              },
+            )
             loungePostJobRunningRef.current = false
+          } else {
+            deferOrShowFastLaneFailure(failKind, snapshot, 'Publishing', msg)
           }
+        } else {
+          deferOrShowFastLaneFailure(failKind, snapshot, 'Publishing', msg)
         }
-        deferOrShowFastLaneFailure(failKind, snapshot, 'Publishing', msg)
       } finally {
         if (type === 'postEdit') {
           loungeDetailEditAbortRef.current = null
@@ -10646,8 +10663,10 @@ export default function SocialFeed({
     setThreadComposeFocusPartIndex(null)
     setThreadComposeActivePartIndex(0)
     const skipRevoke = opts.pendingSnapshot ? loungeSubmitSnapshotBlobUrls(opts.pendingSnapshot) : null
-    threadComposeVideoPrepControllerRef.current?.reset()
-    threadComposeVideoPrepByPartRef.current = {}
+    if (!opts.pendingSnapshot) {
+      threadComposeVideoPrepControllerRef.current?.reset()
+      threadComposeVideoPrepByPartRef.current = {}
+    }
     setThreadComposePartMedia((prev) => {
       for (const part of prev) revokeThreadComposePartMediaFull(part, skipRevoke)
       return [emptyThreadComposePartMedia()]
@@ -10792,7 +10811,17 @@ export default function SocialFeed({
     }
     const caption = rootPart.body
     const hasThread = normalizedParts.length > 1
-    if (loungeComposerVideoPostBlocked) return
+    if (loungeComposerVideoPostBlocked) {
+      const blockedPart = threadComposePartMedia.findIndex((part) =>
+        threadComposeVideoSlotBlocksPost(part.videoSlot),
+      )
+      setThreadComposeErr(
+        blockedPart >= 0
+          ? `Post ${blockedPart + 1}: video upload failed — remove the video or pick a new one before posting.`
+          : 'A video in this thread failed to upload — fix it before posting.',
+      )
+      return
+    }
 
     const buildThreadPartsSnapshot = () =>
       normalizedParts.map((part, i) => {
@@ -16036,7 +16065,7 @@ export default function SocialFeed({
 
       {threadComposeDiscardOpen ? (
         <div
-          className="fixed inset-0 z-[97] flex items-center justify-center bg-black/45 px-4 p-6 backdrop-blur-[3px]"
+          className="fixed inset-0 z-[99] flex items-center justify-center bg-black/45 px-4 p-6 backdrop-blur-[3px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="thread-compose-discard-title"
@@ -16102,7 +16131,7 @@ export default function SocialFeed({
 
       {loungePostUploadFailedOpen ? (
         <div
-          className="fixed inset-0 z-[95] flex items-end justify-center bg-black/50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 backdrop-blur-[2px] sm:items-center sm:p-6"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 backdrop-blur-[2px] sm:items-center sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="lounge-upload-failed-title"

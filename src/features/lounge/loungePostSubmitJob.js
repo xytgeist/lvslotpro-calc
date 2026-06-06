@@ -205,8 +205,56 @@ async function resolveThreadPartStreamVideoForInsert({
     streamPosterPublicUrl,
     streamVideoWidthOut,
     streamVideoHeightOut,
-    pendingUid: pendingCfUploadUid,
+    /** Only newly minted uploads this call — not compose-time `preUid` (avoid orphan-deleting on later failure). */
+    pendingUid: preUid ? null : pendingCfUploadUid,
   }
+}
+
+/**
+ * After a failed publish/rollback, strip Stream UIDs so retry re-uploads from file/spec/handoff.
+ * Keeps `videoFile`, `videoPrepSpec`, and in-flight handoffs intact.
+ *
+ * @param {object | null | undefined} snapshot
+ */
+export function sanitizeLoungeThreadSnapshotForVideoRetry(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return snapshot
+  let next = snapshot
+  const touch = () => {
+    if (next === snapshot) next = { ...snapshot }
+  }
+
+  const rootUid = String(snapshot.streamVideoUid || '').trim()
+  if (
+    rootUid &&
+    (snapshot.videoFile instanceof File ||
+      snapshot.videoPrepSpec ||
+      snapshot.awaitingComposerVideoPrepJobId != null ||
+      snapshot._capturedPrepHandoff)
+  ) {
+    touch()
+    next.streamVideoUid = null
+  }
+
+  if (Array.isArray(snapshot.threadParts) && snapshot.threadParts.length > 0) {
+    const parts = snapshot.threadParts.map((part) => {
+      if (!part || typeof part !== 'object') return part
+      const uid = String(part.streamVideoUid ?? '').trim()
+      if (!uid) return part
+      if (
+        part.videoFile instanceof File ||
+        part.videoPrepSpec ||
+        part.awaitingThreadPartVideoPrepJobId != null ||
+        part._capturedPrepHandoff
+      ) {
+        return { ...part, streamVideoUid: '' }
+      }
+      return part
+    })
+    touch()
+    next.threadParts = parts
+  }
+
+  return next
 }
 
 /**
@@ -352,7 +400,14 @@ async function prepareAllThreadContinuationParts({
     const partMsg =
       (prepErr instanceof Error ? prepErr.message : String(prepErr || '')).trim() ||
       `Could not prepare thread part ${partNum}.`
-    throw new Error(`Thread part ${partNum} of ${totalParts}: ${partMsg}`)
+    const err = new Error(`Thread part ${partNum} of ${totalParts}: ${partMsg}`)
+    console.warn('[lounge-thread-submit]', {
+      phase: 'prepare',
+      partNum,
+      totalParts,
+      message: partMsg,
+    })
+    throw err
   }
 
   return { prepared, pendingUids }
