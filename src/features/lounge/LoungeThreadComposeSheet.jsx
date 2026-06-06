@@ -132,16 +132,22 @@ export default function LoungeThreadComposeSheet({
   const activePartIndexRef = useRef(activePartIndex)
   const didUserActivatePartRef = useRef(false)
   const kbOverlapPrevRef = useRef(0)
+  const pendingMediaKeyboardReflowRef = useRef(false)
+  const lastMediaTailKeyRef = useRef('')
+  const keyboardDockActiveRef = useRef(false)
   activePartIndexRef.current = activePartIndex
   const [toolbarHeightPx, setToolbarHeightPx] = useState(52)
   /** Caption focus — drives tail-follow while typing; keyboard lift uses visualViewport whenever open. */
   const [keyboardDockActive, setKeyboardDockActive] = useState(false)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(LOUNGE_IOS)
-  const { overlapPx: kbOverlapPx } = useLoungeKeyboardOverlapPx(open, {
+  const { overlapPx: kbOverlapPx, targetPx: kbOverlapTargetPx } = useLoungeKeyboardOverlapPx(open, {
     smooth: LOUNGE_IOS,
     smoothMs: LOUNGE_IOS_KEYBOARD_SMOOTH_MS,
   })
-  const keyboardUp = kbOverlapPx > iosSafeBottomPx + 0.5
+  /** Footer snaps to live keyboard height — smoothed overlap lags and leaves the bar behind keys on reopen. */
+  const kbFooterLiftPx = Math.max(kbOverlapPx, kbOverlapTargetPx)
+  const keyboardUp = kbFooterLiftPx > iosSafeBottomPx + 0.5
+  keyboardDockActiveRef.current = keyboardDockActive
   const activePartMediaTailKey = useMemo(() => {
     const m = partsMedia[activePartIndex]
     if (!m) return 'none'
@@ -150,7 +156,7 @@ export default function LoungeThreadComposeSheet({
   }, [activePartIndex, partsMedia])
   const footerPadBottom =
     keyboardUp
-      ? `${Math.round(kbOverlapPx)}px`
+      ? `${Math.round(kbFooterLiftPx)}px`
       : loungeComposerFooterPaddingBottom(0, iosSafeBottomPx)
 
   /** Nudge scroll until the part row tail clears the options bar, or no more overlap remains. */
@@ -188,6 +194,26 @@ export default function LoungeThreadComposeSheet({
     [pinThreadPartTail],
   )
 
+  /**
+   * After media embed the keyboard dismisses; on reopen iOS keeps a stale scroll offset until
+   * the list is scrolled. Mimic “scroll to top, then pin tail” so layout matches without a manual gesture.
+   */
+  const reflowThreadScrollForKeyboardReopen = useCallback(
+    (partIdx) => {
+      const scrollEl = scrollRef.current
+      if (scrollEl) {
+        scrollEl.scrollTop = 0
+        void scrollEl.offsetHeight
+      }
+      const runPin = () => pinThreadPartTail(partIdx, { maxPasses: 12 })
+      requestAnimationFrame(() => {
+        requestAnimationFrame(runPin)
+      })
+      schedulePinThreadPartTail(partIdx, { extended: true, maxPasses: 12 })
+    },
+    [pinThreadPartTail, schedulePinThreadPartTail],
+  )
+
   const syncFocusLeftSheet = useCallback(() => {
     window.setTimeout(() => {
       const active = document.activeElement
@@ -197,6 +223,7 @@ export default function LoungeThreadComposeSheet({
       ) {
         return
       }
+      keyboardDockActiveRef.current = false
       setKeyboardDockActive(false)
     }, 80)
   }, [])
@@ -205,11 +232,25 @@ export default function LoungeThreadComposeSheet({
     if (!open) {
       didUserActivatePartRef.current = false
       setKeyboardDockActive(false)
+      pendingMediaKeyboardReflowRef.current = false
+      lastMediaTailKeyRef.current = ''
       return
     }
     const scrollEl = scrollRef.current
     if (scrollEl) scrollEl.scrollTop = 0
   }, [open])
+
+  useEffect(() => {
+    if (!open || activePartIndex < 0) return undefined
+    if (
+      lastMediaTailKeyRef.current &&
+      lastMediaTailKeyRef.current !== activePartMediaTailKey
+    ) {
+      pendingMediaKeyboardReflowRef.current = true
+    }
+    lastMediaTailKeyRef.current = activePartMediaTailKey
+    return undefined
+  }, [activePartIndex, activePartMediaTailKey, open])
 
   useEffect(() => {
     if (!open || focusPartIndex == null || focusPartIndex < 0) return undefined
@@ -238,18 +279,25 @@ export default function LoungeThreadComposeSheet({
     }
     if (activePartIndex < 0) return undefined
     const prev = kbOverlapPrevRef.current
-    kbOverlapPrevRef.current = kbOverlapPx
-    if (kbOverlapPx > prev + 2) {
-      schedulePinThreadPartTail(activePartIndex, { extended: true })
-    } else if (kbOverlapPx > iosSafeBottomPx + 0.5) {
+    kbOverlapPrevRef.current = kbFooterLiftPx
+    if (kbFooterLiftPx > prev + 2) {
+      if (pendingMediaKeyboardReflowRef.current) {
+        pendingMediaKeyboardReflowRef.current = false
+        reflowThreadScrollForKeyboardReopen(activePartIndex)
+      } else {
+        schedulePinThreadPartTail(activePartIndex, { extended: true })
+      }
+    } else if (kbFooterLiftPx > iosSafeBottomPx + 0.5) {
       schedulePinThreadPartTail(activePartIndex)
     }
     return undefined
   }, [
     activePartIndex,
     iosSafeBottomPx,
-    kbOverlapPx,
+    kbFooterLiftPx,
+    kbOverlapTargetPx,
     open,
+    reflowThreadScrollForKeyboardReopen,
     schedulePinThreadPartTail,
     toolbarHeightPx,
   ])
@@ -323,6 +371,22 @@ export default function LoungeThreadComposeSheet({
     return () => ro.disconnect()
   }, [keyboardDockActive, keyboardUp, open, pinThreadPartTail])
 
+  useEffect(() => {
+    if (!open) return undefined
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return undefined
+    const onVvChange = () => {
+      if (!keyboardDockActiveRef.current && kbOverlapTargetPx <= iosSafeBottomPx + 0.5) return
+      pinThreadPartTail(activePartIndexRef.current, { maxPasses: 8 })
+    }
+    vv.addEventListener('resize', onVvChange)
+    vv.addEventListener('scroll', onVvChange)
+    return () => {
+      vv.removeEventListener('resize', onVvChange)
+      vv.removeEventListener('scroll', onVvChange)
+    }
+  }, [iosSafeBottomPx, kbOverlapTargetPx, open, pinThreadPartTail])
+
   const shouldTailFollowPart = useCallback(
     (partIdx) =>
       partIdx === activePartIndexRef.current && (keyboardDockActive || keyboardUp),
@@ -345,19 +409,33 @@ export default function LoungeThreadComposeSheet({
     [mentionComposer, pinThreadPartTail, shouldTailFollowPart],
   )
 
+  const runPartFocusTailPin = useCallback(
+    (partIdx) => {
+      if (pendingMediaKeyboardReflowRef.current) {
+        pendingMediaKeyboardReflowRef.current = false
+        reflowThreadScrollForKeyboardReopen(partIdx)
+        return
+      }
+      schedulePinThreadPartTail(partIdx, { extended: true })
+    },
+    [reflowThreadScrollForKeyboardReopen, schedulePinThreadPartTail],
+  )
+
   const handlePartFocus = useCallback(
     (partIdx) => {
       didUserActivatePartRef.current = true
+      keyboardDockActiveRef.current = true
       setKeyboardDockActive(true)
       onFocusPart?.(partIdx)
-      schedulePinThreadPartTail(partIdx, { extended: true })
+      runPartFocusTailPin(partIdx)
     },
-    [onFocusPart, schedulePinThreadPartTail],
+    [onFocusPart, runPartFocusTailPin],
   )
 
   const focusPart = useCallback(
     (partIdx) => {
       didUserActivatePartRef.current = true
+      keyboardDockActiveRef.current = true
       setKeyboardDockActive(true)
       onFocusPart?.(partIdx)
       window.requestAnimationFrame(() => {
@@ -370,10 +448,10 @@ export default function LoungeThreadComposeSheet({
             // ignore
           }
         }
-        schedulePinThreadPartTail(partIdx, { extended: true })
+        runPartFocusTailPin(partIdx)
       })
     },
-    [getPartRef, onFocusPart, schedulePinThreadPartTail],
+    [getPartRef, onFocusPart, runPartFocusTailPin],
   )
 
   if (!open) return null
