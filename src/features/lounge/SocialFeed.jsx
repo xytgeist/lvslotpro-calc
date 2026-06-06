@@ -536,6 +536,7 @@ export default function SocialFeed({
   })
   /** Full-screen thread composer (multi-post with per-section media). */
   const [threadComposeOpen, setThreadComposeOpen] = useState(false)
+  const [threadComposeSessionKey, setThreadComposeSessionKey] = useState(0)
   const [threadComposeCaptions, setThreadComposeCaptions] = useState([''])
   const [threadComposePartMedia, setThreadComposePartMedia] = useState([emptyThreadComposePartMedia()])
   const [threadComposeActivePartIndex, setThreadComposeActivePartIndex] = useState(0)
@@ -1548,12 +1549,26 @@ export default function SocialFeed({
   }, [loungeDetailEditing])
 
   useEffect(() => {
-    if (!composerExpanded || composerFoldReveal < 0.88 || loungeDockPanel) return undefined
+    if (
+      threadComposeOpen ||
+      !composerExpanded ||
+      composerFoldReveal < 0.88 ||
+      loungeDockPanel
+    ) {
+      return undefined
+    }
     return scheduleLoungeComposerTextareaFocus({
       getTextarea: () => composerFieldRef.current,
       scrollFeedToTop: scrollLoungeFeedToTopInstant,
     })
-  }, [composerExpanded, composerFoldReveal, loungeDockPanel, composerFocusToken, scrollLoungeFeedToTopInstant])
+  }, [
+    composerExpanded,
+    composerFoldReveal,
+    composerFocusToken,
+    loungeDockPanel,
+    scrollLoungeFeedToTopInstant,
+    threadComposeOpen,
+  ])
 
   useLayoutEffect(() => {
     const bar = loungeTitleBarRef.current
@@ -2603,9 +2618,25 @@ export default function SocialFeed({
     [disposeComposerVideoMedia, dismissLoungePostUploadBarIfIdle, loungeBackgroundSubmitBusy],
   )
 
+  const blurAllThreadComposeFields = useCallback(() => {
+    for (const el of Object.values(threadComposePartRefMap.current)) {
+      try {
+        el?.blur?.()
+      } catch {
+        // ignore
+      }
+    }
+  }, [])
+
+  const consumeThreadComposeFocusPartIndex = useCallback(() => {
+    setThreadComposeFocusPartIndex(null)
+  }, [])
+
   const loadServerDraftIntoThreadCompose = useCallback(
     (draft) => {
       cancelComposerMediaPrep()
+      blurAllThreadComposeFields()
+      blurLoungeComposerCaption(() => composerFieldRef.current)
       setComposerVideoSlot(null)
       setPostText('')
       setPostErr('')
@@ -2615,33 +2646,37 @@ export default function SocialFeed({
       setLoungePostUploadBar(null)
       threadComposeVideoPrepControllerRef.current?.reset()
       threadComposeVideoPrepByPartRef.current = {}
-      setLoungeComposerActiveDraftId(String(draft.id))
-      setComposerCategoryPills(Array.isArray(draft.category_pills) ? draft.category_pills : [])
-      setComposerPinOnPost(false)
-      const parts = loungePostDraftThreadParts(draft)
-      setThreadComposeCaptions(parts)
-      setThreadComposePartMedia([
-        {
-          imageItems: composerImageItemsFromDraftUrls(draft.image_urls),
-          gifUrl: String(draft.gif_url || '').trim(),
-        },
-        ...parts.slice(1).map(() => emptyThreadComposePartMedia()),
-      ])
-      setComposerImageItems([])
-      setComposerMediaUrl('')
-      setThreadComposeActivePartIndex(0)
-      setThreadComposeDiscardOpen(false)
-      setThreadComposeDiscardStep('discard')
-      setThreadComposeFocusPartIndex(null)
-      composerExpandedRef.current = false
-      composerFoldRevealRef.current = 0
-      setComposerFoldReveal(0)
-      composerFoldedFromFeedScrollRef.current = false
-      setComposerExpanded(false)
-      setLoungeDraftsSheetOpen(false)
+      setThreadComposeOpen(false)
+      flushSync(() => {
+        setLoungeComposerActiveDraftId(String(draft.id))
+        setComposerCategoryPills(Array.isArray(draft.category_pills) ? draft.category_pills : [])
+        setComposerPinOnPost(false)
+        const parts = loungePostDraftThreadParts(draft)
+        setThreadComposeCaptions(parts)
+        setThreadComposePartMedia([
+          {
+            imageItems: composerImageItemsFromDraftUrls(draft.image_urls),
+            gifUrl: String(draft.gif_url || '').trim(),
+          },
+          ...parts.slice(1).map(() => emptyThreadComposePartMedia()),
+        ])
+        setComposerImageItems([])
+        setComposerMediaUrl('')
+        setThreadComposeActivePartIndex(0)
+        setThreadComposeDiscardOpen(false)
+        setThreadComposeDiscardStep('discard')
+        setThreadComposeFocusPartIndex(null)
+        composerExpandedRef.current = false
+        composerFoldRevealRef.current = 0
+        setComposerFoldReveal(0)
+        composerFoldedFromFeedScrollRef.current = false
+        setComposerExpanded(false)
+        setLoungeDraftsSheetOpen(false)
+        setThreadComposeSessionKey((k) => k + 1)
+      })
       setThreadComposeOpen(true)
     },
-    [cancelComposerMediaPrep, composerImageItemsFromDraftUrls],
+    [blurAllThreadComposeFields, cancelComposerMediaPrep, composerImageItemsFromDraftUrls],
   )
 
   const loadServerDraftIntoComposer = useCallback(
@@ -16000,6 +16035,7 @@ export default function SocialFeed({
       ) : null}
 
       <LoungeThreadComposeSheet
+        key={threadComposeSessionKey}
         open={threadComposeOpen}
         onRequestClose={requestCloseThreadCompose}
         captions={threadComposeCaptions}
@@ -16030,7 +16066,7 @@ export default function SocialFeed({
         registerPartRef={registerThreadComposePartRef}
         getPartRef={getThreadComposePartRef}
         focusPartIndex={threadComposeFocusPartIndex}
-        onFocusPartIndexConsumed={() => setThreadComposeFocusPartIndex(null)}
+        onFocusPartIndexConsumed={consumeThreadComposeFocusPartIndex}
         categoryPills={composerCategoryPills}
         onCategoryPillsChange={setComposerCategoryPills}
         onSubmit={submitThreadCompose}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import LoungeRichComposerField from './LoungeRichComposerField.jsx'
 import LoungeComposerMediaToolbar from './LoungeComposerMediaToolbar.jsx'
 import LoungeMentionDropdown from './LoungeMentionDropdown.jsx'
@@ -129,8 +129,12 @@ export default function LoungeThreadComposeSheet({
   const didUserActivatePartRef = useRef(false)
   const scrollMetricsRef = useRef({ toolbarHeightPx: 52, kbOverlapPx: 0 })
   const [toolbarHeightPx, setToolbarHeightPx] = useState(52)
+  /** Only track keyboard overlap while a caption field is focused — avoids footer/scroll fights on open. */
+  const [keyboardDockActive, setKeyboardDockActive] = useState(false)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(LOUNGE_IOS)
-  const { overlapPx: kbOverlapPx } = useLoungeKeyboardOverlapPx(open, { smooth: LOUNGE_IOS })
+  const { overlapPx: kbOverlapPx } = useLoungeKeyboardOverlapPx(open && keyboardDockActive, {
+    smooth: false,
+  })
   const footerPadBottom = loungeComposerFooterPaddingBottom(kbOverlapPx, iosSafeBottomPx)
 
   scrollMetricsRef.current = { toolbarHeightPx, kbOverlapPx }
@@ -164,12 +168,15 @@ export default function LoungeThreadComposeSheet({
     scrollEl.scrollTop = nextScrollTop
   }, [captions.length])
 
-  const chaseScrollPartAboveToolbar = useCallback(
-    (partIdx, opts = {}) => {
-      const run = () => scrollPartAboveToolbar(partIdx, opts)
+  const scheduleScrollPin = useCallback(
+    (partIdx, { pinTail = false, chase = false } = {}) => {
+      const run = () => scrollPartAboveToolbar(partIdx, { pinTail })
+      if (!chase) {
+        requestAnimationFrame(run)
+        return
+      }
       run()
       requestAnimationFrame(run)
-      requestAnimationFrame(() => requestAnimationFrame(run))
       if (LOUNGE_IOS) {
         window.setTimeout(run, LOUNGE_IOS_KEYBOARD_SMOOTH_MS)
       }
@@ -177,9 +184,23 @@ export default function LoungeThreadComposeSheet({
     [scrollPartAboveToolbar],
   )
 
+  const syncFocusLeftSheet = useCallback(() => {
+    window.setTimeout(() => {
+      const active = document.activeElement
+      if (
+        active &&
+        (scrollRef.current?.contains(active) || toolbarRef.current?.contains(active))
+      ) {
+        return
+      }
+      setKeyboardDockActive(false)
+    }, 80)
+  }, [])
+
   useEffect(() => {
     if (!open) {
       didUserActivatePartRef.current = false
+      setKeyboardDockActive(false)
     }
   }, [open])
 
@@ -187,16 +208,21 @@ export default function LoungeThreadComposeSheet({
     if (!open || focusPartIndex == null || focusPartIndex < 0) return undefined
     const id = window.setTimeout(() => {
       didUserActivatePartRef.current = true
-      chaseScrollPartAboveToolbar(focusPartIndex, { pinTail: true })
+      setKeyboardDockActive(true)
       try {
-        getPartRef?.(focusPartIndex)?.focus?.()
+        getPartRef?.(focusPartIndex)?.focus?.({ preventScroll: true })
       } catch {
-        // ignore
+        try {
+          getPartRef?.(focusPartIndex)?.focus?.()
+        } catch {
+          // ignore
+        }
       }
+      scheduleScrollPin(focusPartIndex, { pinTail: true, chase: true })
       onFocusPartIndexConsumed?.()
     }, 40)
     return () => window.clearTimeout(id)
-  }, [chaseScrollPartAboveToolbar, focusPartIndex, getPartRef, onFocusPartIndexConsumed, open])
+  }, [focusPartIndex, getPartRef, onFocusPartIndexConsumed, open, scheduleScrollPin])
 
   useEffect(() => {
     const el = toolbarRef.current
@@ -208,26 +234,38 @@ export default function LoungeThreadComposeSheet({
     return () => ro.disconnect()
   }, [open, captions.length, showPinToggle])
 
-  useLayoutEffect(() => {
-    if (!open || activePartIndex < 0 || submitting) return
-    if (!didUserActivatePartRef.current) return
-    chaseScrollPartAboveToolbar(activePartIndex, { pinTail: activePartIndex >= captions.length - 1 })
-  }, [activePartIndex, captions.length, chaseScrollPartAboveToolbar, open, submitting])
+  const handlePartFocus = useCallback(
+    (partIdx) => {
+      didUserActivatePartRef.current = true
+      setKeyboardDockActive(true)
+      onFocusPart?.(partIdx)
+      scheduleScrollPin(partIdx, {
+        pinTail: partIdx >= captions.length - 1,
+        chase: false,
+      })
+    },
+    [captions.length, onFocusPart, scheduleScrollPin],
+  )
 
   const focusPart = useCallback(
     (partIdx) => {
       didUserActivatePartRef.current = true
+      setKeyboardDockActive(true)
       onFocusPart?.(partIdx)
       window.requestAnimationFrame(() => {
-        chaseScrollPartAboveToolbar(partIdx, { pinTail: true })
         try {
-          getPartRef?.(partIdx)?.focus?.()
+          getPartRef?.(partIdx)?.focus?.({ preventScroll: true })
         } catch {
-          // ignore
+          try {
+            getPartRef?.(partIdx)?.focus?.()
+          } catch {
+            // ignore
+          }
         }
+        scheduleScrollPin(partIdx, { pinTail: true, chase: false })
       })
     },
-    [chaseScrollPartAboveToolbar, getPartRef, onFocusPart],
+    [getPartRef, onFocusPart, scheduleScrollPin],
   )
 
   if (!open) return null
@@ -386,7 +424,7 @@ export default function LoungeThreadComposeSheet({
                         autoGrow
                         value={partText}
                         onChange={(next) => onChangePart(partIdx, next)}
-                        onFocus={() => focusPart(partIdx)}
+                        onFocus={() => handlePartFocus(partIdx)}
                         maxLength={LOUNGE_CAPTION_MAX}
                         placeholder={isActive ? 'Start your thread…' : ''}
                         ariaLabel="Thread post 1"
@@ -402,7 +440,10 @@ export default function LoungeThreadComposeSheet({
                         onKeyUp={mentionComposer?.onCursorMove}
                         onMouseUp={mentionComposer?.onCursorMove}
                         onInput={mentionComposer?.onCursorMove}
-                        onBlur={() => window.setTimeout(() => mentionComposer?.clearMention?.(), 150)}
+                        onBlur={() => {
+                          syncFocusLeftSheet()
+                          window.setTimeout(() => mentionComposer?.clearMention?.(), 150)
+                        }}
                       />
                       <LoungeMentionDropdown
                         suggestions={mentionComposer?.suggestions ?? []}
@@ -426,7 +467,8 @@ export default function LoungeThreadComposeSheet({
                       autoGrow
                       value={partText}
                       onChange={(next) => onChangePart(partIdx, next)}
-                      onFocus={() => focusPart(partIdx)}
+                      onFocus={() => handlePartFocus(partIdx)}
+                      onBlur={syncFocusLeftSheet}
                       maxLength={LOUNGE_CAPTION_MAX}
                       placeholder={isActive ? 'Say more…' : ''}
                       ariaLabel={`Thread post ${partIdx + 1}`}
