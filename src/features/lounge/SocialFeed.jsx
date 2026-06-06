@@ -11018,33 +11018,48 @@ export default function SocialFeed({
         : postText
     const hasSeedCaption = Boolean(normalizeFeedCaption(seed))
     const initialFocusPartIndex = hasSeedCaption ? 1 : 0
-    setThreadComposeCaptions([seed, ''])
-    setThreadComposePartMedia([
-      {
-        imageItems: [...composerImageItems],
-        gifUrl: String(composerMediaUrl || '').trim(),
-        videoSlot: composerVideoSlot ? { ...composerVideoSlot } : null,
-        videoPrepHud: null,
-      },
-      emptyThreadComposePartMedia(),
-    ])
-    if (composerVideoSlot) {
-      setComposerVideoSlot(null)
+    const applyOpen = () => {
+      setThreadComposeCaptions([seed, ''])
+      setThreadComposePartMedia([
+        {
+          imageItems: [...composerImageItems],
+          gifUrl: String(composerMediaUrl || '').trim(),
+          videoSlot: composerVideoSlot ? { ...composerVideoSlot } : null,
+          videoPrepHud: null,
+        },
+        emptyThreadComposePartMedia(),
+      ])
+      if (composerVideoSlot) {
+        setComposerVideoSlot(null)
+      }
+      setComposerImageItems([])
+      setComposerMediaUrl('')
+      setThreadComposeActivePartIndex(initialFocusPartIndex)
+      setPostText('')
+      composerFoldedFromFeedScrollRef.current = false
+      composerFoldRevealRef.current = 0
+      setComposerFoldReveal(0)
+      composerExpandedRef.current = false
+      setComposerExpanded(false)
+      setThreadComposeOpen(true)
+      setThreadComposeFocusPartIndex(initialFocusPartIndex)
     }
-    setComposerImageItems([])
-    setComposerMediaUrl('')
-    setThreadComposeActivePartIndex(initialFocusPartIndex)
-    setPostText('')
-    composerFoldedFromFeedScrollRef.current = false
-    composerFoldRevealRef.current = 0
-    setComposerFoldReveal(0)
-    composerExpandedRef.current = false
-    setComposerExpanded(false)
-    setThreadComposeOpen(true)
-    focusThreadComposePart(initialFocusPartIndex)
+
+    blurLoungeComposerCaption(() => composerFieldRef.current)
+
+    if (!hasSeedCaption) {
+      flushSync(applyOpen)
+      const focusThreadPart0 = () => threadComposePartRefMap.current[0]
+      invokeLoungeComposerCaptionKeyboard(focusThreadPart0)
+      scheduleLoungeComposerTextareaFocus({
+        getTextarea: focusThreadPart0,
+        isBlocked: () => !threadComposeOpenRef.current,
+      })
+    } else {
+      applyOpen()
+    }
   }, [
     appendThreadComposePart,
-    focusThreadComposePart,
     loungeReadOnly,
     openProfileGateIfNeeded,
     composerVideoSlot,
@@ -13266,6 +13281,7 @@ export default function SocialFeed({
               />
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => openThreadComposeSheet()}
                 className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 [-webkit-tap-highlight-color:transparent]"
                 title="Start a thread"
