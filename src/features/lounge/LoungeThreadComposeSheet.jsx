@@ -135,7 +135,7 @@ export default function LoungeThreadComposeSheet({
   })
   const footerPadBottom = loungeComposerFooterPaddingBottom(kbOverlapPx, iosSafeBottomPx)
 
-  /** Scroll up only when a part row would sit under the fixed toolbar (footer lifts with keyboard). */
+  /** Scroll up only when a part row would sit under the options bar (above the keyboard). */
   const scrollPartClearToolbarOverlap = useCallback((partIdx) => {
     const scrollEl = scrollRef.current
     const row = partRowRefs.current[partIdx]
@@ -143,7 +143,8 @@ export default function LoungeThreadComposeSheet({
     if (!scrollEl || !row || !toolbar) return
 
     const rowRect = row.getBoundingClientRect()
-    const visibleBottom = toolbar.getBoundingClientRect().top - THREAD_COMPOSE_SCROLL_GAP_PX
+    const toolbarTop = toolbar.getBoundingClientRect().top
+    const visibleBottom = toolbarTop - THREAD_COMPOSE_SCROLL_GAP_PX
     if (rowRect.bottom <= visibleBottom) return
 
     scrollEl.scrollTop += rowRect.bottom - visibleBottom
@@ -223,7 +224,7 @@ export default function LoungeThreadComposeSheet({
     const ro = new ResizeObserver(sync)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [open, captions.length])
+  }, [open, captions.length, kbOverlapPx])
 
   const handlePartFocus = useCallback(
     (partIdx) => {
@@ -317,7 +318,7 @@ export default function LoungeThreadComposeSheet({
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
         style={{
-          paddingBottom: `calc(${toolbarHeightPx}px + 0.75rem)`,
+          paddingBottom: `calc(${toolbarHeightPx}px + ${Math.round(kbOverlapPx)}px + 0.75rem)`,
         }}
       >
         <div className="space-y-0 pb-2">
@@ -549,7 +550,6 @@ export default function LoungeThreadComposeSheet({
       </div>
 
       <footer
-        ref={toolbarRef}
         className="fixed inset-x-0 bottom-0 z-[97] px-2 pt-1"
         style={{ paddingBottom: footerPadBottom }}
       >
@@ -572,7 +572,10 @@ export default function LoungeThreadComposeSheet({
           {...mediaInputHandlers}
           onChange={onVideoInputChange}
         />
-        <div className="lounge-thread-compose-toolbar-glass flex items-center gap-0.5 rounded-2xl px-2 py-1.5">
+        <div
+          ref={toolbarRef}
+          className="lounge-thread-compose-toolbar-glass flex items-center gap-0.5 rounded-2xl px-2 py-1.5"
+        >
           <LoungeComposerMediaToolbar
             variant="thread"
             imageInputId={imageInputId}
