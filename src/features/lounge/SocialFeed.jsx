@@ -2610,6 +2610,11 @@ export default function SocialFeed({
       setPostText('')
       setPostErr('')
       setThreadComposeErr('')
+      loungePostSnapshotRef.current = null
+      loungePostJobRunningRef.current = false
+      setLoungePostUploadBar(null)
+      threadComposeVideoPrepControllerRef.current?.reset()
+      threadComposeVideoPrepByPartRef.current = {}
       setLoungeComposerActiveDraftId(String(draft.id))
       setComposerCategoryPills(Array.isArray(draft.category_pills) ? draft.category_pills : [])
       setComposerPinOnPost(false)
@@ -2626,6 +2631,8 @@ export default function SocialFeed({
       setComposerMediaUrl('')
       setThreadComposeActivePartIndex(0)
       setThreadComposeDiscardOpen(false)
+      setThreadComposeDiscardStep('discard')
+      setThreadComposeFocusPartIndex(null)
       composerExpandedRef.current = false
       composerFoldRevealRef.current = 0
       setComposerFoldReveal(0)
@@ -2633,7 +2640,6 @@ export default function SocialFeed({
       setComposerExpanded(false)
       setLoungeDraftsSheetOpen(false)
       setThreadComposeOpen(true)
-      setThreadComposeFocusPartIndex(0)
     },
     [cancelComposerMediaPrep, composerImageItemsFromDraftUrls],
   )
@@ -10678,6 +10684,8 @@ export default function SocialFeed({
     setThreadComposeActivePartIndex(0)
     const skipRevoke = opts.pendingSnapshot ? loungeSubmitSnapshotBlobUrls(opts.pendingSnapshot) : null
     if (!opts.pendingSnapshot) {
+      loungePostSnapshotRef.current = null
+      setLoungePostUploadBar(null)
       threadComposeVideoPrepControllerRef.current?.reset()
       threadComposeVideoPrepByPartRef.current = {}
     }
@@ -16022,6 +16030,7 @@ export default function SocialFeed({
         registerPartRef={registerThreadComposePartRef}
         getPartRef={getThreadComposePartRef}
         focusPartIndex={threadComposeFocusPartIndex}
+        onFocusPartIndexConsumed={() => setThreadComposeFocusPartIndex(null)}
         categoryPills={composerCategoryPills}
         onCategoryPillsChange={setComposerCategoryPills}
         onSubmit={submitThreadCompose}

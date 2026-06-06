@@ -121,10 +121,12 @@ export default function LoungeThreadComposeSheet({
   onRemovePartImageIndex,
   onRemovePartGif,
   onRemovePartVideo,
+  onFocusPartIndexConsumed,
 }) {
   const scrollRef = useRef(null)
   const toolbarRef = useRef(null)
   const partRowRefs = useRef({})
+  const didUserActivatePartRef = useRef(false)
   const scrollMetricsRef = useRef({ toolbarHeightPx: 52, kbOverlapPx: 0 })
   const [toolbarHeightPx, setToolbarHeightPx] = useState(52)
   const iosSafeBottomPx = useLoungeIosSafeBottomPx(LOUNGE_IOS)
@@ -176,17 +178,25 @@ export default function LoungeThreadComposeSheet({
   )
 
   useEffect(() => {
+    if (!open) {
+      didUserActivatePartRef.current = false
+    }
+  }, [open])
+
+  useEffect(() => {
     if (!open || focusPartIndex == null || focusPartIndex < 0) return undefined
     const id = window.setTimeout(() => {
+      didUserActivatePartRef.current = true
       chaseScrollPartAboveToolbar(focusPartIndex, { pinTail: true })
       try {
         getPartRef?.(focusPartIndex)?.focus?.()
       } catch {
         // ignore
       }
+      onFocusPartIndexConsumed?.()
     }, 40)
     return () => window.clearTimeout(id)
-  }, [chaseScrollPartAboveToolbar, focusPartIndex, getPartRef, open, captions.length])
+  }, [chaseScrollPartAboveToolbar, focusPartIndex, getPartRef, onFocusPartIndexConsumed, open])
 
   useEffect(() => {
     const el = toolbarRef.current
@@ -200,11 +210,13 @@ export default function LoungeThreadComposeSheet({
 
   useLayoutEffect(() => {
     if (!open || activePartIndex < 0 || submitting) return
+    if (!didUserActivatePartRef.current) return
     chaseScrollPartAboveToolbar(activePartIndex, { pinTail: activePartIndex >= captions.length - 1 })
   }, [activePartIndex, captions.length, chaseScrollPartAboveToolbar, open, submitting])
 
   const focusPart = useCallback(
     (partIdx) => {
+      didUserActivatePartRef.current = true
       onFocusPart?.(partIdx)
       window.requestAnimationFrame(() => {
         chaseScrollPartAboveToolbar(partIdx, { pinTail: true })
@@ -230,7 +242,7 @@ export default function LoungeThreadComposeSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[96] flex flex-col bg-zinc-950"
+      className="fixed inset-0 z-[98] flex flex-col bg-zinc-950"
       role="dialog"
       aria-modal="true"
       aria-labelledby="lounge-thread-compose-title"
