@@ -16,6 +16,10 @@ import {
   CHAT_MESSAGE_COLUMN_WIDTH_CLASS,
   chatVideoTileStyle,
 } from './chatVideoTileLayout.js'
+import {
+  CHAT_YOUTUBE_EMBED_WIDTH_CLASS,
+  isYouTubeLinkPreview,
+} from '../../utils/youtubeEmbed.js'
 
 const QUICK_REACTIONS = ['👍','❤️','😂','🔥','😮','😢','🎉','😍','👏','💯','🙏','🤣']
 
@@ -245,6 +249,9 @@ export default function ChatBubble({
   const showTextBubble = !isLinkPreviewOnly || isDeleted
   /** Caption + link card share one bubble (iMessage-style). */
   const linkPreviewInBubble = Boolean(linkPreview && showTextBubble && !isDeleted)
+  const youtubeLinkPreview = Boolean(linkPreview && isYouTubeLinkPreview(linkPreview))
+  const widenColumnForYoutube =
+    youtubeLinkPreview && (linkPreviewInBubble || isLinkPreviewOnly)
 
   const bubbleHighlightStyle =
     highlighted && !isDeleted
@@ -536,7 +543,7 @@ export default function ChatBubble({
 
         <div
           className={`flex flex-col gap-1 ${isMine ? 'items-end' : 'items-start'} ${
-            isSingleVideoOnly ? CHAT_MESSAGE_COLUMN_WIDTH_CLASS : 'max-w-[78%]'
+            isSingleVideoOnly || widenColumnForYoutube ? CHAT_MESSAGE_COLUMN_WIDTH_CLASS : 'max-w-[78%]'
           }`}
         >
           {/* Sender name — others only; first in run only; hidden in DMs */}
@@ -578,7 +585,7 @@ export default function ChatBubble({
             onContextMenu={(e) => e.preventDefault()}
             className={`chat-bubble-surface relative select-none text-[16px] leading-snug transition-opacity ${
               hasMedia && !isDeleted ? 'p-[3px]' : 'px-3 py-2'
-            } ${isSingleVideoOnly ? 'w-full' : ''} ${
+            } ${isSingleVideoOnly || (linkPreviewInBubble && youtubeLinkPreview) ? 'w-full' : ''} ${
               compactBubble ? '' : 'rounded-2xl'
             } ${
               isDeleted
@@ -634,7 +641,7 @@ export default function ChatBubble({
                   </div>
                 )}
                 {linkPreviewInBubble ? (
-                  <div className={hasMedia ? 'px-3 pb-2' : ''}>
+                  <div className={`${hasMedia ? 'px-3 pb-2' : ''} ${youtubeLinkPreview ? `flex ${isMine ? 'justify-end' : 'justify-start'}` : ''}`}>
                     <ChatLinkPreviewCard preview={linkPreview} isMine={isMine} embedded />
                   </div>
                 ) : null}
@@ -665,7 +672,7 @@ export default function ChatBubble({
           {linkPreview && !isDeleted && !linkPreviewInBubble ? (
             <div
               ref={isLinkPreviewOnly ? bubbleRef : undefined}
-              className={isLinkPreviewOnly ? 'chat-bubble-surface' : undefined}
+              className={`${isLinkPreviewOnly ? 'chat-bubble-surface' : ''} ${youtubeLinkPreview ? CHAT_YOUTUBE_EMBED_WIDTH_CLASS : ''}`.trim()}
               onPointerDown={isLinkPreviewOnly ? handlePointerDown : undefined}
               onPointerUp={isLinkPreviewOnly ? cancelLongPress : undefined}
               onPointerCancel={isLinkPreviewOnly ? cancelLongPress : undefined}
