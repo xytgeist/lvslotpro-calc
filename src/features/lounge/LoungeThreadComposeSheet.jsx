@@ -426,7 +426,9 @@ export default function LoungeThreadComposeSheet({
                         onChange={(next) => onChangePart(partIdx, next)}
                         onFocus={() => handlePartFocus(partIdx)}
                         maxLength={LOUNGE_CAPTION_MAX}
-                        placeholder={isActive ? 'Start your thread…' : ''}
+                        placeholder={
+                          String(partText || '').trim() ? '' : 'Are ya winning, son?'
+                        }
                         ariaLabel="Thread post 1"
                         disabled={submitting}
                         className={mutedFieldClass}
@@ -470,7 +472,9 @@ export default function LoungeThreadComposeSheet({
                       onFocus={() => handlePartFocus(partIdx)}
                       onBlur={syncFocusLeftSheet}
                       maxLength={LOUNGE_CAPTION_MAX}
-                      placeholder={isActive ? 'Say more…' : ''}
+                      placeholder={
+                        String(partText || '').trim() ? '' : 'Say more…'
+                      }
                       ariaLabel={`Thread post ${partIdx + 1}`}
                       disabled={submitting}
                       className={mutedFieldClass}
