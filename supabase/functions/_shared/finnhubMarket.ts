@@ -544,18 +544,25 @@ export async function finnhubProfile(symbol: string, assetClass: MarketAssetClas
       name: cg.name || normalizeDisplaySymbol(finnhubSym, assetClass),
       exchange: 'Crypto',
       logo: cg.logo,
-      marketCapitalization: null,
+      marketCapitalization: cg.marketCapUsd,
       currency: 'USD',
     }
   }
   try {
     const data = await finnhubFetch('/stock/profile2', { symbol: finnhubSym })
+    let marketCapitalization =
+      data?.marketCapitalization != null ? Number(data.marketCapitalization) * 1_000_000 : null
+    if (marketCapitalization == null || !Number.isFinite(marketCapitalization) || marketCapitalization <= 0) {
+      const yahoo = await yahooStockProfile(symbol)
+      if (yahoo?.marketCapitalization != null && yahoo.marketCapitalization > 0) {
+        marketCapitalization = yahoo.marketCapitalization
+      }
+    }
     return {
       name: String(data?.name || finnhubSym),
       exchange: String(data?.exchange || ''),
       logo: String(data?.logo || ''),
-      marketCapitalization:
-        data?.marketCapitalization != null ? Number(data.marketCapitalization) * 1_000_000 : null,
+      marketCapitalization,
       currency: String(data?.currency || 'USD'),
     }
   } catch {

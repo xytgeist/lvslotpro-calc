@@ -1,6 +1,6 @@
 /**
- * CoinGecko helpers for crypto search + logos (server-side — optional COINGECKO_API_KEY in Edge secrets).
- * Prices/candles stay on Finnhub; CoinGecko is identity + logo only.
+ * CoinGecko helpers for crypto search, logos, market cap, and candle fallback.
+ * Prices/quotes stay on Finnhub; CoinGecko supplies identity, logo, and USD market cap.
  */
 
 const COINGECKO_DEMO_BASE = 'https://api.coingecko.com/api/v3'
@@ -15,7 +15,13 @@ export type CoingeckoSearchRow = {
   logo_url: string
 }
 
-type LogoCacheEntry = { logo: string; name: string; coinId: string; expires: number }
+type LogoCacheEntry = {
+  logo: string
+  name: string
+  coinId: string
+  marketCapUsd: number | null
+  expires: number
+}
 const logoCache = new Map<string, LogoCacheEntry>()
 
 export function coingeckoApiKey(): string {
@@ -76,6 +82,23 @@ function pickBestCoin(
   })[0]
 }
 
+async function coingeckoMarketCapUsd(coinId: string): Promise<number | null> {
+  const id = String(coinId || '').trim()
+  if (!id) return null
+  try {
+    const data = await coingeckoFetch('/simple/price', {
+      ids: id,
+      vs_currencies: 'usd',
+      include_market_cap: 'true',
+    })
+    const row = data?.[id] as { usd_market_cap?: number } | undefined
+    const cap = Number(row?.usd_market_cap)
+    return Number.isFinite(cap) && cap > 0 ? cap : null
+  } catch {
+    return null
+  }
+}
+
 export async function coingeckoResolveCoinId(symbol: string): Promise<string> {
   const profile = await coingeckoCryptoProfile(symbol)
   return profile.coinId
@@ -83,14 +106,19 @@ export async function coingeckoResolveCoinId(symbol: string): Promise<string> {
 
 export async function coingeckoCryptoProfile(
   symbol: string,
-): Promise<{ name: string; logo: string; coinId: string }> {
+): Promise<{ name: string; logo: string; coinId: string; marketCapUsd: number | null }> {
   const base = cryptoBaseTicker(symbol)
-  if (!base) return { name: '', logo: '', coinId: '' }
+  if (!base) return { name: '', logo: '', coinId: '', marketCapUsd: null }
 
   const cacheKey = base.toUpperCase()
   const cached = logoCache.get(cacheKey)
   if (cached && cached.expires > Date.now()) {
-    return { name: cached.name, logo: cached.logo, coinId: cached.coinId }
+    return {
+      name: cached.name,
+      logo: cached.logo,
+      coinId: cached.coinId,
+      marketCapUsd: cached.marketCapUsd,
+    }
   }
 
   try {
@@ -100,10 +128,11 @@ export async function coingeckoCryptoProfile(
     const logo = String(pick?.large || pick?.thumb || '')
     const name = String(pick?.name || base)
     const coinId = String(pick?.id || '')
-    logoCache.set(cacheKey, { logo, name, coinId, expires: Date.now() + LOGO_CACHE_TTL_MS })
-    return { name, logo, coinId }
+    const marketCapUsd = coinId ? await coingeckoMarketCapUsd(coinId) : null
+    logoCache.set(cacheKey, { logo, name, coinId, marketCapUsd, expires: Date.now() + LOGO_CACHE_TTL_MS })
+    return { name, logo, coinId, marketCapUsd }
   } catch {
-    return { name: base, logo: '', coinId: '' }
+    return { name: base, logo: '', coinId: '', marketCapUsd: null }
   }
 }
 

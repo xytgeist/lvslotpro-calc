@@ -623,6 +623,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-06: **Lounge crypto market cap on embeds (code on `test`):** CoinGecko **`/simple/price`** USD market cap on crypto attach/preview/modal; stocks fall back to Yahoo **`marketCap`** when Finnhub profile omits cap. **Redeploy `lounge-market-data`; re-post to refresh existing embeds.**
 - 2026-06-06: **Lounge market historical mini-chart date labels (code on `test`):** caption windows like "last week" show **UTC date range** on feed mini charts (e.g. `May 24 – 30` same month, `May 30 – Jun 6` cross-month) instead of `1W` or a single day — uses caption window span when bar data is same-day; client + server. **Redeploy `lounge-market-data` for new attaches.**
 - 2026-06-06: **Lounge market modal strict cashtag posts (code on `test`):** modal Top/Latest uses **`lounge_search_cashtag_posts`** (literal `$TICKER` word boundaries) instead of fuzzy **`lounge_search`** — fixes `$AMD` matching unrelated sector posts / `$ASMLON` matching gibberish via pg_trgm. Migration **`20260609140000_lounge_search_strict_cashtag.sql`**. **Apply on test.**
 - 2026-06-06: **Lounge market modal news fallback (code on `test`):** Finnhub `/company-news` failures (403/empty on major tickers like AMD) no longer show a false empty state — try/catch + **30d** window + newest-first sort, then **Yahoo search news** fallback. **Redeploy `lounge-market-data`.**
