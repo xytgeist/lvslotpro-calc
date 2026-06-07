@@ -46,6 +46,10 @@ import {
   unlockMarketChartLandscapeOrientation,
 } from './loungeMarketChartAdvancedFullscreen.js'
 import {
+  bindMarketChartPriceAxisZoom,
+  marketChartPriceAxisHit,
+} from './loungeMarketChartPriceAxisZoom.js'
+import {
   marketChartAdvancedLocalization,
   marketChartAdvancedPriceScaleOptions,
   marketChartAdvancedTimeScaleOptions,
@@ -250,10 +254,12 @@ function scrollMarketChartByPixels(chart, deltaPx) {
  * @param {import('lightweight-charts').ISeriesApi} mainSeries
  * @param {Array<{ time: number, value: number }>} barPoints
  * @param {(quote: object | null) => void} onScrub
- * @param {{ panEnabled?: boolean }} [opts]
+ * @param {{ panEnabled?: boolean, priceAxisHit?: (clientX: number, clientY?: number) => boolean }} [opts]
  */
 function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, gestureOpts = {}) {
   const panEnabled = gestureOpts.panEnabled !== false
+  const priceAxisHit =
+    typeof gestureOpts.priceAxisHit === 'function' ? gestureOpts.priceAxisHit : null
   const clearScrub = () => {
     chart.clearCrosshairPosition()
     onScrub(null)
@@ -330,6 +336,7 @@ function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, 
   }
 
   const onPointerDown = (e) => {
+    if (priceAxisHit?.(e.clientX, e.clientY)) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
     resetGesture()
@@ -352,6 +359,10 @@ function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, 
 
   const onPointerMove = (e) => {
     if (e.pointerType === 'mouse' && e.buttons === 0 && mode == null) {
+      if (priceAxisHit?.(e.clientX, e.clientY)) {
+        clearScrub()
+        return
+      }
       applyScrubAt(e.clientX, e.clientY)
       return
     }
@@ -991,13 +1002,36 @@ export default function LoungeMarketChartModal({
       setPriceAxisLabels(next)
     }
 
+    let priceScaleUserPinned = false
+    const priceAxisBottomExclude = marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount)
+    const resetPriceScaleToData = () => {
+      priceScaleUserPinned = false
+      if (!isAdvancedView) return
+      applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
+        keepMargins: true,
+        chartType: effectiveChartType,
+        rawBars,
+      })
+    }
+    const priceAxisHit = (clientX, clientY) =>
+      isAdvancedView &&
+      marketChartPriceAxisHit(
+        clientX,
+        clientY ?? 0,
+        el.getBoundingClientRect(),
+        chart.priceScale('right').width() || 52,
+        priceAxisBottomExclude,
+      )
+
     const refreshChartOverlays = () => {
       if (isAdvancedView) {
-        applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-          keepMargins: true,
-          chartType: effectiveChartType,
-          rawBars,
-        })
+        if (!priceScaleUserPinned) {
+          applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
+            keepMargins: true,
+            chartType: effectiveChartType,
+            rawBars,
+          })
+        }
         return
       }
       applyMarketChartPriceRange(mainSeries, barPoints, [], {
@@ -1008,6 +1042,16 @@ export default function LoungeMarketChartModal({
     }
     refreshChartOverlays()
     requestAnimationFrame(refreshChartOverlays)
+
+    const unbindPriceAxisZoom = isAdvancedView
+      ? bindMarketChartPriceAxisZoom(el, chart, mainSeries, {
+          bottomExcludeFraction: priceAxisBottomExclude,
+          onUserZoom: () => {
+            priceScaleUserPinned = true
+          },
+          onReset: resetPriceScaleToData,
+        })
+      : () => {}
 
     const unbindScrub = bindMarketChartScrubPointer(
       el,
@@ -1026,7 +1070,7 @@ export default function LoungeMarketChartModal({
           setScrubAxisCurrent(null)
         }
       },
-      { panEnabled: isAdvancedView },
+      { panEnabled: isAdvancedView, priceAxisHit },
     )
 
     chartRef.current = chart
@@ -1049,6 +1093,7 @@ export default function LoungeMarketChartModal({
     ro.observe(el)
     return () => {
       cancelAnimationFrame(resizeRaf)
+      unbindPriceAxisZoom()
       unbindScrub()
       ro.disconnect()
       chart.remove()
