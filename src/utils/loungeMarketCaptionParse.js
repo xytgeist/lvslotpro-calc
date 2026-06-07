@@ -419,6 +419,7 @@ export const MARKET_MODAL_TIMEFRAMES = [
   { label: '1D', windowKey: '24h', kind: 'rolling' },
   { label: '1W', windowKey: '1w', kind: 'historical' },
   { label: '1M', windowKey: '1m', kind: 'historical' },
+  { label: '3M', windowKey: '3m', kind: 'historical' },
   { label: '1Y', windowKey: '1y', kind: 'historical' },
   { label: 'ALL', windowKey: '1y', kind: 'historical' },
 ]

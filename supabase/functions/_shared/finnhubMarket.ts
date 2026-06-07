@@ -11,7 +11,7 @@ import {
   lastRegularSessionLabel,
   regularSessionDaysBack,
 } from './usEquityMarketSession.ts'
-import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote } from './yahooMarket.ts'
+import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
 
 export type MarketAssetClass = 'stock' | 'crypto'
 export type MarketEmbedKind = 'rolling' | 'historical'
@@ -238,9 +238,9 @@ export function windowRange(windowKey: MarketWindowKey): {
     case '3d':
       return { fromSec: now - 3 * day, toSec: now, resolution: '15' }
     case '1w':
-      return { fromSec: now - 7 * day, toSec: now, resolution: '60' }
+      return { fromSec: now - 7 * day, toSec: now, resolution: '15' }
     case '1m':
-      return { fromSec: now - 30 * day, toSec: now, resolution: 'D' }
+      return { fromSec: now - 30 * day, toSec: now, resolution: '60' }
     case '3m':
       return { fromSec: now - 90 * day, toSec: now, resolution: 'D' }
     case '6m':
@@ -330,8 +330,8 @@ const RESOLUTION_FALLBACKS: Record<MarketWindowKey, string[]> = {
   '1h': ['1', '5', '15'],
   '24h': ['5', '15', '30', '60', 'D'],
   '3d': ['15', '30', '60', 'D'],
-  '1w': ['D', '60'],
-  '1m': ['D'],
+  '1w': ['15', '30', '60'],
+  '1m': ['60', '30'],
   '3m': ['D'],
   '6m': ['D'],
   '1y': ['D'],
@@ -427,6 +427,114 @@ async function resolveStockIntradayBars(
   return []
 }
 
+/** Modal 1W chart: 15m RTH candles (Yahoo `range=7d`, Finnhub `15`). */
+const MIN_1W_INTRADAY_BARS = 16
+const MAX_1W_MEDIAN_GAP_SEC = 6 * 3600
+
+/** Modal 1M chart: 2h candles aggregated from 1h/30m source bars. */
+const TWO_HOUR_BUCKET_SEC = 7200
+const MIN_1M_TWO_HOUR_BARS = 24
+const MAX_1M_MEDIAN_GAP_SEC = 12 * 3600
+
+/** Modal 3M chart: daily candles (Yahoo `range=3mo`, Finnhub `D`). */
+const MIN_3M_DAILY_BARS = 20
+const MIN_DAILY_MEDIAN_GAP_SEC = 12 * 3600
+const MAX_DAILY_MEDIAN_GAP_SEC = 7 * 86400
+
+function medianBarGapSec(bars: MarketBar[]): number {
+  if (bars.length < 2) return Number.POSITIVE_INFINITY
+  const gaps: number[] = []
+  for (let i = 1; i < bars.length; i += 1) {
+    gaps.push(Math.abs(barUnixSec(bars[i].t) - barUnixSec(bars[i - 1].t)))
+  }
+  gaps.sort((a, b) => a - b)
+  return gaps[Math.floor(gaps.length / 2)] ?? Number.POSITIVE_INFINITY
+}
+
+/** Reject ~5 daily candles masquerading as a weekly intraday chart. */
+export function isUsableWeeklyHourlyBars(bars: MarketBar[]): boolean {
+  if (!Array.isArray(bars) || bars.length < MIN_1W_INTRADAY_BARS) return false
+  return medianBarGapSec(bars) <= MAX_1W_MEDIAN_GAP_SEC
+}
+
+function aggregateBarsToBucketSec(bars: MarketBar[], bucketSec: number): MarketBar[] {
+  if (!Array.isArray(bars) || !bars.length || bucketSec <= 0) return []
+  const buckets = new Map<number, number>()
+  for (const bar of bars) {
+    if (!Number.isFinite(bar?.t) || !Number.isFinite(bar?.c)) continue
+    const t = barUnixSec(bar.t)
+    const key = Math.floor(t / bucketSec) * bucketSec
+    buckets.set(key, bar.c)
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, c]) => ({ t, c }))
+}
+
+function aggregateMarketBarsToTwoHour(bars: MarketBar[]): MarketBar[] {
+  return aggregateBarsToBucketSec(bars, TWO_HOUR_BUCKET_SEC)
+}
+
+/** Reject ~22 daily candles masquerading as a monthly 2h chart. */
+function isUsableMonthlyTwoHourBars(bars: MarketBar[]): boolean {
+  if (!Array.isArray(bars) || bars.length < MIN_1M_TWO_HOUR_BARS) return false
+  return medianBarGapSec(bars) <= MAX_1M_MEDIAN_GAP_SEC
+}
+
+/** Reject sparse intraday or weekly buckets on a 3M daily chart. */
+function isUsableQuarterlyDailyBars(bars: MarketBar[]): boolean {
+  if (!Array.isArray(bars) || bars.length < MIN_3M_DAILY_BARS) return false
+  const median = medianBarGapSec(bars)
+  return median >= MIN_DAILY_MEDIAN_GAP_SEC && median <= MAX_DAILY_MEDIAN_GAP_SEC
+}
+
+/** Locked modal 1W path — do not fall back to daily for US equities. */
+async function resolveStockWeeklyBars(symbol: string): Promise<MarketBar[]> {
+  const yahoo = await yahooStockWeeklyIntradayCandles(symbol)
+  if (isUsableWeeklyHourlyBars(yahoo)) return normalizeMarketBars(yahoo)
+
+  const { fromSec, toSec } = windowRange('1w')
+  for (const interval of ['15m', '30m', '1h']) {
+    const bars = await yahooStockCandles(symbol, fromSec, toSec, interval)
+    if (isUsableWeeklyHourlyBars(bars)) return normalizeMarketBars(bars)
+  }
+
+  const finnhub = await finnhubCandles(symbol, 'stock', '1w')
+  if (isUsableWeeklyHourlyBars(finnhub)) return normalizeMarketBars(finnhub)
+  return []
+}
+
+/** Locked modal 1M path — 2h candles, not daily. */
+async function resolveStockMonthlyBars(symbol: string): Promise<MarketBar[]> {
+  const yahoo = await yahooStockMonthlyTwoHourCandles(symbol)
+  if (isUsableMonthlyTwoHourBars(yahoo)) return normalizeMarketBars(yahoo)
+
+  const { fromSec, toSec } = windowRange('1m')
+  for (const interval of ['1h', '30m']) {
+    const raw = await yahooStockCandles(symbol, fromSec, toSec, interval)
+    const bars = aggregateMarketBarsToTwoHour(raw)
+    if (isUsableMonthlyTwoHourBars(bars)) return normalizeMarketBars(bars)
+  }
+
+  const finnhub = aggregateMarketBarsToTwoHour(await finnhubCandles(symbol, 'stock', '1m'))
+  if (isUsableMonthlyTwoHourBars(finnhub)) return normalizeMarketBars(finnhub)
+  return []
+}
+
+/** Locked modal 3M path — daily candles. */
+async function resolveStockQuarterlyBars(symbol: string): Promise<MarketBar[]> {
+  const yahoo = await yahooStockQuarterlyDailyCandles(symbol)
+  if (isUsableQuarterlyDailyBars(yahoo)) return normalizeMarketBars(yahoo)
+
+  const { fromSec, toSec } = windowRange('3m')
+  const bars = await yahooStockCandles(symbol, fromSec, toSec, '1d')
+  if (isUsableQuarterlyDailyBars(bars)) return normalizeMarketBars(bars)
+
+  const finnhub = await finnhubCandles(symbol, 'stock', '3m')
+  if (isUsableQuarterlyDailyBars(finnhub)) return normalizeMarketBars(finnhub)
+  return []
+}
+
 export async function resolveMarketBars(
   symbol: string,
   assetClass: MarketAssetClass,
@@ -436,9 +544,24 @@ export async function resolveMarketBars(
   if (assetClass === 'stock' && (windowKey === '24h' || windowKey === '1h')) {
     return resolveStockIntradayBars(symbol, windowKey)
   }
+  if (assetClass === 'stock' && windowKey === '1w') {
+    return resolveStockWeeklyBars(symbol)
+  }
+  if (assetClass === 'stock' && windowKey === '1m') {
+    return resolveStockMonthlyBars(symbol)
+  }
+  if (assetClass === 'stock' && windowKey === '3m') {
+    return resolveStockQuarterlyBars(symbol)
+  }
 
   let bars = await finnhubCandles(symbol, assetClass, windowKey)
-  if (bars.length >= 2) return normalizeMarketBars(bars)
+  const finnhubSparseWeekly = windowKey === '1w' && bars.length > 0 && !isUsableWeeklyHourlyBars(bars)
+  const finnhubSparseMonthly =
+    windowKey === '1m' && bars.length > 0 && !isUsableMonthlyTwoHourBars(aggregateMarketBarsToTwoHour(bars))
+  const finnhubSparseQuarterly = windowKey === '3m' && bars.length > 0 && !isUsableQuarterlyDailyBars(bars)
+  if (bars.length >= 2 && !finnhubSparseWeekly && !finnhubSparseMonthly && !finnhubSparseQuarterly) {
+    return normalizeMarketBars(bars)
+  }
 
   const { fromSec, toSec } = windowRange(windowKey)
 

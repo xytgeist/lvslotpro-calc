@@ -246,6 +246,10 @@ export function yahooIntervalForWindow(windowKey: string): string {
     case '3d':
       return '30m'
     case '1w':
+      return '15m'
+    case '1m':
+      return '1h'
+    case '3m':
       return '1d'
     default:
       return '1d'
@@ -256,6 +260,35 @@ function downsampleBars(bars: YahooBar[], max = MAX_BARS): YahooBar[] {
   if (bars.length <= max) return bars
   const step = Math.ceil(bars.length / max)
   return bars.filter((_, i) => i % step === 0 || i === bars.length - 1)
+}
+
+function parseYahooChartBars(data: unknown): YahooBar[] {
+  const result = (data as { chart?: { result?: unknown[] } })?.chart?.result?.[0] as
+    | { timestamp?: number[]; indicators?: { quote?: Array<{ close?: number[] }> } }
+    | undefined
+  const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : []
+  const closes = result?.indicators?.quote?.[0]?.close
+  if (!Array.isArray(closes) || !timestamps.length) return []
+
+  const bars: YahooBar[] = []
+  for (let i = 0; i < timestamps.length; i += 1) {
+    const t = Number(timestamps[i])
+    const c = Number(closes[i])
+    if (!Number.isFinite(t) || !Number.isFinite(c)) continue
+    bars.push({ t, c })
+  }
+  return bars
+}
+
+async function fetchYahooChartUrl(url: URL): Promise<YahooBar[]> {
+  try {
+    const res = await fetch(url.toString(), { headers: YAHOO_HEADERS })
+    if (!res.ok) return []
+    const data = await res.json()
+    return parseYahooChartBars(data)
+  } catch {
+    return []
+  }
 }
 
 /** Daily/intraday OHLCV closes for a stock ticker and window. */
@@ -274,24 +307,103 @@ export async function yahooStockCandles(
   url.searchParams.set('interval', interval)
   url.searchParams.set('includePrePost', 'false')
 
-  try {
-    const res = await fetch(url.toString(), { headers: YAHOO_HEADERS })
-    if (!res.ok) return []
-    const data = await res.json()
-    const result = data?.chart?.result?.[0]
-    const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : []
-    const closes = result?.indicators?.quote?.[0]?.close
-    if (!Array.isArray(closes) || !timestamps.length) return []
+  let bars = await fetchYahooChartUrl(url)
+  if (bars.length >= 2) return downsampleBars(bars)
 
-    const bars: YahooBar[] = []
-    for (let i = 0; i < timestamps.length; i += 1) {
-      const t = Number(timestamps[i])
-      const c = Number(closes[i])
-      if (!Number.isFinite(t) || !Number.isFinite(c)) continue
-      bars.push({ t, c })
+  // Yahoo often serves richer intraday history via `range` than period1/period2 from Edge.
+  if (interval === '15m' || interval === '1h' || interval === '30m' || interval === '5m') {
+    for (const range of ['7d', '5d', '1mo']) {
+      const rangeUrl = new URL(`${YAHOO_CHART}/${encodeURIComponent(ticker)}`)
+      rangeUrl.searchParams.set('range', range)
+      rangeUrl.searchParams.set('interval', interval)
+      rangeUrl.searchParams.set('includePrePost', 'false')
+      bars = await fetchYahooChartUrl(rangeUrl)
+      if (bars.length >= 2) {
+        const from = Math.floor(fromSec)
+        const to = Math.floor(toSec)
+        const clipped = bars.filter((b) => b.t >= from && b.t <= to)
+        if (clipped.length >= 2) return downsampleBars(clipped)
+        if (bars.length >= 8) return downsampleBars(bars)
+      }
     }
-    return downsampleBars(bars)
-  } catch {
-    return []
   }
+
+  return []
+}
+
+/** Locked modal 1W — 15m candles via Yahoo `range=7d`. */
+export async function yahooStockWeeklyIntradayCandles(symbol: string): Promise<YahooBar[]> {
+  const ticker = yahooTicker(symbol)
+  if (!ticker) return []
+
+  const maxBars = 200
+  for (const interval of ['15m', '30m', '1h']) {
+    for (const range of ['7d', '5d']) {
+      const url = new URL(`${YAHOO_CHART}/${encodeURIComponent(ticker)}`)
+      url.searchParams.set('range', range)
+      url.searchParams.set('interval', interval)
+      url.searchParams.set('includePrePost', 'false')
+      const bars = await fetchYahooChartUrl(url)
+      if (bars.length >= 8) return downsampleBars(bars, maxBars)
+    }
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  return yahooStockCandles(symbol, now - 7 * 86400, now, '15m')
+}
+
+const TWO_HOUR_BUCKET_SEC = 7200
+
+function aggregateYahooBarsToBucket(bars: YahooBar[], bucketSec: number): YahooBar[] {
+  if (!bars.length || bucketSec <= 0) return []
+  const buckets = new Map<number, number>()
+  for (const bar of bars) {
+    if (!Number.isFinite(bar?.t) || !Number.isFinite(bar?.c)) continue
+    const key = Math.floor(bar.t / bucketSec) * bucketSec
+    buckets.set(key, bar.c)
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, c]) => ({ t, c }))
+}
+
+/** Locked modal 1M — 2h candles aggregated from Yahoo `range=1mo` at 1h (or 30m). */
+export async function yahooStockMonthlyTwoHourCandles(symbol: string): Promise<YahooBar[]> {
+  const ticker = yahooTicker(symbol)
+  if (!ticker) return []
+
+  const maxBars = 200
+  for (const range of ['1mo', '30d']) {
+    for (const interval of ['1h', '30m']) {
+      const url = new URL(`${YAHOO_CHART}/${encodeURIComponent(ticker)}`)
+      url.searchParams.set('range', range)
+      url.searchParams.set('interval', interval)
+      url.searchParams.set('includePrePost', 'false')
+      const raw = await fetchYahooChartUrl(url)
+      const bars = aggregateYahooBarsToBucket(raw, TWO_HOUR_BUCKET_SEC)
+      if (bars.length >= 24) return downsampleBars(bars, maxBars)
+    }
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const raw = await yahooStockCandles(symbol, now - 30 * 86400, now, '1h')
+  return downsampleBars(aggregateYahooBarsToBucket(raw, TWO_HOUR_BUCKET_SEC), maxBars)
+}
+
+/** Locked modal 3M — daily candles via Yahoo `range=3mo`. */
+export async function yahooStockQuarterlyDailyCandles(symbol: string): Promise<YahooBar[]> {
+  const ticker = yahooTicker(symbol)
+  if (!ticker) return []
+
+  for (const range of ['3mo', '90d']) {
+    const url = new URL(`${YAHOO_CHART}/${encodeURIComponent(ticker)}`)
+    url.searchParams.set('range', range)
+    url.searchParams.set('interval', '1d')
+    url.searchParams.set('includePrePost', 'false')
+    const bars = await fetchYahooChartUrl(url)
+    if (bars.length >= 20) return downsampleBars(bars, MAX_BARS)
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  return yahooStockCandles(symbol, now - 90 * 86400, now, '1d')
 }
