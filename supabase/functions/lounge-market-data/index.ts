@@ -29,6 +29,12 @@ import {
   resolveMarketSeriesByResolution,
 } from '../_shared/marketChartResolution.ts'
 import { isUsEquityRegularSessionOpen, isUsableStockIntradayBars, STOCK_ROLLING_CLOSED_CACHE_TTL_MS } from '../_shared/usEquityMarketSession.ts'
+import {
+  attachCoingeckoDebugPayload,
+  buildCoingeckoActionMeta,
+  runCoingeckoUsageScope,
+  shouldDebugCoingecko,
+} from '../_shared/coingeckoUsageLog.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -239,37 +245,47 @@ Deno.serve(async (req) => {
 
   const action = String(body?.action || '').trim()
 
+  return runCoingeckoUsageScope(
+    {
+      action: action || 'unknown',
+      meta: buildCoingeckoActionMeta(action, body),
+      emitConsoleLog: shouldDebugCoingecko(body),
+    },
+    async () => {
+      const respond = (status: number, payload: Record<string, unknown>) =>
+        json(status, attachCoingeckoDebugPayload(body, payload))
+
   if (action === 'search') {
     const q = String(body?.query || body?.q || '').trim()
-    if (q.length < 1) return json(400, { error: 'query is required.' })
+    if (q.length < 1) return respond(400, { error: 'query is required.' })
     try {
       const results = await marketSearch(q)
       const enriched = await enrichSearchResultsForPicker(results.slice(0, 8))
-      return json(200, { ok: true, results: sortMarketSearchResults(q, enriched) })
+      return respond(200, { ok: true, results: sortMarketSearchResults(q, enriched) })
     } catch (e) {
-      return json(502, { error: e instanceof Error ? e.message : 'Search failed.' })
+      return respond(502, { error: e instanceof Error ? e.message : 'Search failed.' })
     }
   }
 
   if (action === 'preview') {
     const parsed = parseSymbolInput(body)
-    if (!parsed) return json(400, { error: 'symbol is required.' })
+    if (!parsed) return respond(400, { error: 'symbol is required.' })
     try {
       const preview = await previewSymbol(parsed.symbol, parsed.asset_class)
-      return json(200, { ok: true, preview })
+      return respond(200, { ok: true, preview })
     } catch (e) {
-      return json(502, { error: e instanceof Error ? e.message : 'Preview failed.' })
+      return respond(502, { error: e instanceof Error ? e.message : 'Preview failed.' })
     }
   }
 
   if (action === 'modal_news') {
     const parsed = parseSymbolInput(body)
-    if (!parsed) return json(400, { error: 'symbol is required.' })
+    if (!parsed) return respond(400, { error: 'symbol is required.' })
     try {
       const news = await finnhubLatestNews(parsed.symbol, parsed.asset_class)
-      return json(200, { ok: true, news })
+      return respond(200, { ok: true, news })
     } catch (e) {
-      return json(502, { error: e instanceof Error ? e.message : 'News failed.' })
+      return respond(502, { error: e instanceof Error ? e.message : 'News failed.' })
     }
   }
 
@@ -281,27 +297,27 @@ Deno.serve(async (req) => {
     try {
       const logoUrl = await resolveMarketLogoUrl(body?.url, symbol, asset_class)
       if (!logoUrl || !isAllowedMarketLogoUrl(logoUrl)) {
-        return json(404, { error: 'Logo unavailable.' })
+        return respond(404, { error: 'Logo unavailable.' })
       }
       const res = await fetch(logoUrl, {
         headers: { 'User-Agent': 'LVSlotPro lounge-market-data/1' },
       })
-      if (!res.ok) return json(502, { error: 'Logo fetch failed.' })
+      if (!res.ok) return respond(502, { error: 'Logo fetch failed.' })
       const bytes = new Uint8Array(await res.arrayBuffer())
-      if (!bytes.length) return json(502, { error: 'Empty logo.' })
-      return json(200, {
+      if (!bytes.length) return respond(502, { error: 'Empty logo.' })
+      return respond(200, {
         ok: true,
         content_type: res.headers.get('content-type') || 'image/png',
         data_base64: bytesToBase64(bytes),
       })
     } catch (e) {
-      return json(502, { error: e instanceof Error ? e.message : 'Logo failed.' })
+      return respond(502, { error: e instanceof Error ? e.message : 'Logo failed.' })
     }
   }
 
   if (action === 'modal_series') {
     const parsed = parseSymbolInput(body)
-    if (!parsed) return json(400, { error: 'symbol is required.' })
+    if (!parsed) return respond(400, { error: 'symbol is required.' })
     const resolutionId = String(body?.resolution || '').trim()
     const barLimitRaw = body?.bar_limit
     const barLimit =
@@ -314,7 +330,7 @@ Deno.serve(async (req) => {
     if (beforeSecRaw != null && beforeSecRaw !== '') {
       const beforeSec = Number(beforeSecRaw)
       if (!Number.isFinite(beforeSec) || beforeSec <= 0) {
-        return json(400, { error: 'Invalid before_sec.' })
+        return respond(400, { error: 'Invalid before_sec.' })
       }
       try {
         const profile = await finnhubProfile(parsed.symbol, parsed.asset_class)
@@ -328,7 +344,7 @@ Deno.serve(async (req) => {
             barLimit,
           )
           const normalizedBars = await normalizeMarketBarsToUsd(bars, currency)
-          return json(200, { ok: true, bars: normalizedBars, has_more: hasMore })
+          return respond(200, { ok: true, bars: normalizedBars, has_more: hasMore })
         }
         const extendWindowKey = (kind === 'rolling' ? '24h' : windowKey) as MarketWindowKey
         const { bars, hasMore } = await resolveMarketBarsBefore(
@@ -338,9 +354,9 @@ Deno.serve(async (req) => {
           beforeSec,
         )
         const normalizedBars = await normalizeMarketBarsToUsd(bars, currency)
-        return json(200, { ok: true, bars: normalizedBars, has_more: hasMore })
+        return respond(200, { ok: true, bars: normalizedBars, has_more: hasMore })
       } catch (e) {
-        return json(502, { error: e instanceof Error ? e.message : 'Series extend failed.' })
+        return respond(502, { error: e instanceof Error ? e.message : 'Series extend failed.' })
       }
     }
     if (resolutionId) {
@@ -372,7 +388,7 @@ Deno.serve(async (req) => {
           }
         }
         const normalized = await normalizeMarketSeriesToUsd(quoteOut, bars, currency)
-        return json(200, {
+        return respond(200, {
           ok: true,
           quote: normalized.quote,
           bars: normalized.bars,
@@ -381,7 +397,7 @@ Deno.serve(async (req) => {
           resolution: resolutionId,
         })
       } catch (e) {
-        return json(502, { error: e instanceof Error ? e.message : 'Resolution series failed.' })
+        return respond(502, { error: e instanceof Error ? e.message : 'Resolution series failed.' })
       }
     }
     try {
@@ -408,7 +424,7 @@ Deno.serve(async (req) => {
           }
         }
         const normalized = await normalizeMarketSeriesToUsd(quoteOut, bars, currency)
-        return json(200, {
+        return respond(200, {
           ok: true,
           quote: normalized.quote,
           bars: normalized.bars,
@@ -416,9 +432,9 @@ Deno.serve(async (req) => {
         })
       }
       const payload = await buildRollingBatchPayload(parsed.symbol, parsed.asset_class)
-      return json(200, { ok: true, ...payload })
+      return respond(200, { ok: true, ...payload })
     } catch (e) {
-      return json(502, { error: e instanceof Error ? e.message : 'Series failed.' })
+      return respond(502, { error: e instanceof Error ? e.message : 'Series failed.' })
     }
   }
 
@@ -450,7 +466,7 @@ Deno.serve(async (req) => {
         /* skip symbol on failure */
       }
     }
-    return json(200, { ok: true, quotes: out })
+    return respond(200, { ok: true, quotes: out })
   }
 
   if (action === 'attach') {
@@ -469,15 +485,15 @@ Deno.serve(async (req) => {
         }
       })
       .filter(Boolean) as Array<{ symbol: string; asset_class: MarketAssetClass; display_symbol?: string }>
-    if (!postId) return json(400, { error: 'post_id is required.' })
+    if (!postId) return respond(400, { error: 'post_id is required.' })
 
     const { data: postRow } = await admin
       .from('community_feed_posts')
       .select('id,user_id')
       .eq('id', postId)
       .maybeSingle()
-    if (!postRow?.id) return json(404, { error: 'Post not found.' })
-    if (postRow.user_id !== user.id) return json(403, { error: 'Not allowed.' })
+    if (!postRow?.id) return respond(404, { error: 'Post not found.' })
+    if (postRow.user_id !== user.id) return respond(403, { error: 'Not allowed.' })
 
     try {
       const symbols = await resolveMarketSymbolsForAttach(caption, pickerSymbols)
@@ -487,18 +503,20 @@ Deno.serve(async (req) => {
           .update({ market_embeds: [] })
           .eq('id', postId)
         if (error) throw new Error(error.message || 'Could not clear market embeds.')
-        return json(200, { ok: true, embeds: [] })
+        return respond(200, { ok: true, embeds: [] })
       }
       const { embeds, skipped } = await attachMarketEmbeds(admin, postId, caption, symbols, origin)
-      return json(200, {
+      return respond(200, {
         ok: true,
         embeds,
         ...(skipped.length ? { warnings: skipped } : {}),
       })
     } catch (e) {
-      return json(502, { error: e instanceof Error ? e.message : 'Attach failed.' })
+      return respond(502, { error: e instanceof Error ? e.message : 'Attach failed.' })
     }
   }
 
-  return json(400, { error: 'Unknown action.' })
+  return respond(400, { error: 'Unknown action.' })
+    },
+  )
 })

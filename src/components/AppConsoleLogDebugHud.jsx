@@ -11,7 +11,7 @@ import { APP_BUILD_SHA } from '../utils/appBuildInfo.js'
 function lineClass(line) {
   if (line.includes(' ERR ')) return 'text-rose-300'
   if (line.includes(' WARN ')) return 'text-amber-300'
-  if (line.includes('[marketChartPan]')) return 'text-cyan-300'
+  if (line.includes('[coingeckoUsage]')) return 'text-emerald-300'
   return 'text-zinc-400'
 }
 

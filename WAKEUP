@@ -50,10 +50,20 @@ The agent should treat the following as **standing instructions for this session
 
 ### Active (likely next)
 
-- **`lounge-market-data` redeploy on test** — required after recent Edge pulls (**`logo_image`**, **`yahooResolveUsEquityCashtag`**, auto cashtag attach). Secrets: **`FINNHUB_API_KEY`**, optional **`COINGECKO_API_KEY`**. Smoke: post `$AAPL` without picker → real Apple chart (not Ondo); Advanced snapshot PNG → EDGE wordmark left, company centered, floating legend.
-- **Lounge thread compose** — code on `test`; Ryan smoke **pending** (keyboard toolbar, split image/video, retry restores all part media, no load crash).
-- **Thread SQL on test** — if not applied, run in order through **`20260608210000_lounge_post_drafts_thread_part_media.sql`** (after **`20260608140000`** … **`20260608190000`**); see backlog Update log for each step.
-- **Thread compose iOS** — after media pick, options bar can sit **behind keyboard** (parked).
+- **Link preview + group-delete smoke** — migrations/Edge on test; Ryan sign-off still open (see backlog **Chat** section).
+- **Play Logbook SQL** on test if not fully applied; Ryan smoke pending.
+- **Bankroll Risk Advisor** — move card higher in Phoenix/Buffalo/MHB (+ layout tweaks Ryan still wants).
+- **Chat** — local-only spinner assets not committed; redeploy **`lounge-chat`** if peers see wrong video prep timeline order.
+
+### Parked / deferred
+
+- **Thread compose iOS** — after media pick, options bar can sit **behind keyboard** (known; revisit later).
+
+### Shipped + smoked (2026-06-07, Ryan on test)
+
+- **`lounge-market-data`** redeploy + smoke **§22** **PASSED** (`$AAPL` auto-attach, snapshot branding).
+- **Thread SQL** **`20260608140000`**–**`20260608210000`** applied.
+- **Thread compose UX** smoke **§23** **PASSED** (keyboard toolbar, split image/video, retry, no load crash).
 
 ### Shipped recently (Lounge market charts, on `test`)
 

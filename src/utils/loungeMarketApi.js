@@ -5,6 +5,21 @@
  */
 
 import { marketBarRowFields } from './marketBarOhlc.js'
+import { readAppConsoleLogHudEnabled } from './appConsoleLogHudPref.js'
+
+function logCoingeckoUsageDebug(data, payload) {
+  const summary = data?._debug?.coingecko
+  if (!summary || typeof summary !== 'object') return
+  const action = String(payload?.action || summary.action || 'unknown')
+  const network = Number(summary.network_calls) || 0
+  const cached = Number(summary.cache_hits) || 0
+  console.log(
+    `[coingeckoUsage] action=${action} network=${network} cache_hits=${cached} by_reason=`,
+    summary.by_reason,
+    summary,
+  )
+}
+
 export async function loungeMarketInvoke(supabase, payload) {
   let {
     data: { session },
@@ -17,8 +32,13 @@ export async function loungeMarketInvoke(supabase, payload) {
     if (refreshed?.session?.access_token) session = refreshed.session
   }
 
+  const body = {
+    ...payload,
+    ...(readAppConsoleLogHudEnabled() ? { debug_coingecko: true } : {}),
+  }
+
   const { data, error } = await supabase.functions.invoke('lounge-market-data', {
-    body: payload,
+    body,
     headers: { Authorization: `Bearer ${session.access_token}` },
   })
 
@@ -27,8 +47,9 @@ export async function loungeMarketInvoke(supabase, payload) {
     try {
       const ctx = error.context
       if (ctx && typeof ctx.json === 'function') {
-        const body = await ctx.json()
-        if (body?.error) message = String(body.error)
+        const errBody = await ctx.json()
+        if (errBody?.error) message = String(errBody.error)
+        logCoingeckoUsageDebug(errBody, body)
       }
     } catch {
       /* ignore parse errors */
@@ -37,8 +58,11 @@ export async function loungeMarketInvoke(supabase, payload) {
   }
 
   if (data && typeof data === 'object' && data.error) {
+    logCoingeckoUsageDebug(data, body)
     return { error: String(data.error) }
   }
+
+  logCoingeckoUsageDebug(data, body)
   return data
 }
 

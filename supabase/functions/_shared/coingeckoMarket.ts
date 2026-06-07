@@ -1,9 +1,11 @@
 /**
  * CoinGecko helpers for crypto search, logos, market cap, and candle fallback.
  * Prices/quotes stay on Finnhub; CoinGecko supplies identity, logo, USD market cap, and OHLC candles.
+ * Network calls are recorded via `coingeckoUsageLog.ts` when a `lounge-market-data` scope is active.
  */
 
 import type { MarketBarOhlc } from './marketBarOhlc.ts'
+import { recordCoingeckoCall } from './coingeckoUsageLog.ts'
 
 const COINGECKO_DEMO_BASE = 'https://api.coingecko.com/api/v3'
 const LOGO_CACHE_TTL_MS = 86_400_000
@@ -59,15 +61,51 @@ export function finnhubCryptoSymbol(ticker: string): string {
   return `BINANCE:${t}USDT`
 }
 
-async function coingeckoFetch(path: string, params: Record<string, string> = {}) {
+async function coingeckoFetch(
+  path: string,
+  params: Record<string, string> = {},
+  reason = 'unknown',
+) {
+  const started = Date.now()
   const url = new URL(`${COINGECKO_DEMO_BASE}${path}`)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
   const headers: Record<string, string> = { Accept: 'application/json' }
   const key = coingeckoApiKey()
   if (key) headers['x-cg-demo-api-key'] = key
-  const res = await fetch(url.toString(), { headers })
-  if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`)
-  return res.json()
+  try {
+    const res = await fetch(url.toString(), { headers })
+    if (!res.ok) {
+      recordCoingeckoCall({
+        endpoint: path,
+        reason,
+        params,
+        ms: Date.now() - started,
+        ok: false,
+        error: `HTTP ${res.status}`,
+      })
+      throw new Error(`CoinGecko HTTP ${res.status}`)
+    }
+    recordCoingeckoCall({
+      endpoint: path,
+      reason,
+      params,
+      ms: Date.now() - started,
+      ok: true,
+    })
+    return res.json()
+  } catch (e) {
+    if (!(e instanceof Error && /^CoinGecko HTTP/.test(e.message))) {
+      recordCoingeckoCall({
+        endpoint: path,
+        reason,
+        params,
+        ms: Date.now() - started,
+        ok: false,
+        error: e instanceof Error ? e.message : 'fetch failed',
+      })
+    }
+    throw e
+  }
 }
 
 function pickBestCoin(
@@ -100,12 +138,16 @@ export async function coingeckoBatchPickerQuotes(
   if (!ids.length) return out
 
   try {
-    const data = await coingeckoFetch('/simple/price', {
-      ids: ids.join(','),
-      vs_currencies: 'usd',
-      include_market_cap: 'true',
-      include_24hr_change: 'true',
-    })
+    const data = await coingeckoFetch(
+      '/simple/price',
+      {
+        ids: ids.join(','),
+        vs_currencies: 'usd',
+        include_market_cap: 'true',
+        include_24hr_change: 'true',
+      },
+      'picker_batch_price',
+    )
     for (const id of ids) {
       const row = data?.[id] as { usd?: number; usd_market_cap?: number; usd_24h_change?: number } | undefined
       const price = Number(row?.usd)
@@ -127,11 +169,15 @@ async function coingeckoMarketCapUsd(coinId: string): Promise<number | null> {
   const id = String(coinId || '').trim()
   if (!id) return null
   try {
-    const data = await coingeckoFetch('/simple/price', {
-      ids: id,
-      vs_currencies: 'usd',
-      include_market_cap: 'true',
-    })
+    const data = await coingeckoFetch(
+      '/simple/price',
+      {
+        ids: id,
+        vs_currencies: 'usd',
+        include_market_cap: 'true',
+      },
+      'crypto_profile_mcap',
+    )
     const row = data?.[id] as { usd_market_cap?: number } | undefined
     const cap = Number(row?.usd_market_cap)
     return Number.isFinite(cap) && cap > 0 ? cap : null
@@ -154,6 +200,13 @@ export async function coingeckoCryptoProfile(
   const cacheKey = base.toUpperCase()
   const cached = logoCache.get(cacheKey)
   if (cached && cached.expires > Date.now()) {
+    recordCoingeckoCall({
+      endpoint: '(memory_cache)',
+      reason: 'crypto_profile',
+      cache_hit: true,
+      ms: 0,
+      ok: true,
+    })
     return {
       name: cached.name,
       logo: cached.logo,
@@ -163,7 +216,7 @@ export async function coingeckoCryptoProfile(
   }
 
   try {
-    const data = await coingeckoFetch('/search', { query: base.toLowerCase() })
+    const data = await coingeckoFetch('/search', { query: base.toLowerCase() }, 'crypto_profile_search')
     const coins = Array.isArray(data?.coins) ? data.coins : []
     const pick = pickBestCoin(coins, base)
     const logo = String(pick?.large || pick?.thumb || '')
@@ -269,16 +322,20 @@ async function coingeckoCryptoOhlcCandles(coinId: string, windowKey: string): Pr
   }
 
   try {
-    const data = await coingeckoFetch(`/coins/${id}/ohlc`, params)
+    const data = await coingeckoFetch(`/coins/${id}/ohlc`, params, 'candles_ohlc')
     const bars = parseCoingeckoOhlcPayload(data)
     if (bars.length >= 2) return downsampleCoingeckoBars(bars)
   } catch {
     if (params.interval) {
       try {
-        const data = await coingeckoFetch(`/coins/${id}/ohlc`, {
-          vs_currency: 'usd',
-          days,
-        })
+        const data = await coingeckoFetch(
+          `/coins/${id}/ohlc`,
+          {
+            vs_currency: 'usd',
+            days,
+          },
+          'candles_ohlc_retry',
+        )
         const bars = parseCoingeckoOhlcPayload(data)
         if (bars.length >= 2) return downsampleCoingeckoBars(bars)
       } catch {
@@ -295,10 +352,14 @@ async function coingeckoCryptoCloseCandles(coinId: string, windowKey: string): P
   if (!id) return []
 
   try {
-    const data = await coingeckoFetch(`/coins/${id}/market_chart`, {
-      vs_currency: 'usd',
-      days: String(coingeckoDaysForWindow(windowKey)),
-    })
+    const data = await coingeckoFetch(
+      `/coins/${id}/market_chart`,
+      {
+        vs_currency: 'usd',
+        days: String(coingeckoDaysForWindow(windowKey)),
+      },
+      'candles_market_chart',
+    )
     const prices = Array.isArray(data?.prices) ? data.prices : []
     const bars: MarketBarOhlc[] = []
     for (const row of prices) {
@@ -358,13 +419,17 @@ export async function coingeckoCryptoCandlesForAdvanced(
     if (key && (days === '1' || days === '7' || days === '14' || days === '30' || days === '90')) {
       params.interval = 'hourly'
     }
-    const data = await coingeckoFetch(`/coins/${coinId}/ohlc`, params)
+    const data = await coingeckoFetch(`/coins/${coinId}/ohlc`, params, 'candles_advanced_ohlc')
     const bars = parseCoingeckoOhlcPayload(data)
     if (bars.length >= 2) return downsampleCoingeckoBars(bars, maxBars)
   } catch {
     if (days !== '1') {
       try {
-        const data = await coingeckoFetch(`/coins/${coinId}/ohlc`, { vs_currency: 'usd', days })
+        const data = await coingeckoFetch(
+          `/coins/${coinId}/ohlc`,
+          { vs_currency: 'usd', days },
+          'candles_advanced_ohlc_retry',
+        )
         const bars = parseCoingeckoOhlcPayload(data)
         if (bars.length >= 2) return downsampleCoingeckoBars(bars, maxBars)
       } catch {
@@ -409,7 +474,7 @@ export async function coingeckoMarketSearch(query: string): Promise<CoingeckoSea
   if (q.length < 1) return []
 
   try {
-    const data = await coingeckoFetch('/search', { query: q.toLowerCase() })
+    const data = await coingeckoFetch('/search', { query: q.toLowerCase() }, 'market_search')
     const coins = Array.isArray(data?.coins) ? data.coins : []
     const qUpper = q.toUpperCase()
     const sorted = [...coins].sort((a, b) => {
