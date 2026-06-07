@@ -1670,195 +1670,59 @@ export default function LoungeMarketChartModal({
 
               <div className="relative min-h-0 flex-1 overflow-hidden">
                 <div style={advancedPlotWrapStyle}>
-                  <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div
-                  className="relative min-h-0 flex-1 overflow-hidden"
-                >
-                  <div ref={advancedChartHostRef} className="absolute inset-0 touch-none select-none" />
-                  {subPaneAxisTitles.rows.length ? (
+                  <div className="relative min-h-0 h-full overflow-hidden">
+                    <div ref={advancedChartHostRef} className="absolute inset-0 touch-none select-none" />
                     <div
-                      className="pointer-events-none absolute inset-y-0 right-0 z-10"
-                      style={{ width: subPaneAxisTitles.width }}
+                      className="absolute left-0 top-0 z-20 flex max-w-[calc(100%-3rem)] flex-wrap items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-950/85 p-1 backdrop-blur-[2px]"
+                      style={{
+                        marginTop: 'max(0.25rem, env(safe-area-inset-top, 0px))',
+                        marginLeft: 'max(0.5rem, env(safe-area-inset-left, 0px))',
+                      }}
                     >
-                      {subPaneAxisTitles.rows.map((row) => (
-                        <div
-                          key={row.id}
-                          className={`absolute right-0 max-w-full truncate pr-0.5 text-right text-[9px] font-semibold uppercase tracking-wide ${mutedClass}`}
-                          style={{ top: row.topPx }}
+                      <div className="relative shrink-0" ref={chartTypeMenuRef}>
+                        <button
+                          type="button"
+                          aria-haspopup="listbox"
+                          aria-expanded={chartTypeMenuOpen}
+                          aria-label="Chart type"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setChartTypeMenuOpen((openNow) => {
+                              if (!openNow) {
+                                setIndicatorMenuOpen(false)
+                                setResolutionMenuOpen(false)
+                                setTimeframeMenuOpen(false)
+                              }
+                              return !openNow
+                            })
+                          }}
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
+                            chartType !== 'candle'
+                              ? 'text-cyan-300 hover:text-cyan-200'
+                              : `${mutedClass} hover:text-zinc-300`
+                          }`}
                         >
-                          {row.text}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  {activeIndicatorLegend.length ? (
-                    <div
-                      className="pointer-events-none absolute left-2 top-2 z-10 max-w-[min(100%,14rem)] rounded-md border border-zinc-700/70 bg-zinc-950/85 px-2 py-1.5 backdrop-blur-[2px]"
-                      aria-label="Indicator legend"
-                    >
-                      <div className={`mb-1 text-[9px] font-semibold uppercase tracking-wide ${mutedClass}`}>
-                        Legend
-                      </div>
-                      <ul className="flex flex-col gap-1">
-                        {activeIndicatorLegend.map((row) => (
-                          <li
-                            key={row.key}
-                            className="flex items-center gap-1.5 text-[10px] leading-none text-zinc-200"
+                          {marketModalChartTypeLabel(chartType)}
+                          <span aria-hidden="true">{chartTypeMenuOpen ? ' ▴' : ' ▾'}</span>
+                        </button>
+                        {chartTypeMenuOpen ? (
+                          <div
+                            role="listbox"
+                            aria-label="Chart type"
+                            className="absolute left-0 top-full z-30 mt-1 min-w-[7.5rem] overflow-hidden rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <MarketIndicatorLegendLine color={row.color} dashed={row.dashed} />
-                            <span className="truncate">{row.label}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div
-                  className="relative z-10 flex shrink-0 items-end gap-2 px-3 pb-0.5"
-                  style={{
-                    paddingBottom: 'max(0.125rem, env(safe-area-inset-bottom, 0px))',
-                    paddingLeft: 'max(0.75rem, env(safe-area-inset-left, 0px))',
-                    paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))',
-                  }}
-                >
-                  <div className="relative shrink-0" ref={chartTypeMenuRef}>
-                    <button
-                      type="button"
-                      aria-haspopup="listbox"
-                      aria-expanded={chartTypeMenuOpen}
-                      aria-label="Chart type"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setChartTypeMenuOpen((openNow) => {
-                          if (!openNow) {
-                            setIndicatorMenuOpen(false)
-                            setTimeframeMenuOpen(false)
-                          }
-                          return !openNow
-                        })
-                      }}
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
-                        chartType !== 'candle'
-                          ? 'text-cyan-300 hover:text-cyan-200'
-                          : `${mutedClass} hover:text-zinc-300`
-                      }`}
-                    >
-                      {marketModalChartTypeLabel(chartType)}
-                      <span aria-hidden="true">{chartTypeMenuOpen ? ' ▴' : ' ▾'}</span>
-                    </button>
-                    {chartTypeMenuOpen ? (
-                      <div
-                        role="listbox"
-                        aria-label="Chart type"
-                        className="absolute bottom-full left-0 z-20 mb-1 min-w-[7.5rem] overflow-hidden rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {MARKET_MODAL_CHART_TYPES.map((row) => {
-                          const on = chartType === row.id
-                          return (
-                            <button
-                              key={row.id}
-                              type="button"
-                              role="option"
-                              aria-selected={on}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                selectChartType(row.id)
-                              }}
-                              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90 ${
-                                on ? 'text-cyan-200' : 'text-zinc-200'
-                              }`}
-                            >
-                              <span
-                                className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-[11px] ${
-                                  on ? 'text-cyan-400' : 'text-transparent'
-                                }`}
-                                aria-hidden="true"
-                              >
-                                ✓
-                              </span>
-                              {row.label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="relative shrink-0" ref={indicatorMenuRef}>
-                    <button
-                      type="button"
-                      aria-haspopup="listbox"
-                      aria-expanded={indicatorMenuOpen}
-                      aria-label="Chart indicators"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setIndicatorMenuOpen((openNow) => {
-                          if (!openNow) {
-                            setChartTypeMenuOpen(false)
-                            setTimeframeMenuOpen(false)
-                          }
-                          return !openNow
-                        })
-                      }}
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
-                        activeIndicatorCount
-                          ? 'text-cyan-300 hover:text-cyan-200'
-                          : `${mutedClass} hover:text-zinc-300`
-                      }`}
-                    >
-                      Indicators
-                      {activeIndicatorCount ? ` · ${activeIndicatorCount}` : ''}
-                      <span aria-hidden="true">{indicatorMenuOpen ? ' ▴' : ' ▾'}</span>
-                    </button>
-                    {indicatorMenuOpen ? (
-                      <div
-                        role="listbox"
-                        aria-label="Chart indicators"
-                        className="absolute bottom-full left-0 z-20 mb-1 max-h-[min(20rem,45dvh)] min-w-[12rem] overflow-y-auto overscroll-contain rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {activeIndicatorLegend.length ? (
-                          <div className="border-b border-zinc-800 px-3 py-2">
-                            <div className={`mb-1.5 text-[10px] font-semibold uppercase tracking-wide ${mutedClass}`}>
-                              Legend
-                            </div>
-                            <ul className="flex flex-col gap-1.5">
-                              {activeIndicatorLegend.map((row) => (
-                                <li
-                                  key={row.key}
-                                  className="flex items-center gap-2 text-[11px] leading-none text-zinc-200"
-                                >
-                                  <MarketIndicatorLegendLine color={row.color} dashed={row.dashed} />
-                                  <span>{row.label}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <div className={`border-b border-zinc-800 px-3 py-2 text-[11px] ${mutedClass}`}>
-                            Select indicators to show on chart
-                          </div>
-                        )}
-                        {MARKET_CHART_INDICATOR_CATEGORIES.map((cat) => (
-                          <div key={cat.id}>
-                            <div
-                              className={`sticky top-0 z-[1] border-b border-zinc-800/80 bg-zinc-900 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${mutedClass}`}
-                            >
-                              {cat.label}
-                            </div>
-                            {listMarketChartIndicatorsByCategory(cat.id).map((ind) => {
-                              const on = activeIndicators.has(ind.id)
-                              const legendItems = marketIndicatorLegendItems(ind.id, isLight)
+                            {MARKET_MODAL_CHART_TYPES.map((row) => {
+                              const on = chartType === row.id
                               return (
                                 <button
-                                  key={ind.id}
+                                  key={row.id}
                                   type="button"
                                   role="option"
                                   aria-selected={on}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    toggleIndicator(ind.id)
+                                    selectChartType(row.id)
                                   }}
                                   className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90 ${
                                     on ? 'text-cyan-200' : 'text-zinc-200'
@@ -1872,86 +1736,218 @@ export default function LoungeMarketChartModal({
                                   >
                                     ✓
                                   </span>
-                                  <span className="min-w-0 flex-1 truncate">{ind.label}</span>
-                                  <MarketIndicatorLegendSwatches items={legendItems} />
+                                  {row.label}
                                 </button>
                               )
                             })}
                           </div>
+                        ) : null}
+                      </div>
+                      <div className="relative shrink-0" ref={indicatorMenuRef}>
+                        <button
+                          type="button"
+                          aria-haspopup="listbox"
+                          aria-expanded={indicatorMenuOpen}
+                          aria-label="Chart indicators"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setIndicatorMenuOpen((openNow) => {
+                              if (!openNow) {
+                                setChartTypeMenuOpen(false)
+                                setResolutionMenuOpen(false)
+                                setTimeframeMenuOpen(false)
+                              }
+                              return !openNow
+                            })
+                          }}
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
+                            activeIndicatorCount
+                              ? 'text-cyan-300 hover:text-cyan-200'
+                              : `${mutedClass} hover:text-zinc-300`
+                          }`}
+                        >
+                          Indicators
+                          {activeIndicatorCount ? ` · ${activeIndicatorCount}` : ''}
+                          <span aria-hidden="true">{indicatorMenuOpen ? ' ▴' : ' ▾'}</span>
+                        </button>
+                        {indicatorMenuOpen ? (
+                          <div
+                            role="listbox"
+                            aria-label="Chart indicators"
+                            className="absolute left-0 top-full z-30 mt-1 max-h-[min(20rem,45dvh)] min-w-[12rem] overflow-y-auto overscroll-contain rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {activeIndicatorLegend.length ? (
+                              <div className="border-b border-zinc-800 px-3 py-2">
+                                <div className={`mb-1.5 text-[10px] font-semibold uppercase tracking-wide ${mutedClass}`}>
+                                  Legend
+                                </div>
+                                <ul className="flex flex-col gap-1.5">
+                                  {activeIndicatorLegend.map((row) => (
+                                    <li
+                                      key={row.key}
+                                      className="flex items-center gap-2 text-[11px] leading-none text-zinc-200"
+                                    >
+                                      <MarketIndicatorLegendLine color={row.color} dashed={row.dashed} />
+                                      <span>{row.label}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                              <div className={`border-b border-zinc-800 px-3 py-2 text-[11px] ${mutedClass}`}>
+                                Select indicators to show on chart
+                              </div>
+                            )}
+                            {MARKET_CHART_INDICATOR_CATEGORIES.map((cat) => (
+                              <div key={cat.id}>
+                                <div
+                                  className={`sticky top-0 z-[1] border-b border-zinc-800/80 bg-zinc-900 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${mutedClass}`}
+                                >
+                                  {cat.label}
+                                </div>
+                                {listMarketChartIndicatorsByCategory(cat.id).map((ind) => {
+                                  const on = activeIndicators.has(ind.id)
+                                  const legendItems = marketIndicatorLegendItems(ind.id, isLight)
+                                  return (
+                                    <button
+                                      key={ind.id}
+                                      type="button"
+                                      role="option"
+                                      aria-selected={on}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        toggleIndicator(ind.id)
+                                      }}
+                                      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90 ${
+                                        on ? 'text-cyan-200' : 'text-zinc-200'
+                                      }`}
+                                    >
+                                      <span
+                                        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-[11px] ${
+                                          on ? 'text-cyan-400' : 'text-transparent'
+                                        }`}
+                                        aria-hidden="true"
+                                      >
+                                        ✓
+                                      </span>
+                                      <span className="min-w-0 flex-1 truncate">{ind.label}</span>
+                                      <MarketIndicatorLegendSwatches items={legendItems} />
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="relative shrink-0" ref={resolutionMenuRef}>
+                        <button
+                          type="button"
+                          aria-haspopup="listbox"
+                          aria-expanded={resolutionMenuOpen}
+                          aria-label="Chart resolution"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setResolutionMenuOpen((openNow) => {
+                              if (!openNow) {
+                                setChartTypeMenuOpen(false)
+                                setIndicatorMenuOpen(false)
+                              }
+                              return !openNow
+                            })
+                          }}
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
+                            advancedResolutionId !== DEFAULT_MARKET_CHART_RESOLUTION_ID
+                              ? 'text-cyan-300 hover:text-cyan-200'
+                              : `${mutedClass} hover:text-zinc-300`
+                          }`}
+                        >
+                          {advancedResolution.label}
+                          <span aria-hidden="true">{resolutionMenuOpen ? ' ▴' : ' ▾'}</span>
+                        </button>
+                        {resolutionMenuOpen ? (
+                          <div
+                            role="listbox"
+                            aria-label="Chart resolution"
+                            className="absolute left-0 top-full z-30 mt-1 max-h-[min(16rem,50vh)] min-w-[5.5rem] overflow-y-auto rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {MARKET_CHART_RESOLUTIONS.map((row) => {
+                              const on = row.id === advancedResolutionId
+                              return (
+                                <button
+                                  key={row.id}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={on}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    selectAdvancedResolutionId(row.id)
+                                  }}
+                                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90 ${
+                                    on ? 'text-cyan-200' : 'text-zinc-200'
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-[11px] ${
+                                      on ? 'text-cyan-400' : 'text-transparent'
+                                    }`}
+                                    aria-hidden="true"
+                                  >
+                                    ✓
+                                  </span>
+                                  {row.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {subPaneAxisTitles.rows.length ? (
+                      <div
+                        className="pointer-events-none absolute inset-y-0 right-0 z-10"
+                        style={{ width: subPaneAxisTitles.width }}
+                      >
+                        {subPaneAxisTitles.rows.map((row) => (
+                          <div
+                            key={row.id}
+                            className={`absolute right-0 max-w-full truncate pr-0.5 text-right text-[9px] font-semibold uppercase tracking-wide ${mutedClass}`}
+                            style={{ top: row.topPx }}
+                          >
+                            {row.text}
+                          </div>
                         ))}
                       </div>
                     ) : null}
-                  </div>
-                  <div className="relative shrink-0" ref={resolutionMenuRef}>
-                    <button
-                      type="button"
-                      aria-haspopup="listbox"
-                      aria-expanded={resolutionMenuOpen}
-                      aria-label="Chart resolution"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setResolutionMenuOpen((openNow) => {
-                          if (!openNow) {
-                            setChartTypeMenuOpen(false)
-                            setIndicatorMenuOpen(false)
-                          }
-                          return !openNow
-                        })
-                      }}
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
-                        advancedResolutionId !== DEFAULT_MARKET_CHART_RESOLUTION_ID
-                          ? 'text-cyan-300 hover:text-cyan-200'
-                          : `${mutedClass} hover:text-zinc-300`
-                      }`}
-                    >
-                      {advancedResolution.label}
-                      <span aria-hidden="true">{resolutionMenuOpen ? ' ▴' : ' ▾'}</span>
-                    </button>
-                    {resolutionMenuOpen ? (
+                    {activeIndicatorLegend.length ? (
                       <div
-                        role="listbox"
-                        aria-label="Chart resolution"
-                        className="absolute bottom-full left-0 z-20 mb-1 max-h-[min(16rem,50vh)] min-w-[5.5rem] overflow-y-auto rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
+                        className="pointer-events-none absolute right-2 top-2 z-10 max-w-[min(100%,14rem)] rounded-md border border-zinc-700/70 bg-zinc-950/85 px-2 py-1.5 backdrop-blur-[2px]"
+                        style={{ marginRight: 'max(0.5rem, env(safe-area-inset-right, 0px))' }}
+                        aria-label="Indicator legend"
                       >
-                        {MARKET_CHART_RESOLUTIONS.map((row) => {
-                          const on = row.id === advancedResolutionId
-                          return (
-                            <button
-                              key={row.id}
-                              type="button"
-                              role="option"
-                              aria-selected={on}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                selectAdvancedResolutionId(row.id)
-                              }}
-                              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90 ${
-                                on ? 'text-cyan-200' : 'text-zinc-200'
-                              }`}
+                        <div className={`mb-1 text-[9px] font-semibold uppercase tracking-wide ${mutedClass}`}>
+                          Legend
+                        </div>
+                        <ul className="flex flex-col gap-1">
+                          {activeIndicatorLegend.map((row) => (
+                            <li
+                              key={row.key}
+                              className="flex items-center gap-1.5 text-[10px] leading-none text-zinc-200"
                             >
-                              <span
-                                className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-[11px] ${
-                                  on ? 'text-cyan-400' : 'text-transparent'
-                                }`}
-                                aria-hidden="true"
-                              >
-                                ✓
-                              </span>
-                              {row.label}
-                            </button>
-                          )
-                        })}
+                              <MarketIndicatorLegendLine color={row.color} dashed={row.dashed} />
+                              <span className="truncate">{row.label}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     ) : null}
-                  </div>
-                </div>
-
-                {advancedLoading ? (
-                  <div className={`absolute inset-0 z-[1] grid place-items-center text-sm ${mutedClass}`}>
-                    Loading…
-                  </div>
-                ) : null}
+                    {advancedLoading ? (
+                      <div className={`absolute inset-0 z-[1] grid place-items-center text-sm ${mutedClass}`}>
+                        Loading…
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
