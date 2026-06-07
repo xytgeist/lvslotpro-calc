@@ -51,6 +51,8 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   let startLocalX = 0
   let startLocalY = 0
   let lastLocalX = null
+  /** @type {Map<number, { x: number, y: number }>} */
+  const activePointers = new Map()
 
   const releaseCapture = (pointerId) => {
     if (!el.hasPointerCapture(pointerId)) return
@@ -70,6 +72,14 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   const onPointerDown = (e) => {
     if (priceAxisHit?.(e.clientX, e.clientY)) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
+
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (activePointers.size >= 2) {
+      if (activePointerId != null) releaseCapture(activePointerId)
+      resetGesture()
+      return
+    }
+
     resetGesture()
     mode = 'pending'
     activePointerId = e.pointerId
@@ -84,6 +94,7 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   }
 
   const onPointerMove = (e) => {
+    if (activePointers.size >= 2) return
     if (activePointerId == null || e.pointerId !== activePointerId) return
     const local = marketChartClientToLocal(el, e.clientX, e.clientY)
 
@@ -108,6 +119,7 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   }
 
   const onPointerEnd = (e) => {
+    activePointers.delete(e.pointerId)
     if (activePointerId == null || e.pointerId !== activePointerId) return
     releaseCapture(e.pointerId)
     resetGesture()

@@ -52,6 +52,7 @@ import {
 } from './loungeMarketChartPriceAxisZoom.js'
 import {
   bindMarketChartHistoryLoader,
+  bindMarketChartPanPointer,
   scrollMarketChartByPixels,
   shiftMarketChartLogicalRange,
 } from './loungeMarketChartPan.js'
@@ -1036,8 +1037,8 @@ export default function LoungeMarketChartModal({
       handleScroll: isAdvancedView
         ? {
             mouseWheel: false,
-            pressedMouseMove: true,
-            horzTouchDrag: true,
+            pressedMouseMove: false,
+            horzTouchDrag: false,
             vertTouchDrag: false,
           }
         : false,
@@ -1164,6 +1165,10 @@ export default function LoungeMarketChartModal({
         })
       : () => {}
 
+    const unbindPan = isAdvancedView
+      ? bindMarketChartPanPointer(el, chart, { priceAxisHit })
+      : () => {}
+
     const unbindHistory = isAdvancedView
       ? bindMarketChartHistoryLoader(
           chart,
@@ -1229,6 +1234,7 @@ export default function LoungeMarketChartModal({
     return () => {
       cancelAnimationFrame(resizeRaf)
       unbindPriceAxisZoom()
+      unbindPan()
       unbindHistory()
       unbindScrub()
       ro.disconnect()
