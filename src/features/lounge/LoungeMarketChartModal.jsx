@@ -12,7 +12,7 @@ import {
   MARKET_MODAL_DEFAULT_TIMEFRAME_IDX,
   MARKET_MODAL_TIMEFRAMES,
 } from '../../utils/loungeMarketCaptionParse.js'
-import { loungeMarketModalNews, loungeMarketModalSeries } from '../../utils/loungeMarketApi.js'
+import { loungeMarketModalNews, loungeMarketModalSeries, loungeMarketModalSeriesBefore, mergeMarketBarsOlder } from '../../utils/loungeMarketApi.js'
 import { isUsableStockIntradayBars, isUsEquityRegularSessionOpen } from '../../utils/usEquityMarketSession.js'
 import { formatLoungeSearchError, loungeSearchCashtagPosts, LOUNGE_SEARCH_SORT } from './loungeSearchApi.js'
 import { useLoungeMarketFeedQuotes } from './LoungeMarketFeedContext.jsx'
@@ -49,6 +49,13 @@ import {
   bindMarketChartPriceAxisZoom,
   marketChartPriceAxisHit,
 } from './loungeMarketChartPriceAxisZoom.js'
+import {
+  bindMarketChartHistoryLoader,
+  bindMarketChartPanPointer,
+  scrollMarketChartByPixels,
+  shiftMarketChartLogicalRange,
+} from './loungeMarketChartPan.js'
+import { refreshAdvancedMarketChartData } from './loungeMarketChartDataSync.js'
 import {
   marketChartAdvancedLocalization,
   marketChartAdvancedPriceScaleOptions,
@@ -198,11 +205,11 @@ function MarketIndicatorLegendSwatches({ items, className = '' }) {
   )
 }
 
-/** Fit series to width with the last bar flush to the plot's right edge. */
-function fitMarketChartTimeScale(chart) {
+/** Fit series to width; Advanced keeps the right edge free so pan-back works. */
+function fitMarketChartTimeScale(chart, { fixRightEdge = true } = {}) {
   chart.timeScale().applyOptions({ rightOffset: 0, rightOffsetPixels: 0 })
   chart.timeScale().fitContent()
-  chart.timeScale().applyOptions({ rightOffset: 0, rightOffsetPixels: 0, fixRightEdge: true })
+  chart.timeScale().applyOptions({ rightOffset: 0, rightOffsetPixels: 0, fixRightEdge })
 }
 
 /** Last series value at or before crosshair time. */
@@ -229,26 +236,8 @@ function scrubQuoteFromBarPoints(barPoints, price) {
   return { price }
 }
 
-/** Shift visible range by horizontal drag delta (px). */
-function scrollMarketChartByPixels(chart, deltaPx) {
-  if (!chart || !deltaPx) return
-  const ts = chart.timeScale()
-  const range = ts.getVisibleLogicalRange()
-  if (!range) return
-  const coord0 = ts.logicalToCoordinate(range.from)
-  const coord1 = ts.logicalToCoordinate(range.from + 1)
-  if (coord0 == null || coord1 == null) return
-  const barWidthPx = coord1 - coord0
-  if (!Number.isFinite(barWidthPx) || barWidthPx === 0) return
-  const barShift = deltaPx / barWidthPx
-  ts.setVisibleLogicalRange({
-    from: range.from - barShift,
-    to: range.to - barShift,
-  })
-}
-
 /**
- * Scrub on tap/slide; long-press (~450ms) then drag pans the time scale.
+ * Scrub on tap/slide; long-press (~450ms) then drag pans the time scale (modal quick view only).
  * @param {HTMLElement} el
  * @param {import('lightweight-charts').IChartApi} chart
  * @param {import('lightweight-charts').ISeriesApi} mainSeries
@@ -501,6 +490,14 @@ export default function LoungeMarketChartModal({
   const [series, setSeries] = useState(/** @type {{ quote?: object, bars?: object[], window_label?: string } | null} */ (null))
   const [seriesScope, setSeriesScope] = useState('')
   const loadSeriesGenRef = useRef(0)
+  const [historyBars, setHistoryBars] = useState(/** @type {object[]} */ ([]))
+  const [historyHasMore, setHistoryHasMore] = useState(true)
+  const historyLoadingRef = useRef(false)
+  const volumeSeriesRef = useRef(null)
+  const indicatorSeriesRef = useRef(/** @type {import('lightweight-charts').ISeriesApi[]} */ ([]))
+  const chartSeriesRef = useRef(null)
+  const allBarsRef = useRef(/** @type {object[]} */ ([]))
+  const priceScaleUserPinnedRef = useRef(false)
   const [loading, setLoading] = useState(false)
   const [news, setNews] = useState(/** @type {object | null} */ (null))
   const [newsLoading, setNewsLoading] = useState(false)
@@ -635,6 +632,9 @@ export default function LoungeMarketChartModal({
     setChartTypeMenuOpen(false)
     setTimeframeMenuOpen(false)
     setScrubQuote(null)
+    setHistoryBars([])
+    setHistoryHasMore(true)
+    historyLoadingRef.current = false
     writeStoredMarketChartViewMode('quick')
   }, [])
 
@@ -735,6 +735,9 @@ export default function LoungeMarketChartModal({
     loadSeriesGenRef.current += 1
     setSeries(null)
     setSeriesScope('')
+    setHistoryBars([])
+    setHistoryHasMore(true)
+    historyLoadingRef.current = false
   }, [active?.asset_class, active?.symbol, activeIdx, timeframeIdx])
 
   const loadSeries = useCallback(async () => {
@@ -870,6 +873,93 @@ export default function LoungeMarketChartModal({
     return fetchedSeries || live
   }, [active, fetchedSeries, rollingLive, timeframe.kind])
 
+  const allBars = useMemo(() => {
+    const base = chartSeries?.bars || []
+    return mergeMarketBarsOlder(base, historyBars)
+  }, [chartSeries?.bars, historyBars])
+
+  chartSeriesRef.current = chartSeries
+  allBarsRef.current = allBars
+
+  const loadMoreHistory = useCallback(
+    async (beforeSec) => {
+      if (
+        !advancedFullscreenOpen ||
+        !historyHasMore ||
+        historyLoadingRef.current ||
+        !supabaseClient ||
+        !active
+      ) {
+        return
+      }
+      historyLoadingRef.current = true
+      try {
+        const tf = MARKET_MODAL_TIMEFRAMES[timeframeIdx] || MARKET_MODAL_TIMEFRAMES[0]
+        const data = await loungeMarketModalSeriesBefore(supabaseClient, {
+          symbol: active.symbol,
+          asset_class: active.asset_class,
+          kind: tf.kind,
+          window_key: tf.windowKey,
+          before_sec: beforeSec,
+        })
+        if (!data) return
+        if (!data.bars?.length) {
+          setHistoryHasMore(false)
+          return
+        }
+        setHistoryBars((prev) => {
+          const nextHistory = mergeMarketBarsOlder(prev, data.bars)
+          const base = chartSeriesRef.current?.bars || []
+          const prevAll = mergeMarketBarsOlder(base, prev)
+          const nextAll = mergeMarketBarsOlder(base, nextHistory)
+          const added = nextAll.length - prevAll.length
+          const chart = chartRef.current
+          const mainSeries = mainSeriesRef.current
+          if (chart && mainSeries && added > 0) {
+            const refreshed = refreshAdvancedMarketChartData({
+              chart,
+              mainSeries,
+              volumeSeries: volumeSeriesRef.current,
+              indicatorSeries: indicatorSeriesRef.current,
+              rawBars: nextAll,
+              chartType: effectiveChartType,
+              activeIndicators,
+              isLight,
+              volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
+              applyPriceRange: priceScaleUserPinnedRef.current
+                ? undefined
+                : (barPoints, overlayLines) => {
+                    applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
+                      keepMargins: true,
+                      chartType: effectiveChartType,
+                      rawBars: nextAll,
+                    })
+                  },
+            })
+            volumeSeriesRef.current = refreshed.volumeSeries
+            indicatorSeriesRef.current = refreshed.indicatorSeries
+            shiftMarketChartLogicalRange(chart, added)
+          }
+          allBarsRef.current = nextAll
+          return nextHistory
+        })
+        if (data.has_more === false) setHistoryHasMore(false)
+      } finally {
+        historyLoadingRef.current = false
+      }
+    },
+    [
+      active,
+      activeIndicators,
+      advancedFullscreenOpen,
+      effectiveChartType,
+      historyHasMore,
+      isLight,
+      supabaseClient,
+      timeframeIdx,
+    ],
+  )
+
   const quote = chartSeries?.quote || active?.quote
   const displayQuote = scrubQuote ?? quote
   const displayChangePct = Number(displayQuote?.change_pct)
@@ -947,7 +1037,7 @@ export default function LoungeMarketChartModal({
           },
       crosshair: loungeMarketChartCrosshairOptions(isAdvancedView, isLight),
     })
-    const rawBars = chartSeries?.bars || []
+    const rawBars = allBarsRef.current?.length ? allBarsRef.current : chartSeries?.bars || []
     const barPoints = loungeMarketBarsToSeries(rawBars)
     const overlayLines = isAdvancedView
       ? computeMarketChartOverlayLines(barPoints, activeIndicators)
@@ -960,6 +1050,8 @@ export default function LoungeMarketChartModal({
       isLight,
     })
     mainSeriesRef.current = mainSeries
+    volumeSeriesRef.current = null
+    indicatorSeriesRef.current = []
     const hasOscillatorPane =
       isAdvancedView &&
       MARKET_CHART_INDICATORS.some((row) => row.kind === 'oscillator' && activeIndicators.has(row.id))
@@ -967,11 +1059,11 @@ export default function LoungeMarketChartModal({
       ? MARKET_CHART_INDICATORS.filter((row) => row.kind === 'oscillator' && activeIndicators.has(row.id)).length
       : 0
     if (isAdvancedView) {
-      attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, {
+      indicatorSeriesRef.current = attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, {
         isLight,
         volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
       })
-      attachMarketChartVolumePane(chart, rawBars, { isLight })
+      volumeSeriesRef.current = attachMarketChartVolumePane(chart, rawBars, { isLight })
       mainSeries.priceScale().applyOptions({
         scaleMargins: {
           top: 0.06,
@@ -994,7 +1086,7 @@ export default function LoungeMarketChartModal({
     if (effectiveChartType !== 'candle') {
       setChartLineMarkers(mainSeries, barPoints, lineColor)
     }
-    fitMarketChartTimeScale(chart)
+    fitMarketChartTimeScale(chart, { fixRightEdge: !isAdvancedView })
 
     const publishPriceAxisLabels = (next) => {
       if (priceAxisLabelsEqual(priceAxisLabelsRef.current, next)) return
@@ -1003,9 +1095,11 @@ export default function LoungeMarketChartModal({
     }
 
     let priceScaleUserPinned = false
+    priceScaleUserPinnedRef.current = false
     const priceAxisBottomExclude = marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount)
     const resetPriceScaleToData = () => {
       priceScaleUserPinned = false
+      priceScaleUserPinnedRef.current = false
       if (!isAdvancedView) return
       applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
         keepMargins: true,
@@ -1048,30 +1142,49 @@ export default function LoungeMarketChartModal({
           bottomExcludeFraction: priceAxisBottomExclude,
           onUserZoom: () => {
             priceScaleUserPinned = true
+            priceScaleUserPinnedRef.current = true
           },
           onReset: resetPriceScaleToData,
         })
       : () => {}
 
-    const unbindScrub = bindMarketChartScrubPointer(
-      el,
-      chart,
-      mainSeries,
-      barPoints,
-      (quoteAtPoint) => {
-        setScrubQuote(quoteAtPoint)
-        if (isAdvancedView) return
-        if (quoteAtPoint?.price != null) {
-          const axisY = mainSeries.priceToCoordinate(quoteAtPoint.price)
-          setScrubAxisCurrent(
-            axisY != null ? { price: quoteAtPoint.price, y: Math.round(axisY) } : null,
-          )
-        } else {
-          setScrubAxisCurrent(null)
-        }
-      },
-      { panEnabled: isAdvancedView, priceAxisHit },
-    )
+    const unbindPan = isAdvancedView
+      ? bindMarketChartPanPointer(el, chart, { priceAxisHit })
+      : () => {}
+
+    const unbindHistory = isAdvancedView
+      ? bindMarketChartHistoryLoader(
+          chart,
+          () => allBarsRef.current,
+          (beforeSec) => {
+            void loadMoreHistory(beforeSec)
+          },
+          {
+            canLoad: () => historyHasMore && !historyLoadingRef.current,
+          },
+        )
+      : () => {}
+
+    const unbindScrub = isAdvancedView
+      ? () => {}
+      : bindMarketChartScrubPointer(
+          el,
+          chart,
+          mainSeries,
+          barPoints,
+          (quoteAtPoint) => {
+            setScrubQuote(quoteAtPoint)
+            if (quoteAtPoint?.price != null) {
+              const axisY = mainSeries.priceToCoordinate(quoteAtPoint.price)
+              setScrubAxisCurrent(
+                axisY != null ? { price: quoteAtPoint.price, y: Math.round(axisY) } : null,
+              )
+            } else {
+              setScrubAxisCurrent(null)
+            }
+          },
+          { panEnabled: false, priceAxisHit },
+        )
 
     chartRef.current = chart
     let resizeRaf = 0
@@ -1086,19 +1199,25 @@ export default function LoungeMarketChartModal({
           width: liveHost.clientWidth,
           height: liveHost.clientHeight,
         })
-        fitMarketChartTimeScale(chartRef.current)
-        refreshChartOverlays()
+        if (!isAdvancedView) {
+          fitMarketChartTimeScale(chartRef.current, { fixRightEdge: true })
+          refreshChartOverlays()
+        }
       })
     })
     ro.observe(el)
     return () => {
       cancelAnimationFrame(resizeRaf)
       unbindPriceAxisZoom()
+      unbindPan()
+      unbindHistory()
       unbindScrub()
       ro.disconnect()
       chart.remove()
       chartRef.current = null
       mainSeriesRef.current = null
+      volumeSeriesRef.current = null
+      indicatorSeriesRef.current = []
       priceAxisLabelsRef.current = { high: null, current: null, low: null }
       setPriceAxisLabels({ high: null, current: null, low: null })
       setScrubQuote(null)
@@ -1108,12 +1227,15 @@ export default function LoungeMarketChartModal({
     active?.symbol,
     activeIndicatorKey,
     advancedFullscreenOpen,
-    chartSeries,
+    chartSeries?.bars,
     effectiveChartType,
     chartUp,
     isAdvancedView,
     isLight,
+    loadMoreHistory,
+    historyHasMore,
     open,
+    seriesScope,
     theme,
     timeframe.label,
   ])

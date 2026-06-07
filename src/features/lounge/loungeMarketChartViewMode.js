@@ -143,7 +143,7 @@ export function marketChartAdvancedTimeScaleOptions(timeframeLabel, isLight = fa
     borderColor: chartAxisBorderColor(isLight),
     rightOffset: 0,
     rightOffsetPixels: 0,
-    fixRightEdge: true,
+    fixRightEdge: false,
     timeVisible: timeframeLabel === '1H' || timeframeLabel === '1D' || timeframeLabel === '1W',
     secondsVisible: timeframeLabel === '1H',
     tickMarkFormatter: (time) => formatMarketChartAxisTime(time, timeframeLabel),

@@ -119,6 +119,39 @@ export async function loungeMarketModalSeries(supabase, opts) {
 }
 
 /**
+ * Fetch older bars ending before `before_sec` (Advanced chart pan-back).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ symbol: string, asset_class: string, kind?: string, window_key?: string, before_sec: number }} opts
+ */
+export async function loungeMarketModalSeriesBefore(supabase, opts) {
+  const data = await loungeMarketInvoke(supabase, {
+    action: 'modal_series',
+    symbol: opts.symbol,
+    asset_class: opts.asset_class,
+    kind: opts.kind || 'historical',
+    window_key: opts.window_key || '24h',
+    before_sec: opts.before_sec,
+  })
+  if (!data || data.error) return null
+  return data
+}
+
+/** Merge older bars into an ascending unique series. */
+export function mergeMarketBarsOlder(existing = [], older = []) {
+  /** @type {Map<number, { t: number, c: number, v?: number }>} */
+  const map = new Map()
+  for (const bar of [...older, ...existing]) {
+    if (!bar || !Number.isFinite(bar.t) || !Number.isFinite(bar.c)) continue
+    const t = Math.floor(bar.t > 1e12 ? bar.t / 1000 : bar.t)
+    const row = { t, c: bar.c, ...(Number.isFinite(bar.v) ? { v: bar.v } : {}) }
+    map.set(t, row)
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, row]) => row)
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {{ symbol: string, asset_class: string }} opts
  */

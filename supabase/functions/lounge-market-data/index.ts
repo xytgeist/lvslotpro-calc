@@ -12,10 +12,12 @@ import {
   finnhubSymbolForAsset,
   marketSearch,
   normalizeDisplaySymbol,
+  normalizeMarketBarsToUsd,
   normalizeMarketCapToUsd,
   normalizeMarketQuoteToUsd,
   normalizeMarketSeriesToUsd,
   resolveMarketBars,
+  resolveMarketBarsBefore,
   resolveMarketSymbolsForAttach,
   sortMarketSearchResults,
   type MarketAssetClass,
@@ -227,6 +229,28 @@ Deno.serve(async (req) => {
     if (!parsed) return json(400, { error: 'symbol is required.' })
     const windowKey = (String(body?.window_key || '24h').trim() || '24h') as MarketWindowKey
     const kind = String(body?.kind || 'rolling')
+    const beforeSecRaw = body?.before_sec
+    if (beforeSecRaw != null && beforeSecRaw !== '') {
+      const beforeSec = Number(beforeSecRaw)
+      if (!Number.isFinite(beforeSec) || beforeSec <= 0) {
+        return json(400, { error: 'Invalid before_sec.' })
+      }
+      try {
+        const profile = await finnhubProfile(parsed.symbol, parsed.asset_class)
+        const currency = embedQuoteCurrency(profile.exchange, profile.currency)
+        const extendWindowKey = (kind === 'rolling' ? '24h' : windowKey) as MarketWindowKey
+        const { bars, hasMore } = await resolveMarketBarsBefore(
+          parsed.symbol,
+          parsed.asset_class,
+          extendWindowKey,
+          beforeSec,
+        )
+        const normalizedBars = await normalizeMarketBarsToUsd(bars, currency)
+        return json(200, { ok: true, bars: normalizedBars, has_more: hasMore })
+      } catch (e) {
+        return json(502, { error: e instanceof Error ? e.message : 'Series extend failed.' })
+      }
+    }
     try {
       if (kind === 'historical') {
         const profile = await finnhubProfile(parsed.symbol, parsed.asset_class)

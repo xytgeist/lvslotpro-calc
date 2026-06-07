@@ -623,6 +623,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-09: **Lounge market modal Advanced pan + history (code on `test`):** Advanced chart **drag-to-pan** (no scrub); panning left loads older bars via **`modal_series` + `before_sec`**. **Redeploy `lounge-market-data`**. Client + Edge.
 - 2026-06-09: **Lounge market modal Advanced fullscreen (code on `test`):** **Advanced** opens landscape fullscreen — defaults to **Candles** + **volume** histogram pane; modal sheet keeps gradient **area** + **H/L/current** gutter. **Redeploy `lounge-market-data`** for Yahoo **`volume`** on bars. Client + Edge.
 - 2026-06-09: **Lounge market modal Quick / Advanced view (code on `test`):** **`LoungeMarketChartModal`** **Advanced** fullscreen — grid, **LWC time + price axes** (timeframe-aware tick labels), Area/Candles, indicators, timeframe dropdown, pan, true crosshair, TV logo. Client-only.
 - 2026-06-09: **Lounge market modal chart pan (code on `test`):** long-press ~450ms on plot then horizontal drag **pans** time scale; tap/slide keeps **scrub** (header price + crosshair). Client-only.

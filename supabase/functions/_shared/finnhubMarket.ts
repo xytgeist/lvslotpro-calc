@@ -223,6 +223,25 @@ export function parseCaptionMarketWindow(caption: string): {
   return { kind: 'rolling', windowKey: '24h', windowLabel: '24h' }
 }
 
+const MARKET_HISTORY_MAX_LOOKBACK_SEC = 20 * 365 * 86400
+
+export function windowSpanSec(windowKey: MarketWindowKey): number {
+  const { fromSec, toSec } = windowRange(windowKey)
+  return Math.max(3600, toSec - fromSec)
+}
+
+/** Same span/resolution as `windowRange`, anchored so `toSec` ends at `endSec`. */
+export function windowRangeAtEnd(windowKey: MarketWindowKey, endSec: number): {
+  fromSec: number
+  toSec: number
+  resolution: string
+} {
+  const end = Math.floor(endSec)
+  const span = windowSpanSec(windowKey)
+  const { resolution } = windowRange(windowKey)
+  return { fromSec: end - span, toSec: end, resolution }
+}
+
 export function windowRange(windowKey: MarketWindowKey): {
   fromSec: number
   toSec: number
@@ -588,6 +607,43 @@ export async function resolveMarketBars(
   }
 
   return normalizeMarketBars(synthesizeBarsFromQuote(quote, windowKey))
+}
+
+/** Older bars ending strictly before `beforeSec` — used when panning back on modal charts. */
+export async function resolveMarketBarsBefore(
+  symbol: string,
+  assetClass: MarketAssetClass,
+  windowKey: MarketWindowKey,
+  beforeSec: number,
+): Promise<{ bars: MarketBar[]; hasMore: boolean }> {
+  const anchor = Math.floor(beforeSec)
+  if (!Number.isFinite(anchor) || anchor <= 0) return { bars: [], hasMore: false }
+
+  const endSec = anchor - 1
+  const { fromSec, toSec, resolution } = windowRangeAtEnd(windowKey, endSec)
+  const minFrom = Math.floor(Date.now() / 1000) - MARKET_HISTORY_MAX_LOOKBACK_SEC
+  if (fromSec < minFrom) return { bars: [], hasMore: false }
+
+  const finnhubSym = finnhubSymbolForAsset(symbol, assetClass)
+  const interval = yahooIntervalForWindow(windowKey)
+  let bars: MarketBar[] = []
+
+  const candidates = [resolution, ...(RESOLUTION_FALLBACKS[windowKey] || [])]
+  const seen = new Set<string>()
+  for (const res of candidates) {
+    if (seen.has(res)) continue
+    seen.add(res)
+    bars = await fetchFinnhubCandlesAtResolution(finnhubSym, assetClass, fromSec, toSec, res)
+    if (bars.length >= 2) break
+  }
+
+  if (bars.length < 2 && assetClass === 'stock') {
+    bars = await yahooStockCandles(symbol, fromSec, toSec, interval)
+  }
+
+  bars = normalizeMarketBars(bars).filter((b) => barUnixSec(b.t) < anchor)
+  const hasMore = bars.length >= 2 && fromSec > minFrom
+  return { bars, hasMore }
 }
 
 /** Strictly ascending unique timestamps for chart libraries + embed storage. */
