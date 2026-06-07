@@ -5,9 +5,11 @@
 
 import { coingeckoBatchPickerQuotes, coingeckoCryptoCandles, coingeckoCryptoProfile, coingeckoMarketSearch } from './coingeckoMarket.ts'
 import {
+  isUsableStockIntradayBars,
   isUsEquityRegularSessionOpen,
   lastRegularSessionBounds,
   lastRegularSessionLabel,
+  regularSessionDaysBack,
 } from './usEquityMarketSession.ts'
 import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote } from './yahooMarket.ts'
 
@@ -408,14 +410,20 @@ async function resolveStockIntradayBars(
     if (bars.length >= 2) return normalizeMarketBars(bars)
   }
 
-  const session = lastRegularSessionBounds()
-  const sessionBars = await yahooStockCandles(
-    symbol,
-    session.fromSec,
-    session.toSec,
-    windowKey === '1h' ? '1m' : '5m',
-  )
-  if (sessionBars.length >= 2) return normalizeMarketBars(sessionBars)
+  const intervals = windowKey === '1h' ? ['1m', '5m'] : ['5m', '1m']
+  for (const session of regularSessionDaysBack()) {
+    for (const step of intervals) {
+      const sessionBars = await yahooStockCandles(
+        symbol,
+        session.fromSec,
+        session.toSec + 60,
+        step,
+      )
+      if (sessionBars.length >= 2 && isUsableStockIntradayBars(sessionBars)) {
+        return normalizeMarketBars(sessionBars)
+      }
+    }
+  }
   return []
 }
 

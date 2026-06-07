@@ -1,6 +1,8 @@
 /** @typedef {'stock'|'crypto'} MarketAssetClass */
 /** @typedef {'rolling'|'historical'} MarketEmbedKind */
 
+import { isUsableStockIntradayBars } from './usEquityMarketSession.js'
+
 /**
  * @typedef {Object} MarketBar
  * @property {number} t
@@ -365,6 +367,50 @@ export function formatMarketChangeLine(change, changePct) {
     parts.push(`(${sign}${Math.abs(pct).toFixed(2)}%)`)
   }
   return parts.join(' ')
+}
+
+/**
+ * Pick rolling quote/bars for feed minis — reject synthetic calendar-24h diagonals on stocks.
+ * @param {MarketEmbed | object | null | undefined} embed
+ * @param {object | null | undefined} rollingLive
+ */
+export function pickRollingMarketPayload(embed, rollingLive) {
+  if (!embed || embed.kind !== 'rolling') {
+    return {
+      quote: embed?.quote,
+      bars: embed?.bars,
+      window_label: embed?.window_label,
+    }
+  }
+
+  if (embed.asset_class === 'stock') {
+    if (isUsableStockIntradayBars(rollingLive?.bars)) {
+      return {
+        quote: rollingLive.quote,
+        bars: rollingLive.bars,
+        window_label: rollingLive.window_label,
+      }
+    }
+    if (isUsableStockIntradayBars(embed?.bars)) {
+      return {
+        quote: embed.quote,
+        bars: embed.bars,
+        window_label: embed.window_label,
+      }
+    }
+    return {
+      quote: rollingLive?.quote || embed?.quote,
+      bars: [],
+      window_label: rollingLive?.window_label || embed?.window_label,
+    }
+  }
+
+  const bars = rollingLive?.bars?.length >= 2 ? rollingLive.bars : embed?.bars
+  return {
+    quote: rollingLive?.quote || embed?.quote,
+    bars,
+    window_label: rollingLive?.window_label || embed?.window_label,
+  }
 }
 
 /** Modal chart timeframe pills → Edge `window_key` + series kind. */

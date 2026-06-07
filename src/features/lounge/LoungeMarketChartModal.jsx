@@ -6,13 +6,16 @@ import {
   formatMarketCap,
   formatMarketChangeLine,
   formatMarketPrice,
+  marketEmbedCacheKey,
   marketEmbedSearchCashtag,
+  pickRollingMarketPayload,
   MARKET_MODAL_DEFAULT_TIMEFRAME_IDX,
   MARKET_MODAL_TIMEFRAMES,
 } from '../../utils/loungeMarketCaptionParse.js'
 import { loungeMarketModalNews, loungeMarketModalSeries } from '../../utils/loungeMarketApi.js'
-import { isUsEquityRegularSessionOpen } from '../../utils/usEquityMarketSession.js'
+import { isUsableStockIntradayBars, isUsEquityRegularSessionOpen } from '../../utils/usEquityMarketSession.js'
 import { formatLoungeSearchError, loungeSearchCashtagPosts, LOUNGE_SEARCH_SORT } from './loungeSearchApi.js'
+import { useLoungeMarketFeedQuotes } from './LoungeMarketFeedContext.jsx'
 import { loungeMarketBarsToSeries, loungeMarketChartIsLight, loungeMarketChartTheme, TRADINGVIEW_CHART_ATTRIBUTION_URL } from './loungeMarketChartTheme.js'
 
 const SHEET_DISMISS_PX = 88
@@ -313,6 +316,7 @@ export default function LoungeMarketChartModal({
   )
 
   const isLight = loungeMarketChartIsLight()
+  const { quotes: feedQuotes } = useLoungeMarketFeedQuotes()
   const list = useMemo(() => (Array.isArray(embeds) ? embeds.filter(Boolean) : []), [embeds])
   const timeframe = MARKET_MODAL_TIMEFRAMES[timeframeIdx] || MARKET_MODAL_TIMEFRAMES[0]
 
@@ -327,6 +331,14 @@ export default function LoungeMarketChartModal({
   }, [open, focusSymbol, list])
 
   const active = list[activeIdx] || null
+
+  /** Same live rolling payload as feed mini charts (`LoungeMarketChartStrip`). */
+  const rollingLive = useMemo(() => {
+    if (!active || active.kind !== 'rolling') return null
+    const key = marketEmbedCacheKey(active)
+    const live = feedQuotes[key]
+    return live && typeof live === 'object' ? live : null
+  }, [active, feedQuotes])
 
   const resetSheetDrag = useCallback(() => {
     sheetDragRef.current = null
@@ -516,7 +528,7 @@ export default function LoungeMarketChartModal({
   useEffect(() => {
     setScrubQuote(null)
     setScrubAxisCurrent(null)
-  }, [activeIdx, timeframeIdx, series])
+  }, [activeIdx, timeframeIdx, series, rollingLive])
 
   useEffect(() => {
     if (!open) {
@@ -525,7 +537,24 @@ export default function LoungeMarketChartModal({
     }
   }, [open])
 
-  const quote = series?.quote || active?.quote
+  /** Rolling 1D: reject synthetic diagonals; prefer fresh modal series, then feed live, then embed. */
+  const chartSeries = useMemo(() => {
+    if (timeframe.kind !== 'rolling') return series
+
+    if (active?.asset_class === 'stock') {
+      if (isUsableStockIntradayBars(series?.bars)) return series
+      const live = pickRollingMarketPayload(active, rollingLive)
+      if (isUsableStockIntradayBars(live?.bars)) return live
+      return series || { quote: active?.quote, bars: [], window_label: active?.window_label }
+    }
+
+    if (series?.bars?.length >= 2) return series
+    const live = pickRollingMarketPayload(active, rollingLive)
+    if (live?.bars?.length >= 2) return live
+    return series
+  }, [active, rollingLive, series, timeframe.kind])
+
+  const quote = chartSeries?.quote || active?.quote
   const displayQuote = scrubQuote ?? quote
   const displayChangePct = Number(displayQuote?.change_pct)
   const displayUp = Number.isFinite(displayChangePct) ? displayChangePct >= 0 : true
@@ -575,7 +604,7 @@ export default function LoungeMarketChartModal({
         horzLine: { visible: false, labelVisible: false },
       },
     })
-    const barPoints = loungeMarketBarsToSeries(series?.bars || active?.bars || [])
+    const barPoints = loungeMarketBarsToSeries(chartSeries?.bars || [])
     const area = chart.addSeries(AreaSeries, {
       lineColor,
       topColor: chartUp ? 'rgba(34, 197, 94, 0.28)' : 'rgba(239, 68, 68, 0.28)',
@@ -650,7 +679,7 @@ export default function LoungeMarketChartModal({
       setScrubQuote(null)
       setScrubAxisCurrent(null)
     }
-  }, [open, series, chartUp, isLight, active?.symbol])
+  }, [open, chartSeries, chartUp, isLight, active?.symbol])
 
   if (!open || !list.length) return null
 

@@ -5,6 +5,7 @@ import {
   formatMarketEmbedWindowLabel,
   formatMarketPrice,
   marketEmbedCacheKey,
+  pickRollingMarketPayload,
 } from '../../utils/loungeMarketCaptionParse.js'
 import { loungeMarketBarsToSeries, loungeMarketChartTheme } from './loungeMarketChartTheme.js'
 
@@ -24,9 +25,10 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
   const tapRef = useRef(/** @type {{ x: number, y: number, pointerId: number } | null} */ (null))
 
   const isRolling = embed?.kind === 'rolling'
-  const quote = isRolling && rollingLive?.quote ? rollingLive.quote : embed?.quote
-  const bars = isRolling && rollingLive?.bars?.length ? rollingLive.bars : embed?.bars
-  const windowLabel = formatMarketEmbedWindowLabel(embed, isRolling ? rollingLive : null)
+  const rollingPayload = isRolling ? pickRollingMarketPayload(embed, rollingLive) : null
+  const quote = isRolling ? rollingPayload?.quote : embed?.quote
+  const bars = isRolling ? rollingPayload?.bars : embed?.bars
+  const windowLabel = formatMarketEmbedWindowLabel(embed, isRolling ? rollingPayload : null)
   const changePct = Number(quote?.change_pct)
   const up = Number.isFinite(changePct) ? changePct >= 0 : true
   const theme = loungeMarketChartTheme()

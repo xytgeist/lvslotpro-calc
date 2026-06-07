@@ -22,7 +22,7 @@ import {
   type MarketEmbed,
   type MarketWindowKey,
 } from '../_shared/finnhubMarket.ts'
-import { isUsEquityRegularSessionOpen, STOCK_ROLLING_CLOSED_CACHE_TTL_MS } from '../_shared/usEquityMarketSession.ts'
+import { isUsEquityRegularSessionOpen, isUsableStockIntradayBars, STOCK_ROLLING_CLOSED_CACHE_TTL_MS } from '../_shared/usEquityMarketSession.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,6 +40,14 @@ function cacheKey(symbol: string, assetClass: string) {
   return `${assetClass}:${symbol}`.toLowerCase()
 }
 
+function isRollingCachePayloadValid(payload: unknown, assetClass: MarketAssetClass): boolean {
+  if (!payload || typeof payload !== 'object') return false
+  const bars = (payload as { bars?: unknown }).bars
+  if (!Array.isArray(bars) || bars.length < 2) return false
+  if (assetClass === 'stock') return isUsableStockIntradayBars(bars as Array<{ t: number; c: number }>)
+  return true
+}
+
 async function readCache(
   admin: ReturnType<typeof createClient>,
   key: string,
@@ -51,6 +59,7 @@ async function readCache(
     .eq('cache_key', key)
     .maybeSingle()
   if (!data?.payload || !data.fetched_at) return null
+  if (!isRollingCachePayloadValid(data.payload, assetClass)) return null
   const age = Date.now() - new Date(String(data.fetched_at)).getTime()
   const ttl =
     assetClass === 'stock' && !isUsEquityRegularSessionOpen()
@@ -67,6 +76,7 @@ async function writeCache(
   assetClass: string,
   payload: unknown,
 ) {
+  if (!isRollingCachePayloadValid(payload, assetClass as MarketAssetClass)) return
   await admin.from('market_quote_cache').upsert({
     cache_key: key,
     symbol,
@@ -257,6 +267,7 @@ Deno.serve(async (req) => {
 
   if (action === 'batch_rolling') {
     const raw = Array.isArray(body?.symbols) ? body.symbols : []
+    const refresh = body?.refresh === true
     const items = raw
       .map((row) => parseSymbolInput(row))
       .filter(Boolean) as Array<{ symbol: string; asset_class: MarketAssetClass }>
@@ -267,10 +278,12 @@ Deno.serve(async (req) => {
     }
     const out: Record<string, unknown> = {}
     for (const [key, item] of unique.entries()) {
-      const cached = await readCache(admin, key, item.asset_class)
-      if (cached) {
-        out[key] = cached
-        continue
+      if (!refresh) {
+        const cached = await readCache(admin, key, item.asset_class)
+        if (cached) {
+          out[key] = cached
+          continue
+        }
       }
       try {
         const payload = await buildRollingBatchPayload(item.symbol, item.asset_class)

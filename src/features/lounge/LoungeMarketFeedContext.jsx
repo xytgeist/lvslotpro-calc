@@ -98,6 +98,7 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
       const batch = await loungeMarketBatchRolling(
         supabaseClient,
         pollItems.map(({ symbol, asset_class }) => ({ symbol, asset_class })),
+        { refresh: options.forceStocks === true },
       )
       if (!batch || typeof batch !== 'object') return
       const next = {}

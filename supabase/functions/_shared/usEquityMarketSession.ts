@@ -126,3 +126,36 @@ export function lastRegularSessionLabel(now = new Date()): string {
 
 /** Longer cache TTL for stock rolling quotes when RTH is closed. */
 export const STOCK_ROLLING_CLOSED_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * Reject synthetic calendar-24h diagonals (~32 pts / ~24h span).
+ * Real RTH intraday is ~6.5h with many 1m/5m bars.
+ */
+export function isUsableStockIntradayBars(
+  bars: Array<{ t: number; c: number }> | null | undefined,
+): boolean {
+  if (!Array.isArray(bars) || bars.length < 10) return false
+  const sorted = bars
+    .filter((b) => Number.isFinite(b?.t) && Number.isFinite(b?.c))
+    .map((b) => ({
+      t: Math.floor(b.t > 1e12 ? b.t / 1000 : b.t),
+      c: b.c,
+    }))
+    .sort((a, b) => a.t - b.t)
+  if (sorted.length < 10) return false
+  const span = sorted[sorted.length - 1].t - sorted[0].t
+  return span > 0 && span <= 8 * 3600
+}
+
+/** Last N regular sessions (newest first) for Yahoo fallback when the latest day has no intraday. */
+export function* regularSessionDaysBack(start = new Date(), maxDays = 5) {
+  let { year, month, day } = lastRegularSessionBounds(start)
+  for (let i = 0; i < maxDays; i += 1) {
+    const bounds = regularSessionBoundsForDay(year, month, day)
+    yield { year, month, day, ...bounds }
+    const prev = previousTradingDay({ year, month, day, weekday: 0, hour: 12, minute: 0 })
+    year = prev.year
+    month = prev.month
+    day = prev.day
+  }
+}

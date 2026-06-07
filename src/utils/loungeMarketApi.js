@@ -89,10 +89,15 @@ export async function attachMarketEmbedsToPost(supabase, { postId, caption, symb
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {Array<{ symbol: string, asset_class: string }>} symbols
+ * @param {{ refresh?: boolean }} [opts]
  */
-export async function loungeMarketBatchRolling(supabase, symbols) {
+export async function loungeMarketBatchRolling(supabase, symbols, opts = {}) {
   if (!symbols?.length) return {}
-  const data = await loungeMarketInvoke(supabase, { action: 'batch_rolling', symbols })
+  const data = await loungeMarketInvoke(supabase, {
+    action: 'batch_rolling',
+    symbols,
+    ...(opts.refresh ? { refresh: true } : {}),
+  })
   if (!data || data.error) return {}
   return data.quotes && typeof data.quotes === 'object' ? data.quotes : {}
 }
