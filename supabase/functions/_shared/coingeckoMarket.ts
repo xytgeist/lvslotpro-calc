@@ -206,6 +206,18 @@ export function coingeckoOhlcDaysForWindow(windowKey: string): '1' | '7' | '14' 
   }
 }
 
+/** Pick the smallest CoinGecko `/ohlc` `days` bucket that covers a lookback span. */
+export function coingeckoOhlcDaysForLookbackDays(lookbackDays: number): '1' | '7' | '14' | '30' | '90' | '180' | '365' {
+  const d = Math.max(1, Math.ceil(lookbackDays))
+  if (d <= 1) return '1'
+  if (d <= 7) return '7'
+  if (d <= 14) return '14'
+  if (d <= 30) return '30'
+  if (d <= 90) return '90'
+  if (d <= 180) return '180'
+  return '365'
+}
+
 function downsampleCoingeckoBars(bars: MarketBarOhlc[], max = 120): MarketBarOhlc[] {
   if (bars.length <= max) return bars
   const step = Math.ceil(bars.length / max)
@@ -328,6 +340,53 @@ export function coingeckoDaysForWindow(windowKey: string): number {
     default:
       return 1
   }
+}
+
+/** Advanced crypto chart fallback when Finnhub `/crypto/candle` returns nothing. */
+export async function coingeckoCryptoCandlesForAdvanced(
+  symbol: string,
+  lookbackDays: number,
+  maxBars = 500,
+): Promise<MarketBarOhlc[]> {
+  const coinId = await coingeckoResolveCoinId(symbol)
+  if (!coinId) return []
+
+  const days = coingeckoOhlcDaysForLookbackDays(lookbackDays)
+  try {
+    const params: Record<string, string> = { vs_currency: 'usd', days }
+    const key = coingeckoApiKey()
+    if (key && (days === '1' || days === '7' || days === '14' || days === '30' || days === '90')) {
+      params.interval = 'hourly'
+    }
+    const data = await coingeckoFetch(`/coins/${coinId}/ohlc`, params)
+    const bars = parseCoingeckoOhlcPayload(data)
+    if (bars.length >= 2) return downsampleCoingeckoBars(bars, maxBars)
+  } catch {
+    if (days !== '1') {
+      try {
+        const data = await coingeckoFetch(`/coins/${coinId}/ohlc`, { vs_currency: 'usd', days })
+        const bars = parseCoingeckoOhlcPayload(data)
+        if (bars.length >= 2) return downsampleCoingeckoBars(bars, maxBars)
+      } catch {
+        /* fall through to close-only */
+      }
+    }
+  }
+
+  const windowKey =
+    lookbackDays <= 1
+      ? '24h'
+      : lookbackDays <= 7
+        ? '1w'
+        : lookbackDays <= 30
+          ? '1m'
+          : lookbackDays <= 90
+            ? '3m'
+            : lookbackDays <= 180
+              ? '6m'
+              : '1y'
+  const closeOnly = await coingeckoCryptoCloseCandles(coinId, windowKey)
+  return downsampleCoingeckoBars(closeOnly, maxBars)
 }
 
 /** Crypto candle fallback when Finnhub candles are empty — OHLC via `/ohlc`, then close-only `market_chart`. */

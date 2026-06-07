@@ -3,6 +3,7 @@
  */
 
 import { aggregateMarketBarsToBucketSec } from './marketBarOhlc.ts'
+import { coingeckoCryptoCandlesForAdvanced } from './coingeckoMarket.ts'
 import {
   fetchFinnhubCandlesAtResolution,
   finnhubSymbolForAsset,
@@ -238,6 +239,10 @@ async function fetchRawBarsForWindow(
       yahooIntervalForResolution(config),
       yahooMax,
     )
+  }
+  if (bars.length < 2 && assetClass === 'crypto') {
+    const lookbackDays = Math.min(config.maxLookbackDays, Math.max(1, Math.ceil((toSec - fromSec) / 86400) + 2))
+    bars = await coingeckoCryptoCandlesForAdvanced(symbol, lookbackDays, 500)
   }
 
   bars = normalizeMarketBars(bars)

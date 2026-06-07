@@ -33,7 +33,6 @@ import { useLoungeMarketFeedQuotes } from './LoungeMarketFeedContext.jsx'
 import { loungeMarketBarsToSeries, loungeMarketChartCrosshairOptions, loungeMarketChartIsLight, loungeMarketChartTheme } from './loungeMarketChartTheme.js'
 import {
   attachMarketChartIndicators,
-  computeMarketChartOverlayLines,
   MARKET_CHART_INDICATOR_CATEGORIES,
   listActiveIndicatorLegend,
   listMarketChartIndicatorsByCategory,
@@ -78,6 +77,11 @@ import {
   shiftMarketChartLogicalRange,
 } from './loungeMarketChartPan.js'
 import { refreshAdvancedMarketChartData } from './loungeMarketChartDataSync.js'
+import {
+  applyVisibleCandlePriceRange,
+  bindVisibleCandlePriceRangeFit,
+  scheduleVisibleCandlePriceRange,
+} from './loungeMarketChartPriceRange.js'
 import {
   captureMarketChartPngFile,
   marketChartSnapshotBrandingFromEmbed,
@@ -834,6 +838,8 @@ export default function LoungeMarketChartModal({
   const chartPanningRef = useRef(false)
   const pendingHistoryApplyRef = useRef(/** @type {(() => void) | null} */ (null))
   const advancedBarsSignatureRef = useRef('')
+  /** True after user picks a resolution this Advanced session — keeps choice across ticker switches. */
+  const advancedResolutionSessionPickedRef = useRef(false)
   const volumeSeriesRef = useRef(null)
   const indicatorSeriesRef = useRef(/** @type {import('lightweight-charts').ISeriesApi[]} */ ([]))
   const chartSeriesRef = useRef(null)
@@ -918,6 +924,16 @@ export default function LoungeMarketChartModal({
   }, [activeIdx, advancedResolutionId])
 
   const active = list[activeIdx] || null
+  const activeAdvancedSeriesScope = useMemo(() => {
+    if (!active) return ''
+    return advancedMarketSeriesScopeKey({
+      symbol: active.symbol,
+      asset_class: active.asset_class,
+      resolutionId: advancedResolutionId,
+    })
+  }, [active, advancedResolutionId])
+  const scopedAdvancedSeries =
+    advancedSeriesScope === activeAdvancedSeriesScope ? advancedSeries : null
   const activeSeriesScope = modalSeriesScopeKey(active, timeframeIdx)
   const fetchedSeries = seriesScope === activeSeriesScope ? series : null
   const activeIndicatorKey = useMemo(
@@ -1068,6 +1084,7 @@ export default function LoungeMarketChartModal({
   }, [])
 
   const selectAdvancedResolutionId = useCallback((id) => {
+    advancedResolutionSessionPickedRef.current = true
     setAdvancedResolutionId(id)
     writeStoredMarketChartResolution(id)
     setResolutionMenuOpen(false)
@@ -1096,11 +1113,15 @@ export default function LoungeMarketChartModal({
     setAnnotateMode(false)
     setChartAnnotations([])
     setChartType('candle')
+    if (!advancedResolutionSessionPickedRef.current) {
+      setAdvancedResolutionId(DEFAULT_MARKET_CHART_RESOLUTION_ID)
+    }
     void lockMarketChartLandscapeOrientation()
     setAdvancedFullscreenOpen(true)
   }, [closeAnnotateMenus])
 
   const closeAdvancedFullscreen = useCallback(() => {
+    advancedResolutionSessionPickedRef.current = false
     setAdvancedFullscreenOpen(false)
     closeAnnotateMenus()
     setAnnotateMode(false)
@@ -1125,6 +1146,8 @@ export default function LoungeMarketChartModal({
   }, [annotateMode, advancedFullscreenOpen])
 
   const isAdvancedView = advancedFullscreenOpen
+  /** Quick-sheet series fetches must not remount the Advanced chart when `seriesScope` updates. */
+  const chartMountScopeKey = advancedFullscreenOpen ? 'advanced' : seriesScope
   /** Modal sheet stays on gradient area; advanced fullscreen uses stored chart type. */
   const effectiveChartType = isAdvancedView ? chartType : 'area'
 
@@ -1218,6 +1241,10 @@ export default function LoungeMarketChartModal({
   }, [open, resetSheetDrag])
 
   useEffect(() => {
+    if (!open) advancedResolutionSessionPickedRef.current = false
+  }, [open])
+
+  useEffect(() => {
     loadSeriesGenRef.current += 1
     setSeries(null)
     setSeriesScope('')
@@ -1239,7 +1266,9 @@ export default function LoungeMarketChartModal({
     advancedBarsSignatureRef.current = ''
     advancedUserPannedRef.current = false
     historyResetAnchorRef.current?.()
-  }, [active?.asset_class, active?.symbol, activeIdx, advancedResolutionId])
+    priceScaleUserPinnedRef.current = false
+    if (advancedFullscreenOpen) setAdvancedLoading(true)
+  }, [active?.asset_class, active?.symbol, activeIdx, advancedFullscreenOpen, advancedResolutionId])
 
   const loadAdvancedSeries = useCallback(async () => {
     if (!advancedFullscreenOpen || !active || !supabaseClient) return
@@ -1414,11 +1443,11 @@ export default function LoungeMarketChartModal({
 
   const allBars = useMemo(() => {
     if (isAdvancedView) {
-      const base = advancedSeries?.bars || []
+      const base = scopedAdvancedSeries?.bars || []
       return mergeMarketBarsOlder(base, historyBars)
     }
     return chartSeries?.bars || []
-  }, [advancedSeries?.bars, chartSeries?.bars, historyBars, isAdvancedView])
+  }, [scopedAdvancedSeries?.bars, chartSeries?.bars, historyBars, isAdvancedView])
 
   chartSeriesRef.current = chartSeries
   allBarsRef.current = allBars
@@ -1458,10 +1487,6 @@ export default function LoungeMarketChartModal({
         })
         volumeSeriesRef.current = refreshed.volumeSeries
         indicatorSeriesRef.current = refreshed.indicatorSeries
-        if (priceRange && Number.isFinite(priceRange.from) && Number.isFinite(priceRange.to)) {
-          priceScale.applyOptions({ autoScale: false })
-          priceScale.setVisibleRange(priceRange)
-        }
         if (logicalRange && Number.isFinite(logicalRange.from) && Number.isFinite(logicalRange.to)) {
           ts.setVisibleLogicalRange({
             from: logicalRange.from + added,
@@ -1469,6 +1494,16 @@ export default function LoungeMarketChartModal({
           })
         } else {
           shiftMarketChartLogicalRange(chart, added)
+        }
+        if (priceScaleUserPinnedRef.current) {
+          if (priceRange && Number.isFinite(priceRange.from) && Number.isFinite(priceRange.to)) {
+            priceScale.applyOptions({ autoScale: false })
+            priceScale.setVisibleRange(priceRange)
+          }
+        } else {
+          applyVisibleCandlePriceRange(mainSeries, chart, nextAll, effectiveChartType, {
+            keepMargins: true,
+          })
         }
         if (host && panePlan) {
           applyMarketChartPaneHeights(chart, host.clientHeight, panePlan)
@@ -1665,11 +1700,12 @@ export default function LoungeMarketChartModal({
           },
       crosshair: loungeMarketChartCrosshairOptions(isAdvancedView, isLight),
     })
-    const rawBars = allBarsRef.current?.length ? allBarsRef.current : chartSeries?.bars || []
+    const rawBars = isAdvancedView
+      ? allBarsRef.current || []
+      : allBarsRef.current?.length
+        ? allBarsRef.current
+        : chartSeries?.bars || []
     const barPoints = loungeMarketBarsToSeries(rawBars)
-    const overlayLines = isAdvancedView
-      ? computeMarketChartOverlayLines(barPoints, rawBars, activeIndicators)
-      : []
     const mainSeries = attachModalMainChartSeries(chart, effectiveChartType, {
       barPoints,
       rawBars,
@@ -1697,11 +1733,7 @@ export default function LoungeMarketChartModal({
       setSubPaneAxisTitles(measureMarketChartSubPaneAxisTitles(chart, panePlan))
     }
     if (isAdvancedView) {
-      applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-        keepMargins: true,
-        chartType: effectiveChartType,
-        rawBars,
-      })
+      /* Y scale fits visible candle OHLC after time scale is set (see refreshChartOverlays). */
     } else {
       applyMarketChartPriceRange(mainSeries, barPoints, [], {
         chartType: effectiveChartType,
@@ -1722,15 +1754,24 @@ export default function LoungeMarketChartModal({
     let priceScaleUserPinned = false
     priceScaleUserPinnedRef.current = false
     const mainPlotBottomLocalY = () => marketChartMainPanePlotBottomLocalY(mainSeries, el)
+    const fitAdvancedPriceToVisibleCandles = (series = mainSeries, liveChart = chart, opts = {}) => {
+      if (!isAdvancedView || priceScaleUserPinnedRef.current) return
+      const bars = allBarsRef.current?.length ? allBarsRef.current : rawBars
+      if (!bars?.length) return
+      if (opts.immediate) {
+        applyVisibleCandlePriceRange(series, liveChart, bars, effectiveChartType, { keepMargins: true })
+        return
+      }
+      scheduleVisibleCandlePriceRange(series, liveChart, bars, effectiveChartType, {
+        keepMargins: true,
+        fitTimeScale: opts.fitTimeScale !== false,
+      })
+    }
     const resetPriceScaleToData = () => {
       priceScaleUserPinned = false
       priceScaleUserPinnedRef.current = false
       if (!isAdvancedView) return
-      applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-        keepMargins: true,
-        chartType: effectiveChartType,
-        rawBars,
-      })
+      fitAdvancedPriceToVisibleCandles()
     }
     const priceAxisHit = (clientX, clientY) =>
       isAdvancedView &&
@@ -1744,13 +1785,7 @@ export default function LoungeMarketChartModal({
 
     const refreshChartOverlays = () => {
       if (isAdvancedView) {
-        if (!priceScaleUserPinned) {
-          applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-            keepMargins: true,
-            chartType: effectiveChartType,
-            rawBars,
-          })
-        }
+        fitAdvancedPriceToVisibleCandles()
         return
       }
       applyMarketChartPriceRange(mainSeries, barPoints, [], {
@@ -1795,8 +1830,24 @@ export default function LoungeMarketChartModal({
               const pending = pendingHistoryApplyRef.current
               pendingHistoryApplyRef.current = null
               if (pending) requestAnimationFrame(pending)
+              fitAdvancedPriceToVisibleCandles(mainSeriesRef.current, chartRef.current, {
+                fitTimeScale: false,
+              })
             })
           },
+        })
+      : () => {}
+
+    const unbindVisiblePriceFit = isAdvancedView
+      ? bindVisibleCandlePriceRangeFit(chart, () => {
+          const ms = mainSeriesRef.current
+          const bars = allBarsRef.current
+          if (!ms || !bars?.length) return null
+          return { mainSeries: ms, rawBars: bars, chartType: effectiveChartType }
+        }, {
+          isPinned: () => priceScaleUserPinnedRef.current,
+          isPanning: () => chartPanningRef.current,
+          keepMargins: true,
         })
       : () => {}
 
@@ -1868,8 +1919,59 @@ export default function LoungeMarketChartModal({
       })
     })
     ro.observe(el)
-    if (isAdvancedView) {
+    if (isAdvancedView && rawBars.length > 0) {
       advancedBarsSignatureRef.current = marketChartBarsSignature(rawBars)
+    }
+    if (isAdvancedView && rawBars.length === 0) {
+      requestAnimationFrame(() => {
+        const pending = allBarsRef.current
+        if (!pending?.length || !chartRef.current || !mainSeriesRef.current) return
+        const signature = marketChartBarsSignature(pending)
+        if (signature === advancedBarsSignatureRef.current) return
+        advancedBarsSignatureRef.current = signature
+        const barPoints = loungeMarketBarsToSeries(pending)
+        const lineColor = chartUp ? theme.upColor : theme.downColor
+        const panePlan = computeMarketChartPanePlan(activeIndicators)
+        const refreshed = refreshAdvancedMarketChartData({
+          chart: chartRef.current,
+          mainSeries: mainSeriesRef.current,
+          volumeSeries: volumeSeriesRef.current,
+          indicatorSeries: indicatorSeriesRef.current,
+          rawBars: pending,
+          chartType: effectiveChartType,
+          activeIndicators,
+          isLight,
+          panePlan,
+          applyPriceRange: priceScaleUserPinnedRef.current
+            ? undefined
+            : () => {
+                scheduleVisibleCandlePriceRange(
+                  mainSeriesRef.current,
+                  chartRef.current,
+                  pending,
+                  effectiveChartType,
+                  { keepMargins: true },
+                )
+              },
+        })
+        volumeSeriesRef.current = refreshed.volumeSeries
+        indicatorSeriesRef.current = refreshed.indicatorSeries
+        if (marketModalChartTypeUsesLineMarkers(effectiveChartType)) {
+          setChartLineMarkers(mainSeriesRef.current, barPoints, lineColor)
+        }
+        chartRef.current.timeScale().fitContent()
+        if (!priceScaleUserPinnedRef.current) {
+          scheduleVisibleCandlePriceRange(
+            mainSeriesRef.current,
+            chartRef.current,
+            pending,
+            effectiveChartType,
+            { keepMargins: true, fitTimeScale: false },
+          )
+        }
+      })
+    }
+    if (isAdvancedView && rawBars.length > 0) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (!chartRef.current || !el.isConnected || !panePlan) return
@@ -1888,6 +1990,7 @@ export default function LoungeMarketChartModal({
       chartPanningRef.current = false
       pendingHistoryApplyRef.current = null
       unbindPriceAxisZoom()
+      unbindVisiblePriceFit()
       unbindPan()
       unbindHistory()
       unbindScrub()
@@ -1908,11 +2011,10 @@ export default function LoungeMarketChartModal({
     activeIndicatorKey,
     advancedFullscreenOpen,
     advancedResolutionId,
-    advancedSeriesScope,
     effectiveChartType,
     isLight,
     open,
-    seriesScope,
+    chartMountScopeKey,
   ])
 
   /** Quick sheet: refresh bars in place when live series updates. */
@@ -1962,7 +2064,6 @@ export default function LoungeMarketChartModal({
     if (signature === advancedBarsSignatureRef.current) return
     advancedBarsSignatureRef.current = signature
     const barPoints = loungeMarketBarsToSeries(rawBars)
-    const overlayLines = computeMarketChartOverlayLines(barPoints, rawBars, activeIndicators)
     const lineColor = chartUp ? theme.upColor : theme.downColor
     const panePlan = computeMarketChartPanePlan(activeIndicators)
     const refreshed = refreshAdvancedMarketChartData({
@@ -1978,10 +2079,8 @@ export default function LoungeMarketChartModal({
       applyPriceRange: priceScaleUserPinnedRef.current
         ? undefined
         : () => {
-            applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
+            scheduleVisibleCandlePriceRange(mainSeries, chart, rawBars, effectiveChartType, {
               keepMargins: true,
-              chartType: effectiveChartType,
-              rawBars,
             })
           },
     })
@@ -2001,6 +2100,28 @@ export default function LoungeMarketChartModal({
     chartUp,
     theme.upColor,
     theme.downColor,
+  ])
+
+  /** Advanced: re-fit Y to visible candles when scoped series lands (ticker / resolution change). */
+  useEffect(() => {
+    if (!open || !advancedFullscreenOpen || !isAdvancedView) return
+    if (priceScaleUserPinnedRef.current) return
+    if (advancedSeriesScope !== activeAdvancedSeriesScope) return
+    const bars = allBarsRef.current
+    if (!bars?.length) return
+    const chart = chartRef.current
+    const mainSeries = mainSeriesRef.current
+    if (!chart || !mainSeries) return
+
+    scheduleVisibleCandlePriceRange(mainSeries, chart, bars, effectiveChartType, { keepMargins: true })
+  }, [
+    open,
+    advancedFullscreenOpen,
+    isAdvancedView,
+    activeAdvancedSeriesScope,
+    advancedSeriesScope,
+    advancedSeries?.bars,
+    effectiveChartType,
   ])
 
   if (!open || !list.length) return null
