@@ -577,6 +577,8 @@ function scrubQuoteFromBarPoints(barPoints, price) {
  */
 function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, gestureOpts = {}) {
   const panEnabled = gestureOpts.panEnabled !== false
+  /** Quick sheet: let vertical swipes bubble to the modal dismiss handler (Android). */
+  const sheetDismissPassthrough = panEnabled === false
   const priceAxisHit =
     typeof gestureOpts.priceAxisHit === 'function' ? gestureOpts.priceAxisHit : null
   const clearScrub = () => {
@@ -657,13 +659,13 @@ function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, 
   const onPointerDown = (e) => {
     if (priceAxisHit?.(e.clientX, e.clientY)) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
-    e.stopPropagation()
+    if (!sheetDismissPassthrough) e.stopPropagation()
     resetGesture()
     mode = 'pending'
     activePointerId = e.pointerId
     startX = e.clientX
     startY = e.clientY
-    applyScrubAt(e.clientX, e.clientY)
+    if (!sheetDismissPassthrough) applyScrubAt(e.clientX, e.clientY)
     if (!panEnabled) return
     longPressTimer = window.setTimeout(() => {
       longPressTimer = null
@@ -691,7 +693,16 @@ function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, 
     if (mode === 'pending') {
       const dx = e.clientX - startX
       const dy = e.clientY - startY
+      if (
+        sheetDismissPassthrough &&
+        dy > MARKET_CHART_GESTURE_SLOP_PX &&
+        dy > Math.abs(dx)
+      ) {
+        resetGesture()
+        return
+      }
       if (dx * dx + dy * dy >= MARKET_CHART_GESTURE_SLOP_PX * MARKET_CHART_GESTURE_SLOP_PX) {
+        if (sheetDismissPassthrough) e.stopPropagation()
         enterScrubMode(e)
         return
       }
@@ -728,7 +739,7 @@ function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, 
     }
   }
 
-  const opts = { capture: true }
+  const opts = { capture: !sheetDismissPassthrough }
   el.addEventListener('pointerdown', onPointerDown, opts)
   el.addEventListener('pointermove', onPointerMove, opts)
   el.addEventListener('pointerup', onPointerEnd, opts)
@@ -1216,6 +1227,7 @@ export default function LoungeMarketChartModal({
   const canStartSheetDrag = useCallback((target) => {
     if (shouldIgnoreSheetDragTarget(target)) return false
     if (target instanceof Element && target.closest('[data-market-sheet-drag]')) return true
+    if (target instanceof Element && target.closest('[data-lounge-market-chart-area]')) return true
     const scroll = postsScrollRef.current
     if (scroll && scroll.contains(target) && scroll.scrollTop <= 0) return true
     return false
@@ -1226,14 +1238,19 @@ export default function LoungeMarketChartModal({
       if (sheetClosing) return
       if (e.button !== 0 && e.pointerType === 'mouse') return
       if (!canStartSheetDrag(e.target)) return
+      const fromChart =
+        e.target instanceof Element && Boolean(e.target.closest('[data-lounge-market-chart-area]'))
       sheetDragRef.current = {
         pointerId: e.pointerId,
+        startX: e.clientX,
         startY: e.clientY,
         startMs: Date.now(),
+        captured: !fromChart,
+        fromChart,
       }
       setSheetDragging(true)
       setSheetDragY(0)
-      e.currentTarget.setPointerCapture(e.pointerId)
+      if (!fromChart) e.currentTarget.setPointerCapture(e.pointerId)
     },
     [canStartSheetDrag, sheetClosing],
   )
@@ -1241,7 +1258,30 @@ export default function LoungeMarketChartModal({
   const onSheetPointerMove = useCallback((e) => {
     const drag = sheetDragRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
-    const dy = Math.max(0, e.clientY - drag.startY)
+    const dy = e.clientY - drag.startY
+    const dx = e.clientX - drag.startX
+    if (!drag.captured) {
+      const dist2 = dx * dx + dy * dy
+      if (dist2 < MARKET_CHART_GESTURE_SLOP_PX * MARKET_CHART_GESTURE_SLOP_PX) return
+      if (drag.fromChart && Math.abs(dx) >= dy) {
+        sheetDragRef.current = null
+        setSheetDragging(false)
+        setSheetDragY(0)
+        return
+      }
+      if (dy <= 0) {
+        sheetDragRef.current = null
+        setSheetDragging(false)
+        setSheetDragY(0)
+        return
+      }
+      drag.captured = true
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    }
     if (dy <= 0) return
     e.preventDefault()
     setSheetDragY(dy)
@@ -2594,7 +2634,12 @@ export default function LoungeMarketChartModal({
       aria-modal="true"
       aria-label={`${active?.display_symbol || 'Market'} chart`}
     >
-      <div className="absolute inset-0 cursor-default" aria-hidden />
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        aria-label="Close chart"
+        onClick={dismissSheet}
+      />
       <div
         className={`relative z-10 flex w-full max-w-none shrink-0 flex-col rounded-none border-x-0 border-b-0 border-t shadow-2xl will-change-transform motion-reduce:transition-none ${shellClass} ${
           sheetDragging ? 'touch-none' : ''
@@ -2672,7 +2717,7 @@ export default function LoungeMarketChartModal({
         <div
           className="relative w-full shrink-0 overflow-hidden"
           style={{ height: MARKET_CHART_HEIGHT_PX }}
-          data-market-sheet-no-drag
+          data-lounge-market-chart-area
         >
           <div
             className="absolute inset-x-0 top-0"

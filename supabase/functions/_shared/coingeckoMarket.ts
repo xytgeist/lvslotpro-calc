@@ -310,8 +310,10 @@ async function coingeckoCryptoOhlcCandles(coinId: string, windowKey: string): Pr
     days,
   }
   const key = coingeckoApiKey()
+  // CoinGecko rejects `interval=hourly` with `days=1` (400) — use default granularity for 24h mini charts.
   if (
     key &&
+    days !== '1' &&
     (windowKey === '1h' ||
       windowKey === '24h' ||
       windowKey === '3d' ||
@@ -416,7 +418,7 @@ export async function coingeckoCryptoCandlesForAdvanced(
   try {
     const params: Record<string, string> = { vs_currency: 'usd', days }
     const key = coingeckoApiKey()
-    if (key && (days === '1' || days === '7' || days === '14' || days === '30' || days === '90')) {
+    if (key && days !== '1' && (days === '7' || days === '14' || days === '30' || days === '90')) {
       params.interval = 'hourly'
     }
     const data = await coingeckoFetch(`/coins/${coinId}/ohlc`, params, 'candles_advanced_ohlc')

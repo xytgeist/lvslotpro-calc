@@ -32,6 +32,8 @@ Each `lounge-market-data` response (when debug is on) includes:
 
 **Typical smoke:** post `$BTC`, scroll feed (wait for `batch_rolling`), open Advanced, pan left once — compare `by_reason` totals per action in Supabase **Edge Functions → lounge-market-data → Logs** or the Console log HUD.
 
+**Rolling batch quota:** `batch_rolling` does **not** re-fetch profile/logo/mcap (attach already stored those). Crypto 24h mini charts use CoinGecko `/ohlc` with `days=1` **without** `interval=hourly` (hourly + 1-day bucket returns 400 on Demo tier). Feed poll uses **`market_quote_cache`** unless the client sends `refresh: true`.
+
 ## Deploy (test)
 
 ```bash

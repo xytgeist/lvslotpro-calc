@@ -1466,8 +1466,8 @@ export async function buildRollingBatchPayload(
   symbol: string,
   assetClass: MarketAssetClass,
 ): Promise<{ quote: MarketEmbed['quote']; bars: MarketBar[]; window_label: string }> {
-  const profile = await finnhubProfile(symbol, assetClass)
-  const currency = embedQuoteCurrency(profile.exchange, profile.currency)
+  // Rolling poll: quote + mini-chart only — name/logo/mcap/currency come from attach embed.
+  const currency = 'USD'
   const quote = await finnhubQuote(symbol, assetClass)
   const bars = await resolveMarketBars(symbol, assetClass, '24h', quote)
   let changePct = quote.change_pct

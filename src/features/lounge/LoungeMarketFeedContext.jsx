@@ -85,11 +85,11 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
     setCashtagQuotesByTicker((prev) => ({ ...seededCashtagQuotes, ...prev }))
   }, [seededCashtagQuotes])
 
-  const refresh = useCallback(async (/** @type {{ forceStocks?: boolean }} */ options = {}) => {
+  const refresh = useCallback(async (/** @type {{ includeStocksWhenClosed?: boolean, forceRefresh?: boolean }} */ options = {}) => {
     if (!supabaseClient || !symbolItems.length || inflightRef.current) return
     const sessionOpen = isUsEquityRegularSessionOpen()
     const pollItems =
-      sessionOpen || options.forceStocks
+      sessionOpen || options.includeStocksWhenClosed
         ? symbolItems
         : symbolItems.filter((item) => item.asset_class !== 'stock')
     if (!pollItems.length) return
@@ -98,7 +98,7 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
       const batch = await loungeMarketBatchRolling(
         supabaseClient,
         pollItems.map(({ symbol, asset_class }) => ({ symbol, asset_class })),
-        { refresh: options.forceStocks === true },
+        { refresh: options.forceRefresh === true },
       )
       if (!batch || typeof batch !== 'object') return
       const next = {}
@@ -119,7 +119,7 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
   }, [seededCashtagQuotes, supabaseClient, symbolItems])
 
   useEffect(() => {
-    void refresh({ forceStocks: true })
+    void refresh({ includeStocksWhenClosed: true })
     const id = window.setInterval(() => void refresh(), 90_000)
     return () => window.clearInterval(id)
   }, [refresh])
