@@ -30,9 +30,11 @@ import {
 } from './loungeMarketChartIndicators.js'
 import {
   attachModalMainChartSeries,
-  loungeMarketBarsToCandlestickSeries,
   marketModalChartHighLow,
   marketModalChartTypeLabel,
+  marketModalChartTypeUsesLineMarkers,
+  marketModalChartTypeUsesOhlc,
+  marketModalMainSeriesData,
   MARKET_MODAL_CHART_TYPES,
   readStoredMarketChartType,
   writeStoredMarketChartType,
@@ -64,6 +66,12 @@ import {
   shiftMarketChartLogicalRange,
 } from './loungeMarketChartPan.js'
 import { refreshAdvancedMarketChartData } from './loungeMarketChartDataSync.js'
+import {
+  captureMarketChartPngFile,
+  copyMarketChartScreenshotToClipboard,
+  marketChartSnapshotBrandingFromEmbed,
+  marketChartSnapshotFilename,
+} from './loungeMarketChartSnapshot.js'
 import {
   marketChartAdvancedHandleScaleOptions,
   marketChartAdvancedLayoutPanesOptions,
@@ -121,7 +129,7 @@ function applyMarketChartPriceRange(mainSeries, barPoints, overlayLines = [], op
     to = Math.max(to, v)
   }
   for (const point of barPoints || []) consider(point?.value)
-  if (opts.chartType === 'candle' && opts.rawBars?.length) {
+  if (marketModalChartTypeUsesOhlc(opts.chartType) && opts.rawBars?.length) {
     const { high, low } = marketModalChartHighLow('candle', barPoints, opts.rawBars)
     consider(high?.value)
     consider(low?.value)
@@ -220,6 +228,82 @@ function MarketIndicatorLegendSwatches({ items, className = '' }) {
         <MarketIndicatorLegendLine key={item.label} color={item.color} dashed={item.dashed} />
       ))}
     </span>
+  )
+}
+
+function MarketChartSnapshotButton({
+  menuRef,
+  menuOpen,
+  onToggleMenu,
+  disabled = false,
+  busy = false,
+  status = '',
+  canInsert = false,
+  onCopy,
+  onInsert,
+  mutedClass,
+}) {
+  return (
+    <div className="relative shrink-0" ref={menuRef}>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-label="Snapshot"
+        disabled={disabled || busy}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleMenu()
+        }}
+        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation disabled:opacity-40 ${
+          menuOpen ? 'text-cyan-300' : `${mutedClass} hover:text-cyan-300`
+        }`}
+      >
+        {busy ? 'Saving…' : 'Snapshot'}
+        <span aria-hidden="true">{menuOpen ? ' ▴' : ' ▾'}</span>
+      </button>
+      {status ? (
+        <span
+          className="pointer-events-none absolute left-0 top-full z-40 mt-9 whitespace-nowrap rounded border border-zinc-700/80 bg-zinc-950/95 px-2 py-1 text-[10px] font-medium text-cyan-200 shadow-lg"
+          aria-live="polite"
+        >
+          {status}
+        </span>
+      ) : null}
+      {menuOpen ? (
+        <div
+          role="menu"
+          aria-label="Snapshot"
+          className="absolute left-0 top-full z-30 mt-1 min-w-[10.5rem] overflow-hidden rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCopy()
+            }}
+            className="flex w-full px-3 py-2 text-left text-[12px] text-zinc-200 touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90"
+          >
+            Capture image
+          </button>
+          {canInsert ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation()
+                onInsert()
+              }}
+              className="flex w-full px-3 py-2 text-left text-[12px] text-zinc-200 touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90"
+            >
+              Add to post
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -480,6 +564,7 @@ function formatPostAge(createdAt) {
  *   onClose: () => void,
  *   hydratePosts?: (rows: object[]) => Promise<object[]>,
  *   onOpenPost?: (post: object) => void,
+ *   onInsertSnapshot?: (file: File, ctx?: { embed?: object | null, symbol?: string | null }) => boolean,
  * }} props
  */
 export default function LoungeMarketChartModal({
@@ -490,6 +575,7 @@ export default function LoungeMarketChartModal({
   onClose,
   hydratePosts,
   onOpenPost,
+  onInsertSnapshot,
 }) {
   const chartHostRef = useRef(null)
   const advancedChartHostRef = useRef(null)
@@ -500,6 +586,7 @@ export default function LoungeMarketChartModal({
   const chartTypeMenuRef = useRef(null)
   const timeframeMenuRef = useRef(null)
   const resolutionMenuRef = useRef(null)
+  const snapshotMenuRef = useRef(null)
   const postsScrollRef = useRef(null)
   const sheetDragRef = useRef(null)
   const [sheetDragY, setSheetDragY] = useState(0)
@@ -549,6 +636,9 @@ export default function LoungeMarketChartModal({
   const [chartTypeMenuOpen, setChartTypeMenuOpen] = useState(false)
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
   const [resolutionMenuOpen, setResolutionMenuOpen] = useState(false)
+  const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false)
+  const [snapshotBusy, setSnapshotBusy] = useState(false)
+  const [snapshotFlash, setSnapshotFlash] = useState('')
   /** Crosshair scrub overrides header quote until pointer leaves the chart. */
   const [scrubQuote, setScrubQuote] = useState(/** @type {{ price: number, change?: number, change_pct?: number } | null} */ (null))
   const [scrubAxisCurrent, setScrubAxisCurrent] = useState(/** @type {{ price: number, y: number } | null} */ (null))
@@ -618,6 +708,9 @@ export default function LoungeMarketChartModal({
       setIndicatorMenuOpen(false)
       setChartTypeMenuOpen(false)
       setTimeframeMenuOpen(false)
+      setResolutionMenuOpen(false)
+      setSnapshotMenuOpen(false)
+      setSnapshotFlash('')
       setAdvancedFullscreenOpen(false)
     }
   }, [open])
@@ -636,20 +729,72 @@ export default function LoungeMarketChartModal({
   }, [advancedFullscreenOpen])
 
   useEffect(() => {
-    if (!indicatorMenuOpen && !chartTypeMenuOpen && !timeframeMenuOpen && !resolutionMenuOpen) return undefined
+    if (!indicatorMenuOpen && !chartTypeMenuOpen && !timeframeMenuOpen && !resolutionMenuOpen && !snapshotMenuOpen) {
+      return undefined
+    }
     const onPointerDown = (e) => {
       if (indicatorMenuRef.current?.contains(e.target)) return
       if (chartTypeMenuRef.current?.contains(e.target)) return
       if (timeframeMenuRef.current?.contains(e.target)) return
       if (resolutionMenuRef.current?.contains(e.target)) return
+      if (snapshotMenuRef.current?.contains(e.target)) return
       setIndicatorMenuOpen(false)
       setChartTypeMenuOpen(false)
       setTimeframeMenuOpen(false)
       setResolutionMenuOpen(false)
+      setSnapshotMenuOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown, true)
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
-  }, [chartTypeMenuOpen, indicatorMenuOpen, resolutionMenuOpen, timeframeMenuOpen])
+  }, [chartTypeMenuOpen, indicatorMenuOpen, resolutionMenuOpen, snapshotMenuOpen, timeframeMenuOpen])
+
+  const snapshotDisabled = advancedLoading
+
+  const runMarketChartSnapshot = useCallback(
+    async (mode) => {
+      const chart = chartRef.current
+      if (!chart || snapshotBusy || advancedLoading) return
+      setSnapshotBusy(true)
+      setSnapshotMenuOpen(false)
+      try {
+        const filename = marketChartSnapshotFilename(active?.display_symbol || active?.symbol)
+        const branding = marketChartSnapshotBrandingFromEmbed(active, isLight)
+        if (mode === 'copy') {
+          await copyMarketChartScreenshotToClipboard(chart, branding)
+          setSnapshotFlash('Copied to clipboard')
+        } else if (mode === 'insert') {
+          if (typeof onInsertSnapshot !== 'function') {
+            setSnapshotFlash('Add to post unavailable')
+          } else {
+            const file = await captureMarketChartPngFile(chart, filename, branding)
+            const ok = onInsertSnapshot(file, {
+              embed: active,
+              symbol: active?.display_symbol || active?.symbol || null,
+            })
+            if (!ok) setSnapshotFlash('Could not add image')
+          }
+        }
+      } catch (err) {
+        setSnapshotFlash(err instanceof Error ? err.message : 'Snapshot failed')
+      } finally {
+        setSnapshotBusy(false)
+        window.setTimeout(() => setSnapshotFlash(''), 2400)
+      }
+    },
+    [active, advancedLoading, isLight, onInsertSnapshot, snapshotBusy],
+  )
+
+  const toggleSnapshotMenu = useCallback(() => {
+    setSnapshotMenuOpen((openNow) => {
+      if (!openNow) {
+        setIndicatorMenuOpen(false)
+        setChartTypeMenuOpen(false)
+        setResolutionMenuOpen(false)
+        setTimeframeMenuOpen(false)
+      }
+      return !openNow
+    })
+  }, [])
 
   const selectChartType = useCallback((id) => {
     setChartType(id)
@@ -673,6 +818,7 @@ export default function LoungeMarketChartModal({
     setChartTypeMenuOpen(false)
     setTimeframeMenuOpen(false)
     setResolutionMenuOpen(false)
+    setSnapshotMenuOpen(false)
     setChartType('candle')
     void lockMarketChartLandscapeOrientation()
     setAdvancedFullscreenOpen(true)
@@ -1169,6 +1315,11 @@ export default function LoungeMarketChartModal({
           setTimeframeMenuOpen(false)
           return
         }
+        if (snapshotMenuOpen) {
+          e.stopPropagation()
+          setSnapshotMenuOpen(false)
+          return
+        }
         if (advancedFullscreenOpen) {
           e.stopPropagation()
           closeAdvancedFullscreen()
@@ -1184,7 +1335,7 @@ export default function LoungeMarketChartModal({
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [advancedFullscreenOpen, chartTypeMenuOpen, closeAdvancedFullscreen, dismissSheet, indicatorMenuOpen, open, resolutionMenuOpen, timeframeMenuOpen])
+  }, [advancedFullscreenOpen, chartTypeMenuOpen, closeAdvancedFullscreen, dismissSheet, indicatorMenuOpen, open, resolutionMenuOpen, snapshotMenuOpen, timeframeMenuOpen])
 
   useEffect(() => {
     const el = advancedFullscreenOpen ? advancedChartHostRef.current : chartHostRef.current
@@ -1270,7 +1421,7 @@ export default function LoungeMarketChartModal({
         rawBars,
       })
     }
-    if (effectiveChartType !== 'candle') {
+    if (marketModalChartTypeUsesLineMarkers(effectiveChartType)) {
       setChartLineMarkers(mainSeries, barPoints, lineColor)
     }
     fitMarketChartTimeScale(chart, { fixRightEdge: !isAdvancedView })
@@ -1487,10 +1638,8 @@ export default function LoungeMarketChartModal({
     const barPoints = loungeMarketBarsToSeries(rawBars)
     if (!barPoints.length) return
     const lineColor = chartUp ? theme.upColor : theme.downColor
-    if (effectiveChartType === 'candle') {
-      mainSeries.setData(loungeMarketBarsToCandlestickSeries(rawBars))
-    } else {
-      mainSeries.setData(barPoints)
+    mainSeries.setData(marketModalMainSeriesData(effectiveChartType, rawBars, barPoints))
+    if (marketModalChartTypeUsesLineMarkers(effectiveChartType)) {
       setChartLineMarkers(mainSeries, barPoints, lineColor)
     }
     applyMarketChartPriceRange(mainSeries, barPoints, [], {
@@ -1551,7 +1700,7 @@ export default function LoungeMarketChartModal({
     })
     volumeSeriesRef.current = refreshed.volumeSeries
     indicatorSeriesRef.current = refreshed.indicatorSeries
-    if (effectiveChartType !== 'candle') {
+    if (marketModalChartTypeUsesLineMarkers(effectiveChartType)) {
       setChartLineMarkers(mainSeries, barPoints, lineColor)
     }
   }, [
@@ -1673,12 +1822,34 @@ export default function LoungeMarketChartModal({
                   <div className="relative min-h-0 h-full overflow-hidden">
                     <div ref={advancedChartHostRef} className="absolute inset-0 touch-none select-none" />
                     <div
-                      className="absolute left-0 top-0 z-20 flex max-w-[calc(100%-3rem)] flex-wrap items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-950/85 p-1 backdrop-blur-[2px]"
+                      className="absolute left-0 top-0 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-start gap-1"
                       style={{
                         marginTop: 'max(0.25rem, env(safe-area-inset-top, 0px))',
                         marginLeft: 'max(0.5rem, env(safe-area-inset-left, 0px))',
                       }}
                     >
+                      {activeIndicatorLegend.length ? (
+                        <div
+                          className="pointer-events-none shrink-0 rounded-md border border-zinc-700/70 bg-zinc-950/85 px-2 py-1.5 backdrop-blur-[2px]"
+                          aria-label="Indicator legend"
+                        >
+                          <div className={`mb-1 text-[9px] font-semibold uppercase tracking-wide ${mutedClass}`}>
+                            Legend
+                          </div>
+                          <ul className="flex flex-col gap-1">
+                            {activeIndicatorLegend.map((row) => (
+                              <li
+                                key={row.key}
+                                className="flex items-center gap-1.5 text-[10px] leading-none text-zinc-200"
+                              >
+                                <MarketIndicatorLegendLine color={row.color} dashed={row.dashed} />
+                                <span className="truncate">{row.label}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      <div className="flex flex-wrap items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-950/85 p-1 backdrop-blur-[2px]">
                       <div className="relative shrink-0" ref={chartTypeMenuRef}>
                         <button
                           type="button"
@@ -1709,7 +1880,7 @@ export default function LoungeMarketChartModal({
                           <div
                             role="listbox"
                             aria-label="Chart type"
-                            className="absolute left-0 top-full z-30 mt-1 min-w-[7.5rem] overflow-hidden rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
+                            className="absolute left-0 top-full z-30 mt-1 min-w-[10.5rem] overflow-hidden rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
                             onClick={(e) => e.stopPropagation()}
                           >
                             {MARKET_MODAL_CHART_TYPES.map((row) => {
@@ -1777,28 +1948,6 @@ export default function LoungeMarketChartModal({
                             className="absolute left-0 top-full z-30 mt-1 max-h-[min(20rem,45dvh)] min-w-[12rem] overflow-y-auto overscroll-contain rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {activeIndicatorLegend.length ? (
-                              <div className="border-b border-zinc-800 px-3 py-2">
-                                <div className={`mb-1.5 text-[10px] font-semibold uppercase tracking-wide ${mutedClass}`}>
-                                  Legend
-                                </div>
-                                <ul className="flex flex-col gap-1.5">
-                                  {activeIndicatorLegend.map((row) => (
-                                    <li
-                                      key={row.key}
-                                      className="flex items-center gap-2 text-[11px] leading-none text-zinc-200"
-                                    >
-                                      <MarketIndicatorLegendLine color={row.color} dashed={row.dashed} />
-                                      <span>{row.label}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ) : (
-                              <div className={`border-b border-zinc-800 px-3 py-2 text-[11px] ${mutedClass}`}>
-                                Select indicators to show on chart
-                              </div>
-                            )}
                             {MARKET_CHART_INDICATOR_CATEGORIES.map((cat) => (
                               <div key={cat.id}>
                                 <div
@@ -1904,6 +2053,19 @@ export default function LoungeMarketChartModal({
                           </div>
                         ) : null}
                       </div>
+                      <MarketChartSnapshotButton
+                        menuRef={snapshotMenuRef}
+                        menuOpen={snapshotMenuOpen}
+                        onToggleMenu={toggleSnapshotMenu}
+                        disabled={snapshotDisabled}
+                        busy={snapshotBusy}
+                        status={snapshotFlash}
+                        canInsert={typeof onInsertSnapshot === 'function'}
+                        onCopy={() => void runMarketChartSnapshot('copy')}
+                        onInsert={() => void runMarketChartSnapshot('insert')}
+                        mutedClass={mutedClass}
+                      />
+                      </div>
                     </div>
                     {subPaneAxisTitles.rows.length ? (
                       <div
@@ -1919,28 +2081,6 @@ export default function LoungeMarketChartModal({
                             {row.text}
                           </div>
                         ))}
-                      </div>
-                    ) : null}
-                    {activeIndicatorLegend.length ? (
-                      <div
-                        className="pointer-events-none absolute right-2 top-2 z-10 max-w-[min(100%,14rem)] rounded-md border border-zinc-700/70 bg-zinc-950/85 px-2 py-1.5 backdrop-blur-[2px]"
-                        style={{ marginRight: 'max(0.5rem, env(safe-area-inset-right, 0px))' }}
-                        aria-label="Indicator legend"
-                      >
-                        <div className={`mb-1 text-[9px] font-semibold uppercase tracking-wide ${mutedClass}`}>
-                          Legend
-                        </div>
-                        <ul className="flex flex-col gap-1">
-                          {activeIndicatorLegend.map((row) => (
-                            <li
-                              key={row.key}
-                              className="flex items-center gap-1.5 text-[10px] leading-none text-zinc-200"
-                            >
-                              <MarketIndicatorLegendLine color={row.color} dashed={row.dashed} />
-                              <span className="truncate">{row.label}</span>
-                            </li>
-                          ))}
-                        </ul>
                       </div>
                     ) : null}
                     {advancedLoading ? (

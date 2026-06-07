@@ -1,5 +1,11 @@
 /** Modal chart density — Quick (sparkline) vs Advanced (grid, axes, indicators). */
 
+import {
+  formatMarketChartAxisTickForResolution,
+  marketChartResolutionShowsTimeAxis,
+  marketChartTimeToDate,
+} from './loungeMarketChartTimeAxis.js'
+
 export const LOUNGE_MARKET_CHART_VIEW_MODE_STORAGE_KEY = 'loungeMarketChartViewMode:v1'
 
 /** @typedef {'quick' | 'advanced'} MarketChartViewModeId */
@@ -55,17 +61,13 @@ function chartAxisBorderColor(isLight = false) {
 }
 
 /** @param {number | import('lightweight-charts').UTCTimestamp | import('lightweight-charts').BusinessDay} time */
-function marketChartTimeToDate(time) {
-  if (typeof time === 'number') return new Date(time * 1000)
-  if (time && typeof time === 'object' && 'year' in time) {
-    return new Date(time.year, time.month - 1, time.day)
-  }
-  return null
+function marketChartTimeToDateQuick(time) {
+  return marketChartTimeToDate(time)
 }
 
 /** @param {number | import('lightweight-charts').UTCTimestamp | import('lightweight-charts').BusinessDay} time @param {string} timeframeLabel */
 function formatMarketChartAxisTime(time, timeframeLabel) {
-  const d = marketChartTimeToDate(time)
+  const d = marketChartTimeToDateQuick(time)
   if (!d || Number.isNaN(d.getTime())) return ''
   switch (timeframeLabel) {
     case '1H':
@@ -86,33 +88,9 @@ function formatMarketChartAxisTime(time, timeframeLabel) {
   }
 }
 
-/** @param {number | import('lightweight-charts').UTCTimestamp | import('lightweight-charts').BusinessDay} time @param {import('./loungeMarketChartResolution.js').MarketChartResolutionId | string} resolutionId */
-function formatMarketChartAxisTimeForResolution(time, resolutionId) {
-  const d = marketChartTimeToDate(time)
-  if (!d || Number.isNaN(d.getTime())) return ''
-  switch (resolutionId) {
-    case '1':
-    case '5':
-      return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-    case '15':
-    case '30':
-    case '60':
-      return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-    case '120':
-    case '240':
-      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric' })
-    case 'D':
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    case 'W':
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    default:
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  }
-}
-
 /** @param {number | import('lightweight-charts').UTCTimestamp | import('lightweight-charts').BusinessDay} time @param {string} timeframeLabel */
 function formatMarketChartCrosshairTime(time, timeframeLabel) {
-  const d = marketChartTimeToDate(time)
+  const d = marketChartTimeToDateQuick(time)
   if (!d || Number.isNaN(d.getTime())) return ''
   switch (timeframeLabel) {
     case '1H':
@@ -150,7 +128,7 @@ function formatMarketChartCrosshairTime(time, timeframeLabel) {
 
 /** @param {number | import('lightweight-charts').UTCTimestamp | import('lightweight-charts').BusinessDay} time @param {import('./loungeMarketChartResolution.js').MarketChartResolutionId | string} resolutionId */
 function formatMarketChartCrosshairTimeForResolution(time, resolutionId) {
-  const d = marketChartTimeToDate(time)
+  const d = marketChartTimeToDateQuick(time)
   if (!d || Number.isNaN(d.getTime())) return ''
   switch (resolutionId) {
     case '1':
@@ -163,7 +141,6 @@ function formatMarketChartCrosshairTimeForResolution(time, resolutionId) {
       })
     case '5':
     case '15':
-    case '30':
     case '60':
       return d.toLocaleString(undefined, {
         month: 'short',
@@ -177,8 +154,6 @@ function formatMarketChartCrosshairTimeForResolution(time, resolutionId) {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
       })
     case 'D':
       return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
@@ -271,8 +246,6 @@ export function marketChartAdvancedTimeScaleOptions(timeframeLabel, isLight = fa
 /** @param {import('./loungeMarketChartResolution.js').MarketChartResolutionId | string} resolutionId @param {boolean} [isLight] */
 export function marketChartAdvancedTimeScaleOptionsForResolution(resolutionId, isLight = false) {
   const id = String(resolutionId || '')
-  const intraday = id === '1' || id === '5' || id === '15' || id === '30' || id === '60'
-  const hourlyPlus = id === '120' || id === '240'
   return {
     visible: true,
     borderVisible: true,
@@ -280,9 +253,9 @@ export function marketChartAdvancedTimeScaleOptionsForResolution(resolutionId, i
     rightOffset: 0,
     rightOffsetPixels: 0,
     fixRightEdge: false,
-    timeVisible: intraday || hourlyPlus,
-    secondsVisible: id === '1',
-    tickMarkFormatter: (time) => formatMarketChartAxisTimeForResolution(time, id),
+    timeVisible: marketChartResolutionShowsTimeAxis(id),
+    secondsVisible: false,
+    tickMarkFormatter: (time, tickMarkType) => formatMarketChartAxisTickForResolution(time, tickMarkType, id),
   }
 }
 

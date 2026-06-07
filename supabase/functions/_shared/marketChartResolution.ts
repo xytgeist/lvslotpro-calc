@@ -13,7 +13,7 @@ import {
 import { isUsableStockIntradayBars, regularSessionDaysBack } from './usEquityMarketSession.ts'
 import { yahooStockCandles } from './yahooMarket.ts'
 
-export type MarketChartResolutionId = '1' | '5' | '15' | '30' | '60' | '120' | '240' | 'D' | 'W'
+export type MarketChartResolutionId = '1' | '5' | '15' | '60' | '120' | '240' | 'D' | 'W'
 
 export type MarketChartResolutionConfig = {
   id: MarketChartResolutionId
@@ -30,7 +30,6 @@ export const MARKET_CHART_RESOLUTIONS: MarketChartResolutionConfig[] = [
   { id: '1', label: '1m', finnhubResolution: '1', barSec: 60, initialBars: 390, chunkBars: 200, maxLookbackDays: 30 },
   { id: '5', label: '5m', finnhubResolution: '5', barSec: 300, initialBars: 350, chunkBars: 200, maxLookbackDays: 30 },
   { id: '15', label: '15m', finnhubResolution: '15', barSec: 900, initialBars: 280, chunkBars: 200, maxLookbackDays: 90 },
-  { id: '30', label: '30m', finnhubResolution: '30', barSec: 1800, initialBars: 280, chunkBars: 200, maxLookbackDays: 90 },
   { id: '60', label: '1H', finnhubResolution: '60', barSec: 3600, initialBars: 400, chunkBars: 200, maxLookbackDays: 730 },
   { id: '120', label: '2H', finnhubResolution: '60', bucketSec: 7200, barSec: 7200, initialBars: 400, chunkBars: 200, maxLookbackDays: 730 },
   { id: '240', label: '4H', finnhubResolution: '60', bucketSec: 14400, barSec: 14400, initialBars: 400, chunkBars: 200, maxLookbackDays: 730 },
@@ -44,12 +43,13 @@ const RESOLUTION_BY_ID = Object.fromEntries(
   MARKET_CHART_RESOLUTIONS.map((row) => [row.id, row]),
 ) as Record<string, MarketChartResolutionConfig>
 
-const STOCK_RTH_RESOLUTIONS = new Set<MarketChartResolutionId>(['1', '5', '15', '30'])
+const STOCK_RTH_RESOLUTIONS = new Set<MarketChartResolutionId>(['1', '5', '15'])
 const YAHOO_RESOLUTION_MAX_BARS = 500
 const MAX_YAHOO_FALLBACK_BARS = 500
 
 export function getMarketChartResolution(id: string): MarketChartResolutionConfig {
   const key = String(id || '').trim()
+  if (key === '30') return RESOLUTION_BY_ID['15']
   return RESOLUTION_BY_ID[key] || RESOLUTION_BY_ID[DEFAULT_MARKET_CHART_RESOLUTION_ID]
 }
 
@@ -65,8 +65,6 @@ function yahooIntervalForResolution(config: MarketChartResolutionConfig): string
       return '5m'
     case '15':
       return '15m'
-    case '30':
-      return '30m'
     case '60':
     case '120':
     case '240':
@@ -133,7 +131,7 @@ async function fetchStockRthSessionBars(
   })
 }
 
-/** US equities 1m–30m: Yahoo RTH sessions (Finnhub free tier truncates 1m). */
+/** US equities 1m–15m: Yahoo RTH sessions (Finnhub free tier truncates 1m). */
 async function resolveStockRthSeriesByResolution(
   symbol: string,
   config: MarketChartResolutionConfig,

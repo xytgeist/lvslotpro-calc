@@ -623,6 +623,10 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-09: **Lounge market modal snapshot ticker header (code on `test`):** Advanced **Snapshot → Capture image** PNG composites **company name + $ticker** band above LWC chart canvas (theme-aware). Client-only.
+- 2026-06-09: **Lounge market modal chart capture (code on `test`):** **Capture image** menu on **Advanced** chart toolbar — **Copy image** (clipboard PNG via LWC `takeScreenshot`) or **Add to post** (composer image attach). Client-only.
+- 2026-06-09: **Lounge market modal chart types expanded (code on `test`):** Advanced chart-type dropdown adds **Line**, **Hollow candles** (outline bodies), and **Heikin Ashi**; prefs still **`loungeMarketChartType:v1`**. Client-only.
+- 2026-06-09: **Lounge market modal Advanced time axis (code on `test`):** resolution-aware tick labels (1H/2H/4H date-only; 1m/5m/15m stepped intraday + day switchover); **30m** resolution removed. Client + Edge README.
 - 2026-06-09: **Lounge market modal Advanced 1m RTH fix (code on `test`):** stock **1m/5m/15m/30m** resolution loads **Yahoo RTH sessions** (not truncated Finnhub ~75 bars); pan-back walks prior sessions; Yahoo **`maxBars` 500** for resolution fetch. **Redeploy `lounge-market-data`**. Client + Edge.
 - 2026-06-09: **Lounge market modal Advanced resolution loading (code on `test`):** Advanced drops timeframe pills — **resolution picker** only (`1m`…`Weekly`, default **Daily ~280 bars**); **`modal_series` + `resolution` + `bar_limit`** with **200-bar** pan-back chunks and per-resolution max lookback; Quick sheet keeps **1H/1D/1W/…** pills. **Redeploy `lounge-market-data`**. Client + Edge.
 - 2026-06-09: **Lounge market modal CoinGecko crypto OHLC (code on `test`):** crypto Finnhub miss → CoinGecko **`/coins/{id}/ohlc`** (hourly when **`COINGECKO_API_KEY`** set); close-only **`market_chart`** fallback if OHLC fails. **Redeploy `lounge-market-data`.**

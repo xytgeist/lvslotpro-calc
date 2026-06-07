@@ -1,0 +1,159 @@
+/** Capture Lounge market chart screenshots (Lightweight Charts `takeScreenshot`). */
+
+/**
+ * @typedef {{
+ *   ticker?: string | null,
+ *   name?: string | null,
+ *   isLight?: boolean,
+ * }} MarketChartSnapshotBranding
+ */
+
+/**
+ * @param {import('lightweight-charts').IChartApi | null | undefined} chart
+ * @returns {HTMLCanvasElement}
+ */
+export function captureMarketChartScreenshotCanvas(chart) {
+  if (!chart || typeof chart.takeScreenshot !== 'function') {
+    throw new Error('Chart is not ready')
+  }
+  return chart.takeScreenshot()
+}
+
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {string} text
+ * @param {number} maxWidth
+ */
+function truncateCanvasText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text
+  let out = text
+  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) {
+    out = out.slice(0, -1)
+  }
+  return `${out}…`
+}
+
+/**
+ * Draw ticker + name above the chart canvas (Advanced header branding).
+ * @param {HTMLCanvasElement} chartCanvas
+ * @param {MarketChartSnapshotBranding} [branding]
+ */
+export function composeMarketChartSnapshotCanvas(chartCanvas, branding = {}) {
+  const tickerRaw = String(branding.ticker || '').trim()
+  const name = String(branding.name || '').trim()
+  if (!tickerRaw && !name) return chartCanvas
+
+  const ticker = tickerRaw.startsWith('$') ? tickerRaw : tickerRaw ? `$${tickerRaw}` : ''
+  const chartW = chartCanvas.width
+  const chartH = chartCanvas.height
+  const headerH = Math.max(48, Math.round(chartW * 0.048))
+  const padX = Math.max(14, Math.round(chartW * 0.014))
+
+  const out = document.createElement('canvas')
+  out.width = chartW
+  out.height = chartH + headerH
+  const ctx = out.getContext('2d')
+  if (!ctx) return chartCanvas
+
+  const isLight = branding.isLight === true
+  const bg = isLight ? '#fafafa' : '#09090b'
+  const titleColor = isLight ? '#18181b' : '#fafafa'
+  const tickerColor = isLight ? '#71717a' : '#a1a1aa'
+  const divider = isLight ? '#e4e4e7' : '#27272a'
+
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, chartW, headerH + chartH)
+
+  const titleSize = Math.max(14, Math.round(chartW * 0.015))
+  const tickerSize = Math.max(12, Math.round(chartW * 0.012))
+  const maxTextW = chartW - padX * 2
+
+  const nameLineH = name ? titleSize + 3 : 0
+  const tickerLineH = ticker ? tickerSize + 2 : 0
+  const gap = name && ticker ? 2 : 0
+  const blockH = nameLineH + gap + tickerLineH
+  let y = Math.max(padX * 0.6, Math.round((headerH - blockH) / 2))
+
+  ctx.textBaseline = 'top'
+  if (name) {
+    ctx.fillStyle = titleColor
+    ctx.font = `700 ${titleSize}px system-ui, -apple-system, "Segoe UI", sans-serif`
+    ctx.fillText(truncateCanvasText(ctx, name, maxTextW), padX, y)
+    y += nameLineH + gap
+  }
+  if (ticker) {
+    ctx.fillStyle = tickerColor
+    ctx.font = `600 ${tickerSize}px system-ui, -apple-system, "Segoe UI", sans-serif`
+    ctx.fillText(ticker, padX, y)
+  }
+
+  ctx.fillStyle = divider
+  ctx.fillRect(0, headerH - 1, chartW, 1)
+  ctx.drawImage(chartCanvas, 0, headerH)
+
+  return out
+}
+
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @returns {Promise<Blob>}
+ */
+export function marketChartScreenshotCanvasToPngBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob)
+        else reject(new Error('Could not encode image'))
+      },
+      'image/png',
+    )
+  })
+}
+
+/**
+ * @param {import('lightweight-charts').IChartApi | null | undefined} chart
+ * @param {string} [filename]
+ * @param {MarketChartSnapshotBranding} [branding]
+ * @returns {Promise<File>}
+ */
+export async function captureMarketChartPngFile(chart, filename = 'chart-snapshot.png', branding) {
+  const raw = captureMarketChartScreenshotCanvas(chart)
+  const canvas = composeMarketChartSnapshotCanvas(raw, branding)
+  const blob = await marketChartScreenshotCanvasToPngBlob(canvas)
+  const safeName = String(filename || 'chart-snapshot.png').trim() || 'chart-snapshot.png'
+  return new File([blob], safeName.endsWith('.png') ? safeName : `${safeName}.png`, { type: 'image/png' })
+}
+
+/**
+ * @param {import('lightweight-charts').IChartApi | null | undefined} chart
+ * @param {MarketChartSnapshotBranding} [branding]
+ */
+export async function copyMarketChartScreenshotToClipboard(chart, branding) {
+  const file = await captureMarketChartPngFile(chart, 'chart-snapshot.png', branding)
+  const nav = typeof navigator !== 'undefined' ? navigator : null
+  if (nav?.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+    await nav.clipboard.write([new ClipboardItem({ [file.type]: file })])
+    return
+  }
+  throw new Error('Copy not supported in this browser')
+}
+
+/** @param {string | null | undefined} symbol */
+export function marketChartSnapshotFilename(symbol) {
+  const base = String(symbol || 'chart')
+    .trim()
+    .replace(/[^\w.-]+/g, '')
+    .slice(0, 32)
+  const day = new Date().toISOString().slice(0, 10)
+  return `${base || 'chart'}-${day}.png`
+}
+
+/** @param {object | null | undefined} embed @param {boolean} [isLight] */
+export function marketChartSnapshotBrandingFromEmbed(embed, isLight = false) {
+  if (!embed || typeof embed !== 'object') {
+    return { ticker: '', name: '', isLight }
+  }
+  const ticker = String(embed.display_symbol || embed.symbol || '').trim()
+  const name = String(embed.name || embed.display_symbol || embed.symbol || '').trim()
+  return { ticker, name, isLight }
+}

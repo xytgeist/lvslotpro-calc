@@ -9,7 +9,7 @@ import {
   attachMarketChartVolumePane,
   loungeMarketBarsToVolumeSeries,
 } from './loungeMarketChartVolume.js'
-import { loungeMarketBarsToCandlestickSeries } from './loungeMarketChartTypes.js'
+import { marketModalMainSeriesData } from './loungeMarketChartTypes.js'
 
 /**
  * @param {{
@@ -41,11 +41,7 @@ export function refreshAdvancedMarketChartData(ctx) {
   let { volumeSeries } = ctx
 
   const barPoints = loungeMarketBarsToSeries(rawBars)
-  if (chartType === 'candle') {
-    mainSeries.setData(loungeMarketBarsToCandlestickSeries(rawBars))
-  } else {
-    mainSeries.setData(barPoints)
-  }
+  mainSeries.setData(marketModalMainSeriesData(chartType, rawBars, barPoints))
 
   if (volumeSeries) {
     volumeSeries.setData(loungeMarketBarsToVolumeSeries(rawBars, isLight))

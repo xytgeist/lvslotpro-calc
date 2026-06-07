@@ -8,15 +8,29 @@ import { marketBarHasOhlc } from '../../utils/marketBarOhlc.js'
 
 export const LOUNGE_MARKET_CHART_TYPE_STORAGE_KEY = 'loungeMarketChartType:v1'
 
-/** @typedef {'area' | 'line' | 'candle'} MarketModalChartTypeId */
+/** @typedef {'area' | 'line' | 'candle' | 'hollow' | 'heikin'} MarketModalChartTypeId */
 
 /** @type {Array<{ id: MarketModalChartTypeId, label: string }>} */
 export const MARKET_MODAL_CHART_TYPES = [
   { id: 'area', label: 'Area' },
+  { id: 'line', label: 'Line' },
   { id: 'candle', label: 'Candles' },
+  { id: 'hollow', label: 'Hollow candles' },
+  { id: 'heikin', label: 'Heikin Ashi' },
 ]
 
 const CHART_TYPE_BY_ID = Object.fromEntries(MARKET_MODAL_CHART_TYPES.map((row) => [row.id, row]))
+const OHLC_CHART_TYPES = new Set(['candle', 'hollow', 'heikin'])
+
+/** @param {MarketModalChartTypeId | string} chartType */
+export function marketModalChartTypeUsesOhlc(chartType) {
+  return OHLC_CHART_TYPES.has(chartType)
+}
+
+/** @param {MarketModalChartTypeId | string} chartType */
+export function marketModalChartTypeUsesLineMarkers(chartType) {
+  return chartType === 'area' || chartType === 'line'
+}
 
 /** @returns {MarketModalChartTypeId} */
 export function readStoredMarketChartType() {
@@ -24,7 +38,6 @@ export function readStoredMarketChartType() {
   try {
     const raw = window.localStorage.getItem(LOUNGE_MARKET_CHART_TYPE_STORAGE_KEY)
     const id = String(raw || '').trim()
-    if (id === 'line') return 'area'
     return CHART_TYPE_BY_ID[id] ? /** @type {MarketModalChartTypeId} */ (id) : 'area'
   } catch {
     return 'area'
@@ -111,23 +124,71 @@ export function loungeMarketBarsToCandlestickSeries(bars) {
   return out
 }
 
+/** Heikin Ashi OHLC derived from regular candlestick bars. */
+export function loungeMarketBarsToHeikinAshiSeries(bars) {
+  const candles = loungeMarketBarsToCandlestickSeries(bars)
+  if (!candles.length) return []
+
+  /** @type {Array<{ time: number, open: number, high: number, low: number, close: number }>} */
+  const out = []
+  let prevHaOpen = null
+  let prevHaClose = null
+
+  for (const row of candles) {
+    const haClose = (row.open + row.high + row.low + row.close) / 4
+    const haOpen = prevHaOpen == null ? (row.open + row.close) / 2 : (prevHaOpen + prevHaClose) / 2
+    const haHigh = Math.max(row.high, haOpen, haClose)
+    const haLow = Math.min(row.low, haOpen, haClose)
+    out.push({
+      time: row.time,
+      open: haOpen,
+      high: haHigh,
+      low: haLow,
+      close: haClose,
+    })
+    prevHaOpen = haOpen
+    prevHaClose = haClose
+  }
+
+  return out
+}
+
+function ohlcSeriesForChartType(chartType, rawBars) {
+  if (chartType === 'heikin') return loungeMarketBarsToHeikinAshiSeries(rawBars)
+  if (marketModalChartTypeUsesOhlc(chartType)) return loungeMarketBarsToCandlestickSeries(rawBars)
+  return null
+}
+
+/**
+ * @param {MarketModalChartTypeId | string} chartType
+ * @param {Array<{ t: number, c: number }>} rawBars
+ * @param {Array<{ time: number, value: number }>} barPoints
+ */
+export function marketModalMainSeriesData(chartType, rawBars, barPoints) {
+  const ohlc = ohlcSeriesForChartType(chartType, rawBars)
+  if (ohlc) return ohlc
+  return barPoints
+}
+
+function candleHighLow(candles) {
+  let high = null
+  let low = null
+  for (const row of candles) {
+    if (!Number.isFinite(row.high) || !Number.isFinite(row.low)) continue
+    if (!high || row.high > high.value) high = { time: row.time, value: row.high }
+    if (!low || row.low < low.value) low = { time: row.time, value: row.low }
+  }
+  return { high, low }
+}
+
 /**
  * @param {MarketModalChartTypeId | string} chartType
  * @param {Array<{ time: number, value: number }>} barPoints
  * @param {Array<{ t: number, c: number }>} [rawBars]
  */
 export function marketModalChartHighLow(chartType, barPoints, rawBars = []) {
-  if (chartType === 'candle') {
-    const candles = loungeMarketBarsToCandlestickSeries(rawBars)
-    let high = null
-    let low = null
-    for (const row of candles) {
-      if (!Number.isFinite(row.high) || !Number.isFinite(row.low)) continue
-      if (!high || row.high > high.value) high = { time: row.time, value: row.high }
-      if (!low || row.low < low.value) low = { time: row.time, value: row.low }
-    }
-    return { high, low }
-  }
+  const ohlc = ohlcSeriesForChartType(chartType, rawBars)
+  if (ohlc?.length) return candleHighLow(ohlc)
 
   let high = null
   let low = null
@@ -159,6 +220,8 @@ export function attachModalMainChartSeries(chart, chartType, opts) {
     lastValueVisible: false,
     priceFormat,
   }
+  const up = isLight ? '#16a34a' : '#22c55e'
+  const down = isLight ? '#dc2626' : '#ef4444'
 
   if (chartType === 'line') {
     const series = chart.addSeries(LineSeries, {
@@ -170,9 +233,35 @@ export function attachModalMainChartSeries(chart, chartType, opts) {
     return series
   }
 
+  if (chartType === 'hollow') {
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: 'transparent',
+      downColor: 'transparent',
+      borderVisible: true,
+      borderUpColor: up,
+      borderDownColor: down,
+      wickUpColor: up,
+      wickDownColor: down,
+      ...common,
+    })
+    series.setData(loungeMarketBarsToCandlestickSeries(rawBars))
+    return series
+  }
+
+  if (chartType === 'heikin') {
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: up,
+      downColor: down,
+      borderVisible: false,
+      wickUpColor: up,
+      wickDownColor: down,
+      ...common,
+    })
+    series.setData(loungeMarketBarsToHeikinAshiSeries(rawBars))
+    return series
+  }
+
   if (chartType === 'candle') {
-    const up = isLight ? '#16a34a' : '#22c55e'
-    const down = isLight ? '#dc2626' : '#ef4444'
     const series = chart.addSeries(CandlestickSeries, {
       upColor: up,
       downColor: down,

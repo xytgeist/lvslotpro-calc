@@ -1601,6 +1601,35 @@ export default function SocialFeed({
     setMarketChartModal({ open: false, embeds: [], focusSymbol: null })
   }, [])
 
+  const insertMarketChartSnapshotIntoComposer = useCallback(
+    (file) => {
+      if (!(file instanceof File)) return false
+      if (!composerUserId || loungeReadOnly) return false
+      if (openProfileGateIfNeeded()) return false
+      const { next, limitDialog } = mergeLoungePickedImageItems(
+        composerImageItemsRef.current,
+        [file],
+        newComposerImageId,
+      )
+      if (limitDialog) {
+        setLoungeImageLimitDialog(limitDialog)
+        return false
+      }
+      composerImageItemsRef.current = next
+      setComposerImageItems(next)
+      setComposerExpanded(true)
+      closeMarketChartModal()
+      setLoungeShareFlash('Chart image added to post.')
+      return true
+    },
+    [
+      closeMarketChartModal,
+      composerUserId,
+      loungeReadOnly,
+      openProfileGateIfNeeded,
+    ],
+  )
+
   const expandAndFocusLoungeDetailCommentComposer = useCallback(({ skipScrollToTop = false } = {}) => {
     if (!skipScrollToTop) scrollLoungePostDetailToTopInstant()
     focusLoungeComposerCaption(() => loungeDetailCommentFieldRef.current, {
@@ -16121,6 +16150,7 @@ export default function SocialFeed({
         hydratePosts={hydrateCommunityPosts}
         onOpenPost={openLoungePostDetail}
         onClose={closeMarketChartModal}
+        onInsertSnapshot={composerUserId && !loungeReadOnly ? insertMarketChartSnapshotIntoComposer : undefined}
       />
 
       {loungeImageLimitDialog && typeof document !== 'undefined'
