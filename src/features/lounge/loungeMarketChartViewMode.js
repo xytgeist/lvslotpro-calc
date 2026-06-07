@@ -135,6 +135,22 @@ export function marketChartAdvancedPriceScaleOptions(isLight = false) {
   }
 }
 
+/** Pinch / double-tap scale for Advanced fullscreen (time axis only; price uses custom axis zoom). */
+export function marketChartAdvancedHandleScaleOptions() {
+  return {
+    mouseWheel: false,
+    pinch: true,
+    axisPressedMouseMove: {
+      time: false,
+      price: false,
+    },
+    axisDoubleClickReset: {
+      time: true,
+      price: false,
+    },
+  }
+}
+
 /** @param {string} timeframeLabel @param {boolean} [isLight] */
 export function marketChartAdvancedTimeScaleOptions(timeframeLabel, isLight = false) {
   return {

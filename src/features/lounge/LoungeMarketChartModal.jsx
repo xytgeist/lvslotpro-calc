@@ -57,6 +57,7 @@ import {
 } from './loungeMarketChartPan.js'
 import { refreshAdvancedMarketChartData } from './loungeMarketChartDataSync.js'
 import {
+  marketChartAdvancedHandleScaleOptions,
   marketChartAdvancedLocalization,
   marketChartAdvancedPriceScaleOptions,
   marketChartAdvancedTimeScaleOptions,
@@ -1040,7 +1041,7 @@ export default function LoungeMarketChartModal({
             vertTouchDrag: false,
           }
         : false,
-      handleScale: false,
+      handleScale: isAdvancedView ? marketChartAdvancedHandleScaleOptions() : false,
       timeScale: isAdvancedView
         ? marketChartAdvancedTimeScaleOptions(timeframe.label, isLight)
         : {
