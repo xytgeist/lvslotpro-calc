@@ -16,7 +16,7 @@ import { loungeMarketModalNews, loungeMarketModalSeries } from '../../utils/loun
 import { isUsableStockIntradayBars, isUsEquityRegularSessionOpen } from '../../utils/usEquityMarketSession.js'
 import { formatLoungeSearchError, loungeSearchCashtagPosts, LOUNGE_SEARCH_SORT } from './loungeSearchApi.js'
 import { useLoungeMarketFeedQuotes } from './LoungeMarketFeedContext.jsx'
-import { loungeMarketBarsToSeries, loungeMarketChartIsLight, loungeMarketChartTheme } from './loungeMarketChartTheme.js'
+import { loungeMarketBarsToSeries, loungeMarketChartCrosshairOptions, loungeMarketChartIsLight, loungeMarketChartTheme } from './loungeMarketChartTheme.js'
 import {
   attachMarketChartIndicators,
   computeMarketChartOverlayLines,
@@ -34,6 +34,15 @@ import {
   readStoredMarketChartType,
   writeStoredMarketChartType,
 } from './loungeMarketChartTypes.js'
+import {
+  isMarketChartAdvancedView,
+  marketChartAdvancedLocalization,
+  marketChartAdvancedPriceScaleOptions,
+  marketChartAdvancedTimeScaleOptions,
+  marketChartAnalysisGrid,
+  readStoredMarketChartViewMode,
+  writeStoredMarketChartViewMode,
+} from './loungeMarketChartViewMode.js'
 
 const SHEET_DISMISS_PX = 88
 const SHEET_DISMISS_VEL = 0.45
@@ -42,8 +51,6 @@ const MARKET_CHART_TIMEFRAME_BAND_PX = 24
 const MARKET_CHART_MODAL_HEIGHT = '90dvh'
 const MARKET_CHART_HEIGHT_PX = 360
 const MARKET_CHART_PRICE_SCALE_FONT_SIZE = 10
-const MARKET_CHART_PRICE_AXIS_GUTTER_PX = 56
-const MARKET_CHART_PRICE_AXIS_LABEL_MIN_GAP_PX = 14
 const MARKET_CHART_PRICE_SCALE_MARGINS = { top: 0.06, bottom: 0.06 }
 /** Hold still this long, then drag pans the chart (scrub stays tap/slide). */
 const MARKET_CHART_LONG_PRESS_MS = 450
@@ -62,12 +69,7 @@ function setChartLineMarkers(series, barPoints, lineColor) {
   ])
 }
 
-/** High / low in the active timeframe series (close line or candle OHLC). */
-function barSeriesHighLow(barPoints, chartType = 'area', rawBars = []) {
-  return marketModalChartHighLow(chartType, barPoints, rawBars)
-}
-
-/** Pin Y scale to timeframe high/low (+ optional overlay lines) for gutter labels. */
+/** Pin Y scale to timeframe high/low (+ optional overlay lines). */
 function applyMarketChartPriceRange(mainSeries, barPoints, overlayLines = [], opts = {}) {
   const keepMargins = opts.keepMargins === true
   let from = Infinity
@@ -100,50 +102,6 @@ function applyMarketChartPriceRange(mainSeries, barPoints, overlayLines = [], op
     ...(keepMargins ? {} : { scaleMargins: MARKET_CHART_PRICE_SCALE_MARGINS }),
   })
   mainSeries.priceScale().setVisibleRange({ from, to })
-}
-
-/** HOD / current / LOD price values on the right gutter (three ticks only). */
-function buildPriceAxisLabels(mainSeries, barPoints, chartType = 'area', rawBars = []) {
-  const { high, low } = barSeriesHighLow(barPoints, chartType, rawBars)
-  const last = barPoints?.[barPoints.length - 1]
-  const currentPrice = Number(last?.value)
-  if (!high || !low || !Number.isFinite(currentPrice)) {
-    return { high: null, current: null, low: null }
-  }
-
-  const lowPrice = Math.min(low.value, high.value)
-  const highPrice = Math.max(low.value, high.value)
-
-  const toRow = (id, price) => {
-    const y = mainSeries.priceToCoordinate(price)
-    if (y == null) return null
-    return { id, price, y: Math.round(y) }
-  }
-
-  const rows = [toRow('high', highPrice), toRow('current', currentPrice), toRow('low', lowPrice)].filter(Boolean)
-
-  rows.sort((a, b) => a.y - b.y)
-  for (let i = 1; i < rows.length; i += 1) {
-    if (rows[i].y - rows[i - 1].y < MARKET_CHART_PRICE_AXIS_LABEL_MIN_GAP_PX) {
-      rows[i].y = rows[i - 1].y + MARKET_CHART_PRICE_AXIS_LABEL_MIN_GAP_PX
-    }
-  }
-
-  const byId = Object.fromEntries(rows.map((row) => [row.id, row]))
-  return {
-    high: byId.high ? { price: highPrice, y: byId.high.y } : null,
-    current: byId.current ? { price: currentPrice, y: byId.current.y } : null,
-    low: byId.low ? { price: lowPrice, y: byId.low.y } : null,
-  }
-}
-
-function priceAxisLabelsEqual(a, b) {
-  if (a === b) return true
-  if (!a || !b) return false
-  const samePoint = (p, q) =>
-    (p == null && q == null) ||
-    (p != null && q != null && p.price === q.price && p.y === q.y)
-  return samePoint(a.high, b.high) && samePoint(a.current, b.current) && samePoint(a.low, b.low)
 }
 
 function MarketIndicatorLegendLine({ color, dashed = false, className = '' }) {
@@ -232,8 +190,10 @@ function scrollMarketChartByPixels(chart, deltaPx) {
  * @param {import('lightweight-charts').ISeriesApi} mainSeries
  * @param {Array<{ time: number, value: number }>} barPoints
  * @param {(quote: object | null) => void} onScrub
+ * @param {{ panEnabled?: boolean }} [opts]
  */
-function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub) {
+function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub, gestureOpts = {}) {
+  const panEnabled = gestureOpts.panEnabled !== false
   const clearScrub = () => {
     chart.clearCrosshairPosition()
     onScrub(null)
@@ -248,22 +208,27 @@ function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub) 
       return
     }
     const time = chart.timeScale().coordinateToTime(x)
-    let price = priceAtSeriesTime(barPoints, time)
-    if (!Number.isFinite(price) && barPoints.length) {
-      price =
+    const crosshairTime = time ?? barPoints[barPoints.length - 1]?.time
+    let crosshairPrice = mainSeries.coordinateToPrice(y)
+    if (crosshairPrice == null || !Number.isFinite(crosshairPrice)) {
+      crosshairPrice = priceAtSeriesTime(barPoints, crosshairTime)
+    }
+    if (!Number.isFinite(crosshairPrice) && barPoints.length) {
+      crosshairPrice =
         x <= 0
           ? Number(barPoints[0].value)
           : Number(barPoints[barPoints.length - 1].value)
     }
-    if (!Number.isFinite(price)) {
+    if (!Number.isFinite(crosshairPrice)) {
       clearScrub()
       return
     }
-    const crosshairTime = time ?? barPoints[barPoints.length - 1]?.time
     if (crosshairTime != null) {
-      chart.setCrosshairPosition(price, crosshairTime, mainSeries)
+      chart.setCrosshairPosition(crosshairPrice, crosshairTime, mainSeries)
     }
-    onScrub(scrubQuoteFromBarPoints(barPoints, price))
+    const seriesPrice = priceAtSeriesTime(barPoints, crosshairTime)
+    const headerPrice = Number.isFinite(seriesPrice) ? seriesPrice : crosshairPrice
+    onScrub(scrubQuoteFromBarPoints(barPoints, headerPrice))
   }
 
   /** @type {'pending' | 'scrub' | 'pan' | null} */
@@ -313,6 +278,7 @@ function bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, onScrub) 
     startX = e.clientX
     startY = e.clientY
     applyScrubAt(e.clientX, e.clientY)
+    if (!panEnabled) return
     longPressTimer = window.setTimeout(() => {
       longPressTimer = null
       if (mode !== 'pending' || activePointerId !== e.pointerId) return
@@ -452,6 +418,7 @@ export default function LoungeMarketChartModal({
   const mainSeriesRef = useRef(null)
   const indicatorMenuRef = useRef(null)
   const chartTypeMenuRef = useRef(null)
+  const timeframeMenuRef = useRef(null)
   const postsScrollRef = useRef(null)
   const sheetDragRef = useRef(null)
   const [sheetDragY, setSheetDragY] = useState(0)
@@ -471,25 +438,12 @@ export default function LoungeMarketChartModal({
   const [postsErr, setPostsErr] = useState('')
   const [activeIndicators, setActiveIndicators] = useState(() => readStoredMarketChartIndicators())
   const [chartType, setChartType] = useState(() => readStoredMarketChartType())
+  const [viewMode, setViewMode] = useState(() => readStoredMarketChartViewMode())
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false)
   const [chartTypeMenuOpen, setChartTypeMenuOpen] = useState(false)
+  const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
   /** Crosshair scrub overrides header quote until pointer leaves the chart. */
   const [scrubQuote, setScrubQuote] = useState(/** @type {{ price: number, change?: number, change_pct?: number } | null} */ (null))
-  const [scrubAxisCurrent, setScrubAxisCurrent] = useState(/** @type {{ price: number, y: number } | null} */ (null))
-  const [priceAxisLabels, setPriceAxisLabels] = useState(
-    /** @type {{ high: { price: number, y: number } | null, current: { price: number, y: number } | null, low: { price: number, y: number } | null }} */ ({
-      high: null,
-      current: null,
-      low: null,
-    }),
-  )
-  const priceAxisLabelsRef = useRef(
-    /** @type {{ high: { price: number, y: number } | null, current: { price: number, y: number } | null, low: { price: number, y: number } | null }} */ ({
-      high: null,
-      current: null,
-      low: null,
-    }),
-  )
 
   const isLight = loungeMarketChartIsLight()
   const { quotes: feedQuotes } = useLoungeMarketFeedQuotes()
@@ -534,26 +488,50 @@ export default function LoungeMarketChartModal({
     if (!open) {
       setIndicatorMenuOpen(false)
       setChartTypeMenuOpen(false)
+      setTimeframeMenuOpen(false)
     }
   }, [open])
 
   useEffect(() => {
-    if (!indicatorMenuOpen && !chartTypeMenuOpen) return undefined
+    if (!indicatorMenuOpen && !chartTypeMenuOpen && !timeframeMenuOpen) return undefined
     const onPointerDown = (e) => {
       if (indicatorMenuRef.current?.contains(e.target)) return
       if (chartTypeMenuRef.current?.contains(e.target)) return
+      if (timeframeMenuRef.current?.contains(e.target)) return
       setIndicatorMenuOpen(false)
       setChartTypeMenuOpen(false)
+      setTimeframeMenuOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown, true)
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
-  }, [indicatorMenuOpen, chartTypeMenuOpen])
+  }, [chartTypeMenuOpen, indicatorMenuOpen, timeframeMenuOpen])
 
   const selectChartType = useCallback((id) => {
     setChartType(id)
     writeStoredMarketChartType(id)
     setChartTypeMenuOpen(false)
   }, [])
+
+  const selectTimeframeIdx = useCallback((idx) => {
+    setTimeframeIdx(idx)
+    setTimeframeMenuOpen(false)
+  }, [])
+
+  const toggleAdvancedView = useCallback(() => {
+    setViewMode((prev) => {
+      const next = isMarketChartAdvancedView(prev) ? 'quick' : 'advanced'
+      writeStoredMarketChartViewMode(next)
+      if (next === 'quick') {
+        setIndicatorMenuOpen(false)
+        setChartTypeMenuOpen(false)
+        setTimeframeMenuOpen(false)
+      }
+      return next
+    })
+  }, [])
+
+  const isAdvancedView = isMarketChartAdvancedView(viewMode)
+  const effectiveChartType = isAdvancedView ? chartType : 'line'
 
   /** Same live rolling payload as feed mini charts (`LoungeMarketChartStrip`). */
   const rollingLive = useMemo(() => {
@@ -745,14 +723,10 @@ export default function LoungeMarketChartModal({
 
   useEffect(() => {
     setScrubQuote(null)
-    setScrubAxisCurrent(null)
   }, [activeIdx, timeframeIdx, series, rollingLive])
 
   useEffect(() => {
-    if (!open) {
-      setScrubQuote(null)
-      setScrubAxisCurrent(null)
-    }
+    if (!open) setScrubQuote(null)
   }, [open])
 
   /** Rolling 1D: same source priority as feed minis; never reuse another ticker's fetched series. */
@@ -789,7 +763,10 @@ export default function LoungeMarketChartModal({
   const displayUp = Number.isFinite(displayChangePct) ? displayChangePct >= 0 : true
   const chartChangePct = Number(quote?.change_pct)
   const chartUp = Number.isFinite(chartChangePct) ? chartChangePct >= 0 : true
-  const theme = useMemo(() => loungeMarketChartTheme(isLight, { attributionLogo: true }), [isLight])
+  const theme = useMemo(
+    () => loungeMarketChartTheme(isLight, { attributionLogo: isAdvancedView }),
+    [isAdvancedView, isLight],
+  )
 
   useEffect(() => {
     if (!open) return undefined
@@ -805,6 +782,11 @@ export default function LoungeMarketChartModal({
           setIndicatorMenuOpen(false)
           return
         }
+        if (timeframeMenuOpen) {
+          e.stopPropagation()
+          setTimeframeMenuOpen(false)
+          return
+        }
         dismissSheet()
       }
     }
@@ -815,7 +797,7 @@ export default function LoungeMarketChartModal({
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [chartTypeMenuOpen, dismissSheet, indicatorMenuOpen, open])
+  }, [chartTypeMenuOpen, dismissSheet, indicatorMenuOpen, open, timeframeMenuOpen])
 
   useEffect(() => {
     const el = chartHostRef.current
@@ -828,27 +810,31 @@ export default function LoungeMarketChartModal({
         ...theme.layout,
         fontSize: MARKET_CHART_PRICE_SCALE_FONT_SIZE,
       },
-      grid: theme.grid,
-      rightPriceScale: { visible: false },
+      localization: isAdvancedView ? marketChartAdvancedLocalization(timeframe.label) : undefined,
+      grid: isAdvancedView ? marketChartAnalysisGrid(isLight) : theme.grid,
+      rightPriceScale: isAdvancedView
+        ? marketChartAdvancedPriceScaleOptions(isLight)
+        : { visible: false },
       leftPriceScale: { visible: false },
       handleScroll: false,
       handleScale: false,
-      timeScale: {
-        visible: false,
-        borderVisible: false,
-        rightOffset: 0,
-        rightOffsetPixels: 0,
-        fixRightEdge: true,
-      },
-      crosshair: {
-        vertLine: { visible: true, labelVisible: false },
-        horzLine: { visible: false, labelVisible: false },
-      },
+      timeScale: isAdvancedView
+        ? marketChartAdvancedTimeScaleOptions(timeframe.label, isLight)
+        : {
+            visible: false,
+            borderVisible: false,
+            rightOffset: 0,
+            rightOffsetPixels: 0,
+            fixRightEdge: true,
+          },
+      crosshair: loungeMarketChartCrosshairOptions(isAdvancedView, isLight),
     })
     const rawBars = chartSeries?.bars || []
     const barPoints = loungeMarketBarsToSeries(rawBars)
-    const overlayLines = computeMarketChartOverlayLines(barPoints, activeIndicators)
-    const mainSeries = attachModalMainChartSeries(chart, chartType, {
+    const overlayLines = isAdvancedView
+      ? computeMarketChartOverlayLines(barPoints, activeIndicators)
+      : []
+    const mainSeries = attachModalMainChartSeries(chart, effectiveChartType, {
       barPoints,
       rawBars,
       lineColor,
@@ -856,48 +842,52 @@ export default function LoungeMarketChartModal({
       isLight,
     })
     mainSeriesRef.current = mainSeries
-    const hasOscillatorPane = MARKET_CHART_INDICATORS.some(
-      (row) => row.kind === 'oscillator' && activeIndicators.has(row.id),
-    )
-    attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, { isLight })
-    applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-      keepMargins: hasOscillatorPane,
-      chartType,
-      rawBars,
-    })
-    if (chartType !== 'candle') {
+    const hasOscillatorPane =
+      isAdvancedView &&
+      MARKET_CHART_INDICATORS.some((row) => row.kind === 'oscillator' && activeIndicators.has(row.id))
+    if (isAdvancedView) {
+      attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, { isLight })
+    }
+    if (isAdvancedView) {
+      applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
+        keepMargins: hasOscillatorPane,
+        chartType: effectiveChartType,
+        rawBars,
+      })
+    } else {
+      mainSeries.priceScale().applyOptions({
+        autoScale: true,
+        scaleMargins: MARKET_CHART_PRICE_SCALE_MARGINS,
+      })
+    }
+    if (effectiveChartType !== 'candle') {
       setChartLineMarkers(mainSeries, barPoints, lineColor)
     }
     fitMarketChartTimeScale(chart)
 
-    const publishPriceAxisLabels = (next) => {
-      if (priceAxisLabelsEqual(priceAxisLabelsRef.current, next)) return
-      priceAxisLabelsRef.current = next
-      setPriceAxisLabels(next)
-    }
-
-    const refreshChartOverlays = () => {
+    const refreshChartPriceRange = () => {
+      if (!isAdvancedView) return
       applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
         keepMargins: hasOscillatorPane,
-        chartType,
+        chartType: effectiveChartType,
         rawBars,
       })
-      publishPriceAxisLabels(buildPriceAxisLabels(mainSeries, barPoints, chartType, rawBars))
     }
-    refreshChartOverlays()
-    requestAnimationFrame(refreshChartOverlays)
+    if (isAdvancedView) {
+      refreshChartPriceRange()
+      requestAnimationFrame(refreshChartPriceRange)
+    }
 
-    const unbindScrub = bindMarketChartScrubPointer(el, chart, mainSeries, barPoints, (quoteAtPoint) => {
-      setScrubQuote(quoteAtPoint)
-      if (quoteAtPoint?.price != null) {
-        const axisY = mainSeries.priceToCoordinate(quoteAtPoint.price)
-        setScrubAxisCurrent(
-          axisY != null ? { price: quoteAtPoint.price, y: Math.round(axisY) } : null,
-        )
-      } else {
-        setScrubAxisCurrent(null)
-      }
-    })
+    const unbindScrub = bindMarketChartScrubPointer(
+      el,
+      chart,
+      mainSeries,
+      barPoints,
+      (quoteAtPoint) => {
+        setScrubQuote(quoteAtPoint)
+      },
+      { panEnabled: isAdvancedView },
+    )
 
     chartRef.current = chart
     let resizeRaf = 0
@@ -911,7 +901,7 @@ export default function LoungeMarketChartModal({
           height: chartHostRef.current.clientHeight,
         })
         fitMarketChartTimeScale(chartRef.current)
-        refreshChartOverlays()
+        refreshChartPriceRange()
       })
     })
     ro.observe(el)
@@ -922,12 +912,21 @@ export default function LoungeMarketChartModal({
       chart.remove()
       chartRef.current = null
       mainSeriesRef.current = null
-      priceAxisLabelsRef.current = { high: null, current: null, low: null }
-      setPriceAxisLabels({ high: null, current: null, low: null })
       setScrubQuote(null)
-      setScrubAxisCurrent(null)
     }
-  }, [active?.symbol, activeIndicatorKey, chartSeries, chartType, chartUp, isLight, open])
+  }, [
+    active?.symbol,
+    activeIndicatorKey,
+    chartSeries,
+    effectiveChartType,
+    chartUp,
+    isAdvancedView,
+    isLight,
+    open,
+    theme,
+    timeframe.label,
+    viewMode,
+  ])
 
   if (!open || !list.length) return null
 
@@ -942,7 +941,6 @@ export default function LoungeMarketChartModal({
   const sheetTransform = sheetClosing || sheetDragY > 0 ? `translate3d(0, ${sheetDragY}px, 0)` : undefined
   const sheetTransition =
     sheetClosing || (!sheetDragging && sheetDragY === 0) ? 'transform 0.22s ease' : 'none'
-  const axisCurrentLabel = scrubAxisCurrent ?? priceAxisLabels.current
 
   return createPortal(
     <div
@@ -1041,7 +1039,7 @@ export default function LoungeMarketChartModal({
             style={{ bottom: MARKET_CHART_TIMEFRAME_BAND_PX }}
           >
             <div ref={chartHostRef} className="absolute inset-0 touch-none select-none" />
-            {activeIndicatorLegend.length ? (
+            {isAdvancedView && activeIndicatorLegend.length ? (
               <div
                 className="pointer-events-none absolute left-2 top-2 z-10 max-w-[min(100%,14rem)] rounded-md border border-zinc-700/70 bg-zinc-950/85 px-2 py-1.5 backdrop-blur-[2px]"
                 aria-label="Indicator legend"
@@ -1059,41 +1057,31 @@ export default function LoungeMarketChartModal({
                 </ul>
               </div>
             ) : null}
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 z-10"
-              style={{ width: MARKET_CHART_PRICE_AXIS_GUTTER_PX }}
-            >
-              {priceAxisLabels.high ? (
-                <div
-                  className={`absolute right-0 -translate-y-1/2 whitespace-nowrap pr-0.5 text-[10px] font-bold tabular-nums ${mutedClass}`}
-                  style={{ top: priceAxisLabels.high.y }}
-                >
-                  {formatMarketPrice(priceAxisLabels.high.price)}
-                </div>
-              ) : null}
-              {axisCurrentLabel ? (
-                <div
-                  className={`absolute right-0 -translate-y-1/2 whitespace-nowrap pr-0.5 text-[10px] font-semibold tabular-nums ${displayUp ? 'text-lv-green' : 'text-lv-red'}`}
-                  style={{ top: axisCurrentLabel.y }}
-                >
-                  {formatMarketPrice(axisCurrentLabel.price)}
-                </div>
-              ) : null}
-              {priceAxisLabels.low ? (
-                <div
-                  className={`absolute right-0 -translate-y-1/2 whitespace-nowrap pr-0.5 text-[10px] font-bold tabular-nums ${mutedClass}`}
-                  style={{ top: priceAxisLabels.low.y }}
-                >
-                  {formatMarketPrice(priceAxisLabels.low.price)}
-                </div>
-              ) : null}
-            </div>
           </div>
 
           <div
             className="absolute inset-x-3 bottom-0.5 z-10 flex items-end gap-2"
             data-market-sheet-no-drag
           >
+            <button
+              type="button"
+              aria-pressed={isAdvancedView}
+              aria-label="Advanced chart view"
+              title={isAdvancedView ? 'Advanced on — grid, axes, indicators' : 'Advanced off — quick sparkline'}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleAdvancedView()
+              }}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
+                isAdvancedView
+                  ? 'bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/40 hover:text-cyan-200'
+                  : `${mutedClass} hover:text-zinc-300`
+              }`}
+            >
+              Advanced
+            </button>
+            {isAdvancedView ? (
+            <>
             <div className="relative shrink-0" ref={chartTypeMenuRef}>
               <button
                 type="button"
@@ -1103,7 +1091,10 @@ export default function LoungeMarketChartModal({
                 onClick={(e) => {
                   e.stopPropagation()
                   setChartTypeMenuOpen((openNow) => {
-                    if (!openNow) setIndicatorMenuOpen(false)
+                    if (!openNow) {
+                      setIndicatorMenuOpen(false)
+                      setTimeframeMenuOpen(false)
+                    }
                     return !openNow
                   })
                 }}
@@ -1163,7 +1154,10 @@ export default function LoungeMarketChartModal({
                 onClick={(e) => {
                   e.stopPropagation()
                   setIndicatorMenuOpen((openNow) => {
-                    if (!openNow) setChartTypeMenuOpen(false)
+                    if (!openNow) {
+                      setChartTypeMenuOpen(false)
+                      setTimeframeMenuOpen(false)
+                    }
                     return !openNow
                   })
                 }}
@@ -1239,6 +1233,72 @@ export default function LoungeMarketChartModal({
                 </div>
               ) : null}
             </div>
+            <div className="relative shrink-0" ref={timeframeMenuRef}>
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={timeframeMenuOpen}
+                aria-label="Chart timeframe"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setTimeframeMenuOpen((openNow) => {
+                    if (!openNow) {
+                      setChartTypeMenuOpen(false)
+                      setIndicatorMenuOpen(false)
+                    }
+                    return !openNow
+                  })
+                }}
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
+                  timeframeIdx !== MARKET_MODAL_DEFAULT_TIMEFRAME_IDX
+                    ? 'text-cyan-300 hover:text-cyan-200'
+                    : `${mutedClass} hover:text-zinc-300`
+                }`}
+              >
+                {timeframe.label}
+                <span aria-hidden="true">{timeframeMenuOpen ? ' ▴' : ' ▾'}</span>
+              </button>
+              {timeframeMenuOpen ? (
+                <div
+                  role="listbox"
+                  aria-label="Chart timeframe"
+                  className="absolute bottom-full left-0 z-20 mb-1 min-w-[5.5rem] overflow-hidden rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {MARKET_MODAL_TIMEFRAMES.map((tf, i) => {
+                    const on = i === timeframeIdx
+                    return (
+                      <button
+                        key={tf.label}
+                        type="button"
+                        role="option"
+                        aria-selected={on}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          selectTimeframeIdx(i)
+                        }}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] touch-manipulation hover:bg-zinc-800 active:bg-zinc-800/90 ${
+                          on ? 'text-cyan-200' : 'text-zinc-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-[11px] ${
+                            on ? 'text-cyan-400' : 'text-transparent'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          ✓
+                        </span>
+                        {tf.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+            </>
+            ) : null}
+            {!isAdvancedView ? (
             <div className="flex min-w-0 flex-1 justify-between gap-0.5">
               {MARKET_MODAL_TIMEFRAMES.map((tf, i) => (
                 <button
@@ -1258,6 +1318,7 @@ export default function LoungeMarketChartModal({
                 </button>
               ))}
             </div>
+            ) : null}
           </div>
           {loading ? (
             <div className={`absolute inset-0 z-[1] grid place-items-center text-sm ${mutedClass}`}>

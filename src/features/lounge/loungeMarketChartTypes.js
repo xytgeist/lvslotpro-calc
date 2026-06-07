@@ -2,12 +2,12 @@
  * Modal chart display types (feed minis stay sparkline-only).
  */
 
-import { AreaSeries, CandlestickSeries } from 'lightweight-charts'
+import { AreaSeries, CandlestickSeries, LineSeries } from 'lightweight-charts'
 import { loungeMarketBarsToSeries } from './loungeMarketChartTheme.js'
 
 export const LOUNGE_MARKET_CHART_TYPE_STORAGE_KEY = 'loungeMarketChartType:v1'
 
-/** @typedef {'area' | 'candle'} MarketModalChartTypeId */
+/** @typedef {'area' | 'line' | 'candle'} MarketModalChartTypeId */
 
 /** @type {Array<{ id: MarketModalChartTypeId, label: string }>} */
 export const MARKET_MODAL_CHART_TYPES = [
@@ -116,6 +116,16 @@ export function attachModalMainChartSeries(chart, chartType, opts) {
     priceLineVisible: false,
     lastValueVisible: false,
     priceFormat,
+  }
+
+  if (chartType === 'line') {
+    const series = chart.addSeries(LineSeries, {
+      color: lineColor,
+      lineWidth: 2,
+      ...common,
+    })
+    series.setData(barPoints)
+    return series
   }
 
   if (chartType === 'candle') {

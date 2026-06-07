@@ -1,6 +1,6 @@
 /** Light/dark colors for TradingView Lightweight Charts in Lounge. */
 
-import { ColorType } from 'lightweight-charts'
+import { ColorType, CrosshairMode, LineStyle } from 'lightweight-charts'
 
 export function loungeMarketChartIsLight() {
   return typeof document !== 'undefined' && document.documentElement.classList.contains('light')
@@ -51,4 +51,21 @@ export function loungeMarketBarsToSeries(bars) {
     }
   }
   return out
+}
+
+/** Crosshair — both axes; labels only in advanced modal. */
+export function loungeMarketChartCrosshairOptions(isAdvancedView = false, isLight = loungeMarketChartIsLight()) {
+  const color = isLight ? 'rgba(113, 113, 122, 0.55)' : 'rgba(161, 161, 170, 0.55)'
+  const labelBackgroundColor = isLight ? '#fafafa' : '#18181b'
+  const line = {
+    color,
+    width: 1,
+    style: LineStyle.Dashed,
+    labelBackgroundColor,
+  }
+  return {
+    mode: CrosshairMode.Normal,
+    vertLine: { visible: true, labelVisible: isAdvancedView, ...line },
+    horzLine: { visible: true, labelVisible: isAdvancedView, ...line },
+  }
 }
