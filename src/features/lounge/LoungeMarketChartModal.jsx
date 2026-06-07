@@ -28,6 +28,7 @@ import {
 } from './loungeMarketChartIndicators.js'
 import {
   attachModalMainChartSeries,
+  loungeMarketBarsToCandlestickSeries,
   marketModalChartHighLow,
   marketModalChartTypeLabel,
   MARKET_MODAL_CHART_TYPES,
@@ -496,6 +497,8 @@ export default function LoungeMarketChartModal({
   const [historyBars, setHistoryBars] = useState(/** @type {object[]} */ ([]))
   const [historyHasMore, setHistoryHasMore] = useState(true)
   const historyLoadingRef = useRef(false)
+  const historyHasMoreRef = useRef(true)
+  const loadMoreHistoryRef = useRef(/** @type {(beforeSec: number) => void} */ (() => {}))
   const volumeSeriesRef = useRef(null)
   const indicatorSeriesRef = useRef(/** @type {import('lightweight-charts').ISeriesApi[]} */ ([]))
   const chartSeriesRef = useRef(null)
@@ -511,7 +514,6 @@ export default function LoungeMarketChartModal({
   const [activeIndicators, setActiveIndicators] = useState(() => readStoredMarketChartIndicators())
   const [chartType, setChartType] = useState(() => readStoredMarketChartType())
   const [advancedFullscreenOpen, setAdvancedFullscreenOpen] = useState(false)
-  const [advancedPortraitViewport, setAdvancedPortraitViewport] = useState(() => isMarketChartPortraitViewport())
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false)
   const [chartTypeMenuOpen, setChartTypeMenuOpen] = useState(false)
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
@@ -583,13 +585,7 @@ export default function LoungeMarketChartModal({
 
   useEffect(() => {
     if (!advancedFullscreenOpen) return undefined
-    const syncPortrait = () => setAdvancedPortraitViewport(isMarketChartPortraitViewport())
-    syncPortrait()
-    window.addEventListener('resize', syncPortrait)
-    window.addEventListener('orientationchange', syncPortrait)
     return () => {
-      window.removeEventListener('resize', syncPortrait)
-      window.removeEventListener('orientationchange', syncPortrait)
       unlockMarketChartLandscapeOrientation()
     }
   }, [advancedFullscreenOpen])
@@ -630,7 +626,6 @@ export default function LoungeMarketChartModal({
     setChartTypeMenuOpen(false)
     setTimeframeMenuOpen(false)
     setChartType('candle')
-    setAdvancedPortraitViewport(isMarketChartPortraitViewport())
     void lockMarketChartLandscapeOrientation()
     setAdvancedFullscreenOpen(true)
   }, [])
@@ -962,12 +957,14 @@ export default function LoungeMarketChartModal({
       activeIndicators,
       advancedFullscreenOpen,
       effectiveChartType,
-      historyHasMore,
       isLight,
       supabaseClient,
       timeframeIdx,
     ],
   )
+
+  historyHasMoreRef.current = historyHasMore
+  loadMoreHistoryRef.current = loadMoreHistory
 
   const quote = chartSeries?.quote || active?.quote
   const displayQuote = scrubQuote ?? quote
@@ -1174,10 +1171,10 @@ export default function LoungeMarketChartModal({
           chart,
           () => allBarsRef.current,
           (beforeSec) => {
-            void loadMoreHistory(beforeSec)
+            void loadMoreHistoryRef.current(beforeSec)
           },
           {
-            canLoad: () => historyHasMore && !historyLoadingRef.current,
+            canLoad: () => historyHasMoreRef.current && !historyLoadingRef.current,
           },
         )
       : () => {}
@@ -1252,18 +1249,112 @@ export default function LoungeMarketChartModal({
     active?.symbol,
     activeIndicatorKey,
     advancedFullscreenOpen,
-    advancedPortraitViewport,
-    chartSeries?.bars,
     effectiveChartType,
     chartUp,
     isAdvancedView,
     isLight,
-    loadMoreHistory,
-    historyHasMore,
     open,
     seriesScope,
     theme,
     timeframe.label,
+  ])
+
+  /** Quick sheet: refresh bars in place when live series updates. */
+  useEffect(() => {
+    if (!open || advancedFullscreenOpen || isAdvancedView) return
+    const chart = chartRef.current
+    const mainSeries = mainSeriesRef.current
+    if (!chart || !mainSeries) return
+    const rawBars = chartSeries?.bars || []
+    const barPoints = loungeMarketBarsToSeries(rawBars)
+    if (!barPoints.length) return
+    const lineColor = chartUp ? theme.upColor : theme.downColor
+    if (effectiveChartType === 'candle') {
+      mainSeries.setData(loungeMarketBarsToCandlestickSeries(rawBars))
+    } else {
+      mainSeries.setData(barPoints)
+      setChartLineMarkers(mainSeries, barPoints, lineColor)
+    }
+    applyMarketChartPriceRange(mainSeries, barPoints, [], {
+      chartType: effectiveChartType,
+      rawBars,
+    })
+    const nextLabels = buildPriceAxisLabels(mainSeries, barPoints, effectiveChartType, rawBars)
+    if (!priceAxisLabelsEqual(priceAxisLabelsRef.current, nextLabels)) {
+      priceAxisLabelsRef.current = nextLabels
+      setPriceAxisLabels(nextLabels)
+    }
+  }, [
+    open,
+    advancedFullscreenOpen,
+    isAdvancedView,
+    chartSeries?.bars,
+    effectiveChartType,
+    chartUp,
+    theme.upColor,
+    theme.downColor,
+  ])
+
+  /** Advanced: refresh series in place on live bar updates — avoid remounting the chart. */
+  useEffect(() => {
+    if (!open || !advancedFullscreenOpen || !isAdvancedView) return
+    const chart = chartRef.current
+    const mainSeries = mainSeriesRef.current
+    if (!chart || !mainSeries) return
+    const rawBars = allBarsRef.current
+    if (!rawBars?.length) return
+    const barPoints = loungeMarketBarsToSeries(rawBars)
+    const overlayLines = computeMarketChartOverlayLines(barPoints, activeIndicators)
+    const lineColor = chartUp ? theme.upColor : theme.downColor
+    const hasOscillatorPane = MARKET_CHART_INDICATORS.some(
+      (row) => row.kind === 'oscillator' && activeIndicators.has(row.id),
+    )
+    const oscillatorCount = MARKET_CHART_INDICATORS.filter(
+      (row) => row.kind === 'oscillator' && activeIndicators.has(row.id),
+    ).length
+    const refreshed = refreshAdvancedMarketChartData({
+      chart,
+      mainSeries,
+      volumeSeries: volumeSeriesRef.current,
+      indicatorSeries: indicatorSeriesRef.current,
+      rawBars,
+      chartType: effectiveChartType,
+      activeIndicators,
+      isLight,
+      volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
+      applyPriceRange: priceScaleUserPinnedRef.current
+        ? undefined
+        : () => {
+            applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
+              keepMargins: true,
+              chartType: effectiveChartType,
+              rawBars,
+            })
+          },
+    })
+    volumeSeriesRef.current = refreshed.volumeSeries
+    indicatorSeriesRef.current = refreshed.indicatorSeries
+    if (effectiveChartType !== 'candle') {
+      setChartLineMarkers(mainSeries, barPoints, lineColor)
+    }
+    mainSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.06,
+        bottom: marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount),
+      },
+    })
+  }, [
+    open,
+    advancedFullscreenOpen,
+    isAdvancedView,
+    chartSeries?.bars,
+    effectiveChartType,
+    activeIndicatorKey,
+    isLight,
+    chartUp,
+    theme.upColor,
+    theme.downColor,
+    activeIndicators,
   ])
 
   if (!open || !list.length) return null

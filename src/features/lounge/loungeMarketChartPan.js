@@ -36,7 +36,7 @@ const PAN_GESTURE_SLOP_PX = 6
 
 /**
  * Drag on the plot pans the time scale (Advanced view).
- * Uses element-local X so pan works when the fullscreen shell is CSS-rotated.
+ * Pointer capture starts only after the pan slop so pinch / crosshair are not blocked.
  * @param {HTMLElement} el
  * @param {import('lightweight-charts').IChartApi} chart
  * @param {{ priceAxisHit?: (clientX: number, clientY?: number) => boolean }} [opts]
@@ -53,6 +53,8 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   let lastLocalX = null
   /** @type {Map<number, { x: number, y: number }>} */
   const activePointers = new Map()
+  let panRaf = 0
+  let pendingDeltaPx = 0
 
   const releaseCapture = (pointerId) => {
     if (!el.hasPointerCapture(pointerId)) return
@@ -67,6 +69,19 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
     mode = null
     activePointerId = null
     lastLocalX = null
+  }
+
+  const flushPan = () => {
+    panRaf = 0
+    if (!pendingDeltaPx) return
+    scrollMarketChartByPixels(chart, pendingDeltaPx)
+    pendingDeltaPx = 0
+  }
+
+  const queuePanDelta = (deltaPx) => {
+    if (!Number.isFinite(deltaPx) || deltaPx === 0) return
+    pendingDeltaPx += deltaPx
+    if (!panRaf) panRaf = requestAnimationFrame(flushPan)
   }
 
   const onPointerDown = (e) => {
@@ -86,11 +101,6 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
     const local = marketChartClientToLocal(el, e.clientX, e.clientY)
     startLocalX = local.x
     startLocalY = local.y
-    try {
-      el.setPointerCapture(e.pointerId)
-    } catch {
-      /* ignore */
-    }
   }
 
   const onPointerMove = (e) => {
@@ -103,8 +113,12 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
       const ldy = local.y - startLocalY
       if (Math.hypot(ldx, ldy) < PAN_GESTURE_SLOP_PX) return
       mode = 'pan'
-      chart.timeScale().applyOptions({ fixRightEdge: false })
       lastLocalX = local.x
+      try {
+        el.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
       e.preventDefault()
       return
     }
@@ -112,7 +126,7 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
     if (mode === 'pan') {
       e.preventDefault()
       if (lastLocalX != null) {
-        scrollMarketChartByPixels(chart, local.x - lastLocalX)
+        queuePanDelta(local.x - lastLocalX)
       }
       lastLocalX = local.x
     }
@@ -132,6 +146,7 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   el.addEventListener('pointercancel', onPointerEnd, capture)
 
   return () => {
+    if (panRaf) cancelAnimationFrame(panRaf)
     el.removeEventListener('pointerdown', onPointerDown, capture)
     el.removeEventListener('pointermove', onPointerMove, capture)
     el.removeEventListener('pointerup', onPointerEnd, capture)
@@ -150,17 +165,12 @@ export function bindMarketChartHistoryLoader(chart, getBars, onNeedHistory, opts
   const edgeBars = Number(opts.edgeBars) || 10
   const canLoad = typeof opts.canLoad === 'function' ? opts.canLoad : () => true
   let lastBeforeSec = null
-  let lastBarCount = 0
 
   const handler = (range) => {
     if (!range || range.from > edgeBars) return
     if (!canLoad()) return
     const bars = getBars()
     if (!bars?.length) return
-    if (bars.length > lastBarCount) {
-      lastBeforeSec = null
-      lastBarCount = bars.length
-    }
     const oldest = bars[0]
     const beforeSec = Math.floor(oldest.t > 1e12 ? oldest.t / 1000 : oldest.t)
     if (!Number.isFinite(beforeSec) || beforeSec <= 0) return

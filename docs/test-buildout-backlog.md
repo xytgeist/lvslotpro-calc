@@ -623,7 +623,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
-- 2026-06-09: **Lounge market modal Advanced full-surface pan (code on `test`):** plot pan binds to the full chart host (volume/oscillator strips + empty margins), not only LWC candle hit targets; LWC native horz scroll off, pinch unchanged. Client-only.
+- 2026-06-09: **Lounge market modal Advanced pan freeze fix (code on `test`):** stop remounting LWC on resize/history/live bar ticks; history loader dedupe fix; pan pointer capture deferred + rAF batching. Client-only.
 - 2026-06-09: **Lounge market modal Advanced pinch zoom (code on `test`):** Advanced fullscreen enables LWC **pinch** on time scale (pan unchanged); double-tap plot resets time zoom; price axis keeps custom drag/wheel zoom. Client-only.
 - 2026-06-09: **Lounge market modal Advanced pan + history (code on `test`):** Advanced chart **drag-to-pan** (no scrub); panning left loads older bars via **`modal_series` + `before_sec`**. **Redeploy `lounge-market-data`**. Client + Edge.
 - 2026-06-09: **Lounge market modal Advanced fullscreen (code on `test`):** **Advanced** opens landscape fullscreen — defaults to **Candles** + **volume** histogram pane; modal sheet keeps gradient **area** + **H/L/current** gutter. **Redeploy `lounge-market-data`** for Yahoo **`volume`** on bars. Client + Edge.
