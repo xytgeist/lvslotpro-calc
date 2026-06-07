@@ -161,6 +161,42 @@ export async function yahooStockPickerRow(symbol: string): Promise<YahooPickerRo
   }
 }
 
+const YAHOO_EQUITY_INSTRUMENT_TYPES = new Set(['EQUITY', 'ETF', 'MUTUALFUND'])
+const YAHOO_TOKENIZED_NAME_RE = /ondo|tokenized|xstock|wrapped|dinari|mirrored/i
+
+/**
+ * Resolve a caption cashtag to a real US equity/ETF when Yahoo knows the ticker.
+ * Skips crypto and tokenized-equity names so auto-attach prefers the actual stock.
+ */
+export async function yahooResolveUsEquityCashtag(
+  tag: string,
+): Promise<{ symbol: string; asset_class: 'stock' } | null> {
+  const upper = String(tag || '').trim().toUpperCase()
+  if (!upper || !/^[A-Z][A-Z0-9.-]{0,14}$/.test(upper)) return null
+
+  const meta = await yahooChartMetaPicker(upper)
+  if (!meta) return null
+
+  const instrumentType = String(meta.instrumentType || meta.quoteType || '').trim().toUpperCase()
+  if (instrumentType === 'CRYPTOCURRENCY') return null
+  if (instrumentType && !YAHOO_EQUITY_INSTRUMENT_TYPES.has(instrumentType)) return null
+
+  const resolvedSymbol = String(meta.symbol || yahooTicker(upper)).trim().toUpperCase()
+  if (!resolvedSymbol) return null
+
+  const tagRoot = yahooTicker(upper)
+  const resolvedRoot = yahooTicker(resolvedSymbol)
+  if (resolvedRoot !== tagRoot && resolvedSymbol !== upper) return null
+
+  const name = String(meta.longName || meta.shortName || '').toLowerCase()
+  if (YAHOO_TOKENIZED_NAME_RE.test(name)) return null
+
+  const price = Number(meta.regularMarketPrice)
+  if (!Number.isFinite(price) || price <= 0) return null
+
+  return { symbol: resolvedSymbol, asset_class: 'stock' }
+}
+
 /** Company metadata when Finnhub `/stock/profile2` returns 403 or empty. */
 export async function yahooStockProfile(symbol: string): Promise<YahooStockProfile | null> {
   const meta = await yahooChartMeta(symbol)

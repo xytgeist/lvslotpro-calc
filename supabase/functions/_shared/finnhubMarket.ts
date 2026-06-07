@@ -17,7 +17,7 @@ import {
   lastRegularSessionLabel,
   regularSessionDaysBack,
 } from './usEquityMarketSession.ts'
-import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
+import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooResolveUsEquityCashtag, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
 
 export type MarketBar = MarketBarOhlc
 export type MarketAssetClass = 'stock' | 'crypto'
@@ -115,16 +115,13 @@ export async function resolveCashtagTicker(
 ): Promise<{ symbol: string; asset_class: MarketAssetClass } | null> {
   const upper = String(tag || '').trim().toUpperCase()
   if (!upper) return null
+
+  const direct = await yahooResolveUsEquityCashtag(upper).catch(() => null)
+  if (direct) return direct
+
   const results = await marketSearch(upper)
   if (!results.length) return null
-  const exact = results.find((row) => {
-    const disp = normalizeDisplaySymbol(
-      finnhubSymbolForAsset(row.symbol, row.asset_class),
-      row.asset_class,
-    ).toUpperCase()
-    return disp === upper || String(row.display_symbol || '').toUpperCase() === upper
-  })
-  const pick = exact || results[0]
+  const pick = pickBestCashtagSearchResult(upper, results)
   return { symbol: pick.symbol, asset_class: pick.asset_class }
 }
 
@@ -741,6 +738,77 @@ export async function finnhubSearch(query: string) {
 const MARKET_SEARCH_TOKENIZED_RE =
   /ondo|tokenized|xstock|wrapped|dinari|mirrored|\s+on\b|\s+x\b|\.d\b|xstock/i
 
+function cashtagRowMatchesTicker(
+  tag: string,
+  row: { symbol: string; display_symbol?: string; asset_class: MarketAssetClass },
+): boolean {
+  const display = marketSearchRowDisplay(row)
+  const root = display.includes('.') ? display.split('.')[0] : display
+  return display === tag || root === tag
+}
+
+function isTokenizedMarketSearchRow(row: {
+  symbol: string
+  display_symbol?: string
+  description?: string
+  asset_class: MarketAssetClass
+}): boolean {
+  const display = marketSearchRowDisplay(row)
+  const desc = String(row.description || '').toLowerCase()
+  const hay = `${display} ${desc} ${row.symbol}`.toLowerCase()
+  return (
+    MARKET_SEARCH_TOKENIZED_RE.test(hay) ||
+    (row.asset_class === 'crypto' && /stock|equity|etf/i.test(desc))
+  )
+}
+
+function pickBestCashtagSearchResult<
+  T extends {
+    symbol: string
+    display_symbol?: string
+    description?: string
+    asset_class: MarketAssetClass
+    type?: string
+    market_cap?: number | null
+  },
+>(tag: string, results: T[]): T {
+  const matching = results.filter((row) => cashtagRowMatchesTicker(tag, row))
+  const pool = matching.length ? matching : results
+
+  let best = pool[0]
+  let bestScore = marketSearchRelevanceScore(tag, best)
+
+  for (let i = 1; i < pool.length; i++) {
+    const row = pool[i]
+    const score = marketSearchRelevanceScore(tag, row)
+    if (score < bestScore) {
+      best = row
+      bestScore = score
+      continue
+    }
+    if (score > bestScore) continue
+
+    const bestTok = isTokenizedMarketSearchRow(best)
+    const rowTok = isTokenizedMarketSearchRow(row)
+    if (bestTok && !rowTok) {
+      best = row
+      continue
+    }
+    if (!bestTok && rowTok) continue
+
+    if (row.asset_class === 'stock' && best.asset_class !== 'stock') {
+      best = row
+      continue
+    }
+
+    const ca = Number(best.market_cap)
+    const cb = Number(row.market_cap)
+    if (Number.isFinite(cb) && Number.isFinite(ca) && cb > ca) best = row
+  }
+
+  return best
+}
+
 function marketSearchQueryNorm(query: string): string {
   return String(query || '').trim().toUpperCase().replace(/^\$/, '')
 }
@@ -772,8 +840,6 @@ export function marketSearchRelevanceScore(
 
   const display = marketSearchRowDisplay(row)
   const root = display.includes('.') ? display.split('.')[0] : display
-  const desc = String(row.description || '').toLowerCase()
-  const hay = `${display} ${desc} ${row.symbol}`.toLowerCase()
 
   let score = 500
 
@@ -789,7 +855,7 @@ export function marketSearchRelevanceScore(
     score = row.asset_class === 'stock' ? 250 : 340
   }
 
-  if (MARKET_SEARCH_TOKENIZED_RE.test(hay) || (row.asset_class === 'crypto' && /stock|equity|etf/i.test(desc))) {
+  if (isTokenizedMarketSearchRow(row)) {
     score += 650
   }
 
