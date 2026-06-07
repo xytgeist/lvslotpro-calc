@@ -1,9 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MARKET_CHART_ANNOTATION_PEN_COLOR,
   MARKET_CHART_ANNOTATION_PEN_WIDTH,
+  MARKET_CHART_ANNOTATION_TEXT_COLOR,
+  MARKET_CHART_ANNOTATION_TEXT_STROKE,
+  marketChartAnnotationStrokeItems,
+  marketChartAnnotationTextFontSize,
+  marketChartAnnotationTextStrokeWidth,
   renderMarketChartAnnotations,
 } from './loungeMarketChartAnnotation.js'
+
+/** @param {number} fontSize */
+function annotationTextDomStyle(fontSize) {
+  const stroke = marketChartAnnotationTextStrokeWidth(fontSize)
+  return {
+    fontSize: `${fontSize}px`,
+    fontWeight: 600,
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    lineHeight: 1.15,
+    color: MARKET_CHART_ANNOTATION_TEXT_COLOR,
+    WebkitTextStroke: `${stroke}px ${MARKET_CHART_ANNOTATION_TEXT_STROKE}`,
+    paintOrder: 'stroke fill',
+  }
+}
 
 /**
  * @param {{
@@ -12,7 +31,7 @@ import {
  *   visible: boolean,
  *   tool: 'pen' | 'text',
  *   items: import('./loungeMarketChartAnnotation.js').MarketChartAnnotationItem[],
- *   onItemsChange: (next: import('./loungeMarketChartAnnotation.js').MarketChartAnnotationItem[]) => void,
+ *   onItemsChange: (next: import('./loungeMarketChartAnnotation.js').MarketChartAnnotationItem[] | ((prev: import('./loungeMarketChartAnnotation.js').MarketChartAnnotationItem[]) => import('./loungeMarketChartAnnotation.js').MarketChartAnnotationItem[])) => void,
  * }} props
  */
 export default function LoungeMarketChartAnnotationOverlay({
@@ -26,11 +45,22 @@ export default function LoungeMarketChartAnnotationOverlay({
   const canvasRef = useRef(null)
   const itemsRef = useRef(items)
   itemsRef.current = items
+  const [hostSize, setHostSize] = useState({ w: 0, h: 0 })
   const [liveStroke, setLiveStroke] = useState(
     /** @type {import('./loungeMarketChartAnnotation.js').MarketChartAnnotationStroke | null} */ (null),
   )
   const [textDraft, setTextDraft] = useState(/** @type {{ nx: number, ny: number } | null} */ (null))
   const [textValue, setTextValue] = useState('')
+  const [editingTextIndex, setEditingTextIndex] = useState(/** @type {number | null} */ (null))
+  const [selectedTextIndex, setSelectedTextIndex] = useState(/** @type {number | null} */ (null))
+  /** @type {React.MutableRefObject<{ kind: 'draft' } | { kind: 'text', index: number } | null>} */
+  const dragTargetRef = useRef(null)
+
+  const textFontSize = useMemo(
+    () => marketChartAnnotationTextFontSize(hostSize.w, hostSize.h),
+    [hostSize.h, hostSize.w],
+  )
+  const textDomStyle = useMemo(() => annotationTextDomStyle(textFontSize), [textFontSize])
 
   const paint = useCallback(
     (stroke) => {
@@ -40,6 +70,7 @@ export default function LoungeMarketChartAnnotationOverlay({
       const w = host.clientWidth
       const h = host.clientHeight
       if (!w || !h) return
+      setHostSize({ w, h })
       const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
       const nextW = Math.max(1, Math.round(w * dpr))
       const nextH = Math.max(1, Math.round(h * dpr))
@@ -54,9 +85,10 @@ export default function LoungeMarketChartAnnotationOverlay({
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       const ink = stroke ? [...items, stroke] : items
-      renderMarketChartAnnotations(ctx, ink, canvas.width, canvas.height)
+      const canvasItems = active ? marketChartAnnotationStrokeItems(ink) : ink
+      renderMarketChartAnnotations(ctx, canvasItems, canvas.width, canvas.height)
     },
-    [hostRef, items],
+    [active, hostRef, items],
   )
 
   useEffect(() => {
@@ -76,8 +108,20 @@ export default function LoungeMarketChartAnnotationOverlay({
       setLiveStroke(null)
       setTextDraft(null)
       setTextValue('')
+      setEditingTextIndex(null)
+      setSelectedTextIndex(null)
+      dragTargetRef.current = null
     }
   }, [active])
+
+  useEffect(() => {
+    if (tool === 'pen') {
+      setTextDraft(null)
+      setTextValue('')
+      setEditingTextIndex(null)
+      setSelectedTextIndex(null)
+    }
+  }, [tool])
 
   const pointerNorm = useCallback((clientX, clientY) => {
     const canvas = canvasRef.current
@@ -93,31 +137,119 @@ export default function LoungeMarketChartAnnotationOverlay({
     }
   }, [])
 
+  const positionStyle = useCallback((nx, ny) => ({
+    left: `${nx * 100}%`,
+    top: `${ny * 100}%`,
+  }), [])
+
   const commitTextDraft = useCallback(() => {
     const draft = textDraft
     const text = String(textValue || '').trim()
     setTextDraft(null)
     setTextValue('')
     if (!draft || !text) return
-    onItemsChange([
-      ...items,
+    onItemsChange((prev) => [
+      ...prev,
       { type: 'text', nx: draft.nx, ny: draft.ny, text: text.slice(0, 120) },
     ])
-  }, [items, onItemsChange, textDraft, textValue])
+  }, [onItemsChange, textDraft, textValue])
+
+  const commitTextEdit = useCallback(() => {
+    const index = editingTextIndex
+    const text = String(textValue || '').trim()
+    setEditingTextIndex(null)
+    setTextValue('')
+    if (index == null) return
+    if (!text) {
+      onItemsChange((prev) => prev.filter((_, i) => i !== index))
+      setSelectedTextIndex(null)
+      return
+    }
+    onItemsChange((prev) =>
+      prev.map((item, i) =>
+        i === index && item.type === 'text' ? { ...item, text: text.slice(0, 120) } : item,
+      ),
+    )
+  }, [editingTextIndex, onItemsChange, textValue])
+
+  const moveTextItem = useCallback(
+    (index, norm) => {
+      onItemsChange((prev) =>
+        prev.map((item, i) =>
+          i === index && item.type === 'text' ? { ...item, nx: norm.nx, ny: norm.ny } : item,
+        ),
+      )
+    },
+    [onItemsChange],
+  )
+
+  const startTextDrag = useCallback(
+    (e, target) => {
+      if (!active || tool !== 'text') return
+      e.preventDefault()
+      e.stopPropagation()
+      dragTargetRef.current = target
+      if (target.kind === 'text') setSelectedTextIndex(target.index)
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [active, tool],
+  )
+
+  const onTextDragMove = useCallback(
+    (e) => {
+      const target = dragTargetRef.current
+      if (!target) return
+      const norm = pointerNorm(e.clientX, e.clientY)
+      if (!norm) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (target.kind === 'draft') {
+        setTextDraft(norm)
+        return
+      }
+      moveTextItem(target.index, norm)
+    },
+    [moveTextItem, pointerNorm],
+  )
+
+  const endTextDrag = useCallback((e) => {
+    if (!dragTargetRef.current) return
+    dragTargetRef.current = null
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const beginEditText = useCallback((index) => {
+    const item = itemsRef.current[index]
+    if (!item || item.type !== 'text') return
+    setEditingTextIndex(index)
+    setSelectedTextIndex(index)
+    setTextDraft(null)
+    setTextValue(item.text)
+  }, [])
 
   const onPointerDown = useCallback(
     (e) => {
       if (!active) return
-      if (textDraft) return
+      if (textDraft || editingTextIndex != null) return
       if (tool === 'text') {
         const norm = pointerNorm(e.clientX, e.clientY)
         if (!norm) return
         e.preventDefault()
         e.stopPropagation()
+        setSelectedTextIndex(null)
         setTextDraft(norm)
         setTextValue('')
         return
       }
+      setSelectedTextIndex(null)
       const norm = pointerNorm(e.clientX, e.clientY)
       if (!norm) return
       e.preventDefault()
@@ -134,7 +266,7 @@ export default function LoungeMarketChartAnnotationOverlay({
         /* ignore */
       }
     },
-    [active, pointerNorm, textDraft, tool],
+    [active, editingTextIndex, pointerNorm, textDraft, tool],
   )
 
   const onPointerMove = useCallback(
@@ -172,14 +304,60 @@ export default function LoungeMarketChartAnnotationOverlay({
     [onItemsChange, tool],
   )
 
-  if (!visible) return null
+  const textEditor = (opts) => {
+    const { norm, onCommit, onCancel, placeholder = 'Label…' } = opts
+    return (
+      <div
+        className="absolute z-[27] max-w-[min(70vw,16rem)] touch-none select-none"
+        style={positionStyle(norm.nx, norm.ny)}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div
+          role="presentation"
+          className={`mb-1 max-w-[min(70vw,16rem)] cursor-grab touch-none select-none break-words active:cursor-grabbing ${
+            opts.showDragHint ? 'rounded ring-1 ring-cyan-500/40 ring-offset-1 ring-offset-zinc-950/80' : ''
+          }`}
+          style={textDomStyle}
+          onPointerDown={(e) => startTextDrag(e, opts.dragTarget)}
+          onPointerMove={onTextDragMove}
+          onPointerUp={endTextDrag}
+          onPointerCancel={endTextDrag}
+        >
+          {String(textValue || '').trim() || (
+            <span className="opacity-45">{placeholder}</span>
+          )}
+        </div>
+        <div className="min-w-[8rem] rounded-md border border-cyan-500/50 bg-zinc-950/95 p-1 shadow-lg">
+          <input
+            type="text"
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                onCommit()
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                onCancel()
+              }
+            }}
+            onBlur={() => {
+              window.setTimeout(() => {
+                if (dragTargetRef.current) return
+                onCommit()
+              }, 0)
+            }}
+            autoFocus
+            maxLength={120}
+            placeholder={placeholder}
+            className="w-full rounded bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100 outline-none ring-1 ring-cyan-500/40"
+          />
+        </div>
+      </div>
+    )
+  }
 
-  const draftStyle = textDraft
-    ? {
-        left: `${textDraft.nx * 100}%`,
-        top: `${textDraft.ny * 100}%`,
-      }
-    : null
+  if (!visible) return null
 
   return (
     <>
@@ -192,34 +370,72 @@ export default function LoungeMarketChartAnnotationOverlay({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       />
-      {active && textDraft ? (
-        <div
-          className="absolute z-[26] min-w-[8rem] max-w-[min(70vw,16rem)] -translate-y-1 rounded-md border border-cyan-500/50 bg-zinc-950/95 p-1 shadow-lg"
-          style={draftStyle}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <input
-            type="text"
-            value={textValue}
-            onChange={(e) => setTextValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                commitTextDraft()
-              } else if (e.key === 'Escape') {
-                e.preventDefault()
-                setTextDraft(null)
+      {active
+        ? items.map((item, index) => {
+            if (item.type !== 'text') return null
+            const text = String(item.text || '').trim()
+            if (!text) return null
+            if (editingTextIndex === index) return null
+            const selected = selectedTextIndex === index
+            return (
+              <div
+                key={`text-${index}`}
+                className="absolute z-[26] max-w-[min(70vw,16rem)] touch-none select-none"
+                style={positionStyle(item.nx, item.ny)}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <div
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`Chart label: ${text}. Drag to move; double-click to edit.`}
+                  className={`max-w-[min(70vw,16rem)] cursor-grab break-words active:cursor-grabbing ${
+                    selected ? 'rounded ring-2 ring-cyan-400/70 ring-offset-1 ring-offset-zinc-950/80' : ''
+                  }`}
+                  style={textDomStyle}
+                  onPointerDown={(e) => startTextDrag(e, { kind: 'text', index })}
+                  onPointerMove={onTextDragMove}
+                  onPointerUp={endTextDrag}
+                  onPointerCancel={endTextDrag}
+                  onDoubleClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    beginEditText(index)
+                  }}
+                >
+                  {text}
+                </div>
+              </div>
+            )
+          })
+        : null}
+      {active && textDraft && !editingTextIndex
+        ? textEditor({
+            norm: textDraft,
+            dragTarget: { kind: 'draft' },
+            showDragHint: true,
+            onCommit: commitTextDraft,
+            onCancel: () => {
+              setTextDraft(null)
+              setTextValue('')
+            },
+          })
+        : null}
+      {active && editingTextIndex != null
+        ? (() => {
+            const item = items[editingTextIndex]
+            if (!item || item.type !== 'text') return null
+            return textEditor({
+              norm: { nx: item.nx, ny: item.ny },
+              dragTarget: { kind: 'text', index: editingTextIndex },
+              showDragHint: true,
+              onCommit: commitTextEdit,
+              onCancel: () => {
+                setEditingTextIndex(null)
                 setTextValue('')
-              }
-            }}
-            onBlur={() => commitTextDraft()}
-            autoFocus
-            maxLength={120}
-            placeholder="Label…"
-            className="w-full rounded bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100 outline-none ring-1 ring-cyan-500/40"
-          />
-        </div>
-      ) : null}
+              },
+            })
+          })()
+        : null}
     </>
   )
 }

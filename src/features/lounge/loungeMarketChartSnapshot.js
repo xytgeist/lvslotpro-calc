@@ -1,12 +1,12 @@
 /** Capture Lounge market chart screenshots (Lightweight Charts `takeScreenshot`). */
 
 import { formatMarketChangeLine, formatMarketPrice } from '../../utils/loungeMarketCaptionParse.js'
+import { loungeMarketLogoImageBlob } from '../../utils/loungeMarketApi.js'
 import {
   exportMarketChartAnnotationCanvas,
   marketChartAnnotationHasInk,
   mergeAnnotationLayerOntoCanvas,
 } from './loungeMarketChartAnnotation.js'
-import { formatMarketChartVisibleTimeRangeLabel } from './loungeMarketChartPriceRange.js'
 import { computeMarketChartVisibleWindowQuoteFromChart } from './loungeMarketChartTypes.js'
 
 /**
@@ -23,11 +23,13 @@ import { computeMarketChartVisibleWindowQuoteFromChart } from './loungeMarketCha
  *   name?: string | null,
  *   logoUrl?: string | null,
  *   legendRows?: MarketChartSnapshotLegendRow[],
- *   dateRangeLabel?: string | null,
  *   priceLabel?: string | null,
  *   changeLabel?: string | null,
  *   changeUp?: boolean,
  *   isLight?: boolean,
+ *   supabase?: import('@supabase/supabase-js').SupabaseClient | null,
+ *   symbol?: string | null,
+ *   asset_class?: string | null,
  * }} MarketChartSnapshotBranding
  */
 
@@ -57,32 +59,75 @@ function truncateCanvasText(ctx, text, maxWidth) {
 }
 
 /**
+ * @param {Blob} blob
+ * @returns {Promise<HTMLImageElement | null>}
+ */
+function blobToSnapshotLogoImage(blob) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(blob)
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(null)
+    }
+    img.src = objectUrl
+  })
+}
+
+/**
  * @param {string} url
  * @returns {Promise<HTMLImageElement | null>}
  */
-async function loadSnapshotLogoImage(url) {
-  if (!url || typeof Image === 'undefined') return null
+function loadSnapshotLogoViaCrossOrigin(url) {
+  if (typeof Image === 'undefined') return Promise.resolve(null)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
 
-  try {
-    const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'force-cache' })
-    if (res.ok) {
-      const blob = await res.blob()
-      return await new Promise((resolve) => {
-        const img = new Image()
-        const objectUrl = URL.createObjectURL(blob)
-        img.onload = () => {
-          URL.revokeObjectURL(objectUrl)
-          resolve(img)
-        }
-        img.onerror = () => {
-          URL.revokeObjectURL(objectUrl)
-          resolve(null)
-        }
-        img.src = objectUrl
-      })
+/**
+ * @param {string} url
+ * @param {{ supabase?: import('@supabase/supabase-js').SupabaseClient | null, symbol?: string | null, asset_class?: string | null }} [opts]
+ * @returns {Promise<HTMLImageElement | null>}
+ */
+async function loadSnapshotLogoImage(url, opts = {}) {
+  const logoUrl = String(url || '').trim()
+  if (typeof document === 'undefined') return null
+  if (!logoUrl && !opts.symbol) return null
+
+  if (logoUrl) {
+    try {
+      const res = await fetch(logoUrl, { mode: 'cors', credentials: 'omit', cache: 'force-cache' })
+      if (res.ok) {
+        const img = await blobToSnapshotLogoImage(await res.blob())
+        if (img) return img
+      }
+    } catch {
+      // Logo hosts without CORS — try crossOrigin img, then Edge proxy.
     }
-  } catch {
-    // Logo hosts without CORS are skipped so canvas export stays clean.
+
+    const crossOriginImg = await loadSnapshotLogoViaCrossOrigin(logoUrl)
+    if (crossOriginImg) return crossOriginImg
+  }
+
+  if (opts.supabase) {
+    const blob = await loungeMarketLogoImageBlob(opts.supabase, {
+      url: logoUrl,
+      symbol: opts.symbol,
+      asset_class: opts.asset_class,
+    })
+    if (blob) {
+      const img = await blobToSnapshotLogoImage(blob)
+      if (img) return img
+    }
   }
 
   return null
@@ -288,11 +333,10 @@ export async function composeMarketChartSnapshotCanvas(chartCanvas, branding = {
   const name = String(branding.name || '').trim()
   const logoUrl = String(branding.logoUrl || '').trim()
   const legendRows = Array.isArray(branding.legendRows) ? branding.legendRows : []
-  const dateRangeLabel = String(branding.dateRangeLabel || '').trim()
   const priceLabel = String(branding.priceLabel || '').trim()
   const changeLabel = String(branding.changeLabel || '').trim()
   const changeUp = branding.changeUp !== false
-  const hasHeader = !!(tickerRaw || name || logoUrl || dateRangeLabel || priceLabel || changeLabel)
+  const hasHeader = !!(tickerRaw || name || logoUrl || priceLabel || changeLabel)
   const hasLegend = legendRows.length > 0
   if (!hasHeader && !hasLegend) return chartCanvas
 
@@ -303,7 +347,6 @@ export async function composeMarketChartSnapshotCanvas(chartCanvas, branding = {
   const bg = isLight ? '#fafafa' : '#09090b'
   const titleColor = isLight ? '#18181b' : '#fafafa'
   const tickerColor = isLight ? '#71717a' : '#a1a1aa'
-  const rangeColor = isLight ? '#52525b' : '#a1a1aa'
   const changeColor = changeUp ? (isLight ? '#16a34a' : '#22c55e') : isLight ? '#dc2626' : '#ef4444'
   const divider = isLight ? '#e4e4e7' : '#27272a'
   const fontFamily = 'system-ui, -apple-system, "Segoe UI", sans-serif'
@@ -314,12 +357,17 @@ export async function composeMarketChartSnapshotCanvas(chartCanvas, branding = {
   const textGap = Math.max(6, Math.round(chartW * 0.005))
   const titleSize = Math.max(32, Math.round(chartW * 0.038))
   const tickerSize = Math.max(24, Math.round(chartW * 0.028))
-  const rangeSize = Math.max(20, Math.round(chartW * 0.017))
   const priceSize = Math.max(28, Math.round(chartW * 0.032))
   const changeSize = Math.max(18, Math.round(chartW * 0.014))
   const logoSize = Math.max(56, Math.round(chartW * 0.045))
 
-  const logo = logoUrl ? await loadSnapshotLogoImage(logoUrl) : null
+  const logo = logoUrl
+    ? await loadSnapshotLogoImage(logoUrl, {
+        supabase: branding.supabase,
+        symbol: branding.symbol,
+        asset_class: branding.asset_class,
+      })
+    : null
   const showLogo = Boolean(logo)
 
   const measureCtx =
@@ -349,7 +397,6 @@ export async function composeMarketChartSnapshotCanvas(chartCanvas, branding = {
   const rightBlockTotalW = rightBlockW > 0 ? padX + rightBlockW : 0
   const sideGutter = Math.max(leftBlockW, rightBlockTotalW, Math.round(chartW * 0.17))
   const leftTextMaxW = Math.max(48, sideGutter - padX - (showLogo ? logoSize + logoGap : 0) - padX)
-  const centerMaxW = Math.max(80, chartW - sideGutter * 2)
 
   const leftTextBlockH = (name ? titleSize + textGap : 0) + (ticker ? tickerSize : 0)
   const rightTextBlockH =
@@ -390,18 +437,6 @@ export async function composeMarketChartSnapshotCanvas(chartCanvas, branding = {
       ctx.fillStyle = tickerColor
       ctx.font = `600 ${tickerSize}px ${fontFamily}`
       ctx.fillText(truncateCanvasText(ctx, ticker, leftTextMaxW), textX, textY)
-    }
-
-    if (dateRangeLabel) {
-      ctx.fillStyle = rangeColor
-      ctx.font = `600 ${rangeSize}px ${fontFamily}`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(
-        truncateCanvasText(ctx, dateRangeLabel, centerMaxW),
-        chartW / 2,
-        contentTop + headerContentH / 2,
-      )
     }
 
     if (priceLabel || changeLabel) {
@@ -578,8 +613,8 @@ export function marketChartSnapshotBrandingFromEmbed(embed, isLight = false, leg
  *   legendRows?: MarketChartSnapshotLegendRow[],
  *   chart?: import('lightweight-charts').IChartApi | null,
  *   rawBars?: Array<{ t: number, c: number }>,
- *   resolutionId?: string,
  *   chartType?: string,
+ *   supabase?: import('@supabase/supabase-js').SupabaseClient | null,
  * }} opts
  */
 export function marketChartSnapshotBrandingFromCapture(opts = {}) {
@@ -589,8 +624,8 @@ export function marketChartSnapshotBrandingFromCapture(opts = {}) {
     legendRows = [],
     chart = null,
     rawBars = [],
-    resolutionId = 'D',
     chartType = 'candle',
+    supabase = null,
   } = opts
   const base = marketChartSnapshotBrandingFromEmbed(embed, isLight, legendRows)
   const quote = computeMarketChartVisibleWindowQuoteFromChart(chart, rawBars, chartType)
@@ -600,9 +635,11 @@ export function marketChartSnapshotBrandingFromCapture(opts = {}) {
 
   return {
     ...base,
-    dateRangeLabel: formatMarketChartVisibleTimeRangeLabel(chart, rawBars, resolutionId),
     priceLabel: formatMarketPrice(quote?.price),
     changeLabel: formatMarketChangeLine(quote?.change, changePct),
     changeUp,
+    supabase,
+    symbol: embed?.symbol ?? null,
+    asset_class: embed?.asset_class ?? null,
   }
 }

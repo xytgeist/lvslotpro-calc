@@ -4,6 +4,23 @@ export const MARKET_CHART_ANNOTATION_PEN_COLOR = '#22d3ee'
 export const MARKET_CHART_ANNOTATION_PEN_WIDTH = 2.75
 export const MARKET_CHART_ANNOTATION_TEXT_COLOR = '#fafafa'
 export const MARKET_CHART_ANNOTATION_TEXT_STROKE = '#09090b'
+export const MARKET_CHART_ANNOTATION_TEXT_FONT =
+  '600 system-ui, -apple-system, "Segoe UI", sans-serif'
+
+/** @param {number} width @param {number} height */
+export function marketChartAnnotationTextFontSize(width, height) {
+  return Math.max(12, Math.round(Math.min(width, height) * 0.028))
+}
+
+/** @param {number} fontSize */
+export function marketChartAnnotationTextStrokeWidth(fontSize) {
+  return Math.max(2, fontSize * 0.14)
+}
+
+/** @param {MarketChartAnnotationItem[]} items */
+export function marketChartAnnotationStrokeItems(items) {
+  return (items || []).filter((item) => item.type === 'stroke')
+}
 
 /** @typedef {{ type: 'stroke', color: string, width: number, points: Array<{ nx: number, ny: number }> }} MarketChartAnnotationStroke */
 /** @typedef {{ type: 'text', nx: number, ny: number, text: string }} MarketChartAnnotationText */
@@ -40,11 +57,11 @@ export function renderMarketChartAnnotations(ctx, items, width, height) {
       if (!text) continue
       const x = item.nx * width
       const y = item.ny * height
-      const fontSize = Math.max(12, Math.round(Math.min(width, height) * 0.028))
+      const fontSize = marketChartAnnotationTextFontSize(width, height)
       ctx.save()
       ctx.font = `600 ${fontSize}px system-ui, -apple-system, "Segoe UI", sans-serif`
       ctx.textBaseline = 'top'
-      ctx.lineWidth = Math.max(2, fontSize * 0.14)
+      ctx.lineWidth = marketChartAnnotationTextStrokeWidth(fontSize)
       ctx.strokeStyle = MARKET_CHART_ANNOTATION_TEXT_STROKE
       ctx.fillStyle = MARKET_CHART_ANNOTATION_TEXT_COLOR
       ctx.strokeText(text, x, y)

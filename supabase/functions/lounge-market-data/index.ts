@@ -163,6 +163,52 @@ async function attachMarketEmbeds(
   return { embeds, skipped }
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize)
+    binary += String.fromCharCode(...chunk)
+  }
+  return btoa(binary)
+}
+
+function isAllowedMarketLogoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    const host = parsed.hostname.toLowerCase()
+    const allowed = [
+      'static2.finnhub.io',
+      'finnhub.io',
+      'coin-images.coingecko.com',
+      'assets.coingecko.com',
+      's.yimg.com',
+      'logo.clearbit.com',
+    ]
+    return allowed.some((entry) => host === entry || host.endsWith(`.${entry}`))
+  } catch {
+    return false
+  }
+}
+
+async function resolveMarketLogoUrl(
+  urlRaw: unknown,
+  symbol: string,
+  asset_class: MarketAssetClass,
+): Promise<string> {
+  let url = String(urlRaw || '').trim()
+  if (url) return url
+  if (!symbol) return ''
+  try {
+    const profile = await finnhubProfile(symbol, asset_class)
+    url = String(profile.logo || '').trim()
+  } catch {
+    url = ''
+  }
+  return url
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
@@ -225,6 +271,32 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, news })
     } catch (e) {
       return json(502, { error: e instanceof Error ? e.message : 'News failed.' })
+    }
+  }
+
+  if (action === 'logo_image') {
+    const parsed = parseSymbolInput(body)
+    const symbol = parsed?.symbol || String(body?.symbol || '').trim()
+    const asset_class = (parsed?.asset_class ||
+      (String(body?.asset_class || '').trim() === 'crypto' ? 'crypto' : 'stock')) as MarketAssetClass
+    try {
+      const logoUrl = await resolveMarketLogoUrl(body?.url, symbol, asset_class)
+      if (!logoUrl || !isAllowedMarketLogoUrl(logoUrl)) {
+        return json(404, { error: 'Logo unavailable.' })
+      }
+      const res = await fetch(logoUrl, {
+        headers: { 'User-Agent': 'LVSlotPro lounge-market-data/1' },
+      })
+      if (!res.ok) return json(502, { error: 'Logo fetch failed.' })
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      if (!bytes.length) return json(502, { error: 'Empty logo.' })
+      return json(200, {
+        ok: true,
+        content_type: res.headers.get('content-type') || 'image/png',
+        data_base64: bytesToBase64(bytes),
+      })
+    } catch (e) {
+      return json(502, { error: e instanceof Error ? e.message : 'Logo failed.' })
     }
   }
 

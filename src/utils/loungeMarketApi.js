@@ -176,3 +176,34 @@ export async function loungeMarketModalNews(supabase, opts) {
   if (!data || data.error) return null
   return data.news ?? null
 }
+
+/**
+ * Fetch a market logo through Edge (server-side) for canvas snapshot compositing.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ url?: string, symbol?: string, asset_class?: string }} opts
+ * @returns {Promise<Blob | null>}
+ */
+export async function loungeMarketLogoImageBlob(supabase, opts = {}) {
+  const url = String(opts.url || '').trim()
+  const symbol = String(opts.symbol || '').trim()
+  if (!url && !symbol) return null
+
+  const payload = { action: 'logo_image' }
+  if (url) payload.url = url
+  if (symbol) {
+    payload.symbol = symbol
+    payload.asset_class = opts.asset_class === 'crypto' ? 'crypto' : 'stock'
+  }
+
+  const data = await loungeMarketInvoke(supabase, payload)
+  if (!data?.ok || !data.data_base64) return null
+
+  try {
+    const binary = atob(String(data.data_base64))
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+    return new Blob([bytes], { type: String(data.content_type || 'image/png') })
+  } catch {
+    return null
+  }
+}

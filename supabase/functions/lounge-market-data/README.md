@@ -26,6 +26,7 @@ supabase functions deploy lounge-market-data --project-ref jtjgtucumuoswnbauxry
 | `batch_rolling` | `{ symbols[] }` | `{ quotes }` keyed by cache key |
 | `modal_series` | `{ symbol, asset_class, kind?, window_key? }` or extend `{ …, before_sec }` or Advanced `{ …, resolution, bar_limit?, before_sec? }` | `{ quote, bars, window_label, has_more? }` or extend `{ bars, has_more }` — **`resolution`** (`1`, `5`, `15`, `60`, `120`, `240`, `D`, `W`) + **`bar_limit`** for Advanced bar-count windows; **`before_sec`** loads **`chunkBars`** (200) older bars capped by per-resolution max lookback |
 | `modal_news` | `{ symbol, asset_class }` | `{ news }` — Finnhub company-news (30d) or crypto feed; **Yahoo search news** when Finnhub empty/forbidden |
+| `logo_image` | `{ url? }` or `{ symbol, asset_class }` | `{ data_base64, content_type }` — server-side logo fetch for **Advanced snapshot PNG** (canvas-safe; allowlisted hosts) |
 
 Client: `src/utils/loungeMarketApi.js`.
 

@@ -1025,8 +1025,8 @@ export default function LoungeMarketChartModal({
           legendRows: activeIndicatorLegend,
           chart,
           rawBars: allBarsRef.current,
-          resolutionId: advancedResolutionId,
           chartType: advancedFullscreenOpen ? chartType : 'candle',
+          supabase: supabaseClient,
         })
         if (mode === 'save') {
           const result = await saveMarketChartScreenshot(
@@ -1061,7 +1061,7 @@ export default function LoungeMarketChartModal({
         window.setTimeout(() => setSnapshotFlash(''), 2400)
       }
     },
-    [active, activeIndicatorLegend, advancedFullscreenOpen, advancedLoading, advancedResolutionId, chartType, isLight, onInsertSnapshot, snapshotBusy],
+    [active, activeIndicatorLegend, advancedFullscreenOpen, advancedLoading, chartType, isLight, onInsertSnapshot, snapshotBusy, supabaseClient],
   )
 
   const undoChartAnnotation = useCallback(() => {
@@ -2182,7 +2182,12 @@ export default function LoungeMarketChartModal({
                 }}
               >
                 {active?.logo_url ? (
-                  <img src={active.logo_url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                  <img
+                    src={active.logo_url}
+                    alt=""
+                    crossOrigin="anonymous"
+                    className="h-8 w-8 shrink-0 rounded-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300">
                     {(active?.display_symbol || '?').slice(0, 1)}
@@ -2600,7 +2605,12 @@ export default function LoungeMarketChartModal({
         <div className="shrink-0 px-4 pb-1 pt-0" data-market-sheet-drag>
           <div className="flex items-start gap-3">
             {active?.logo_url ? (
-              <img src={active.logo_url} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+              <img
+                src={active.logo_url}
+                alt=""
+                crossOrigin="anonymous"
+                className="h-10 w-10 shrink-0 rounded-full object-cover"
+              />
             ) : (
               <div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold text-zinc-300"
