@@ -215,12 +215,16 @@ export function attachMarketChartIndicators(chart, mainSeries, barPoints, active
   const created = []
   if (!barPoints.length) return created
 
+  const volReserve = Number(opts.volumePaneFraction) || 0
   const oscillators = MARKET_CHART_INDICATORS.filter((row) => row.kind === 'oscillator' && ids.has(row.id))
   const hasOscillator = oscillators.length > 0
 
   if (hasOscillator) {
     mainSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.06, bottom: oscillators.length > 1 ? 0.42 : 0.34 },
+      scaleMargins: {
+        top: 0.06,
+        bottom: (oscillators.length > 1 ? 0.42 : 0.34) + volReserve,
+      },
     })
   }
 
@@ -256,7 +260,7 @@ export function attachMarketChartIndicators(chart, mainSeries, barPoints, active
   if (ids.has('rsi14')) {
     const scaleId = 'rsi'
     const top = oscSlotCount > 1 ? 0.58 : 0.66
-    const bottom = oscSlotCount > 1 ? 0.22 : 0.02
+    const bottom = (oscSlotCount > 1 ? 0.22 : 0.02) + volReserve
     const rsi = chart.addSeries(LineSeries, {
       color: '#c084fc',
       lineWidth: 1,
@@ -278,7 +282,7 @@ export function attachMarketChartIndicators(chart, mainSeries, barPoints, active
     const { macdLine, signalLine, histogram } = computeMacdSeries(barPoints)
     const scaleId = 'macd'
     const top = oscSlotCount > 1 ? 0.86 : 0.66
-    const bottom = 0.02
+    const bottom = 0.02 + volReserve
     const upColor = opts.isLight ? '#16a34a' : '#22c55e'
     const downColor = opts.isLight ? '#dc2626' : '#ef4444'
     const hist = chart.addSeries(HistogramSeries, {

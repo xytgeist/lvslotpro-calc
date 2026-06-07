@@ -459,16 +459,21 @@ export function isUsableWeeklyHourlyBars(bars: MarketBar[]): boolean {
 
 function aggregateBarsToBucketSec(bars: MarketBar[], bucketSec: number): MarketBar[] {
   if (!Array.isArray(bars) || !bars.length || bucketSec <= 0) return []
-  const buckets = new Map<number, number>()
+  const buckets = new Map<number, { c: number; v: number }>()
   for (const bar of bars) {
     if (!Number.isFinite(bar?.t) || !Number.isFinite(bar?.c)) continue
     const t = barUnixSec(bar.t)
     const key = Math.floor(t / bucketSec) * bucketSec
-    buckets.set(key, bar.c)
+    const prev = buckets.get(key)
+    const vAdd = Number.isFinite(bar.v) ? Number(bar.v) : 0
+    buckets.set(key, {
+      c: bar.c,
+      v: (prev?.v ?? 0) + vAdd,
+    })
   }
   return [...buckets.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([t, c]) => ({ t, c }))
+    .map(([t, row]) => ({ t, c: row.c, ...(row.v > 0 ? { v: row.v } : {}) }))
 }
 
 function aggregateMarketBarsToTwoHour(bars: MarketBar[]): MarketBar[] {

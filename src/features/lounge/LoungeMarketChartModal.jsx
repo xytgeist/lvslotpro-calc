@@ -35,6 +35,11 @@ import {
   writeStoredMarketChartType,
 } from './loungeMarketChartTypes.js'
 import {
+  attachMarketChartVolumePane,
+  MARKET_CHART_VOLUME_PANE_FRACTION,
+  marketChartMainBottomMarginWithVolume,
+} from './loungeMarketChartVolume.js'
+import {
   isMarketChartPortraitViewport,
   lockMarketChartLandscapeOrientation,
   marketChartAdvancedFullscreenShellStyle,
@@ -608,6 +613,7 @@ export default function LoungeMarketChartModal({
     setIndicatorMenuOpen(false)
     setChartTypeMenuOpen(false)
     setTimeframeMenuOpen(false)
+    setChartType('candle')
     setAdvancedPortraitViewport(isMarketChartPortraitViewport())
     setAdvancedFullscreenOpen(true)
   }, [])
@@ -946,12 +952,25 @@ export default function LoungeMarketChartModal({
     const hasOscillatorPane =
       isAdvancedView &&
       MARKET_CHART_INDICATORS.some((row) => row.kind === 'oscillator' && activeIndicators.has(row.id))
+    const oscillatorCount = isAdvancedView
+      ? MARKET_CHART_INDICATORS.filter((row) => row.kind === 'oscillator' && activeIndicators.has(row.id)).length
+      : 0
     if (isAdvancedView) {
-      attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, { isLight })
+      attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, {
+        isLight,
+        volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
+      })
+      attachMarketChartVolumePane(chart, rawBars, { isLight })
+      mainSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.06,
+          bottom: marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount),
+        },
+      })
     }
     if (isAdvancedView) {
       applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-        keepMargins: hasOscillatorPane,
+        keepMargins: true,
         chartType: effectiveChartType,
         rawBars,
       })
@@ -975,7 +994,7 @@ export default function LoungeMarketChartModal({
     const refreshChartOverlays = () => {
       if (isAdvancedView) {
         applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-          keepMargins: hasOscillatorPane,
+          keepMargins: true,
           chartType: effectiveChartType,
           rawBars,
         })
@@ -1207,7 +1226,7 @@ export default function LoungeMarketChartModal({
                         })
                       }}
                       className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
-                        chartType !== 'area'
+                        chartType !== 'candle'
                           ? 'text-cyan-300 hover:text-cyan-200'
                           : `${mutedClass} hover:text-zinc-300`
                       }`}

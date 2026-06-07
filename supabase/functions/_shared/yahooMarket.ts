@@ -7,7 +7,7 @@ const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart'
 const YAHOO_SEARCH = 'https://query1.finance.yahoo.com/v1/finance/search'
 const MAX_BARS = 120
 
-export type YahooBar = { t: number; c: number }
+export type YahooBar = { t: number; c: number; v?: number }
 
 export type YahooStockProfile = {
   name: string
@@ -264,10 +264,15 @@ function downsampleBars(bars: YahooBar[], max = MAX_BARS): YahooBar[] {
 
 function parseYahooChartBars(data: unknown): YahooBar[] {
   const result = (data as { chart?: { result?: unknown[] } })?.chart?.result?.[0] as
-    | { timestamp?: number[]; indicators?: { quote?: Array<{ close?: number[] }> } }
+    | {
+        timestamp?: number[]
+        indicators?: { quote?: Array<{ close?: number[]; volume?: number[] }> }
+      }
     | undefined
   const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : []
-  const closes = result?.indicators?.quote?.[0]?.close
+  const quote = result?.indicators?.quote?.[0]
+  const closes = quote?.close
+  const volumes = quote?.volume
   if (!Array.isArray(closes) || !timestamps.length) return []
 
   const bars: YahooBar[] = []
@@ -275,7 +280,8 @@ function parseYahooChartBars(data: unknown): YahooBar[] {
     const t = Number(timestamps[i])
     const c = Number(closes[i])
     if (!Number.isFinite(t) || !Number.isFinite(c)) continue
-    bars.push({ t, c })
+    const v = Array.isArray(volumes) ? Number(volumes[i]) : NaN
+    bars.push({ t, c, ...(Number.isFinite(v) && v >= 0 ? { v } : {}) })
   }
   return bars
 }
@@ -356,15 +362,20 @@ const TWO_HOUR_BUCKET_SEC = 7200
 
 function aggregateYahooBarsToBucket(bars: YahooBar[], bucketSec: number): YahooBar[] {
   if (!bars.length || bucketSec <= 0) return []
-  const buckets = new Map<number, number>()
+  const buckets = new Map<number, { c: number; v: number }>()
   for (const bar of bars) {
     if (!Number.isFinite(bar?.t) || !Number.isFinite(bar?.c)) continue
     const key = Math.floor(bar.t / bucketSec) * bucketSec
-    buckets.set(key, bar.c)
+    const prev = buckets.get(key)
+    const vAdd = Number.isFinite(bar.v) ? Number(bar.v) : 0
+    buckets.set(key, {
+      c: bar.c,
+      v: (prev?.v ?? 0) + vAdd,
+    })
   }
   return [...buckets.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([t, c]) => ({ t, c }))
+    .map(([t, row]) => ({ t, c: row.c, ...(row.v > 0 ? { v: row.v } : {}) }))
 }
 
 /** Locked modal 1M — 2h candles aggregated from Yahoo `range=1mo` at 1h (or 30m). */
