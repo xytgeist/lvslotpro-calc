@@ -6,6 +6,7 @@ Server-side market search, embed build, and rolling batch quotes for Lounge feed
 
 - **`FINNHUB_API_KEY`** — [Finnhub](https://finnhub.io/) API token (quotes + search; **US stock candles often blocked on free tier**). Non-USD listings are converted to **USD** via Finnhub **`/forex/rates`** (with **Yahoo FX** fallback when Finnhub forex is forbidden).
 - Stock sparklines, quotes, profiles, and **modal news** fall back to **Yahoo Finance** (no key) when Finnhub returns empty or **403**.
+- **Modal / Advanced candles:** Yahoo and Finnhub candle responses parse full **OHLCV** (`o`, `h`, `l`, `c`, `v` on each bar). CoinGecko crypto fallback uses **`/coins/{id}/ohlc`** (full OHLC when available; **`market_chart`** close-only if OHLC fails). Quote-synthesized fallbacks remain close-only.
 - **`COINGECKO_API_KEY`** — [CoinGecko Demo API](https://docs.coingecko.com/reference/setting-up-your-api-key) key for crypto logos, **USD market cap**, and search. Works without a key at low volume; set a demo key on test/prod to avoid rate limits.
 - Optional **`LOUNGE_PUBLIC_ORIGIN`** — e.g. `https://lvslotpro.com` for OG image URLs on embed attach.
 

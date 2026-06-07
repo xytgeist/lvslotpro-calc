@@ -1,7 +1,9 @@
 /**
  * CoinGecko helpers for crypto search, logos, market cap, and candle fallback.
- * Prices/quotes stay on Finnhub; CoinGecko supplies identity, logo, and USD market cap.
+ * Prices/quotes stay on Finnhub; CoinGecko supplies identity, logo, USD market cap, and OHLC candles.
  */
+
+import type { MarketBarOhlc } from './marketBarOhlc.ts'
 
 const COINGECKO_DEMO_BASE = 'https://api.coingecko.com/api/v3'
 const LOGO_CACHE_TTL_MS = 86_400_000
@@ -180,6 +182,126 @@ export async function coingeckoCryptoLogo(symbol: string): Promise<string> {
   return profile.logo
 }
 
+/** CoinGecko `/ohlc` only accepts these `days` values. */
+export function coingeckoOhlcDaysForWindow(windowKey: string): '1' | '7' | '14' | '30' | '90' | '180' | '365' {
+  switch (windowKey) {
+    case '1h':
+    case '24h':
+      return '1'
+    case '3d':
+      return '7'
+    case '1w':
+      return '7'
+    case '1m':
+      return '30'
+    case '3m':
+      return '90'
+    case '6m':
+      return '180'
+    case '1y':
+    case 'ytd':
+      return '365'
+    default:
+      return '1'
+  }
+}
+
+function downsampleCoingeckoBars(bars: MarketBarOhlc[], max = 120): MarketBarOhlc[] {
+  if (bars.length <= max) return bars
+  const step = Math.ceil(bars.length / max)
+  return bars.filter((_, i) => i % step === 0 || i === bars.length - 1)
+}
+
+function parseCoingeckoOhlcPayload(data: unknown): MarketBarOhlc[] {
+  if (!Array.isArray(data)) return []
+  const bars: MarketBarOhlc[] = []
+  for (const row of data) {
+    if (!Array.isArray(row) || row.length < 5) continue
+    const tMs = Number(row[0])
+    const o = Number(row[1])
+    const h = Number(row[2])
+    const l = Number(row[3])
+    const c = Number(row[4])
+    if (!Number.isFinite(tMs) || !Number.isFinite(c)) continue
+    if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l)) continue
+    bars.push({
+      t: Math.floor(tMs / 1000),
+      o,
+      h,
+      l,
+      c,
+    })
+  }
+  return bars
+}
+
+async function coingeckoCryptoOhlcCandles(coinId: string, windowKey: string): Promise<MarketBarOhlc[]> {
+  const id = String(coinId || '').trim()
+  if (!id) return []
+
+  const days = coingeckoOhlcDaysForWindow(windowKey)
+  const params: Record<string, string> = {
+    vs_currency: 'usd',
+    days,
+  }
+  const key = coingeckoApiKey()
+  if (
+    key &&
+    (windowKey === '1h' ||
+      windowKey === '24h' ||
+      windowKey === '3d' ||
+      windowKey === '1w' ||
+      windowKey === '1m')
+  ) {
+    params.interval = 'hourly'
+  }
+
+  try {
+    const data = await coingeckoFetch(`/coins/${id}/ohlc`, params)
+    const bars = parseCoingeckoOhlcPayload(data)
+    if (bars.length >= 2) return downsampleCoingeckoBars(bars)
+  } catch {
+    if (params.interval) {
+      try {
+        const data = await coingeckoFetch(`/coins/${id}/ohlc`, {
+          vs_currency: 'usd',
+          days,
+        })
+        const bars = parseCoingeckoOhlcPayload(data)
+        if (bars.length >= 2) return downsampleCoingeckoBars(bars)
+      } catch {
+        /* fall through to close-only chart */
+      }
+    }
+  }
+  return []
+}
+
+/** Close-only fallback when `/ohlc` is unavailable. */
+async function coingeckoCryptoCloseCandles(coinId: string, windowKey: string): Promise<MarketBarOhlc[]> {
+  const id = String(coinId || '').trim()
+  if (!id) return []
+
+  try {
+    const data = await coingeckoFetch(`/coins/${id}/market_chart`, {
+      vs_currency: 'usd',
+      days: String(coingeckoDaysForWindow(windowKey)),
+    })
+    const prices = Array.isArray(data?.prices) ? data.prices : []
+    const bars: MarketBarOhlc[] = []
+    for (const row of prices) {
+      if (!Array.isArray(row) || row.length < 2) continue
+      const t = Number(row[0])
+      const c = Number(row[1])
+      if (!Number.isFinite(t) || !Number.isFinite(c)) continue
+      bars.push({ t: Math.floor(t / 1000), c })
+    }
+    return downsampleCoingeckoBars(bars)
+  } catch {
+    return []
+  }
+}
+
 /** CoinGecko `market_chart` days param for a window key. */
 export function coingeckoDaysForWindow(windowKey: string): number {
   switch (windowKey) {
@@ -208,34 +330,18 @@ export function coingeckoDaysForWindow(windowKey: string): number {
   }
 }
 
-/** Crypto sparkline fallback when Finnhub candles are empty. */
+/** Crypto candle fallback when Finnhub candles are empty — OHLC via `/ohlc`, then close-only `market_chart`. */
 export async function coingeckoCryptoCandles(
   symbol: string,
   windowKey: string,
-): Promise<Array<{ t: number; c: number }>> {
+): Promise<MarketBarOhlc[]> {
   const coinId = await coingeckoResolveCoinId(symbol)
   if (!coinId) return []
 
-  try {
-    const data = await coingeckoFetch(`/coins/${coinId}/market_chart`, {
-      vs_currency: 'usd',
-      days: String(coingeckoDaysForWindow(windowKey)),
-    })
-    const prices = Array.isArray(data?.prices) ? data.prices : []
-    const bars: Array<{ t: number; c: number }> = []
-    for (const row of prices) {
-      if (!Array.isArray(row) || row.length < 2) continue
-      const t = Number(row[0])
-      const c = Number(row[1])
-      if (!Number.isFinite(t) || !Number.isFinite(c)) continue
-      bars.push({ t: Math.floor(t / 1000), c })
-    }
-    if (bars.length <= 120) return bars
-    const step = Math.ceil(bars.length / 120)
-    return bars.filter((_, i) => i % step === 0 || i === bars.length - 1)
-  } catch {
-    return []
-  }
+  const ohlc = await coingeckoCryptoOhlcCandles(coinId, windowKey)
+  if (ohlc.length >= 2) return ohlc
+
+  return coingeckoCryptoCloseCandles(coinId, windowKey)
 }
 
 /** Finnhub `/search` rarely returns crypto — use CoinGecko for cashtag/picker discovery. */

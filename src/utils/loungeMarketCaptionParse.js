@@ -7,6 +7,9 @@ import { isUsableStockIntradayBars } from './usEquityMarketSession.js'
  * @typedef {Object} MarketBar
  * @property {number} t
  * @property {number} c
+ * @property {number} [o]
+ * @property {number} [h]
+ * @property {number} [l]
  * @property {number} [v]
  */
 

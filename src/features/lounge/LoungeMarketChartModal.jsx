@@ -54,6 +54,7 @@ import {
 import {
   bindMarketChartHistoryLoader,
   bindMarketChartPanPointer,
+  marketChartBarsSignature,
   scrollMarketChartByPixels,
   shiftMarketChartLogicalRange,
 } from './loungeMarketChartPan.js'
@@ -72,7 +73,7 @@ const SHEET_DISMISS_VEL = 0.45
 /** Chart canvas stops above this band — timeframe pills sit in the gap. */
 const MARKET_CHART_TIMEFRAME_BAND_PX = 24
 const MARKET_CHART_MODAL_HEIGHT = '90dvh'
-const MARKET_CHART_HEIGHT_PX = 360
+const MARKET_CHART_HEIGHT_PX = 320
 const MARKET_CHART_PRICE_SCALE_FONT_SIZE = 10
 const MARKET_CHART_PRICE_AXIS_GUTTER_PX = 56
 const MARKET_CHART_PRICE_AXIS_LABEL_MIN_GAP_PX = 14
@@ -499,6 +500,10 @@ export default function LoungeMarketChartModal({
   const historyLoadingRef = useRef(false)
   const historyHasMoreRef = useRef(true)
   const loadMoreHistoryRef = useRef(/** @type {(beforeSec: number) => void} */ (() => {}))
+  const historyFlushPendingRef = useRef(/** @type {(() => void) | null} */ (null))
+  const chartPanningRef = useRef(false)
+  const pendingHistoryApplyRef = useRef(/** @type {(() => void) | null} */ (null))
+  const advancedBarsSignatureRef = useRef('')
   const volumeSeriesRef = useRef(null)
   const indicatorSeriesRef = useRef(/** @type {import('lightweight-charts').ISeriesApi[]} */ ([]))
   const chartSeriesRef = useRef(null)
@@ -639,6 +644,9 @@ export default function LoungeMarketChartModal({
     setHistoryBars([])
     setHistoryHasMore(true)
     historyLoadingRef.current = false
+    advancedBarsSignatureRef.current = ''
+    chartPanningRef.current = false
+    pendingHistoryApplyRef.current = null
     writeStoredMarketChartViewMode('quick')
   }, [])
 
@@ -742,6 +750,7 @@ export default function LoungeMarketChartModal({
     setHistoryBars([])
     setHistoryHasMore(true)
     historyLoadingRef.current = false
+    advancedBarsSignatureRef.current = ''
   }, [active?.asset_class, active?.symbol, activeIdx, timeframeIdx])
 
   const loadSeries = useCallback(async () => {
@@ -885,6 +894,51 @@ export default function LoungeMarketChartModal({
   chartSeriesRef.current = chartSeries
   allBarsRef.current = allBars
 
+  const applyAdvancedHistoryBars = useCallback(
+    (nextAll, added) => {
+      const chart = chartRef.current
+      const mainSeries = mainSeriesRef.current
+      if (!chart || !mainSeries || added <= 0) return
+
+      const run = () => {
+        if (!chartRef.current || !mainSeriesRef.current) return
+        const barPoints = loungeMarketBarsToSeries(nextAll)
+        const overlayLines = computeMarketChartOverlayLines(barPoints, activeIndicators)
+        const refreshed = refreshAdvancedMarketChartData({
+          chart: chartRef.current,
+          mainSeries: mainSeriesRef.current,
+          volumeSeries: volumeSeriesRef.current,
+          indicatorSeries: indicatorSeriesRef.current,
+          rawBars: nextAll,
+          chartType: effectiveChartType,
+          activeIndicators,
+          isLight,
+          volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
+          applyPriceRange: priceScaleUserPinnedRef.current
+            ? undefined
+            : () => {
+                applyMarketChartPriceRange(mainSeriesRef.current, barPoints, overlayLines, {
+                  keepMargins: true,
+                  chartType: effectiveChartType,
+                  rawBars: nextAll,
+                })
+              },
+        })
+        volumeSeriesRef.current = refreshed.volumeSeries
+        indicatorSeriesRef.current = refreshed.indicatorSeries
+        shiftMarketChartLogicalRange(chartRef.current, added)
+        advancedBarsSignatureRef.current = marketChartBarsSignature(nextAll)
+      }
+
+      if (chartPanningRef.current) {
+        pendingHistoryApplyRef.current = run
+        return
+      }
+      requestAnimationFrame(run)
+    },
+    [activeIndicators, effectiveChartType, isLight],
+  )
+
   const loadMoreHistory = useCallback(
     async (beforeSec) => {
       if (
@@ -911,42 +965,18 @@ export default function LoungeMarketChartModal({
           setHistoryHasMore(false)
           return
         }
+        let nextAll = /** @type {object[]} */ ([])
+        let added = 0
         setHistoryBars((prev) => {
           const nextHistory = mergeMarketBarsOlder(prev, data.bars)
           const base = chartSeriesRef.current?.bars || []
           const prevAll = mergeMarketBarsOlder(base, prev)
-          const nextAll = mergeMarketBarsOlder(base, nextHistory)
-          const added = nextAll.length - prevAll.length
-          const chart = chartRef.current
-          const mainSeries = mainSeriesRef.current
-          if (chart && mainSeries && added > 0) {
-            const refreshed = refreshAdvancedMarketChartData({
-              chart,
-              mainSeries,
-              volumeSeries: volumeSeriesRef.current,
-              indicatorSeries: indicatorSeriesRef.current,
-              rawBars: nextAll,
-              chartType: effectiveChartType,
-              activeIndicators,
-              isLight,
-              volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
-              applyPriceRange: priceScaleUserPinnedRef.current
-                ? undefined
-                : (barPoints, overlayLines) => {
-                    applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
-                      keepMargins: true,
-                      chartType: effectiveChartType,
-                      rawBars: nextAll,
-                    })
-                  },
-            })
-            volumeSeriesRef.current = refreshed.volumeSeries
-            indicatorSeriesRef.current = refreshed.indicatorSeries
-            shiftMarketChartLogicalRange(chart, added)
-          }
-          allBarsRef.current = nextAll
+          nextAll = mergeMarketBarsOlder(base, nextHistory)
+          added = nextAll.length - prevAll.length
           return nextHistory
         })
+        allBarsRef.current = nextAll
+        applyAdvancedHistoryBars(nextAll, added)
         if (data.has_more === false) setHistoryHasMore(false)
       } finally {
         historyLoadingRef.current = false
@@ -954,10 +984,9 @@ export default function LoungeMarketChartModal({
     },
     [
       active,
-      activeIndicators,
       advancedFullscreenOpen,
-      effectiveChartType,
-      isLight,
+      applyAdvancedHistoryBars,
+      historyHasMore,
       supabaseClient,
       timeframeIdx,
     ],
@@ -1163,10 +1192,19 @@ export default function LoungeMarketChartModal({
       : () => {}
 
     const unbindPan = isAdvancedView
-      ? bindMarketChartPanPointer(el, chart, { priceAxisHit })
+      ? bindMarketChartPanPointer(el, chart, {
+          priceAxisHit,
+          onPanActiveChange: (active) => {
+            chartPanningRef.current = active
+            if (active) return
+            historyFlushPendingRef.current?.()
+            pendingHistoryApplyRef.current?.()
+            pendingHistoryApplyRef.current = null
+          },
+        })
       : () => {}
 
-    const unbindHistory = isAdvancedView
+    const historyLoader = isAdvancedView
       ? bindMarketChartHistoryLoader(
           chart,
           () => allBarsRef.current,
@@ -1175,9 +1213,12 @@ export default function LoungeMarketChartModal({
           },
           {
             canLoad: () => historyHasMoreRef.current && !historyLoadingRef.current,
+            isPanning: () => chartPanningRef.current,
           },
         )
-      : () => {}
+      : null
+    historyFlushPendingRef.current = historyLoader?.flushPending ?? null
+    const unbindHistory = historyLoader?.unbind ?? (() => {})
 
     const unbindScrub = isAdvancedView
       ? () => {}
@@ -1221,6 +1262,7 @@ export default function LoungeMarketChartModal({
     })
     ro.observe(el)
     if (isAdvancedView) {
+      advancedBarsSignatureRef.current = marketChartBarsSignature(rawBars)
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (!chartRef.current || !el.isConnected) return
@@ -1230,6 +1272,9 @@ export default function LoungeMarketChartModal({
     }
     return () => {
       cancelAnimationFrame(resizeRaf)
+      historyFlushPendingRef.current = null
+      chartPanningRef.current = false
+      pendingHistoryApplyRef.current = null
       unbindPriceAxisZoom()
       unbindPan()
       unbindHistory()
@@ -1250,12 +1295,9 @@ export default function LoungeMarketChartModal({
     activeIndicatorKey,
     advancedFullscreenOpen,
     effectiveChartType,
-    chartUp,
-    isAdvancedView,
     isLight,
     open,
     seriesScope,
-    theme,
     timeframe.label,
   ])
 
@@ -1298,11 +1340,15 @@ export default function LoungeMarketChartModal({
   /** Advanced: refresh series in place on live bar updates — avoid remounting the chart. */
   useEffect(() => {
     if (!open || !advancedFullscreenOpen || !isAdvancedView) return
+    if (chartPanningRef.current) return
     const chart = chartRef.current
     const mainSeries = mainSeriesRef.current
     if (!chart || !mainSeries) return
     const rawBars = allBarsRef.current
     if (!rawBars?.length) return
+    const signature = marketChartBarsSignature(rawBars)
+    if (signature === advancedBarsSignatureRef.current) return
+    advancedBarsSignatureRef.current = signature
     const barPoints = loungeMarketBarsToSeries(rawBars)
     const overlayLines = computeMarketChartOverlayLines(barPoints, activeIndicators)
     const lineColor = chartUp ? theme.upColor : theme.downColor
@@ -1354,7 +1400,6 @@ export default function LoungeMarketChartModal({
     chartUp,
     theme.upColor,
     theme.downColor,
-    activeIndicators,
   ])
 
   if (!open || !list.length) return null
@@ -1398,14 +1443,6 @@ export default function LoungeMarketChartModal({
                   paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))',
                 }}
               >
-                <button
-                  type="button"
-                  aria-label="Close advanced chart"
-                  onClick={closeAdvancedFullscreen}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-800/90 text-lg leading-none text-zinc-200 touch-manipulation hover:bg-zinc-700"
-                >
-                  ×
-                </button>
                 {active?.logo_url ? (
                   <img src={active.logo_url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
                 ) : (
@@ -1431,6 +1468,14 @@ export default function LoungeMarketChartModal({
                     {formatMarketChangeLine(displayQuote?.change, displayChangePct)}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  aria-label="Close advanced chart"
+                  onClick={closeAdvancedFullscreen}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-800/90 text-lg leading-none text-zinc-200 touch-manipulation hover:bg-zinc-700"
+                >
+                  ×
+                </button>
               </div>
 
               {list.length > 1 ? (

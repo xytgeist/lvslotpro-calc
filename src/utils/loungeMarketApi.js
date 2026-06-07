@@ -3,6 +3,8 @@
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {Record<string, unknown>} payload Must include `action`.
  */
+
+import { marketBarRowFields } from './marketBarOhlc.js'
 export async function loungeMarketInvoke(supabase, payload) {
   let {
     data: { session },
@@ -138,13 +140,12 @@ export async function loungeMarketModalSeriesBefore(supabase, opts) {
 
 /** Merge older bars into an ascending unique series. */
 export function mergeMarketBarsOlder(existing = [], older = []) {
-  /** @type {Map<number, { t: number, c: number, v?: number }>} */
+  /** @type {Map<number, ReturnType<typeof marketBarRowFields>>} */
   const map = new Map()
   for (const bar of [...older, ...existing]) {
     if (!bar || !Number.isFinite(bar.t) || !Number.isFinite(bar.c)) continue
-    const t = Math.floor(bar.t > 1e12 ? bar.t / 1000 : bar.t)
-    const row = { t, c: bar.c, ...(Number.isFinite(bar.v) ? { v: bar.v } : {}) }
-    map.set(t, row)
+    const row = marketBarRowFields(bar)
+    map.set(row.t, row)
   }
   return [...map.entries()]
     .sort((a, b) => a[0] - b[0])

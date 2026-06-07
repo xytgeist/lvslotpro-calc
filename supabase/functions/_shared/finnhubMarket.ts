@@ -3,6 +3,12 @@
  * Crypto logos: CoinGecko via coingeckoMarket.ts (optional COINGECKO_API_KEY).
  */
 
+import {
+  aggregateMarketBarsToBucketSec,
+  mergeMarketBarSameTime,
+  normalizeMarketBarPoint,
+  type MarketBarOhlc,
+} from './marketBarOhlc.ts'
 import { coingeckoBatchPickerQuotes, coingeckoCryptoCandles, coingeckoCryptoProfile, coingeckoMarketSearch } from './coingeckoMarket.ts'
 import {
   isUsableStockIntradayBars,
@@ -13,11 +19,10 @@ import {
 } from './usEquityMarketSession.ts'
 import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
 
+export type MarketBar = MarketBarOhlc
 export type MarketAssetClass = 'stock' | 'crypto'
 export type MarketEmbedKind = 'rolling' | 'historical'
 export type MarketWindowKey = '1h' | '24h' | '3d' | '1w' | '1m' | '3m' | '6m' | '1y' | 'ytd'
-
-export type MarketBar = { t: number; c: number; v?: number }
 
 export type MarketEmbed = {
   symbol: string
@@ -358,15 +363,33 @@ const RESOLUTION_FALLBACKS: Record<MarketWindowKey, string[]> = {
 }
 
 function parseFinnhubCandlePayload(data: unknown): MarketBar[] {
-  const row = data as { s?: string; c?: number[]; t?: number[]; v?: number[] }
+  const row = data as {
+    s?: string
+    o?: number[]
+    h?: number[]
+    l?: number[]
+    c?: number[]
+    t?: number[]
+    v?: number[]
+  }
   if (row?.s !== 'ok' || !Array.isArray(row?.c)) return []
   const out: MarketBar[] = []
   for (let i = 0; i < row.c.length; i += 1) {
     const c = Number(row.c[i])
     const t = Number(row.t?.[i])
+    const o = Number(row.o?.[i])
+    const h = Number(row.h?.[i])
+    const l = Number(row.l?.[i])
     const v = row.v != null ? Number(row.v[i]) : undefined
     if (!Number.isFinite(c) || !Number.isFinite(t)) continue
-    out.push({ t, c, ...(Number.isFinite(v) ? { v } : {}) })
+    out.push({
+      t,
+      c,
+      ...(Number.isFinite(o) ? { o } : {}),
+      ...(Number.isFinite(h) ? { h } : {}),
+      ...(Number.isFinite(l) ? { l } : {}),
+      ...(Number.isFinite(v) ? { v } : {}),
+    })
   }
   return out
 }
@@ -477,22 +500,11 @@ export function isUsableWeeklyHourlyBars(bars: MarketBar[]): boolean {
 }
 
 function aggregateBarsToBucketSec(bars: MarketBar[], bucketSec: number): MarketBar[] {
-  if (!Array.isArray(bars) || !bars.length || bucketSec <= 0) return []
-  const buckets = new Map<number, { c: number; v: number }>()
-  for (const bar of bars) {
-    if (!Number.isFinite(bar?.t) || !Number.isFinite(bar?.c)) continue
-    const t = barUnixSec(bar.t)
-    const key = Math.floor(t / bucketSec) * bucketSec
-    const prev = buckets.get(key)
-    const vAdd = Number.isFinite(bar.v) ? Number(bar.v) : 0
-    buckets.set(key, {
-      c: bar.c,
-      v: (prev?.v ?? 0) + vAdd,
-    })
-  }
-  return [...buckets.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([t, row]) => ({ t, c: row.c, ...(row.v > 0 ? { v: row.v } : {}) }))
+  const normalized = bars.map((bar) => ({
+    ...bar,
+    t: barUnixSec(bar.t),
+  }))
+  return aggregateMarketBarsToBucketSec(normalized, bucketSec)
 }
 
 function aggregateMarketBarsToTwoHour(bars: MarketBar[]): MarketBar[] {
@@ -650,21 +662,16 @@ export async function resolveMarketBarsBefore(
 export function normalizeMarketBars(bars: MarketBar[]): MarketBar[] {
   const sorted = bars
     .filter((b) => Number.isFinite(b.t) && Number.isFinite(b.c))
-    .map((b) => ({
-      ...b,
-      t: Math.floor(b.t > 1e12 ? b.t / 1000 : b.t),
-      c: b.c,
-    }))
+    .map((b) => normalizeMarketBarPoint(b))
     .sort((a, b) => a.t - b.t)
 
   const out: MarketBar[] = []
   for (const bar of sorted) {
     const last = out[out.length - 1]
     if (last && last.t === bar.t) {
-      last.c = bar.c
-      if (bar.v != null) last.v = bar.v
+      mergeMarketBarSameTime(last, bar)
     } else {
-      out.push({ t: bar.t, c: bar.c, ...(bar.v != null ? { v: bar.v } : {}) })
+      out.push({ ...bar })
     }
   }
   return out

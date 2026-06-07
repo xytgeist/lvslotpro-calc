@@ -3,11 +3,16 @@
  * Finnhub free tier often blocks `/stock/candle`, `/quote`, and `/forex/rates`; Yahoo needs no API key.
  */
 
+import {
+  aggregateMarketBarsToBucketSec,
+  type MarketBarOhlc,
+} from './marketBarOhlc.ts'
+
 const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart'
 const YAHOO_SEARCH = 'https://query1.finance.yahoo.com/v1/finance/search'
 const MAX_BARS = 120
 
-export type YahooBar = { t: number; c: number; v?: number }
+export type YahooBar = MarketBarOhlc
 
 export type YahooStockProfile = {
   name: string
@@ -266,11 +271,22 @@ function parseYahooChartBars(data: unknown): YahooBar[] {
   const result = (data as { chart?: { result?: unknown[] } })?.chart?.result?.[0] as
     | {
         timestamp?: number[]
-        indicators?: { quote?: Array<{ close?: number[]; volume?: number[] }> }
+        indicators?: {
+          quote?: Array<{
+            open?: number[]
+            high?: number[]
+            low?: number[]
+            close?: number[]
+            volume?: number[]
+          }>
+        }
       }
     | undefined
   const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : []
   const quote = result?.indicators?.quote?.[0]
+  const opens = quote?.open
+  const highs = quote?.high
+  const lows = quote?.low
   const closes = quote?.close
   const volumes = quote?.volume
   if (!Array.isArray(closes) || !timestamps.length) return []
@@ -280,8 +296,18 @@ function parseYahooChartBars(data: unknown): YahooBar[] {
     const t = Number(timestamps[i])
     const c = Number(closes[i])
     if (!Number.isFinite(t) || !Number.isFinite(c)) continue
+    const o = Array.isArray(opens) ? Number(opens[i]) : NaN
+    const h = Array.isArray(highs) ? Number(highs[i]) : NaN
+    const l = Array.isArray(lows) ? Number(lows[i]) : NaN
     const v = Array.isArray(volumes) ? Number(volumes[i]) : NaN
-    bars.push({ t, c, ...(Number.isFinite(v) && v >= 0 ? { v } : {}) })
+    bars.push({
+      t,
+      c,
+      ...(Number.isFinite(o) ? { o } : {}),
+      ...(Number.isFinite(h) ? { h } : {}),
+      ...(Number.isFinite(l) ? { l } : {}),
+      ...(Number.isFinite(v) && v >= 0 ? { v } : {}),
+    })
   }
   return bars
 }
@@ -361,21 +387,7 @@ export async function yahooStockWeeklyIntradayCandles(symbol: string): Promise<Y
 const TWO_HOUR_BUCKET_SEC = 7200
 
 function aggregateYahooBarsToBucket(bars: YahooBar[], bucketSec: number): YahooBar[] {
-  if (!bars.length || bucketSec <= 0) return []
-  const buckets = new Map<number, { c: number; v: number }>()
-  for (const bar of bars) {
-    if (!Number.isFinite(bar?.t) || !Number.isFinite(bar?.c)) continue
-    const key = Math.floor(bar.t / bucketSec) * bucketSec
-    const prev = buckets.get(key)
-    const vAdd = Number.isFinite(bar.v) ? Number(bar.v) : 0
-    buckets.set(key, {
-      c: bar.c,
-      v: (prev?.v ?? 0) + vAdd,
-    })
-  }
-  return [...buckets.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([t, row]) => ({ t, c: row.c, ...(row.v > 0 ? { v: row.v } : {}) }))
+  return aggregateMarketBarsToBucketSec(bars, bucketSec)
 }
 
 /** Locked modal 1M — 2h candles aggregated from Yahoo `range=1mo` at 1h (or 30m). */

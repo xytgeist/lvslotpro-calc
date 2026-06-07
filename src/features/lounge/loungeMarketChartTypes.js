@@ -4,6 +4,7 @@
 
 import { AreaSeries, CandlestickSeries, LineSeries } from 'lightweight-charts'
 import { loungeMarketBarsToSeries } from './loungeMarketChartTheme.js'
+import { marketBarHasOhlc } from '../../utils/marketBarOhlc.js'
 
 export const LOUNGE_MARKET_CHART_TYPE_STORAGE_KEY = 'loungeMarketChartType:v1'
 
@@ -46,19 +47,59 @@ export function marketModalChartTypeLabel(chartType) {
   return CHART_TYPE_BY_ID[chartType]?.label || 'Area'
 }
 
-/** Close-only bars → synthetic OHLC (open = prior close). */
+/** Real OHLC when present on bars; otherwise close-only → synthetic wickless candles. */
 export function loungeMarketBarsToCandlestickSeries(bars) {
-  const line = loungeMarketBarsToSeries(bars)
-  if (!line.length) return []
+  if (!Array.isArray(bars) || !bars.length) return []
+
+  const sorted = bars
+    .filter((b) => Number.isFinite(b?.t) && Number.isFinite(b?.c))
+    .map((b) => ({
+      t: Math.floor(b.t > 1e12 ? b.t / 1000 : b.t),
+      c: b.c,
+      o: b.o,
+      h: b.h,
+      l: b.l,
+    }))
+    .sort((a, b) => a.t - b.t)
 
   /** @type {Array<{ time: number, open: number, high: number, low: number, close: number }>} */
   const out = []
-  let prevClose = line[0].value
-  for (let i = 0; i < line.length; i += 1) {
-    const close = line[i].value
-    const open = i === 0 ? close : prevClose
+  let prevClose = sorted[0]?.c
+
+  for (const row of sorted) {
+    const time = row.t
+    const last = out[out.length - 1]
+    if (last && last.time === time) {
+      if (marketBarHasOhlc(row)) {
+        last.open = row.o
+        last.high = row.h
+        last.low = row.l
+        last.close = row.c
+      } else {
+        last.close = row.c
+        last.high = Math.max(last.open, row.c)
+        last.low = Math.min(last.open, row.c)
+      }
+      prevClose = row.c
+      continue
+    }
+
+    if (marketBarHasOhlc(row)) {
+      out.push({
+        time,
+        open: row.o,
+        high: row.h,
+        low: row.l,
+        close: row.c,
+      })
+      prevClose = row.c
+      continue
+    }
+
+    const close = row.c
+    const open = prevClose == null ? close : prevClose
     out.push({
-      time: line[i].time,
+      time,
       open,
       high: Math.max(open, close),
       low: Math.min(open, close),
@@ -66,6 +107,7 @@ export function loungeMarketBarsToCandlestickSeries(bars) {
     })
     prevClose = close
   }
+
   return out
 }
 

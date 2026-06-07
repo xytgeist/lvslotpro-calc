@@ -33,17 +33,28 @@ export function scrollMarketChartByPixels(chart, deltaPx) {
 }
 
 const PAN_GESTURE_SLOP_PX = 6
+const HISTORY_LOAD_DEBOUNCE_MS = 220
+
+/** Stable fingerprint for bar arrays — skip redundant Advanced chart refreshes. */
+export function marketChartBarsSignature(bars) {
+  if (!bars?.length) return ''
+  const first = bars[0]?.t
+  const last = bars[bars.length - 1]?.t
+  return `${bars.length}:${first}:${last}`
+}
 
 /**
  * Drag on the plot pans the time scale (Advanced view).
  * Pointer capture starts only after the pan slop so pinch / crosshair are not blocked.
  * @param {HTMLElement} el
  * @param {import('lightweight-charts').IChartApi} chart
- * @param {{ priceAxisHit?: (clientX: number, clientY?: number) => boolean }} [opts]
+ * @param {{ priceAxisHit?: (clientX: number, clientY?: number) => boolean, onPanActiveChange?: (active: boolean) => void }} [opts]
  */
 export function bindMarketChartPanPointer(el, chart, opts = {}) {
   const priceAxisHit =
     typeof opts.priceAxisHit === 'function' ? opts.priceAxisHit : null
+  const onPanActiveChange =
+    typeof opts.onPanActiveChange === 'function' ? opts.onPanActiveChange : null
 
   /** @type {'pending' | 'pan' | null} */
   let mode = null
@@ -66,9 +77,23 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   }
 
   const resetGesture = () => {
+    const wasPanning = mode === 'pan'
     mode = null
     activePointerId = null
     lastLocalX = null
+    if (wasPanning) onPanActiveChange?.(false)
+  }
+
+  const startPan = (e, localX) => {
+    mode = 'pan'
+    lastLocalX = localX
+    onPanActiveChange?.(true)
+    try {
+      el.setPointerCapture(e.pointerId)
+    } catch {
+      /* ignore */
+    }
+    e.preventDefault()
   }
 
   const flushPan = () => {
@@ -112,14 +137,7 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
       const ldx = local.x - startLocalX
       const ldy = local.y - startLocalY
       if (Math.hypot(ldx, ldy) < PAN_GESTURE_SLOP_PX) return
-      mode = 'pan'
-      lastLocalX = local.x
-      try {
-        el.setPointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
-      }
-      e.preventDefault()
+      startPan(e, local.x)
       return
     }
 
@@ -136,6 +154,10 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
     activePointers.delete(e.pointerId)
     if (activePointerId == null || e.pointerId !== activePointerId) return
     releaseCapture(e.pointerId)
+    if (panRaf) {
+      cancelAnimationFrame(panRaf)
+      flushPan()
+    }
     resetGesture()
   }
 
@@ -159,12 +181,30 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
  * @param {import('lightweight-charts').IChartApi} chart
  * @param {() => Array<{ t: number }>} getBars
  * @param {(beforeSec: number) => void} onNeedHistory
- * @param {{ edgeBars?: number, canLoad?: () => boolean }} [opts]
+ * @param {{ edgeBars?: number, canLoad?: () => boolean, isPanning?: () => boolean, debounceMs?: number }} [opts]
+ * @returns {() => void}
  */
 export function bindMarketChartHistoryLoader(chart, getBars, onNeedHistory, opts = {}) {
   const edgeBars = Number(opts.edgeBars) || 10
   const canLoad = typeof opts.canLoad === 'function' ? opts.canLoad : () => true
+  const isPanning = typeof opts.isPanning === 'function' ? opts.isPanning : () => false
+  const debounceMs = Number(opts.debounceMs) || HISTORY_LOAD_DEBOUNCE_MS
   let lastBeforeSec = null
+  let pendingBeforeSec = null
+  let debounceTimer = 0
+
+  const flushPending = () => {
+    debounceTimer = 0
+    if (pendingBeforeSec == null || isPanning() || !canLoad()) return
+    const beforeSec = pendingBeforeSec
+    pendingBeforeSec = null
+    onNeedHistory(beforeSec)
+  }
+
+  const schedulePending = () => {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(flushPending, debounceMs)
+  }
 
   const handler = (range) => {
     if (!range || range.from > edgeBars) return
@@ -176,13 +216,23 @@ export function bindMarketChartHistoryLoader(chart, getBars, onNeedHistory, opts
     if (!Number.isFinite(beforeSec) || beforeSec <= 0) return
     if (lastBeforeSec === beforeSec) return
     lastBeforeSec = beforeSec
-    onNeedHistory(beforeSec)
+    pendingBeforeSec = beforeSec
+    if (isPanning()) return
+    schedulePending()
   }
 
   const ts = chart.timeScale()
   ts.subscribeVisibleLogicalRangeChange(handler)
-  return () => {
-    ts.unsubscribeVisibleLogicalRangeChange(handler)
+  return {
+    unbind: () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      ts.unsubscribeVisibleLogicalRangeChange(handler)
+    },
+    flushPending: () => {
+      if (pendingBeforeSec == null || isPanning() || !canLoad()) return
+      if (debounceTimer) clearTimeout(debounceTimer)
+      flushPending()
+    },
   }
 }
 
