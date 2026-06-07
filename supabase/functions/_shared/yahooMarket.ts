@@ -329,6 +329,7 @@ export async function yahooStockCandles(
   fromSec: number,
   toSec: number,
   interval: string,
+  maxBars = MAX_BARS,
 ): Promise<YahooBar[]> {
   const ticker = yahooTicker(symbol)
   if (!ticker || !Number.isFinite(fromSec) || !Number.isFinite(toSec)) return []
@@ -340,10 +341,10 @@ export async function yahooStockCandles(
   url.searchParams.set('includePrePost', 'false')
 
   let bars = await fetchYahooChartUrl(url)
-  if (bars.length >= 2) return downsampleBars(bars)
+  if (bars.length >= 2) return downsampleBars(bars, maxBars)
 
   // Yahoo often serves richer intraday history via `range` than period1/period2 from Edge.
-  if (interval === '15m' || interval === '1h' || interval === '30m' || interval === '5m') {
+  if (interval === '1m' || interval === '15m' || interval === '1h' || interval === '30m' || interval === '5m') {
     for (const range of ['7d', '5d', '1mo']) {
       const rangeUrl = new URL(`${YAHOO_CHART}/${encodeURIComponent(ticker)}`)
       rangeUrl.searchParams.set('range', range)
@@ -354,8 +355,8 @@ export async function yahooStockCandles(
         const from = Math.floor(fromSec)
         const to = Math.floor(toSec)
         const clipped = bars.filter((b) => b.t >= from && b.t <= to)
-        if (clipped.length >= 2) return downsampleBars(clipped)
-        if (bars.length >= 8) return downsampleBars(bars)
+        if (clipped.length >= 2) return downsampleBars(clipped, maxBars)
+        if (bars.length >= 8) return downsampleBars(bars, maxBars)
       }
     }
   }

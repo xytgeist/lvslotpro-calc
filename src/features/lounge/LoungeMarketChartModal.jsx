@@ -1100,7 +1100,7 @@ export default function LoungeMarketChartModal({
         allBarsRef.current = nextAll
         marketChartPanDebug('history got bars', { incoming: incoming.length, added, oldestT })
         applyAdvancedHistoryBars(nextAll, added)
-        if (data.has_more === false || added <= 0) setHistoryHasMore(false)
+        if (data.has_more === false) setHistoryHasMore(false)
       } finally {
         historyLoadingRef.current = false
       }
