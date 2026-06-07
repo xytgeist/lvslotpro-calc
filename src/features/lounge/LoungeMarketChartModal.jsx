@@ -36,11 +36,13 @@ import {
   readStoredMarketChartType,
   writeStoredMarketChartType,
 } from './loungeMarketChartTypes.js'
+import { attachMarketChartVolumePane } from './loungeMarketChartVolume.js'
 import {
-  attachMarketChartVolumePane,
-  MARKET_CHART_VOLUME_PANE_FRACTION,
-  marketChartMainBottomMarginWithVolume,
-} from './loungeMarketChartVolume.js'
+  applyMarketChartPaneHeights,
+  computeMarketChartPanePlan,
+  marketChartMainPanePlotBottomLocalY,
+  measureMarketChartSubPaneAxisTitles,
+} from './loungeMarketChartPanes.js'
 import {
   isMarketChartPortraitViewport,
   lockMarketChartLandscapeOrientation,
@@ -63,6 +65,7 @@ import {
 import { refreshAdvancedMarketChartData } from './loungeMarketChartDataSync.js'
 import {
   marketChartAdvancedHandleScaleOptions,
+  marketChartAdvancedLayoutPanesOptions,
   marketChartAdvancedLocalization,
   marketChartAdvancedPriceScaleOptions,
   marketChartAdvancedTimeScaleOptions,
@@ -545,6 +548,12 @@ export default function LoungeMarketChartModal({
       low: null,
     }),
   )
+  const [subPaneAxisTitles, setSubPaneAxisTitles] = useState(
+    /** @type {{ width: number, rows: Array<{ id: string, text: string, topPx: number, paneIndex: number }> }} */ ({
+      width: 52,
+      rows: [],
+    }),
+  )
 
   const isLight = loungeMarketChartIsLight()
   const { quotes: feedQuotes } = useLoungeMarketFeedQuotes()
@@ -918,6 +927,7 @@ export default function LoungeMarketChartModal({
         if (!chartRef.current || !mainSeriesRef.current) return
         const barPoints = loungeMarketBarsToSeries(nextAll)
         const overlayLines = computeMarketChartOverlayLines(barPoints, activeIndicators)
+        const panePlan = computeMarketChartPanePlan(activeIndicators)
         const refreshed = refreshAdvancedMarketChartData({
           chart: chartRef.current,
           mainSeries: mainSeriesRef.current,
@@ -927,7 +937,7 @@ export default function LoungeMarketChartModal({
           chartType: effectiveChartType,
           activeIndicators,
           isLight,
-          volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
+          panePlan,
           applyPriceRange: priceScaleUserPinnedRef.current
             ? undefined
             : () => {
@@ -1084,6 +1094,7 @@ export default function LoungeMarketChartModal({
       layout: {
         ...theme.layout,
         fontSize: MARKET_CHART_PRICE_SCALE_FONT_SIZE,
+        ...(isAdvancedView ? marketChartAdvancedLayoutPanesOptions(isLight) : {}),
       },
       localization: isAdvancedView ? marketChartAdvancedLocalization(timeframe.label) : undefined,
       grid: isAdvancedView ? marketChartAnalysisGrid(isLight) : theme.grid,
@@ -1126,24 +1137,21 @@ export default function LoungeMarketChartModal({
     mainSeriesRef.current = mainSeries
     volumeSeriesRef.current = null
     indicatorSeriesRef.current = []
-    const hasOscillatorPane =
-      isAdvancedView &&
-      MARKET_CHART_INDICATORS.some((row) => row.kind === 'oscillator' && activeIndicators.has(row.id))
-    const oscillatorCount = isAdvancedView
-      ? MARKET_CHART_INDICATORS.filter((row) => row.kind === 'oscillator' && activeIndicators.has(row.id)).length
-      : 0
-    if (isAdvancedView) {
+    const panePlan = isAdvancedView ? computeMarketChartPanePlan(activeIndicators) : null
+    if (isAdvancedView && panePlan) {
+      mainSeries.priceScale().applyOptions({
+        scaleMargins: { top: 0.06, bottom: 0.04 },
+      })
+      volumeSeriesRef.current = attachMarketChartVolumePane(chart, rawBars, {
+        isLight,
+        paneIndex: panePlan.volumePaneIndex,
+      })
       indicatorSeriesRef.current = attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, {
         isLight,
-        volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
+        panePlan,
       })
-      volumeSeriesRef.current = attachMarketChartVolumePane(chart, rawBars, { isLight })
-      mainSeries.priceScale().applyOptions({
-        scaleMargins: {
-          top: 0.06,
-          bottom: marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount),
-        },
-      })
+      applyMarketChartPaneHeights(chart, el.offsetHeight || el.clientHeight, panePlan)
+      setSubPaneAxisTitles(measureMarketChartSubPaneAxisTitles(chart, panePlan))
     }
     if (isAdvancedView) {
       applyMarketChartPriceRange(mainSeries, barPoints, overlayLines, {
@@ -1170,7 +1178,7 @@ export default function LoungeMarketChartModal({
 
     let priceScaleUserPinned = false
     priceScaleUserPinnedRef.current = false
-    const priceAxisBottomExclude = marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount)
+    const mainPlotBottomLocalY = () => marketChartMainPanePlotBottomLocalY(mainSeries, el)
     const resetPriceScaleToData = () => {
       priceScaleUserPinned = false
       priceScaleUserPinnedRef.current = false
@@ -1188,7 +1196,7 @@ export default function LoungeMarketChartModal({
         clientY ?? 0,
         el.getBoundingClientRect(),
         chart.priceScale('right').width() || 52,
-        priceAxisBottomExclude,
+        mainPlotBottomLocalY() ?? el.offsetHeight,
       )
 
     const refreshChartOverlays = () => {
@@ -1213,7 +1221,7 @@ export default function LoungeMarketChartModal({
 
     const unbindPriceAxisZoom = isAdvancedView
       ? bindMarketChartPriceAxisZoom(el, chart, mainSeries, {
-          bottomExcludeFraction: priceAxisBottomExclude,
+          maxPlotLocalY: mainPlotBottomLocalY,
           onUserZoom: () => {
             priceScaleUserPinned = true
             priceScaleUserPinnedRef.current = true
@@ -1224,7 +1232,13 @@ export default function LoungeMarketChartModal({
 
     const unbindPan = isAdvancedView
       ? bindMarketChartPanPointer(el, chart, {
+          mainSeries,
+          mainPlotBottomLocalY,
           priceAxisHit,
+          onUserPricePan: () => {
+            priceScaleUserPinned = true
+            priceScaleUserPinnedRef.current = true
+          },
           onPanActiveChange: (active) => {
             chartPanningRef.current = active
             if (active) {
@@ -1295,7 +1309,12 @@ export default function LoungeMarketChartModal({
       resizeRaf = requestAnimationFrame(() => {
         const liveHost = advancedFullscreenOpen ? advancedChartHostRef.current : chartHostRef.current
         if (!liveHost || !chartRef.current || !mainSeriesRef.current) return
-        if (!isAdvancedView) {
+        if (isAdvancedView && panePlan) {
+          applyMarketChartPaneHeights(chartRef.current, liveHost.clientHeight, panePlan)
+          setSubPaneAxisTitles(
+            measureMarketChartSubPaneAxisTitles(chartRef.current, panePlan),
+          )
+        } else if (!isAdvancedView) {
           chartRef.current.applyOptions({
             width: liveHost.clientWidth,
             height: liveHost.clientHeight,
@@ -1310,8 +1329,9 @@ export default function LoungeMarketChartModal({
       advancedBarsSignatureRef.current = marketChartBarsSignature(rawBars)
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (!chartRef.current || !el.isConnected) return
+          if (!chartRef.current || !el.isConnected || !panePlan) return
           chartRef.current.timeScale().fitContent()
+          setSubPaneAxisTitles(measureMarketChartSubPaneAxisTitles(chartRef.current, panePlan))
         })
       })
     }
@@ -1336,6 +1356,7 @@ export default function LoungeMarketChartModal({
       indicatorSeriesRef.current = []
       priceAxisLabelsRef.current = { high: null, current: null, low: null }
       setPriceAxisLabels({ high: null, current: null, low: null })
+      setSubPaneAxisTitles({ width: 52, rows: [] })
       setScrubQuote(null)
       setScrubAxisCurrent(null)
     }
@@ -1401,12 +1422,7 @@ export default function LoungeMarketChartModal({
     const barPoints = loungeMarketBarsToSeries(rawBars)
     const overlayLines = computeMarketChartOverlayLines(barPoints, activeIndicators)
     const lineColor = chartUp ? theme.upColor : theme.downColor
-    const hasOscillatorPane = MARKET_CHART_INDICATORS.some(
-      (row) => row.kind === 'oscillator' && activeIndicators.has(row.id),
-    )
-    const oscillatorCount = MARKET_CHART_INDICATORS.filter(
-      (row) => row.kind === 'oscillator' && activeIndicators.has(row.id),
-    ).length
+    const panePlan = computeMarketChartPanePlan(activeIndicators)
     const refreshed = refreshAdvancedMarketChartData({
       chart,
       mainSeries,
@@ -1416,7 +1432,7 @@ export default function LoungeMarketChartModal({
       chartType: effectiveChartType,
       activeIndicators,
       isLight,
-      volumePaneFraction: MARKET_CHART_VOLUME_PANE_FRACTION,
+      panePlan,
       applyPriceRange: priceScaleUserPinnedRef.current
         ? undefined
         : () => {
@@ -1432,12 +1448,6 @@ export default function LoungeMarketChartModal({
     if (effectiveChartType !== 'candle') {
       setChartLineMarkers(mainSeries, barPoints, lineColor)
     }
-    mainSeries.priceScale().applyOptions({
-      scaleMargins: {
-        top: 0.06,
-        bottom: marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount),
-      },
-    })
   }, [
     open,
     advancedFullscreenOpen,
@@ -1559,6 +1569,22 @@ export default function LoungeMarketChartModal({
                   className="relative min-h-0 flex-1 overflow-hidden"
                 >
                   <div ref={advancedChartHostRef} className="absolute inset-0 touch-none select-none" />
+                  {subPaneAxisTitles.rows.length ? (
+                    <div
+                      className="pointer-events-none absolute inset-y-0 right-0 z-10"
+                      style={{ width: subPaneAxisTitles.width }}
+                    >
+                      {subPaneAxisTitles.rows.map((row) => (
+                        <div
+                          key={row.id}
+                          className={`absolute right-0 max-w-full truncate pr-0.5 text-right text-[9px] font-semibold uppercase tracking-wide ${mutedClass}`}
+                          style={{ top: row.topPx }}
+                        >
+                          {row.text}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {activeIndicatorLegend.length ? (
                     <div
                       className="pointer-events-none absolute left-2 top-2 z-10 max-w-[min(100%,14rem)] rounded-md border border-zinc-700/70 bg-zinc-950/85 px-2 py-1.5 backdrop-blur-[2px]"

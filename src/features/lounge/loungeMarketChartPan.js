@@ -1,4 +1,4 @@
-/** Horizontal pan + history prefetch for Advanced market charts. */
+/** Horizontal + vertical pan and history prefetch for Advanced market charts. */
 
 /** Map viewport pointer position into element-local coordinates (handles CSS rotation). */
 export function marketChartClientToLocal(el, clientX, clientY) {
@@ -57,6 +57,48 @@ export function scrollMarketChartByPixels(chart, deltaPx) {
   })
 }
 
+/**
+ * Shift main price scale so plot content follows vertical drag (pull down → chart moves down).
+ * @param {import('lightweight-charts').ISeriesApi} mainSeries
+ * @param {number} lastLocalY
+ * @param {number} currentLocalY
+ * @param {number} [plotBottomLocalY] skip when both points are below the main price plot
+ */
+export function scrollMarketChartPriceByPixels(mainSeries, lastLocalY, currentLocalY, plotBottomLocalY) {
+  if (!mainSeries || lastLocalY == null || !Number.isFinite(currentLocalY) || !Number.isFinite(lastLocalY)) {
+    return false
+  }
+  if (currentLocalY === lastLocalY) return false
+  if (
+    plotBottomLocalY != null &&
+    Number.isFinite(plotBottomLocalY) &&
+    lastLocalY > plotBottomLocalY &&
+    currentLocalY > plotBottomLocalY
+  ) {
+    return false
+  }
+
+  const yLast = plotBottomLocalY != null ? Math.min(lastLocalY, plotBottomLocalY) : lastLocalY
+  const yCur = plotBottomLocalY != null ? Math.min(currentLocalY, plotBottomLocalY) : currentLocalY
+  const pLast = mainSeries.coordinateToPrice(yLast)
+  const pCur = mainSeries.coordinateToPrice(yCur)
+  if (!Number.isFinite(pLast) || !Number.isFinite(pCur)) return false
+
+  const shift = pLast - pCur
+  if (shift === 0) return false
+
+  const scale = mainSeries.priceScale()
+  const range = scale.getVisibleRange()
+  if (!range) return false
+
+  scale.applyOptions({ autoScale: false })
+  scale.setVisibleRange({
+    from: range.from + shift,
+    to: range.to + shift,
+  })
+  return true
+}
+
 const PAN_GESTURE_SLOP_PX = 6
 const HISTORY_LOAD_DEBOUNCE_MS = 220
 
@@ -74,17 +116,36 @@ export function marketChartBarsSignature(bars) {
 }
 
 /**
- * Drag on the plot pans the time scale (Advanced view).
- * Pointer capture starts only after the pan slop so pinch / crosshair are not blocked.
+ * Drag on the plot pans time (horizontal) and price (vertical). Advanced view.
  * @param {HTMLElement} el
  * @param {import('lightweight-charts').IChartApi} chart
- * @param {{ priceAxisHit?: (clientX: number, clientY?: number) => boolean, onPanActiveChange?: (active: boolean) => void }} [opts]
+ * @param {{
+ *   mainSeries?: import('lightweight-charts').ISeriesApi,
+ *   mainPlotBottomLocalY?: () => number | null,
+ *   plotBottomExcludeFraction?: number,
+ *   priceAxisHit?: (clientX: number, clientY?: number) => boolean,
+ *   onUserPricePan?: () => void,
+ *   onPanActiveChange?: (active: boolean) => void,
+ * }} [opts]
  */
 export function bindMarketChartPanPointer(el, chart, opts = {}) {
+  const mainSeries = opts.mainSeries ?? null
+  const plotBottomExcludeFraction = Number(opts.plotBottomExcludeFraction) || 0
   const priceAxisHit =
     typeof opts.priceAxisHit === 'function' ? opts.priceAxisHit : null
+  const onUserPricePan = typeof opts.onUserPricePan === 'function' ? opts.onUserPricePan : null
   const onPanActiveChange =
     typeof opts.onPanActiveChange === 'function' ? opts.onPanActiveChange : null
+
+  const plotBottomLocalY = () => {
+    if (typeof opts.mainPlotBottomLocalY === 'function') {
+      const y = opts.mainPlotBottomLocalY()
+      if (Number.isFinite(y)) return y
+    }
+    const h = el.offsetHeight
+    if (!h) return null
+    return h * (1 - plotBottomExcludeFraction)
+  }
 
   /** @type {'pending' | 'pan' | null} */
   let mode = null
@@ -92,6 +153,7 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
   let startLocalX = 0
   let startLocalY = 0
   let lastLocalX = null
+  let lastLocalY = null
   /** @type {Map<number, { x: number, y: number }>} */
   const activePointers = new Map()
   let panRaf = 0
@@ -111,15 +173,17 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
     mode = null
     activePointerId = null
     lastLocalX = null
+    lastLocalY = null
     if (wasPanning) {
       marketChartPanDebug('pan end')
       onPanActiveChange?.(false)
     }
   }
 
-  const startPan = (e, localX) => {
+  const startPan = (e, localX, localY) => {
     mode = 'pan'
     lastLocalX = localX
+    lastLocalY = localY
     marketChartPanDebug('pan start', { pointerId: e.pointerId })
     onPanActiveChange?.(true)
     try {
@@ -128,6 +192,22 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
       /* ignore */
     }
     e.preventDefault()
+  }
+
+  const applyPricePanStep = (fromY, toY) => {
+    if (!mainSeries || fromY == null) return
+    if (
+      scrollMarketChartPriceByPixels(mainSeries, fromY, toY, plotBottomLocalY())
+    ) {
+      onUserPricePan?.()
+    }
+  }
+
+  const applyPanStep = (local) => {
+    if (lastLocalX != null) queuePanDelta(local.x - lastLocalX)
+    if (lastLocalY != null) applyPricePanStep(lastLocalY, local.y)
+    lastLocalX = local.x
+    lastLocalY = local.y
   }
 
   const flushPan = () => {
@@ -171,17 +251,17 @@ export function bindMarketChartPanPointer(el, chart, opts = {}) {
       const ldx = local.x - startLocalX
       const ldy = local.y - startLocalY
       if (Math.hypot(ldx, ldy) < PAN_GESTURE_SLOP_PX) return
-      startPan(e, local.x)
+      startPan(e, local.x, local.y)
       queuePanDelta(ldx)
+      applyPricePanStep(startLocalY, local.y)
+      lastLocalX = local.x
+      lastLocalY = local.y
       return
     }
 
     if (mode === 'pan') {
       e.preventDefault()
-      if (lastLocalX != null) {
-        queuePanDelta(local.x - lastLocalX)
-      }
-      lastLocalX = local.x
+      applyPanStep(local)
     }
   }
 

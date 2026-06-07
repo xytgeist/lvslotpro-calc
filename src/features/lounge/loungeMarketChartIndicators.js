@@ -3,7 +3,8 @@
  * @typedef {{ time: number, value: number }} ChartPoint
  */
 
-import { HistogramSeries, LineSeries } from 'lightweight-charts'
+import { HistogramSeries, LineSeries, LineStyle } from 'lightweight-charts'
+import { applyMarketChartSubPanePriceScale } from './loungeMarketChartViewMode.js'
 
 /** @typedef {'overlay' | 'oscillator'} MarketChartIndicatorKind */
 
@@ -206,7 +207,7 @@ export function computeMarketChartOverlayLines(barPoints, activeIds) {
  * @param {import('lightweight-charts').ISeriesApi} mainSeries
  * @param {ChartPoint[]} barPoints
  * @param {Set<string>|string[]} activeIds
- * @param {{ isLight?: boolean }} [opts]
+ * @param {{ isLight?: boolean, panePlan?: import('./loungeMarketChartPanes.js').MarketChartPanePlan }} [opts]
  * @returns {import('lightweight-charts').ISeriesApi[]}
  */
 export function attachMarketChartIndicators(chart, mainSeries, barPoints, activeIds, opts = {}) {
@@ -215,18 +216,8 @@ export function attachMarketChartIndicators(chart, mainSeries, barPoints, active
   const created = []
   if (!barPoints.length) return created
 
-  const volReserve = Number(opts.volumePaneFraction) || 0
-  const oscillators = MARKET_CHART_INDICATORS.filter((row) => row.kind === 'oscillator' && ids.has(row.id))
-  const hasOscillator = oscillators.length > 0
-
-  if (hasOscillator) {
-    mainSeries.priceScale().applyOptions({
-      scaleMargins: {
-        top: 0.06,
-        bottom: (oscillators.length > 1 ? 0.42 : 0.34) + volReserve,
-      },
-    })
-  }
+  const oscPaneById = new Map((opts.panePlan?.oscillatorPanes ?? []).map((row) => [row.id, row.paneIndex]))
+  const oscillatorCount = opts.panePlan?.oscillatorCount ?? 0
 
   const addOverlayLine = (data, color, lineWidth = 1, lineStyle = 0) => {
     if (!data.length) return
@@ -255,42 +246,58 @@ export function attachMarketChartIndicators(chart, mainSeries, barPoints, active
     addOverlayLine(bb.lower, '#64748b', 1, 2)
   }
 
-  const oscSlotCount = oscillators.length
 
   if (ids.has('rsi14')) {
-    const scaleId = 'rsi'
-    const top = oscSlotCount > 1 ? 0.58 : 0.66
-    const bottom = (oscSlotCount > 1 ? 0.22 : 0.02) + volReserve
-    const rsi = chart.addSeries(LineSeries, {
-      color: '#c084fc',
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
-      priceScaleId: scaleId,
-      priceFormat: { type: 'price', precision: 0, minMove: 1 },
-    })
+    const paneIndex = oscPaneById.get('rsi14') ?? 2
+    const rsi = chart.addSeries(
+      LineSeries,
+      {
+        color: '#c084fc',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: false,
+        priceFormat: { type: 'price', precision: 0, minMove: 1 },
+      },
+      paneIndex,
+    )
     rsi.setData(computeRsiSeries(barPoints, 14))
     created.push(rsi)
-    chart.priceScale(scaleId).applyOptions({
-      scaleMargins: { top, bottom },
-      borderVisible: false,
+    applyMarketChartSubPanePriceScale(chart, paneIndex, opts.isLight)
+    rsi.createPriceLine({
+      price: 70,
+      color: opts.isLight ? 'rgba(113, 113, 122, 0.35)' : 'rgba(161, 161, 170, 0.35)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      lineVisible: true,
+      axisLabelVisible: true,
+      title: '',
+    })
+    rsi.createPriceLine({
+      price: 30,
+      color: opts.isLight ? 'rgba(113, 113, 122, 0.35)' : 'rgba(161, 161, 170, 0.35)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      lineVisible: true,
+      axisLabelVisible: true,
+      title: '',
     })
   }
 
   if (ids.has('macd')) {
     const { macdLine, signalLine, histogram } = computeMacdSeries(barPoints)
-    const scaleId = 'macd'
-    const top = oscSlotCount > 1 ? 0.86 : 0.66
-    const bottom = 0.02 + volReserve
+    const paneIndex = oscPaneById.get('macd') ?? (oscillatorCount > 1 ? 3 : 2)
     const upColor = opts.isLight ? '#16a34a' : '#22c55e'
     const downColor = opts.isLight ? '#dc2626' : '#ef4444'
-    const hist = chart.addSeries(HistogramSeries, {
-      priceScaleId: scaleId,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      base: 0,
-    })
+    const hist = chart.addSeries(
+      HistogramSeries,
+      {
+        priceLineVisible: false,
+        lastValueVisible: false,
+        base: 0,
+      },
+      paneIndex,
+    )
     hist.setData(
       histogram.map((p) => ({
         time: p.time,
@@ -299,28 +306,33 @@ export function attachMarketChartIndicators(chart, mainSeries, barPoints, active
       })),
     )
     created.push(hist)
-    chart.priceScale(scaleId).applyOptions({
-      scaleMargins: { top, bottom },
-      borderVisible: false,
-    })
-    const macd = chart.addSeries(LineSeries, {
-      color: '#38bdf8',
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
-      priceScaleId: scaleId,
-    })
+    applyMarketChartSubPanePriceScale(chart, paneIndex, opts.isLight)
+    const macd = chart.addSeries(
+      LineSeries,
+      {
+        color: '#38bdf8',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: false,
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+      },
+      paneIndex,
+    )
     macd.setData(macdLine)
     created.push(macd)
-    const signal = chart.addSeries(LineSeries, {
-      color: '#fb923c',
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
-      priceScaleId: scaleId,
-    })
+    const signal = chart.addSeries(
+      LineSeries,
+      {
+        color: '#fb923c',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+      },
+      paneIndex,
+    )
     signal.setData(signalLine)
     created.push(signal)
   }

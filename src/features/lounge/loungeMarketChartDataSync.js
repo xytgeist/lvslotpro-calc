@@ -21,7 +21,7 @@ import { loungeMarketBarsToCandlestickSeries } from './loungeMarketChartTypes.js
  *   chartType: string,
  *   activeIndicators: Set<string>,
  *   isLight?: boolean,
- *   volumePaneFraction?: number,
+ *   panePlan?: import('./loungeMarketChartPanes.js').MarketChartPanePlan,
  *   applyPriceRange?: (barPoints: Array<{ time: number, value: number }>, overlayLines: unknown[]) => void,
  * }} ctx
  * @returns {{ volumeSeries: import('lightweight-charts').ISeriesApi | null, indicatorSeries: import('lightweight-charts').ISeriesApi[] }}
@@ -35,7 +35,7 @@ export function refreshAdvancedMarketChartData(ctx) {
     chartType,
     activeIndicators,
     isLight = false,
-    volumePaneFraction,
+    panePlan,
     applyPriceRange,
   } = ctx
   let { volumeSeries } = ctx
@@ -49,8 +49,11 @@ export function refreshAdvancedMarketChartData(ctx) {
 
   if (volumeSeries) {
     volumeSeries.setData(loungeMarketBarsToVolumeSeries(rawBars, isLight))
-  } else if (volumePaneFraction) {
-    volumeSeries = attachMarketChartVolumePane(chart, rawBars, { isLight, paneFraction: volumePaneFraction })
+  } else if (panePlan) {
+    volumeSeries = attachMarketChartVolumePane(chart, rawBars, {
+      isLight,
+      paneIndex: panePlan.volumePaneIndex,
+    })
   }
 
   for (const series of indicatorSeries) {
@@ -62,7 +65,7 @@ export function refreshAdvancedMarketChartData(ctx) {
   }
   const nextIndicators = attachMarketChartIndicators(chart, mainSeries, barPoints, activeIndicators, {
     isLight,
-    volumePaneFraction,
+    panePlan,
   })
 
   if (typeof applyPriceRange === 'function') {

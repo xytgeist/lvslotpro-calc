@@ -2,6 +2,7 @@
 
 import { HistogramSeries } from 'lightweight-charts'
 import { loungeMarketBarsToSeries } from './loungeMarketChartTheme.js'
+import { applyMarketChartSubPanePriceScale } from './loungeMarketChartViewMode.js'
 
 /** Bottom strip height as a fraction of chart height. */
 export const MARKET_CHART_VOLUME_PANE_FRACTION = 0.18
@@ -46,30 +47,23 @@ export function loungeMarketBarsToVolumeSeries(rawBars, isLight = false) {
 /**
  * @param {import('lightweight-charts').IChartApi} chart
  * @param {Array<{ t: number, c: number, v?: number }>} rawBars
- * @param {{ isLight?: boolean, paneFraction?: number }} [opts]
+ * @param {{ isLight?: boolean, paneIndex?: number }} [opts]
  */
 export function attachMarketChartVolumePane(chart, rawBars, opts = {}) {
-  const { isLight = false, paneFraction = MARKET_CHART_VOLUME_PANE_FRACTION } = opts
+  const { isLight = false, paneIndex = 1 } = opts
   const data = loungeMarketBarsToVolumeSeries(rawBars, isLight)
   if (!data.length) return null
 
-  const series = chart.addSeries(HistogramSeries, {
-    priceScaleId: 'volume',
-    priceLineVisible: false,
-    lastValueVisible: false,
-    priceFormat: { type: 'volume' },
-  })
+  const series = chart.addSeries(
+    HistogramSeries,
+    {
+      priceLineVisible: false,
+      lastValueVisible: true,
+      priceFormat: { type: 'volume' },
+    },
+    paneIndex,
+  )
   series.setData(data)
-  chart.priceScale('volume').applyOptions({
-    scaleMargins: { top: 1 - paneFraction, bottom: 0 },
-    borderVisible: false,
-  })
+  applyMarketChartSubPanePriceScale(chart, paneIndex, isLight)
   return series
-}
-
-/** Extra bottom margin on the main price scale when volume (+ optional oscillators) are shown. */
-export function marketChartMainBottomMarginWithVolume(hasOscillatorPane, oscillatorCount = 0) {
-  const vol = MARKET_CHART_VOLUME_PANE_FRACTION
-  if (!hasOscillatorPane) return vol + 0.04
-  return vol + (oscillatorCount > 1 ? 0.28 : 0.22) + 0.04
 }

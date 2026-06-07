@@ -10,15 +10,14 @@ const MAX_RANGE_RATIO = 50
  * @param {number} clientY
  * @param {DOMRect} hostRect
  * @param {number} priceScaleWidth
- * @param {number} [bottomExcludeFraction] fraction of chart height reserved below main price scale (volume / oscillators)
+ * @param {number} [maxPlotLocalY] max Y in host-local coords for the main price pane (excludes volume / oscillators)
  */
-export function marketChartPriceAxisHit(clientX, clientY, hostRect, priceScaleWidth, bottomExcludeFraction = 0) {
+export function marketChartPriceAxisHit(clientX, clientY, hostRect, priceScaleWidth, maxPlotLocalY = Infinity) {
   if (!hostRect?.width || !priceScaleWidth) return false
   const relX = clientX - hostRect.left
   const relY = clientY - hostRect.top
   if (relX < hostRect.width - priceScaleWidth) return false
-  const mainBottom = hostRect.height * (1 - bottomExcludeFraction)
-  if (relY > mainBottom) return false
+  if (relY > maxPlotLocalY) return false
   return true
 }
 
@@ -38,7 +37,8 @@ export function zoomMarketChartPriceScale(mainSeries, deltaPx, anchorClientY, ho
   if (!Number.isFinite(span) || span <= 0) return false
 
   const sens = mode === 'drag' ? DRAG_ZOOM_SENS : WHEEL_ZOOM_SENS
-  const signedDelta = mode === 'drag' ? -deltaPx : deltaPx
+  // Drag/wheel delta: up / scroll-up → zoom in; down → zoom out.
+  const signedDelta = deltaPx
   const factor = Math.exp(signedDelta * sens)
   const dataSpan = span
   let newSpan = span * factor
@@ -61,17 +61,20 @@ export function zoomMarketChartPriceScale(mainSeries, deltaPx, anchorClientY, ho
  * @param {HTMLElement} el
  * @param {import('lightweight-charts').IChartApi} chart
  * @param {import('lightweight-charts').ISeriesApi} mainSeries
- * @param {{ bottomExcludeFraction?: number, onUserZoom?: () => void, onReset?: () => void }} [opts]
+ * @param {{ maxPlotLocalY?: number | (() => number | null), onUserZoom?: () => void, onReset?: () => void }} [opts]
  */
 export function bindMarketChartPriceAxisZoom(el, chart, mainSeries, opts = {}) {
-  const bottomExcludeFraction = Number(opts.bottomExcludeFraction) || 0
+  const readMaxPlotY = () => {
+    const v = typeof opts.maxPlotLocalY === 'function' ? opts.maxPlotLocalY() : opts.maxPlotLocalY
+    return Number.isFinite(v) ? v : Infinity
+  }
   const onUserZoom = typeof opts.onUserZoom === 'function' ? opts.onUserZoom : null
   const onReset = typeof opts.onReset === 'function' ? opts.onReset : null
 
   const readWidth = () => chart.priceScale('right').width() || 52
 
   const hit = (clientX, clientY) =>
-    marketChartPriceAxisHit(clientX, clientY, el.getBoundingClientRect(), readWidth(), bottomExcludeFraction)
+    marketChartPriceAxisHit(clientX, clientY, el.getBoundingClientRect(), readWidth(), readMaxPlotY())
 
   let dragging = false
   let activePointerId = null

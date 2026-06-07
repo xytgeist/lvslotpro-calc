@@ -132,7 +132,44 @@ export function marketChartAdvancedPriceScaleOptions(isLight = false) {
     borderColor: chartAxisBorderColor(isLight),
     alignLabels: true,
     minimumWidth: 52,
+    ticksVisible: true,
+    textColor: isLight ? '#71717a' : '#a1a1aa',
   }
+}
+
+/** Pane separator styling for Advanced multi-pane charts. */
+export function marketChartAdvancedLayoutPanesOptions(isLight = false) {
+  return {
+    panes: {
+      separatorColor: chartAxisBorderColor(isLight),
+      separatorHoverColor: isLight ? 'rgba(113, 113, 122, 0.45)' : 'rgba(161, 161, 170, 0.45)',
+      enableResize: true,
+    },
+  }
+}
+
+/** Visible right price scale for volume / RSI / MACD panes. */
+export function marketChartSubPanePriceScaleOptions(isLight = false) {
+  return {
+    visible: true,
+    borderVisible: true,
+    borderColor: chartAxisBorderColor(isLight),
+    alignLabels: true,
+    minimumWidth: 52,
+    ticksVisible: true,
+    textColor: isLight ? '#71717a' : '#a1a1aa',
+    scaleMargins: { top: 0.1, bottom: 0.1 },
+  }
+}
+
+/**
+ * Configure the dedicated right price scale on a sub-pane (volume / oscillator).
+ * @param {import('lightweight-charts').IChartApi} chart
+ * @param {number} paneIndex
+ * @param {boolean} [isLight]
+ */
+export function applyMarketChartSubPanePriceScale(chart, paneIndex, isLight = false) {
+  chart.priceScale('right', paneIndex).applyOptions(marketChartSubPanePriceScaleOptions(isLight))
 }
 
 /** Pinch / double-tap scale for Advanced fullscreen (time axis only; price uses custom axis zoom). */
