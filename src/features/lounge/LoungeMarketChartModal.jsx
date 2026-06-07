@@ -1007,12 +1007,17 @@ export default function LoungeMarketChartModal({
 
       const run = () => {
         if (!chartRef.current || !mainSeriesRef.current) return
-        const barPoints = loungeMarketBarsToSeries(nextAll)
-        const overlayLines = computeMarketChartOverlayLines(barPoints, nextAll, activeIndicators)
+        const chart = chartRef.current
+        const mainSeries = mainSeriesRef.current
+        const ts = chart.timeScale()
+        const logicalRange = ts.getVisibleLogicalRange()
+        const priceScale = mainSeries.priceScale()
+        const priceRange = priceScale.getVisibleRange()
         const panePlan = computeMarketChartPanePlan(activeIndicators)
+        const host = advancedChartHostRef.current
         const refreshed = refreshAdvancedMarketChartData({
-          chart: chartRef.current,
-          mainSeries: mainSeriesRef.current,
+          chart,
+          mainSeries,
           volumeSeries: volumeSeriesRef.current,
           indicatorSeries: indicatorSeriesRef.current,
           rawBars: nextAll,
@@ -1020,19 +1025,27 @@ export default function LoungeMarketChartModal({
           activeIndicators,
           isLight,
           panePlan,
-          applyPriceRange: priceScaleUserPinnedRef.current
-            ? undefined
-            : () => {
-                applyMarketChartPriceRange(mainSeriesRef.current, barPoints, overlayLines, {
-                  keepMargins: true,
-                  chartType: effectiveChartType,
-                  rawBars: nextAll,
-                })
-              },
+          // Prepend only — never re-fit Y/time to the full merged series.
+          applyPriceRange: undefined,
         })
         volumeSeriesRef.current = refreshed.volumeSeries
         indicatorSeriesRef.current = refreshed.indicatorSeries
-        shiftMarketChartLogicalRange(chartRef.current, added)
+        if (priceRange && Number.isFinite(priceRange.from) && Number.isFinite(priceRange.to)) {
+          priceScale.applyOptions({ autoScale: false })
+          priceScale.setVisibleRange(priceRange)
+        }
+        if (logicalRange && Number.isFinite(logicalRange.from) && Number.isFinite(logicalRange.to)) {
+          ts.setVisibleLogicalRange({
+            from: logicalRange.from + added,
+            to: logicalRange.to + added,
+          })
+        } else {
+          shiftMarketChartLogicalRange(chart, added)
+        }
+        if (host && panePlan) {
+          applyMarketChartPaneHeights(chart, host.clientHeight, panePlan)
+          setSubPaneAxisTitles(measureMarketChartSubPaneAxisTitles(chart, panePlan))
+        }
         advancedBarsSignatureRef.current = marketChartBarsSignature(nextAll)
         historyAckBarsRef.current?.()
       }
@@ -1098,6 +1111,7 @@ export default function LoungeMarketChartModal({
         const added = nextAll.length - prevAll.length
         setHistoryBars((prev) => mergeMarketBarsOlder(prev, incoming))
         allBarsRef.current = nextAll
+        advancedBarsSignatureRef.current = marketChartBarsSignature(nextAll)
         marketChartPanDebug('history got bars', { incoming: incoming.length, added, oldestT })
         applyAdvancedHistoryBars(nextAll, added)
         if (data.has_more === false) setHistoryHasMore(false)
@@ -1545,7 +1559,6 @@ export default function LoungeMarketChartModal({
     advancedFullscreenOpen,
     isAdvancedView,
     advancedSeries?.bars,
-    historyBars,
     effectiveChartType,
     activeIndicatorKey,
     isLight,
