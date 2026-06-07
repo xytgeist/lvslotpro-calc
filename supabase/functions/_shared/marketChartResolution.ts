@@ -216,6 +216,7 @@ async function fetchRawBarsForWindow(
   config: MarketChartResolutionConfig,
   fromSec: number,
   toSec: number,
+  coinId?: string,
 ): Promise<MarketBar[]> {
   if (assetClass === 'stock' && STOCK_RTH_RESOLUTIONS.has(config.id)) {
     return fetchStockRthSessionBars(symbol, config, fromSec, toSec)
@@ -242,7 +243,7 @@ async function fetchRawBarsForWindow(
   }
   if (bars.length < 2 && assetClass === 'crypto') {
     const lookbackDays = Math.min(config.maxLookbackDays, Math.max(1, Math.ceil((toSec - fromSec) / 86400) + 2))
-    bars = await coingeckoCryptoCandlesForAdvanced(symbol, lookbackDays, 500)
+    bars = await coingeckoCryptoCandlesForAdvanced(symbol, lookbackDays, 500, coinId)
   }
 
   bars = normalizeMarketBars(bars)
@@ -265,6 +266,7 @@ export async function resolveMarketSeriesByResolution(
   assetClass: MarketAssetClass,
   resolutionId: string,
   barLimit?: number,
+  coinId?: string,
 ): Promise<{ bars: MarketBar[]; hasMore: boolean; windowLabel: string }> {
   const config = getMarketChartResolution(resolutionId)
   const limit = Math.min(500, Math.max(10, Math.floor(barLimit || config.initialBars)))
@@ -277,7 +279,7 @@ export async function resolveMarketSeriesByResolution(
   }
 
   const fromSec = Math.max(minFromSec, now - fetchSpanSec(config, limit))
-  const raw = await fetchRawBarsForWindow(symbol, assetClass, config, fromSec, now)
+  const raw = await fetchRawBarsForWindow(symbol, assetClass, config, fromSec, now, coinId)
   const bars = takeLastBars(raw, limit)
   const hasMore = bars.length >= 2 && barUnixSec(bars[0].t) > minFromSec
   return { bars, hasMore, windowLabel: config.label }
@@ -289,6 +291,7 @@ export async function resolveMarketBarsBeforeByResolution(
   resolutionId: string,
   beforeSec: number,
   barLimit?: number,
+  coinId?: string,
 ): Promise<{ bars: MarketBar[]; hasMore: boolean }> {
   const anchor = Math.floor(beforeSec)
   if (!Number.isFinite(anchor) || anchor <= 0) return { bars: [], hasMore: false }
@@ -305,7 +308,7 @@ export async function resolveMarketBarsBeforeByResolution(
 
   const endSec = anchor - 1
   const fromSec = Math.max(minFromSec, endSec - fetchSpanSec(config, limit))
-  const raw = await fetchRawBarsForWindow(symbol, assetClass, config, fromSec, endSec)
+  const raw = await fetchRawBarsForWindow(symbol, assetClass, config, fromSec, endSec, coinId)
   const clipped = clipBarsBefore(raw, anchor)
   const bars = takeLastBars(clipped, limit)
   const hasMore = bars.length >= 2 && barUnixSec(bars[0].t) > minFromSec

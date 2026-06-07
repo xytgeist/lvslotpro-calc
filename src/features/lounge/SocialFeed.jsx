@@ -11507,7 +11507,7 @@ export default function SocialFeed({
   ])
 
   const submitLoungePost = useCallback(async () => {
-    const caption = postText.trim()
+    const caption = normalizeFeedCaption(postText)
     setPostErr('')
     const gifCheck = validateAtMostOneGifUrl(composerMediaUrl)
     if (!gifCheck.ok) {

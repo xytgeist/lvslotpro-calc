@@ -9,7 +9,13 @@ import {
   normalizeMarketBarPoint,
   type MarketBarOhlc,
 } from './marketBarOhlc.ts'
-import { coingeckoBatchPickerQuotes, coingeckoCryptoCandles, coingeckoCryptoProfile, coingeckoMarketSearch } from './coingeckoMarket.ts'
+import {
+  coingeckoBatchPickerQuotes,
+  coingeckoCryptoCandles,
+  coingeckoCryptoProfile,
+  coingeckoMarketCapUsd,
+  coingeckoMarketSearch,
+} from './coingeckoMarket.ts'
 import {
   isUsableStockIntradayBars,
   isUsEquityRegularSessionOpen,
@@ -18,6 +24,16 @@ import {
   regularSessionDaysBack,
 } from './usEquityMarketSession.ts'
 import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooResolveUsEquityCashtag, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
+import { isCommonCryptoCashtag, coingeckoCoinIdForTicker } from './marketCashtagCrypto.ts'
+
+export type MarketProfile = {
+  name: string
+  exchange: string
+  logo: string
+  marketCapitalization: number | null
+  currency: string
+  coinId?: string
+}
 
 export type MarketBar = MarketBarOhlc
 export type MarketAssetClass = 'stock' | 'crypto'
@@ -44,6 +60,10 @@ export type MarketEmbed = {
   }
   bars: MarketBar[]
   og_image_url: string
+  /** CoinGecko id — crypto only; avoids `/search` on rolling/modal candles. */
+  coin_id?: string
+  /** ISO timestamp when name/logo/mcap were last resolved. */
+  metadata_as_of?: string
 }
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
@@ -115,6 +135,10 @@ export async function resolveCashtagTicker(
 ): Promise<{ symbol: string; asset_class: MarketAssetClass } | null> {
   const upper = String(tag || '').trim().toUpperCase()
   if (!upper) return null
+
+  if (isCommonCryptoCashtag(upper)) {
+    return { symbol: finnhubSymbolForAsset(upper, 'crypto'), asset_class: 'crypto' }
+  }
 
   const direct = await yahooResolveUsEquityCashtag(upper).catch(() => null)
   if (direct) return direct
@@ -573,6 +597,7 @@ export async function resolveMarketBars(
   assetClass: MarketAssetClass,
   windowKey: MarketWindowKey,
   quote: { price: number; change_pct: number },
+  opts?: { coinId?: string },
 ): Promise<MarketBar[]> {
   if (assetClass === 'stock' && (windowKey === '24h' || windowKey === '1h')) {
     return resolveStockIntradayBars(symbol, windowKey)
@@ -605,7 +630,7 @@ export async function resolveMarketBars(
   }
 
   if (assetClass === 'crypto') {
-    bars = await coingeckoCryptoCandles(symbol, windowKey)
+    bars = await coingeckoCryptoCandles(symbol, windowKey, opts?.coinId)
     if (bars.length >= 2) {
       bars = bars.filter((b) => {
         const t = Math.floor(b.t > 1e12 ? b.t / 1000 : b.t)
@@ -1150,16 +1175,18 @@ export async function enrichSearchResultsWithLogos<
   return enriched
 }
 
-export async function finnhubProfile(symbol: string, assetClass: MarketAssetClass) {
+export async function finnhubProfile(symbol: string, assetClass: MarketAssetClass): Promise<MarketProfile> {
   const finnhubSym = finnhubSymbolForAsset(symbol, assetClass)
   if (assetClass === 'crypto') {
     const cg = await coingeckoCryptoProfile(finnhubSym)
+    const display = normalizeDisplaySymbol(finnhubSym, assetClass)
     return {
-      name: cg.name || normalizeDisplaySymbol(finnhubSym, assetClass),
+      name: cg.name || display,
       exchange: 'Crypto',
       logo: cg.logo,
       marketCapitalization: cg.marketCapUsd,
       currency: 'USD',
+      coinId: cg.coinId || coingeckoCoinIdForTicker(display) || undefined,
     }
   }
   try {
@@ -1184,6 +1211,26 @@ export async function finnhubProfile(symbol: string, assetClass: MarketAssetClas
     if (yahoo) return yahoo
     throw new Error(`Profile unavailable for ${finnhubSym}`)
   }
+}
+
+/** Fresh USD market cap for modal header — not served from registry cold cache. */
+export async function fetchLiveMarketCapUsd(
+  symbol: string,
+  assetClass: MarketAssetClass,
+  coinId?: string,
+): Promise<number | null> {
+  if (assetClass === 'crypto') {
+    const finnhubSym = finnhubSymbolForAsset(symbol, assetClass)
+    const display = normalizeDisplaySymbol(finnhubSym, assetClass)
+    const id = String(coinId || '').trim() || coingeckoCoinIdForTicker(display)
+    if (!id) return null
+    return coingeckoMarketCapUsd(id)
+  }
+  const yahoo = await yahooStockProfile(symbol)
+  if (yahoo?.marketCapitalization != null && yahoo.marketCapitalization > 0) {
+    return yahoo.marketCapitalization
+  }
+  return null
 }
 
 export async function finnhubQuote(symbol: string, assetClass: MarketAssetClass) {
@@ -1413,7 +1460,9 @@ export async function buildMarketEmbed(
     finnhubProfile(symbol, assetClass),
     finnhubQuote(symbol, assetClass),
   ])
-  const bars = await resolveMarketBars(symbol, assetClass, candleWindow, quote)
+  const bars = await resolveMarketBars(symbol, assetClass, candleWindow, quote, {
+    coinId: assetClass === 'crypto' ? profile.coinId : undefined,
+  })
   let quoteOut = {
     price: quote.price,
     change_pct: quote.change_pct,
@@ -1459,17 +1508,20 @@ export async function buildMarketEmbed(
     quote: quoteUsd,
     bars: barsUsd,
     og_image_url: '',
+    ...(assetClass === 'crypto' && profile.coinId ? { coin_id: profile.coinId } : {}),
+    metadata_as_of: new Date().toISOString(),
   }
 }
 
 export async function buildRollingBatchPayload(
   symbol: string,
   assetClass: MarketAssetClass,
+  opts?: { coinId?: string },
 ): Promise<{ quote: MarketEmbed['quote']; bars: MarketBar[]; window_label: string }> {
   // Rolling poll: quote + mini-chart only — name/logo/mcap/currency come from attach embed.
   const currency = 'USD'
   const quote = await finnhubQuote(symbol, assetClass)
-  const bars = await resolveMarketBars(symbol, assetClass, '24h', quote)
+  const bars = await resolveMarketBars(symbol, assetClass, '24h', quote, { coinId: opts?.coinId })
   let changePct = quote.change_pct
   let quoteOut: MarketEmbed['quote'] = { ...quote }
   if (bars.length >= 2) {

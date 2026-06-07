@@ -7,6 +7,7 @@ import {
   aggregateMarketBarsToBucketSec,
   type MarketBarOhlc,
 } from './marketBarOhlc.ts'
+import { isCommonCryptoCashtag } from './marketCashtagCrypto.ts'
 
 const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart'
 const YAHOO_SEARCH = 'https://query1.finance.yahoo.com/v1/finance/search'
@@ -173,6 +174,7 @@ export async function yahooResolveUsEquityCashtag(
 ): Promise<{ symbol: string; asset_class: 'stock' } | null> {
   const upper = String(tag || '').trim().toUpperCase()
   if (!upper || !/^[A-Z][A-Z0-9.-]{0,14}$/.test(upper)) return null
+  if (isCommonCryptoCashtag(upper)) return null
 
   const meta = await yahooChartMetaPicker(upper)
   if (!meta) return null

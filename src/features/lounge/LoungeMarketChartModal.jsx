@@ -21,6 +21,7 @@ import {
   formatMarketPrice,
   marketEmbedCacheKey,
   marketEmbedSearchCashtag,
+  coingeckoCoinIdForTicker,
   pickRollingMarketPayload,
   MARKET_MODAL_DEFAULT_TIMEFRAME_IDX,
   MARKET_MODAL_TIMEFRAMES,
@@ -761,6 +762,17 @@ function shouldIgnoreSheetDragTarget(target) {
   return Boolean(target.closest('button, a, input, textarea, select, [data-market-sheet-no-drag]'))
 }
 
+function modalCoinIdForEmbed(embed) {
+  if (!embed) return undefined
+  const fromEmbed = String(embed.coin_id || '').trim()
+  if (fromEmbed) return fromEmbed
+  if (embed.asset_class === 'crypto') {
+    const mapped = coingeckoCoinIdForTicker(embed.display_symbol || embed.symbol)
+    return mapped || undefined
+  }
+  return undefined
+}
+
 /** Match fetched modal series to active embed + timeframe pill. */
 function modalSeriesScopeKey(active, timeframeIdx) {
   if (!active) return ''
@@ -859,6 +871,7 @@ export default function LoungeMarketChartModal({
   const [timeframeIdx, setTimeframeIdx] = useState(0)
   const [series, setSeries] = useState(/** @type {{ quote?: object, bars?: object[], window_label?: string } | null} */ (null))
   const [seriesScope, setSeriesScope] = useState('')
+  const [liveMarketCap, setLiveMarketCap] = useState(/** @type {number | null} */ (null))
   const loadSeriesGenRef = useRef(0)
   const loadAdvancedSeriesGenRef = useRef(0)
   const [historyBars, setHistoryBars] = useState(/** @type {object[]} */ ([]))
@@ -1326,6 +1339,7 @@ export default function LoungeMarketChartModal({
     loadSeriesGenRef.current += 1
     setSeries(null)
     setSeriesScope('')
+    setLiveMarketCap(null)
     setHistoryBars([])
     setHistoryHasMore(true)
     historyLoadingRef.current = false
@@ -1364,6 +1378,7 @@ export default function LoungeMarketChartModal({
         asset_class: active.asset_class,
         resolution: advancedResolutionId,
         bar_limit: resolution.initialBars,
+        coin_id: modalCoinIdForEmbed(active),
       })
       if (gen !== loadAdvancedSeriesGenRef.current) return
       if (data) {
@@ -1375,6 +1390,9 @@ export default function LoungeMarketChartModal({
         })
         setAdvancedSeriesScope(scope)
         setHistoryHasMore(data.has_more !== false)
+        if (data.market_cap != null && Number.isFinite(Number(data.market_cap))) {
+          setLiveMarketCap(Number(data.market_cap))
+        }
       }
     } finally {
       if (gen === loadAdvancedSeriesGenRef.current) setAdvancedLoading(false)
@@ -1398,6 +1416,7 @@ export default function LoungeMarketChartModal({
         asset_class: active.asset_class,
         kind: tf.kind,
         window_key: tf.windowKey,
+        coin_id: modalCoinIdForEmbed(active),
       })
       if (gen !== loadSeriesGenRef.current) return
       if (data) {
@@ -1407,6 +1426,9 @@ export default function LoungeMarketChartModal({
           window_label: data.window_label,
         })
         setSeriesScope(scope)
+        if (data.market_cap != null && Number.isFinite(Number(data.market_cap))) {
+          setLiveMarketCap(Number(data.market_cap))
+        }
       }
     } finally {
       if (gen === loadSeriesGenRef.current) setLoading(false)
@@ -1621,6 +1643,7 @@ export default function LoungeMarketChartModal({
           resolution: advancedResolutionId,
           bar_limit: resolution.chunkBars,
           before_sec: beforeSec,
+          coin_id: modalCoinIdForEmbed(active),
         })
         if (!data) {
           marketChartPanDebug('history empty response')
@@ -2677,7 +2700,9 @@ export default function LoungeMarketChartModal({
               </div>
               <div className={`truncate text-[13px] leading-snug ${mutedClass}`}>
                 ${active?.display_symbol}
-                {active?.market_cap != null ? ` · ${formatMarketCap(active.market_cap)} MC` : ''}
+                {(liveMarketCap ?? active?.market_cap) != null
+                  ? ` · ${formatMarketCap(liveMarketCap ?? active.market_cap)} MC`
+                  : ''}
               </div>
             </div>
             <div className="shrink-0 text-right">

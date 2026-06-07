@@ -4,6 +4,7 @@ import {
   cashtagFinnhubSymbol,
   extractCashtagsFromCaption,
   guessCashtagAssetClass,
+  coingeckoCoinIdForTicker,
   normalizeMarketEmbeds,
 } from '../../utils/loungeMarketCaptionParse.js'
 import { loungeMarketBatchRolling } from '../../utils/loungeMarketApi.js'
@@ -23,7 +24,7 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
   const inflightRef = useRef(false)
 
   const symbolItems = useMemo(() => {
-    /** @type {Array<{ symbol: string, asset_class: string, cacheKey: string, displayTicker: string }>} */
+    /** @type {Array<{ symbol: string, asset_class: string, cacheKey: string, displayTicker: string, coin_id?: string }>} */
     const items = []
     const seen = new Set()
     const embedClassByTicker = new Map()
@@ -35,18 +36,22 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
       }
     }
 
-    const addItem = (displayTicker, assetClass, finnhubSymbol) => {
+    const addItem = (displayTicker, assetClass, finnhubSymbol, coinId = '') => {
       const ticker = String(displayTicker || '').trim().toUpperCase()
       const sym = String(finnhubSymbol || '').trim()
       if (!ticker || !sym) return
       const cacheKey = `${assetClass}:${sym}`.toLowerCase()
       if (seen.has(cacheKey)) return
       seen.add(cacheKey)
+      const resolvedCoinId =
+        String(coinId || '').trim() ||
+        (assetClass === 'crypto' ? coingeckoCoinIdForTicker(ticker) : '')
       items.push({
         symbol: sym,
         asset_class: assetClass,
         cacheKey,
         displayTicker: ticker,
+        ...(resolvedCoinId ? { coin_id: resolvedCoinId } : {}),
       })
     }
 
@@ -54,7 +59,7 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
       for (const embed of normalizeMarketEmbeds(post?.market_embeds)) {
         if (embed.kind !== 'rolling') continue
         const ticker = String(embed.display_symbol || embed.symbol || '').trim().toUpperCase()
-        addItem(ticker, embed.asset_class, embed.symbol)
+        addItem(ticker, embed.asset_class, embed.symbol, embed.coin_id)
       }
 
       const caption = feedPostDisplayCaption(post)
@@ -97,7 +102,11 @@ export function LoungeMarketFeedProvider({ supabaseClient, posts, children }) {
     try {
       const batch = await loungeMarketBatchRolling(
         supabaseClient,
-        pollItems.map(({ symbol, asset_class }) => ({ symbol, asset_class })),
+        pollItems.map(({ symbol, asset_class, coin_id }) => ({
+          symbol,
+          asset_class,
+          ...(coin_id ? { coin_id } : {}),
+        })),
         { refresh: options.forceRefresh === true },
       )
       if (!batch || typeof batch !== 'object') return

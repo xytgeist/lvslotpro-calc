@@ -139,6 +139,7 @@ export async function loungeMarketModalSeries(supabase, opts) {
     asset_class: opts.asset_class,
     kind: opts.kind || 'rolling',
     window_key: opts.window_key || '24h',
+    ...(opts.coin_id ? { coin_id: opts.coin_id } : {}),
     ...(opts.resolution ? { resolution: opts.resolution } : {}),
     ...(opts.bar_limit != null ? { bar_limit: opts.bar_limit } : {}),
   })
@@ -159,6 +160,7 @@ export async function loungeMarketModalSeriesBefore(supabase, opts) {
     kind: opts.kind || 'historical',
     window_key: opts.window_key || '24h',
     before_sec: opts.before_sec,
+    ...(opts.coin_id ? { coin_id: opts.coin_id } : {}),
     ...(opts.resolution ? { resolution: opts.resolution } : {}),
     ...(opts.bar_limit != null ? { bar_limit: opts.bar_limit } : {}),
   })

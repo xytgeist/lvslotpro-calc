@@ -7,6 +7,7 @@ import {
   embedQuoteCurrency,
   enrichSearchResultsForPicker,
   finnhubLatestNews,
+  fetchLiveMarketCapUsd,
   finnhubProfile,
   finnhubQuote,
   finnhubSymbolForAsset,
@@ -22,6 +23,7 @@ import {
   sortMarketSearchResults,
   type MarketAssetClass,
   type MarketEmbed,
+  type MarketProfile,
   type MarketWindowKey,
 } from '../_shared/finnhubMarket.ts'
 import {
@@ -35,6 +37,14 @@ import {
   runCoingeckoUsageScope,
   shouldDebugCoingecko,
 } from '../_shared/coingeckoUsageLog.ts'
+import {
+  marketInstrumentCacheKey,
+  readMarketInstrument,
+  readMarketInstrumentCoinId,
+  upsertMarketInstrument,
+  upsertMarketInstrumentFromEmbed,
+} from '../_shared/marketInstrumentRegistry.ts'
+import { coingeckoCoinIdForTicker } from '../_shared/marketCashtagCrypto.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,13 +108,83 @@ async function writeCache(
   })
 }
 
-function parseSymbolInput(raw: unknown): { symbol: string; asset_class: MarketAssetClass } | null {
+function parseSymbolInput(raw: unknown): {
+  symbol: string
+  asset_class: MarketAssetClass
+  coin_id?: string
+} | null {
   const symbol = String(raw?.symbol || raw || '').trim()
   if (!symbol) return null
   const asset_class = (String(raw?.asset_class || '').trim() === 'crypto'
     ? 'crypto'
     : 'stock') as MarketAssetClass
-  return { symbol, asset_class }
+  const coin_id = String(raw?.coin_id || raw?.coinId || '').trim() || undefined
+  return { symbol, asset_class, coin_id }
+}
+
+const MARKET_INSTRUMENT_METADATA_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+async function resolveCoinIdForSymbol(
+  admin: ReturnType<typeof createClient>,
+  symbol: string,
+  assetClass: MarketAssetClass,
+  hint?: string,
+): Promise<string | undefined> {
+  const fromHint = String(hint || '').trim()
+  if (fromHint) return fromHint
+  const fromRegistry = await readMarketInstrumentCoinId(admin, symbol, assetClass)
+  if (fromRegistry) return fromRegistry
+  if (assetClass === 'crypto') {
+    const mapped = coingeckoCoinIdForTicker(normalizeDisplaySymbol(finnhubSymbolForAsset(symbol, assetClass), assetClass))
+    if (mapped) return mapped
+  }
+  return undefined
+}
+
+async function loadMarketProfileContext(
+  admin: ReturnType<typeof createClient>,
+  symbol: string,
+  assetClass: MarketAssetClass,
+  coinIdHint?: string,
+): Promise<{ profile: MarketProfile; coinId?: string }> {
+  const coinId = await resolveCoinIdForSymbol(admin, symbol, assetClass, coinIdHint)
+  const row = await readMarketInstrument(admin, marketInstrumentCacheKey(symbol, assetClass))
+  if (row?.name && row.metadata_updated_at) {
+    const age = Date.now() - new Date(String(row.metadata_updated_at)).getTime()
+    if (age <= MARKET_INSTRUMENT_METADATA_TTL_MS) {
+      return {
+        profile: {
+          name: row.name,
+          exchange: row.exchange,
+          logo: row.logo_url,
+          marketCapitalization: null,
+          currency: row.listing_currency || 'USD',
+          coinId: row.coin_id || coinId || undefined,
+        },
+        coinId: row.coin_id || coinId || undefined,
+      }
+    }
+  }
+  const profile = await finnhubProfile(symbol, assetClass)
+  const resolvedCoinId = profile.coinId || coinId || undefined
+  try {
+    await upsertMarketInstrument(admin, {
+      cache_key: marketInstrumentCacheKey(symbol, assetClass),
+      display_symbol: normalizeDisplaySymbol(finnhubSymbolForAsset(symbol, assetClass), assetClass),
+      asset_class: assetClass,
+      symbol: finnhubSymbolForAsset(symbol, assetClass),
+      coin_id: resolvedCoinId || null,
+      name: profile.name,
+      exchange: profile.exchange,
+      logo_url: profile.logo,
+      market_cap_usd: null,
+      listing_currency: profile.currency || 'USD',
+      metadata_updated_at: new Date().toISOString(),
+    })
+  } catch {
+    /* registry optional until migration applied */
+  }
+  return { profile, coinId: resolvedCoinId }
 }
 
 async function previewSymbol(symbol: string, asset_class: MarketAssetClass) {
@@ -148,6 +228,7 @@ async function attachMarketEmbeds(
       const embed = await buildMarketEmbed(item.symbol, item.asset_class, caption)
       embed.og_image_url = `${origin}/api/lounge-market-og?postId=${encodeURIComponent(postId)}&symbol=${encodeURIComponent(embed.display_symbol)}`
       embeds.push(embed)
+      await upsertMarketInstrumentFromEmbed(admin, embed)
     } catch (e) {
       const detail = e instanceof Error ? e.message : 'embed build failed'
       skipped.push(`${item.symbol}: ${detail}`)
@@ -333,7 +414,12 @@ Deno.serve(async (req) => {
         return respond(400, { error: 'Invalid before_sec.' })
       }
       try {
-        const profile = await finnhubProfile(parsed.symbol, parsed.asset_class)
+        const { profile, coinId } = await loadMarketProfileContext(
+          admin,
+          parsed.symbol,
+          parsed.asset_class,
+          parsed.coin_id,
+        )
         const currency = embedQuoteCurrency(profile.exchange, profile.currency)
         if (resolutionId) {
           const { bars, hasMore } = await resolveMarketBarsBeforeByResolution(
@@ -342,6 +428,7 @@ Deno.serve(async (req) => {
             resolutionId,
             beforeSec,
             barLimit,
+            coinId,
           )
           const normalizedBars = await normalizeMarketBarsToUsd(bars, currency)
           return respond(200, { ok: true, bars: normalizedBars, has_more: hasMore })
@@ -361,7 +448,12 @@ Deno.serve(async (req) => {
     }
     if (resolutionId) {
       try {
-        const profile = await finnhubProfile(parsed.symbol, parsed.asset_class)
+        const { profile, coinId } = await loadMarketProfileContext(
+          admin,
+          parsed.symbol,
+          parsed.asset_class,
+          parsed.coin_id,
+        )
         const currency = embedQuoteCurrency(profile.exchange, profile.currency)
         const quote = await finnhubQuote(parsed.symbol, parsed.asset_class)
         const { bars, hasMore, windowLabel } = await resolveMarketSeriesByResolution(
@@ -369,6 +461,7 @@ Deno.serve(async (req) => {
           parsed.asset_class,
           resolutionId,
           barLimit,
+          coinId,
         )
         let quoteOut: typeof quote & { change_pct: number } = { ...quote }
         let changePct = quote.change_pct
@@ -388,6 +481,7 @@ Deno.serve(async (req) => {
           }
         }
         const normalized = await normalizeMarketSeriesToUsd(quoteOut, bars, currency)
+        const market_cap = await fetchLiveMarketCapUsd(parsed.symbol, parsed.asset_class, coinId)
         return respond(200, {
           ok: true,
           quote: normalized.quote,
@@ -395,6 +489,7 @@ Deno.serve(async (req) => {
           has_more: hasMore,
           window_label: windowLabel,
           resolution: resolutionId,
+          market_cap,
         })
       } catch (e) {
         return respond(502, { error: e instanceof Error ? e.message : 'Resolution series failed.' })
@@ -402,10 +497,17 @@ Deno.serve(async (req) => {
     }
     try {
       if (kind === 'historical') {
-        const profile = await finnhubProfile(parsed.symbol, parsed.asset_class)
+        const { profile, coinId } = await loadMarketProfileContext(
+          admin,
+          parsed.symbol,
+          parsed.asset_class,
+          parsed.coin_id,
+        )
         const currency = embedQuoteCurrency(profile.exchange, profile.currency)
         const quote = await finnhubQuote(parsed.symbol, parsed.asset_class)
-        const bars = await resolveMarketBars(parsed.symbol, parsed.asset_class, windowKey, quote)
+        const bars = await resolveMarketBars(parsed.symbol, parsed.asset_class, windowKey, quote, {
+          coinId,
+        })
         let quoteOut: typeof quote & { change_pct: number } = { ...quote }
         let changePct = quote.change_pct
         if (bars.length >= 2) {
@@ -424,15 +526,21 @@ Deno.serve(async (req) => {
           }
         }
         const normalized = await normalizeMarketSeriesToUsd(quoteOut, bars, currency)
+        const market_cap = await fetchLiveMarketCapUsd(parsed.symbol, parsed.asset_class, coinId)
         return respond(200, {
           ok: true,
           quote: normalized.quote,
           bars: normalized.bars,
           window_label: windowKey.toUpperCase(),
+          market_cap,
         })
       }
-      const payload = await buildRollingBatchPayload(parsed.symbol, parsed.asset_class)
-      return respond(200, { ok: true, ...payload })
+      const coinId = await resolveCoinIdForSymbol(admin, parsed.symbol, parsed.asset_class, parsed.coin_id)
+      const [payload, market_cap] = await Promise.all([
+        buildRollingBatchPayload(parsed.symbol, parsed.asset_class, { coinId }),
+        fetchLiveMarketCapUsd(parsed.symbol, parsed.asset_class, coinId),
+      ])
+      return respond(200, { ok: true, ...payload, market_cap })
     } catch (e) {
       return respond(502, { error: e instanceof Error ? e.message : 'Series failed.' })
     }
@@ -444,7 +552,10 @@ Deno.serve(async (req) => {
     const items = raw
       .map((row) => parseSymbolInput(row))
       .filter(Boolean) as Array<{ symbol: string; asset_class: MarketAssetClass }>
-    const unique = new Map<string, { symbol: string; asset_class: MarketAssetClass }>()
+    const unique = new Map<
+      string,
+      { symbol: string; asset_class: MarketAssetClass; coin_id?: string }
+    >()
     for (const item of items) {
       const key = cacheKey(finnhubSymbolForAsset(item.symbol, item.asset_class), item.asset_class)
       if (!unique.has(key)) unique.set(key, item)
@@ -459,7 +570,8 @@ Deno.serve(async (req) => {
         }
       }
       try {
-        const payload = await buildRollingBatchPayload(item.symbol, item.asset_class)
+        const coinId = await resolveCoinIdForSymbol(admin, item.symbol, item.asset_class, item.coin_id)
+        const payload = await buildRollingBatchPayload(item.symbol, item.asset_class, { coinId })
         await writeCache(admin, key, finnhubSymbolForAsset(item.symbol, item.asset_class), item.asset_class, payload)
         out[key] = payload
       } catch {

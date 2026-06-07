@@ -6,6 +6,7 @@ import {
   syncComposerHtml,
 } from './loungeRichComposerDom.js'
 import { LOUNGE_CAPTION_MAX } from '../../utils/loungeCommentLimits.js'
+import { normalizeCashtagsInCaption } from '../../utils/loungeMarketCaptionParse.js'
 import { LOUNGE_RICH_COMPOSER_VARIANTS } from './loungeRichComposerVariants.js'
 
 /**
@@ -65,6 +66,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     if (!el || composingRef.current) return
     const caret = getCaretTextOffset(el)
     let text = plainTextFromComposerRoot(el)
+    text = normalizeCashtagsInCaption(text)
     const capped =
       maxLength != null && text.length > maxLength ? text.slice(0, maxLength) : text
     const nextCaret =

@@ -32,7 +32,9 @@ Each `lounge-market-data` response (when debug is on) includes:
 
 **Typical smoke:** post `$BTC`, scroll feed (wait for `batch_rolling`), open Advanced, pan left once — compare `by_reason` totals per action in Supabase **Edge Functions → lounge-market-data → Logs** or the Console log HUD.
 
-**Rolling batch quota:** `batch_rolling` does **not** re-fetch profile/logo/mcap (attach already stored those). Crypto 24h mini charts use CoinGecko `/ohlc` with `days=1` **without** `interval=hourly` (hourly + 1-day bucket returns 400 on Demo tier). Feed poll uses **`market_quote_cache`** unless the client sends `refresh: true`.
+**Rolling batch quota:** `batch_rolling` does **not** re-fetch profile/logo/mcap (attach already stored those). Crypto 24h mini charts use CoinGecko `/ohlc` with `days=1` **without** `interval=hourly` (hourly + 1-day bucket returns 400 on Demo tier). Feed poll uses **`market_quote_cache`** unless the client sends `refresh: true`. Client may send **`coin_id`** per symbol (from embed or registry) to skip CoinGecko `/search` on OHLC.
+
+**Instrument registry:** Apply migration **`20260610160000_market_instruments_registry.sql`** — seeds top crypto `coin_id` rows; attach upserts **`market_instruments`**. Modal uses registry for **cold** metadata only (name, logo, exchange, `coin_id`) when fresh (&lt;7d). **Market cap is hot:** `modal_series` returns fresh **`market_cap`** (CoinGecko `simple/price` via stored `coin_id` for crypto; Yahoo for stocks) — not read from the 7-day registry cache.
 
 ## Deploy (test)
 
@@ -48,7 +50,7 @@ supabase functions deploy lounge-market-data --project-ref jtjgtucumuoswnbauxry
 | `preview` | `{ symbol, asset_class }` | `{ preview }` picker info row |
 | `attach` | `{ post_id, caption, symbols[]? }` | `{ embeds[], warnings?[] }` — merges caption `$` cashtags (auto) with picker rows; picker wins per ticker; **skips failed tickers** instead of failing the whole post |
 | `batch_rolling` | `{ symbols[] }` | `{ quotes }` keyed by cache key |
-| `modal_series` | `{ symbol, asset_class, kind?, window_key? }` or extend `{ …, before_sec }` or Advanced `{ …, resolution, bar_limit?, before_sec? }` | `{ quote, bars, window_label, has_more? }` or extend `{ bars, has_more }` — **`resolution`** (`1`, `5`, `15`, `60`, `120`, `240`, `D`, `W`) + **`bar_limit`** for Advanced bar-count windows; **`before_sec`** loads **`chunkBars`** (200) older bars capped by per-resolution max lookback |
+| `modal_series` | `{ symbol, asset_class, kind?, window_key? }` or extend `{ …, before_sec }` or Advanced `{ …, resolution, bar_limit?, before_sec? }` | `{ quote, bars, window_label, has_more?, market_cap? }` or extend `{ bars, has_more }` — **`market_cap`** is live on each full series load (not from registry cache); **`resolution`** (`1`, `5`, `15`, `60`, `120`, `240`, `D`, `W`) + **`bar_limit`** for Advanced bar-count windows; **`before_sec`** loads **`chunkBars`** (200) older bars capped by per-resolution max lookback |
 | `modal_news` | `{ symbol, asset_class }` | `{ news }` — Finnhub company-news (30d) or crypto feed; **Yahoo search news** when Finnhub empty/forbidden |
 | `logo_image` | `{ url? }` or `{ symbol, asset_class }` | `{ data_base64, content_type }` — server-side logo fetch for **Advanced snapshot PNG** (canvas-safe; allowlisted hosts) |
 

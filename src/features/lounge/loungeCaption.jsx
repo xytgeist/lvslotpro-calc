@@ -137,7 +137,7 @@ export function renderRichCaption(
       const tickerKey = ticker.toUpperCase()
       const changePct = cashtagQuotesByTicker?.[tickerKey]?.change_pct
       const cashtagClassName = marketCashtagColorClass(changePct)
-      const label = `$${ticker}`
+      const label = `$${tickerKey}`
       if (onCashtagClick) {
         out.push(
           <button

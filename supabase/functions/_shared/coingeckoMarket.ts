@@ -5,6 +5,7 @@
  */
 
 import type { MarketBarOhlc } from './marketBarOhlc.ts'
+import { coingeckoCoinIdForTicker } from './marketCashtagCrypto.ts'
 import { recordCoingeckoCall } from './coingeckoUsageLog.ts'
 
 const COINGECKO_DEMO_BASE = 'https://api.coingecko.com/api/v3'
@@ -165,7 +166,8 @@ export async function coingeckoBatchPickerQuotes(
   return out
 }
 
-async function coingeckoMarketCapUsd(coinId: string): Promise<number | null> {
+/** Live USD market cap for one CoinGecko coin id (no /search). */
+export async function coingeckoMarketCapUsd(coinId: string): Promise<number | null> {
   const id = String(coinId || '').trim()
   if (!id) return null
   try {
@@ -186,7 +188,11 @@ async function coingeckoMarketCapUsd(coinId: string): Promise<number | null> {
   }
 }
 
-export async function coingeckoResolveCoinId(symbol: string): Promise<string> {
+export async function coingeckoResolveCoinId(symbol: string, coinIdHint?: string): Promise<string> {
+  const hinted = String(coinIdHint || '').trim()
+  if (hinted) return hinted
+  const fromMap = coingeckoCoinIdForTicker(cryptoBaseTicker(symbol))
+  if (fromMap) return fromMap
   const profile = await coingeckoCryptoProfile(symbol)
   return profile.coinId
 }
@@ -410,8 +416,9 @@ export async function coingeckoCryptoCandlesForAdvanced(
   symbol: string,
   lookbackDays: number,
   maxBars = 500,
+  coinIdHint?: string,
 ): Promise<MarketBarOhlc[]> {
-  const coinId = await coingeckoResolveCoinId(symbol)
+  const coinId = await coingeckoResolveCoinId(symbol, coinIdHint)
   if (!coinId) return []
 
   const days = coingeckoOhlcDaysForLookbackDays(lookbackDays)
@@ -460,8 +467,9 @@ export async function coingeckoCryptoCandlesForAdvanced(
 export async function coingeckoCryptoCandles(
   symbol: string,
   windowKey: string,
+  coinIdHint?: string,
 ): Promise<MarketBarOhlc[]> {
-  const coinId = await coingeckoResolveCoinId(symbol)
+  const coinId = await coingeckoResolveCoinId(symbol, coinIdHint)
   if (!coinId) return []
 
   const ohlc = await coingeckoCryptoOhlcCandles(coinId, windowKey)

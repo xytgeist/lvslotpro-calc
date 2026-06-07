@@ -47,7 +47,7 @@ export function marketSymbolDedupeKey(row) {
 
 export function applyCashtagSuggestion(value, cashtag, displaySymbol) {
   if (!cashtag) return { value, cursorPos: value.length }
-  const sym = String(displaySymbol || '').trim()
+  const sym = String(displaySymbol || '').trim().toUpperCase()
   if (!sym) return { value, cursorPos: value.length }
   const before = value.slice(0, cashtag.start)
   const after = value.slice(cashtag.end)

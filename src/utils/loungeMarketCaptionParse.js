@@ -29,6 +29,8 @@ import { isUsableStockIntradayBars } from './usEquityMarketSession.js'
  * @property {{ price: number, change_pct: number, change: number, as_of: string }} quote
  * @property {MarketBar[]} bars
  * @property {string} [og_image_url]
+ * @property {string} [coin_id] CoinGecko id (crypto) — skips search on rolling/modal candles
+ * @property {string} [metadata_as_of] ISO timestamp when name/logo/mcap were resolved
  */
 
 export const LOUNGE_MARKET_EMBED_MAX = 12
@@ -84,6 +86,82 @@ const COMMON_CRYPTO_CASHTAGS = new Set([
   'HBAR', 'ICP', 'VET', 'ALGO', 'AAVE', 'MKR', 'CRO', 'STX', 'INJ', 'RUNE', 'SEI', 'TIA', 'SUI',
   'TAO', 'FET', 'RENDER', 'WLD', 'TRX', 'USDT', 'USDC',
 ])
+// Keep in sync with `supabase/functions/_shared/marketCashtagCrypto.ts`.
+
+const COINGECKO_COIN_ID_BY_TICKER = {
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  SOL: 'solana',
+  DOGE: 'dogecoin',
+  XRP: 'ripple',
+  ADA: 'cardano',
+  AVAX: 'avalanche-2',
+  LINK: 'chainlink',
+  BNB: 'binancecoin',
+  LTC: 'litecoin',
+  DOT: 'polkadot',
+  MATIC: 'matic-network',
+  SHIB: 'shiba-inu',
+  UNI: 'uniswap',
+  ATOM: 'cosmos',
+  BCH: 'bitcoin-cash',
+  XLM: 'stellar',
+  ETC: 'ethereum-classic',
+  FIL: 'filecoin',
+  NEAR: 'near',
+  APT: 'aptos',
+  ARB: 'arbitrum',
+  OP: 'optimism',
+  PEPE: 'pepe',
+  WIF: 'dogwifcoin',
+  BONK: 'bonk',
+  HBAR: 'hedera-hashgraph',
+  ICP: 'internet-computer',
+  VET: 'vechain',
+  ALGO: 'algorand',
+  AAVE: 'aave',
+  MKR: 'maker',
+  CRO: 'crypto-com-chain',
+  STX: 'blockstack',
+  INJ: 'injective-protocol',
+  RUNE: 'thorchain',
+  SEI: 'sei-network',
+  TIA: 'celestia',
+  SUI: 'sui',
+  TAO: 'bittensor',
+  FET: 'fetch-ai',
+  RENDER: 'render-token',
+  WLD: 'worldcoin-wld',
+  TRX: 'tron',
+  USDT: 'tether',
+  USDC: 'usd-coin',
+}
+
+/** @param {string} ticker */
+export function coingeckoCoinIdForTicker(ticker) {
+  const s = String(ticker || '').trim().toUpperCase()
+  return s ? String(COINGECKO_COIN_ID_BY_TICKER[s] || '').trim() : ''
+}
+
+/** @param {object} embed */
+function reconcileMarketEmbedAssetClass(embed) {
+  const ticker = String(embed.display_symbol || embed.symbol || '').trim().toUpperCase()
+  if (!ticker) return embed
+  let next = embed
+  if (embed.asset_class !== 'crypto' && COMMON_CRYPTO_CASHTAGS.has(ticker)) {
+    next = {
+      ...next,
+      asset_class: 'crypto',
+      display_symbol: ticker,
+      symbol: cashtagFinnhubSymbol(ticker, 'crypto'),
+    }
+  }
+  if (next.asset_class === 'crypto' && !String(next.coin_id || '').trim()) {
+    const coinId = coingeckoCoinIdForTicker(ticker)
+    if (coinId) next = { ...next, coin_id: coinId }
+  }
+  return next
+}
 
 /** @param {string} ticker @param {Map<string, string>} [embedClassByTicker] */
 export function guessCashtagAssetClass(ticker, embedClassByTicker) {
@@ -118,6 +196,17 @@ export function extractCashtagsFromCaption(caption) {
     out.push(sym)
   }
   return out
+}
+
+/** Uppercase `$TICKER` symbols in caption text (display + storage). */
+export function normalizeCashtagsInCaption(caption) {
+  const text = String(caption ?? '')
+  if (!text) return text
+  CASHTAG_RE.lastIndex = 0
+  return text.replace(CASHTAG_RE, (match, ticker) => {
+    const upper = String(ticker || '').trim().toUpperCase()
+    return upper ? `$${upper}` : match
+  })
 }
 
 /** Mirror server `windowRange` for client date labels. @param {string} windowKey */
@@ -297,7 +386,9 @@ export function normalizeMarketEmbeds(raw) {
     }
   }
   if (!Array.isArray(arr)) return []
-  return arr.filter((row) => row && typeof row === 'object' && String(row.display_symbol || row.symbol || '').trim())
+  return arr
+    .filter((row) => row && typeof row === 'object' && String(row.display_symbol || row.symbol || '').trim())
+    .map(reconcileMarketEmbedAssetClass)
 }
 
 /** @param {MarketEmbed} embed */

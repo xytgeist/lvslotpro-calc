@@ -11,6 +11,7 @@ import {
   uploadLoungeFeedPostImageToCfR2,
 } from './loungeCfImageMedia.js'
 import { LOUNGE_CAPTION_MAX } from './loungeCommentLimits.js'
+import { normalizeCashtagsInCaption } from './loungeMarketCaptionParse.js'
 import { normalizeLoungePostCategoryPills } from './loungePostCategoryPills.js'
 
 export { isLoungeCfR2MediaUrl, isLoungeHostedFeedMediaUrl, isLoungeSupabaseFeedMediaUrl } from './loungeCfImageMedia.js'
@@ -158,11 +159,9 @@ export function feedPostMediaUpdatePayload({ imageUrls, gifUrl }) {
   }
 }
 
-/** Normalized caption for insert/update (trim, max {@link LOUNGE_CAPTION_MAX}). */
+/** Normalized caption for insert/update (trim, uppercase cashtags, max {@link LOUNGE_CAPTION_MAX}). */
 export function normalizeFeedCaption(caption) {
-  return String(caption ?? '')
-    .trim()
-    .slice(0, LOUNGE_CAPTION_MAX)
+  return normalizeCashtagsInCaption(String(caption ?? '').trim()).slice(0, LOUNGE_CAPTION_MAX)
 }
 
 function attachCategoryPills(out, categoryPills) {
