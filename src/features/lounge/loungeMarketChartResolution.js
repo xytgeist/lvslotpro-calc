@@ -21,8 +21,8 @@ export const MARKET_CHART_RESOLUTIONS = [
   { id: '60', label: '1H', initialBars: 400, chunkBars: 200, maxLookbackDays: 730 },
   { id: '120', label: '2H', initialBars: 400, chunkBars: 200, maxLookbackDays: 730 },
   { id: '240', label: '4H', initialBars: 400, chunkBars: 200, maxLookbackDays: 730 },
-  { id: 'D', label: 'Daily', initialBars: 280, chunkBars: 200, maxLookbackDays: 730 },
-  { id: 'W', label: 'Weekly', initialBars: 110, chunkBars: 200, maxLookbackDays: 730 },
+  { id: 'D', label: '1D', initialBars: 280, chunkBars: 200, maxLookbackDays: 730 },
+  { id: 'W', label: '1W', initialBars: 110, chunkBars: 200, maxLookbackDays: 730 },
 ]
 
 export const DEFAULT_MARKET_CHART_RESOLUTION_ID = /** @type {MarketChartResolutionId} */ ('D')
