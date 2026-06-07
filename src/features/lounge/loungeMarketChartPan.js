@@ -126,7 +126,7 @@ export function bindMarketChartHistoryLoader(chart, getBars, onNeedHistory, opts
   let lastBeforeSec = null
   let lastBarCount = 0
 
-  return chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+  const handler = (range) => {
     if (!range || range.from > edgeBars) return
     if (!canLoad()) return
     const bars = getBars()
@@ -141,7 +141,13 @@ export function bindMarketChartHistoryLoader(chart, getBars, onNeedHistory, opts
     if (lastBeforeSec === beforeSec) return
     lastBeforeSec = beforeSec
     onNeedHistory(beforeSec)
-  })
+  }
+
+  const ts = chart.timeScale()
+  ts.subscribeVisibleLogicalRangeChange(handler)
+  return () => {
+    ts.unsubscribeVisibleLogicalRangeChange(handler)
+  }
 }
 
 /** Preserve viewport when prepending `added` bars to the series. */
