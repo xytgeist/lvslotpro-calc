@@ -1,5 +1,11 @@
 /** Capture Lounge market chart screenshots (Lightweight Charts `takeScreenshot`). */
 
+import {
+  exportMarketChartAnnotationCanvas,
+  marketChartAnnotationHasInk,
+  mergeAnnotationLayerOntoCanvas,
+} from './loungeMarketChartAnnotation.js'
+
 /**
  * @typedef {{
  *   ticker?: string | null,
@@ -111,13 +117,27 @@ export function marketChartScreenshotCanvasToPngBlob(canvas) {
 }
 
 /**
+ * @typedef {import('./loungeMarketChartAnnotation.js').MarketChartAnnotationItem[]} MarketChartAnnotationItems
+ */
+
+/**
  * @param {import('lightweight-charts').IChartApi | null | undefined} chart
  * @param {string} [filename]
  * @param {MarketChartSnapshotBranding} [branding]
+ * @param {MarketChartAnnotationItems} [annotationItems]
  * @returns {Promise<File>}
  */
-export async function captureMarketChartPngFile(chart, filename = 'chart-snapshot.png', branding) {
+export async function captureMarketChartPngFile(
+  chart,
+  filename = 'chart-snapshot.png',
+  branding,
+  annotationItems,
+) {
   const raw = captureMarketChartScreenshotCanvas(chart)
+  if (marketChartAnnotationHasInk(annotationItems)) {
+    const layer = exportMarketChartAnnotationCanvas(annotationItems, raw.width, raw.height)
+    mergeAnnotationLayerOntoCanvas(raw, layer)
+  }
   const canvas = composeMarketChartSnapshotCanvas(raw, branding)
   const blob = await marketChartScreenshotCanvasToPngBlob(canvas)
   const safeName = String(filename || 'chart-snapshot.png').trim() || 'chart-snapshot.png'
@@ -127,9 +147,10 @@ export async function captureMarketChartPngFile(chart, filename = 'chart-snapsho
 /**
  * @param {import('lightweight-charts').IChartApi | null | undefined} chart
  * @param {MarketChartSnapshotBranding} [branding]
+ * @param {MarketChartAnnotationItems} [annotationItems]
  */
-export async function copyMarketChartScreenshotToClipboard(chart, branding) {
-  const file = await captureMarketChartPngFile(chart, 'chart-snapshot.png', branding)
+export async function copyMarketChartScreenshotToClipboard(chart, branding, annotationItems) {
+  const file = await captureMarketChartPngFile(chart, 'chart-snapshot.png', branding, annotationItems)
   const nav = typeof navigator !== 'undefined' ? navigator : null
   if (nav?.clipboard?.write && typeof ClipboardItem !== 'undefined') {
     await nav.clipboard.write([new ClipboardItem({ [file.type]: file })])

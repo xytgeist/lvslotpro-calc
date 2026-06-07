@@ -623,6 +623,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-09: **Lounge market modal Advanced chart annotation (code on `test`):** **Annotate** toolbar — **Pen** + **Text** pins, **Undo** / **Clear**, **Done** exits; chart pan/zoom frozen while annotating; ink merged into **Snapshot** PNG (clipboard / Add to post). Client-only.
 - 2026-06-09: **Lounge market modal snapshot ticker header (code on `test`):** Advanced **Snapshot → Capture image** PNG composites **company name + $ticker** band above LWC chart canvas (theme-aware). Client-only.
 - 2026-06-09: **Lounge market modal chart capture (code on `test`):** **Capture image** menu on **Advanced** chart toolbar — **Copy image** (clipboard PNG via LWC `takeScreenshot`) or **Add to post** (composer image attach). Client-only.
 - 2026-06-09: **Lounge market modal chart types expanded (code on `test`):** Advanced chart-type dropdown adds **Line**, **Hollow candles** (outline bodies), and **Heikin Ashi**; prefs still **`loungeMarketChartType:v1`**. Client-only.

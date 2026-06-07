@@ -72,6 +72,8 @@ import {
   marketChartSnapshotBrandingFromEmbed,
   marketChartSnapshotFilename,
 } from './loungeMarketChartSnapshot.js'
+import LoungeMarketChartAnnotationOverlay from './LoungeMarketChartAnnotationOverlay.jsx'
+import { marketChartAnnotationHasInk } from './loungeMarketChartAnnotation.js'
 import {
   marketChartAdvancedHandleScaleOptions,
   marketChartAdvancedLayoutPanesOptions,
@@ -639,6 +641,15 @@ export default function LoungeMarketChartModal({
   const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false)
   const [snapshotBusy, setSnapshotBusy] = useState(false)
   const [snapshotFlash, setSnapshotFlash] = useState('')
+  const [annotateMode, setAnnotateMode] = useState(false)
+  const [annotationTool, setAnnotationTool] = useState(/** @type {'pen' | 'text'} */ ('pen'))
+  const [chartAnnotations, setChartAnnotations] = useState(
+    /** @type {import('./loungeMarketChartAnnotation.js').MarketChartAnnotationItem[]} */ ([]),
+  )
+  const annotateModeRef = useRef(false)
+  const chartAnnotationsRef = useRef(chartAnnotations)
+  chartAnnotationsRef.current = chartAnnotations
+  annotateModeRef.current = annotateMode
   /** Crosshair scrub overrides header quote until pointer leaves the chart. */
   const [scrubQuote, setScrubQuote] = useState(/** @type {{ price: number, change?: number, change_pct?: number } | null} */ (null))
   const [scrubAxisCurrent, setScrubAxisCurrent] = useState(/** @type {{ price: number, y: number } | null} */ (null))
@@ -679,6 +690,12 @@ export default function LoungeMarketChartModal({
     setPostSort(LOUNGE_SEARCH_SORT.ENGAGEMENT)
   }, [open, focusSymbol, list])
 
+  useEffect(() => {
+    setChartAnnotations([])
+    setAnnotateMode(false)
+    setAnnotationTool('pen')
+  }, [activeIdx, advancedResolutionId])
+
   const active = list[activeIdx] || null
   const activeSeriesScope = modalSeriesScopeKey(active, timeframeIdx)
   const fetchedSeries = seriesScope === activeSeriesScope ? series : null
@@ -711,6 +728,8 @@ export default function LoungeMarketChartModal({
       setResolutionMenuOpen(false)
       setSnapshotMenuOpen(false)
       setSnapshotFlash('')
+      setAnnotateMode(false)
+      setChartAnnotations([])
       setAdvancedFullscreenOpen(false)
     }
   }, [open])
@@ -748,7 +767,7 @@ export default function LoungeMarketChartModal({
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [chartTypeMenuOpen, indicatorMenuOpen, resolutionMenuOpen, snapshotMenuOpen, timeframeMenuOpen])
 
-  const snapshotDisabled = advancedLoading
+  const snapshotDisabled = advancedLoading || annotateMode
 
   const runMarketChartSnapshot = useCallback(
     async (mode) => {
@@ -760,13 +779,18 @@ export default function LoungeMarketChartModal({
         const filename = marketChartSnapshotFilename(active?.display_symbol || active?.symbol)
         const branding = marketChartSnapshotBrandingFromEmbed(active, isLight)
         if (mode === 'copy') {
-          await copyMarketChartScreenshotToClipboard(chart, branding)
+          await copyMarketChartScreenshotToClipboard(chart, branding, chartAnnotationsRef.current)
           setSnapshotFlash('Copied to clipboard')
         } else if (mode === 'insert') {
           if (typeof onInsertSnapshot !== 'function') {
             setSnapshotFlash('Add to post unavailable')
           } else {
-            const file = await captureMarketChartPngFile(chart, filename, branding)
+            const file = await captureMarketChartPngFile(
+              chart,
+              filename,
+              branding,
+              chartAnnotationsRef.current,
+            )
             const ok = onInsertSnapshot(file, {
               embed: active,
               symbol: active?.display_symbol || active?.symbol || null,
@@ -784,7 +808,16 @@ export default function LoungeMarketChartModal({
     [active, advancedLoading, isLight, onInsertSnapshot, snapshotBusy],
   )
 
+  const undoChartAnnotation = useCallback(() => {
+    setChartAnnotations((prev) => (prev.length ? prev.slice(0, -1) : prev))
+  }, [])
+
+  const clearChartAnnotations = useCallback(() => {
+    setChartAnnotations([])
+  }, [])
+
   const toggleSnapshotMenu = useCallback(() => {
+    if (annotateModeRef.current) return
     setSnapshotMenuOpen((openNow) => {
       if (!openNow) {
         setIndicatorMenuOpen(false)
@@ -813,23 +846,38 @@ export default function LoungeMarketChartModal({
     setResolutionMenuOpen(false)
   }, [])
 
-  const openAdvancedFullscreen = useCallback(() => {
+  const closeAnnotateMenus = useCallback(() => {
     setIndicatorMenuOpen(false)
     setChartTypeMenuOpen(false)
-    setTimeframeMenuOpen(false)
     setResolutionMenuOpen(false)
+    setTimeframeMenuOpen(false)
     setSnapshotMenuOpen(false)
+  }, [])
+
+  const enterAnnotateMode = useCallback(() => {
+    closeAnnotateMenus()
+    setAnnotationTool('pen')
+    setAnnotateMode(true)
+  }, [closeAnnotateMenus])
+
+  const exitAnnotateMode = useCallback(() => {
+    setAnnotateMode(false)
+  }, [])
+
+  const openAdvancedFullscreen = useCallback(() => {
+    closeAnnotateMenus()
+    setAnnotateMode(false)
+    setChartAnnotations([])
     setChartType('candle')
     void lockMarketChartLandscapeOrientation()
     setAdvancedFullscreenOpen(true)
-  }, [])
+  }, [closeAnnotateMenus])
 
   const closeAdvancedFullscreen = useCallback(() => {
     setAdvancedFullscreenOpen(false)
-    setIndicatorMenuOpen(false)
-    setChartTypeMenuOpen(false)
-    setTimeframeMenuOpen(false)
-    setResolutionMenuOpen(false)
+    closeAnnotateMenus()
+    setAnnotateMode(false)
+    setChartAnnotations([])
     setScrubQuote(null)
     setHistoryBars([])
     setHistoryHasMore(true)
@@ -840,7 +888,14 @@ export default function LoungeMarketChartModal({
     advancedUserPannedRef.current = false
     historyResetAnchorRef.current?.()
     writeStoredMarketChartViewMode('quick')
-  }, [])
+  }, [closeAnnotateMenus])
+
+  useEffect(() => {
+    if (!advancedFullscreenOpen || !chartRef.current) return
+    chartRef.current.applyOptions({
+      handleScale: annotateMode ? false : marketChartAdvancedHandleScaleOptions(),
+    })
+  }, [annotateMode, advancedFullscreenOpen])
 
   const isAdvancedView = advancedFullscreenOpen
   /** Modal sheet stays on gradient area; advanced fullscreen uses stored chart type. */
@@ -1320,6 +1375,11 @@ export default function LoungeMarketChartModal({
           setSnapshotMenuOpen(false)
           return
         }
+        if (annotateMode) {
+          e.stopPropagation()
+          setAnnotateMode(false)
+          return
+        }
         if (advancedFullscreenOpen) {
           e.stopPropagation()
           closeAdvancedFullscreen()
@@ -1335,7 +1395,7 @@ export default function LoungeMarketChartModal({
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [advancedFullscreenOpen, chartTypeMenuOpen, closeAdvancedFullscreen, dismissSheet, indicatorMenuOpen, open, resolutionMenuOpen, snapshotMenuOpen, timeframeMenuOpen])
+  }, [advancedFullscreenOpen, annotateMode, chartTypeMenuOpen, closeAdvancedFullscreen, dismissSheet, indicatorMenuOpen, open, resolutionMenuOpen, snapshotMenuOpen, timeframeMenuOpen])
 
   useEffect(() => {
     const el = advancedFullscreenOpen ? advancedChartHostRef.current : chartHostRef.current
@@ -1665,7 +1725,7 @@ export default function LoungeMarketChartModal({
   /** Advanced: refresh series in place on live bar updates — avoid remounting the chart. */
   useEffect(() => {
     if (!open || !advancedFullscreenOpen || !isAdvancedView) return
-    if (chartPanningRef.current) return
+    if (chartPanningRef.current || annotateModeRef.current) return
     const chart = chartRef.current
     const mainSeries = mainSeriesRef.current
     if (!chart || !mainSeries) return
@@ -1820,7 +1880,18 @@ export default function LoungeMarketChartModal({
               <div className="relative min-h-0 flex-1 overflow-hidden">
                 <div style={advancedPlotWrapStyle}>
                   <div className="relative min-h-0 h-full overflow-hidden">
-                    <div ref={advancedChartHostRef} className="absolute inset-0 touch-none select-none" />
+                    <div
+                      ref={advancedChartHostRef}
+                      className={`absolute inset-0 touch-none select-none ${annotateMode ? 'pointer-events-none' : ''}`}
+                    />
+                    <LoungeMarketChartAnnotationOverlay
+                      hostRef={advancedChartHostRef}
+                      active={annotateMode}
+                      visible={annotateMode || chartAnnotations.length > 0}
+                      tool={annotationTool}
+                      items={chartAnnotations}
+                      onItemsChange={setChartAnnotations}
+                    />
                     <div
                       className="absolute left-0 top-0 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-start gap-1"
                       style={{
@@ -1850,6 +1921,69 @@ export default function LoungeMarketChartModal({
                         </div>
                       ) : null}
                       <div className="flex flex-wrap items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-950/85 p-1 backdrop-blur-[2px]">
+                      {annotateMode ? (
+                        <>
+                          <button
+                            type="button"
+                            aria-pressed={annotationTool === 'pen'}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setAnnotationTool('pen')
+                            }}
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
+                              annotationTool === 'pen' ? 'text-cyan-300' : `${mutedClass} hover:text-zinc-300`
+                            }`}
+                          >
+                            Pen
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={annotationTool === 'text'}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setAnnotationTool('text')
+                            }}
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${
+                              annotationTool === 'text' ? 'text-cyan-300' : `${mutedClass} hover:text-zinc-300`
+                            }`}
+                          >
+                            Text
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!chartAnnotations.length}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              undoChartAnnotation()
+                            }}
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation disabled:opacity-40 ${mutedClass} hover:text-zinc-300`}
+                          >
+                            Undo
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!chartAnnotations.length}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              clearChartAnnotations()
+                            }}
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation disabled:opacity-40 ${mutedClass} hover:text-zinc-300`}
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              exitAnnotateMode()
+                            }}
+                            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none text-cyan-300 touch-manipulation hover:text-cyan-200"
+                          >
+                            Done
+                          </button>
+                        </>
+                      ) : (
+                        <>
                       <div className="relative shrink-0" ref={chartTypeMenuRef}>
                         <button
                           type="button"
@@ -2053,6 +2187,17 @@ export default function LoungeMarketChartModal({
                           </div>
                         ) : null}
                       </div>
+                      <button
+                        type="button"
+                        aria-pressed={false}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          enterAnnotateMode()
+                        }}
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none touch-manipulation ${mutedClass} hover:text-cyan-300`}
+                      >
+                        Annotate
+                      </button>
                       <MarketChartSnapshotButton
                         menuRef={snapshotMenuRef}
                         menuOpen={snapshotMenuOpen}
@@ -2065,6 +2210,8 @@ export default function LoungeMarketChartModal({
                         onInsert={() => void runMarketChartSnapshot('insert')}
                         mutedClass={mutedClass}
                       />
+                        </>
+                      )}
                       </div>
                     </div>
                     {subPaneAxisTitles.rows.length ? (
