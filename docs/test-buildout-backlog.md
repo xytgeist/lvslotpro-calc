@@ -172,7 +172,16 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 **Surface:** separate Vite entry **`src/slot-guide-form/`** (`SlotGuideFormApp.jsx`, `LoginGate.jsx` admin session). Deployed at **`/slot-guide-form`** on app host (e.g. **`lvslotpro-calc-tx18.vercel.app`**). Not in main `AppShell` hamburger.
 
-### Docx → repo → test DB (Ryan + Theo pilot workflow, Jun 2026)
+**Primary workflow (form-first):** Supabase + cloud storage are source of truth — **no repo `guide.md` required** for live app copy.
+
+| Mode | Action |
+| --- | --- |
+| **New guide** | Fill form → upload hero/diagrams → **Ingest guide** → `POST /api/slot-guide-ingest` |
+| **Existing guide** | **Fetch guides** → **Load** → edit → **Save changes** (direct Supabase update) |
+| **WIP (same browser)** | **Save draft** → `localStorage` **`slotGuideFormDraft:v1`** (text only; re-attach images after restore) |
+| **Optional repo/sync** | **`Slots/<slug>/guide.md`** + **`npm run slots:sync:test -- --slug=<slug>`** for docx/bulk/git backup only |
+
+### Docx → repo → sync (optional legacy path)
 
 **Drop sources (local, usually gitignored):** **`Slots/_ingest/`**
 
@@ -183,25 +192,23 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 **Output in repo:** **`Slots/<slug>/guide.md`**, **`card.meta.json`**, **`hero.png`**; hero WebP at **`public/guides/<slug>/hero.webp`**.
 
-**Publish to test Supabase (primary — no form required):**
+**Publish to test Supabase (optional — when using repo files):**
 
 ```bash
 npm run slots:sync:test -- --slug=<slug>
 ```
 
-Reads manifest + **`guide.md`** → upserts **`machines`** + **`guides`** (including **`content_markdown`**). **App Guides tab reads DB** — sync alone updates live copy on test.
+Reads manifest + **`guide.md`** → upserts **`machines`** + **`guides`**. **App Guides tab reads DB** — form **Save changes** / **Ingest** also update live copy without sync.
 
 **When to commit / deploy:**
 
-| Change | `slots:sync:test` | Git commit | Vercel deploy |
-| --- | --- | --- | --- |
-| Guide text only | ✓ enough for test app | recommended (repo = source of truth) | no |
-| Form / parse / card UI code | — | yes | yes |
-| New hero under **`public/guides/`** | optional (DB may point at URL) | yes | yes for hosted static file |
+| Change | Form save/ingest | `slots:sync:test` | Git commit | Vercel deploy |
+| --- | --- | --- | --- | --- |
+| Guide text / images (form) | ✓ enough for test app | not required | optional backup | client deploy for form code |
+| Repo-only text change | — | ✓ | recommended | no |
+| Form / parse / card UI code | — | — | yes | yes |
 
-**Optional editor:** **`/slot-guide-form`** — **Fetch guides** → **Load** → edit → **Save changes**. **Ingest guide** still available for greenfield. Requires client deploy + SQL **`20260610170000`** (`machines.popularity`).
-
-**`guide.md` section order (compiled markdown):**
+**Compiled markdown section order:**
 
 1. 🟢 When to play  
 2. 🛑 When to stop  
@@ -224,12 +231,7 @@ Built by **`formUtils.js`** / **`scripts/lib/slotGuideIngestCore.mjs`**; slot-gu
 
 **Pilot on test:** **`coin-kingdom-aztec`** @ **`132ec95`** / **`102cec1`** — dual MHB; Egyptian skin; **Where to find** with Vegas + regional table.
 
-| Mode | Action |
-| --- | --- |
-| **New guide (repo path)** | Theo/build → **`Slots/<slug>/`** → **`npm run slots:sync:test -- --slug=<slug>`** |
-| **New guide (form path)** | **Ingest guide** → `POST /api/slot-guide-ingest` (target **test** / **production**); optional hero + sparse body sections OK |
-| **WIP (same browser)** | **Save draft** → `localStorage` **`slotGuideFormDraft:v1`** (text only; re-attach hero/diagram files after restore) |
-| **Existing guide** | **Fetch guides** → **Load →** → **Save changes** (direct Supabase update, not ingest) |
+**Form-only fixes (2026-06-10):** **`parseGuideMarkdown`** preserves embedded images on Load; **`buildGuideMarkdown`** uses shared **`slotGuideIngestCore.mjs`** (diagram placements); **Diagrams** section enabled on edit; hero/diagram/inline uploads convert to WebP client-side before R2/Storage PUT.
 
 **Auth (ingest API):** `Authorization: Bearer <supabase-session>`; caller **`profiles.role = admin`** (test project hardcoded in **`api/slot-guide-ingest.js`** for JWT validation). **Not** `x-guide-ingest-secret` on Vercel path.
 
@@ -237,6 +239,7 @@ Built by **`formUtils.js`** / **`scripts/lib/slotGuideIngestCore.mjs`**; slot-gu
 
 ### Status
 
+- [x] **Form-first workflow:** Load preserves inline images; WebP uploads; Diagrams on edit; DB + R2 source of truth (2026-06-10)
 - [x] **Docx pilot workflow** documented; **`coin-kingdom-aztec`** on test via **`slots:sync`** @ **`132ec95`** / **`102cec1`**
 - [x] **`## 📍 Where to find`** section in markdown pipeline + form @ **`102cec1`**
 - [x] **`machines.popularity`** rename + card shows tier only @ **`132ec95`** / **`a3a20b7`** — SQL **`20260610170000`** (apply on test + prod)
@@ -698,6 +701,8 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-10: **Public guide heroes → R2 (test):** **`scripts/backfill-public-guide-heroes-to-r2.mjs`** uploaded 12 fallback heroes + 3 inline **`/guides/`** assets to R2; all test **`guides.thumbnail_url`** now remote (no code-fallback heroes left except global buffalo placeholder).
+- 2026-06-10: **AP Guide form-first workflow:** **`/slot-guide-form`** is primary editor — Supabase + R2/Storage source of truth; **`parseGuideMarkdown`** keeps embedded images on Load; shared **`buildGuideMarkdown`** + WebP uploads on Save/Ingest; **Diagrams** on edit. Repo **`guide.md`** + **`slots:sync`** optional (docx/bulk only).
 - 2026-06-08: **AP Guides admin Delete (`GuidesScreen`):** admin-only **Delete** on guide card hero + confirm modal removes **`guides`** + **`machines`** (+ optional **`content_access_gates`**) on test; does not delete **`Slots/<slug>/`** in git. Apply **`20260610180000_guide_admin_delete_rls.sql`** on test before use.
 - 2026-06-08: **AP guide docx pilot + sync workflow (on `test`):** drop **`AP-*.docx`** + **`Review-*.docx`** in **`Slots/_ingest/`** → synthesize **`Slots/<slug>/guide.md`** + **`card.meta.json`** → **`npm run slots:sync:test -- --slug=<slug>`** publishes **`guides.content_markdown`** (app reads DB; git commit for source of truth, not required for test copy). **`coin-kingdom-aztec`** first pilot @ **`132ec95`** / **`102cec1`**. See backlog **AP Guide editor** § docx workflow.
 - 2026-06-08: **Guide card popularity display (`test`, `a3a20b7`):** collapsed tile always shows **`machines.popularity`** tier; **`popularity_summary`** no longer overrides label.

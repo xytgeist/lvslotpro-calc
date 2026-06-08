@@ -10,6 +10,7 @@ import {
   slugifyInput,
   writeSlotGuideDraftToStorage,
 } from './formUtils.js'
+import { prepareGuideImageFile, useBlobObjectUrl } from './guideImageUtils.js'
 import GuideCardPreview from './GuideCardPreview.jsx'
 
 const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
@@ -104,7 +105,44 @@ function fileToBase64(file) {
 }
 
 function emptyDiagram(slug) {
-  return { id: crypto.randomUUID(), alt: '', placement: 'when_to_play', filename: `${slug}-diagram.webp`, file: null }
+  return {
+    id: crypto.randomUUID(),
+    alt: '',
+    placement: 'when_to_play',
+    filename: `${slug}-diagram.webp`,
+    file: null,
+    publicUrl: null,
+  }
+}
+
+/** Diagram rows ready for buildGuideMarkdown (new file or already uploaded). */
+function activeDiagramRows(diagrams, slug) {
+  return diagrams
+    .filter((d) => d.alt?.trim() && (d.file || d.publicUrl))
+    .map((d) => ({
+      alt: d.alt.trim(),
+      placement: d.placement,
+      filename: d.filename || diagramFilename(d.file?.name || 'diagram', slug),
+    }))
+}
+
+function resolveGuideImageUrl(slug, diagrams, filename) {
+  const match = diagrams.find((d) => d.filename === filename && d.publicUrl)
+  if (match?.publicUrl) return match.publicUrl
+  return `/guides/${slug}/${filename}`
+}
+
+function DiagramPreview({ file, publicUrl, alt }) {
+  const blobUrl = useBlobObjectUrl(file)
+  const src = file ? blobUrl : publicUrl
+  if (!src) return null
+  return (
+    <img
+      src={src}
+      alt={alt || 'Diagram preview'}
+      className="w-full max-h-40 object-contain rounded-lg border border-gray-800 bg-gray-950"
+    />
+  )
 }
 
 /** Fields that support inline image insertion. */
@@ -128,13 +166,13 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
     e.target.value = ''
 
     const effectiveSlug = slug || slugify(guideTitle || 'guide') || 'guide'
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')
-    const filename = `content-${Date.now()}.${ext || 'jpg'}`
+    const filename = `content-${Date.now()}.webp`
 
     setUploading(true)
     setUploadErr('')
     try {
-      const url = await uploadGuideImageToR2OrStorage(file, { slug: effectiveSlug, filename })
+      const prepared = await prepareGuideImageFile(file, filename)
+      const url = await uploadGuideImageToR2OrStorage(prepared, { slug: effectiveSlug, filename: prepared.name })
       const ta = taRef.current
       const pos = ta?.selectionStart ?? value.length
       const before = value.slice(0, pos)
@@ -336,6 +374,7 @@ export default function SlotGuideFormApp() {
         placement: d.placement || 'when_to_play',
         filename: d.filename || '',
         file: null,
+        publicUrl: null,
       })),
     )
     setHeroFile(null)
@@ -421,6 +460,8 @@ export default function SlotGuideFormApp() {
   }, [machine.name])
 
   const slug = slugify(machine.slug.trim())
+
+  const heroPreviewUrl = useBlobObjectUrl(heroFile)
 
   const setMachineField = useCallback((key, value) => {
     setMachine((m) => {
@@ -553,10 +594,15 @@ export default function SlotGuideFormApp() {
       const diagramImages = []
       for (const d of diagrams) {
         if (!d.file || !d.alt.trim()) continue
-        diagramImages.push({ filename: d.filename || diagramFilename(d.file.name, slug), dataBase64: await fileToBase64(d.file) })
+        const fn = d.filename || diagramFilename(d.file.name, slug)
+        const prepared = await prepareGuideImageFile(d.file, fn)
+        diagramImages.push({ filename: prepared.name, dataBase64: await fileToBase64(prepared) })
       }
       const body = { target, payload, diagramImages }
-      if (heroFile) body.heroImage = { dataBase64: await fileToBase64(heroFile) }
+      if (heroFile) {
+        const preparedHero = await prepareGuideImageFile(heroFile, 'hero.webp')
+        body.heroImage = { dataBase64: await fileToBase64(preparedHero) }
+      }
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
@@ -586,13 +632,33 @@ export default function SlotGuideFormApp() {
       // Upload hero image first if a new one was provided
       let newThumbnailUrl = null
       if (heroFile) {
-        const heroExt = heroFile.name.split('.').pop().toLowerCase() || 'webp'
-        newThumbnailUrl = await uploadGuideImageToR2OrStorage(heroFile, {
+        const preparedHero = await prepareGuideImageFile(heroFile, 'hero.webp')
+        newThumbnailUrl = await uploadGuideImageToR2OrStorage(preparedHero, {
           slug: machine.slug,
-          filename: `hero.${heroExt}`,
+          filename: preparedHero.name,
         })
         setCurrentThumbnail(newThumbnailUrl)
         setHeroFile(null)
+      }
+
+      // Upload new diagram files to cloud storage
+      const diagramUrlMap = {}
+      const nextDiagrams = [...diagrams]
+      for (let i = 0; i < nextDiagrams.length; i++) {
+        const d = nextDiagrams[i]
+        if (!d.file || !d.alt?.trim()) continue
+        const fn = d.filename || diagramFilename(d.file.name, machine.slug)
+        const prepared = await prepareGuideImageFile(d.file, fn)
+        const publicUrl = await uploadGuideImageToR2OrStorage(prepared, {
+          slug: machine.slug,
+          filename: prepared.name,
+        })
+        diagramUrlMap[prepared.name] = publicUrl
+        nextDiagrams[i] = { ...d, filename: prepared.name, file: null, publicUrl }
+      }
+      if (nextDiagrams.some((d, i) => d !== diagrams[i])) setDiagrams(nextDiagrams)
+      for (const d of nextDiagrams) {
+        if (d.publicUrl && d.filename) diagramUrlMap[d.filename] = d.publicUrl
       }
 
       // Update machines row
@@ -613,7 +679,12 @@ export default function SlotGuideFormApp() {
       const { error: mErr } = await supabase.from('machines').update(machinePayload).eq('id', editIds.machineId)
       if (mErr) throw new Error(`machines: ${mErr.message}`)
 
-      const compiledMarkdown = buildGuideMarkdown({ title: guide.title || machine.name, guide })
+      const compiledMarkdown = buildGuideMarkdown({
+        machine,
+        guide,
+        diagrams: activeDiagramRows(nextDiagrams, machine.slug),
+        resolveImageUrl: (filename) => diagramUrlMap[filename] || resolveGuideImageUrl(machine.slug, nextDiagrams, filename),
+      })
       const nowIso = new Date().toISOString()
 
       // Update guides row
@@ -643,6 +714,17 @@ export default function SlotGuideFormApp() {
   const isEdit = mode === 'edit'
 
   const showPreview = isEdit || !!(guide.title || machine.name)
+
+  const previewMarkdown = useMemo(() => {
+    const effectiveSlug = guide._slug || machine.slug || slug
+    if (!effectiveSlug && !guide.title && !machine.name) return ''
+    return buildGuideMarkdown({
+      machine: { ...machine, slug: effectiveSlug },
+      guide,
+      diagrams: activeDiagramRows(diagrams, effectiveSlug),
+      resolveImageUrl: (filename) => resolveGuideImageUrl(effectiveSlug, diagrams, filename),
+    })
+  }, [machine, guide, diagrams, slug])
 
   return (
     <div className="bg-gray-950 text-white px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom,0px))]">
@@ -719,7 +801,9 @@ export default function SlotGuideFormApp() {
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-cyan-300">AP Guide editor</h1>
-            <p className="text-gray-400 text-sm mt-0.5">Load an existing guide or create a new one.</p>
+            <p className="text-gray-400 text-sm mt-0.5">
+              Supabase + cloud storage are the source of truth. Edit here, upload images from your computer, save... no repo markdown required.
+            </p>
           </div>
           <div className="flex gap-2">
             <button
@@ -928,7 +1012,7 @@ export default function SlotGuideFormApp() {
                   <label className="block cursor-pointer group">
                     <div className="relative w-full rounded-xl overflow-hidden border border-gray-700 bg-gray-900">
                       <img
-                        src={heroFile ? URL.createObjectURL(heroFile) : currentThumbnail}
+                        src={heroPreviewUrl || currentThumbnail}
                         alt="Hero"
                         className="w-full max-h-52 object-cover"
                         onError={(e) => { e.currentTarget.style.display = 'none' }}
@@ -1033,34 +1117,50 @@ export default function SlotGuideFormApp() {
             </div>
           </section>
 
-          {/* Diagrams — new guides only (edits keep existing diagrams in DB) */}
-          {!isEdit && (
-            <section className={sc}>
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold">Diagrams</h2>
-                <button type="button" className="text-sm text-cyan-300 hover:underline" onClick={() => setDiagrams((d) => [...d, emptyDiagram(slug || 'guide')])}>
-                  + Add diagram
-                </button>
-              </div>
-              {diagrams.length === 0 && (
-                <p className="text-sm text-gray-500">Optional. Each diagram is converted to WebP and embedded in guide.md.</p>
-              )}
-              {diagrams.map((d) => (
-                <div key={d.id} className="rounded-xl border border-gray-800 p-3 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-400">Diagram</span>
-                    <button type="button" className="text-xs text-red-400" onClick={() => setDiagrams((list) => list.filter((x) => x.id !== d.id))}>Remove</button>
-                  </div>
-                  <input type="file" accept="image/*" className={ic} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, file: e.target.files?.[0] || null }))} />
-                  <input className={ic} placeholder="Alt text" value={d.alt} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, alt: e.target.value }))} />
-                  <input className={ic} placeholder="Filename" value={d.filename} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, filename: e.target.value }))} />
-                  <select className={ic} value={d.placement} onChange={(e) => setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, placement: e.target.value }))}>
-                    {PLACEMENTS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                  </select>
+          {/* Diagrams — placement images (also use Insert image in section fields for inline) */}
+          <section className={sc}>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold">Diagrams</h2>
+              <button
+                type="button"
+                className="text-sm text-cyan-300 hover:underline"
+                onClick={() => { setDiagrams((d) => [...d, emptyDiagram(slug || machine.slug || 'guide')]); setIsDirty(true) }}
+              >
+                + Add diagram
+              </button>
+            </div>
+            {diagrams.length === 0 && (
+              <p className="text-sm text-gray-500">
+                Optional. Each diagram converts to WebP, uploads to cloud storage, and embeds in the saved guide markdown.
+                You can also use <span className="text-gray-400">Insert image</span> inside section fields.
+              </p>
+            )}
+            {diagrams.map((d) => (
+              <div key={d.id} className="rounded-xl border border-gray-800 p-3 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Diagram</span>
+                  <button type="button" className="text-xs text-red-400" onClick={() => { setDiagrams((list) => list.filter((x) => x.id !== d.id)); setIsDirty(true) }}>Remove</button>
                 </div>
-              ))}
-            </section>
-          )}
+                {(d.publicUrl || d.file) && (
+                  <DiagramPreview file={d.file} publicUrl={d.publicUrl} alt={d.alt} />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className={ic}
+                  onChange={(e) => {
+                    setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, file: e.target.files?.[0] || null, publicUrl: null }))
+                    setIsDirty(true)
+                  }}
+                />
+                <input className={ic} placeholder="Alt text" value={d.alt} onChange={(e) => { setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, alt: e.target.value })); setIsDirty(true) }} />
+                <input className={ic} placeholder="Filename (e.g. ladder-diagram.webp)" value={d.filename} onChange={(e) => { setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, filename: e.target.value })); setIsDirty(true) }} />
+                <select className={ic} value={d.placement} onChange={(e) => { setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, placement: e.target.value })); setIsDirty(true) }}>
+                  {PLACEMENTS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </div>
+            ))}
+          </section>
 
           {error  ? <p className="text-red-400 text-sm">{error}</p> : null}
           {result ? (
@@ -1092,7 +1192,7 @@ export default function SlotGuideFormApp() {
               </div>
               <p className="text-xs text-gray-500 text-center sm:text-left">
                 <strong className="text-gray-400">Save draft</strong> keeps your work in this browser only.
-                <strong className="text-gray-400"> Ingest guide</strong> creates the guide in the database.
+                <strong className="text-gray-400"> Ingest guide</strong> publishes to Supabase + cloud storage (live on test).
               </p>
             </div>
           ) : (
@@ -1130,7 +1230,7 @@ export default function SlotGuideFormApp() {
                   machine={machine}
                   heroFile={heroFile}
                   heroUrl={currentThumbnail}
-                  contentMarkdown={buildGuideMarkdown({ title: guide.title, guide })}
+                  contentMarkdown={previewMarkdown}
                   guideList={guideList}
                 />
               </div>

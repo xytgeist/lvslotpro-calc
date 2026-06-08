@@ -1,13 +1,7 @@
-export function slugify(raw) {
-  return String(raw ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-')
-}
+import { buildGuideMarkdown as buildGuideMarkdownCore } from '../../scripts/lib/slotGuideIngestCore.mjs'
 
-/** Live slug field: allow a trailing hyphen while typing (e.g. `buffalo-` before `link`). */
+export { diagramFilename, slugify } from '../../scripts/lib/slotGuideIngestCore.mjs'
+
 export function slugifyInput(raw) {
   return String(raw ?? '')
     .toLowerCase()
@@ -16,19 +10,16 @@ export function slugifyInput(raw) {
     .replace(/-{2,}/g, '-')
 }
 
-export function diagramFilename(name, slug) {
-  const base = slugify(name.replace(/\.[^.]+$/, '')) || `${slug}-diagram`
-  return base.endsWith('.webp') ? base : `${base}.webp`
+function trimBody(text) {
+  return String(text ?? '').trim()
 }
 
-/** Strip embedded diagram images from a section body. */
-function stripImages(text) {
-  return text.replace(/!\[.*?\]\(.*?\)\n?/g, '').trim()
-}
+const KNOWN_SECTION =
+  /When to play|When to stop|How to check|Risk|Where to find|Skins|Gameplay/i
 
 /**
- * Parse compiled guide markdown back into structured section fields.
- * Matches the structure produced by slotGuideIngestCore buildGuideMarkdown.
+ * Parse compiled guide markdown into structured section fields.
+ * Preserves embedded markdown images (including R2 / Storage URLs).
  */
 export function parseGuideMarkdown(markdown) {
   const out = {
@@ -39,78 +30,82 @@ export function parseGuideMarkdown(markdown) {
   }
   if (!markdown) return out
 
-  // Remove the leading H1 title line and split on H2 headers
   const withoutH1 = markdown.replace(/^#\s[^\n]*\n+/, '')
-  // Remove horizontal rules that separate gameplay section
   const cleaned = withoutH1.replace(/^---\s*\n/gm, '')
   const parts = cleaned.split(/^## /m)
+  const orphans = []
 
   for (const part of parts) {
     if (!part.trim()) continue
     const nl = part.indexOf('\n')
     const header = nl === -1 ? part.trim() : part.slice(0, nl).trim()
-    const body   = nl === -1 ? '' : part.slice(nl + 1)
+    const body = nl === -1 ? '' : part.slice(nl + 1)
 
     if (/When to play/i.test(header)) {
-      out.when_to_play = stripImages(body)
+      out.when_to_play = trimBody(body)
     } else if (/When to stop/i.test(header)) {
-      out.when_to_stop = stripImages(body)
+      out.when_to_stop = trimBody(body)
     } else if (/How to check/i.test(header)) {
-      out.how_to_check = stripImages(body)
+      out.how_to_check = trimBody(body)
     } else if (/Risk/i.test(header)) {
-      // Extract bankroll bold line, summary paragraphs, and bullet list
       const lines = body.split('\n')
       const summaryLines = []
       const bullets = []
       for (const line of lines) {
         const bm = line.match(/^\*\*Bankroll on hand:\s*(.+?)\*\*/)
         if (bm) { out.risk_bankroll = bm[1].trim(); continue }
-        if (/^!\[/.test(line)) continue                  // skip images
         if (/^- /.test(line)) { bullets.push(line.slice(2).trim()); continue }
         summaryLines.push(line)
       }
       out.risk_summary = summaryLines.join('\n').trim()
       out.risk_bullets = bullets.join('\n')
     } else if (/Where to find/i.test(header)) {
-      out.where_to_find = stripImages(body)
+      out.where_to_find = trimBody(body)
     } else if (/Skins/i.test(header)) {
-      out.skins_markdown = stripImages(body)
+      out.skins_markdown = trimBody(body)
     } else if (/Gameplay/i.test(header)) {
-      out.gameplay_mechanics = stripImages(body)
+      out.gameplay_mechanics = trimBody(body)
+    } else if (header && !KNOWN_SECTION.test(header)) {
+      orphans.push(`## ${header}\n\n${trimBody(body)}`)
     }
+  }
+
+  if (orphans.length) {
+    const block = orphans.join('\n\n')
+    out.when_to_play = [out.when_to_play, block].filter(Boolean).join('\n\n\n')
   }
 
   return out
 }
 
 /**
- * Re-assemble structured guide fields back into the compiled markdown format.
- * Mirrors slotGuideIngestCore buildGuideMarkdown (no image embedding on client).
+ * @param {{
+ *   machine: Record<string, unknown>,
+ *   guide: Record<string, unknown>,
+ *   diagrams?: Array<{ alt: string, filename: string, placement: string }>,
+ *   resolveImageUrl?: (filename: string) => string | undefined,
+ * }} args
  */
-export function buildGuideMarkdown({ title, guide }) {
-  const t = String(title || '').trim()
-  const g = guide
-  let md = t ? `# ${t}\n\n` : ''
+export function buildGuideMarkdown({ machine, guide, diagrams = [], resolveImageUrl }) {
+  const riskBullets = Array.isArray(guide.risk_bullets)
+    ? guide.risk_bullets
+    : String(guide.risk_bullets ?? '')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean)
 
-  md += `## 🟢 When to play\n\n${g.when_to_play.trim()}\n\n`
-  md += `## 🛑 When to stop\n\n${g.when_to_stop.trim()}\n\n`
-  md += `## 🔍 How to check (quick/easy)\n\n${g.how_to_check.trim()}\n\n`
-
-  md += `## ⚠️ Risk & Warnings\n\n`
-  if (g.risk_bankroll.trim()) md += `**Bankroll on hand: ${g.risk_bankroll.trim()}**\n\n`
-  if (g.risk_summary.trim()) md += `${g.risk_summary.trim()}\n\n`
-  const bullets = g.risk_bullets.split('\n').map(s => s.trim()).filter(Boolean)
-  if (bullets.length) md += `${bullets.map(b => `- ${b}`).join('\n')}\n\n`
-
-  const whereToFind = g.where_to_find.trim()
-  if (whereToFind) md += `## 📍 Where to find\n\n${whereToFind}\n\n`
-
-  const skins = g.skins_markdown.trim()
-  if (skins) md += `## 🎭 Skins (same game different theme/art)\n\n${skins}\n\n`
-
-  md += `---\n\n## 🎰 Gameplay Mechanics\n\n${g.gameplay_mechanics.trim()}\n`
-
-  return md
+  return buildGuideMarkdownCore(
+    {
+      machine: { slug: machine.slug, name: machine.name, ...machine },
+      guide: {
+        ...guide,
+        title: guide.title || machine.name,
+        risk_bullets: riskBullets,
+      },
+      diagrams,
+    },
+    { resolveImageUrl },
+  )
 }
 
 export const SLOT_GUIDE_DRAFT_KEY = 'slotGuideFormDraft:v1'

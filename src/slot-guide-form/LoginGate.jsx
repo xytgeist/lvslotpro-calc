@@ -77,9 +77,26 @@ export default function LoginGate({ children }) {
     setState('login')
   }
 
-  const scrollShell = 'flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-gray-950'
+  // fixed + --slot-guide-vh from window.innerHeight — h-dvh shrinks after native file picker (Chrome/Windows)
+  const scrollShell =
+    'fixed inset-x-0 top-0 z-0 flex min-h-0 flex-col overflow-hidden bg-gray-950 h-[var(--slot-guide-vh,100dvh)] max-h-[var(--slot-guide-vh,100dvh)]'
   const scrollBody =
     'min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] touch-pan-y'
+
+  useEffect(() => {
+    const root = document.documentElement
+    const syncViewport = () => {
+      root.style.setProperty('--slot-guide-vh', `${window.innerHeight}px`)
+    }
+    syncViewport()
+    window.addEventListener('resize', syncViewport)
+    window.addEventListener('focus', syncViewport)
+    return () => {
+      window.removeEventListener('resize', syncViewport)
+      window.removeEventListener('focus', syncViewport)
+      root.style.removeProperty('--slot-guide-vh')
+    }
+  }, [])
 
   if (state === 'checking') {
     return (

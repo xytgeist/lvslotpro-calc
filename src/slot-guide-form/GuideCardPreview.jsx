@@ -13,6 +13,7 @@
 import { useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useBlobObjectUrl } from './guideImageUtils.js'
 
 const BUFFALO_PLACEHOLDER =
   'https://media-test.lvslotpro.com/guides/buffalo-link/hero.webp'
@@ -318,11 +319,8 @@ export default function GuideCardPreview({
   const accent = useMemo(() => cardAccent(slug), [slug])
   const mdComponents = useMemo(() => makeMarkdownComponents(accent, guideList), [accent, guideList])
 
-  const heroSrc = useMemo(() => {
-    if (heroFile) return URL.createObjectURL(heroFile)
-    if (heroUrl)  return heroUrl
-    return slug ? `/guides/${slug}/hero.webp` : BUFFALO_PLACEHOLDER
-  }, [heroFile, heroUrl, slug])
+  const heroBlobUrl = useBlobObjectUrl(heroFile)
+  const heroSrc = heroBlobUrl || heroUrl || (slug ? `/guides/${slug}/hero.webp` : BUFFALO_PLACEHOLDER)
 
   const evLine = guide.card_ev_threshold?.trim() || 'Verify +EV on the glass — open guide'
   const calcKey = machine.has_calculator

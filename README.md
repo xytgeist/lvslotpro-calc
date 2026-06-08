@@ -150,21 +150,32 @@ node scripts/sync-slot-forms-to-supabase.mjs --target=test --slug=buffalo-link
 
 Run sync whenever you add games, change manifests, or update `guide.md` and want the database to reflect it.
 
-### AP guide updates (docx → repo → test DB)
+### AP guide updates (form-first — recommended)
 
-**Typical flow (Ryan + Theo, Jun 2026 pilot):**
+**Day-to-day workflow:** use **`/slot-guide-form`** only. Supabase **`guides.content_markdown`** + cloud image URLs (R2 or **`guide-assets`** storage) are the live source of truth. The app **never reads `Slots/*/guide.md` at runtime**.
 
-1. Drop **`AP-<name>.docx`** (advantage play) and **`Review-<name>.docx`** (gameplay mechanics) in **`Slots/_ingest/`** (local; usually not committed).
-2. Build **`Slots/<slug>/`**: **`guide.md`**, **`card.meta.json`**, **`hero.png`**; convert hero to **`public/guides/<slug>/hero.webp`**.
+| Task | How |
+| --- | --- |
+| **New guide** | Sign in as admin → fill sections → upload hero/diagrams → **Ingest guide** |
+| **Edit existing** | **Fetch guides** → **Load** → edit → **Save changes** |
+| **Inline images** | **Insert image** in section fields (WebP upload to cloud, markdown URL inserted at cursor) |
+| **Placement diagrams** | **Diagrams** section (optional; embeds after a section header on save) |
+
+Repo **`Slots/<slug>/guide.md`** and **`npm run slots:sync`** remain optional for bulk/docx pipelines or git backup — not required for test/prod copy to go live.
+
+### AP guide updates (docx → repo → sync — optional)
+
+Legacy / bulk path when starting from Word docs:
+
+1. Drop **`AP-<name>.docx`** and **`Review-<name>.docx`** in **`Slots/_ingest/`** (local; usually not committed).
+2. Build **`Slots/<slug>/`**: **`guide.md`**, **`card.meta.json`**, hero asset.
 3. Publish on **test**:
 
    ```bash
    npm run slots:sync:test -- --slug=<slug>
    ```
 
-   The app **reads `guides.content_markdown` from Supabase** — sync is enough for guide text to go live on test. Commit to git for repo source of truth; deploy Vercel when **code** or **`public/guides/`** assets change.
-
-**`guide.md` sections (in order):** When to play → When to stop → How to check → Risk & Warnings → **📍 Where to find** (optional) → Skins → Gameplay Mechanics.
+**Compiled markdown section order:** When to play → When to stop → How to check → Risk & Warnings → **📍 Where to find** (optional) → Skins → Gameplay Mechanics.
 
 **Card collapsed tile:** **Popularity** = **`machines.popularity`** tier (`Common`, etc.). Migration **`20260610170000`** renamed **`vegas_availability`** → **`popularity`**.
 
@@ -192,25 +203,23 @@ Web form for complete guide cards (machine fields, emoji-section markdown, hero 
 | **Local scripts / `slot-guide:serve`** | Repo-root **`.env.supabase.test`** / **`.env.supabase.production`** (gitignored), selected by form **target** (same as `slots:sync`) |
 | **Vercel serverless** | Dashboard env vars — **no** `.env.supabase.*` files on the server. **Test** ingest: **`SUPABASE_URL`** + **`SUPABASE_SERVICE_ROLE_KEY`**. **Production** ingest: optional **`SUPABASE_URL_PRODUCTION`** + **`SUPABASE_SERVICE_ROLE_KEY_PRODUCTION`** |
 
-**Draft vs ingest:** **Save draft** stores WIP in browser **`localStorage`** (`slotGuideFormDraft:v1`) — not Supabase. **Ingest guide** creates the DB row; then **Fetch guides → Load → Save changes** for later edits.
+**Draft vs ingest vs save:** **Save draft** = browser **`localStorage`** only. **Ingest guide** / **Save changes** = Supabase + cloud storage (live on test). No repo markdown write on Vercel.
 
-**Images:** converted to WebP. Local server writes **`public/guides/<slug>/`** and **`Slots/<slug>/`**. Vercel API uploads to Supabase Storage bucket **`guide-assets`** (run **`supabase/guide_assets_storage.sql`** on test + prod first) and stores public URLs in `machines.thumbnail_url` + markdown when repo files are not written.
+**Images:** converted to WebP client-side. Vercel ingest + **Save changes** upload to R2 (preferred) or Supabase Storage bucket **`guide-assets`**. Local **`npm run slot-guide:serve`** can optionally write **`public/guides/`** + **`Slots/`** when **`SLOT_GUIDE_WRITE_REPO=1`**.
 
-**Typical local workflow:**
+**Typical workflow (deployed):**
 
 ```bash
-# Terminal 1
-npm run slot-guide:serve
-
-# Terminal 2
-npm run dev
-# Open /slot-guide-form — sign in as admin; for local ingest API set URL http://localhost:8787/ingest + GUIDE_INGEST_SECRET on that server
-
-git add Slots/ public/guides/
-npm run slots:sync:test   # optional if ingest already synced Supabase
+# npm run dev → /slot-guide-form — sign in as admin
+# New: Ingest guide | Existing: Fetch → Load → Save changes
 ```
 
-Deployed-only workflow: form → `/api/slot-guide-ingest` with Vercel env vars; commit returned `files.cardMetaJson` / `files.guideMarkdown` + pull storage assets into `public/guides/` when you want repo parity.
+**Optional local repo mirror:**
+
+```bash
+npm run slot-guide:serve   # SLOT_GUIDE_WRITE_REPO=1 for Slots/ + public/guides/
+npm run dev
+```
 
 ### Windows note
 

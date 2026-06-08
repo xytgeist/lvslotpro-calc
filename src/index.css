@@ -131,10 +131,15 @@ html.light body {
   background-color: #030712;
 }
 
-/* slot-guide-form entry: body is overflow:hidden globally — pin #root height so the inner scroll shell can reach top/bottom */
+/* slot-guide-form entry: body is overflow:hidden globally — scroll shell is fixed inset-0 (see LoginGate.jsx) */
+html:has([data-slot-guide-form]),
+html:has([data-slot-guide-form]) body {
+  height: 100%;
+  overflow: hidden;
+}
+
 html:has([data-slot-guide-form]) #root {
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
