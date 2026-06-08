@@ -51,3 +51,17 @@ CREATE POLICY "Admins can update guides" ON guides
   WITH CHECK (
     EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
   );
+
+DROP POLICY IF EXISTS "Admins can delete machines" ON machines;
+CREATE POLICY "Admins can delete machines" ON machines
+  FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+DROP POLICY IF EXISTS "Admins can delete guides" ON guides;
+CREATE POLICY "Admins can delete guides" ON guides
+  FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
+  );

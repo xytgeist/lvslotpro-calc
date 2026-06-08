@@ -247,6 +247,7 @@ Built by **`formUtils.js`** / **`scripts/lib/slotGuideIngestCore.mjs`**; slot-gu
 - [x] **Vercel env fallback:** ingest no longer requires **`.env.supabase.test`** file on server @ **`24d0412`**
 - [ ] **Ryan smoke — ingest on tx18:** Vercel env vars set + deploy **`test`** ≥ **`24d0412`**; ingest Buffalo Link (or other) → **Fetch guides** → **Load** → edit → **Save changes**
 - [ ] **Automated `_ingest` docx → guide.md** script (pilot was manual; deferred)
+- [x] **Admin Delete on AP Guide cards** — **`GuidesScreen`** red **Delete** (admin only) + confirm modal; SQL **`20260610180000_guide_admin_delete_rls.sql`** (apply on test before use)
 - [x] **AP Guides light-mode search:** **`ap-guides-search-input`** + **`html.light`** rules in **`index.css`** (readable on light gray) @ **`ea1d72e`**
 
 ---
@@ -697,6 +698,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-08: **AP Guides admin Delete (`GuidesScreen`):** admin-only **Delete** on guide card hero + confirm modal removes **`guides`** + **`machines`** (+ optional **`content_access_gates`**) on test; does not delete **`Slots/<slug>/`** in git. Apply **`20260610180000_guide_admin_delete_rls.sql`** on test before use.
 - 2026-06-08: **AP guide docx pilot + sync workflow (on `test`):** drop **`AP-*.docx`** + **`Review-*.docx`** in **`Slots/_ingest/`** → synthesize **`Slots/<slug>/guide.md`** + **`card.meta.json`** → **`npm run slots:sync:test -- --slug=<slug>`** publishes **`guides.content_markdown`** (app reads DB; git commit for source of truth, not required for test copy). **`coin-kingdom-aztec`** first pilot @ **`132ec95`** / **`102cec1`**. See backlog **AP Guide editor** § docx workflow.
 - 2026-06-08: **Guide card popularity display (`test`, `a3a20b7`):** collapsed tile always shows **`machines.popularity`** tier; **`popularity_summary`** no longer overrides label.
 - 2026-06-08: **Voice rule — no em dashes (`a3a20b7`):** `.cursor/rules/no-em-dashes.mdc` + **`AGENTS.md`**; prefer **`...`** over spaced hyphens for breaks.

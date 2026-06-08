@@ -1631,6 +1631,9 @@ export default function GuidesScreen({
     }, 120)
   }, [openCardSlug, loading])
   const [gateBusySlug, setGateBusySlug] = useState(null)
+  /** @type {[null | { guideId: string, machineId: string | null, slug: string, name: string }, import('react').Dispatch<import('react').SetStateAction<null | { guideId: string, machineId: string | null, slug: string, name: string }>>]} */
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const guideCardRefs = useRef(Object.create(null))
 
   const access = useMemo(
@@ -1692,6 +1695,50 @@ export default function GuidesScreen({
     },
     [gatesDbReady, isAdmin, onSetContentGate],
   )
+
+  const handleAdminDeleteGuide = useCallback(async () => {
+    if (!deleteConfirm || !supabaseClient) return
+    const { guideId, machineId, slug } = deleteConfirm
+    const normalized = normalizeGuideAccessSlug(slug)
+    setDeleteBusy(true)
+    setLoadErr('')
+    try {
+      if (normalized) {
+        const { error: gateErr } = await supabaseClient
+          .from('content_access_gates')
+          .delete()
+          .eq('content_kind', 'guide')
+          .eq('content_key', normalized)
+        if (gateErr && !gateErr.message?.includes('content_access_gates')) throw gateErr
+      }
+      const { error: guideErr } = await supabaseClient.from('guides').delete().eq('id', guideId)
+      if (guideErr) {
+        if (guideErr.message?.includes('policy') || guideErr.code === '42501') {
+          throw new Error(
+            'Delete blocked by RLS. Apply migration 20260610180000_guide_admin_delete_rls.sql on test Supabase.',
+          )
+        }
+        throw guideErr
+      }
+      if (machineId) {
+        const { error: machineErr } = await supabaseClient.from('machines').delete().eq('id', machineId)
+        if (machineErr) throw machineErr
+      }
+      setRows((prev) => prev.filter((r) => r.id !== guideId))
+      if (
+        expandedSlug != null &&
+        normalized &&
+        String(expandedSlug).toLowerCase() === String(normalized).toLowerCase()
+      ) {
+        setExpandedSlug(null)
+      }
+      setDeleteConfirm(null)
+    } catch (err) {
+      setLoadErr(err instanceof Error ? err.message : String(err))
+    } finally {
+      setDeleteBusy(false)
+    }
+  }, [deleteConfirm, expandedSlug, supabaseClient])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1969,16 +2016,37 @@ export default function GuidesScreen({
                         }`}
                       >
                         {isAdmin ? (
-                          <div className="absolute right-3 top-3 z-20">
-                            <ContentAccessAdminSwitch
-                              locked={adminGuideLocked}
-                              busy={gateBusySlug === normalizedGuideSlug}
-                              disabled={!gatesDbReady}
-                              label={`${m?.name || row.title} Slots Edge lock`}
-                              onLockedChange={(nextLocked) =>
-                                void handleAdminGuideLockToggle(slug, nextLocked)
-                              }
-                            />
+                          <div className="absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2 pointer-events-none">
+                            {!isLocalDemoGuide(row) ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setDeleteConfirm({
+                                    guideId: row.id,
+                                    machineId: m?.id ?? null,
+                                    slug,
+                                    name: m?.name || row.title || slug,
+                                  })
+                                }}
+                                className="pointer-events-auto shrink-0 rounded-xl border border-red-500/70 bg-red-950/75 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-red-200 backdrop-blur-sm hover:bg-red-950/95 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                              >
+                                Delete
+                              </button>
+                            ) : (
+                              <span className="pointer-events-none" aria-hidden />
+                            )}
+                            <div className="pointer-events-auto shrink-0">
+                              <ContentAccessAdminSwitch
+                                locked={adminGuideLocked}
+                                busy={gateBusySlug === normalizedGuideSlug}
+                                disabled={!gatesDbReady}
+                                label={`${m?.name || row.title} Slots Edge lock`}
+                                onLockedChange={(nextLocked) =>
+                                  void handleAdminGuideLockToggle(slug, nextLocked)
+                                }
+                              />
+                            </div>
                           </div>
                         ) : null}
                         <img
@@ -2155,6 +2223,46 @@ export default function GuidesScreen({
       )}
 
       </ScrollLinkedEdgeTitleBarShell>
+
+      {deleteConfirm ? (
+        <div
+          className="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-black/75"
+          role="dialog"
+          aria-modal
+          aria-labelledby="guide-delete-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl">
+            <h2 id="guide-delete-title" className="text-lg font-bold text-white">
+              Delete AP guide?
+            </h2>
+            <p className="mt-2 text-sm text-zinc-300 leading-relaxed">
+              Remove <strong className="text-white">{deleteConfirm.name}</strong>{' '}
+              (<code className="text-zinc-400">{deleteConfirm.slug}</code>) from the app on this
+              environment. This deletes the Supabase <code className="text-zinc-400">guides</code> and{' '}
+              <code className="text-zinc-400">machines</code> rows. It does not remove{' '}
+              <code className="text-zinc-400">Slots/{deleteConfirm.slug}/</code> from git.
+            </p>
+            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => setDeleteConfirm(null)}
+                className="min-h-11 rounded-xl border border-zinc-600 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => void handleAdminDeleteGuide()}
+                className="min-h-11 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete guide'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <AskCommunityModal
         open={!!askFor}
