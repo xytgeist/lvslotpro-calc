@@ -57,33 +57,31 @@ Stop when your ladder hits or you exhaust session bankroll. Do not max-bet a $1,
 
 ### In Las Vegas / physical casinos
 
-It is a relatively new game (2025 release) and is starting to appear in various casinos.
+Coin Kingdom Aztec is a newer Ainsworth title that has been gaining traction since its release.
 
-You can find it at places like:
+You can find it at various casinos, though it is not as widespread as the main Coin Kingdom or bigger Aristocrat games.
 
-- Palms Casino
-- Aliante Casino
-- Other local and Strip casinos that carry newer Ainsworth-style games
+Current placements include: Palms Casino, Aliante Casino, South Point, and several locals casinos and smaller Strip properties.
 
-It is not as widespread as Buffalo Link or Phoenix Link yet, but it is gaining popularity.
+It is still being rolled out, so availability can vary by week.
 
 ### Online / free play
 
-You can play the demo version on sites like VegasSlotsOnline.com and other slot review sites.
+Demo versions are available on some slot review sites, though they may not fully represent the real machine.
 
 ### Top cities / regions (outside Las Vegas)
 
 | Rank | City / region | Popularity level | Notes |
 | --- | --- | --- | --- |
-| 1 | Atlantic City, NJ | High | Strong presence at Resorts AC, Golden Nugget, and Borgata |
-| 2 | Oklahoma (esp. Tulsa area) | High | Very popular at Cherokee casinos and smaller regional spots |
-| 3 | Pennsylvania (Philly area) | Medium-High | Parx Casino and others have multiple banks |
-| 4 | Florida | Medium-High | Seminole Hard Rock Tampa and other tribal casinos |
-| 5 | Mississippi Gulf Coast | Medium | Island View, Golden Nugget Biloxi |
-| 6 | Indiana / Ohio River | Medium | Growing in popularity |
-| 7 | New York (NYC metro) | Medium | Resorts World New York has it |
+| 1 | Atlantic City, NJ | High | Strong presence at Borgata and Resorts |
+| 2 | Pennsylvania | High | Popular at Parx and Rivers casinos |
+| 3 | Florida | Medium-High | Found at Seminole Hard Rock and other tribal casinos |
+| 4 | Oklahoma | Medium-High | Doing well at Cherokee Nation properties |
+| 5 | Mississippi Gulf Coast | Medium | Available at several Biloxi casinos |
+| 6 | Indiana | Medium | Growing placement at Horseshoe and Ameristar |
+| 7 | New York metro | Medium | Limited but present at Resorts World |
 
-**Summary:** East Coast (especially Atlantic City and Pennsylvania) currently has the strongest placement of Coin Kingdom outside Vegas. Oklahoma and Florida tribal casinos are also hot spots for this game. It is still spreading, so availability can vary week to week.
+**Summary:** Coin Kingdom Aztec is performing well on the East Coast and in Florida tribal casinos. It has not reached the same level of distribution as Phoenix Link or Buffalo Link, but it is steadily expanding. Availability can vary significantly by casino and week.
 
 ## 🎭 Skins (same game different theme/art)
 
