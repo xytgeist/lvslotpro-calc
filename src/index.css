@@ -141,9 +141,9 @@ html:has([data-slot-guide-form]) body {
 }
 
 html:has([data-slot-guide-form]) #root {
-  height: 100vh;
-  max-height: 100vh;
-  min-height: 0;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  min-height: 0 !important;
   overflow: hidden;
 }
 

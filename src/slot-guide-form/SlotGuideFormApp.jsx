@@ -12,6 +12,7 @@ import {
 } from './formUtils.js'
 import { prepareGuideImageFile, useBlobObjectUrl } from './guideImageUtils.js'
 import { assertSupabaseRowUpdated } from './slotGuideViewport.js'
+import { cacheBustUrl, useGuideFilePicker } from './guideFilePicker.jsx'
 import GuideCardPreview from './GuideCardPreview.jsx'
 
 const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
@@ -156,17 +157,14 @@ const IMAGE_UPLOAD_FIELDS = new Set([
  * Uploads the image to R2 (or Supabase Storage fallback) and inserts
  * `![image](url)` markdown at the current cursor position.
  */
-function InlineImageTextarea({ value, onChange, className, required, slug, guideTitle }) {
+function InlineImageTextarea({ value, onChange, className, required, slug, guideTitle, pickFile }) {
   const taRef  = useRef(null)
-  const fileRef = useRef(null)
   const [uploading, setUploading]   = useState(false)
   const [uploadErr, setUploadErr]   = useState('')
   const [uploadOk, setUploadOk]     = useState('')
 
-  async function handleFile(e) {
-    const file = e.target.files?.[0]
+  async function handleFile(file) {
     if (!file) return
-    e.target.value = ''
 
     const effectiveSlug = slug || slugify(guideTitle || 'guide') || 'guide'
     const filename = `content-${Date.now()}.webp`
@@ -206,8 +204,8 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
       <div className="flex items-center justify-end mb-1">
         <button
           type="button"
-          disabled={uploading}
-          onClick={() => fileRef.current?.click()}
+          disabled={uploading || !pickFile}
+          onClick={() => pickFile?.({ accept: 'image/*', onPick: (f) => f && handleFile(f) })}
           className={`inline-flex items-center gap-1.5 text-xs font-medium transition-colors
             ${uploading ? 'text-zinc-500 cursor-not-allowed' : 'text-cyan-400 hover:text-cyan-300'}`}
           title="Upload image and insert at cursor"
@@ -226,16 +224,6 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
           )}
           {uploading ? 'Uploading…' : 'Insert image'}
         </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          disabled={uploading}
-          className="sr-only"
-          tabIndex={-1}
-          aria-hidden
-          onChange={handleFile}
-        />
       </div>
       <textarea
         ref={taRef}
@@ -339,6 +327,7 @@ const blankGuide = {
 }
 
 export default function SlotGuideFormApp() {
+  const { pickFile, portal: filePickerPortal } = useGuideFilePicker()
   const saved = useMemo(() => (typeof window !== 'undefined' ? readSettings() : null), [])
 
   // ── Connection settings (ingest target only — auth uses LoginGate session token)
@@ -506,11 +495,11 @@ export default function SlotGuideFormApp() {
   }
 
   // ── Load a selected guide into the form
-  async function loadGuide(id) {
+  async function loadGuide(id, { preserveResult = false } = {}) {
     setListBusy(true)
     setListErr('')
     setError('')
-    setResult(null)
+    if (!preserveResult) setResult(null)
     try {
       const { data, error: err } = await supabase.from('guides').select(`
         id, slug, title, content_markdown, card_ev_threshold, published, thumbnail_url,
@@ -642,10 +631,11 @@ export default function SlotGuideFormApp() {
       let newThumbnailUrl = null
       if (heroFile) {
         const preparedHero = await prepareGuideImageFile(heroFile, 'hero.webp')
-        newThumbnailUrl = await uploadGuideImageToR2OrStorage(preparedHero, {
-          slug: machine.slug,
+        const uploadedUrl = await uploadGuideImageToR2OrStorage(preparedHero, {
+          slug: machine.slug || guide._slug,
           filename: preparedHero.name,
         })
+        newThumbnailUrl = cacheBustUrl(uploadedUrl)
         setCurrentThumbnail(newThumbnailUrl)
         setHeroFile(null)
       }
@@ -713,6 +703,8 @@ export default function SlotGuideFormApp() {
 
       setResult({ ok: true, message: newThumbnailUrl ? 'Guide and hero image updated.' : 'Guide updated successfully.' })
       setIsDirty(false)
+
+      if (editIds.guideId) await loadGuide(editIds.guideId, { preserveResult: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -735,7 +727,21 @@ export default function SlotGuideFormApp() {
     })
   }, [machine, guide, diagrams, slug])
 
+  const pickHeroFile = useCallback(() => {
+    pickFile({
+      accept: 'image/*',
+      onPick: (file) => {
+        if (file) {
+          setHeroFile(file)
+          setIsDirty(true)
+        }
+      },
+    })
+  }, [pickFile])
+
   return (
+    <>
+    {filePickerPortal}
     <div className="bg-gray-950 text-white px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom,0px))]">
       {/* Two-column on large screens: form left, card preview right */}
       <div className="max-w-7xl mx-auto">
@@ -1017,48 +1023,48 @@ export default function SlotGuideFormApp() {
                   Hero image <span className="text-gray-500 font-normal text-xs">(optional)</span>
                 </label>
                 {isEdit && currentThumbnail ? (
-                  /* Edit mode: show current image with click-to-replace */
-                  <label className="block cursor-pointer group">
-                    <div className="relative w-full rounded-xl overflow-hidden border border-gray-700 bg-gray-900">
-                      <img
-                        src={heroPreviewUrl || currentThumbnail}
-                        alt="Hero"
-                        className="w-full max-h-52 object-cover"
-                        onError={(e) => { e.currentTarget.style.display = 'none' }}
-                      />
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                        <span className="text-white text-sm font-semibold">{heroFile ? 'Change image' : 'Replace image'}</span>
-                      </div>
-                      {heroFile && (
-                        <div className="absolute top-2 right-2 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                          New
+                  <div>
+                    <button
+                      type="button"
+                      onClick={pickHeroFile}
+                      className="block w-full cursor-pointer group text-left"
+                    >
+                      <div className="relative w-full rounded-xl overflow-hidden border border-gray-700 bg-gray-900">
+                        <img
+                          src={heroPreviewUrl || currentThumbnail}
+                          alt="Hero"
+                          className="w-full max-h-52 object-cover"
+                          onError={(e) => { e.currentTarget.style.display = 'none' }}
+                        />
+                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <svg viewBox="0 0 24 24" className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                          </svg>
+                          <span className="text-white text-sm font-semibold">{heroFile ? 'Change image' : 'Replace image'}</span>
                         </div>
-                      )}
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={(e) => { setHeroFile(e.target.files?.[0] || null); setIsDirty(true) }}
-                    />
+                        {heroFile && (
+                          <div className="absolute top-2 right-2 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                            New
+                          </div>
+                        )}
+                      </div>
+                    </button>
                     {heroFile
                       ? <p className="text-xs text-emerald-400 mt-1.5">Replacing with: {heroFile.name} — save to apply</p>
                       : <p className="text-xs text-gray-600 mt-1.5">Click image to replace</p>
                     }
-                  </label>
-                ) : isEdit ? (
-                  /* Edit mode, no existing image */
-                  <div>
-                    <input type="file" accept="image/*" className={ic} onChange={(e) => { setHeroFile(e.target.files?.[0] || null); setIsDirty(true) }} />
-                    {heroFile && <p className="text-xs text-emerald-400 mt-1">Selected: {heroFile.name}</p>}
                   </div>
                 ) : (
-                  /* New guide mode */
-                  <input type="file" accept="image/*" className={ic} onChange={(e) => { setHeroFile(e.target.files?.[0] || null); setIsDirty(true) }} />
+                  <div>
+                    <button
+                      type="button"
+                      onClick={pickHeroFile}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                    >
+                      Choose hero image
+                    </button>
+                    {heroFile && <p className="text-xs text-emerald-400 mt-1">Selected: {heroFile.name}</p>}
+                  </div>
                 )}
               </div>
             </div>
@@ -1083,6 +1089,7 @@ export default function SlotGuideFormApp() {
                     onChange={(val) => setGuideField(key, val)}
                     slug={machine.slug || guide._slug}
                     guideTitle={guide.title}
+                    pickFile={pickFile}
                   />
                 ) : (
                   <textarea
@@ -1106,6 +1113,7 @@ export default function SlotGuideFormApp() {
                   onChange={(val) => setGuideField('where_to_find', val)}
                   slug={machine.slug || guide._slug}
                   guideTitle={guide.title}
+                  pickFile={pickFile}
                 />
               ) : (
                 <textarea
@@ -1135,6 +1143,7 @@ export default function SlotGuideFormApp() {
                   onChange={(val) => setGuideField('gameplay_mechanics', val)}
                   slug={machine.slug || guide._slug}
                   guideTitle={guide.title}
+                  pickFile={pickFile}
                 />
               ) : (
                 <textarea
@@ -1173,15 +1182,20 @@ export default function SlotGuideFormApp() {
                 {(d.publicUrl || d.file) && (
                   <DiagramPreview file={d.file} publicUrl={d.publicUrl} alt={d.alt} />
                 )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className={ic}
-                  onChange={(e) => {
-                    setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, file: e.target.files?.[0] || null, publicUrl: null }))
-                    setIsDirty(true)
-                  }}
-                />
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                  onClick={() => pickFile({
+                    accept: 'image/*',
+                    onPick: (file) => {
+                      if (!file) return
+                      setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, file, publicUrl: null }))
+                      setIsDirty(true)
+                    },
+                  })}
+                >
+                  {d.file ? `Selected: ${d.file.name}` : 'Choose diagram image'}
+                </button>
                 <input className={ic} placeholder="Alt text" value={d.alt} onChange={(e) => { setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, alt: e.target.value })); setIsDirty(true) }} />
                 <input className={ic} placeholder="Filename (e.g. ladder-diagram.webp)" value={d.filename} onChange={(e) => { setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, filename: e.target.value })); setIsDirty(true) }} />
                 <select className={ic} value={d.placement} onChange={(e) => { setDiagrams((list) => list.map((x) => x.id !== d.id ? x : { ...x, placement: e.target.value })); setIsDirty(true) }}>
@@ -1272,5 +1286,6 @@ export default function SlotGuideFormApp() {
       </div>{/* end flex/grid row */}
       </div>{/* end max-w-7xl */}
     </div>
+    </>
   )
 }

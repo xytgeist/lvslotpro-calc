@@ -4,14 +4,35 @@ import { createClient } from '@supabase/supabase-js'
 const SB_URL = 'https://jtjgtucumuoswnbauxry.supabase.co'
 const SB_ANON = 'sb_publishable_u3-GQGrZ_hswapkiWiPyLA_Ah3mxU8B'
 
-// Auth checks against the test environment (where the app currently lives).
-// Exported so SlotGuideFormApp can reuse the same authenticated client instance
-// for reads/writes — no service key needed; RLS admin policies gate access.
 export const supabase = createClient(SB_URL, SB_ANON)
 
 const ic = 'w-full min-h-11 text-base text-white bg-gray-900 rounded-xl border border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/40'
 
-/** Check localStorage for any Supabase session token synchronously. */
+/** Inline + CSS — survives file-picker viewport quirks on Chrome/Windows. */
+const SHELL_STYLE = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  height: '100vh',
+  maxHeight: '100vh',
+  width: '100%',
+  overflow: 'hidden',
+  backgroundColor: '#030712',
+}
+
+const SCROLL_STYLE = {
+  flex: '1 1 auto',
+  minHeight: 0,
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+  WebkitOverflowScrolling: 'touch',
+}
+
 function hasStoredSession() {
   try {
     for (let i = 0; i < localStorage.length; i++) {
@@ -22,12 +43,7 @@ function hasStoredSession() {
   return false
 }
 
-/**
- * Wraps children behind a Supabase email/password login.
- * Only users with profiles.role = 'admin' are admitted.
- */
 export default function LoginGate({ children }) {
-  // Skip 'checking' entirely if there's no stored session token
   const [state, setState] = useState(() => hasStoredSession() ? 'checking' : 'login')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -35,13 +51,33 @@ export default function LoginGate({ children }) {
   const [error, setError]       = useState('')
   const userRef = useRef(null)
 
+  useEffect(() => {
+    const lock = () => {
+      document.documentElement.style.height = '100vh'
+      document.body.style.height = '100vh'
+      const root = document.getElementById('root')
+      if (root) {
+        root.style.height = '100vh'
+        root.style.maxHeight = '100vh'
+        root.style.minHeight = '0'
+      }
+    }
+    lock()
+    window.visualViewport?.addEventListener('resize', lock)
+    window.addEventListener('resize', lock)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', lock)
+      window.removeEventListener('resize', lock)
+    }
+  }, [])
+
   async function checkRole(userId) {
     const { data } = await supabase.from('profiles').select('role').eq('user_id', userId).maybeSingle()
     return data?.role === 'admin'
   }
 
   useEffect(() => {
-    if (state !== 'checking') return  // no stored session, skip async check
+    if (state !== 'checking') return
 
     const timeout = setTimeout(() => setState('login'), 6000)
 
@@ -65,7 +101,6 @@ export default function LoginGate({ children }) {
     try {
       const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (err) throw err
-      // onAuthStateChange handles the rest
     } catch (err) {
       setError(err.message || 'Login failed.')
       setBusy(false)
@@ -77,36 +112,36 @@ export default function LoginGate({ children }) {
     setState('login')
   }
 
-  const scrollShell = 'slot-guide-form-shell'
-  const scrollBody = 'slot-guide-form-scroll'
-
-  if (state === 'checking') {
+  function shell(className, content) {
     return (
-      <div className={scrollShell} data-slot-guide-form>
-        <div className={`${scrollBody} flex items-center justify-center`}>
-          <p className="text-gray-400">Checking session…</p>
-        </div>
+      <div className={className} data-slot-guide-form style={SHELL_STYLE}>
+        {content}
       </div>
     )
+  }
+
+  if (state === 'checking') {
+    return shell('slot-guide-form-shell', (
+      <div className="slot-guide-form-scroll flex items-center justify-center" style={SCROLL_STYLE}>
+        <p className="text-gray-400">Checking session…</p>
+      </div>
+    ))
   }
 
   if (state === 'not-admin') {
-    return (
-      <div className={scrollShell} data-slot-guide-form>
-        <div className={`${scrollBody} flex flex-col items-center justify-center gap-4 px-4`}>
-          <p className="text-red-400 font-semibold">Your account does not have admin access.</p>
-          <button onClick={handleSignOut} className="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm text-white">
-            Sign out
-          </button>
-        </div>
+    return shell('slot-guide-form-shell', (
+      <div className="slot-guide-form-scroll flex flex-col items-center justify-center gap-4 px-4" style={SCROLL_STYLE}>
+        <p className="text-red-400 font-semibold">Your account does not have admin access.</p>
+        <button type="button" onClick={handleSignOut} className="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm text-white">
+          Sign out
+        </button>
       </div>
-    )
+    ))
   }
 
   if (state === 'login') {
-    return (
-      <div className={`${scrollShell} text-white`} data-slot-guide-form>
-        <div className={`${scrollBody} flex items-center justify-center px-4 py-8`}>
+    return shell('slot-guide-form-shell text-white', (
+      <div className="slot-guide-form-scroll flex items-center justify-center px-4 py-8" style={SCROLL_STYLE}>
         <div className="w-full max-w-sm space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-cyan-300">AP Guide editor</h1>
@@ -146,22 +181,20 @@ export default function LoginGate({ children }) {
             </button>
           </form>
         </div>
-        </div>
       </div>
-    )
+    ))
   }
 
-  // state === 'ready'
-  return (
-    <div className={scrollShell} data-slot-guide-form>
+  return shell('slot-guide-form-shell', (
+    <>
       <div className="shrink-0 flex justify-end px-4 pt-3">
-        <button onClick={handleSignOut} className="text-xs text-gray-500 hover:text-gray-300">
+        <button type="button" onClick={handleSignOut} className="text-xs text-gray-500 hover:text-gray-300">
           Sign out ({userRef.current?.email})
         </button>
       </div>
-      <div className={scrollBody}>
+      <div className="slot-guide-form-scroll" style={SCROLL_STYLE}>
         {children}
       </div>
-    </div>
-  )
+    </>
+  ))
 }
