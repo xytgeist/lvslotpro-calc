@@ -131,17 +131,42 @@ html.light body {
   background-color: #030712;
 }
 
-/* slot-guide-form entry: body is overflow:hidden globally — scroll shell is fixed inset-0 (see LoginGate.jsx) */
+/* slot-guide-form entry: fixed full-viewport shell — no dvh/JS height (file picker breaks both on Chrome/Windows) */
 html:has([data-slot-guide-form]),
 html:has([data-slot-guide-form]) body {
-  height: 100%;
+  height: 100vh;
+  max-height: 100vh;
   overflow: hidden;
+  margin: 0;
 }
 
 html:has([data-slot-guide-form]) #root {
-  height: 100%;
+  height: 100vh;
+  max-height: 100vh;
   min-height: 0;
   overflow: hidden;
+}
+
+html:has([data-slot-guide-form]) .slot-guide-form-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100vh;
+  max-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: #030712;
+}
+
+html:has([data-slot-guide-form]) .slot-guide-form-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 html.light #root {

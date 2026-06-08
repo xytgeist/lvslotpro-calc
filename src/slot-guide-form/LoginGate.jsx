@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { initSlotGuideViewport } from './slotGuideViewport.js'
 
 const SB_URL = 'https://jtjgtucumuoswnbauxry.supabase.co'
 const SB_ANON = 'sb_publishable_u3-GQGrZ_hswapkiWiPyLA_Ah3mxU8B'
@@ -78,13 +77,8 @@ export default function LoginGate({ children }) {
     setState('login')
   }
 
-  // fixed + --slot-guide-vh from window.innerHeight — h-dvh shrinks after native file picker (Chrome/Windows)
-  const scrollShell =
-    'fixed inset-x-0 top-0 z-0 flex min-h-0 flex-col overflow-hidden bg-gray-950 h-[var(--slot-guide-vh,100dvh)] max-h-[var(--slot-guide-vh,100dvh)]'
-  const scrollBody =
-    'min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] touch-pan-y'
-
-  useEffect(() => initSlotGuideViewport(), [])
+  const scrollShell = 'slot-guide-form-shell'
+  const scrollBody = 'slot-guide-form-scroll'
 
   if (state === 'checking') {
     return (

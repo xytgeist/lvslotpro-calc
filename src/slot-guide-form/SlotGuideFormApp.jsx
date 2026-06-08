@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useId } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './LoginGate.jsx'
 import {
   buildGuideMarkdown,
@@ -11,7 +11,7 @@ import {
   writeSlotGuideDraftToStorage,
 } from './formUtils.js'
 import { prepareGuideImageFile, useBlobObjectUrl } from './guideImageUtils.js'
-import { assertSupabaseRowUpdated, syncSlotGuideViewport } from './slotGuideViewport.js'
+import { assertSupabaseRowUpdated } from './slotGuideViewport.js'
 import GuideCardPreview from './GuideCardPreview.jsx'
 
 const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
@@ -159,7 +159,6 @@ const IMAGE_UPLOAD_FIELDS = new Set([
 function InlineImageTextarea({ value, onChange, className, required, slug, guideTitle }) {
   const taRef  = useRef(null)
   const fileRef = useRef(null)
-  const inputId = useId()
   const [uploading, setUploading]   = useState(false)
   const [uploadErr, setUploadErr]   = useState('')
   const [uploadOk, setUploadOk]     = useState('')
@@ -187,7 +186,6 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
       const next   = before + insert + after
       onChange(next)
       setUploadOk('Image uploaded and inserted in markdown below.')
-      syncSlotGuideViewport({ force: true })
       // Restore focus and park cursor after the inserted text
       setTimeout(() => {
         if (!ta) return
@@ -204,11 +202,13 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
 
   return (
     <div>
-      {/* toolbar */}
+      {/* toolbar — button (not label) so file picker does not steal layout/focus in the form */}
       <div className="flex items-center justify-end mb-1">
-        <label
-          htmlFor={inputId}
-          className={`inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          className={`inline-flex items-center gap-1.5 text-xs font-medium transition-colors
             ${uploading ? 'text-zinc-500 cursor-not-allowed' : 'text-cyan-400 hover:text-cyan-300'}`}
           title="Upload image and insert at cursor"
         >
@@ -225,14 +225,15 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
             </svg>
           )}
           {uploading ? 'Uploading…' : 'Insert image'}
-        </label>
+        </button>
         <input
-          id={inputId}
           ref={fileRef}
           type="file"
           accept="image/*"
           disabled={uploading}
           className="sr-only"
+          tabIndex={-1}
+          aria-hidden
           onChange={handleFile}
         />
       </div>
