@@ -239,12 +239,30 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
 }
 
 /**
- * Textarea for the Skins section with a "Insert guide link" slug-picker toolbar.
- * Selecting a guide from the dropdown inserts `[Machine Name](guide:slug)` at cursor.
+ * Textarea for the Skins section with guide-link picker and inline image insert.
  */
-function SkinsTextarea({ value, onChange, className, guideList = [] }) {
+function SkinsTextarea({ value, onChange, className, guideList = [], pickFile, slug, guideTitle }) {
   const taRef = useRef(null)
   const [pickerSlug, setPickerSlug] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
+  const [uploadOk, setUploadOk] = useState('')
+
+  function insertAtCursor(insert, { padBefore = true } = {}) {
+    const ta = taRef.current
+    const pos = ta?.selectionStart ?? value.length
+    const before = value.slice(0, pos)
+    const after = value.slice(pos)
+    const pad = padBefore && before.length > 0 && !before.endsWith('\n') ? '\n' : ''
+    const next = before + pad + insert + after
+    onChange(next)
+    setTimeout(() => {
+      if (!ta) return
+      ta.focus()
+      const cur = (before + pad + insert).length
+      ta.setSelectionRange(cur, cur)
+    }, 0)
+  }
 
   function insertLink() {
     if (!pickerSlug) return
@@ -252,40 +270,45 @@ function SkinsTextarea({ value, onChange, className, guideList = [] }) {
       (g) => (g.machines?.slug || g.slug) === pickerSlug
     )
     const label = picked?.machines?.name || picked?.title || pickerSlug
-    const insert = `[${label}](guide:${pickerSlug})`
-
-    const ta = taRef.current
-    const pos = ta?.selectionStart ?? value.length
-    const before = value.slice(0, pos)
-    const after  = value.slice(pos)
-    const pad    = before.length > 0 && !before.endsWith('\n') ? '\n' : ''
-    const next   = before + pad + insert + after
-    onChange(next)
-
-    setTimeout(() => {
-      if (!ta) return
-      ta.focus()
-      const cur = (before + pad + insert).length
-      ta.setSelectionRange(cur, cur)
-    }, 0)
+    insertAtCursor(`[${label}](guide:${pickerSlug})`)
     setPickerSlug('')
+  }
+
+  async function handleImageFile(file) {
+    if (!file) return
+
+    const effectiveSlug = slug || slugify(guideTitle || 'guide') || 'guide'
+    const filename = `content-${Date.now()}.webp`
+
+    setUploading(true)
+    setUploadErr('')
+    setUploadOk('')
+    try {
+      const prepared = await prepareGuideImageFile(file, filename)
+      const url = await uploadGuideImageToR2OrStorage(prepared, { slug: effectiveSlug, filename: prepared.name })
+      insertAtCursor(`![image](${url})\n`, { padBefore: true })
+      setUploadOk('Image uploaded and inserted in markdown below.')
+    } catch (err) {
+      setUploadErr(err.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
     <div>
-      {/* slug picker toolbar */}
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
         <select
-          className="flex-1 min-h-9 text-sm text-white bg-gray-900 rounded-xl border border-gray-700 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          className="flex-1 min-w-[12rem] min-h-9 text-sm text-white bg-gray-900 rounded-xl border border-gray-700 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
           value={pickerSlug}
           onChange={(e) => setPickerSlug(e.target.value)}
         >
           <option value="">— pick a guide to link —</option>
           {guideList.map((g) => {
-            const slug = g.machines?.slug || g.slug
-            const name = g.machines?.name || g.title || slug
+            const s = g.machines?.slug || g.slug
+            const name = g.machines?.name || g.title || s
             return (
-              <option key={g.id} value={slug}>
+              <option key={g.id} value={s}>
                 {name}{g.published ? '' : ' (unpublished)'}
               </option>
             )
@@ -300,6 +323,30 @@ function SkinsTextarea({ value, onChange, className, guideList = [] }) {
         >
           Insert link
         </button>
+        <button
+          type="button"
+          disabled={uploading || !pickFile}
+          onClick={() => pickFile?.({ accept: 'image/*', onPick: (f) => f && handleImageFile(f) })}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-colors
+            ${uploading
+              ? 'text-zinc-500 cursor-not-allowed bg-gray-800'
+              : 'text-cyan-300 hover:text-cyan-200 bg-gray-800 hover:bg-gray-700 border border-gray-700'}`}
+          title="Upload image and insert at cursor"
+        >
+          {uploading ? (
+            <svg className="animate-spin h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          )}
+          {uploading ? 'Uploading…' : 'Insert image'}
+        </button>
       </div>
       <textarea
         ref={taRef}
@@ -307,6 +354,8 @@ function SkinsTextarea({ value, onChange, className, guideList = [] }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {uploadErr && <p className="text-xs text-red-400 mt-1">{uploadErr}</p>}
+      {uploadOk && !uploadErr && <p className="text-xs text-emerald-400 mt-1">{uploadOk}</p>}
     </div>
   )
 }
@@ -1132,6 +1181,9 @@ export default function SlotGuideFormApp() {
                 value={guide.skins_markdown}
                 onChange={(val) => setGuideField('skins_markdown', val)}
                 guideList={guideList}
+                pickFile={pickFile}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
               />
             </div>
             <div>
