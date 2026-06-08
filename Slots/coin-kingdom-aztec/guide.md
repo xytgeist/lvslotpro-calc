@@ -8,15 +8,35 @@ This is a **dual must-hit-by** Ainsworth title: **Grand $10,000** (resets ~$8,00
 
 **Major-only or combo:** Major runs about **3.5×** the Grand meter speed. You can enter Grand earlier when Major is high and factor expected Major hits during the chase into your Grand EV (each ~$70 you expect to add on the Grand path pulls Major up ~$245).
 
-Rough **Major breakeven** (hits at ceiling ~$990, not random early):
+Rough **Grand breakeven**:
 
-| Paytable RTP | Major playable around |
+| Paytable RTP | Grand breakeven |
 | --- | --- |
-| 89-90% | ~$965-968+ |
-| 91% | ~$963+ |
-| 92% | ~$961+ |
-| 93% | ~$958+ |
-| 94% | ~$955+ |
+| 85% | $9,931.24 |
+| 86% | $9,927.56 |
+| 87% | $9,923.40 |
+| 88% | $9,918.64 |
+| 89% | $9,913.15 |
+| 90% | $9,906.75 |
+| 91% | $9,899.18 |
+| 92% | $9,890.10 |
+| 93% | $9,879.00 |
+| 94% | $9,865.13 |
+
+Rough **Major breakeven**:
+
+| Paytable RTP | Major breakeven |
+| --- | --- |
+| 85% | $971.72 |
+| 86% | $970.70 |
+| 87% | $969.57 |
+| 88% | $968.29 |
+| 89% | $966.84 |
+| 90% | $965.19 |
+| 91% | $963.28 |
+| 92% | $961.05 |
+| 93% | $958.42 |
+| 94% | $955.26 |
 
 Grand needs to be **much closer to ceiling** (~$9,900+) for most RTPs ... run your numbers; **taxes on a $10k handpay** matter if you are grinding Grand.
 
