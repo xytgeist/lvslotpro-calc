@@ -11,6 +11,7 @@ import {
   writeSlotGuideDraftToStorage,
 } from './formUtils.js'
 import { prepareGuideImageFile, useBlobObjectUrl } from './guideImageUtils.js'
+import { assertSupabaseRowUpdated, syncSlotGuideViewport } from './slotGuideViewport.js'
 import GuideCardPreview from './GuideCardPreview.jsx'
 
 const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
@@ -146,7 +147,9 @@ function DiagramPreview({ file, publicUrl, alt }) {
 }
 
 /** Fields that support inline image insertion. */
-const IMAGE_UPLOAD_FIELDS = new Set(['when_to_play', 'when_to_stop', 'how_to_check'])
+const IMAGE_UPLOAD_FIELDS = new Set([
+  'when_to_play', 'when_to_stop', 'how_to_check', 'where_to_find', 'gameplay_mechanics',
+])
 
 /**
  * Textarea with an "Add image" toolbar button.
@@ -159,6 +162,7 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
   const inputId = useId()
   const [uploading, setUploading]   = useState(false)
   const [uploadErr, setUploadErr]   = useState('')
+  const [uploadOk, setUploadOk]     = useState('')
 
   async function handleFile(e) {
     const file = e.target.files?.[0]
@@ -170,6 +174,7 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
 
     setUploading(true)
     setUploadErr('')
+    setUploadOk('')
     try {
       const prepared = await prepareGuideImageFile(file, filename)
       const url = await uploadGuideImageToR2OrStorage(prepared, { slug: effectiveSlug, filename: prepared.name })
@@ -181,6 +186,8 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
       const insert = `${pad}![image](${url})\n`
       const next   = before + insert + after
       onChange(next)
+      setUploadOk('Image uploaded and inserted in markdown below.')
+      syncSlotGuideViewport({ force: true })
       // Restore focus and park cursor after the inserted text
       setTimeout(() => {
         if (!ta) return
@@ -237,6 +244,7 @@ function InlineImageTextarea({ value, onChange, className, required, slug, guide
         required={required}
       />
       {uploadErr && <p className="text-xs text-red-400 mt-1">{uploadErr}</p>}
+      {uploadOk && !uploadErr && <p className="text-xs text-emerald-400 mt-1">{uploadOk}</p>}
     </div>
   )
 }
@@ -676,8 +684,8 @@ export default function SlotGuideFormApp() {
         calculator_slug: machine.has_calculator ? machine.calculator_slug || machine.slug : null,
       }
       if (newThumbnailUrl) machinePayload.thumbnail_url = newThumbnailUrl
-      const { error: mErr } = await supabase.from('machines').update(machinePayload).eq('id', editIds.machineId)
-      if (mErr) throw new Error(`machines: ${mErr.message}`)
+      const machineResult = await supabase.from('machines').update(machinePayload).eq('id', editIds.machineId).select('id').maybeSingle()
+      assertSupabaseRowUpdated(machineResult, 'machines')
 
       const compiledMarkdown = buildGuideMarkdown({
         machine,
@@ -696,11 +704,11 @@ export default function SlotGuideFormApp() {
         updated_at: nowIso,
       }
       if (newThumbnailUrl) guidePayload.thumbnail_url = newThumbnailUrl
-      const { error: gErr } = await supabase.from('guides').update(guidePayload).eq('id', editIds.guideId)
-      if (gErr) throw new Error(`guides: ${gErr.message}`)
+      const guideResult = await supabase.from('guides').update(guidePayload).eq('id', editIds.guideId).select('id, updated_at, content_markdown').maybeSingle()
+      assertSupabaseRowUpdated(guideResult, 'guides')
 
       // Reflect new timestamp in the preview
-      setGuide((g) => ({ ...g, _updated_at: nowIso }))
+      setGuide((g) => ({ ...g, _updated_at: guideResult.data.updated_at || nowIso }))
 
       setResult({ ok: true, message: newThumbnailUrl ? 'Guide and hero image updated.' : 'Guide updated successfully.' })
       setIsDirty(false)
@@ -1090,11 +1098,21 @@ export default function SlotGuideFormApp() {
             </div>
             <div>
               <label className={lc}>📍 Where to find <span className="text-gray-500 font-normal text-xs">(optional)</span></label>
-              <textarea
-                className={`${ic} min-h-36`}
-                value={guide.where_to_find}
-                onChange={(e) => setGuideField('where_to_find', e.target.value)}
-              />
+              {IMAGE_UPLOAD_FIELDS.has('where_to_find') ? (
+                <InlineImageTextarea
+                  className={`${ic} min-h-36`}
+                  value={guide.where_to_find}
+                  onChange={(val) => setGuideField('where_to_find', val)}
+                  slug={machine.slug || guide._slug}
+                  guideTitle={guide.title}
+                />
+              ) : (
+                <textarea
+                  className={`${ic} min-h-36`}
+                  value={guide.where_to_find}
+                  onChange={(e) => setGuideField('where_to_find', e.target.value)}
+                />
+              )}
             </div>
 
             {/* Skins — separate because it needs the slug-link picker */}
@@ -1109,11 +1127,21 @@ export default function SlotGuideFormApp() {
             </div>
             <div>
               <label className={lc}>🎰 Gameplay mechanics</label>
-              <textarea
-                className={`${ic} min-h-28`}
-                value={guide.gameplay_mechanics}
-                onChange={(e) => setGuideField('gameplay_mechanics', e.target.value)}
-              />
+              {IMAGE_UPLOAD_FIELDS.has('gameplay_mechanics') ? (
+                <InlineImageTextarea
+                  className={`${ic} min-h-28`}
+                  value={guide.gameplay_mechanics}
+                  onChange={(val) => setGuideField('gameplay_mechanics', val)}
+                  slug={machine.slug || guide._slug}
+                  guideTitle={guide.title}
+                />
+              ) : (
+                <textarea
+                  className={`${ic} min-h-28`}
+                  value={guide.gameplay_mechanics}
+                  onChange={(e) => setGuideField('gameplay_mechanics', e.target.value)}
+                />
+              )}
             </div>
           </section>
 
