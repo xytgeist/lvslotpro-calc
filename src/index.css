@@ -131,6 +131,14 @@ html.light body {
   background-color: #030712;
 }
 
+/* slot-guide-form entry: body is overflow:hidden globally — pin #root height so the inner scroll shell can reach top/bottom */
+html:has([data-slot-guide-form]) #root {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 html.light #root {
   background-color: var(--color-zinc-950, #fafafa);
 }

@@ -645,7 +645,7 @@ export default function SlotGuideFormApp() {
   const showPreview = isEdit || !!(guide.title || machine.name)
 
   return (
-    <div className="min-h-dvh bg-gray-950 text-white px-4 py-8 pb-24">
+    <div className="bg-gray-950 text-white px-4 py-8 pb-[max(6rem,env(safe-area-inset-bottom,0px))]">
       {/* Two-column on large screens: form left, card preview right */}
       <div className="max-w-7xl mx-auto">
       <div className={`flex gap-8 items-start ${showPreview ? 'xl:grid xl:grid-cols-[1fr_360px]' : ''}`}>

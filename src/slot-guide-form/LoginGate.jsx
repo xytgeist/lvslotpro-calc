@@ -77,10 +77,14 @@ export default function LoginGate({ children }) {
     setState('login')
   }
 
+  const scrollShell = 'flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-gray-950'
+  const scrollBody =
+    'min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] touch-pan-y'
+
   if (state === 'checking') {
     return (
-      <div className="h-dvh overflow-y-auto overscroll-y-contain bg-gray-950">
-        <div className="min-h-dvh flex items-center justify-center">
+      <div className={scrollShell} data-slot-guide-form>
+        <div className={`${scrollBody} flex items-center justify-center`}>
           <p className="text-gray-400">Checking session…</p>
         </div>
       </div>
@@ -89,8 +93,8 @@ export default function LoginGate({ children }) {
 
   if (state === 'not-admin') {
     return (
-      <div className="h-dvh overflow-y-auto overscroll-y-contain bg-gray-950">
-        <div className="min-h-dvh flex flex-col items-center justify-center gap-4 px-4">
+      <div className={scrollShell} data-slot-guide-form>
+        <div className={`${scrollBody} flex flex-col items-center justify-center gap-4 px-4`}>
           <p className="text-red-400 font-semibold">Your account does not have admin access.</p>
           <button onClick={handleSignOut} className="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm text-white">
             Sign out
@@ -102,8 +106,8 @@ export default function LoginGate({ children }) {
 
   if (state === 'login') {
     return (
-      <div className="h-dvh overflow-y-auto overscroll-y-contain bg-gray-950 text-white">
-        <div className="min-h-dvh flex items-center justify-center px-4">
+      <div className={`${scrollShell} text-white`} data-slot-guide-form>
+        <div className={`${scrollBody} flex items-center justify-center px-4 py-8`}>
         <div className="w-full max-w-sm space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-cyan-300">AP Guide editor</h1>
@@ -150,13 +154,15 @@ export default function LoginGate({ children }) {
 
   // state === 'ready'
   return (
-    <div className="h-dvh overflow-y-auto overscroll-y-contain bg-gray-950" data-slot-guide-form>
-      <div className="flex justify-end px-4 pt-3">
+    <div className={scrollShell} data-slot-guide-form>
+      <div className="shrink-0 flex justify-end px-4 pt-3">
         <button onClick={handleSignOut} className="text-xs text-gray-500 hover:text-gray-300">
           Sign out ({userRef.current?.email})
         </button>
       </div>
-      {children}
+      <div className={scrollBody}>
+        {children}
+      </div>
     </div>
   )
 }
