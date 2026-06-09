@@ -37,18 +37,23 @@ export function useGuideFilePicker() {
   const inputRef = useRef(null)
   const onPickRef = useRef(null)
   const scrollTopRef = useRef(0)
+  /** True only while native file picker may have moved scroll (avoid restoring on every field focus). */
+  const pickingRef = useRef(false)
 
   useEffect(() => {
-    const restore = () => {
+    const restoreAfterPicker = () => {
+      if (!pickingRef.current) return
+      pickingRef.current = false
       lockShellHeight()
-      window.setTimeout(() => restoreScrollPosition(scrollTopRef.current), 0)
-      window.setTimeout(() => restoreScrollPosition(scrollTopRef.current), 100)
+      window.requestAnimationFrame(() => {
+        restoreScrollPosition(scrollTopRef.current)
+      })
     }
-    window.addEventListener('focus', restore)
+    window.addEventListener('focus', restoreAfterPicker)
     window.visualViewport?.addEventListener('resize', lockShellHeight)
     window.addEventListener('resize', lockShellHeight)
     return () => {
-      window.removeEventListener('focus', restore)
+      window.removeEventListener('focus', restoreAfterPicker)
       window.visualViewport?.removeEventListener('resize', lockShellHeight)
       window.removeEventListener('resize', lockShellHeight)
     }
@@ -56,10 +61,14 @@ export function useGuideFilePicker() {
 
   const pickFile = useCallback(({ accept = 'image/*', onPick }) => {
     scrollTopRef.current = saveScrollPosition()
+    pickingRef.current = true
     lockShellHeight()
     onPickRef.current = onPick
     const input = inputRef.current
-    if (!input) return
+    if (!input) {
+      pickingRef.current = false
+      return
+    }
     input.accept = accept
     input.value = ''
     input.click()
@@ -85,6 +94,7 @@ export function useGuideFilePicker() {
         e.target.value = ''
         onPickRef.current?.(file)
         onPickRef.current = null
+        pickingRef.current = false
         lockShellHeight()
         restoreScrollPosition(scrollTopRef.current)
       }}
