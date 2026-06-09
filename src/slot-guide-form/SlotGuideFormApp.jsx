@@ -70,6 +70,7 @@ const PLACEMENTS = [
   { id: 'when_to_play', label: 'After When to play' },
   { id: 'when_to_stop', label: 'After When to stop' },
   { id: 'how_to_check', label: 'After How to check' },
+  { id: 'bankroll', label: 'After Bankroll on hand' },
   { id: 'risk', label: 'After Risk & Warnings' },
   { id: 'where_to_find', label: 'After Where to find' },
   { id: 'skins', label: 'After Skins' },
@@ -79,6 +80,58 @@ const PLACEMENTS = [
 const ic = 'w-full min-h-11 text-base text-white bg-gray-900 rounded-xl border border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/40'
 const lc = 'block text-sm font-medium text-gray-300 mb-1'
 const sc = 'rounded-2xl border border-gray-800 bg-gray-900/60 p-4 space-y-4'
+const guideSectionPanel = 'rounded-xl border border-gray-800 bg-gray-950/80 p-4 space-y-3'
+const subFieldLabel = 'block text-xs font-medium text-gray-500 mb-1'
+
+/** Matches expanded AP guide card section headers (same order). */
+function GuideSectionPanel({ title, optional, children }) {
+  return (
+    <div className={guideSectionPanel}>
+      <h3 className="text-base font-semibold text-white border-b border-gray-800 pb-2">
+        {title}
+        {optional ? (
+          <span className="text-gray-500 font-normal text-xs ml-2">(optional)</span>
+        ) : null}
+      </h3>
+      {children}
+    </div>
+  )
+}
+
+function GuideSectionBody({
+  fieldKey,
+  value,
+  onChange,
+  slug,
+  guideTitle,
+  pickFile,
+  minH = 'min-h-28',
+  placeholder,
+  required,
+}) {
+  if (IMAGE_UPLOAD_FIELDS.has(fieldKey)) {
+    return (
+      <InlineImageTextarea
+        className={`${ic} ${minH}`}
+        value={value}
+        onChange={onChange}
+        slug={slug}
+        guideTitle={guideTitle}
+        pickFile={pickFile}
+        required={required}
+      />
+    )
+  }
+  return (
+    <textarea
+      className={`${ic} ${minH}`}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      required={required}
+    />
+  )
+}
 
 const POPULARITY_OPTIONS = [
   'Extremely Common', 'Very Common', 'Common', 'Uncommon', 'Rare', 'Rare (nostalgia)',
@@ -1119,63 +1172,95 @@ export default function SlotGuideFormApp() {
             </div>
           </section>
 
-          {/* Guide sections — same form for both new and edit */}
+          {/* Guide sections — same order & headers as expanded AP guide card */}
           <section className={sc}>
-            <h2 className="text-lg font-semibold">Guide sections</h2>
-            {[
-              ['when_to_play',      '🟢 When to play'],
-              ['when_to_stop',      '🛑 When to stop'],
-              ['how_to_check',      '🔍 How to check'],
-              ['risk_bankroll',     '⚠️ Risk — bankroll line (e.g. 5–40 units)'],
-              ['risk_summary',      '⚠️ Risk — summary paragraph'],
-            ].map(([key, label]) => (
-              <div key={key}>
-                <label className={lc}>{label}</label>
-                {IMAGE_UPLOAD_FIELDS.has(key) ? (
-                  <InlineImageTextarea
-                    className={`${ic} min-h-28`}
-                    value={guide[key]}
-                    onChange={(val) => setGuideField(key, val)}
-                    slug={machine.slug || guide._slug}
-                    guideTitle={guide.title}
-                    pickFile={pickFile}
-                  />
-                ) : (
-                  <textarea
-                    className={`${ic} min-h-28`}
-                    value={guide[key]}
-                    onChange={(e) => setGuideField(key, e.target.value)}
-                  />
-                )}
-              </div>
-            ))}
             <div>
-              <label className={lc}>⚠️ Risk bullets (one per line, optional)</label>
-              <textarea className={`${ic} min-h-24`} value={guide.risk_bullets} onChange={(e) => setGuideField('risk_bullets', e.target.value)} />
+              <h2 className="text-lg font-semibold">Guide card sections</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Same order and titles as the expanded AP Guides card. One panel = one section on the card.
+              </p>
             </div>
-            <div>
-              <label className={lc}>📍 Where to find <span className="text-gray-500 font-normal text-xs">(optional)</span></label>
-              {IMAGE_UPLOAD_FIELDS.has('where_to_find') ? (
-                <InlineImageTextarea
-                  className={`${ic} min-h-36`}
-                  value={guide.where_to_find}
-                  onChange={(val) => setGuideField('where_to_find', val)}
+
+            <GuideSectionPanel title="🟢 When to play">
+              <GuideSectionBody
+                fieldKey="when_to_play"
+                value={guide.when_to_play}
+                onChange={(val) => setGuideField('when_to_play', val)}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
+                pickFile={pickFile}
+              />
+            </GuideSectionPanel>
+
+            <GuideSectionPanel title="🛑 When to stop">
+              <GuideSectionBody
+                fieldKey="when_to_stop"
+                value={guide.when_to_stop}
+                onChange={(val) => setGuideField('when_to_stop', val)}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
+                pickFile={pickFile}
+              />
+            </GuideSectionPanel>
+
+            <GuideSectionPanel title="🔍 How to check (quick/easy)">
+              <GuideSectionBody
+                fieldKey="how_to_check"
+                value={guide.how_to_check}
+                onChange={(val) => setGuideField('how_to_check', val)}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
+                pickFile={pickFile}
+              />
+            </GuideSectionPanel>
+
+            <GuideSectionPanel title="💰 Bankroll on hand">
+              <GuideSectionBody
+                fieldKey="risk_bankroll"
+                value={guide.risk_bankroll}
+                onChange={(val) => setGuideField('risk_bankroll', val)}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
+                pickFile={pickFile}
+                placeholder={'Major - 1500+ (min bet) units\nGrand - 15000+ (min bet) units'}
+              />
+            </GuideSectionPanel>
+
+            <GuideSectionPanel title="⚠️ Risk & Warnings">
+              <div>
+                <span className={subFieldLabel}>Summary</span>
+                <GuideSectionBody
+                  fieldKey="risk_summary"
+                  value={guide.risk_summary}
+                  onChange={(val) => setGuideField('risk_summary', val)}
                   slug={machine.slug || guide._slug}
                   guideTitle={guide.title}
                   pickFile={pickFile}
                 />
-              ) : (
+              </div>
+              <div>
+                <span className={subFieldLabel}>Bullets (one per line, optional)</span>
                 <textarea
-                  className={`${ic} min-h-36`}
-                  value={guide.where_to_find}
-                  onChange={(e) => setGuideField('where_to_find', e.target.value)}
+                  className={`${ic} min-h-24`}
+                  value={guide.risk_bullets}
+                  onChange={(e) => setGuideField('risk_bullets', e.target.value)}
                 />
-              )}
-            </div>
+              </div>
+            </GuideSectionPanel>
 
-            {/* Skins — separate because it needs the slug-link picker */}
-            <div>
-              <label className={lc}>🎭 Skins <span className="text-gray-500 font-normal text-xs">(optional)</span></label>
+            <GuideSectionPanel title="📍 Where to find" optional>
+              <GuideSectionBody
+                fieldKey="where_to_find"
+                value={guide.where_to_find}
+                onChange={(val) => setGuideField('where_to_find', val)}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
+                pickFile={pickFile}
+                minH="min-h-36"
+              />
+            </GuideSectionPanel>
+
+            <GuideSectionPanel title="🎭 Skins (same game different theme/art)" optional>
               <SkinsTextarea
                 className={`${ic} min-h-28`}
                 value={guide.skins_markdown}
@@ -1185,26 +1270,18 @@ export default function SlotGuideFormApp() {
                 slug={machine.slug || guide._slug}
                 guideTitle={guide.title}
               />
-            </div>
-            <div>
-              <label className={lc}>🎰 Gameplay mechanics</label>
-              {IMAGE_UPLOAD_FIELDS.has('gameplay_mechanics') ? (
-                <InlineImageTextarea
-                  className={`${ic} min-h-28`}
-                  value={guide.gameplay_mechanics}
-                  onChange={(val) => setGuideField('gameplay_mechanics', val)}
-                  slug={machine.slug || guide._slug}
-                  guideTitle={guide.title}
-                  pickFile={pickFile}
-                />
-              ) : (
-                <textarea
-                  className={`${ic} min-h-28`}
-                  value={guide.gameplay_mechanics}
-                  onChange={(e) => setGuideField('gameplay_mechanics', e.target.value)}
-                />
-              )}
-            </div>
+            </GuideSectionPanel>
+
+            <GuideSectionPanel title="🎰 Gameplay Mechanics">
+              <GuideSectionBody
+                fieldKey="gameplay_mechanics"
+                value={guide.gameplay_mechanics}
+                onChange={(val) => setGuideField('gameplay_mechanics', val)}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
+                pickFile={pickFile}
+              />
+            </GuideSectionPanel>
           </section>
 
           {/* Diagrams — placement images (also use Insert image in section fields for inline) */}

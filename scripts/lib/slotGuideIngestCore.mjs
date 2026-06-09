@@ -1,4 +1,4 @@
-/** @typedef {"when_to_play" | "when_to_stop" | "how_to_check" | "risk" | "where_to_find" | "skins" | "gameplay"} DiagramPlacement */
+/** @typedef {"when_to_play" | "when_to_stop" | "how_to_check" | "bankroll" | "risk" | "where_to_find" | "skins" | "gameplay"} DiagramPlacement */
 
 export const SLUG_RE = /^[a-z0-9-]+$/;
 
@@ -8,6 +8,7 @@ const PLACEMENTS = new Set([
   "when_to_play",
   "when_to_stop",
   "how_to_check",
+  "bankroll",
   "risk",
   "where_to_find",
   "skins",
@@ -101,10 +102,13 @@ export function buildGuideMarkdown(payload, opts = {}) {
   md += `## 🔍 How to check (quick/easy)\n\n${mdBlock(guide.how_to_check)}`;
   md += diagramsForPlacement(diagrams, "how_to_check", slug, resolveUrl);
 
-  md += `## ⚠️ Risk & Warnings\n\n`;
-  if (guide.risk_bankroll) {
-    md += `**Bankroll on hand: ${String(guide.risk_bankroll).trim()}**\n\n`;
+  const bankroll = String(guide.risk_bankroll ?? "").trim();
+  if (bankroll) {
+    md += `## 💰 Bankroll on hand\n\n${bankroll}\n\n`;
+    md += diagramsForPlacement(diagrams, "bankroll", slug, resolveUrl);
   }
+
+  md += `## ⚠️ Risk & Warnings\n\n`;
   md += mdBlock(guide.risk_summary);
   if (riskBullets.length) {
     md += `${riskBullets.map((b) => `- ${b}`).join("\n")}\n\n`;

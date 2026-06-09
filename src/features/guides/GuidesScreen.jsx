@@ -2213,8 +2213,8 @@ export default function GuidesScreen({
               Remove <strong className="text-white">{deleteConfirm.name}</strong>{' '}
               (<code className="text-zinc-400">{deleteConfirm.slug}</code>) from the app on this
               environment. This deletes the Supabase <code className="text-zinc-400">guides</code> and{' '}
-              <code className="text-zinc-400">machines</code> rows. It does not remove{' '}
-              <code className="text-zinc-400">Slots/{deleteConfirm.slug}/</code> from git.
+              <code className="text-zinc-400">machines</code> rows (and related access gates). Cloud
+              images in R2/Storage are not removed automatically.
             </p>
             <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
               <button

@@ -32,10 +32,9 @@ Other scripts:
 | `npm run build` | Production build |
 | `npm run preview` | Preview the production build |
 | `npm run lint` | ESLint |
-| `npm run slots:backfill-card-fields` | Add `card_ev_threshold` + `release_year` to manifests missing them |
-| `npm run slots:sync:test` / `slots:sync:production` | Upsert manifests to **test** or **prod** (see `.env.supabase.*`) |
-| `npm run slots:sync:test:dry` / `slots:sync:production:dry` | Dry-run for those targets |
-| `npm run slots:sync:test:dry:quiet` / `slots:sync:production:dry:quiet` | Same, without dumping every manifest JSON (short output) |
+| `npm run slots:backfill-card-fields` | **Legacy** — backfill manifest JSON (repo no longer ships `Slots/`) |
+| `npm run slots:sync:test` / `slots:sync:production` | **Legacy** — upsert from repo `Slots/<slug>/` (removed; use **`/slot-guide-form`**) |
+| `npm run slots:sync:*:dry` / `*:dry:quiet` | Dry-run variants of legacy sync |
 
 ## Supabase: schema SQL vs app data
 
@@ -51,135 +50,31 @@ Run schema-related SQL when you add or change tables/columns/policies—not on e
 
 Treat other files in `supabase/` the same way: run them when the file’s purpose matches what your database still needs (new tables, RLS, seeds).
 
-**Important:** Row updates for machines/guides from the repo’s slot “forms” are **not** done by pasting upsert SQL by hand. Use the sync script below so `machines` and `guides` stay consistent with `Slots/<slug>/`.
+**Important:** AP guide **content** lives in Supabase (`guides.content_markdown`, `machines.*`, cloud image URLs). Do **not** paste upsert SQL by hand for day-to-day edits. Use **`/slot-guide-form`**.
 
-## Slot manifests (`Slots/`) and upserts to Supabase
+## AP guide updates (form-first)
 
-Each game has a **lowercase kebab-case** folder matching the machine `slug`, for example `Slots/buffalo-link/`. Inside:
+**Source of truth:** Supabase + cloud storage (R2 preferred, or **`guide-assets`** bucket). The app reads **`guides.content_markdown`** at runtime — **not** repo markdown files.
 
-- `card.meta.json` — machine fields (including optional **`release_year`**), **`guide_seed.card_ev_threshold`** (one phrase: +EV threshold / when to play, e.g. Buffalo **Play any 1400+**), advantage-play **`ap`** blocks, asset hints.
-- `guide.md` — markdown synced to `guides.content_markdown`.
-
-**+EV threshold defaults:** curated per slug / type fallbacks live in **`src/constants/slotCardEvThreshold.js`**. After adding machines, either edit each manifest’s `card_ev_threshold` or run **`npm run slots:backfill-card-fields`** once to populate missing **`card_ev_threshold`** / **`release_year`** from those defaults (`release_year` stays `null` unless listed in constants).
-
-Legacy asset folders with mixed case or non-slug names are ignored by the sync script; keep the canonical slug folder for anything that should sync.
-
-### When to regenerate manifests
-
-After you change the **`INSERT INTO machines`** seed block in `supabase/machines_guides_schema.sql` (new slug, renamed game, calculator flags, etc.):
-
-```bash
-npm run slots:generate
-```
-
-That refreshes `card.meta.json` and `guide.md` stubs under `Slots/<slug>/` for every row in that insert. Edit the JSON and markdown afterward; re-run generate only when the SQL seed is the new source of truth for machine rows.
-
-### When to sync to the database (upsert)
-
-When you want Supabase `machines` and `guides` to match the repo:
-
-**Quick copy-paste** (run from the repo root; use `.env.supabase.test` / `.env.supabase.production` with **`SUPABASE_SERVICE_ROLE_KEY`**, not the anon key):
-
-```bash
-npm run slots:sync:test                  # upsert → test project
-npm run slots:sync:production            # upsert → production project
-
-npm run slots:sync:test:dry              # preview test (no writes)
-npm run slots:sync:production:dry       # preview production (no writes)
-
-npm run slots:sync:test:dry:quiet        # dry-run, short output only
-```
-
-Single game only:
-
-```bash
-node scripts/sync-slot-forms-to-supabase.mjs --target=test --slug=buffalo-link
-```
-
-(`--target=production` works the same; use any folder slug under `Slots/`.)
-
-1. **Pick the project:** test vs production.
-
-   **Option A — explicit target (recommended with two Supabase projects)**  
-   Add two repo-root env files (**gitignored**):
-
-   | File | Use |
-   | --- | --- |
-   | `.env.supabase.test` | Test/staging project URL + **service_role** key |
-   | `.env.supabase.production` | Production project URL + **service_role** key |
-
-   Each file can contain the same variable names as `.env`:
-
-   - `SUPABASE_URL` or `VITE_SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-
-   The script always loads **`.env`** first (optional shared defaults), then **overwrites** URL/key from the target file when you pass `--target=`.
-
-   | Command |
-   | --- |
-   | `npm run slots:sync:test` / `npm run slots:sync:test:dry` |
-   | `npm run slots:sync:production` / `npm run slots:sync:production:dry` |
-
-   CLI equivalents: `--target=test`, `--target=production` (`prod` is accepted).
-
-   **Option B — single `.env` only**  
-   `npm run slots:sync` / `slots:sync:dry` behave as before: only `.env` (good if you temporarily point `.env` at one project).
-
-2. **Dry run** (no writes, prints payloads and which host/target):
-
-   ```bash
-   npm run slots:sync:test:dry
-   ```
-
-3. **Apply upserts:**
-
-   ```bash
-   npm run slots:sync:test
-   ```
-   or `npm run slots:sync:production` when you intend production.
-
-   The sync script reads **`Slots/...`** and prints **`Slots sync → <target> → <hostname>`** before writing so you can confirm which Supabase instance you hit.
-
-  **`TypeError: fetch failed`** on upsert means the HTTP client couldn’t reach your project (wrong URL, paused project, DNS, firewall/VPN blocking `*.supabase.co`, TLS issues). Fix connectivity; the slug printed first (e.g. `buffalo-link`) is alphabetical, not broken data.
-
-Optional: sync a single game:
-
-```bash
-node scripts/sync-slot-forms-to-supabase.mjs --target=test --slug=buffalo-link
-```
-
-Run sync whenever you add games, change manifests, or update `guide.md` and want the database to reflect it.
-
-### AP guide updates (form-first — recommended)
-
-**Day-to-day workflow:** use **`/slot-guide-form`** only. Supabase **`guides.content_markdown`** + cloud image URLs (R2 or **`guide-assets`** storage) are the live source of truth. The app **never reads `Slots/*/guide.md` at runtime**.
+**Repo cleanup (Jun 2026):** **`Slots/`** and **`public/guides/`** were removed from git. Guide heroes and inline images are R2/Storage URLs in the DB. Calculator tab icons remain at **`public/calculators/*.webp`** (`CALCULATOR_ICON_SRC` in **`calculatorAccess.js`**).
 
 | Task | How |
 | --- | --- |
 | **New guide** | Sign in as admin → fill sections → upload hero/diagrams → **Ingest guide** |
 | **Edit existing** | **Fetch guides** → **Load** → edit → **Save changes** |
-| **Inline images** | **Insert image** in section fields (WebP upload to cloud, markdown URL inserted at cursor) |
+| **Inline images** | **Insert image** in section fields (WebP upload to cloud, markdown URL at cursor) |
 | **Placement diagrams** | **Diagrams** section (optional; embeds after a section header on save) |
+| **Hero refresh after save** | Form cache-busts **`thumbnail_url`** on guides + machines after R2 upload |
 
-Repo **`Slots/<slug>/guide.md`** and **`npm run slots:sync`** remain optional for bulk/docx pipelines or git backup — not required for test/prod copy to go live.
+**Always Fetch → Load before editing an existing guide.** Save compiles the full markdown from form fields — an empty **Where to find** field will wipe that section in the DB.
 
-### AP guide updates (docx → repo → sync — optional)
-
-Legacy / bulk path when starting from Word docs:
-
-1. Drop **`AP-<name>.docx`** and **`Review-<name>.docx`** in **`Slots/_ingest/`** (local; usually not committed).
-2. Build **`Slots/<slug>/`**: **`guide.md`**, **`card.meta.json`**, hero asset.
-3. Publish on **test**:
-
-   ```bash
-   npm run slots:sync:test -- --slug=<slug>
-   ```
-
-**Compiled markdown section order:** When to play → When to stop → How to check → Risk & Warnings → **📍 Where to find** (optional) → Skins → Gameplay Mechanics.
+**Compiled markdown section order:** When to play → When to stop → How to check → **💰 Bankroll on hand** (optional) → Risk & Warnings → **📍 Where to find** (optional) → Skins → Gameplay Mechanics.
 
 **Card collapsed tile:** **Popularity** = **`machines.popularity`** tier (`Common`, etc.). Migration **`20260610170000`** renamed **`vegas_availability`** → **`popularity`**.
 
-**Pilot:** **`coin-kingdom-aztec`** on test. Details: **`docs/test-buildout-backlog.md`** → **AP Guide editor**.
+**+EV threshold defaults:** curated per slug / type fallbacks in **`src/constants/slotCardEvThreshold.js`** (used by form ingest and card UI when DB field is empty).
+
+Details + smoke checklist: **`docs/test-buildout-backlog.md`** → **AP Guide editor**.
 
 ### AP Guide ingest form + API
 
@@ -205,7 +100,7 @@ Web form for complete guide cards (machine fields, emoji-section markdown, hero 
 
 **Draft vs ingest vs save:** **Save draft** = browser **`localStorage`** only. **Ingest guide** / **Save changes** = Supabase + cloud storage (live on test). No repo markdown write on Vercel.
 
-**Images:** converted to WebP client-side. Vercel ingest + **Save changes** upload to R2 (preferred) or Supabase Storage bucket **`guide-assets`**. Local **`npm run slot-guide:serve`** can optionally write **`public/guides/`** + **`Slots/`** when **`SLOT_GUIDE_WRITE_REPO=1`**.
+**Images:** converted to WebP client-side. Vercel ingest + **Save changes** upload to R2 (preferred) or Supabase Storage bucket **`guide-assets`**.
 
 **Typical workflow (deployed):**
 
@@ -214,16 +109,11 @@ Web form for complete guide cards (machine fields, emoji-section markdown, hero 
 # New: Ingest guide | Existing: Fetch → Load → Save changes
 ```
 
-**Optional local repo mirror:**
+### Legacy repo sync scripts (optional)
 
-```bash
-npm run slot-guide:serve   # SLOT_GUIDE_WRITE_REPO=1 for Slots/ + public/guides/
-npm run dev
-```
+**`scripts/sync-slot-forms-to-supabase.mjs`** and **`npm run slots:sync:*`** remain for emergencies if you recreate local **`Slots/<slug>/`** manifests (`guide.md`, `card.meta.json`). They are **not** the day-to-day path and the repo no longer ships those folders. Use **`.env.supabase.test`** / **`.env.supabase.production`** with **`SUPABASE_SERVICE_ROLE_KEY`** when running sync.
 
-### Windows note
-
-On a case-insensitive drive, mixed-case legacy folders (for example `Phoenix-Link`) collide with canonical `phoenix-link`. The sync script only reads **lowercase kebab-case** directories (`a-z`, `0-9`, hyphens). Asset-only trees were renamed to match (e.g. `igt-must-hit-by`, `rich-little-hens`, `cash-falls`).
+Local **`npm run slot-guide:serve`** can still mirror to disk when **`SLOT_GUIDE_WRITE_REPO=1`** (creates **`Slots/`** + **`public/guides/`** locally only).
 
 ## Further reading
 

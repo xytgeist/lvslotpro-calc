@@ -172,51 +172,37 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 **Surface:** separate Vite entry **`src/slot-guide-form/`** (`SlotGuideFormApp.jsx`, `LoginGate.jsx` admin session). Deployed at **`/slot-guide-form`** on app host (e.g. **`lvslotpro-calc-tx18.vercel.app`**). Not in main `AppShell` hamburger.
 
-**Primary workflow (form-first):** Supabase + cloud storage are source of truth — **no repo `guide.md` required** for live app copy.
+**Primary workflow (form-first):** Supabase + cloud storage are source of truth. Repo **`Slots/`** and **`public/guides/`** removed from git @ **`8bcbdb6`** — all guide heroes and inline images are R2/Storage URLs in the DB. Calculator icons: **`public/calculators/*.webp`**.
 
 | Mode | Action |
 | --- | --- |
 | **New guide** | Fill form → upload hero/diagrams → **Ingest guide** → `POST /api/slot-guide-ingest` |
 | **Existing guide** | **Fetch guides** → **Load** → edit → **Save changes** (direct Supabase update) |
 | **WIP (same browser)** | **Save draft** → `localStorage` **`slotGuideFormDraft:v1`** (text only; re-attach images after restore) |
-| **Optional repo/sync** | **`Slots/<slug>/guide.md`** + **`npm run slots:sync:test -- --slug=<slug>`** for docx/bulk/git backup only |
 
-### Docx → repo → sync (optional legacy path)
+**Fetch → Load before editing.** Save recompiles full markdown from form fields — empty **Where to find** wipes that section in the DB.
 
-**Drop sources (local, usually gitignored):** **`Slots/_ingest/`**
+### Legacy docx / repo sync (optional, not in repo)
 
-| Prefix | Use |
-| --- | --- |
-| **`AP-*.docx`** | AP / ladder / when-to-play / bankroll / floor verification |
-| **`Review-*.docx`** | Gameplay mechanics, features, pay tables (no AP ladder essay) |
-
-**Output in repo:** **`Slots/<slug>/guide.md`**, **`card.meta.json`**, **`hero.png`**; hero WebP at **`public/guides/<slug>/hero.webp`**.
-
-**Publish to test Supabase (optional — when using repo files):**
-
-```bash
-npm run slots:sync:test -- --slug=<slug>
-```
-
-Reads manifest + **`guide.md`** → upserts **`machines`** + **`guides`**. **App Guides tab reads DB** — form **Save changes** / **Ingest** also update live copy without sync.
+Historical pilot used local **`Slots/_ingest/`** docx → **`Slots/<slug>/`** → **`npm run slots:sync:test`**. Scripts remain under **`scripts/`** if you recreate manifests locally; **not** required for test/prod copy after form-first cutover.
 
 **When to commit / deploy:**
 
-| Change | Form save/ingest | `slots:sync:test` | Git commit | Vercel deploy |
-| --- | --- | --- | --- | --- |
-| Guide text / images (form) | ✓ enough for test app | not required | optional backup | client deploy for form code |
-| Repo-only text change | — | ✓ | recommended | no |
-| Form / parse / card UI code | — | — | yes | yes |
+| Change | Form save/ingest | Git commit | Vercel deploy |
+| --- | --- | --- | --- |
+| Guide text / images (form) | ✓ enough for test app | not required | client deploy for form code only |
+| Form / parse / card UI code | — | yes | yes |
 
 **Compiled markdown section order:**
 
 1. 🟢 When to play  
 2. 🛑 When to stop  
 3. 🔍 How to check  
-4. ⚠️ Risk & Warnings  
-5. 📍 **Where to find** (optional — floor / regions; after Risk)  
-6. 🎭 Skins (optional)  
-7. 🎰 Gameplay Mechanics  
+4. 💰 **Bankroll on hand** (optional)  
+5. ⚠️ Risk & Warnings  
+6. 📍 **Where to find** (optional — floor / regions; after Risk)  
+7. 🎭 Skins (optional)  
+8. 🎰 Gameplay Mechanics  
 
 Built by **`formUtils.js`** / **`scripts/lib/slotGuideIngestCore.mjs`**; slot-guide-form field **`where_to_find`**.
 
@@ -240,7 +226,8 @@ Built by **`formUtils.js`** / **`scripts/lib/slotGuideIngestCore.mjs`**; slot-gu
 ### Status
 
 - [x] **Form-first workflow:** Load preserves inline images; WebP uploads; Diagrams on edit; DB + R2 source of truth (2026-06-10)
-- [x] **Docx pilot workflow** documented; **`coin-kingdom-aztec`** on test via **`slots:sync`** @ **`132ec95`** / **`102cec1`**
+- [x] **Repo asset cleanup:** **`Slots/`** + **`public/guides/`** removed; heroes/inline images R2-only; calc icons **`public/calculators/`** @ **`8bcbdb6`**
+- [x] **Docx pilot workflow** (historical); **`coin-kingdom-aztec`** on test @ **`132ec95`** / **`102cec1`**
 - [x] **`## 📍 Where to find`** section in markdown pipeline + form @ **`102cec1`**
 - [x] **`machines.popularity`** rename + card shows tier only @ **`132ec95`** / **`a3a20b7`** — SQL **`20260610170000`** (apply on test + prod)
 - [x] **Slot-guide-form scroll** (`LoginGate` viewport scroll shell) @ **`132ec95`**
@@ -702,8 +689,9 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 ## Update log
 
 - 2026-06-10: **Public guide heroes → R2 (test):** **`scripts/backfill-public-guide-heroes-to-r2.mjs`** uploaded 12 fallback heroes + 3 inline **`/guides/`** assets to R2; all test **`guides.thumbnail_url`** now remote (no code-fallback heroes left except global buffalo placeholder).
-- 2026-06-10: **AP Guide form-first workflow:** **`/slot-guide-form`** is primary editor — Supabase + R2/Storage source of truth; **`parseGuideMarkdown`** keeps embedded images on Load; shared **`buildGuideMarkdown`** + WebP uploads on Save/Ingest; **Diagrams** on edit. Repo **`guide.md`** + **`slots:sync`** optional (docx/bulk only).
-- 2026-06-08: **AP Guides admin Delete (`GuidesScreen`):** admin-only **Delete** on guide card hero + confirm modal removes **`guides`** + **`machines`** (+ optional **`content_access_gates`**) on test; does not delete **`Slots/<slug>/`** in git. Apply **`20260610180000_guide_admin_delete_rls.sql`** on test before use.
+- 2026-06-09: **Guide Bankroll section:** **`## 💰 Bankroll on hand`** is its own markdown block (between How to check and Risk & Warnings); form field split out of Risk summary. Legacy inline **`**Bankroll on hand:**`** in Risk still parses on Load. Migration: **`node scripts/migrate-guide-bankroll-section.mjs`** on test. All test guides verified R2 heroes + inline URLs; calculator icons at **`public/calculators/`**; hero fallbacks removed from **`GuidesScreen`** / **`GuideCardPreview`**. Docs updated (**`README.md`**, backlog, **`AGENTS.md`**, **`WAKEUP`**). Legacy **`npm run slots:sync:*`** scripts remain for local manifest replay only.
+- 2026-06-10: **AP Guide form-first workflow:** **`/slot-guide-form`** is primary editor — Supabase + R2/Storage source of truth; **`parseGuideMarkdown`** keeps embedded images on Load; shared **`buildGuideMarkdown`** + WebP uploads on Save/Ingest; **Diagrams** on edit.
+- 2026-06-08: **AP Guides admin Delete (`GuidesScreen`):** admin-only **Delete** on guide card hero + confirm modal removes **`guides`** + **`machines`** (+ optional **`content_access_gates`**) on test; does not delete R2/Storage assets. Apply **`20260610180000_guide_admin_delete_rls.sql`** on test before use.
 - 2026-06-08: **AP guide docx pilot + sync workflow (on `test`):** drop **`AP-*.docx`** + **`Review-*.docx`** in **`Slots/_ingest/`** → synthesize **`Slots/<slug>/guide.md`** + **`card.meta.json`** → **`npm run slots:sync:test -- --slug=<slug>`** publishes **`guides.content_markdown`** (app reads DB; git commit for source of truth, not required for test copy). **`coin-kingdom-aztec`** first pilot @ **`132ec95`** / **`102cec1`**. See backlog **AP Guide editor** § docx workflow.
 - 2026-06-08: **Guide card popularity display (`test`, `a3a20b7`):** collapsed tile always shows **`machines.popularity`** tier; **`popularity_summary`** no longer overrides label.
 - 2026-06-08: **Voice rule — no em dashes (`a3a20b7`):** `.cursor/rules/no-em-dashes.mdc` + **`AGENTS.md`**; prefer **`...`** over spaced hyphens for breaks.

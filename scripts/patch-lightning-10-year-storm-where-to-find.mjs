@@ -1,5 +1,6 @@
 /**
  * Patch lightning-10-year-storm Where to find on test DB (form-first — no repo guide.md).
+ * Prefer: node scripts/patch-all-where-to-find-format.mjs
  * Usage: node scripts/patch-lightning-10-year-storm-where-to-find.mjs
  */
 import { createClient } from '@supabase/supabase-js'
@@ -7,42 +8,42 @@ import { loadSupabaseEnv, readSupabaseCredentials } from './lib/supabaseEnv.mjs'
 
 const SLUG = 'lightning-10-year-storm'
 
-const WHERE_BODY = `### In Las Vegas / physical casinos
+const WHERE_BODY = `### Where to Find Lightning 10 Year Storm
 
-Lightning 10 Year Storm is currently one of the hottest Lightning Link games on the floor.
-
-It has seen very strong placement across both Strip and locals casinos.
-
-You can find it at:
-
-- Bellagio
-- Aria
-- MGM Grand
-- Caesars Palace
-- Wynn / Encore
-- Venetian
-- Red Rock Casino
-- Many other major properties
+**In Las Vegas / Physical Casinos:**
+- Lightning 10 Year Storm is currently one of the hottest Lightning Link games on the floor.
+- It has seen very strong placement across both Strip and locals casinos.
+- You can find it at:
+  - Bellagio
+  - Aria
+  - MGM Grand
+  - Caesars Palace
+  - Wynn / Encore
+  - Venetian
+  - Red Rock Casino
+  - Many other major properties
 
 It is highly sought after by advantage players due to its high volatility and big jackpot potential.
 
-### Online / free play
+**Online / Free Play:**
+- Demo versions are available on several slot review sites.
 
-Demo versions are available on several slot review sites.
+---
 
 ### Top cities / regions (outside Las Vegas)
 
-| Rank | City / region | Popularity level | Notes |
-| --- | --- | --- | --- |
-| 1 | Atlantic City, NJ | Very High | Extremely common at Borgata, Resorts, and Golden Nugget |
-| 2 | Pennsylvania | Very High | Heavy placement at Parx, Rivers, and Wind Creek |
-| 3 | Florida | High | Strong at Seminole Hard Rock Tampa and Hollywood casinos |
-| 4 | Oklahoma | High | Very popular at Cherokee Nation casinos |
-| 5 | Mississippi Gulf Coast | High | Common at Biloxi and Gulfport properties |
-| 6 | Indiana / Chicago area | Medium-High | Growing at Horseshoe and Ameristar |
-| 7 | New York / Connecticut | Medium-High | Available at Resorts World and Mohegan Sun |
+1. Atlantic City, NJ - Very High - Extremely common at Borgata, Resorts, and Golden Nugget
+2. Pennsylvania - Very High - Heavy placement at Parx, Rivers, and Wind Creek
+3. Florida - High - Strong at Seminole Hard Rock Tampa and Hollywood casinos
+4. Oklahoma - High - Very popular at Cherokee Nation casinos
+5. Mississippi Gulf Coast - High - Common at Biloxi and Gulfport properties
+6. Indiana / Chicago area - Medium-High - Growing at Horseshoe and Ameristar
+7. New York / Connecticut - Medium-High - Available at Resorts World and Mohegan Sun
 
-**Summary:** Lightning 10 Year Storm is one of the top performing Lightning Link games right now. East Coast markets (Atlantic City and Pennsylvania) and Florida have the strongest placement outside of Las Vegas. It is actively being rolled out and remains highly desirable for advantage players.`
+**Summary:**
+- Lightning 10 Year Storm is one of the top performing Lightning Link games right now.
+- East Coast markets (Atlantic City and Pennsylvania) and Florida have the strongest placement outside of Las Vegas.
+- It is actively being rolled out and remains highly desirable for advantage players.`
 
 const SKINS_MARKER = '## 🎭 Skins'
 const WHERE_SECTION = `## 📍 Where to find\n\n${WHERE_BODY}\n\n`

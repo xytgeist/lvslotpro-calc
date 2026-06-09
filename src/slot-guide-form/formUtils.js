@@ -15,7 +15,7 @@ function trimBody(text) {
 }
 
 const KNOWN_SECTION =
-  /When to play|When to stop|How to check|Risk|Where to find|Skins|Gameplay/i
+  /When to play|When to stop|How to check|Bankroll|Risk|Where to find|Skins|Gameplay/i
 
 /**
  * Parse compiled guide markdown into structured section fields.
@@ -47,13 +47,18 @@ export function parseGuideMarkdown(markdown) {
       out.when_to_stop = trimBody(body)
     } else if (/How to check/i.test(header)) {
       out.how_to_check = trimBody(body)
+    } else if (/Bankroll on hand/i.test(header)) {
+      out.risk_bankroll = trimBody(body)
     } else if (/Risk/i.test(header)) {
       const lines = body.split('\n')
       const summaryLines = []
       const bullets = []
       for (const line of lines) {
         const bm = line.match(/^\*\*Bankroll on hand:\s*(.+?)\*\*/)
-        if (bm) { out.risk_bankroll = bm[1].trim(); continue }
+        if (bm && !out.risk_bankroll) {
+          out.risk_bankroll = bm[1].trim()
+          continue
+        }
         if (/^- /.test(line)) { bullets.push(line.slice(2).trim()); continue }
         summaryLines.push(line)
       }
