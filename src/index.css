@@ -1966,7 +1966,7 @@ html.light .lounge-media-toolbar .active\:text-sky-200:active {
  * Calculators use Tailwind gray-* classes which do NOT auto-invert with the
  * zinc-* scale. Every shade must be overridden here explicitly.
  *
- * data-calc="phoenix" | "buffalo-link" | "mhb" on each calculator root div.
+ * data-calc="phoenix" | "buffalo-link" | "mhb" | "stackup" | "buffalo-diamond" on each calculator root div.
  */
 
 /* Calculator list buttons — uniform shadow in light mode matching MHB's shadow-lg shadow-black/30 */
@@ -2435,6 +2435,84 @@ html.light [data-calc="stackup"] .bg-red-900 .text-red-300 {
 .stackup-check-emoji { display: inline; }
 html.light .stackup-check-badge { display: inline-flex; }
 html.light .stackup-check-emoji { display: none; }
+
+/* ── BuffaloDiamond (solid title; tier + button gradients elsewhere) ─────── */
+.buffalo-diamond-check-badge { display: none; }
+.buffalo-diamond-check-emoji { display: inline; }
+html.light .buffalo-diamond-check-badge { display: inline-flex; }
+html.light .buffalo-diamond-check-emoji { display: none; }
+
+html.light [data-calc="buffalo-diamond"] h1 {
+  color: #7c3aed !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+html.light [data-calc="buffalo-diamond"] h1 + p {
+  color: #7c3aed !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+html.light [data-calc="buffalo-diamond"] h2,
+html.light [data-calc="buffalo-diamond"] h2.text-violet-400 {
+  color: #000000 !important;
+}
+
+html.light [data-calc="buffalo-diamond"] .text-violet-400 {
+  color: #7c3aed;
+}
+html.light [data-calc="buffalo-diamond"] .text-violet-300 {
+  color: #6d28d9;
+}
+
+html.light [data-calc="buffalo-diamond"] .text-emerald-400 {
+  color: #16A34A;
+}
+
+html.light [data-calc="buffalo-diamond"] .text-sky-400 {
+  color: #0284c7;
+}
+html.light [data-calc="buffalo-diamond"] .text-amber-400 {
+  color: #d97706;
+}
+
+html.light [data-calc="buffalo-diamond"] .text-red-400 {
+  color: #dc2626;
+}
+
+html.light [data-calc="buffalo-diamond"] .bg-violet-700 {
+  background-color: #7c3aed;
+}
+html.light [data-calc="buffalo-diamond"] .bg-violet-700.text-white,
+html.light [data-calc="buffalo-diamond"] .bg-violet-700 .text-white {
+  color: #ffffff !important;
+}
+html.light [data-calc="buffalo-diamond"] .hover\:bg-violet-600:hover {
+  background-color: #6d28d9;
+}
+html.light [data-calc="buffalo-diamond"] .hover\:bg-gray-600:hover {
+  background-color: #a1a1aa;
+}
+
+/* +EV / marginal / -EV pills */
+html.light [data-calc="buffalo-diamond"] .bg-emerald-900 {
+  background-color: #16A34A;
+}
+html.light [data-calc="buffalo-diamond"] .bg-emerald-900.text-emerald-300,
+html.light [data-calc="buffalo-diamond"] .bg-emerald-900 .text-emerald-300 {
+  color: #ffffff;
+}
+html.light [data-calc="buffalo-diamond"] .bg-violet-900 {
+  background-color: #7c3aed;
+}
+html.light [data-calc="buffalo-diamond"] .bg-violet-900.text-violet-300,
+html.light [data-calc="buffalo-diamond"] .bg-violet-900 .text-violet-300 {
+  color: #ffffff;
+}
+html.light [data-calc="buffalo-diamond"] .bg-red-900 {
+  background-color: #DC2626;
+}
+html.light [data-calc="buffalo-diamond"] .bg-red-900.text-red-300,
+html.light [data-calc="buffalo-diamond"] .bg-red-900 .text-red-300 {
+  color: #18181b;
+}
 
 /* ── Bankroll sheet — light mode ─────────────────────────── */
 html.light [data-bankroll-sheet] {

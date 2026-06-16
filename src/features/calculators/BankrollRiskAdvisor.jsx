@@ -81,7 +81,7 @@ function computeRiskMetrics({ maxExpectedLoss, riskBudget, playStake }) {
 
 // ── Need Help modal ────────────────────────────────────────────────────────────
 
-function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, supabaseClient, onClose }) {
+function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, exposureLabel, supabaseClient, onClose }) {
   const [comment, setComment] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
@@ -119,12 +119,24 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, su
         }
       }
       if (playDetails.stackUpTarget) lines.push(`Max exposure target: ${playDetails.stackUpTarget}`)
+      if (playDetails.buffaloDiamondMeters) {
+        for (const label of ['Green', 'Blue', 'Gold']) {
+          const v = playDetails.buffaloDiamondMeters[label]
+          if (v != null) lines.push(`${label} FG: ${Number(v).toLocaleString()}`)
+        }
+      }
+      if (playDetails.currentRtpPct != null) {
+        lines.push(`Current RTP: ${Number(playDetails.currentRtpPct).toFixed(1)}%`)
+      }
+      if (playDetails.coinInExpected != null && Number(playDetails.coinInExpected) > 0) {
+        lines.push(`Coin-in expected: $${Number(playDetails.coinInExpected).toLocaleString()}`)
+      }
       if (playDetails.betSize != null)  lines.push(`Bet Size: $${playDetails.betSize}/spin`)
       if (playDetails.current != null)  lines.push(`Current Meter: $${Number(playDetails.current).toFixed(2)}`)
       if (playDetails.mustHitBy != null) lines.push(`Must Hit By: $${Number(playDetails.mustHitBy).toFixed(2)}`)
       lines.push(
         ``,
-        `Exposure (worst case): ${fmt$(maxExpectedLoss)}`,
+        `${exposureLabel}: ${fmt$(maxExpectedLoss)}`,
         `My Coverage: ${fmt$(coverageDollars)} (${coveragePct}%)`,
         playStakeRaw != null
           ? `Looking to Sell: ${fmtRisk$(sellOnPlay, playStakeRaw)} of action on this ${fmtRisk$(playStakeRounded, playStakeRaw)} play (${sellPct}%)`
@@ -198,6 +210,29 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, su
                   <span className="text-white">{playDetails.stackUpTarget}</span>
                 </div>
               )}
+              {playDetails.buffaloDiamondMeters &&
+                ['Green', 'Blue', 'Gold'].map((label) => {
+                  const v = playDetails.buffaloDiamondMeters[label]
+                  if (v == null) return null
+                  return (
+                    <div key={label} className="flex justify-between">
+                      <span className="text-zinc-400">{label} FG</span>
+                      <span className="text-white tabular-nums">{Number(v).toLocaleString()}</span>
+                    </div>
+                  )
+                })}
+              {playDetails.currentRtpPct != null && (
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Current RTP</span>
+                  <span className="text-white tabular-nums">{Number(playDetails.currentRtpPct).toFixed(1)}%</span>
+                </div>
+              )}
+              {playDetails.coinInExpected != null && Number(playDetails.coinInExpected) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Coin-in Expected</span>
+                  <span className="text-white tabular-nums">${Number(playDetails.coinInExpected).toLocaleString()}</span>
+                </div>
+              )}
               {playDetails.betSize != null && (
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Bet Size</span>
@@ -218,7 +253,7 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, su
               )}
               <div className="border-t border-zinc-700 pt-1.5 mt-0.5 space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Exposure</span>
+                  <span className="text-zinc-400">{exposureLabel}</span>
                   <span className="text-red-400 font-semibold">{fmt$(maxExpectedLoss)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -400,8 +435,9 @@ function BankrollRiskInfoModal({ accentClass, accentBtnClass, onClose }) {
  *
  * @param {object} props
  * @param {import('@supabase/supabase-js').SupabaseClient} props.supabaseClient
- * @param {number}  props.maxExpectedLoss  Exposure in dollars (worst case)
+ * @param {number}  props.maxExpectedLoss  Potential loss / exposure estimate in dollars
  * @param {string}  props.playLabel        e.g. "Phoenix Link"
+ * @param {string}  [props.exposureLabel]  Label for exposure tile and Need Help (default "Exposure")
  * @param {object}  props.playDetails      Fields shown in the Need Help modal
  * @param {string}  [props.accentClass]    Section title color (game accent)
  * @param {string}  [props.accentBtnClass] Primary button classes for info modal
@@ -411,6 +447,7 @@ export default function BankrollRiskAdvisor({
   supabaseClient,
   maxExpectedLoss,
   playLabel,
+  exposureLabel = 'Exposure',
   playDetails = {},
   accentClass = 'text-gray-300',
   accentBtnClass = 'bg-cyan-600 hover:bg-cyan-500',
@@ -555,7 +592,7 @@ export default function BankrollRiskAdvisor({
                 <div className="text-amber-400 font-bold text-lg">{fmt$(riskBudget)}</div>
               </div>
               <div className="bg-gray-800 p-4 rounded-2xl text-center">
-                <div className="text-gray-400 text-sm mb-1">Exposure</div>
+                <div className="text-gray-400 text-sm mb-1">{exposureLabel}</div>
                 <div className="text-red-400 font-bold text-lg">{fmt$(maxExpectedLoss)}</div>
               </div>
             </div>
@@ -648,6 +685,7 @@ export default function BankrollRiskAdvisor({
           maxExpectedLoss={maxExpectedLoss}
           riskBudget={riskBudget}
           playDetails={playDetails}
+          exposureLabel={exposureLabel}
           supabaseClient={supabaseClient}
           onClose={() => setShowModal(false)}
         />
