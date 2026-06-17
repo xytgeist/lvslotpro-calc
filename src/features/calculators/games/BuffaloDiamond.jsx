@@ -14,6 +14,7 @@ import {
   betLevelOptionsForVariant,
   betLevelDisplayLabel,
   defaultBetLevelKeyForVariant,
+  DEFAULT_BET_LEVEL_KEY,
   defaultOverallRtpForVariant,
   effectiveBetSize,
   coupledBreakevenMap,
@@ -40,7 +41,7 @@ import {
 
 export default function BuffaloDiamond({ onBack, supabaseClient = null, onOpenLogbook = null }) {
   const [variantKey, setVariantKey] = useState('diamond')
-  const [betLevelKey, setBetLevelKey] = useState('75')
+  const [betLevelKey, setBetLevelKey] = useState(DEFAULT_BET_LEVEL_KEY)
   const [extremeDenom, setExtremeDenom] = useState(0.01)
   const [greenMeter, setGreenMeter] = useState(24)
   const [blueMeter, setBlueMeter] = useState(59)
@@ -49,7 +50,7 @@ export default function BuffaloDiamond({ onBack, supabaseClient = null, onOpenLo
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [overallRtp, setOverallRtp] = useState(DEFAULT_OVERALL_RTP)
   const [overallRtpInput, setOverallRtpInput] = useState(String(DEFAULT_OVERALL_RTP))
-  const [tierDecimals, setTierDecimals] = useState(() => ({ ...betLevelByKey('75').decimals }))
+  const [tierDecimals, setTierDecimals] = useState(() => ({ ...betLevelByKey(DEFAULT_BET_LEVEL_KEY).decimals }))
   const [showInfoModal, setShowInfoModal] = useState(false)
 
   const betLevel = useMemo(() => betLevelByKey(betLevelKey), [betLevelKey])
@@ -250,30 +251,40 @@ export default function BuffaloDiamond({ onBack, supabaseClient = null, onOpenLo
         </div>
 
         <div className="mb-6 space-y-3 rounded-3xl bg-gray-900 p-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">Game</label>
-              <DropdownSelect
-                value={variantKey}
-                onChange={setVariantKey}
-                options={Object.values(BUFFALO_DIAMOND_VARIANTS).map((v) => ({
-                  value: v.key,
-                  label: v.label,
-                }))}
-                accentClass="text-violet-400"
-                size="lg"
-              />
+          <div>
+            <label className="mb-1 block text-xs text-gray-400">Game</label>
+            <div
+              className="grid grid-cols-2 gap-1.5 rounded-2xl bg-gray-800 p-1"
+              role="radiogroup"
+              aria-label="Buffalo Diamond game variant"
+            >
+              {Object.values(BUFFALO_DIAMOND_VARIANTS).map((v) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={variantKey === v.key}
+                  onClick={() => setVariantKey(v.key)}
+                  className={`touch-manipulation rounded-xl py-2.5 text-center text-sm font-semibold transition-colors ${
+                    variantKey === v.key
+                      ? 'bg-violet-600 text-white'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">Bet level</label>
-              <DropdownSelect
-                value={betLevelKey}
-                onChange={setBetLevelKey}
-                options={betLevelOptions}
-                accentClass="text-violet-400"
-                size="lg"
-              />
-            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-400">Bet level</label>
+            <DropdownSelect
+              value={betLevelKey}
+              onChange={setBetLevelKey}
+              options={betLevelOptions}
+              accentClass="text-violet-400"
+              size="lg"
+            />
           </div>
           {variantKey === 'extreme' ? (
             <div>
@@ -293,7 +304,7 @@ export default function BuffaloDiamond({ onBack, supabaseClient = null, onOpenLo
           <p className="text-[11px] italic leading-relaxed text-gray-500">
             {variantKey === 'extreme' && extremeDenom >= 0.05
               ? `${betLevelLabel} bet (5× $0.01 Extreme level). Default RTP 90% at $0.05.`
-              : `Tier decimals for ${betLevelLabel}; default RTP ${REFERENCE_OVERALL_RTP}% at $0.01 / Diamond.`}
+              : `Tier multipliers for ${betLevelLabel}; default RTP ${REFERENCE_OVERALL_RTP}% at $0.01 / Diamond.`}
           </p>
         </div>
 
@@ -337,10 +348,14 @@ export default function BuffaloDiamond({ onBack, supabaseClient = null, onOpenLo
                   {REFERENCE_OVERALL_RTP}%; ▼ breakevens and Current EV update automatically.
                 </p>
               </div>
+              <p className="text-[11px] leading-relaxed text-amber-400/90">
+                Unless you know what these indicate and have 100s of thousands of spins tabulated, don&apos;t change
+                these settings.
+              </p>
               {BUFFALO_DIAMOND_TIERS.map((tier) => (
                 <div key={tier.key} className="rounded-xl bg-gray-800 p-3">
                   <label className={`mb-1 block text-[10px] uppercase tracking-wide ${tier.text}`}>
-                    {tier.shortLabel} decimal
+                    {tier.shortLabel} multiplier
                   </label>
                   <input
                     type="text"
@@ -541,14 +556,20 @@ export default function BuffaloDiamond({ onBack, supabaseClient = null, onOpenLo
 
         <CalculatorLogPlayButton
           calculatorSlug="buffalo-diamond"
-          gameTitle="Buffalo Diamond"
-          betSize={betSize}
-          evPrefill={playLogCalcEvPrefill({
-            currentRtpPct: playRtpPct,
-            averageCaseMult: evAvg != null && evAvg >= 0 ? evAvg : null,
-            betSize,
-          })}
+          prefillValues={{
+            green_fg: meterValues.green,
+            blue_fg: meterValues.blue,
+            gold_fg: meterValues.gold,
+            bet_size: betSize,
+            denom: variantKey === 'extreme' ? extremeDenom : 0.01,
+            ...playLogCalcEvPrefill({
+              currentRtpPct: playRtpPct,
+              averageCaseMult: evAvg != null && evAvg >= 0 ? evAvg : null,
+              betSize,
+            }),
+          }}
           onOpenLogbook={onOpenLogbook}
+          accentBtnClass="bg-violet-700 hover:bg-violet-600"
         />
 
         <CalculatorDisclaimer />
@@ -567,20 +588,101 @@ export default function BuffaloDiamond({ onBack, supabaseClient = null, onOpenLo
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="buffalo-diamond-calc-info-title" className="mb-3 text-lg font-bold text-violet-300">
-              Decimal RTP model
+              How this calculator works
             </h2>
-            <p className="mb-3">
-              Decimal RTP model:{' '}
-              <span className="text-white">
-                Total RTP% = base game (main + 1×) + green×dec₂× + blue×dec₃× + gold×dec₄×
-              </span>
-              . Play is +EV when total ≥ 100%.
-            </p>
-            <p className="mb-3">
-              Profiles and ▼ breakevens are calibrated at{' '}
-              <span className="text-white">{REFERENCE_OVERALL_RTP}% overall RTP</span>. Change RTP in Advanced
-              Settings to shift grind base game (±1 pt per 1 pt) and recalc breakevens and Current EV.
-            </p>
+            <div className="space-y-4 text-[13px] leading-relaxed">
+              <section>
+                <h3 className="mb-1.5 font-semibold text-white">Snapshot RTP (header)</h3>
+                <p>
+                  Let{' '}
+                  <span className="text-white">B</span> = base-game return % (main line + 1× feature, bet-level
+                  profile). Let{' '}
+                  <span className="text-white">FG<sub>i</sub></span> = live banked free-game count on tier{' '}
+                  <span className="text-white">i</span> ∈ {'{green, blue, gold}'}, and{' '}
+                  <span className="text-white">m<sub>i</sub></span> = that tier&apos;s RTP multiplier (Advanced
+                  Settings). Banked contribution per tier is{' '}
+                  <span className="text-white">FG<sub>i</sub> × m<sub>i</sub> × 100</span> percentage points.{' '}
+                  <strong className="text-white">Current RTP</strong> is the static snapshot:
+                </p>
+                <p className="mt-2 rounded-xl bg-gray-800/80 px-3 py-2 font-mono text-[12px] text-violet-200">
+                  RTP<sub>snap</sub> = B + Σ<sub>i</sub> (FG<sub>i</sub> × m<sub>i</sub> × 100)
+                </p>
+                <p className="mt-2">
+                  Play is labeled +EV when{' '}
+                  <span className="text-white">RTP<sub>snap</sub> ≥ 100%</span>. Profiles and ▼ lines are calibrated
+                  at{' '}
+                  <span className="text-white">{REFERENCE_OVERALL_RTP}%</span> overall paytable RTP for your bet level
+                  (linear between $0.75 and $4.00 anchors). Changing RTP in Advanced shifts{' '}
+                  <span className="text-white">B</span> ±1 pt per 1 pt vs {REFERENCE_OVERALL_RTP}% and recomputes ▼.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="mb-1.5 font-semibold text-white">Why snapshot RTP is not per-spin return</h3>
+                <p>
+                  <span className="text-white">RTP<sub>snap</sub></span> values the{' '}
+                  <em>current machine state</em>: grind return plus all banked meter equity priced at once. On each
+                  actual spin you only realize ~<span className="text-white">B%</span> from base game (minus variance).
+                  The banked terms are <em>latent</em> ... they pay only when that tier&apos;s wheel/bonus path hits and
+                  awards those FG. You cannot cash out meter value every spin, and a 113% snapshot does{' '}
+                  <strong className="text-white">not</strong> mean +13% return per coin-in spin. Realized session RTP
+                  depends on which bonus fires, when meters reset, and chase variance (especially 3× / 4× tiers).
+                </p>
+              </section>
+
+              <section>
+                <h3 className="mb-1.5 font-semibold text-white">Coupled breakeven (▼)</h3>
+                <p>
+                  Each tier has a <strong className="text-white">coupled</strong> breakeven: other meters held at reset,
+                  solve for the target tier FG where snapshot RTP equals 100%:
+                </p>
+                <p className="mt-2 rounded-xl bg-gray-800/80 px-3 py-2 font-mono text-[12px] text-violet-200">
+                  B + Σ<sub>j≠t</sub> (FG<sub>reset,j</sub> × m<sub>j</sub> × 100) + (FG<sub>t</sub> × m<sub>t</sub> ×
+                  100) = 100 ⇒ ▼<sub>t</sub>
+                </p>
+                <p className="mt-2">
+                  When{' '}
+                  <span className="text-white">FG<sub>t</sub> &gt; ▼<sub>t</sub></span>, tier{' '}
+                  <span className="text-white">t</span> is a standalone +EV chase target (gold → blue → green priority
+                  if multiple qualify).
+                </p>
+              </section>
+
+              <section>
+                <h3 className="mb-1.5 font-semibold text-white">Average case (projected session ×)</h3>
+                <p>
+                  Shown only when a priced chase path exists. For a target tier above ▼ at live meters:
+                </p>
+                <p className="mt-2 rounded-xl bg-gray-800/80 px-3 py-2 font-mono text-[12px] text-violet-200">
+                  EV<sub>avg</sub> (bets) ≈ (FG<sub>t</sub> − ▼<sub>t</sub>) × AvgPay<sub>t</sub>
+                </p>
+                <p className="mt-2">
+                  <span className="text-white">AvgPay<sub>t</sub></span> = empirical mean return per banked FG spin on
+                  tier hit ($0.75 calibration). Expected coin-in ≈ cold-hit spins to that tier × bet (wheel frequency ×
+                  tier rate, linear in bet). This is an average-case bonus capture model, not a full session simulator.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="mb-1.5 font-semibold text-white">Combo +EV (no single tier above ▼)</h3>
+                <p>
+                  When <span className="text-white">RTP<sub>snap</sub> ≥ 100%</span> but every tier is below ▼, edge is
+                  spread across meters. We SPI-project to the lowest in-play tier hit; if a higher tier crosses ▼ before
+                  then, we escalate and price that chase at projected meters (same{' '}
+                  <span className="text-white">EV<sub>avg</sub></span> formula). If no tier reaches ▼ on that path, we
+                  show +EV on snapshot only ... session × is not modeled (combo variance is too path-dependent). We
+                  suggest stopping after your first meter hit on combo setups.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="mb-1.5 font-semibold text-white">Potential loss</h3>
+                <p>
+                  Stressed envelope: coin-in to the priced path × house edge at ~85% of paytable RTP, minus average-case
+                  target win $. Not a hard ceiling ... cold runs on 3×/4× chases can exceed it.
+                </p>
+              </section>
+            </div>
             <button
               type="button"
               onClick={() => setShowInfoModal(false)}

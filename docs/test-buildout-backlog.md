@@ -177,10 +177,12 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 | Mode | Action |
 | --- | --- |
 | **New guide** | Fill form → upload hero/diagrams → **Ingest guide** → `POST /api/slot-guide-ingest` |
-| **Existing guide** | **Fetch guides** → **Load** → edit → **Save changes** (direct Supabase update) |
+| **Existing guide** | **Fetch guides** → **Load** → edit → **Save changes** or **Delete guide** (direct Supabase update/delete; admin session) |
 | **WIP (same browser)** | **Save draft** → `localStorage` **`slotGuideFormDraft:v1`** (text only; re-attach images after restore) |
 
 **Fetch → Load before editing.** Save recompiles full markdown from form fields — empty **Where to find** wipes that section in the DB.
+
+**SQL (test before Save changes):** apply **`20260610220000_guide_admin_write_rls.sql`** (admin INSERT/UPDATE on **`machines`** + **`guides`**, read unpublished guides). Delete policies: **`20260610180000_guide_admin_delete_rls.sql`**. Or run full **`supabase/guide_admin_rls.sql`** in SQL editor.
 
 ### Legacy docx / repo sync (optional, not in repo)
 
@@ -688,6 +690,11 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-06-10: **Slot-guide-form Delete:** admin **Delete guide** in edit mode (confirm modal; removes **`guides`** + **`machines`** + optional **`content_access_gates`**; R2/Storage untouched). Requires **`20260610180000_guide_admin_delete_rls.sql`** on test.
+- 2026-06-10: **Drop legacy IGT MHB guide:** migration **`20260610230000_drop_legacy_must_hit_by_igt.sql`** removes duplicate **`must-hit-by-igt`** guide + machine (canonical **`igt-must-hit-by`**). Apply on test.
+- 2026-06-10: **Slot-guide-form Save (machines RLS):** migration **`20260610220000_guide_admin_write_rls.sql`** — admin INSERT/UPDATE on **`machines`** + **`guides`**, SELECT unpublished guides. Required on test before **Save changes** (DELETE was **`20260610180000`** only). **`supabase/guide_admin_rls.sql`** updated to match.
+- 2026-06-10: **Content lock switches + guide Delete — admin only:** **`App.jsx`** **`isAdminRole`** is **`admin`** only (moderators no longer see calc/guide lock toggles or guide Delete). **`content_access_gates`** write RLS stays admin-only (**`20260526150000_content_access_gates.sql`**).
+- 2026-06-10: **Play Logbook — Buffalo Diamond primary template:** migration **`20260610190000_play_log_buffalo_diamond_template.sql`** — system template **`buffalo-diamond`** (`green_fg` / `blue_fg` / `gold_fg` + calc snapshot fields); **`playLogMetrics.js`** fallbacks; **Log play in Logbook** pre-fill from **`BuffaloDiamond.jsx`**. Apply on test before smoke.
 - 2026-06-10: **Public guide heroes → R2 (test):** **`scripts/backfill-public-guide-heroes-to-r2.mjs`** uploaded 12 fallback heroes + 3 inline **`/guides/`** assets to R2; all test **`guides.thumbnail_url`** now remote (no code-fallback heroes left except global buffalo placeholder).
 - 2026-06-09: **Guide Bankroll section:** **`## 💰 Bankroll on hand`** is its own markdown block (between How to check and Risk & Warnings); form field split out of Risk summary. Legacy inline **`**Bankroll on hand:**`** in Risk still parses on Load. Migration: **`node scripts/migrate-guide-bankroll-section.mjs`** on test. All test guides verified R2 heroes + inline URLs; calculator icons at **`public/calculators/`**; hero fallbacks removed from **`GuidesScreen`** / **`GuideCardPreview`**. Docs updated (**`README.md`**, backlog, **`AGENTS.md`**, **`WAKEUP`**). Legacy **`npm run slots:sync:*`** scripts remain for local manifest replay only.
 - 2026-06-10: **AP Guide form-first workflow:** **`/slot-guide-form`** is primary editor — Supabase + R2/Storage source of truth; **`parseGuideMarkdown`** keeps embedded images on Load; shared **`buildGuideMarkdown`** + WebP uploads on Save/Ingest; **Diagrams** on edit.

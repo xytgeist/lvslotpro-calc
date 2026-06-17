@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { normalizeGuideAccessSlug } from '../features/guides/guideAccess.js'
 import { supabase } from './LoginGate.jsx'
 import {
   buildGuideMarkdown,
@@ -533,8 +534,10 @@ export default function SlotGuideFormApp() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
 
-  // ── Submit
+  // ── Submit / delete
   const [busy, setBusy]     = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError]   = useState('')
 
@@ -655,8 +658,7 @@ export default function SlotGuideFormApp() {
     }
   }
 
-  function startNew() {
-    if (isDirty && !window.confirm('Discard unsaved edits and start a blank new guide?')) return
+  function resetToNewGuide() {
     setMode('new')
     setMachine(blankMachine)
     setGuide(blankGuide)
@@ -669,6 +671,50 @@ export default function SlotGuideFormApp() {
     setError('')
     setResult(null)
     clearDraft()
+  }
+
+  function startNew() {
+    if (isDirty && !window.confirm('Discard unsaved edits and start a blank new guide?')) return
+    resetToNewGuide()
+  }
+
+  async function handleDeleteGuide() {
+    if (!deleteConfirm || !editIds) return
+    const { guideId, machineId, slug, name } = deleteConfirm
+    const normalized = normalizeGuideAccessSlug(slug)
+    setDeleteBusy(true)
+    setError('')
+    try {
+      if (normalized) {
+        const { error: gateErr } = await supabase
+          .from('content_access_gates')
+          .delete()
+          .eq('content_kind', 'guide')
+          .eq('content_key', normalized)
+        if (gateErr && !gateErr.message?.includes('content_access_gates')) throw gateErr
+      }
+      const { error: guideErr } = await supabase.from('guides').delete().eq('id', guideId)
+      if (guideErr) {
+        if (guideErr.message?.includes('policy') || guideErr.code === '42501') {
+          throw new Error(
+            'Delete blocked by RLS. Apply migration 20260610180000_guide_admin_delete_rls.sql on test Supabase.',
+          )
+        }
+        throw guideErr
+      }
+      if (machineId) {
+        const { error: machineErr } = await supabase.from('machines').delete().eq('id', machineId)
+        if (machineErr) throw machineErr
+      }
+      setGuideList((prev) => prev.filter((g) => g.id !== guideId))
+      setDeleteConfirm(null)
+      resetToNewGuide()
+      setResult({ ok: true, message: `Deleted ${name || slug}. R2/Storage images were not removed.` })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setDeleteBusy(false)
+    }
   }
 
   // ── Submit: new guide via ingest API (auth via Supabase session token)
@@ -966,11 +1012,28 @@ export default function SlotGuideFormApp() {
             >
               + New guide
             </button>
-            {isEdit && (
-              <span className="px-3 py-2 rounded-xl text-sm font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300">
-                Editing: {machine.name || slug}
-              </span>
-            )}
+            {isEdit && editIds ? (
+              <>
+                <span className="px-3 py-2 rounded-xl text-sm font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300">
+                  Editing: {machine.name || slug}
+                </span>
+                <button
+                  type="button"
+                  disabled={deleteBusy || busy}
+                  onClick={() =>
+                    setDeleteConfirm({
+                      guideId: editIds.guideId,
+                      machineId: editIds.machineId,
+                      slug: guide._slug || machine.slug || slug,
+                      name: guide.title || machine.name || guide._slug || machine.slug,
+                    })
+                  }
+                  className="px-4 py-2 rounded-xl text-sm font-bold border border-red-500/70 bg-red-950/75 text-red-200 hover:bg-red-950 disabled:opacity-50 transition-colors"
+                >
+                  Delete guide
+                </button>
+              </>
+            ) : null}
           </div>
         </header>
 
@@ -1402,13 +1465,30 @@ export default function SlotGuideFormApp() {
               </p>
             </div>
           ) : (
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full min-h-12 rounded-xl font-bold text-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 transition-colors"
-            >
-              {busy ? 'Saving…' : 'Save changes'}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                disabled={deleteBusy || busy || !editIds}
+                onClick={() =>
+                  setDeleteConfirm({
+                    guideId: editIds.guideId,
+                    machineId: editIds.machineId,
+                    slug: guide._slug || machine.slug || slug,
+                    name: guide.title || machine.name || guide._slug || machine.slug,
+                  })
+                }
+                className="sm:w-40 min-h-12 rounded-xl font-bold text-sm border border-red-500/70 bg-red-950/75 text-red-200 hover:bg-red-950 disabled:opacity-50 transition-colors"
+              >
+                Delete guide
+              </button>
+              <button
+                type="submit"
+                disabled={busy || deleteBusy}
+                className="flex-1 min-h-12 rounded-xl font-bold text-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 transition-colors"
+              >
+                {busy ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
           )}
         </form>
 
@@ -1426,6 +1506,45 @@ export default function SlotGuideFormApp() {
       </div>{/* end flex/grid row */}
       </div>{/* end max-w-7xl */}
     </div>
+
+      {deleteConfirm ? (
+        <div
+          className="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-black/75"
+          role="dialog"
+          aria-modal
+          aria-labelledby="slot-guide-delete-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl">
+            <h2 id="slot-guide-delete-title" className="text-lg font-bold text-white">
+              Delete AP guide?
+            </h2>
+            <p className="mt-2 text-sm text-zinc-300 leading-relaxed">
+              Remove <strong className="text-white">{deleteConfirm.name}</strong>{' '}
+              (<code className="text-zinc-400">{deleteConfirm.slug}</code>) from test. This deletes the Supabase{' '}
+              <code className="text-zinc-400">guides</code> and <code className="text-zinc-400">machines</code> rows
+              (and related access gates). Cloud images in R2/Storage are not removed automatically.
+            </p>
+            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => setDeleteConfirm(null)}
+                className="min-h-11 rounded-xl border border-zinc-600 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => void handleDeleteGuide()}
+                className="min-h-11 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete guide'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

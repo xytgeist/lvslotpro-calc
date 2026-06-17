@@ -151,7 +151,10 @@ insert into public.play_log_metric_defs (slug, label, value_type, sort_order) va
   ('acquisition_fee',   'Acquisition fee',      'money',   149),
   ('mhb_manufacturer', 'Manufacturer',        'text',    15),
   ('mhb_meter',        'MHB meter',             'money',   16),
-  ('must_hit_by',      'Must hit by',           'money',   17)
+  ('must_hit_by',      'Must hit by',           'money',   17),
+  ('green_fg',         'Green FG (2×)',         'integer', 18),
+  ('blue_fg',          'Blue FG (3×)',          'integer', 19),
+  ('gold_fg',          'Gold FG (4×)',          'integer', 20)
 on conflict (slug) do update set
   label = excluded.label,
   value_type = excluded.value_type,
@@ -189,6 +192,13 @@ from (values
     null::text,
     'mhb',
     array['mhb_manufacturer','mhb_meter','must_hit_by','bet_size','denom','spin_count','bonus_count','money_in','money_out','expected_ev_usd']::text[]
+  ),
+  (
+    'buffalo-diamond',
+    'Buffalo Diamond',
+    'buffalo-diamond',
+    'buffalo-diamond',
+    array['green_fg','blue_fg','gold_fg','bet_size','denom','spin_count','bonus_count','money_in','money_out','current_ev_rtp','average_case_mult','average_case_usd','acquisition_fee']::text[]
   )
 ) as v(slug, display_name, machine_slug, calculator_slug, metric_slugs)
 where not exists (
@@ -232,6 +242,13 @@ from (values
     null::text,
     'mhb',
     array['mhb_manufacturer','mhb_meter','must_hit_by','bet_size','denom','spin_count','bonus_count','money_in','money_out','expected_ev_usd']::text[]
+  ),
+  (
+    'buffalo-diamond',
+    'Buffalo Diamond',
+    'buffalo-diamond',
+    'buffalo-diamond',
+    array['green_fg','blue_fg','gold_fg','bet_size','denom','spin_count','bonus_count','money_in','money_out','current_ev_rtp','average_case_mult','average_case_usd','acquisition_fee']::text[]
   )
 ) as v(slug, display_name, machine_slug, calculator_slug, metric_slugs)
 where t.is_system = true and t.slug = v.slug;

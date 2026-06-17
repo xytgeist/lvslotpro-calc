@@ -73,13 +73,7 @@ function CalculatorsHome({
         const locked = showCalculatorLock(calc.key, access)
         const adminLocked = calculatorRequiresSlotsEdge(calc.key, gatesMap)
         return (
-          <button
-            key={calc.key}
-            type="button"
-            title={locked ? 'Subscribe to unlock Slots Edge' : undefined}
-            onClick={() => handleSelect(calc.key)}
-            className={`relative calc-list-btn ${calc.buttonClassName}`}
-          >
+          <div key={calc.key} className="relative">
             {isAdmin ? (
               <div className="absolute right-3 top-3 z-10">
                 <ContentAccessAdminSwitch
@@ -91,27 +85,34 @@ function CalculatorsHome({
                 />
               </div>
             ) : null}
-            {calc.iconWrapClassName?.includes('relative') ? (
-              <div className={calc.iconWrapClassName}>
-                <img
-                  src={calc.iconSrc}
-                  alt={calc.iconAlt}
-                  className={calc.iconImgClassName || 'h-full w-full object-cover object-center'}
-                />
+            <button
+              type="button"
+              title={locked ? 'Subscribe to unlock Slots Edge' : undefined}
+              onClick={() => handleSelect(calc.key)}
+              className={`calc-list-btn ${calc.buttonClassName}`}
+            >
+              {calc.iconWrapClassName?.includes('relative') ? (
+                <div className={calc.iconWrapClassName}>
+                  <img
+                    src={calc.iconSrc}
+                    alt={calc.iconAlt}
+                    className={calc.iconImgClassName || 'h-full w-full object-cover object-center'}
+                  />
+                </div>
+              ) : (
+                <img src={calc.iconSrc} alt={calc.iconAlt} className={calc.iconWrapClassName} />
+              )}
+              <div className="min-w-0 flex-1 self-center">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className={`min-w-0 flex-1 ${calc.titleClassName}`}>{calc.title}</div>
+                  {locked ? <NavLockGlyph className="h-4 w-4 shrink-0 text-amber-400/95" /> : null}
+                </div>
+                <p className={calc.subtitleClassName} title={calc.subtitleTitle || undefined}>
+                  {calc.subtitle}
+                </p>
               </div>
-            ) : (
-              <img src={calc.iconSrc} alt={calc.iconAlt} className={calc.iconWrapClassName} />
-            )}
-            <div className="min-w-0 flex-1 self-center">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className={`min-w-0 flex-1 ${calc.titleClassName}`}>{calc.title}</div>
-                {locked ? <NavLockGlyph className="h-4 w-4 shrink-0 text-amber-400/95" /> : null}
-              </div>
-              <p className={calc.subtitleClassName} title={calc.subtitleTitle || undefined}>
-                {calc.subtitle}
-              </p>
-            </div>
-          </button>
+            </button>
+          </div>
         )
       })}
 

@@ -60,7 +60,7 @@ function App() {
   const [accessNotice, setAccessNotice] = useState('')
   /** Moderator/admin: full access; hamburger hides subscriber-only lock icons. */
   const [isStaffRole, setIsStaffRole] = useState(false)
-  /** Admin only: content access lock switches on calcs/guides. */
+  /** Admin only: content access lock switches on calcs/guides, guide delete, play log system templates. */
   const [isAdminRole, setIsAdminRole] = useState(false)
   /** From `profiles.has_active_subscription` when column exists (see `supabase/profiles_tier_testing.sql`). */
   const [hasActiveSubscriptionFromProfile, setHasActiveSubscriptionFromProfile] = useState(false)
@@ -208,7 +208,7 @@ function App() {
       if (wide.data) {
         const r = wide.data.role
         setIsStaffRole(r === 'moderator' || r === 'admin')
-        setIsAdminRole(r === 'moderator' || r === 'admin')
+        setIsAdminRole(r === 'admin')
         setHasActiveSubscriptionFromProfile(Boolean(wide.data.has_active_subscription))
         setStripeCustomerId(wide.data.stripe_customer_id ?? null)
         return
@@ -226,7 +226,7 @@ function App() {
         if (narrow.data) {
           const r = narrow.data.role
           setIsStaffRole(r === 'moderator' || r === 'admin')
-          setIsAdminRole(r === 'moderator' || r === 'admin')
+          setIsAdminRole(r === 'admin')
         } else {
           setIsStaffRole(false)
           setIsAdminRole(false)

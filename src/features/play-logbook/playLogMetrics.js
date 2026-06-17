@@ -34,6 +34,9 @@ export const PLAY_LOG_METRIC_FALLBACK = /** @type {Record<string, { label: strin
   mhb_manufacturer: { label: 'Manufacturer', value_type: 'text' },
   mhb_meter: { label: 'MHB meter', value_type: 'money' },
   must_hit_by: { label: 'Must hit by', value_type: 'money' },
+  green_fg: { label: 'Green FG (2×)', value_type: 'integer' },
+  blue_fg: { label: 'Blue FG (3×)', value_type: 'integer' },
+  gold_fg: { label: 'Gold FG (4×)', value_type: 'integer' },
 })
 
 /** Must Hit By calculator / logbook manufacturer picker (stored slug values). */
@@ -425,6 +428,9 @@ export const LOG_PLAY_FORM_FIELDS = [
   { slug: 'denom', label: 'Denom' },
   { slug: 'counter', label: 'Counter Start' },
   { slug: 'counter_at_hit', label: 'Counter Pop' },
+  { slug: 'green_fg', label: 'Green FG' },
+  { slug: 'blue_fg', label: 'Blue FG' },
+  { slug: 'gold_fg', label: 'Gold FG' },
   { slug: 'money_in', label: 'Cash in' },
   { slug: 'money_out', label: 'Cash out' },
   { slug: 'spin_count', label: '# Spins (optional)' },

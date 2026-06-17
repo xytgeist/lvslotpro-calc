@@ -279,9 +279,12 @@ export function betLevelOptionsForVariant(variantKey, denom = 0.01) {
   })
 }
 
+export const DEFAULT_BET_LEVEL_KEY = '250'
+
 /** @param {BuffaloDiamondVariantKey} variantKey */
 export function defaultBetLevelKeyForVariant(variantKey) {
   const variant = BUFFALO_DIAMOND_VARIANTS[variantKey] ?? BUFFALO_DIAMOND_VARIANTS.diamond
+  if (variantKey === 'diamond') return DEFAULT_BET_LEVEL_KEY
   return variant.betLevelKeys[0]
 }
 

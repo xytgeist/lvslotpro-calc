@@ -139,7 +139,7 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, ex
         `${exposureLabel}: ${fmt$(maxExpectedLoss)}`,
         `My Coverage: ${fmt$(coverageDollars)} (${coveragePct}%)`,
         playStakeRaw != null
-          ? `Looking to Sell: ${fmtRisk$(sellOnPlay, playStakeRaw)} of action on this ${fmtRisk$(playStakeRounded, playStakeRaw)} play (${sellPct}%)`
+          ? `Looking to Sell: ${fmtRisk$(sellOnPlay, playStakeRaw)} (${sellPct}%) of action on this ${fmtRisk$(playStakeRounded, playStakeRaw)} play`
           : `Looking to Sell: ${sellPct}% of action`,
       )
       if (comment.trim()) lines.push(``, comment.trim())
@@ -266,7 +266,8 @@ function NeedHelpModal({ playLabel, maxExpectedLoss, riskBudget, playDetails, ex
                     {playStakeRaw != null
                       ? (
                         <>
-                          {fmtRisk$(sellOnPlay, playStakeRaw)} on {fmtRisk$(playStakeRounded, playStakeRaw)} play ({sellPct}%)
+                          {fmtRisk$(sellOnPlay, playStakeRaw)} ({sellPct}%) of action on this{' '}
+                          {fmtRisk$(playStakeRounded, playStakeRaw)} play
                         </>
                       )
                       : <>{sellPct}% of action</>}
@@ -403,7 +404,7 @@ function BankrollRiskInfoModal({ accentClass, accentBtnClass, onClose }) {
             This is a <strong className="text-white">fixed fractional risk assessment</strong>. A standard bankroll rule that caps how much of your roll you&apos;re willing to lose on one play, then compares that to this calculator&apos;s worst-case cost before you commit money on the floor.
           </p>
           <p>
-            <strong className="text-white">How it&apos;s calculated.</strong> We pull your <strong className="text-white">overall bankroll</strong> from the Bankroll Tracker and multiply it by your chosen risk % (1-10%, default 2%). That gives your <strong className="text-white">risk budget</strong>, your fixed slice of bankroll for this opportunity. Settings above 5% are allowed but significantly increase risk of ruin. <strong className="text-white">Exposure</strong> is the worst-case dollars to complete the play. <strong className="text-white">Coverage</strong> is how much of that exposure your budget can absorb. If you&apos;re underfunded, we show how much of your <strong className="text-white">bet size</strong> to consider selling (e.g. $20 of a $25 play).
+            <strong className="text-white">How it&apos;s calculated.</strong> We pull your <strong className="text-white">overall bankroll</strong> from the Bankroll Tracker and multiply it by your chosen risk % (1-10%, default 2%). That gives your <strong className="text-white">risk budget</strong>, your fixed slice of bankroll for this opportunity. Settings above 5% are allowed but significantly increase risk of ruin. <strong className="text-white">Exposure</strong> is the worst-case dollars to complete the play. <strong className="text-white">Coverage</strong> is how much of that exposure your budget can absorb. If you&apos;re underfunded, we show how much of your <strong className="text-white">bet size</strong> to consider selling (e.g. $10 (50%) of a $20 play).
           </p>
           <p>
             <strong className="text-white">Why fixed fractional over Kelly?</strong> Kelly sizes bets to maximize long-run growth from edge and payoff ratio. Useful in theory, but far too aggressive for AP slots. Slot variance is brutal: fat tails, long loss streaks, and rare huge wins. Full Kelly (and often even half-Kelly) assumes you can tolerate swings that would put most real bankrolls into 50%+ drawdowns or ruin. <strong className="text-white">Fixed fractional risk</strong> produces smoother equity curves and a much lower chance of catastrophic drawdowns, so you stay in the game long enough for edge to matter.
@@ -634,7 +635,9 @@ export default function BankrollRiskAdvisor({
                     {playStakeRaw != null ? (
                       <>
                         Consider selling{' '}
-                        <span className="text-cyan-400 font-semibold">{fmtRisk$(sellOnPlay, playStakeRaw)}</span>
+                        <span className="text-cyan-400 font-semibold">
+                          {fmtRisk$(sellOnPlay, playStakeRaw)} ({sellPct}%)
+                        </span>
                         {' '}of action on this{' '}
                         <span className="text-white font-semibold">{fmtRisk$(playStakeRounded, playStakeRaw)}</span>
                         {' '}play.
