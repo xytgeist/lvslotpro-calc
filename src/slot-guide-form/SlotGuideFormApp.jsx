@@ -19,26 +19,85 @@ import GuideCardPreview from './GuideCardPreview.jsx'
 
 const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
+async function readEdgeFunctionErrorBody(res) {
+  if (!res || typeof res.clone !== 'function') return ''
+  try {
+    const raw = await res.clone().text()
+    if (!raw) return ''
+    try {
+      const body = JSON.parse(raw)
+      if (body?.error) return String(body.error).trim()
+    } catch {
+      return raw.slice(0, 400)
+    }
+  } catch { /* ignore */ }
+  return ''
+}
+
+async function messageFromGuideUploadInvokeError(error, invokeResponse, defaultMessage) {
+  const fallback = String(
+    (error && typeof error === 'object' && 'message' in error && error.message) || defaultMessage,
+  ).trim()
+  const ctx = error && typeof error === 'object' ? error.context : null
+  const res =
+    ctx && typeof ctx === 'object' && typeof ctx.status === 'number'
+      ? ctx
+      : invokeResponse && typeof invokeResponse.status === 'number'
+        ? invokeResponse
+        : null
+  if (res) {
+    const fromBody = await readEdgeFunctionErrorBody(res)
+    if (fromBody) return fromBody
+    if (res.status === 401) return 'Session expired — sign out and sign in again, then retry.'
+    if (res.status === 403) return 'Admin role required for guide image uploads.'
+    if (res.status === 404) return 'Guide upload service is not deployed on this Supabase project.'
+    if (res.status === 503) return 'R2_NOT_CONFIGURED'
+    if (res.status === 400) return 'Invalid slug or image filename for upload.'
+    return fallback || `Upload service returned HTTP ${res.status}.`
+  }
+  return fallback || defaultMessage
+}
+
+async function getFreshGuideUploadAccessToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return null
+  const expiresAt = session.expires_at ?? 0
+  const now = Math.floor(Date.now() / 1000)
+  if (expiresAt > 0 && expiresAt - now < 120) {
+    const { data: refreshed, error } = await supabase.auth.refreshSession()
+    if (error || !refreshed.session?.access_token) {
+      throw new Error('Session expired — sign out and sign in again, then retry.')
+    }
+    return refreshed.session.access_token
+  }
+  return session.access_token
+}
+
 /**
  * Upload a guide image to R2 via the guide-cf-r2-upload Edge function.
  * Falls back to Supabase Storage if R2 is not configured (503).
  * Returns the public URL.
  */
 async function uploadGuideImageToR2OrStorage(file, { slug, filename }) {
-  // Try R2 first
-  const { data: { session } } = await supabase.auth.getSession()
-  if (session?.access_token) {
-    const { data: mintData, error: mintErr } = await supabase.functions.invoke('guide-cf-r2-upload', {
-      body: { slug, contentType: file.type || 'image/webp', filename },
-      headers: { Authorization: `Bearer ${session.access_token}` },
+  const safeSlug = slugify(String(slug || '').trim())
+  if (!safeSlug) throw new Error('Set a slug before uploading images.')
+
+  const accessToken = await getFreshGuideUploadAccessToken()
+  if (accessToken) {
+    const { data: mintData, error: mintErr, response } = await supabase.functions.invoke('guide-cf-r2-upload', {
+      body: { slug: safeSlug, contentType: file.type || 'image/webp', filename },
+      headers: { Authorization: `Bearer ${accessToken}` },
     })
-    const r2NotConfigured = mintErr?.context?.status === 503 ||
+    const detail = mintErr
+      ? await messageFromGuideUploadInvokeError(mintErr, response, 'Could not start R2 upload.')
+      : ''
+    const r2NotConfigured =
+      mintErr?.context?.status === 503 ||
+      response?.status === 503 ||
+      detail === 'R2_NOT_CONFIGURED' ||
       (typeof mintData?.error === 'string' && mintData.error.includes('not configured'))
     if (!r2NotConfigured) {
-      if (mintErr) {
-        const msg = mintData?.error || mintErr.message || 'Could not start R2 upload.'
-        throw new Error(msg)
-      }
+      if (mintErr) throw new Error(detail || mintData?.error || 'Could not start R2 upload.')
       if (mintData?.uploadURL) {
         const putRes = await fetch(mintData.uploadURL, {
           method: 'PUT',
@@ -48,14 +107,15 @@ async function uploadGuideImageToR2OrStorage(file, { slug, filename }) {
         if (!putRes.ok) throw new Error(`R2 upload failed (${putRes.status})`)
         return mintData.publicUrl
       }
+      if (mintData?.error) throw new Error(String(mintData.error))
     }
   }
   // Fallback: Supabase Storage
   const { error: upErr } = await supabase.storage
     .from('guide-assets')
-    .upload(`${slug}/${filename}`, file, { contentType: file.type || 'image/webp', upsert: true, cacheControl: '31536000' })
+    .upload(`${safeSlug}/${filename}`, file, { contentType: file.type || 'image/webp', upsert: true, cacheControl: '31536000' })
   if (upErr) throw new Error(`Storage upload: ${upErr.message}`)
-  const { data: urlData } = supabase.storage.from('guide-assets').getPublicUrl(`${slug}/${filename}`)
+  const { data: urlData } = supabase.storage.from('guide-assets').getPublicUrl(`${safeSlug}/${filename}`)
   return urlData.publicUrl
 }
 
