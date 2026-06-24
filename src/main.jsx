@@ -26,7 +26,7 @@ Sentry.init({
 
 if (shouldShowLoungeColdBootSplash({ tab: 'home', pendingWork: readLoungeComposerDraftPendingWork() })) {
   void import('./features/lounge/SocialFeed.jsx')
-  void import('@lottiefiles/dotlottie-web/dotlottie-player.wasm?url')
+  // WASM is static-imported in LoungeAppSplash (DotLottie.setWasmUrl); duplicate dynamic import here only triggers INEFFECTIVE_DYNAMIC_IMPORT.
 }
 
 createRoot(document.getElementById('root')).render(
