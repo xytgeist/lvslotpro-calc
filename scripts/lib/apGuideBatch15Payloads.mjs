@@ -1,4 +1,4 @@
-/** Batch 15 synth payloads. `lunar-disc` omitted — already live on test (fortune-disc sister). */
+/** Batch 15 synth payloads. `lunar-disc` omitted - already live on test (fortune-disc sister). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH15_PAYLOADS = [
   {

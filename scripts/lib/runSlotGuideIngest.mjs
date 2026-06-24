@@ -10,6 +10,7 @@ import {
   readSupabaseCredentials,
 } from "./supabaseEnv.mjs";
 import { canWriteRepo, toWebpBuffer, writeSlotGuideToRepo } from "./slotGuideRepoWrite.mjs";
+import { extractAccentFromImageBuffer } from "./extractGuideAccentFromImage.mjs";
 import {
   uploadGuideAsset,
   upsertSlotGuideFromManifest,
@@ -199,6 +200,12 @@ export async function runSlotGuideIngest({
     };
     if (preservedThumb && !heroPublicUrl) {
       /** @type {Record<string, unknown>} */ (supabaseMeta.guide_seed).thumbnail_url = preservedThumb;
+    }
+    if (heroWebp) {
+      const extractedAccent = await extractAccentFromImageBuffer(heroWebp);
+      if (extractedAccent) {
+        /** @type {Record<string, unknown>} */ (supabaseMeta.guide_seed).card_accent_color = extractedAccent;
+      }
     }
 
     await upsertSlotGuideFromManifest(supabase, {

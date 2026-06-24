@@ -1,4 +1,4 @@
-/** Batch 16 synth payloads. `mine-blast` omitted — shipped as **`captain-riches-tiki-fortune`** (batch 2). `new-years-parade` omitted — AP source flags not an AP slot. */
+/** Batch 16 synth payloads. `mine-blast` omitted - shipped as **`captain-riches-tiki-fortune`** (batch 2). `new-years-parade` omitted - AP source flags not an AP slot. */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH16_PAYLOADS = [
   {
@@ -20,7 +20,7 @@ export const BATCH16_PAYLOADS = [
       title: 'Mighty Cash Spins',
       published: true,
       card_ev_threshold: 'Red 2× counter at/above bet floor (see body)',
-      when_to_play: `**Primary play — Red 2× counter at or above:**
+      when_to_play: `**Primary play - Red 2× counter at or above:**
 
 - **$0.75 bet:** **18+**
 - **$1.60 bet:** **23+**
@@ -195,7 +195,7 @@ Play the **lowest bet** that qualifies for the meter you are hunting.`,
       title: 'Money Island',
       published: true,
       card_ev_threshold: 'Winner\'s Wave sticky wilds · Mini 24+ · Minor 32+ · never Maxi',
-      when_to_play: `**Primary play (sticky wilds — quick/low cost):**
+      when_to_play: `**Primary play (sticky wilds - quick/low cost):**
 
 - **Winner's Wave** showing above the **three middle reels** with **spins remaining** (active sticky wild window).
 

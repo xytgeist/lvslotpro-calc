@@ -1,4 +1,4 @@
-/** Batch 24 synth payloads. `tiki-fortune` omitted — shipped as **`captain-riches-tiki-fortune`** (batch 2). */
+/** Batch 24 synth payloads. `tiki-fortune` omitted - shipped as **`captain-riches-tiki-fortune`** (batch 2). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH24_PAYLOADS = [
   {

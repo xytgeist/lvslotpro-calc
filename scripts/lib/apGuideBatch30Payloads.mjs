@@ -1,4 +1,4 @@
-/** Batch 30 synth payloads — final planned ingest batch. */
+/** Batch 30 synth payloads - final planned ingest batch. */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH30_PAYLOADS = [
   {

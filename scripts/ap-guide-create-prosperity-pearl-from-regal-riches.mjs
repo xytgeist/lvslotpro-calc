@@ -26,7 +26,7 @@ const sb = createClient(url, key, { auth: { persistSession: false } })
 
 const { data: pearlExisting } = await sb.from('guides').select('slug').eq('slug', PEARL_SLUG).maybeSingle()
 if (pearlExisting) {
-  console.error(`${PEARL_SLUG} already exists — aborting`)
+  console.error(`${PEARL_SLUG} already exists - aborting`)
   process.exit(1)
 }
 
@@ -43,7 +43,7 @@ if (!source) {
     .eq('slug', REGAL_SLUG)
     .maybeSingle()
   if (regalOnly) {
-    console.error(`${COMBINED_SLUG} not found but ${REGAL_SLUG} exists — run prosperity-pearl create manually?`)
+    console.error(`${COMBINED_SLUG} not found but ${REGAL_SLUG} exists - run prosperity-pearl create manually?`)
   } else {
     console.error(`${COMBINED_SLUG} not found on test`)
   }

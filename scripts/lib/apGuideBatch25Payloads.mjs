@@ -1,4 +1,4 @@
-/** Batch 25 synth payloads. Skips: `triple-double-diamond` (progressive-free-games), `triple-treasure-pot` (not AP), `ultimate-x-poker` (VP). */
+/** Batch 25 synth payloads. Skips: `triple-treasure-pot` (not AP). `triple-double-diamond` → sister card from `progressive-free-games`. `ultimate-x-poker` → `apGuideUltimateXPokerPayload.mjs`. */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH25_PAYLOADS = [
   {

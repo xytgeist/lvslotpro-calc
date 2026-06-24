@@ -4,7 +4,7 @@
  * **Batch synth: do not use.** Ryan fills **Where to find** in `/slot-guide-form` after ingest.
  * Keep this module for Ryan-directed manual patches or one-off scripts only.
  *
- * When Ryan (or a directed edit) drafts copy: state where the game is available —
+ * When Ryan (or a directed edit) drafts copy: state where the game is available -
  * properties and regions only. See WHERE_TO_FIND_RESEARCH_STEPS in apGuideVoiceRules.mjs.
  */
 

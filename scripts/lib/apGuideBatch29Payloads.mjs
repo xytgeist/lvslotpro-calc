@@ -1,4 +1,4 @@
-/** Batch 29 synth payloads — skips in _batch-progress.json (wolf-run-eclipse + stubs/merged). */
+/** Batch 29 synth payloads - skips in _batch-progress.json (wolf-run-eclipse + stubs/merged). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH29_PAYLOADS = [
   {

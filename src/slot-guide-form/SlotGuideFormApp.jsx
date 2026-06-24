@@ -16,6 +16,7 @@ import { prepareGuideImageFile, useBlobObjectUrl } from './guideImageUtils.js'
 import { assertSupabaseRowUpdated } from './slotGuideViewport.js'
 import { cacheBustUrl, useGuideFilePicker } from './guideFilePicker.jsx'
 import GuideCardPreview from './GuideCardPreview.jsx'
+import { extractAccentFromImageFile } from '../utils/guideCardAccent.js'
 
 const CF_R2_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
@@ -484,7 +485,7 @@ const blankMachine = {
   popularity_summary: '', release_year: '', has_calculator: false, calculator_slug: '',
 }
 const blankGuide = {
-  title: '', card_ev_threshold: '', published: true,
+  title: '', card_ev_threshold: '', card_accent_color: '', published: true,
   when_to_play: '', when_to_stop: '', how_to_check: '',
   risk_bankroll: '', risk_summary: '', risk_bullets: '',
   where_to_find: '',
@@ -890,6 +891,7 @@ export default function SlotGuideFormApp() {
     try {
       // Upload hero image first if a new one was provided
       let newThumbnailUrl = null
+      let newAccentColor = null
       if (heroFile) {
         const preparedHero = await prepareGuideImageFile(heroFile, 'hero.webp')
         const uploadedUrl = await uploadGuideImageToR2OrStorage(preparedHero, {
@@ -897,6 +899,7 @@ export default function SlotGuideFormApp() {
           filename: preparedHero.name,
         })
         newThumbnailUrl = cacheBustUrl(uploadedUrl)
+        newAccentColor = await extractAccentFromImageFile(preparedHero)
         setCurrentThumbnail(newThumbnailUrl)
         setHeroFile(null)
       }
@@ -956,6 +959,7 @@ export default function SlotGuideFormApp() {
         updated_at: nowIso,
       }
       if (newThumbnailUrl) guidePayload.thumbnail_url = newThumbnailUrl
+      if (newAccentColor) guidePayload.card_accent_color = newAccentColor
       const guideResult = await supabase.from('guides').update(guidePayload).eq('id', editIds.guideId).select('id, updated_at, content_markdown').maybeSingle()
       assertSupabaseRowUpdated(guideResult, 'guides')
 
@@ -995,10 +999,13 @@ export default function SlotGuideFormApp() {
         if (file) {
           setHeroFile(file)
           setIsDirty(true)
+          void extractAccentFromImageFile(file).then((hex) => {
+            if (hex) setGuideField('card_accent_color', hex)
+          })
         }
       },
     })
-  }, [pickFile])
+  }, [pickFile, setGuideField])
 
   const livePreviewPanel = showPreview ? (
     <div className="space-y-3">

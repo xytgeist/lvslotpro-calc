@@ -1,4 +1,4 @@
-/** Batch 6 catch-up — skipped 2026-06-17 (E-letter deferral). */
+/** Batch 6 catch-up - skipped 2026-06-17 (E-letter deferral). */
 export const CATCHUP_BATCH6_PAYLOADS = [
   {
     machine: {

@@ -1,4 +1,4 @@
-/** Shared AP copy — Wolf Peak / Cat Peak / Fu Ren Wu (same delayed expanding-wild math). */
+/** Shared AP copy - Wolf Peak / Cat Peak / Fu Ren Wu (same delayed expanding-wild math). */
 const WOLF_PEAK_FAMILY_GUIDE_CORE = {
   card_ev_threshold: 'Yellow wilds R1–3 active · R4 w/ 2×–3× · skip purple',
   when_to_play: `**Primary:** **yellow** sticky wilds active on **reels 1–3** (partial height OK ... chevron above/below means still expanding).
@@ -141,11 +141,11 @@ export const BATCH3_PAYLOADS = [
 
 ### Top cities / regions (outside Las Vegas)
 
-1. **Louisiana / Boyd Gulf** — Medium — **Treasure Chest** (Kenner) ... Boyd slot search
-2. **Delaware** — Medium — **Delaware Park** (Wilmington) ... recent player reports / new-floor installs
-3. **Pacific Northwest tribal** — Medium — **Chinook Winds** (Lincoln City, OR) ... casino slot lineup
-4. **Other Boyd regions** — Low-Medium — **IP Biloxi**, **Par-A-Dice**, **Blue Chip**, **Valley Forge** ... hit-or-miss by property
-5. **Broader L&W commercial** — Low — still early rollout nationally`,
+1. **Louisiana / Boyd Gulf** - Medium - **Treasure Chest** (Kenner) ... Boyd slot search
+2. **Delaware** - Medium - **Delaware Park** (Wilmington) ... recent player reports / new-floor installs
+3. **Pacific Northwest tribal** - Medium - **Chinook Winds** (Lincoln City, OR) ... casino slot lineup
+4. **Other Boyd regions** - Low-Medium - **IP Biloxi**, **Par-A-Dice**, **Blue Chip**, **Valley Forge** ... hit-or-miss by property
+5. **Broader L&W commercial** - Low - still early rollout nationally`,
       skins_markdown: `**No separate skins.**`,
       gameplay_mechanics: `**Cash Wizard Magic Trio** (Light & Wonder, **2026**) uses a **4 / 6 / 8 / 6 / 4** reel grid.
 
@@ -203,11 +203,11 @@ Base game runs **line pays** and **free games**.`,
 
 ### Top cities / regions (outside Las Vegas)
 
-1. **Atlantic City** — Medium — **Resorts** ... casino slot lineup (**Hong Kong Jackpots** skin)
-2. **Indiana / Midwest commercial** — Medium — **Bally's Evansville** ... field reports
-3. **Northern California** — Medium — **Red Hawk** ... recent player reports
-4. **Oklahoma / tribal** — Medium — hit-or-miss by property
-5. **Other commercial / tribal** — Medium — hit-or-miss by property`,
+1. **Atlantic City** - Medium - **Resorts** ... casino slot lineup (**Hong Kong Jackpots** skin)
+2. **Indiana / Midwest commercial** - Medium - **Bally's Evansville** ... field reports
+3. **Northern California** - Medium - **Red Hawk** ... recent player reports
+4. **Oklahoma / tribal** - Medium - hit-or-miss by property
+5. **Other commercial / tribal** - Medium - hit-or-miss by property`,
       skins_markdown: `**Hong Kong Jackpots**, **Babylon Jackpots**.`,
       gameplay_mechanics: `**Cashman Bingo** (Aristocrat, **2021**) runs a **5×5** coin matrix below a **5×5** bingo board.
 
@@ -261,10 +261,10 @@ Also includes **free games** (wild multipliers up to **10×**) and **Cashman Ant
 
 ### Top cities / regions (outside Las Vegas)
 
-1. **Northern California** — Medium — **Thunder Valley** ... field reports (small bank of machines)
-2. **Atlantic City / commercial** — Medium — hit-or-miss by property
-3. **Oklahoma / tribal** — Medium — hit-or-miss by property
-4. **Other commercial / tribal** — Medium — hit-or-miss by property`,
+1. **Northern California** - Medium - **Thunder Valley** ... field reports (small bank of machines)
+2. **Atlantic City / commercial** - Medium - hit-or-miss by property
+3. **Oklahoma / tribal** - Medium - hit-or-miss by property
+4. **Other commercial / tribal** - Medium - hit-or-miss by property`,
       skins_markdown: `**Sun & Moon.**`,
       gameplay_mechanics: `**Cashman Double Bingo** (Aristocrat, **2022**) runs **two** persistent bingo boards on the **Cashman** premium cabinet ... **Sun** (red) and **Moon** (blue).
 

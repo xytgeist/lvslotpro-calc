@@ -1,4 +1,4 @@
-/** Batch 28 synth payloads — skips in _batch-progress.json (wolf-peak, wish-mistress, wo-shu-sky-spin). */
+/** Batch 28 synth payloads - skips in _batch-progress.json (wolf-peak, wish-mistress, wo-shu-sky-spin). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH28_PAYLOADS = [
   {

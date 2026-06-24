@@ -1,5 +1,5 @@
 /**
- * Batch 1 guide payloads — Ryan voice, synthesized from ap-guide-workspace sources.
+ * Batch 1 guide payloads - Ryan voice, synthesized from ap-guide-workspace sources.
  */
 import {
   wtf,

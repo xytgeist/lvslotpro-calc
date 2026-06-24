@@ -1,4 +1,4 @@
-/** Batch 19 synth payloads — Ryan voice rules (omit where_to_find). */
+/** Batch 19 synth payloads - Ryan voice rules (omit where_to_find). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH19_PAYLOADS = [
   {

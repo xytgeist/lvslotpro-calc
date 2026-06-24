@@ -1,4 +1,4 @@
-/** Batch 12 synth payloads. `igt-classic-hits-*` omitted — duplicate of **`igt-must-hit-by`** (Ryan deleted post-ingest). */
+/** Batch 12 synth payloads. `igt-classic-hits-*` omitted - duplicate of **`igt-must-hit-by`** (Ryan deleted post-ingest). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH12_PAYLOADS = [
   {

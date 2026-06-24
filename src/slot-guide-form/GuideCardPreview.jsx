@@ -10,105 +10,12 @@
  *   heroUrl          — existing stored hero URL
  *   contentMarkdown  — assembled markdown string for the expanded view
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { guideMarkdownForDisplay } from './formUtils.js'
 import { useBlobObjectUrl } from './guideImageUtils.js'
-
-// ─── accent theming ───────────────────────────────────────────────────────────
-function cardAccent(slug) {
-  if (slug === 'phoenix-link')
-    return {
-      strong: 'text-orange-50', subtitle: 'text-orange-200/90',
-      evTablesBox: 'rounded-xl border border-dashed border-orange-400/55 bg-gradient-to-br from-orange-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-orange-300', evTablesRule: 'border-orange-400/65',
-      h2Tone: 'text-orange-100', hrVia: 'via-amber-500/48', titleBarTo: 'to-amber-500/55',
-    }
-  if (slug === 'legend-of-the-phoenix')
-    return {
-      strong: 'text-orange-50', subtitle: 'text-amber-200/88',
-      evTablesBox: 'rounded-xl border border-dashed border-orange-400/55 bg-gradient-to-br from-red-950/30 via-orange-950/25 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-orange-300', evTablesRule: 'border-orange-400/65',
-      h2Tone: 'text-orange-100', hrVia: 'via-orange-500/52', titleBarTo: 'to-orange-500/62',
-    }
-  if (slug === 'stack-up-pays')
-    return {
-      strong: 'text-cyan-50', subtitle: 'text-cyan-200/90',
-      evTablesBox: 'rounded-xl border border-dashed border-cyan-400/55 bg-gradient-to-br from-cyan-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-cyan-300', evTablesRule: 'border-cyan-400/65',
-      h2Tone: 'text-cyan-100', hrVia: 'via-amber-500/48', titleBarTo: 'to-amber-500/55',
-    }
-  if (slug === 'lightning-buffalo-link')
-    return {
-      strong: 'text-indigo-50', subtitle: 'text-amber-200/85',
-      evTablesBox: 'rounded-xl border border-dashed border-indigo-400/55 bg-gradient-to-br from-indigo-950/40 via-blue-950/25 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-indigo-300', evTablesRule: 'border-indigo-400/65',
-      h2Tone: 'text-indigo-100', hrVia: 'via-amber-500/48', titleBarTo: 'to-amber-500/55',
-    }
-  if (slug === 'ainsworth-must-hit-by' || slug === 'must-hit-by-aig')
-    return {
-      strong: 'text-violet-50', subtitle: 'text-fuchsia-200/90',
-      evTablesBox: 'rounded-xl border border-dashed border-violet-400/55 bg-gradient-to-br from-violet-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-violet-300', evTablesRule: 'border-violet-400/65',
-      h2Tone: 'text-violet-100', hrVia: 'via-amber-500/48', titleBarTo: 'to-amber-500/55',
-    }
-  if (slug === 'ags-must-hit-by' || slug === 'must-hit-by-ags')
-    return {
-      strong: 'text-rose-50', subtitle: 'text-rose-200/90',
-      evTablesBox: 'rounded-xl border border-dashed border-rose-400/55 bg-gradient-to-br from-rose-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-rose-300', evTablesRule: 'border-rose-400/65',
-      h2Tone: 'text-rose-100', hrVia: 'via-amber-500/48', titleBarTo: 'to-amber-500/55',
-    }
-  if (slug === 'igt-must-hit-by' || slug === 'must-hit-by-igt')
-    return {
-      strong: 'text-sky-50', subtitle: 'text-sky-200/90',
-      evTablesBox: 'rounded-xl border border-dashed border-sky-400/55 bg-gradient-to-br from-sky-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-sky-300', evTablesRule: 'border-sky-400/65',
-      h2Tone: 'text-sky-100', hrVia: 'via-amber-500/48', titleBarTo: 'to-amber-500/55',
-    }
-  if (slug === 'aladdins-fortune')
-    return {
-      strong: 'text-emerald-50', subtitle: 'text-emerald-200/90',
-      evTablesBox: 'rounded-xl border border-dashed border-emerald-400/55 bg-gradient-to-br from-emerald-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-emerald-300', evTablesRule: 'border-emerald-400/65',
-      h2Tone: 'text-emerald-100', hrVia: 'via-emerald-500/50', titleBarTo: 'to-emerald-500/60',
-    }
-  if (slug === 'aztec-banner')
-    return {
-      strong: 'text-lime-50', subtitle: 'text-orange-200/88',
-      evTablesBox: 'rounded-xl border border-dashed border-lime-400/50 bg-gradient-to-br from-green-950/40 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-lime-300', evTablesRule: 'border-lime-400/60',
-      h2Tone: 'text-lime-100', hrVia: 'via-lime-500/55', titleBarTo: 'to-lime-500/65',
-    }
-  if (slug === 'pegasus-banner')
-    return {
-      strong: 'text-sky-50', subtitle: 'text-amber-200/88',
-      evTablesBox: 'rounded-xl border border-dashed border-sky-400/55 bg-gradient-to-br from-blue-950/38 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-sky-300', evTablesRule: 'border-sky-400/60',
-      h2Tone: 'text-sky-100', hrVia: 'via-sky-500/50', titleBarTo: 'to-sky-500/60',
-    }
-  return {
-    strong: 'text-amber-50', subtitle: 'text-amber-200/90',
-    evTablesBox: 'rounded-xl border border-dashed border-amber-400/55 bg-gradient-to-br from-amber-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-    evTablesHead: 'text-amber-300', evTablesRule: 'border-amber-400/65',
-    h2Tone: 'text-amber-100', hrVia: 'via-amber-500/48', titleBarTo: 'to-amber-500/55',
-  }
-}
-
-function heroGradientClass(slug) {
-  if (slug === 'lightning-buffalo-link') return 'from-indigo-950/85 via-sky-950/40 to-zinc-950'
-  if (slug === 'phoenix-link')           return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
-  if (slug === 'legend-of-the-phoenix')  return 'from-red-950/80 via-orange-950/40 to-zinc-950'
-  if (slug === 'stack-up-pays')          return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
-  if (slug === 'aladdins-fortune')       return 'from-emerald-950/75 via-amber-950/30 to-zinc-950'
-  if (slug === 'aztec-banner')           return 'from-green-950/80 via-orange-950/35 to-zinc-950'
-  if (slug === 'pegasus-banner')         return 'from-sky-950/80 via-amber-950/30 to-zinc-950'
-  if (slug === 'ainsworth-must-hit-by' || slug === 'must-hit-by-aig') return 'from-violet-950/85 via-fuchsia-950/35 to-zinc-950'
-  if (slug === 'ags-must-hit-by' || slug === 'must-hit-by-ags')       return 'from-rose-950/85 via-red-950/40 to-zinc-950'
-  if (slug === 'igt-must-hit-by' || slug === 'must-hit-by-igt')       return 'from-sky-950/80 via-blue-950/45 to-zinc-950'
-  return 'from-amber-900/40 to-zinc-950'
-}
+import { extractAccentFromImageFile, resolveGuideAccent } from '../utils/guideCardAccent.js'
 
 // ─── ratings helpers ──────────────────────────────────────────────────────────
 function volatilityLabel(m) {
@@ -202,14 +109,24 @@ function PreviewSkinCard({ targetSlug, label, allGuides }) {
   const m = row ? (Array.isArray(row.machines) ? row.machines[0] : row.machines) : null
   const name = m?.name || row?.title || label
   const src = resolveGuideHero(row)
-  const gradient = heroGradientClass(m?.slug || targetSlug)
+  const accent = resolveGuideAccent({
+    slug: m?.slug || targetSlug,
+    cardAccentColor: row?.card_accent_color,
+  })
+  const heroGrad =
+    accent.mode === 'hex'
+      ? accent.heroGradientClass
+      : `bg-gradient-to-br ${accent.heroGradientClass}`
 
   return (
     <div className={[
       'group my-3 w-full rounded-2xl overflow-hidden border border-zinc-700/80',
+      accent.mode === 'hex' ? 'guide-accent-themed' : '',
       'bg-zinc-900 shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)]',
-    ].join(' ')}>
-      <div className={`relative h-24 bg-gradient-to-br ${gradient} overflow-hidden`}>
+    ].join(' ')}
+    style={accent.cssVars}
+    >
+      <div className={`relative h-24 ${heroGrad} overflow-hidden`}>
         {src ? (
           <img
             src={src}
@@ -311,13 +228,37 @@ export default function GuideCardPreview({
   guideList = [],
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [pendingHeroAccent, setPendingHeroAccent] = useState(null)
 
   const slug = machine.slug || guide.slug || ''
-  const accent = useMemo(() => cardAccent(slug), [slug])
-  const mdComponents = useMemo(() => makeMarkdownComponents(accent, guideList), [accent, guideList])
-
   const heroBlobUrl = useBlobObjectUrl(heroFile)
   const heroSrc = heroBlobUrl || heroUrl || null
+
+  useEffect(() => {
+    if (!heroFile) {
+      setPendingHeroAccent(null)
+      return
+    }
+    let cancelled = false
+    extractAccentFromImageFile(heroFile).then((hex) => {
+      if (!cancelled) setPendingHeroAccent(hex)
+    })
+    return () => { cancelled = true }
+  }, [heroFile])
+
+  const accent = useMemo(
+    () => resolveGuideAccent({
+      slug,
+      cardAccentColor: pendingHeroAccent || guide.card_accent_color,
+    }),
+    [slug, pendingHeroAccent, guide.card_accent_color],
+  )
+  const mdComponents = useMemo(() => makeMarkdownComponents(accent, guideList), [accent, guideList])
+
+  const heroGrad =
+    accent.mode === 'hex'
+      ? accent.heroGradientClass
+      : `bg-gradient-to-br ${accent.heroGradientClass}`
 
   const evLine = guide.card_ev_threshold?.trim() || 'Verify +EV on the glass — open guide'
   const calcKey = machine.has_calculator
@@ -331,10 +272,14 @@ export default function GuideCardPreview({
 
   return (
     <article
+      style={accent.cssVars}
       className={[
         'rounded-3xl border overflow-hidden bg-zinc-900',
+        accent.mode === 'hex' ? 'guide-accent-themed' : '',
         expanded
-          ? `border-amber-500/50 ring-1 ring-white/[0.07] shadow-2xl`
+          ? accent.mode === 'hex'
+            ? `${accent.expandedBorder} guide-accent-expanded`
+            : `${accent.expandedBorder} ring-1 ring-white/[0.07] shadow-2xl`
           : 'border-zinc-700/85 ring-1 ring-zinc-500/15 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.65)]',
       ].join(' ')}
     >
@@ -348,7 +293,7 @@ export default function GuideCardPreview({
       >
         <div
           className={[
-            `relative w-full bg-gradient-to-br ${heroGradientClass(slug)}`,
+            `relative w-full ${heroGrad}`,
             expanded ? 'flex justify-center overflow-hidden' : 'h-[10.5rem] overflow-hidden',
           ].join(' ')}
         >
@@ -415,13 +360,13 @@ export default function GuideCardPreview({
           </div>
 
           {/* +EV panel */}
-          <div className={accent.evTablesBox}>
-            <div className={`flex items-center gap-2 ${accent.evTablesHead} text-[10px] font-semibold uppercase tracking-[0.2em]`}>
+          <div className={`guide-ev-threshold-panel ${accent.evTablesBox}`}>
+            <div className={`guide-ev-threshold-head flex items-center gap-2 ${accent.evTablesHead} text-[10px] font-bold uppercase tracking-[0.2em]`}>
               <IconEvTrendingUp className="h-3.5 w-3.5 shrink-0" />
               +EV Threshold
             </div>
-            <div className={`relative mt-2 border-l-2 pl-3 ${accent.evTablesRule}`}>
-              <p className={`text-base font-normal leading-snug ${accent.strong}`}>
+            <div className={accent.evTablesRule}>
+              <p className={`guide-ev-threshold-text text-base font-normal leading-snug ${accent.strong}`}>
                 {evLine || <span className="text-zinc-500 italic">Enter +EV threshold above</span>}
               </p>
             </div>

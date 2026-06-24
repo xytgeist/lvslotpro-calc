@@ -1,4 +1,4 @@
-/** Batch 17 synth payloads. `ocean-magic` omitted — live on test. `ocean-magic-ultra` omitted — skin on 4D card. */
+/** Batch 17 synth payloads. `ocean-magic` omitted - live on test. `ocean-magic-ultra` omitted - skin on 4D card. */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH17_PAYLOADS = [
   {
@@ -55,7 +55,7 @@ Same bubble map as **Ocean Magic** ... **regular and Bubble Boost mode** on the 
       title: 'Ocean Magic Bubble Boost',
       published: true,
       card_ev_threshold: 'MHB 5/10/15 away (conservative) · 6+ bubbles R1-3',
-      when_to_play: `**MHB meter chase (conservative floor — tight PAR installs):**
+      when_to_play: `**MHB meter chase (conservative floor - tight PAR installs):**
 
 - **Any one bonus 5 bubbles away** (e.g. **55-20-25** on **60 / 50 / 60** caps).
 - **Any two bonuses 10 away combined** (e.g. **50-40-25**).

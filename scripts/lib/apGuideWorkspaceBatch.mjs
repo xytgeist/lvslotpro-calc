@@ -303,7 +303,7 @@ export function buildProgressDocument(queue) {
       noSourceAttribution:
         'Never name or link MP, AP, Slot Farmers, Advantage Play, or other scrape sources in guide copy',
       whereToFindBatchSynth:
-        'Omit where_to_find in batch payloads — Ryan fills via slot-guide-form after ingest (see AP_GUIDE_VOICE_RULES)',
+        'Omit where_to_find in batch payloads - Ryan fills via slot-guide-form after ingest (see AP_GUIDE_VOICE_RULES)',
       concise:
         'Primary play first in When to play; Bankroll leads with **N units**; sparse "I want" (contrast-only)',
     },

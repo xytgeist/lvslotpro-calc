@@ -1,4 +1,4 @@
-/** Batch 26 synth payloads — no skips (WoF 4D base vs Collector's Edition stay separate cards). */
+/** Batch 26 synth payloads - no skips (WoF 4D base vs Collector's Edition stay separate cards). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH26_PAYLOADS = [
   {

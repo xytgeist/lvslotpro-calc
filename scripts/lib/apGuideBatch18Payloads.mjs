@@ -1,4 +1,4 @@
-/** Batch 18 synth payloads. `pandas-treasure` omitted — AP Club stub (empty Short Description). */
+/** Batch 18 synth payloads. `pandas-treasure` omitted - AP Club stub (empty Short Description). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH18_PAYLOADS = [
   {

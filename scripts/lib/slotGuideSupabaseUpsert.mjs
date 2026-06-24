@@ -122,6 +122,9 @@ export async function upsertSlotGuideFromManifest(supabase, { json, content_mark
     diagram_urls: guideSeed.diagram_urls ?? null,
     related_machine_slugs: guideSeed.related_machine_slugs ?? null,
   };
+  if (guideSeed.card_accent_color !== undefined) {
+    guidePayload.card_accent_color = guideSeed.card_accent_color;
+  }
 
   const { error: ge } = await supabase.from("guides").upsert(guidePayload, { onConflict: "slug" });
   if (ge) throw new Error(`guides upsert ${slug}: ${ge.message}`);

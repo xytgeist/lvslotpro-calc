@@ -1,4 +1,4 @@
-/** Deferred catch-up — wrongly skipped batch 27/28 slugs with workspace HTML (2026-06-08). */
+/** Deferred catch-up - wrongly skipped batch 27/28 slugs with workspace HTML (2026-06-08). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const DEFERRED_CATCHUP_PAYLOADS = [
   {
@@ -22,12 +22,12 @@ export const DEFERRED_CATCHUP_PAYLOADS = [
       card_ev_threshold: 'Blue 19+ · Green 20+ · Purple 23+ · all colors 52+',
       when_to_play: `**Primary play (per meter tier on your bet level):**
 
-**Game 1 — color-specific Sky Spin meters:**
+**Game 1 - color-specific Sky Spin meters:**
 - **Blue (2×) meter 19+**
 - **Green (3×) meter 20+**
 - **Purple (4×) meter 23+**
 
-**Game 2 — combined chase:**
+**Game 2 - combined chase:**
 - **All three color meters 52+** together
 
 Scout every **denom/bet** ... meters are **persistent per bet level**.`,

@@ -400,7 +400,7 @@ Optional **Rocket Rollup MHB** progressive on some installs ... that is a **sepa
       when_to_stop: `No AP stop rule.`,
       how_to_check: `1. Confirm you are not confusing this with a **persistent coin** title.
 2. If chasing **Rocket Rollup**, read that progressive like any other MHB ladder.`,
-      risk_bankroll: `**0 units — skip.** Not an AP hunt.`,
+      risk_bankroll: `**0 units - skip.** Not an AP hunt.`,
       risk_summary: `Publishing this so you do not waste time scouting a **non-AP** cabinet thinking it is another **Cash Falls** clone.`,
       risk_bullets: [],
       where_to_find: wtf('Cash Quest', `- Sparse installs nationally.`),

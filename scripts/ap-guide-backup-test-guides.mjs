@@ -16,7 +16,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadSupabaseEnv, readSupabaseCredentials, repoRoot } from './lib/supabaseEnv.mjs'
 
 const GUIDE_SELECT =
-  'slug, title, card_ev_threshold, content_markdown, published, thumbnail_url, updated_at, machines(slug, name, manufacturer, type, difficulty, popularity, nerf_risk, volatility_index, popularity_summary, release_year, has_calculator, calculator_slug, thumbnail_url)'
+  'slug, title, card_ev_threshold, content_markdown, published, thumbnail_url, card_accent_color, updated_at, machines(slug, name, manufacturer, type, difficulty, popularity, nerf_risk, volatility_index, popularity_summary, release_year, has_calculator, calculator_slug, thumbnail_url)'
 
 const args = process.argv.slice(2)
 const allPublished = args.includes('--all-published')

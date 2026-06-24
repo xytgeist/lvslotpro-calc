@@ -1,4 +1,4 @@
-/** Batch 13 synth payloads. `ji-ji-fu` omitted — AP stub. `jade-monkey-diamond-devils` split → `jade-monkey-deluxe` + `diamonds-devils-deluxe`. */
+/** Batch 13 synth payloads. `ji-ji-fu` omitted - AP stub. `jade-monkey-diamond-devils` split → `jade-monkey-deluxe` + `diamonds-devils-deluxe`. */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH13_PAYLOADS = [
   {

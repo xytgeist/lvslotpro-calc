@@ -123,10 +123,8 @@ Spheres **descend** one row per spin (opposite **Ocean Magic**). Landing on a **
       how_to_check: `1. Scan **reels 2–3** first ... highest expansion value.
 2. Watch for spheres **hovering above reel 4 or reel 1** ... they enter play next spin (often missed on walk-bys).
 3. If expanded wilds confuse the read, **switch bet and back** to show only the true persistent spheres.`,
-      risk_bankroll: `**10 units** ... low-volatility walk-up family.`,
-      risk_summary: `Spheres arrive in **spurts** ... a lone sphere above reel 4 can be worth chasing for the follow-up dump.
-
-Expanded wilds from a prior dragon hit **do not persist** like the sphere itself ... do not count them as locked state.`,
+      risk_bankroll: `**10 units**`,
+      risk_summary: `Spheres arrive in **spurts** ... a lone sphere above reel 4 can be worth chasing for the follow-up dump. Expanded wilds from a prior dragon hit **do not persist** like the sphere itself ... do not count them as locked state.`,
       risk_bullets: [],
       where_to_find: wtf('DragonSphere', `- Common on **IGT** multi-game cabinets nationally.`),
       skins_markdown: '',

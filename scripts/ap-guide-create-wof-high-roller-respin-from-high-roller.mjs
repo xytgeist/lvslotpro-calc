@@ -1,56 +1,44 @@
 /**
- * Create Sure Fire Frenzy Link sister card (same AP copy as Sure Fire Jackpot Link).
+ * Create or refresh wheel-of-fortune-high-roller-respin from live wheel-of-fortune-high-roller.
  * Cross-links Skins on both cards.
  *
- * Usage: node scripts/ap-guide-backup-test-guides.mjs sure-fire-jackpot-link  (recommended first)
- *        node scripts/ap-guide-create-sure-fire-frenzy-from-jackpot.mjs
+ * Usage: npm run ap-guide:backup  (recommended first)
+ *        node scripts/ap-guide-create-wof-high-roller-respin-from-high-roller.mjs
  */
 import { createClient } from '@supabase/supabase-js'
 import { buildGuideMarkdown, parseGuideMarkdown } from '../src/slot-guide-form/formUtils.js'
 import { runSlotGuideIngest } from './lib/runSlotGuideIngest.mjs'
 import { loadSupabaseEnv, readSupabaseCredentials } from './lib/supabaseEnv.mjs'
 
-const JACKPOT_SLUG = 'sure-fire-jackpot-link'
-const FRENZY_SLUG = 'sure-fire-frenzy-link'
+const SOURCE_SLUG = 'wheel-of-fortune-high-roller'
+const TARGET_SLUG = 'wheel-of-fortune-high-roller-respin'
 
-const JACKPOT_TITLE = 'Sure Fire Jackpot Link'
-const FRENZY_TITLE = 'Sure Fire Frenzy Link'
+const SOURCE_TITLE = 'Wheel of Fortune High Roller'
+const TARGET_TITLE = 'Wheel of Fortune High Roller Respin'
 
 loadSupabaseEnv('test')
 const { url, key } = readSupabaseCredentials()
 const sb = createClient(url, key, { auth: { persistSession: false } })
 
-const { data: frenzyExisting } = await sb.from('guides').select('slug').eq('slug', FRENZY_SLUG).maybeSingle()
-if (frenzyExisting) {
-  console.error(`${FRENZY_SLUG} already exists - aborting`)
-  process.exit(1)
-}
+const { data: existingTarget } = await sb.from('guides').select('slug').eq('slug', TARGET_SLUG).maybeSingle()
 
 const { data: source, error: srcErr } = await sb
   .from('guides')
-  .select('title, card_ev_threshold, content_markdown, published, thumbnail_url, machines(*)')
-  .eq('slug', JACKPOT_SLUG)
+  .select('title, card_ev_threshold, content_markdown, published, machines(*)')
+  .eq('slug', SOURCE_SLUG)
   .maybeSingle()
 if (srcErr) throw new Error(srcErr.message)
-if (!source) {
-  console.error(`${JACKPOT_SLUG} not found on test`)
-  process.exit(1)
-}
+if (!source) throw new Error(`${SOURCE_SLUG} not found on test`)
 
 const sourceMachine = Array.isArray(source.machines) ? source.machines[0] : source.machines
-if (!sourceMachine) throw new Error(`${JACKPOT_SLUG} machine row missing`)
+if (!sourceMachine) throw new Error(`${SOURCE_SLUG} machine row missing`)
 
 const sections = parseGuideMarkdown(source.content_markdown)
 
-const sharedGameplayBody = sections.gameplay_mechanics.replace(
-  /\*\*Sure Fire Jackpot Link\*\*/i,
-  `**${FRENZY_TITLE}**`,
-)
-
-const frenzyPayload = {
+const targetPayload = {
   machine: {
-    slug: FRENZY_SLUG,
-    name: FRENZY_TITLE,
+    slug: TARGET_SLUG,
+    name: TARGET_TITLE,
     manufacturer: sourceMachine.manufacturer ?? 'IGT',
     type: sourceMachine.type,
     difficulty: sourceMachine.difficulty,
@@ -63,7 +51,7 @@ const frenzyPayload = {
     release_year: sourceMachine.release_year ?? null,
   },
   guide: {
-    title: FRENZY_TITLE,
+    title: TARGET_TITLE,
     published: source.published !== false,
     card_ev_threshold: source.card_ev_threshold,
     when_to_play: sections.when_to_play,
@@ -73,31 +61,30 @@ const frenzyPayload = {
     risk_summary: sections.risk_summary,
     risk_bullets: sections.risk_bullets ? sections.risk_bullets.split('\n').filter(Boolean) : [],
     where_to_find: sections.where_to_find || '',
-    skins_markdown: `[${JACKPOT_TITLE}](guide:${JACKPOT_SLUG})`,
-    gameplay_mechanics: sharedGameplayBody.replace(/\*\*Sure Fire Jackpot Link\*\*/i, `**${FRENZY_TITLE}**`),
+    skins_markdown: `[${SOURCE_TITLE}](guide:${SOURCE_SLUG}) (same AP).`,
+    gameplay_mechanics: sections.gameplay_mechanics.replace(
+      /\*\*Wheel of Fortune High Roller\*\*/g,
+      `**${TARGET_TITLE}**`,
+    ),
   },
 }
 
 const out = await runSlotGuideIngest({
-  payload: frenzyPayload,
+  payload: targetPayload,
   target: 'test',
   writeRepo: false,
   syncSupabase: true,
 })
+
 if (!out.ok) {
   console.error('Ingest failed:', out.errors)
   process.exit(1)
 }
 
-const jackpotGameplay = sections.gameplay_mechanics.replace(
-  /\*\*Sure Fire Jackpot Link\*\*/i,
-  `**${JACKPOT_TITLE}**`,
-)
-
-const jackpotMarkdown = buildGuideMarkdown({
-  machine: { slug: JACKPOT_SLUG, name: JACKPOT_TITLE, ...sourceMachine },
+const sourceMarkdown = buildGuideMarkdown({
+  machine: { slug: SOURCE_SLUG, name: SOURCE_TITLE, ...sourceMachine },
   guide: {
-    title: JACKPOT_TITLE,
+    title: SOURCE_TITLE,
     published: source.published !== false,
     card_ev_threshold: source.card_ev_threshold,
     when_to_play: sections.when_to_play,
@@ -107,20 +94,24 @@ const jackpotMarkdown = buildGuideMarkdown({
     risk_summary: sections.risk_summary,
     risk_bullets: sections.risk_bullets ? sections.risk_bullets.split('\n').filter(Boolean) : [],
     where_to_find: sections.where_to_find || '',
-    skins_markdown: `[${FRENZY_TITLE}](guide:${FRENZY_SLUG})`,
-    gameplay_mechanics: jackpotGameplay,
+    skins_markdown: `[${TARGET_TITLE}](guide:${TARGET_SLUG}) (same AP).`,
+    gameplay_mechanics: sections.gameplay_mechanics.replace(
+      /\*\*Wheel of Fortune High Roller\*\*/g,
+      `**${SOURCE_TITLE}**`,
+    ),
   },
 })
 
-const { error: guidePatchErr } = await sb
+const { error: patchErr } = await sb
   .from('guides')
   .update({
-    content_markdown: jackpotMarkdown,
+    content_markdown: sourceMarkdown,
     updated_at: new Date().toISOString(),
   })
-  .eq('slug', JACKPOT_SLUG)
-if (guidePatchErr) throw new Error(guidePatchErr.message)
+  .eq('slug', SOURCE_SLUG)
+if (patchErr) throw new Error(patchErr.message)
 
-console.log(`✓ Created ${FRENZY_SLUG}`)
-console.log(`✓ Patched ${JACKPOT_SLUG} Skins → ${FRENZY_SLUG}`)
+const verb = existingTarget ? 'Updated' : 'Created'
+console.log(`${verb} ${TARGET_SLUG} from ${SOURCE_SLUG}`)
+console.log(`Patched ${SOURCE_SLUG} Skins → [${TARGET_TITLE}](guide:${TARGET_SLUG})`)
 console.log(JSON.stringify(out.result, null, 2))

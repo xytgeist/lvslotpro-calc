@@ -99,6 +99,7 @@ for (const row of guides) {
     title: row.title,
     content_markdown: row.content_markdown,
     card_ev_threshold: row.card_ev_threshold ?? null,
+    card_accent_color: row.card_accent_color ?? null,
     published: row.published !== false,
     difficulty: m.difficulty ?? null,
     thumbnail_url: row.thumbnail_url ?? m.thumbnail_url ?? null,

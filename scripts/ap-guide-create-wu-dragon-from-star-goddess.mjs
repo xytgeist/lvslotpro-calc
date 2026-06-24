@@ -23,7 +23,7 @@ const sb = createClient(url, key, { auth: { persistSession: false } })
 
 const { data: dragonExisting } = await sb.from('guides').select('slug').eq('slug', DRAGON_SLUG).maybeSingle()
 if (dragonExisting) {
-  console.error(`${DRAGON_SLUG} already exists — aborting`)
+  console.error(`${DRAGON_SLUG} already exists - aborting`)
   process.exit(1)
 }
 
@@ -36,7 +36,7 @@ if (srcErr) throw new Error(srcErr.message)
 if (!source) {
   const { data: starOnly } = await sb.from('guides').select('slug').eq('slug', STAR_SLUG).maybeSingle()
   if (starOnly) {
-    console.error(`${COMBINED_SLUG} not found but ${STAR_SLUG} exists — run wu-dragon create manually?`)
+    console.error(`${COMBINED_SLUG} not found but ${STAR_SLUG} exists - run wu-dragon create manually?`)
   } else {
     console.error(`${COMBINED_SLUG} not found on test`)
   }

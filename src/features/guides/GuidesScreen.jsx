@@ -69,6 +69,7 @@ import {
   normalizeGuideAccessSlug,
   showGuideLock,
 } from './guideAccess.js'
+import { resolveGuideAccent } from '../../utils/guideCardAccent.js'
 
 const ACTIVE_SUPABASE_HOST = (() => {
   try {
@@ -501,7 +502,14 @@ function GuideSkinCard({ targetSlug, label, allGuides, onOpen }) {
   const m = row ? machineForGuide(row) : null
   const name = m?.name || row?.title || label
   const src = row ? heroImage(row) : null
-  const gradient = heroGradientClass(m?.slug || targetSlug)
+  const accent = resolveGuideAccent({
+    slug: m?.slug || targetSlug,
+    cardAccentColor: row?.card_accent_color,
+  })
+  const heroGrad =
+    accent.mode === 'hex'
+      ? accent.heroGradientClass
+      : `bg-gradient-to-br ${accent.heroGradientClass}`
 
   return (
     <button
@@ -509,14 +517,16 @@ function GuideSkinCard({ targetSlug, label, allGuides, onOpen }) {
       onClick={() => onOpen?.(targetSlug)}
       className={[
         'group my-3 w-full text-left rounded-2xl overflow-hidden border border-zinc-700/80',
+        accent.mode === 'hex' ? 'guide-accent-themed' : '',
         'bg-zinc-900 shadow-[0_6px_24px_-4px_rgba(0,0,0,0.55)]',
         'transition-[border-color,box-shadow] duration-150',
         'hover:border-zinc-500 hover:shadow-[0_8px_28px_-4px_rgba(0,0,0,0.65)]',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60',
       ].join(' ')}
+      style={accent.cssVars}
     >
       {/* hero — gradient when no DB thumbnail; no repo fallback */}
-      <div className={`relative bg-gradient-to-br ${gradient} min-h-[6rem]`}>
+      <div className={`relative ${heroGrad} min-h-[6rem]`}>
         {src ? (
           <img
             src={src}
@@ -541,51 +551,10 @@ function GuideSkinCard({ targetSlug, label, allGuides, onOpen }) {
 }
 
 /** Markdown links `[label](guide:slug)` jump to another guide card (same list). */
-function makeGuideMarkdownComponents(machineSlug, { onOpenGuideSlug, allGuides } = {}) {
-  const h2Tone =
-    machineSlug === 'phoenix-link'
-      ? 'text-orange-100'
-      : machineSlug === 'legend-of-the-phoenix'
-        ? 'text-orange-100'
-      : machineSlug === 'lightning-buffalo-link'
-        ? 'text-indigo-100'
-      : machineSlug === 'buffalo-link'
-        ? 'text-amber-100'
-        : machineSlug === 'stack-up-pays'
-          ? 'text-cyan-100'
-          : machineSlug === 'aladdins-fortune'
-            ? 'text-emerald-100'
-            : machineSlug === 'aztec-banner'
-              ? 'text-lime-100'
-              : machineSlug === 'pegasus-banner'
-                ? 'text-sky-100'
-          : machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig'
-            ? 'text-violet-100'
-            : machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags'
-              ? 'text-rose-100'
-              : machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt'
-                ? 'text-sky-100'
-                : 'text-amber-100'
-  const titleBarTo =
-    machineSlug === 'aztec-banner'
-      ? 'to-lime-500/65'
-      : machineSlug === 'pegasus-banner'
-        ? 'to-sky-500/60'
-      : machineSlug === 'aladdins-fortune'
-        ? 'to-emerald-500/60'
-      : machineSlug === 'legend-of-the-phoenix'
-        ? 'to-orange-500/62'
-      : 'to-amber-500/55'
-  const guideHrVia =
-    machineSlug === 'aztec-banner'
-      ? 'via-lime-500/55'
-      : machineSlug === 'pegasus-banner'
-        ? 'via-sky-500/50'
-      : machineSlug === 'aladdins-fortune'
-        ? 'via-emerald-500/50'
-      : machineSlug === 'legend-of-the-phoenix'
-        ? 'via-orange-500/52'
-      : 'via-amber-500/48'
+function makeGuideMarkdownComponents(accent, { onOpenGuideSlug, allGuides } = {}) {
+  const h2Tone = accent.h2Tone || accent.strong || 'text-amber-100'
+  const titleBarTo = accent.titleBarTo || 'to-amber-500/55'
+  const guideHrVia = accent.hrVia || 'via-amber-500/48'
   return {
     h1: ({ children }) => (
       <div className="flex items-center gap-3 w-full mb-5 mt-0.5 select-none">
@@ -857,11 +826,11 @@ function GuideLockedPaywallOverlay({ onUnlock }) {
 function GuideEvThresholdPanel({ line, accent }) {
   return (
     <div className={`guide-ev-threshold-panel ${accent.evTablesBox}`}>
-      <div className={`flex items-center gap-2 ${accent.evTablesHead}`}>
-        <IconEvTrendingUp className="h-3.5 w-3.5 shrink-0 opacity-90" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">+EV Threshold</span>
+      <div className={`guide-ev-threshold-head flex items-center gap-2 ${accent.evTablesHead}`}>
+        <IconEvTrendingUp className="h-3.5 w-3.5 shrink-0" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">+EV Threshold</span>
       </div>
-      <div className={`relative mt-2 border-l-2 pl-3 ${accent.evTablesRule}`}>
+      <div className={accent.evTablesRule}>
         <p className={`guide-ev-threshold-text text-base font-normal leading-snug ${accent.strong}`}>{line}</p>
       </div>
     </div>
@@ -897,163 +866,27 @@ function hideGuideHeroOnError(e) {
   e.currentTarget.style.display = 'none'
 }
 
-function heroGradientClass(machineSlug) {
-  if (machineSlug === 'lightning-buffalo-link')
-    return 'from-indigo-950/85 via-sky-950/40 to-zinc-950'
-  if (machineSlug === 'phoenix-link') return 'from-orange-950/80 via-zinc-900/40 to-zinc-950'
-  if (machineSlug === 'legend-of-the-phoenix')
-    return 'from-red-950/80 via-orange-950/40 to-zinc-950'
-  if (machineSlug === 'stack-up-pays') return 'from-cyan-950/80 via-sky-950/40 to-zinc-950'
-  if (machineSlug === 'aladdins-fortune')
-    return 'from-emerald-950/75 via-amber-950/30 to-zinc-950'
-  if (machineSlug === 'aztec-banner')
-    return 'from-green-950/80 via-orange-950/35 to-zinc-950'
-  if (machineSlug === 'pegasus-banner')
-    return 'from-sky-950/80 via-amber-950/30 to-zinc-950'
-  if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig')
-    return 'from-violet-950/85 via-fuchsia-950/35 to-zinc-950'
-  if (machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags')
-    return 'from-rose-950/85 via-red-950/40 to-zinc-950'
-  if (machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt')
-    return 'from-sky-950/80 via-blue-950/45 to-zinc-950'
-  return 'from-amber-900/40 to-zinc-950'
-}
-
-function cardAccent(machineSlug) {
-  if (machineSlug === 'phoenix-link') {
-    return {
-      chevron: 'text-orange-500',
-      strong: 'text-orange-50',
-      subtitle: 'text-orange-200/90',
-      expandedBorder: 'border-orange-500/50 shadow-lg shadow-orange-900/20',
-      evTablesBox:
-        'rounded-xl border border-dashed border-orange-400/55 bg-gradient-to-br from-orange-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-orange-300',
-      evTablesRule: 'border-orange-400/65',
-    }
-  }
-  if (machineSlug === 'legend-of-the-phoenix') {
-    return {
-      chevron: 'text-orange-400',
-      strong: 'text-orange-50',
-      subtitle: 'text-amber-200/88',
-      expandedBorder: 'border-orange-500/50 shadow-lg shadow-red-950/30',
-      evTablesBox:
-        'rounded-xl border border-dashed border-orange-400/55 bg-gradient-to-br from-red-950/30 via-orange-950/25 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-orange-300',
-      evTablesRule: 'border-orange-400/65',
-    }
-  }
-  if (machineSlug === 'stack-up-pays') {
-    return {
-      chevron: 'text-cyan-500',
-      strong: 'text-cyan-50',
-      subtitle: 'text-cyan-200/90',
-      expandedBorder: 'border-cyan-500/50 shadow-lg shadow-cyan-900/25',
-      evTablesBox:
-        'rounded-xl border border-dashed border-cyan-400/55 bg-gradient-to-br from-cyan-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-cyan-300',
-      evTablesRule: 'border-cyan-400/65',
-    }
-  }
-  if (machineSlug === 'lightning-buffalo-link') {
-    return {
-      chevron: 'text-indigo-400',
-      strong: 'text-indigo-50',
-      subtitle: 'text-amber-200/85',
-      expandedBorder: 'border-indigo-500/50 shadow-lg shadow-indigo-950/35',
-      evTablesBox:
-        'rounded-xl border border-dashed border-indigo-400/55 bg-gradient-to-br from-indigo-950/40 via-blue-950/25 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-indigo-300',
-      evTablesRule: 'border-indigo-400/65',
-    }
-  }
-  if (machineSlug === 'ainsworth-must-hit-by' || machineSlug === 'must-hit-by-aig') {
-    return {
-      chevron: 'text-fuchsia-400',
-      strong: 'text-violet-50',
-      subtitle: 'text-fuchsia-200/90',
-      expandedBorder: 'border-violet-500/50 shadow-lg shadow-fuchsia-950/30',
-      evTablesBox:
-        'rounded-xl border border-dashed border-violet-400/55 bg-gradient-to-br from-violet-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-violet-300',
-      evTablesRule: 'border-violet-400/65',
-    }
-  }
-  if (machineSlug === 'ags-must-hit-by' || machineSlug === 'must-hit-by-ags') {
-    return {
-      chevron: 'text-rose-400',
-      strong: 'text-rose-50',
-      subtitle: 'text-rose-200/90',
-      expandedBorder: 'border-rose-500/50 shadow-lg shadow-rose-950/35',
-      evTablesBox:
-        'rounded-xl border border-dashed border-rose-400/55 bg-gradient-to-br from-rose-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-rose-300',
-      evTablesRule: 'border-rose-400/65',
-    }
-  }
-  if (machineSlug === 'igt-must-hit-by' || machineSlug === 'must-hit-by-igt') {
-    return {
-      chevron: 'text-sky-400',
-      strong: 'text-sky-50',
-      subtitle: 'text-sky-200/90',
-      expandedBorder: 'border-sky-500/50 shadow-lg shadow-blue-950/30',
-      evTablesBox:
-        'rounded-xl border border-dashed border-sky-400/55 bg-gradient-to-br from-sky-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-sky-300',
-      evTablesRule: 'border-sky-400/65',
-    }
-  }
-  if (machineSlug === 'aladdins-fortune') {
-    return {
-      chevron: 'text-emerald-400',
-      strong: 'text-emerald-50',
-      subtitle: 'text-emerald-200/90',
-      expandedBorder: 'border-emerald-500/45 shadow-lg shadow-emerald-950/25',
-      evTablesBox:
-        'rounded-xl border border-dashed border-emerald-400/55 bg-gradient-to-br from-emerald-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-emerald-300',
-      evTablesRule: 'border-emerald-400/65',
-    }
-  }
-  if (machineSlug === 'aztec-banner') {
-    return {
-      chevron: 'text-lime-400',
-      strong: 'text-lime-50',
-      subtitle: 'text-orange-200/88',
-      expandedBorder: 'border-green-500/45 shadow-lg shadow-green-950/30',
-      evTablesBox:
-        'rounded-xl border border-dashed border-lime-400/50 bg-gradient-to-br from-green-950/40 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-lime-300',
-      evTablesRule: 'border-lime-400/60',
-    }
-  }
-  if (machineSlug === 'pegasus-banner') {
-    return {
-      chevron: 'text-sky-400',
-      strong: 'text-sky-50',
-      subtitle: 'text-amber-200/88',
-      expandedBorder: 'border-sky-500/45 shadow-lg shadow-blue-950/35',
-      evTablesBox:
-        'rounded-xl border border-dashed border-sky-400/55 bg-gradient-to-br from-blue-950/38 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-      evTablesHead: 'text-sky-300',
-      evTablesRule: 'border-sky-400/60',
-    }
-  }
-  return {
-    chevron: 'text-amber-500',
-    strong: 'text-amber-50',
-    subtitle: 'text-amber-200/90',
-    expandedBorder: 'border-amber-500/50 shadow-lg shadow-amber-900/20',
-    evTablesBox:
-      'rounded-xl border border-dashed border-amber-400/55 bg-gradient-to-br from-amber-950/35 via-zinc-950/40 to-zinc-950 px-4 py-3.5',
-    evTablesHead: 'text-amber-300',
-    evTablesRule: 'border-amber-400/65',
+/** Optional second fetch when `guides.card_accent_color` exists (migration applied). Never fails load. */
+async function mergeGuideAccentColors(supabaseClient, rows) {
+  if (!rows?.length) return rows || []
+  const slugs = rows.map((r) => r.slug).filter(Boolean)
+  if (!slugs.length) return rows
+  try {
+    const { data, error } = await supabaseClient
+      .from('guides')
+      .select('slug, card_accent_color')
+      .in('slug', slugs)
+    if (error || !data?.length) return rows
+    const bySlug = new Map(data.map((d) => [d.slug, d.card_accent_color]))
+    return rows.map((r) =>
+      bySlug.has(r.slug) ? { ...r, card_accent_color: bySlug.get(r.slug) } : r
+    )
+  } catch {
+    return rows
   }
 }
 
 function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, onRequireAuth }) {
-  const [caption, setCaption] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [authPromptOpen, setAuthPromptOpen] = useState(false)
@@ -1725,6 +1558,7 @@ export default function GuidesScreen({
           title,
           content_markdown,
           card_ev_threshold,
+          card_accent_color,
           last_updated,
           created_at,
           updated_at,
@@ -1763,6 +1597,7 @@ export default function GuidesScreen({
               title,
               content_markdown,
               card_ev_threshold,
+              card_accent_color,
               last_updated,
               created_at,
               updated_at,
@@ -1790,12 +1625,13 @@ export default function GuidesScreen({
             .eq('published', true)
             .order('title')
           if (ePop) throw ePop
-          setRows(mergeLocalGuideDemos(dPop || []))
+          setRows(await mergeGuideAccentColors(supabaseClient, mergeLocalGuideDemos(dPop || [])))
         } else {
         const missingOptionalCols =
           error.message?.includes('volatility_index') ||
           error.message?.includes('popularity_summary') ||
           error.message?.includes('card_ev_threshold') ||
+          error.message?.includes('card_accent_color') ||
           error.message?.includes('card_gist') ||
           error.message?.includes('release_year')
         if (missingOptionalCols) {
@@ -1807,7 +1643,8 @@ export default function GuidesScreen({
               slug,
               title,
               content_markdown,
-              card_gist,
+              card_ev_threshold,
+              card_accent_color,
               last_updated,
               created_at,
               updated_at,
@@ -1836,13 +1673,14 @@ export default function GuidesScreen({
             .eq('published', true)
             .order('title')
           if (e2) throw e2
-          setRows(mergeLocalGuideDemos(d2 || []))
+          const merged = mergeLocalGuideDemos(d2 || [])
+          setRows(await mergeGuideAccentColors(supabaseClient, merged))
         } else {
           throw error
         }
         }
       } else {
-        setRows(mergeLocalGuideDemos(data || []))
+        setRows(await mergeGuideAccentColors(supabaseClient, mergeLocalGuideDemos(data || [])))
       }
     } catch (e) {
       setLoadErr(e?.message || 'Could not load guides.')
@@ -1930,7 +1768,10 @@ export default function GuidesScreen({
               String(expandedSlug).toLowerCase() === String(slug || '').toLowerCase()
             const calcKey = resolveCalculatorKey(m)
             const evThresholdLine = cardEvThresholdForRow(row)
-            const accent = cardAccent(slug)
+            const accent = resolveGuideAccent({
+              slug,
+              cardAccentColor: row.card_accent_color,
+            })
             const heroThumb = heroImage(row)
             const guideLocked = showGuideLock(slug, access)
             const adminGuideLocked = guideRequiresSlotsEdge(slug, gatesMap)
@@ -1939,28 +1780,11 @@ export default function GuidesScreen({
               ? 'blur-[3px] brightness-[0.72] saturate-[0.9] select-none'
               : ''
             const normalizedGuideSlug = normalizeGuideAccessSlug(slug)
-            const ringFocus =
-              slug === 'phoenix-link'
-                ? 'focus-visible:ring-orange-500/60'
-                : slug === 'legend-of-the-phoenix'
-                  ? 'focus-visible:ring-orange-500/60'
-                  : slug === 'stack-up-pays'
-                  ? 'focus-visible:ring-cyan-500/60'
-                  : slug === 'lightning-buffalo-link'
-                    ? 'focus-visible:ring-indigo-500/60'
-                    : slug === 'ainsworth-must-hit-by' || slug === 'must-hit-by-aig'
-                    ? 'focus-visible:ring-violet-500/60'
-                    : slug === 'ags-must-hit-by' || slug === 'must-hit-by-ags'
-                      ? 'focus-visible:ring-rose-500/60'
-                      : slug === 'igt-must-hit-by' || slug === 'must-hit-by-igt'
-                        ? 'focus-visible:ring-sky-500/60'
-                        : slug === 'aladdins-fortune'
-                          ? 'focus-visible:ring-emerald-500/60'
-                          : slug === 'aztec-banner'
-                            ? 'focus-visible:ring-lime-500/60'
-                            : slug === 'pegasus-banner'
-                              ? 'focus-visible:ring-sky-500/60'
-                              : 'focus-visible:ring-amber-500/60'
+            const ringFocus = accent.ringFocus || 'focus-visible:ring-amber-500/60'
+            const heroGrad =
+              accent.mode === 'hex'
+                ? accent.heroGradientClass
+                : `bg-gradient-to-br ${accent.heroGradientClass}`
 
             return (
               <li key={row.id || row.slug} id={`guide-card-${slug}`}>
@@ -1969,11 +1793,16 @@ export default function GuidesScreen({
                     if (el) guideCardRefs.current[slug] = el
                     else delete guideCardRefs.current[slug]
                   }}
-                  className={`rounded-3xl border overflow-hidden bg-zinc-900 scroll-mt-14 transition-[box-shadow,border-color,ring-color] duration-200 ${
+                  style={accent.cssVars}
+                  className={[
+                    'rounded-3xl border overflow-hidden bg-zinc-900 scroll-mt-14 transition-[box-shadow,border-color,ring-color] duration-200',
+                    accent.mode === 'hex' ? 'guide-accent-themed' : '',
                     expanded
-                      ? `${accent.expandedBorder} ring-1 ring-white/[0.07] shadow-2xl`
-                      : 'border-zinc-700/85 ring-1 ring-zinc-500/15 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.65)]'
-                  }`}
+                      ? accent.mode === 'hex'
+                        ? `${accent.expandedBorder} guide-accent-expanded`
+                        : `${accent.expandedBorder} ring-1 ring-white/[0.07] shadow-2xl`
+                      : 'border-zinc-700/85 ring-1 ring-zinc-500/15 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.65)]',
+                  ].join(' ')}
                 >
                   <div className="relative">
                     <button
@@ -1983,7 +1812,7 @@ export default function GuidesScreen({
                       aria-expanded={expanded}
                     >
                       <div
-                        className={`relative w-full bg-gradient-to-br ${heroGradientClass(slug)} ${
+                        className={`relative w-full ${heroGrad} ${
                           expanded ? 'flex justify-center overflow-hidden' : 'h-[10.5rem] overflow-hidden'
                         }`}
                       >
@@ -2183,7 +2012,7 @@ export default function GuidesScreen({
                       <ReactMarkdown
                         urlTransform={guideMarkdownUrlTransform}
                         remarkPlugins={[remarkGfm]}
-                        components={makeGuideMarkdownComponents(slug, { onOpenGuideSlug: openGuideSlug, allGuides: rows })}
+                        components={makeGuideMarkdownComponents(accent, { onOpenGuideSlug: openGuideSlug, allGuides: rows })}
                       >
                         {guideMarkdownForDisplay(row.content_markdown || '')}
                       </ReactMarkdown>

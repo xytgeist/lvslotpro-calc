@@ -69,7 +69,7 @@ const sb = createClient(url, key, { auth: { persistSession: false } })
 
 const { data: existing } = await sb.from('guides').select('slug').eq('slug', TARGET_SLUG).maybeSingle()
 if (existing) {
-  console.error(`${TARGET_SLUG} already exists — aborting`)
+  console.error(`${TARGET_SLUG} already exists - aborting`)
   process.exit(1)
 }
 

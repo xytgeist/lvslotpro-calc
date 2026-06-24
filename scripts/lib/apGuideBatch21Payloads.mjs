@@ -194,10 +194,10 @@ Limited field data ... treat as preliminary.`,
       card_ev_threshold: 'Blue 14+ · Green 18+ · Purple 33+ · Red 99+',
       when_to_play: `**Primary play:**
 
-- **Blue MHB at 14+** (cap **15**, resets **8**) — **13+** on strong-RTP / card-build floors
-- **Green MHB at 18+** (cap **20**) — **17+** aggressive
-- **Purple MHB at 33+** (cap **35**) — **31+** aggressive
-- **Red MHB at 99+** (cap **100**) — card-build only for most APs
+- **Blue MHB at 14+** (cap **15**, resets **8**) - **13+** on strong-RTP / card-build floors
+- **Green MHB at 18+** (cap **20**) - **17+** aggressive
+- **Purple MHB at 33+** (cap **35**) - **31+** aggressive
+- **Red MHB at 99+** (cap **100**) - card-build only for most APs
 - **Combo:** **Blue + green at 30+** combined · **Blue + green + purple at 58+**`,
       when_to_stop: `Stop after the **must-hit free-games meter** you chased awards.`,
       how_to_check: `Four color meters are on the glass. Cycle through all bets/denoms.`,

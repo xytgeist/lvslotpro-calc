@@ -1535,20 +1535,111 @@ html.light .guide-skin-footer {
   background: linear-gradient(to top, rgba(0,0,0,0.68), rgba(0,0,0,0.35), transparent) !important;
 }
 
+/* Hero-derived guide card accent (CSS vars set on .guide-accent-themed article) */
+.guide-accent-themed .guide-accent-chevron { color: var(--gca-chevron); }
+.guide-accent-themed .guide-accent-strong { color: var(--gca-strong); }
+.guide-accent-themed .guide-accent-subtitle { color: var(--gca-subtitle); }
+.guide-accent-themed.guide-accent-expanded,
+.guide-accent-themed .guide-accent-expanded-border {
+  border-color: var(--gca-border);
+  box-shadow: 0 25px 50px -12px var(--gca-shadow);
+}
+.guide-accent-themed .guide-ev-threshold-panel.guide-accent-ev-box {
+  --guide-ev-fg: var(--gca-chevron);
+}
+.guide-accent-themed .guide-accent-ev-box {
+  border: 1px dashed var(--gca-ev-border);
+  background: linear-gradient(
+    to bottom right,
+    var(--gca-ev-bg-start),
+    rgba(9, 9, 11, 0.4),
+    rgb(9, 9, 11)
+  );
+}
+
+/* +EV label and | bar share one solid accent (never separate opacity utilities). */
+.guide-ev-threshold-accent-label,
+.guide-ev-threshold-accent-label span,
+.guide-ev-threshold-accent-label svg {
+  color: var(--guide-ev-fg) !important;
+  opacity: 1 !important;
+}
+.guide-ev-threshold-accent-label svg path {
+  stroke: currentColor;
+  stroke-opacity: 1;
+}
+.guide-ev-threshold-accent-rule {
+  border-left-color: var(--guide-ev-fg) !important;
+  opacity: 1 !important;
+}
+
+/* Legacy pilot panels: --guide-ev-fg from dashed border family (dark = 400, light = 600–700). */
+.guide-ev-threshold-panel.border-amber-400\/55 { --guide-ev-fg: #fbbf24; }
+.guide-ev-threshold-panel.border-orange-400\/55 { --guide-ev-fg: #fb923c; }
+.guide-ev-threshold-panel.border-cyan-400\/55 { --guide-ev-fg: #22d3ee; }
+.guide-ev-threshold-panel.border-indigo-400\/55 { --guide-ev-fg: #818cf8; }
+.guide-ev-threshold-panel.border-violet-400\/55 { --guide-ev-fg: #a78bfa; }
+.guide-ev-threshold-panel.border-rose-400\/55 { --guide-ev-fg: #fb7185; }
+.guide-ev-threshold-panel.border-sky-400\/55 { --guide-ev-fg: #38bdf8; }
+.guide-ev-threshold-panel.border-emerald-400\/55 { --guide-ev-fg: #34d399; }
+.guide-ev-threshold-panel.border-lime-400\/50 { --guide-ev-fg: #a3e635; }
+
 /*
- * EV Threshold panel in light mode:
- * - Override the dark zinc-based gradient bg with a subtle neutral wash
- * - Apply saturate+darken filter to the whole panel so accent colors
- *   (label, border-rule, outer dashed border) become vivid and readable.
- *   The body text is near-neutral gray (#27272a) so the filter barely
- *   affects it perceptually.
+ * EV Threshold + card accents in light mode:
+ * Flat neutral panel bg. --guide-ev-fg uses readable ~600–700 accents on pale surfaces.
  */
-html.light .guide-ev-threshold-panel {
+html.light .guide-accent-themed .guide-ev-threshold-panel.guide-accent-ev-box {
+  --guide-ev-fg: var(--gca-light-accent, var(--gca-chevron));
+}
+html.light .guide-accent-themed .guide-ev-threshold-panel {
+  filter: none;
+}
+html.light .guide-accent-themed .guide-accent-ev-box {
+  border-color: var(--guide-ev-fg) !important;
   background: rgba(0, 0, 0, 0.04) !important;
-  filter: saturate(2.4) brightness(0.70);
+}
+html.light .guide-accent-themed.guide-accent-expanded,
+html.light .guide-accent-themed .guide-accent-expanded-border {
+  border-color: color-mix(in srgb, var(--gca-light-accent, var(--gca-chevron)) 62%, #71717a) !important;
+}
+html.light .guide-accent-themed .guide-accent-subtitle {
+  color: color-mix(in srgb, var(--gca-chevron) 72%, #fff) !important;
+}
+
+html.light .guide-ev-threshold-panel:not(.guide-accent-ev-box) {
+  filter: none;
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+html.light .guide-ev-threshold-panel.border-amber-400\/55 { --guide-ev-fg: #b45309; }
+html.light .guide-ev-threshold-panel.border-orange-400\/55 { --guide-ev-fg: #c2410c; }
+html.light .guide-ev-threshold-panel.border-cyan-400\/55 { --guide-ev-fg: #0e7490; }
+html.light .guide-ev-threshold-panel.border-indigo-400\/55 { --guide-ev-fg: #4338ca; }
+html.light .guide-ev-threshold-panel.border-violet-400\/55 { --guide-ev-fg: #6d28d9; }
+html.light .guide-ev-threshold-panel.border-rose-400\/55 { --guide-ev-fg: #e11d48; }
+html.light .guide-ev-threshold-panel.border-sky-400\/55 { --guide-ev-fg: #0369a1; }
+html.light .guide-ev-threshold-panel.border-emerald-400\/55 { --guide-ev-fg: #047857; }
+html.light .guide-ev-threshold-panel.border-lime-400\/50 { --guide-ev-fg: #4d7c0f; }
+html.light .guide-ev-threshold-panel.border-amber-400\/55,
+html.light .guide-ev-threshold-panel.border-orange-400\/55,
+html.light .guide-ev-threshold-panel.border-cyan-400\/55,
+html.light .guide-ev-threshold-panel.border-indigo-400\/55,
+html.light .guide-ev-threshold-panel.border-violet-400\/55,
+html.light .guide-ev-threshold-panel.border-rose-400\/55,
+html.light .guide-ev-threshold-panel.border-sky-400\/55,
+html.light .guide-ev-threshold-panel.border-emerald-400\/55,
+html.light .guide-ev-threshold-panel.border-lime-400\/50 {
+  border-color: var(--guide-ev-fg) !important;
 }
 html.light .guide-ev-threshold-text {
   color: #27272a;
+}
+
+.guide-accent-themed .guide-accent-hero-gradient {
+  background: linear-gradient(
+    to bottom right,
+    var(--gca-hero-via),
+    rgb(9, 9, 11)
+  );
 }
 
 /* AP Guides search — light bg from zinc-900 remap; text-white is not flipped when bg-* is present */

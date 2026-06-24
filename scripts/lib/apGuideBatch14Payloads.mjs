@@ -1,4 +1,4 @@
-/** Batch 14 synth payloads. `lightning-and-the-thunder` omitted — AP stub only (storm mode, no numeric thresholds). */
+/** Batch 14 synth payloads. `lightning-and-the-thunder` omitted - AP stub only (storm mode, no numeric thresholds). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH14_PAYLOADS = [
   {

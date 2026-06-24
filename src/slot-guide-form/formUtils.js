@@ -287,6 +287,7 @@ export function guideRowToFormFields(data) {
     ...parsed,
     title: data.title || '',
     card_ev_threshold: data.card_ev_threshold || '',
+    card_accent_color: data.card_accent_color || '',
     published: data.published ?? true,
     _slug: data.slug || '',
     _created_at: data.created_at || '',

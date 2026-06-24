@@ -1,4 +1,4 @@
-/** Batch 27 synth payloads — 3 skips (see _batch-progress.json batch 27 skipped). */
+/** Batch 27 synth payloads - 3 skips (see _batch-progress.json batch 27 skipped). */
 /** @type {Array<{ machine: Record<string, unknown>, guide: Record<string, unknown>, diagrams?: unknown[] }>} */
 export const BATCH27_PAYLOADS = [
   {
