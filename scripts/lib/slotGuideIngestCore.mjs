@@ -120,16 +120,16 @@ export function buildGuideMarkdown(payload, opts = {}) {
   }
   md += diagramsForPlacement(diagrams, "risk", slug, resolveUrl);
 
-  const whereToFind = String(guide.where_to_find ?? "").trim();
-  if (whereToFind) {
-    md += `## 📍 Where to find\n\n${whereToFind}\n\n`;
-    md += diagramsForPlacement(diagrams, "where_to_find", slug, resolveUrl);
-  }
-
   const skins = String(guide.skins_markdown ?? "").trim();
   if (skins) {
     md += `## 🎭 Skins (same game different theme/art)\n\n${skins}\n\n`;
     md += diagramsForPlacement(diagrams, "skins", slug, resolveUrl);
+  }
+
+  const whereToFind = String(guide.where_to_find ?? "").trim();
+  if (whereToFind) {
+    md += `## 📍 Where to find\n\n${whereToFind}\n\n`;
+    md += diagramsForPlacement(diagrams, "where_to_find", slug, resolveUrl);
   }
 
   md += `---\n\n## 🎰 Gameplay Mechanics\n\n${mdBlock(guide.gameplay_mechanics)}`;

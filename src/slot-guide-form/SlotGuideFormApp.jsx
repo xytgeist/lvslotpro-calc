@@ -137,8 +137,8 @@ const PLACEMENTS = [
   { id: 'how_to_check', label: 'After How to check' },
   { id: 'bankroll', label: 'After Bankroll on hand' },
   { id: 'risk', label: 'After Risk & Warnings' },
-  { id: 'where_to_find', label: 'After Where to find' },
   { id: 'skins', label: 'After Skins' },
+  { id: 'where_to_find', label: 'After Where to find' },
   { id: 'gameplay', label: 'After Gameplay' },
 ]
 
@@ -1475,18 +1475,6 @@ export default function SlotGuideFormApp() {
               </div>
             </GuideSectionPanel>
 
-            <GuideSectionPanel title="📍 Where to find" optional>
-              <GuideSectionBody
-                fieldKey="where_to_find"
-                value={guide.where_to_find}
-                onChange={(val) => setGuideField('where_to_find', val)}
-                slug={machine.slug || guide._slug}
-                guideTitle={guide.title}
-                pickFile={pickFile}
-                minH="min-h-36"
-              />
-            </GuideSectionPanel>
-
             <GuideSectionPanel title="🎭 Skins (same game different theme/art)" optional>
               <SkinsTextarea
                 className={`${ic} min-h-28`}
@@ -1496,6 +1484,18 @@ export default function SlotGuideFormApp() {
                 pickFile={pickFile}
                 slug={machine.slug || guide._slug}
                 guideTitle={guide.title}
+              />
+            </GuideSectionPanel>
+
+            <GuideSectionPanel title="📍 Where to find" optional>
+              <GuideSectionBody
+                fieldKey="where_to_find"
+                value={guide.where_to_find}
+                onChange={(val) => setGuideField('where_to_find', val)}
+                slug={machine.slug || guide._slug}
+                guideTitle={guide.title}
+                pickFile={pickFile}
+                minH="min-h-36"
               />
             </GuideSectionPanel>
 

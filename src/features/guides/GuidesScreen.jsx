@@ -34,7 +34,7 @@ import {
   ainsworthMustHitByGuideMarkdown,
 } from './mustHitByGuideDemo'
 import { defaultCardEvThresholdForSlug } from '../../constants/slotCardEvThreshold'
-import { guideMarkdownForDisplay } from '../../slot-guide-form/formUtils.js'
+import { guideMarkdownForDisplay, parseGuideMarkdown } from '../../slot-guide-form/formUtils.js'
 import { communityFeedPostInsertPayload } from '../../utils/communityFeedPost'
 import { prepareAvatarImageForUpload, isProbablyImageFile } from '../../utils/compressImageForUpload'
 import {
@@ -1865,29 +1865,25 @@ export default function GuidesScreen({
     el.scrollIntoView({ block: 'start', inline: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' })
   }, [expandedSlug])
 
+  /** Title + Skins only (not hunt copy, manufacturer, slug, or MHB keyword blobs). */
+  const searchHaystackByRowId = useMemo(() => {
+    /** @type {Record<string, string>} */
+    const map = Object.create(null)
+    for (const r of rows) {
+      const mx = machineForGuide(r)
+      const cardTitle = (mx?.name || r.title || '').toLowerCase()
+      const guideTitle = (r.title || '').toLowerCase()
+      const skins = parseGuideMarkdown(r.content_markdown || '').skins_markdown.toLowerCase()
+      map[r.id] = [cardTitle, guideTitle !== cardTitle ? guideTitle : '', skins].filter(Boolean).join('\n')
+    }
+    return map
+  }, [rows])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return rows
-    return rows.filter((r) => {
-      const mx = machineForGuide(r)
-      const name = (mx?.name || '').toLowerCase()
-      const title = (r.title || '').toLowerCase()
-      const slug = (r.slug || '').toLowerCase()
-      const manu = (mx?.manufacturer || '').toLowerCase()
-      const typ = (mx?.type || '').toLowerCase()
-      const keywords = (r.guide_search_text || '').toLowerCase()
-      const body = (r.content_markdown || '').toLowerCase()
-      return (
-        name.includes(q) ||
-        title.includes(q) ||
-        slug.includes(q) ||
-        manu.includes(q) ||
-        typ.includes(q) ||
-        keywords.includes(q) ||
-        body.includes(q)
-      )
-    })
-  }, [rows, query])
+    return rows.filter((r) => searchHaystackByRowId[r.id]?.includes(q))
+  }, [rows, query, searchHaystackByRowId])
 
   return (
     <>
@@ -1910,7 +1906,7 @@ export default function GuidesScreen({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search slot name…"
+          placeholder="Search title or skin…"
           className="ap-guides-search-input w-full min-h-12 rounded-2xl bg-zinc-900 border border-zinc-700 px-4 py-3 text-white text-base placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
           enterKeyHint="search"
         />

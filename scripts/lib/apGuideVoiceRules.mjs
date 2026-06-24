@@ -15,8 +15,8 @@ export const AP_GUIDE_VOICE_RULES = {
     'how_to_check',
     'risk_bankroll',
     'risk_summary',
-    'where_to_find',
     'skins_markdown',
+    'where_to_find',
     'gameplay_mechanics',
   ],
   /** Where to find: optional section — Ryan fills via slot-guide-form; batch synth must omit. */

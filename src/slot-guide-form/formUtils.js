@@ -87,7 +87,50 @@ export function parseGuideMarkdown(markdown) {
 const OPTIONAL_EMPTY_SECTION_HEADERS = [/Where to find/i]
 
 /**
+ * @param {string} markdown
+ * @returns {{ h1: string, lead: string, sections: Array<{ header: string, body: string, raw: string }> }}
+ */
+function parseMarkdownSections(markdown) {
+  const h1Match = markdown.match(/^#\s[^\n]*\n*/)
+  const h1 = h1Match ? h1Match[0] : ''
+  const rest = h1Match ? markdown.slice(h1Match[0].length) : markdown
+  const parts = rest.split(/^## /m)
+  const lead = parts[0] || ''
+  /** @type {Array<{ header: string, body: string, raw: string }>} */
+  const sections = []
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i]
+    const nl = part.indexOf('\n')
+    const header = nl === -1 ? part.trim() : part.slice(0, nl).trim()
+    const body = nl === -1 ? '' : part.slice(nl + 1)
+    sections.push({
+      header,
+      body,
+      raw: `## ${header}\n${body}`.replace(/\s+$/, ''),
+    })
+  }
+  return { h1, lead, sections }
+}
+
+/** Skins before Where to find (legacy rows may still store the old order). */
+function reorderSkinsBeforeWhereToFind(markdown) {
+  const { h1, lead, sections } = parseMarkdownSections(markdown)
+  const wtfIdx = sections.findIndex((s) => /Where to find/i.test(s.header))
+  const skinsIdx = sections.findIndex((s) => /Skins/i.test(s.header))
+  if (wtfIdx < 0 || skinsIdx < 0 || skinsIdx < wtfIdx) return markdown
+
+  const next = [...sections]
+  const [wtf] = next.splice(wtfIdx, 1)
+  const newSkinsIdx = next.findIndex((s) => /Skins/i.test(s.header))
+  next.splice(newSkinsIdx + 1, 0, wtf)
+
+  const body = next.map((s) => `${s.raw}\n\n`).join('').trimEnd()
+  return `${h1}${lead}${body}\n`
+}
+
+/**
  * Strip optional guide sections that have no body (legacy rows with a bare ## header).
+ * Reorders Skins above Where to find for display (no DB write).
  * @param {string} markdown
  */
 export function guideMarkdownForDisplay(markdown) {
@@ -96,7 +139,7 @@ export function guideMarkdownForDisplay(markdown) {
   for (const headerTest of OPTIONAL_EMPTY_SECTION_HEADERS) {
     out = removeEmptySectionByHeader(out, headerTest)
   }
-  return out
+  return reorderSkinsBeforeWhereToFind(out)
 }
 
 function removeEmptySectionByHeader(markdown, headerTest) {
