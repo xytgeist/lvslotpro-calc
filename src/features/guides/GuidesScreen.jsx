@@ -887,6 +887,7 @@ async function mergeGuideAccentColors(supabaseClient, rows) {
 }
 
 function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, onRequireAuth }) {
+  const [caption, setCaption] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [authPromptOpen, setAuthPromptOpen] = useState(false)
