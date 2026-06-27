@@ -1150,7 +1150,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
     <>
       <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4 bg-black/60" role="dialog" aria-modal>
         <button type="button" className="absolute inset-0 z-0 cursor-default" aria-label="Close" onClick={onClose} />
-        <div className="relative z-10 w-full max-w-lg rounded-3xl bg-zinc-900 border border-zinc-700 shadow-2xl max-h-[90dvh] overflow-hidden flex flex-col">
+        <div className="relative z-10 w-full max-w-lg rounded-3xl bg-zinc-900 border border-zinc-700 shadow-2xl max-h-[90dvh] overflow-hidden flex flex-col" data-ask-community-modal>
           <div className="p-5 border-b border-zinc-800 shrink-0">
             <div className="text-white font-bold text-lg">Ask the community</div>
             <div className="text-zinc-400 text-sm mt-1">
@@ -1212,7 +1212,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
             aria-label="Close auth prompt"
             onClick={() => setAuthPromptOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5">
+          <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5" data-ask-community-auth-prompt>
             <div className="text-rose-200 text-sm font-semibold uppercase tracking-wide">Sign in required</div>
             <div className="text-white text-lg font-bold mt-1">You must be signed in to post in Lounge</div>
             <div className="text-zinc-400 text-sm mt-2 leading-relaxed">
@@ -1256,7 +1256,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
               setProfileGateOpen(false)
             }}
           />
-          <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5">
+          <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5" data-ask-community-profile-gate>
             <div className="text-cyan-200 text-sm font-semibold uppercase tracking-wide">Complete your profile</div>
             <div className="text-white text-lg font-bold mt-1">One-time setup before posting</div>
             <div className="text-zinc-400 text-sm mt-2 leading-relaxed">

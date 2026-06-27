@@ -1662,6 +1662,68 @@ html.light .ap-guides-search-input::placeholder {
   color: #71717a !important;
 }
 
+/* Ask Community modal (Guides) — zinc bg remaps in light mode; text-white on inputs does not */
+html.light [data-ask-community-modal],
+html.light [data-ask-community-auth-prompt],
+html.light [data-ask-community-profile-gate] {
+  background-color: #ffffff !important;
+  border-color: #e4e4e7 !important;
+}
+html.light [data-ask-community-modal] .text-white,
+html.light [data-ask-community-auth-prompt] .text-white,
+html.light [data-ask-community-profile-gate] .text-white {
+  color: #18181b !important;
+}
+html.light [data-ask-community-modal] .text-zinc-400,
+html.light [data-ask-community-auth-prompt] .text-zinc-400,
+html.light [data-ask-community-profile-gate] .text-zinc-400 {
+  color: #71717a !important;
+}
+html.light [data-ask-community-modal] .text-zinc-100,
+html.light [data-ask-community-auth-prompt] .text-zinc-100,
+html.light [data-ask-community-profile-gate] .text-zinc-100 {
+  color: #27272a !important;
+}
+html.light [data-ask-community-modal] .text-zinc-500,
+html.light [data-ask-community-profile-gate] .text-zinc-600 {
+  color: #71717a !important;
+}
+html.light [data-ask-community-modal] .text-amber-100 {
+  color: #78350f !important;
+}
+html.light [data-ask-community-modal] .text-cyan-300,
+html.light [data-ask-community-auth-prompt] .text-cyan-200 {
+  color: #0891b2 !important;
+}
+html.light [data-ask-community-modal] .border-zinc-800,
+html.light [data-ask-community-modal] .border-zinc-700,
+html.light [data-ask-community-auth-prompt] .border-zinc-700,
+html.light [data-ask-community-profile-gate] .border-zinc-700 {
+  border-color: #d4d4d8 !important;
+}
+html.light [data-ask-community-modal] .bg-zinc-800,
+html.light [data-ask-community-modal] .bg-zinc-800\/80,
+html.light [data-ask-community-auth-prompt] .bg-zinc-800,
+html.light [data-ask-community-profile-gate] .bg-zinc-800 {
+  background-color: #f4f4f5 !important;
+}
+html.light [data-ask-community-modal] textarea,
+html.light [data-ask-community-modal] .bg-zinc-950,
+html.light [data-ask-community-profile-gate] input,
+html.light [data-ask-community-profile-gate] .bg-zinc-950 {
+  background-color: #f4f4f5 !important;
+  color: #18181b !important;
+}
+html.light [data-ask-community-modal] textarea::placeholder,
+html.light [data-ask-community-profile-gate] input::placeholder {
+  color: #a1a1aa !important;
+}
+html.light [data-ask-community-modal] .bg-cyan-600,
+html.light [data-ask-community-auth-prompt] .bg-cyan-600,
+html.light [data-ask-community-profile-gate] .bg-cyan-600 {
+  color: #ffffff !important;
+}
+
 /* react-datepicker light theme */
 html.light .offer-datepicker.react-datepicker {
   background-color: #ffffff;
