@@ -603,7 +603,7 @@ export default function ChatComposer({
             ref={plusBtnRef}
             type="button"
             disabled={disabled}
-            onPointerDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={openPlus}
             aria-label="Attach media or GIF"
             className="chat-header-glass shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity disabled:opacity-40"
@@ -689,7 +689,7 @@ export default function ChatComposer({
           ref={plusBtnRef}
           type="button"
           disabled={disabled}
-          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={openPlus}
           aria-label="Attach media or GIF"
           className="chat-header-glass shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-zinc-100 touch-manipulation active:opacity-70 transition-opacity disabled:opacity-40"
@@ -756,7 +756,7 @@ export default function ChatComposer({
           <button
             type="button"
             disabled={!canSend}
-            onPointerDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => void handleSend()}
             aria-label="Send"
             className={`absolute right-[5px] z-10 grid h-7 w-7 place-items-center rounded-full touch-manipulation transition-all ${
@@ -814,7 +814,7 @@ export default function ChatComposer({
         >
           <button
             type="button"
-            onPointerDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handlePasteButton}
             className="px-5 py-2 text-sm font-medium text-white bg-zinc-700 active:bg-zinc-600 select-none touch-manipulation"
           >
