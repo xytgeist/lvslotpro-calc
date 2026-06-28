@@ -54,14 +54,33 @@ import {
   canOpenCalculator,
   calculatorsTabFullyGated,
 } from '../calculators/calculatorAccess.js'
-import { guidesTabFullyGated } from '../guides/guideAccess.js'
+import { guidesTabFullyGated, normalizeGuideAccessSlug } from '../guides/guideAccess.js'
+import { parseGuideSlugFromPathname } from '../lounge/loungeCaptionLink.js'
 import { QUICK_LINK_BY_ID } from './quickLinkDestinations.js'
 
 const LOUNGE_ACTIVITY_INAPP_TOAST_MS = 7000
+const GUIDES_SCREEN_CHUNK_RELOAD_KEY = 'lvsp_guides_screen_chunk_reload'
+
+/** One hard reload when a stale deploy serves index.html for a missing lazy chunk. */
+function lazyImportWithChunkReload(importFn, reloadKey) {
+  return importFn().catch((err) => {
+    if (typeof sessionStorage !== 'undefined' && !sessionStorage.getItem(reloadKey)) {
+      sessionStorage.setItem(reloadKey, '1')
+      window.location.reload()
+      return new Promise(() => {})
+    }
+    throw err
+  })
+}
 
 const SocialFeed = lazy(() => import('../lounge/SocialFeed.jsx'))
 const OffersCalendar = lazy(() => import('../offers/OffersCalendar.jsx'))
-const GuidesScreen = lazy(() => import('../guides/GuidesScreen.jsx'))
+const GuidesScreen = lazy(() =>
+  lazyImportWithChunkReload(
+    () => import('../guides/GuidesScreen.jsx'),
+    GUIDES_SCREEN_CHUNK_RELOAD_KEY,
+  ),
+)
 const BankrollTracker = lazy(() => import('../bankroll/BankrollTracker.jsx'))
 const LocalIntel = lazy(() => import('../intel/LocalIntel.jsx'))
 const CalculatorsTab = lazy(() => import('../calculators/CalculatorsTab.jsx'))
@@ -731,6 +750,28 @@ export default function AppShell({
           if (roomId) setPendingChatRoomId(roomId)
         }
       }
+      const guideFromQuery = (params.get('guide') || '').trim()
+      const guideFromPath = parseGuideSlugFromPathname(window.location.pathname || '')
+      const guideSlug = guideFromQuery || guideFromPath
+      if (guideSlug) {
+        if (browseMode === 'anonymous') {
+          onRequireAuthRef.current?.()
+        } else {
+          setGuideOpenCardSlug(normalizeGuideAccessSlug(guideSlug))
+          setTab('guides')
+          setMenuOpen(false)
+        }
+        try {
+          const u = new URL(window.location.href)
+          if (guideFromPath) u.pathname = '/'
+          if (guideFromQuery) u.searchParams.delete('guide')
+          const qs = u.searchParams.toString()
+          const next = `${u.pathname || '/'}${qs ? `?${qs}` : ''}${u.hash}`
+          window.history.replaceState({}, document.title, next)
+        } catch {
+          /* ignore */
+        }
+      }
       if (targetEventId && !targetEventIds.includes(targetEventId)) targetEventIds.unshift(targetEventId)
       if (targetEventIds.length > 0) {
         if (browseMode === 'anonymous') {
@@ -1006,6 +1047,40 @@ export default function AppShell({
     }
   }, [])
 
+  /** Prefetch AP Guides chunk while Lounge is visible (Ask Community embed taps). */
+  useEffect(() => {
+    if (tab !== 'home') return undefined
+    void import('../guides/GuidesScreen.jsx')
+    return undefined
+  }, [tab])
+
+  const openGuideFromLounge = useCallback((rawSlug) => {
+    const slug = normalizeGuideAccessSlug(rawSlug)
+    if (!slug) return
+    setActiveCalculator(null)
+    setMenuOpen(false)
+    void import('../guides/GuidesScreen.jsx')
+      .then(() => {
+        try {
+          sessionStorage.removeItem(GUIDES_SCREEN_CHUNK_RELOAD_KEY)
+        } catch {
+          /* ignore */
+        }
+        setGuideOpenCardSlug(slug)
+        setTab('guides')
+      })
+      .catch(() => {
+        try {
+          if (!sessionStorage.getItem(GUIDES_SCREEN_CHUNK_RELOAD_KEY)) {
+            sessionStorage.setItem(GUIDES_SCREEN_CHUNK_RELOAD_KEY, '1')
+            window.location.assign(`/?guide=${encodeURIComponent(slug)}`)
+          }
+        } catch {
+          /* ignore */
+        }
+      })
+  }, [])
+
   const { splashVisible, splashDismissing, onSplashAnimationComplete } = useLoungeColdBootSplash({
     tab,
     browseMode,
@@ -1117,10 +1192,7 @@ export default function AppShell({
             onLogout={onLogout}
             onDeleteAccount={onDeleteAccount}
             deleteAccountBusy={deleteAccountBusy}
-            onOpenGuideCard={(slug) => {
-              setGuideOpenCardSlug(slug)
-              setTab('guides')
-            }}
+            onOpenGuideCard={openGuideFromLounge}
             onOpenChatWithUser={(peerUserId) => {
               if (!peerUserId) return
               setPendingChatPeerUserId(peerUserId)

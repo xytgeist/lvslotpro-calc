@@ -152,7 +152,7 @@ import { renderRichCaption } from './loungeCaption'
 import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import {
   hrefForExternalOpen,
-  parseGuideSlugFromUrl,
+  parseGuideSlugFromUrlOrScheme,
   parseLoungePostIdFromUrl,
   parseLoungeProfileHandleFromUrl,
 } from './loungeCaptionLink.js'
@@ -12548,7 +12548,7 @@ export default function SocialFeed({
         void openProfileByHandle(handle, e)
         return
       }
-      const guideSlug = parseGuideSlugFromUrl(url)
+      const guideSlug = parseGuideSlugFromUrlOrScheme(url)
       if (guideSlug) {
         onOpenGuideCard?.(guideSlug)
         return
@@ -14446,7 +14446,10 @@ export default function SocialFeed({
                     {loungePostDetail.is_ap_guide_post && loungePostDetail.game_slug ? (
                       <button
                         type="button"
-                        onClick={() => onOpenGuideCard?.(loungePostDetail.game_slug)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onOpenGuideCard?.(loungePostDetail.game_slug)
+                        }}
                         className="mt-3 w-full text-left rounded-2xl overflow-hidden border border-zinc-700/80 bg-zinc-900/80 hover:border-zinc-600 active:border-cyan-700/60 transition-colors touch-manipulation [-webkit-tap-highlight-color:transparent]"
                         aria-label={`View AP Guide: ${loungePostDetail.game_title}`}
                       >

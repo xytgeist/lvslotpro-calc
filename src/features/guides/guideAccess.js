@@ -19,6 +19,29 @@ export function normalizeGuideAccessSlug(rawSlug) {
   return slug
 }
 
+/**
+ * Machine slug for Lounge AP Guide embeds — matches `guide-card-${slug}` ids in GuidesScreen.
+ * @param {{ slug?: string | null, machines?: { slug?: string | null } | Array<{ slug?: string | null }> | null } | null | undefined} guideRow
+ */
+export function resolveGuidePostSlug(guideRow) {
+  if (!guideRow) return ''
+  const m = guideRow.machines
+  if (m != null && !Array.isArray(m)) {
+    const s = String(m.slug || '').trim()
+    if (s) return s
+  }
+  if (Array.isArray(m)) {
+    const list = m.filter(Boolean)
+    const gs = String(guideRow.slug || '').trim().toLowerCase()
+    const slugMatch =
+      gs && list.find((x) => String(x?.slug || '').trim().toLowerCase() === gs)
+    const picked = slugMatch ?? list[0]
+    const s = String(picked?.slug || '').trim()
+    if (s) return s
+  }
+  return String(guideRow.slug || '').trim()
+}
+
 function codeDefaultGuideRequiresSlotsEdge(slug) {
   const normalized = normalizeGuideAccessSlug(slug)
   if (!normalized) return true

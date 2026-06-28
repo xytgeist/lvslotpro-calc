@@ -33,6 +33,21 @@ export function parseLoungeProfileHandleFromUrl(url) {
   return null
 }
 
+/** Parse AP Guide slug from `/guides/:slug` pathname (full-page deep links). */
+export function parseGuideSlugFromPathname(pathname) {
+  if (typeof pathname !== 'string') return null
+  const m = pathname.match(/^\/guides\/([a-z0-9-]+)/i)
+  return m?.[1]?.toLowerCase() || null
+}
+
+/** Parse AP Guide slug from `/guides/:slug/…` URLs or `guide:slug` markdown scheme. */
+export function parseGuideSlugFromUrlOrScheme(url) {
+  const raw = String(url || '').trim()
+  const scheme = raw.match(/^guide:([a-z0-9-]+)/i)
+  if (scheme?.[1]) return scheme[1].toLowerCase()
+  return parseGuideSlugFromUrl(url)
+}
+
 /** Parse AP Guide slug from `/guides/:slug/…` paths. */
 export function parseGuideSlugFromUrl(url) {
   try {

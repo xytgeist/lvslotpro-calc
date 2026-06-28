@@ -67,6 +67,7 @@ import {
   canOpenGuide,
   guideRequiresSlotsEdge,
   normalizeGuideAccessSlug,
+  resolveGuidePostSlug,
   showGuideLock,
 } from './guideAccess.js'
 import { resolveGuideAccent } from '../../utils/guideCardAccent.js'
@@ -928,7 +929,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
   }, [])
 
   const gameTitle = guideRow?.machines?.name || guideRow?.title || 'Game'
-  const gameSlug = guideRow?.machines?.slug || guideRow?.slug || ''
+  const gameSlug = resolveGuidePostSlug(guideRow)
   const rateLimitMessage = (rawMessage) => {
     const m = /retry_in_seconds=(\d+)/i.exec(String(rawMessage || ''))
     const secs = m ? Number(m[1]) : NaN
@@ -1773,9 +1774,10 @@ export default function GuidesScreen({
           {filtered.map((row) => {
             const m = machineForGuide(row)
             const slug = m?.slug || row.slug
+            const cardSlug = normalizeGuideAccessSlug(slug) || slug
             const expanded =
               expandedSlug != null &&
-              String(expandedSlug).toLowerCase() === String(slug || '').toLowerCase()
+              String(expandedSlug).toLowerCase() === String(cardSlug || '').toLowerCase()
             const calcKey = resolveCalculatorKey(m)
             const evThresholdLine = cardEvThresholdForRow(row)
             const accent = resolveGuideAccent({
@@ -1797,11 +1799,11 @@ export default function GuidesScreen({
                 : `bg-gradient-to-br ${accent.heroGradientClass}`
 
             return (
-              <li key={row.id || row.slug} id={`guide-card-${slug}`}>
+              <li key={row.id || row.slug} id={`guide-card-${cardSlug}`}>
                 <article
                   ref={(el) => {
-                    if (el) guideCardRefs.current[slug] = el
-                    else delete guideCardRefs.current[slug]
+                    if (el) guideCardRefs.current[cardSlug] = el
+                    else delete guideCardRefs.current[cardSlug]
                   }}
                   style={accent.cssVars}
                   onClick={
