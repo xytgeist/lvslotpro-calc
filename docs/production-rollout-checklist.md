@@ -190,7 +190,8 @@ Suggested future tightening:
 Already planned for Slot Pro backlog; prod cutover reminders:
 
 - [ ] Hosted **Terms**, **Privacy**, **Community guidelines** URLs (counsel-reviewed; entity **Quantum Capital Ventures, LLC, Wyoming** per your backlog).
-- [ ] In-app links + signup acceptance flows when those ship.
+- [x] In-app **`/terms`** + **`/privacy`** pages + signup acceptance (migration **`20260627200000_profiles_legal_acceptance.sql`**). **Counsel review still recommended** before prod.
+- [x] In-app **`/guidelines`** (Community Guidelines). Counsel review still recommended before prod.
 
 ---
 

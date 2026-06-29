@@ -11,6 +11,15 @@ import { startEdgeCheckout } from './features/billing/stripeBillingApi.js'
 import { useEdgeEntitlements } from './features/billing/useEdgeEntitlements.js'
 import { useContentAccessGates } from './features/billing/useContentAccessGates.js'
 import {
+  LegalDocumentScreen,
+  LegalAcceptanceModal,
+  parseLegalPathname,
+  recordLegalAcceptance,
+  profileNeedsLegalAcceptance,
+  markPendingLegalAcceptance,
+  readPendingLegalAcceptance,
+} from './features/legal'
+import {
   readLoungeComposerDraftPendingWork,
   shouldShowLoungeColdBootSplash,
 } from './utils/loungeColdBootSplash.js'
@@ -53,7 +62,10 @@ function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isChecking, setIsChecking] = useState(true)
-  const [currentView, setCurrentView] = useState('app')
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window === 'undefined') return 'app'
+    return parseLegalPathname(window.location.pathname || '/') || 'app'
+  })
   /** Login/signup as a modal over the app when the user chooses it or a feature calls onRequireAuth. */
   const [authPanelOpen, setAuthPanelOpen] = useState(false)
   /** Optional shell banner (e.g. future account notices). */
@@ -96,6 +108,10 @@ function App() {
 
   // Verification success message
   const [verificationSuccess, setVerificationSuccess] = useState(false)
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
+  const [legalAcceptancePending, setLegalAcceptancePending] = useState(false)
+  const [legalAcceptanceBusy, setLegalAcceptanceBusy] = useState(false)
+  const [legalAcceptanceError, setLegalAcceptanceError] = useState('')
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -120,6 +136,12 @@ function App() {
 
   useEffect(() => {
     queueMicrotask(() => {
+      const legalSlug = parseLegalPathname(window.location.pathname || '/')
+      if (legalSlug) {
+        setCurrentView(legalSlug)
+        return
+      }
+
       const { error: oauthError, errorCode, errorDescription } = readAuthCallbackParams()
       const oauthMsg = getOAuthCallbackMessage(oauthError, errorCode, errorDescription)
       if (oauthMsg) {
@@ -186,6 +208,50 @@ function App() {
     void ensureDefaultProfileRow(supabase, user)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when auth user id changes; not every new `user` reference from Supabase.
   }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id) {
+      queueMicrotask(() => {
+        setLegalAcceptancePending(false)
+        setLegalAcceptanceError('')
+      })
+      return
+    }
+    let cancelled = false
+    const syncLegalAcceptance = async () => {
+      if (readPendingLegalAcceptance()) {
+        await ensureDefaultProfileRow(supabase, user)
+        const { error } = await recordLegalAcceptance(supabase, user.id)
+        if (cancelled) return
+        if (!error) {
+          setLegalAcceptancePending(false)
+          setLegalAcceptanceError('')
+          return
+        }
+      }
+      const needs = await profileNeedsLegalAcceptance(supabase, user.id)
+      if (!cancelled) setLegalAcceptancePending(needs)
+    }
+    void syncLegalAcceptance()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  const handleLegalAcceptance = useCallback(async () => {
+    if (!user?.id || legalAcceptanceBusy) return
+    setLegalAcceptanceBusy(true)
+    setLegalAcceptanceError('')
+    await ensureDefaultProfileRow(supabase, user)
+    const { error } = await recordLegalAcceptance(supabase, user.id)
+    if (error) {
+      setLegalAcceptanceError('Could not save your acceptance. Please try again.')
+      setLegalAcceptanceBusy(false)
+      return
+    }
+    setLegalAcceptancePending(false)
+    setLegalAcceptanceBusy(false)
+  }, [user, legalAcceptanceBusy])
 
   useEffect(() => {
     if (!user?.id) {
@@ -355,9 +421,10 @@ function App() {
     window.location.reload()
   }
 
-  const handleOAuthSignIn = async (provider, { setError = setLoginError } = {}) => {
+  const handleOAuthSignIn = async (provider, { setError = setLoginError, markLegalPending = false } = {}) => {
     if (isOAuthLoading) return
     setError('')
+    if (markLegalPending) markPendingLegalAcceptance()
     setIsOAuthLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -375,8 +442,10 @@ function App() {
     setSignupError('')
     setSignupMessage('')
     if (!signupEmail || !signupPassword || !signupConfirmPassword) return setSignupError("Please fill in all fields")
+    if (!acceptedLegal) return setSignupError("Please accept the Terms & Conditions and Privacy Policy.")
     if (signupPassword !== signupConfirmPassword) return setSignupError("Passwords do not match")
     if (signupPassword.length < 6) return setSignupError("Password must be at least 6 characters")
+    markPendingLegalAcceptance()
     setIsSigningUp(true)
 
     const { data, error } = await supabase.auth.signUp({ 
@@ -409,9 +478,12 @@ function App() {
     setSignupEmail('')
     setSignupPassword('')
     setSignupConfirmPassword('')
+    setAcceptedLegal(false)
     setIsSigningUp(false)
     if (data?.session?.user) {
-      void ensureDefaultProfileRow(supabase, data.session.user)
+      void ensureDefaultProfileRow(supabase, data.session.user).then(() =>
+        recordLegalAcceptance(supabase, data.session.user.id),
+      )
     }
   }
 
@@ -552,8 +624,24 @@ function App() {
   if (isChecking && !shouldShowLoungeColdBootSplash({
     tab: 'home',
     pendingWork: readLoungeComposerDraftPendingWork(),
-  })) {
+  }) && currentView === 'app') {
     return <div className={`${mobileShell} text-zinc-50`}>Loading...</div>
+  }
+
+  if (currentView === 'terms' || currentView === 'privacy' || currentView === 'guidelines') {
+    return (
+      <LegalDocumentScreen
+        slug={currentView}
+        onBack={() => {
+          if (typeof window !== 'undefined' && window.history.length > 1) {
+            window.history.back()
+            return
+          }
+          setCurrentView('app')
+          window.history.replaceState({}, document.title, '/')
+        }}
+      />
+    )
   }
 
   // Reset Password Page
@@ -639,6 +727,13 @@ function App() {
           supabaseClient={supabase}
           hasBillingAccount={Boolean(stripeCustomerId)}
         />
+        {legalAcceptancePending && user ? (
+          <LegalAcceptanceModal
+            busy={legalAcceptanceBusy}
+            error={legalAcceptanceError}
+            onAccept={() => void handleLegalAcceptance()}
+          />
+        ) : null}
         {authPanelOpen ? (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
             <button
@@ -719,6 +814,11 @@ function App() {
                 isSendingReset={isSendingReset}
                 onForgotSubmit={handleForgotPassword}
                 isOAuthLoading={isOAuthLoading}
+                acceptedLegal={acceptedLegal}
+                onAcceptedLegalChange={setAcceptedLegal}
+                onGoogleSignInBlocked={() =>
+                  setSignupError('Please accept the Terms & Conditions and Privacy Policy.')
+                }
                 onGoogleSignIn={({ setErrorTarget }) => {
                   const setError =
                     setErrorTarget === 'forgot'
@@ -727,7 +827,10 @@ function App() {
                         ? setSignupError
                         : setLoginError
                   setError('')
-                  void handleOAuthSignIn('google', { setError })
+                  void handleOAuthSignIn('google', {
+                    setError,
+                    markLegalPending: authTab === 'join' && acceptedLegal,
+                  })
                 }}
               />
             </div>

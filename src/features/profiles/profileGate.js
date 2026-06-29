@@ -40,6 +40,7 @@ const RESERVED_HANDLES = new Set([
   'api',
   'app',
   'billing',
+  'guidelines',
   'help',
   'login',
   'logout',

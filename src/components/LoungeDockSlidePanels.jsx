@@ -1440,6 +1440,36 @@ export default function LoungeDockSlidePanels({
                     </div>
 
                     <div className="px-3.5 py-3">
+                      <div className="text-[15px] font-semibold text-zinc-100">Legal</div>
+                      <div className="mt-2 flex flex-col gap-2 text-[14px]">
+                        <a
+                          href="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-h-11 inline-flex items-center text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation"
+                        >
+                          Terms &amp; Conditions
+                        </a>
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-h-11 inline-flex items-center text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation"
+                        >
+                          Privacy Policy
+                        </a>
+                        <a
+                          href="/guidelines"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-h-11 inline-flex items-center text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation"
+                        >
+                          Community Guidelines
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="px-3.5 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[15px] font-semibold text-zinc-100">Membership</span>
                         <span

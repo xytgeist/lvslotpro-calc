@@ -34,7 +34,21 @@ export default function AuthModalPanel({
   onForgotSubmit,
   isOAuthLoading,
   onGoogleSignIn,
+  onGoogleSignInBlocked,
+  acceptedLegal = false,
+  onAcceptedLegalChange,
 }) {
+  const legalLinks = (
+    <>
+      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-orange-400 underline underline-offset-2 hover:text-orange-300">
+        Terms &amp; Conditions
+      </a>
+      {' '}and{' '}
+      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-orange-400 underline underline-offset-2 hover:text-orange-300">
+        Privacy Policy
+      </a>
+    </>
+  )
   if (showForgotPassword) {
     return (
       <div className="space-y-4">
@@ -113,7 +127,13 @@ export default function AuthModalPanel({
       <button
         type="button"
         disabled={isOAuthLoading}
-        onClick={() => onGoogleSignIn({ setErrorTarget: authTab })}
+        onClick={() => {
+          if (authTab === 'join' && !acceptedLegal) {
+            onGoogleSignInBlocked?.()
+            return
+          }
+          onGoogleSignIn({ setErrorTarget: authTab })
+        }}
         className={`${btnPrimary} flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed`}
         aria-label="Continue with Google"
       >
@@ -123,6 +143,17 @@ export default function AuthModalPanel({
       <OAuthDivider />
       {authTab === 'join' ? (
         <form onSubmit={onSignUpSubmit} className="space-y-4">
+          <label className="flex items-start gap-3 rounded-2xl border border-zinc-700/80 bg-zinc-900/50 px-3.5 py-3 text-left cursor-pointer touch-manipulation">
+            <input
+              type="checkbox"
+              checked={acceptedLegal}
+              onChange={(e) => onAcceptedLegalChange?.(e.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-500 accent-orange-500"
+            />
+            <span className="text-[13px] leading-relaxed text-zinc-300">
+              I agree to the {legalLinks}.
+            </span>
+          </label>
           <input
             type="email"
             placeholder="Email"
@@ -227,6 +258,25 @@ export default function AuthModalPanel({
           </div>
         </form>
       )}
+      <p className="text-center text-[11px] leading-relaxed text-zinc-500">
+        {authTab === 'join' ? (
+          <>
+            Required to create an account. See also{' '}
+            <a href="/guidelines" target="_blank" rel="noopener noreferrer" className="text-orange-400/90 underline underline-offset-2">
+              Community Guidelines
+            </a>
+            .
+          </>
+        ) : (
+          <>
+            By signing in you agree to our {legalLinks}. See also{' '}
+            <a href="/guidelines" target="_blank" rel="noopener noreferrer" className="text-orange-400/90 underline underline-offset-2">
+              Community Guidelines
+            </a>
+            .
+          </>
+        )}
+      </p>
     </div>
   )
 }

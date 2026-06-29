@@ -112,3 +112,44 @@ export function iosPwaInstallHelpMessage(isSafariBrowser) {
 export function iosPwaInstallRequired() {
   return isIosDevice() && !isStandalonePwa()
 }
+
+export const PWA_INSTALL_BANNER_DISMISS_KEY = 'lvslotpro-pwa-install-banner-dismiss:v1'
+
+export function isPwaInstallBannerDismissed() {
+  if (typeof window === 'undefined') return true
+  try {
+    return window.localStorage.getItem(PWA_INSTALL_BANNER_DISMISS_KEY) === '1'
+  } catch {
+    return true
+  }
+}
+
+export function dismissPwaInstallBanner() {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(PWA_INSTALL_BANNER_DISMISS_KEY, '1')
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+/** Short inline steps for the top install banner (Safari vs other iOS browsers). */
+export function iosPwaInstallBannerSteps(isSafariBrowser) {
+  if (isSafariBrowser) {
+    return [
+      { id: 'share', lead: 'Tap the', emphasis: 'Share', tail: 'button in Safari', showShareIcon: true },
+      { id: 'add', lead: 'Select', emphasis: 'Add to Home Screen', tail: null, showShareIcon: false },
+      { id: 'confirm', lead: 'Tap', emphasis: 'Add', tail: null, showShareIcon: false },
+    ]
+  }
+  return [
+    { id: 'safari', lead: 'Open this page in', emphasis: 'Safari', tail: null, showShareIcon: false },
+    { id: 'share', lead: 'Tap the', emphasis: 'Share', tail: 'button', showShareIcon: true },
+    { id: 'add', lead: 'Select', emphasis: 'Add to Home Screen', tail: null, showShareIcon: false },
+    { id: 'confirm', lead: 'Tap', emphasis: 'Add', tail: null, showShareIcon: false },
+  ]
+}
+
+export function shouldShowPwaInstallBanner() {
+  return iosPwaInstallRequired() && !isPwaInstallBannerDismissed()
+}
