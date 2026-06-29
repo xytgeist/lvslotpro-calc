@@ -2702,11 +2702,16 @@ html.light [data-calc="buffalo-diamond"] .bg-red-900 .text-red-300 {
 }
 
 /* WoF 4D CE calculator — icon green theme (#228e4e) */
-[data-calc="wof-collectors-edition"] .wof-ce-title {
+[data-calc="wof-collectors-edition"] h1.wof-ce-title {
   color: var(--wof-ce-accent-light, #3ecf7a);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 [data-calc="wof-collectors-edition"] .wof-ce-subtitle {
   color: color-mix(in srgb, var(--wof-ce-edition-blue-soft, #93c5fd) 88%, transparent);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+[data-calc="wof-collectors-edition"] h2.wof-ce-title {
+  color: var(--wof-ce-accent-light, #3ecf7a);
 }
 [data-calc="wof-collectors-edition"] .wof-ce-heading,
 [data-calc="wof-collectors-edition"] .wof-ce-accent-text {
@@ -2752,13 +2757,18 @@ html.light [data-calc="buffalo-diamond"] .bg-red-900 .text-red-300 {
 }
 
 html.light [data-calc="wof-collectors-edition"] h1,
-html.light [data-calc="wof-collectors-edition"] .wof-ce-title {
+html.light [data-calc="wof-collectors-edition"] h1.wof-ce-title {
   color: var(--wof-ce-accent, #228e4e) !important;
-  text-shadow: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15) !important;
 }
 html.light [data-calc="wof-collectors-edition"] h1 + p,
 html.light [data-calc="wof-collectors-edition"] .wof-ce-subtitle {
   color: var(--wof-ce-edition-blue-muted, #1d6fa3) !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15) !important;
+}
+html.light [data-calc="wof-collectors-edition"] h2.wof-ce-title {
+  color: var(--wof-ce-accent, #228e4e) !important;
+  text-shadow: none !important;
 }
 html.light [data-calc="wof-collectors-edition"] h2,
 html.light [data-calc="wof-collectors-edition"] .wof-ce-heading {
