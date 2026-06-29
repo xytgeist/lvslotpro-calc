@@ -6,6 +6,7 @@ import DateWheelPicker from '../../components/DateWheelPicker.jsx'
 import TimeWheelPicker from '../../components/TimeWheelPicker.jsx'
 import CasinoAutocomplete from '../../components/CasinoAutocomplete.jsx'
 import LogPlayOptionPicker from '../../components/LogPlayOptionPicker.jsx'
+import LogPlayGamePicker from './LogPlayGamePicker.jsx'
 import { APP_MODAL_OVERLAY_CLASS, APP_MODAL_SHEET_PANEL_CLASS, Z_APP_ALERT } from '../../constants/appZIndex.js'
 import { resolveDefaultCaptureCasino } from '../../utils/nearbyCasinos.js'
 import { consumePlayLogPrefill } from '../../utils/playLogPrefill.js'
@@ -30,8 +31,8 @@ import {
   sortMetricSlugs,
   targetBonusPaidInBets,
   templatesSorted,
-  buildLogPlayGamePickerOptions,
-  templatesSortedByPlayCount,
+  defaultLogPlayTemplateId,
+  resolvePlayLogPrefillTemplate,
   valuesForStorage,
   getLogPlaySaveValidationError,
   defsMapForTemplate,
@@ -190,14 +191,6 @@ export default function PlayLogbook({
 
   const defsMap = useMemo(() => metricDefMap(metricDefs), [metricDefs])
   const sortedTemplates = useMemo(() => templatesSorted(templates), [templates])
-  const logPlayTemplatesSorted = useMemo(
-    () => templatesSortedByPlayCount(templates, entries),
-    [templates, entries],
-  )
-  const logPlayGamePickerOptions = useMemo(
-    () => buildLogPlayGamePickerOptions(templates, entries),
-    [templates, entries],
-  )
 
   const templateById = useMemo(() => {
     /** @type {Record<string, typeof templates[0]>} */
@@ -392,7 +385,7 @@ export default function PlayLogbook({
       setEditingEntryId(null)
       setEditingSessionId(null)
       setPartners([])
-      const templateId = opts.templateId || logPlayTemplatesSorted[0]?.id || ''
+      const templateId = opts.templateId || defaultLogPlayTemplateId(templates)
       setSelectedTemplateId(templateId)
       const tpl = templateId ? templateById[templateId] : null
       const slugs = tpl?.metric_slugs || []
@@ -412,7 +405,7 @@ export default function PlayLogbook({
       setError('')
       if (!opts.casinoName && !opts.skipCasinoPopulate) populateCaptureCasino()
     },
-    [logPlayTemplatesSorted, templateById, populateCaptureCasino, userId, viewerProfile],
+    [templates, templateById, populateCaptureCasino, userId, viewerProfile],
   )
 
   const openEditEntry = useCallback(
@@ -468,9 +461,7 @@ export default function PlayLogbook({
     if (loading || !templates.length) return
     const pre = consumePlayLogPrefill()
     if (!pre) return
-    const tpl =
-      templates.find(t => pre.calculatorSlug && t.calculator_slug === pre.calculatorSlug) ||
-      templates.find(t => pre.templateSlug && t.slug === pre.templateSlug)
+    const tpl = resolvePlayLogPrefillTemplate(templates, pre)
     if (!tpl) return
     setActiveTab('log')
     openLogPlay({
@@ -1068,10 +1059,11 @@ export default function PlayLogbook({
           <>
             <div className="mb-4">
               <label className="block text-zinc-400 text-xs mb-1.5">Game</label>
-              <LogPlayOptionPicker
+              <LogPlayGamePicker
                 value={analyzeTemplate?.id || ''}
                 onChange={setAnalyzeTemplateId}
-                options={sortedTemplates.map(t => ({ value: t.id, label: t.display_name }))}
+                templates={templates}
+                entries={entries}
                 ariaLabel="Game"
                 placeholder="Select game"
               />
@@ -1145,10 +1137,11 @@ export default function PlayLogbook({
                           {selectedTemplate.display_name}
                         </div>
                       ) : (
-                        <LogPlayOptionPicker
+                        <LogPlayGamePicker
                           value={selectedTemplateId}
                           onChange={onTemplateChange}
-                          options={logPlayGamePickerOptions}
+                          templates={templates}
+                          entries={entries}
                           ariaLabel="Game"
                           placeholder="Select game"
                         />

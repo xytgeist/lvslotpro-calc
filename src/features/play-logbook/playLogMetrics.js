@@ -37,6 +37,11 @@ export const PLAY_LOG_METRIC_FALLBACK = /** @type {Record<string, { label: strin
   green_fg: { label: 'Green FG (2×)', value_type: 'integer' },
   blue_fg: { label: 'Blue FG (3×)', value_type: 'integer' },
   gold_fg: { label: 'Gold FG (4×)', value_type: 'integer' },
+  r1_prize: { label: 'R1 prize (cr)', value_type: 'integer' },
+  r2_prize: { label: 'R2 prize (cr)', value_type: 'integer' },
+  r3_prize: { label: 'R3 prize (cr)', value_type: 'integer' },
+  r4_prize: { label: 'R4 prize (cr)', value_type: 'integer' },
+  r5_prize: { label: 'R5 prize (cr)', value_type: 'integer' },
 })
 
 /** Must Hit By calculator / logbook manufacturer picker (stored slug values). */
@@ -221,14 +226,23 @@ export function customTemplateFormStateFromTemplate(template, defsMap) {
   }
 }
 
+/** Always last on Log Play form (immediately above notes). */
+export const LOG_PLAY_TAIL_FIELD_SLUGS = ['spin_count', 'bonus_count']
+
+const LOG_PLAY_TAIL_FIELD_SLUG_SET = new Set(LOG_PLAY_TAIL_FIELD_SLUGS)
+
 /** @param {string[]} metricSlugs @param {Record<string, PlayLogMetricDef>} defsMap */
 export function sortMetricSlugs(metricSlugs, defsMap) {
-  return [...metricSlugs].sort((a, b) => {
+  const inSet = new Set(metricSlugs)
+  const body = metricSlugs.filter(slug => !LOG_PLAY_TAIL_FIELD_SLUG_SET.has(slug))
+  const sortedBody = [...body].sort((a, b) => {
     const oa = defsMap[a]?.sort_order ?? 999
     const ob = defsMap[b]?.sort_order ?? 999
     if (oa !== ob) return oa - ob
     return a.localeCompare(b)
   })
+  const tail = LOG_PLAY_TAIL_FIELD_SLUGS.filter(slug => inSet.has(slug))
+  return [...sortedBody, ...tail]
 }
 
 /** Calculator snapshot values — useful on a log row, not for custom-template historical analysis. */
@@ -419,7 +433,7 @@ export function normalizeDenomFormValue(raw) {
   return LOG_PLAY_DENOM_DEFAULT
 }
 
-/** Log Play sheet field order + display labels (slugs unchanged in DB). */
+/** Log Play sheet field order + display labels (slugs unchanged in DB). Tail fields listed for labels only. */
 export const LOG_PLAY_FORM_FIELDS = [
   { slug: 'mhb_manufacturer', label: 'Manufacturer' },
   { slug: 'mhb_meter', label: 'MHB meter' },
@@ -433,16 +447,18 @@ export const LOG_PLAY_FORM_FIELDS = [
   { slug: 'gold_fg', label: 'Gold FG' },
   { slug: 'money_in', label: 'Cash in' },
   { slug: 'money_out', label: 'Cash out' },
-  { slug: 'spin_count', label: '# Spins (optional)' },
-  { slug: 'bonus_count', label: '# Bonuses (optional)' },
   { slug: 'current_ev_rtp', label: 'Current EV' },
   { slug: 'average_case_mult', label: 'Avg case (×)' },
   { slug: 'average_case_usd', label: 'Avg case ($)' },
   { slug: 'expected_ev_usd', label: 'EV ($) (optional)' },
   { slug: 'acquisition_fee', label: 'Acquisition fee' },
+  { slug: 'spin_count', label: '# Spins (optional)' },
+  { slug: 'bonus_count', label: '# Bonuses (optional)' },
 ]
 
 const LOG_PLAY_FORM_SLUGS = new Set(LOG_PLAY_FORM_FIELDS.map(f => f.slug))
+
+const LOG_PLAY_FORM_LABEL_BY_SLUG = Object.fromEntries(LOG_PLAY_FORM_FIELDS.map(f => [f.slug, f.label]))
 
 /**
  * @param {string[]} templateSlugs
@@ -455,6 +471,7 @@ export function orderedLogPlayFormFields(templateSlugs, defsMap) {
   const out = []
 
   for (const spec of LOG_PLAY_FORM_FIELDS) {
+    if (LOG_PLAY_TAIL_FIELD_SLUG_SET.has(spec.slug)) continue
     if (!inTemplate.has(spec.slug)) continue
     const def = defsMap[spec.slug]
     if (!def) continue
@@ -466,6 +483,17 @@ export function orderedLogPlayFormFields(templateSlugs, defsMap) {
     const def = defsMap[slug]
     if (!def) continue
     out.push({ slug, label: def.label, value_type: def.value_type })
+  }
+
+  for (const slug of LOG_PLAY_TAIL_FIELD_SLUGS) {
+    if (!inTemplate.has(slug)) continue
+    const def = defsMap[slug]
+    if (!def) continue
+    out.push({
+      slug,
+      label: LOG_PLAY_FORM_LABEL_BY_SLUG[slug] || logPlayMetricDisplayLabel(slug, def.label),
+      value_type: def.value_type,
+    })
   }
 
   return out
@@ -528,6 +556,11 @@ export function formatTargetBonusPaidBetsLabel(bets) {
 }
 
 /** @param {PlayLogTemplate[]} templates */
+export function templatesSortedAlphabetically(templates) {
+  return [...templates].sort((a, b) => a.display_name.localeCompare(b.display_name))
+}
+
+/** @param {PlayLogTemplate[]} templates */
 export function templatesSorted(templates) {
   return [...templates].sort((a, b) => {
     if (a.is_system !== b.is_system) return a.is_system ? -1 : 1
@@ -563,32 +596,144 @@ export function templatesSortedByPlayCount(templates, entries) {
   })
 }
 
+export const LOG_PLAY_RECENT_GAMES_LIMIT = 5
+
 /**
- * Log Play game dropdown: system games (by play count), then optional "Custom games" section.
+ * Most recently logged templates (by latest entry `captured_at`).
+ * @param {PlayLogTemplate[]} templates
+ * @param {PlayLogEntry[]} entries
+ * @param {number} [limit]
+ */
+export function recentPlayLogTemplates(templates, entries, limit = LOG_PLAY_RECENT_GAMES_LIMIT) {
+  /** @type {Map<string, string>} */
+  const lastAt = new Map()
+  for (const e of entries || []) {
+    const tid = String(e?.template_id ?? '')
+    if (!tid) continue
+    const at = String(e.captured_at || '')
+    const prev = lastAt.get(tid)
+    if (!prev || at > prev) lastAt.set(tid, at)
+  }
+  const byId = new Map((templates || []).map(t => [String(t.id), t]))
+  return [...lastAt.entries()]
+    .sort((a, b) => b[1].localeCompare(a[1]))
+    .map(([tid]) => byId.get(tid))
+    .filter(Boolean)
+    .slice(0, limit)
+}
+
+/** @param {unknown} raw */
+export function normalizeGameSearchQuery(raw) {
+  return String(raw ?? '')
+    .trim()
+    .toLowerCase()
+}
+
+/**
+ * @param {PlayLogTemplate} template
+ * @param {string} queryNorm
+ */
+export function gameTemplateMatchesSearch(template, queryNorm) {
+  if (!queryNorm) return true
+  const name = String(template.display_name || '').toLowerCase()
+  const slug = String(template.slug || template.machine_slug || '').toLowerCase()
+  const machineSlug = String(template.machine_slug || '').toLowerCase()
+  return (
+    name.includes(queryNorm) ||
+    slug.includes(queryNorm) ||
+    (machineSlug && machineSlug.includes(queryNorm))
+  )
+}
+
+/**
+ * Resolve prefill → system template (guide slug, machine slug, or calculator).
+ * @param {PlayLogTemplate[]} templates
+ * @param {{ calculatorSlug?: string | null, templateSlug?: string | null }} pre
+ */
+export function resolvePlayLogPrefillTemplate(templates, pre) {
+  if (!pre) return null
+  const templateSlug = String(pre.templateSlug || '').trim()
+  const calculatorSlug = String(pre.calculatorSlug || '').trim()
+
+  if (templateSlug) {
+    const bySlug =
+      templates.find(t => t.slug === templateSlug) ||
+      templates.find(t => t.machine_slug === templateSlug)
+    if (bySlug) return bySlug
+  }
+
+  if (calculatorSlug) {
+    const withMachineSlug = templates.filter(t => t.calculator_slug === calculatorSlug)
+    const canonical = withMachineSlug.find(t => t.slug && t.machine_slug && t.slug === t.machine_slug)
+    if (canonical) return canonical
+    return withMachineSlug[0] || null
+  }
+
+  return null
+}
+
+/**
+ * @param {PlayLogTemplate[]} templates
+ * @param {PlayLogEntry[]} entries
+ * @param {string} [searchQuery]
+ */
+export function buildLogPlayGamePickerSections(templates, entries, searchQuery = '') {
+  const q = normalizeGameSearchQuery(searchQuery)
+  const system = (templates || []).filter(t => t.is_system)
+  const custom = (templates || []).filter(t => !t.is_system)
+  const sortAlpha = list => templatesSortedAlphabetically(list)
+  const filterList = list => (q ? list.filter(t => gameTemplateMatchesSearch(t, q)) : list)
+
+  const recent = q ? [] : recentPlayLogTemplates(templates, entries, LOG_PLAY_RECENT_GAMES_LIMIT)
+  const systemFiltered = sortAlpha(filterList(system))
+  const customFiltered = sortAlpha(filterList(custom))
+  const matchCount = systemFiltered.length + customFiltered.length
+
+  /** @type {Array<{ value: string, label: string } | { type: 'label', label: string }>} */
+  const options = []
+
+  if (recent.length > 0) {
+    options.push({ type: 'label', label: 'Recent' })
+    for (const t of recent) {
+      options.push({ value: t.id, label: t.display_name })
+    }
+  }
+
+  if (systemFiltered.length > 0) {
+    options.push({ type: 'label', label: q ? 'Matching games' : 'All games (A–Z)' })
+    for (const t of systemFiltered) {
+      options.push({ value: t.id, label: t.display_name })
+    }
+  }
+
+  if (customFiltered.length > 0) {
+    options.push({ type: 'label', label: 'Custom games' })
+    for (const t of customFiltered) {
+      options.push({ value: t.id, label: t.display_name })
+    }
+  }
+
+  return { options, matchCount, recentCount: recent.length }
+}
+
+/**
+ * Log Play game dropdown sections (Recent + A–Z). Use LogPlayGamePicker for search UI.
  * @param {PlayLogTemplate[]} templates
  * @param {PlayLogEntry[]} entries
  * @returns {Array<{ value: string, label: string } | { type: 'label', label: string }>}
  */
 export function buildLogPlayGamePickerOptions(templates, entries) {
-  const counts = playCountByTemplateId(entries)
-  const sortGroup = list =>
-    [...list].sort((a, b) => {
-      const ca = counts.get(String(a.id)) || 0
-      const cb = counts.get(String(b.id)) || 0
-      if (cb !== ca) return cb - ca
-      return a.display_name.localeCompare(b.display_name)
-    })
-  const system = sortGroup((templates || []).filter(t => t.is_system))
-  const custom = sortGroup((templates || []).filter(t => !t.is_system))
-  /** @type {Array<{ value: string, label: string } | { type: 'label', label: string }>} */
-  const options = system.map(t => ({ value: t.id, label: t.display_name }))
-  if (custom.length > 0) {
-    options.push({ type: 'label', label: 'Custom games' })
-    for (const t of custom) {
-      options.push({ value: t.id, label: t.display_name })
-    }
-  }
-  return options
+  return buildLogPlayGamePickerSections(templates, entries, '').options
+}
+
+/**
+ * Default template when opening Log Play with no prefill (first system game A–Z).
+ * @param {PlayLogTemplate[]} templates
+ */
+export function defaultLogPlayTemplateId(templates) {
+  const system = templatesSortedAlphabetically((templates || []).filter(t => t.is_system))
+  if (system[0]?.id) return system[0].id
+  return templatesSortedAlphabetically(templates || [])[0]?.id || ''
 }
 
 /**

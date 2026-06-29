@@ -3,6 +3,7 @@ import GuideLockTvSnowCanvas from './GuideLockTvSnowCanvas'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { format, parseISO } from 'date-fns'
+import { stashPlayLogPrefill } from '../../utils/playLogPrefill.js'
 import {
   BUFFALO_LINK_DEMO_SLUG,
   buffaloLinkGuideMarkdown,
@@ -56,6 +57,7 @@ import { loungeProfileNeedsGate, writeProfileGateAck } from '../lounge/loungeSto
 import ProfileAvatarCropModal from '../lounge/ProfileAvatarCropModal'
 import LoungePostCategoryPillPicker from '../lounge/LoungePostCategoryPillPicker.jsx'
 import {
+  loungePostCategoryPillChipClass,
   normalizeLoungeProfileCategoryPills,
   profileCategoryPills,
 } from '../../utils/loungePostCategoryPills.js'
@@ -177,6 +179,13 @@ function resolveCalculatorKey(machine) {
   }
   if (slug === 'stack-up-pays' || calc === 'stack-up-pays') return 'stackup'
   if (slug === 'phoenix-link' || calc === 'phoenix-link') return 'phoenix'
+  if (
+    slug === 'wheel-of-fortune-4d-collectors-edition' ||
+    calc === 'wof-collectors-edition' ||
+    calc === 'wheel-of-fortune-4d-collectors-edition'
+  ) {
+    return 'wof-collectors-edition'
+  }
   if (
     slug === 'ainsworth-must-hit-by' ||
     slug === 'must-hit-by-aig' ||
@@ -1157,10 +1166,12 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
             <div className="text-zinc-400 text-sm mt-1">
               Posts to the <span className="text-cyan-300 font-semibold">Lounge</span> feed with the guide card attached.
             </div>
-            <div className="mt-3 rounded-2xl bg-zinc-800/80 px-3 py-2 text-sm text-amber-100 font-semibold">{gameTitle}</div>
+            <div className="mt-3 rounded-2xl bg-zinc-800/80 px-3 py-2 text-sm text-zinc-100 font-semibold">{gameTitle}</div>
             {/* Locked AP Slots pill — auto-applied, not removable */}
             <div className="mt-2 flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
+              <span
+                className={`lounge-category-pill inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${loungePostCategoryPillChipClass('ap_slots', 'display')}`}
+              >
                 <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 AP Slots
               </span>
@@ -1417,6 +1428,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
 export default function GuidesScreen({
   supabaseClient,
   onOpenCalculator,
+  onOpenLogbook = null,
   onNavigateHome,
   onCommunityPosted,
   onRequireAuth,
@@ -2027,6 +2039,24 @@ export default function GuidesScreen({
                             className="flex-1 min-h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold touch-manipulation"
                           >
                             Open calculator
+                          </button>
+                        ) : onOpenLogbook ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!hasSlotsEdge) {
+                                onRequireSubscribe?.('slots-edge')
+                                return
+                              }
+                              const machineSlug = m?.slug || row.slug
+                              if (!machineSlug) return
+                              stashPlayLogPrefill({ templateSlug: machineSlug })
+                              onOpenLogbook()
+                            }}
+                            className="flex-1 min-h-11 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-bold touch-manipulation"
+                          >
+                            Log play in Logbook
                           </button>
                         ) : null}
                         <button

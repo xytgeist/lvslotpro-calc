@@ -15,6 +15,7 @@ const BuffaloLink = lazy(() => import('./games/BuffaloLink.jsx'))
 const BuffaloDiamond = lazy(() => import('./games/BuffaloDiamond.jsx'))
 const StackUpPays = lazy(() => import('./games/StackUpPays.jsx'))
 const MHBCalculator = lazy(() => import('./games/MHBCalculator.jsx'))
+const WheelOfFortuneCollectorsEdition = lazy(() => import('./games/WheelOfFortuneCollectorsEdition.jsx'))
 
 function CalculatorLoadingFallback() {
   return (
@@ -221,6 +222,15 @@ export default function CalculatorsTab({
       {activeCalculator === 'mhb' ? (
         <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pt-3 pb-[calc(3rem+env(safe-area-inset-bottom,0px))]">
           <MHBCalculator
+            onBack={() => setActiveCalculator(null)}
+            supabaseClient={supabaseClient}
+            onOpenLogbook={onOpenLogbook}
+          />
+        </ScrollLinkedEdgeTitleBarShell>
+      ) : null}
+      {activeCalculator === 'wof-collectors-edition' ? (
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={titleBarNavSlot} contentClassName="px-3 pt-3 pb-[calc(3rem+env(safe-area-inset-bottom,0px))]">
+          <WheelOfFortuneCollectorsEdition
             onBack={() => setActiveCalculator(null)}
             supabaseClient={supabaseClient}
             onOpenLogbook={onOpenLogbook}

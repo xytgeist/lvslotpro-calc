@@ -1,6 +1,6 @@
 import { resolveRequiresSlotsEdge } from '../billing/contentAccessGates.js'
 
-/** @typedef {'phoenix'|'buffalo-link'|'buffalo-diamond'|'stackup'|'mhb'} CalculatorKey */
+/** @typedef {'phoenix'|'buffalo-link'|'buffalo-diamond'|'stackup'|'mhb'|'wof-collectors-edition'} CalculatorKey */
 
 export const CALCULATOR_KEYS = /** @type {CalculatorKey[]} */ ([
   'phoenix',
@@ -8,6 +8,7 @@ export const CALCULATOR_KEYS = /** @type {CalculatorKey[]} */ ([
   'buffalo-diamond',
   'stackup',
   'mhb',
+  'wof-collectors-edition',
 ])
 
 /** Static calculator chrome — served from `public/calculators/` (not guide R2 assets). */
@@ -17,6 +18,7 @@ export const CALCULATOR_ICON_SRC = {
   'buffalo-diamond': '/calculators/buffalo-diamond.webp',
   stackup: '/calculators/stack-up-pays.webp',
   mhb: '/calculators/mhb.webp',
+  'wof-collectors-edition': '/calculators/wof-collectors-edition.webp',
 }
 
 /**
@@ -116,6 +118,20 @@ export const CALCULATOR_CATALOG = [
     buttonClassName:
       'w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]',
     titleClassName: 'line-clamp-2 font-semibold text-2xl leading-snug text-[#fff]',
+    subtitleClassName: 'mt-0.5 line-clamp-1 text-base leading-snug text-[rgba(255,255,255,0.82)] sm:line-clamp-2',
+  },
+  {
+    key: 'wof-collectors-edition',
+    title: 'Wheel of Fortune 4D CE',
+    subtitle: 'Column credit prize · 45× weighted threshold',
+    iconSrc: CALCULATOR_ICON_SRC['wof-collectors-edition'],
+    iconAlt: 'Wheel of Fortune',
+    iconWrapClassName:
+      'relative flex h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-[#145a2f] via-[#228e4e] to-[#0d3d20] shadow-inner ring-1 ring-[#145a2f]/45',
+    iconImgClassName: 'h-full w-full object-cover object-center',
+    buttonClassName:
+      'mb-4 flex min-h-[7rem] w-full touch-manipulation items-center gap-4 rounded-3xl bg-gradient-to-br from-[#145a2f] via-[#228e4e] to-[#0d3d20] p-6 text-left ring-1 ring-[#145a2f]/45 transition-all hover:from-[#1a7340] hover:via-[#2dab5f] hover:to-[#145a2f] hover:ring-[#228e4e]/50 active:scale-[0.985] sm:gap-5 sm:p-8',
+    titleClassName: 'line-clamp-2 text-2xl font-semibold leading-snug text-[#fff]',
     subtitleClassName: 'mt-0.5 line-clamp-1 text-base leading-snug text-[rgba(255,255,255,0.82)] sm:line-clamp-2',
   },
   {

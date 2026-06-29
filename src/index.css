@@ -1688,9 +1688,6 @@ html.light [data-ask-community-modal] .text-zinc-500,
 html.light [data-ask-community-profile-gate] .text-zinc-600 {
   color: #71717a !important;
 }
-html.light [data-ask-community-modal] .text-amber-100 {
-  color: #78350f !important;
-}
 html.light [data-ask-community-modal] .text-cyan-300,
 html.light [data-ask-community-auth-prompt] .text-cyan-200 {
   color: #0891b2 !important;
@@ -1722,6 +1719,14 @@ html.light [data-ask-community-modal] .bg-cyan-600,
 html.light [data-ask-community-auth-prompt] .bg-cyan-600,
 html.light [data-ask-community-profile-gate] .bg-cyan-600 {
   color: #ffffff !important;
+}
+html.light [data-ask-community-modal] .lounge-category-pill.text-amber-300,
+html.light [data-ask-community-modal] .lounge-category-pill.text-amber-100 {
+  color: var(--lounge-pill-on-dark-fg) !important;
+}
+html.light [data-ask-community-modal] .lounge-category-pill.bg-amber-500\/10,
+html.light [data-ask-community-modal] .lounge-category-pill.bg-amber-500\/20 {
+  background-color: var(--lounge-pill-ap_slots) !important;
 }
 
 /* react-datepicker light theme */
@@ -2142,7 +2147,7 @@ html.light .lounge-media-toolbar .active\:text-sky-200:active {
  * Calculators use Tailwind gray-* classes which do NOT auto-invert with the
  * zinc-* scale. Every shade must be overridden here explicitly.
  *
- * data-calc="phoenix" | "buffalo-link" | "mhb" | "stackup" | "buffalo-diamond" on each calculator root div.
+ * data-calc="phoenix" | "buffalo-link" | "mhb" | "stackup" | "buffalo-diamond" | "wof-collectors-edition" on each calculator root div.
  */
 
 /* Calculator list buttons — uniform shadow in light mode matching MHB's shadow-lg shadow-black/30 */
@@ -2170,6 +2175,12 @@ html:not(.light) [data-calc] {
 /* Chart container and any other bg-gray-950 inner elements → match inner-box gray */
 html.light [data-calc] .bg-gray-950 {
   background-color: #e4e4e7;
+}
+
+/* Semi-transparent inner cards (e.g. WoF CE reel rows) */
+html.light [data-calc] .bg-gray-950\/60 {
+  background-color: #e4e4e7;
+  box-shadow: none;
 }
 
 /* Section cards (bg-gray-900 / rounded-3xl blocks) → light gray + strong shadow */
@@ -2688,6 +2699,154 @@ html.light [data-calc="buffalo-diamond"] .bg-red-900 {
 html.light [data-calc="buffalo-diamond"] .bg-red-900.text-red-300,
 html.light [data-calc="buffalo-diamond"] .bg-red-900 .text-red-300 {
   color: #18181b;
+}
+
+/* WoF 4D CE calculator — icon green theme (#228e4e) */
+[data-calc="wof-collectors-edition"] .wof-ce-title {
+  color: var(--wof-ce-accent-light, #3ecf7a);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-subtitle {
+  color: color-mix(in srgb, var(--wof-ce-accent-soft, #9ee6b8) 88%, transparent);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-heading,
+[data-calc="wof-collectors-edition"] .wof-ce-accent-text {
+  color: var(--wof-ce-accent-light, #3ecf7a);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-accent-soft {
+  color: var(--wof-ce-accent-soft, #9ee6b8);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-link {
+  color: color-mix(in srgb, var(--wof-ce-accent-light, #3ecf7a) 92%, white);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-link:hover {
+  color: var(--wof-ce-accent-light, #3ecf7a);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-back {
+  color: var(--wof-ce-accent-light, #3ecf7a);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-back:hover {
+  color: var(--wof-ce-accent-soft, #9ee6b8);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-info-btn:hover {
+  color: var(--wof-ce-accent-light, #3ecf7a);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-icon-ring {
+  --tw-ring-color: color-mix(in srgb, var(--wof-ce-accent-dark, #145a2f) 45%, transparent);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-focus:focus {
+  --tw-ring-color: color-mix(in srgb, var(--wof-ce-accent, #228e4e) 45%, transparent);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-progress,
+[data-calc="wof-collectors-edition"] .wof-ce-progress-bar {
+  background-color: color-mix(in srgb, var(--wof-ce-accent, #228e4e) 72%, transparent);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-btn {
+  background-color: var(--wof-ce-accent, #228e4e);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-btn:hover {
+  background-color: var(--wof-ce-accent-muted, #1a7340);
+}
+[data-calc="wof-collectors-edition"] .wof-ce-verdict-plus {
+  background-color: var(--wof-ce-accent-dark, #145a2f);
+  color: var(--wof-ce-accent-soft, #9ee6b8);
+}
+
+html.light [data-calc="wof-collectors-edition"] h1,
+html.light [data-calc="wof-collectors-edition"] .wof-ce-title {
+  color: var(--wof-ce-accent, #228e4e) !important;
+  text-shadow: none;
+}
+html.light [data-calc="wof-collectors-edition"] h1 + p,
+html.light [data-calc="wof-collectors-edition"] .wof-ce-subtitle {
+  color: var(--wof-ce-accent-muted, #1a7340) !important;
+}
+html.light [data-calc="wof-collectors-edition"] h2,
+html.light [data-calc="wof-collectors-edition"] .wof-ce-heading {
+  color: #18181b !important;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-accent-text {
+  color: var(--wof-ce-accent, #228e4e) !important;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-accent-soft {
+  color: var(--wof-ce-accent-muted, #1a7340) !important;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-link {
+  color: var(--wof-ce-accent, #228e4e) !important;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-back {
+  color: var(--wof-ce-accent, #228e4e) !important;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-back:hover {
+  color: var(--wof-ce-accent-muted, #1a7340) !important;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-info-btn:hover {
+  color: var(--wof-ce-accent-muted, #1a7340) !important;
+}
+html.light [data-calc="wof-collectors-edition"] .text-red-400 {
+  color: #dc2626;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-verdict-plus {
+  background-color: var(--wof-ce-accent, #228e4e);
+  color: #ffffff;
+}
+html.light [data-calc="wof-collectors-edition"] .bg-amber-900.text-amber-200 {
+  background-color: #d97706;
+  color: #ffffff;
+}
+html.light [data-calc="wof-collectors-edition"] .bg-red-900.text-red-300 {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-btn {
+  background-color: var(--wof-ce-accent, #228e4e);
+  color: #ffffff;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-btn:hover {
+  background-color: var(--wof-ce-accent-muted, #1a7340);
+}
+
+/* WoF 4D CE — light mode surfaces + reel accents */
+html.light [data-calc="wof-collectors-edition"] .text-gray-400,
+html.light [data-calc="wof-collectors-edition"] .text-gray-300 {
+  color: #52525b !important;
+}
+html.light [data-calc="wof-collectors-edition"] .text-gray-500 {
+  color: #71717a !important;
+}
+html.light [data-calc="wof-collectors-edition"] .text-amber-300 {
+  color: #b45309 !important;
+}
+
+html.light [data-calc="wof-collectors-edition"] input.wof-ce-prize-input,
+html.light [data-calc="wof-collectors-edition"] input.calc-field-lg {
+  background-color: #ffffff !important;
+  border-color: #d4d4d8 !important;
+  color: #18181b !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+html.light [data-calc="wof-collectors-edition"] button.bg-gray-800 {
+  background-color: #ffffff !important;
+  border-color: #d4d4d8 !important;
+  color: #18181b !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+html.light [data-calc="wof-collectors-edition"] button.bg-gray-800 .text-gray-400 {
+  color: #71717a !important;
+}
+[data-calc="wof-collectors-edition"] .wof-ce-reel-marker {
+  color: #000000;
+}
+html.light [data-calc="wof-collectors-edition"] .wof-ce-reel-marker {
+  color: #000000 !important;
+}
+
+html.light [data-calc="wof-collectors-edition"] .wof-ce-progress,
+html.light [data-calc="wof-collectors-edition"] .wof-ce-progress-bar {
+  background-color: var(--wof-ce-accent, #228e4e) !important;
+  opacity: 1;
+}
+html.light [data-calc="wof-collectors-edition"] .bg-gray-800:has(.wof-ce-reel-progress) {
+  background-color: #d4d4d8 !important;
 }
 
 /* ── Bankroll sheet — light mode ─────────────────────────── */

@@ -1348,6 +1348,7 @@ export default function AppShell({
         <GuidesScreen
           supabaseClient={supabaseClient}
           onOpenCalculator={openCalculator}
+          onOpenLogbook={openLogbook}
           onNavigateHome={() => setTab('home')}
           onCommunityPosted={loadCommunityFeed}
           onRequireAuth={onRequireAuth}
