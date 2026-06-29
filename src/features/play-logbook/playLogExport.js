@@ -1,4 +1,4 @@
-import { formatMetricValue, sortMetricSlugs } from './playLogMetrics.js'
+import { formatMetricValue, playLogTemplateDisplayLabel, sortMetricSlugs } from './playLogMetrics.js'
 
 /** @typedef {import('./playLogMetrics.js').PlayLogEntry} PlayLogEntry */
 /** @typedef {import('./playLogMetrics.js').PlayLogTemplate} PlayLogTemplate */
@@ -52,7 +52,8 @@ export function buildPlayLogAllPlaysCsv(entries, templates, defsMap) {
   const slugs = sortMetricSlugs([...slugSet], defsMap)
   const headers = ['captured_at', 'game', 'casino_name', 'notes', ...slugs]
   const rows = (entries || []).map(e => {
-    const game = templateById[e.template_id]?.display_name || ''
+    const tpl = templateById[e.template_id]
+    const game = playLogTemplateDisplayLabel(tpl, templates) || ''
     const cells = [
       e.captured_at || '',
       game,

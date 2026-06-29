@@ -48,6 +48,7 @@ import {
   PLAY_LOG_ANALYZE_ALL_PLAYS_ID,
   PLAY_LOG_ANALYZE_ALL_PLAYS_METRIC_SLUGS,
   isPlayLogAnalyzeAllPlays,
+  playLogTemplateDisplayLabel,
 } from './playLogMetrics.js'
 import { analyzePlayLogEntries } from './playLogAnalysis.js'
 import { buildPlayLogAnalyzeTrendSeries } from './playLogAnalyzeChart.js'
@@ -1012,7 +1013,7 @@ export default function PlayLogbook({
                   const shared = Boolean(entry.session_id)
                   const highlight =
                     highlightEntryId && String(highlightEntryId) === String(entry.id)
-                  const entryTitle = tpl?.display_name || 'Unknown game'
+                  const entryTitle = playLogTemplateDisplayLabel(tpl, templates) || 'Unknown game'
                   return (
                     <div
                       key={entry.id}
@@ -1038,7 +1039,7 @@ export default function PlayLogbook({
                       <div className="mb-2 min-w-0">
                         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                           <span className="min-w-0 truncate text-white font-bold">
-                            {tpl?.display_name || 'Unknown game'}
+                            {playLogTemplateDisplayLabel(tpl, templates) || 'Unknown game'}
                           </span>
                           {shared ? (
                             <span className="shrink-0 rounded-md bg-cyan-600/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-300">
@@ -1230,7 +1231,7 @@ export default function PlayLogbook({
                       <label className="block text-zinc-400 text-xs mb-1.5">Game</label>
                       {editingEntryId ? (
                         <div className="flex min-h-12 items-center rounded-2xl bg-zinc-800/90 px-4 text-sm font-semibold text-white">
-                          {selectedTemplate.display_name}
+                          {playLogTemplateDisplayLabel(selectedTemplate, templates)}
                         </div>
                       ) : (
                         <LogPlayGamePicker
@@ -1353,7 +1354,10 @@ export default function PlayLogbook({
               )
               return (
                 <>
-                  <SheetHeader title={tpl?.display_name || 'Play entry'} onClose={closeSheet} />
+                  <SheetHeader
+                    title={playLogTemplateDisplayLabel(tpl, templates) || 'Play entry'}
+                    onClose={closeSheet}
+                  />
                   <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mt-2">
                     <div className="space-y-4 pb-3">
                       <div>
@@ -1555,7 +1559,7 @@ export default function PlayLogbook({
                               }`}
                             >
                               <span className="min-w-0 truncate text-sm font-semibold text-zinc-200">
-                                {t.display_name}
+                                {playLogTemplateDisplayLabel(t, templates)}
                               </span>
                               <div className="flex shrink-0 items-center gap-1">
                                 <button

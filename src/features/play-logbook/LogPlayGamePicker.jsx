@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildLogPlayGamePickerSections,
   normalizeGameSearchQuery,
+  playLogTemplateDisplayLabel,
   PLAY_LOG_ANALYZE_ALL_PLAYS_ID,
   PLAY_LOG_ANALYZE_ALL_PLAYS_LABEL,
 } from './playLogMetrics.js'
@@ -15,7 +16,7 @@ const PANEL_CLASS =
 const LIST_CLASS = 'max-h-52 overflow-y-auto overscroll-contain'
 
 /**
- * Searchable game picker for Log Play / Analyze (Recent + A–Z + filter by name/slug).
+ * Searchable game picker for Log Play / Analyze (Recent → Custom → A–Z + filter by name/slug).
  *
  * @param {object} props
  * @param {string} props.value — selected template id
@@ -49,8 +50,8 @@ export default function LogPlayGamePicker({
     if (includeAllPlaysOption && String(value) === PLAY_LOG_ANALYZE_ALL_PLAYS_ID) {
       return PLAY_LOG_ANALYZE_ALL_PLAYS_LABEL
     }
-    return selected?.display_name ?? placeholder
-  }, [includeAllPlaysOption, value, selected, placeholder])
+    return selected ? playLogTemplateDisplayLabel(selected, templates) : placeholder
+  }, [includeAllPlaysOption, value, selected, placeholder, templates])
 
   const { options, matchCount } = useMemo(
     () => buildLogPlayGamePickerSections(templates, entries, searchQuery, { includeAllPlaysOption }),

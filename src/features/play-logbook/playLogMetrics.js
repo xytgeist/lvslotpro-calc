@@ -652,6 +652,33 @@ export function normalizeGameSearchQuery(raw) {
     .toLowerCase()
 }
 
+const PLAY_LOG_CUSTOM_TEMPLATE_LABEL_SUFFIX = ' (Custom)'
+
+/** @param {unknown} name */
+export function normalizePlayLogTemplateNameKey(name) {
+  return String(name ?? '').trim().toLowerCase()
+}
+
+/**
+ * Picker / list label for a template. Custom templates append "(Custom)" when the name
+ * collides with another template in the catalog (usually a system primary).
+ * @param {PlayLogTemplate | null | undefined} template
+ * @param {PlayLogTemplate[]} [templates]
+ */
+export function playLogTemplateDisplayLabel(template, templates) {
+  const raw = String(template?.display_name || '').trim()
+  if (!raw || template?.is_system) return raw
+  const key = normalizePlayLogTemplateNameKey(raw)
+  const hasCollision = (templates || []).some(
+    t =>
+      String(t.id) !== String(template.id) &&
+      normalizePlayLogTemplateNameKey(t.display_name) === key,
+  )
+  if (!hasCollision) return raw
+  if (raw.endsWith(PLAY_LOG_CUSTOM_TEMPLATE_LABEL_SUFFIX)) return raw
+  return `${raw}${PLAY_LOG_CUSTOM_TEMPLATE_LABEL_SUFFIX}`
+}
+
 /**
  * @param {PlayLogTemplate} template
  * @param {string} queryNorm
@@ -725,7 +752,14 @@ export function buildLogPlayGamePickerSections(templates, entries, searchQuery =
   if (recent.length > 0) {
     options.push({ type: 'label', label: 'Recent' })
     for (const t of recent) {
-      options.push({ value: t.id, label: t.display_name })
+      options.push({ value: t.id, label: playLogTemplateDisplayLabel(t, templates) })
+    }
+  }
+
+  if (customFiltered.length > 0) {
+    options.push({ type: 'label', label: 'Custom games' })
+    for (const t of customFiltered) {
+      options.push({ value: t.id, label: playLogTemplateDisplayLabel(t, templates) })
     }
   }
 
@@ -736,18 +770,11 @@ export function buildLogPlayGamePickerSections(templates, entries, searchQuery =
     }
   }
 
-  if (customFiltered.length > 0) {
-    options.push({ type: 'label', label: 'Custom games' })
-    for (const t of customFiltered) {
-      options.push({ value: t.id, label: t.display_name })
-    }
-  }
-
   return { options, matchCount, recentCount: recent.length }
 }
 
 /**
- * Log Play game dropdown sections (Recent + A–Z). Use LogPlayGamePicker for search UI.
+ * Log Play game dropdown sections (Recent → Custom → A–Z). Use LogPlayGamePicker for search UI.
  * @param {PlayLogTemplate[]} templates
  * @param {PlayLogEntry[]} entries
  * @returns {Array<{ value: string, label: string } | { type: 'label', label: string }>}
