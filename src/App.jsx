@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { mobileShell, inputBase, btnPrimary, linkBtn } from './features/shell/shellClasses'
 import { readAuthCallbackParams, getOAuthCallbackMessage } from './features/auth/oauthCallback'
@@ -118,6 +118,8 @@ function App() {
   const [legalAcceptancePending, setLegalAcceptancePending] = useState(false)
   const [legalAcceptanceBusy, setLegalAcceptanceBusy] = useState(false)
   const [legalAcceptanceError, setLegalAcceptanceError] = useState('')
+  /** Suppress popstate from re-entering legal while programmatically exiting (Got it / Back). */
+  const legalExitViaPopRef = useRef(false)
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -627,16 +629,13 @@ function App() {
       }
       markLegalReturnContext(ctx)
       setCurrentView(slug)
-      window.history.pushState({ lvLegalReturn: true }, '', `/${slug}?from=${source}`)
+      window.history.pushState({ lvLegalReturn: true, slug, source }, '', `/${slug}?from=${source}`)
     },
     [authTab],
   )
 
-  const finishLegalReturn = useCallback((ctx) => {
+  const applyLegalReturnUi = useCallback((ctx) => {
     if (!ctx) return
-    clearLegalReturnContext()
-    setCurrentView('app')
-    window.history.replaceState({}, document.title, '/')
     if (ctx.source === 'auth') {
       setAuthTab(ctx.authTab === 'signin' ? 'signin' : 'join')
       setAuthPanelOpen(true)
@@ -644,6 +643,23 @@ function App() {
     }
     applyLegalReturnReopen(ctx)
   }, [])
+
+  const finishLegalReturn = useCallback(
+    (ctx) => {
+      if (!ctx) return
+      clearLegalReturnContext()
+      applyLegalReturnUi(ctx)
+      setCurrentView('app')
+      if (typeof window === 'undefined') return
+      if (window.history.state?.lvLegalReturn) {
+        legalExitViaPopRef.current = true
+        window.history.back()
+        return
+      }
+      window.history.replaceState({}, document.title, '/')
+    },
+    [applyLegalReturnUi],
+  )
 
   const exitLegalDocument = useCallback(() => {
     const slug = currentView
@@ -654,9 +670,17 @@ function App() {
         return
       }
     }
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back()
-      return
+    if (typeof window !== 'undefined') {
+      const pathSlug = parseLegalPathname(window.location.pathname)
+      if (!pathSlug) {
+        setCurrentView('app')
+        window.history.replaceState({}, document.title, '/')
+        return
+      }
+      if (window.history.length > 1) {
+        window.history.back()
+        return
+      }
     }
     setCurrentView('app')
     window.history.replaceState({}, document.title, '/')
@@ -664,6 +688,11 @@ function App() {
 
   useEffect(() => {
     const onPopState = () => {
+      if (legalExitViaPopRef.current) {
+        legalExitViaPopRef.current = false
+        setCurrentView('app')
+        return
+      }
       const slug = parseLegalPathname(window.location.pathname)
       if (slug) {
         setCurrentView(slug)
