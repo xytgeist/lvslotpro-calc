@@ -1689,8 +1689,10 @@ html.light [data-ask-community-profile-gate] .text-zinc-600 {
   color: #71717a !important;
 }
 html.light [data-ask-community-modal] .text-cyan-300,
-html.light [data-ask-community-auth-prompt] .text-cyan-200 {
-  color: #0891b2 !important;
+html.light [data-ask-community-auth-prompt] .text-cyan-200,
+html.light [data-ask-community-profile-gate] .profile-gate-kicker,
+html.light [data-ask-community-profile-gate] .text-cyan-200 {
+  color: rgb(21 94 117) !important;
 }
 html.light [data-ask-community-modal] .border-zinc-800,
 html.light [data-ask-community-modal] .border-zinc-700,
@@ -1710,10 +1712,13 @@ html.light [data-ask-community-profile-gate] input,
 html.light [data-ask-community-profile-gate] .bg-zinc-950 {
   background-color: #f4f4f5 !important;
   color: #18181b !important;
+  -webkit-text-fill-color: #18181b;
 }
 html.light [data-ask-community-modal] textarea::placeholder,
 html.light [data-ask-community-profile-gate] input::placeholder {
-  color: #a1a1aa !important;
+  color: #71717a !important;
+  opacity: 1;
+  -webkit-text-fill-color: #71717a;
 }
 html.light [data-ask-community-modal] .bg-cyan-600,
 html.light [data-ask-community-auth-prompt] .bg-cyan-600,

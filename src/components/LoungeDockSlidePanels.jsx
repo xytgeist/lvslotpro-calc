@@ -1664,7 +1664,7 @@ export default function LoungeDockSlidePanels({
                 <span className="min-w-0">
                   <span className="block text-[15px] font-semibold text-zinc-100">Autoplay while scrolling</span>
                   <span className="mt-0.5 block text-[12px] font-normal leading-snug text-zinc-500">
-                    Inline video across Lounge — home feed, search, profiles, and post detail.
+                    Inline video across Lounge - home feed, search, profiles, and post detail.
                   </span>
                 </span>
                 <span

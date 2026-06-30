@@ -16180,8 +16180,11 @@ export default function SocialFeed({
               setProfileGateOpen(false)
             }}
           />
-          <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700/85 bg-zinc-950/92 p-5 shadow-2xl backdrop-blur-md">
-            <div className="text-cyan-200 text-[15px] font-semibold uppercase tracking-wide">Complete your profile</div>
+          <div
+            className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700/85 bg-zinc-950/92 p-5 shadow-2xl backdrop-blur-md"
+            data-ask-community-profile-gate
+          >
+            <div className="profile-gate-kicker text-cyan-200 text-[15px] font-semibold uppercase tracking-wide">Complete your profile</div>
             <div className="text-white text-xl font-bold mt-1">One-time setup before posting</div>
             <div className="text-zinc-400 text-[15px] mt-2 leading-relaxed">
               {profileGateProvisionalConfirmNeeded
@@ -16274,6 +16277,7 @@ export default function SocialFeed({
                   onChange={setProfileGateCategoryPills}
                   disabled={profileGateBusy}
                   maxPills={null}
+                  collapsibleSingleRow={false}
                   hint="Choose your tribes - helps us to deliver you better results."
                 />
               </div>

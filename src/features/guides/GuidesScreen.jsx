@@ -1269,7 +1269,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
             }}
           />
           <div className="relative z-10 w-full max-w-md rounded-3xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5" data-ask-community-profile-gate>
-            <div className="text-cyan-200 text-sm font-semibold uppercase tracking-wide">Complete your profile</div>
+            <div className="profile-gate-kicker text-cyan-200 text-sm font-semibold uppercase tracking-wide">Complete your profile</div>
             <div className="text-white text-lg font-bold mt-1">One-time setup before posting</div>
             <div className="text-zinc-400 text-sm mt-2 leading-relaxed">
               Pick a handle and display name for Lounge posts.
@@ -1367,6 +1367,7 @@ function AskCommunityModal({ open, onClose, guideRow, supabaseClient, onPosted, 
                   onChange={setProfileGateCategoryPills}
                   disabled={profileGateBusy}
                   maxPills={null}
+                  collapsibleSingleRow={false}
                   hint="Choose your tribes - helps us to deliver you better results."
                 />
               </div>
