@@ -19,11 +19,11 @@ export default function LegalDocumentScreen({ slug, onBack }) {
 
   return (
     <div
-      className="flex min-h-[100dvh] flex-col bg-zinc-950 text-zinc-100"
+      className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100"
       data-legal-document
       data-edge-scroll-shell
     >
-      <header className="sticky top-0 z-10 border-b border-zinc-800/90 bg-zinc-950/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
+      <header className="shrink-0 border-b border-zinc-800/90 bg-zinc-950/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <button
             type="button"
@@ -40,7 +40,7 @@ export default function LegalDocumentScreen({ slug, onBack }) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <article className="legal-prose mx-auto max-w-2xl px-4 py-6 pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
           {doc.intro ? <p className="legal-prose-lead">{doc.intro}</p> : null}
           {doc.sections.map((section) => (
