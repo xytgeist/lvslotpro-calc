@@ -59,7 +59,7 @@ function PwaInstallHelpDropPanel({
             Install Edge
           </h2>
           <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">
-            Add to your home screen or install the app for quick access and push alerts.
+            Install to your home screen for quick access and push notifications.
           </p>
         </div>
         <button
@@ -179,7 +179,7 @@ export default function PwaInstallTitleBarRow({ logo, navSlot, rowClassName = 'p
     }
   }, [])
 
-  const chipLabel = 'Install for better experience'
+  const chipLabel = 'How to Install'
 
   if (!visible) {
     return (
