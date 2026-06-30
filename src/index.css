@@ -2170,20 +2170,10 @@ html.light [data-review-queue] .text-cyan-300   { color: #0e7490 !important; }
 /* TV snow uses screen blend which looks bad on light bg - switch to multiply */
 html.light .guide-lock-glitch__tv-snow-canvas {
   mix-blend-mode: multiply;
-  opacity: 0.32;
+  opacity: 0.55;
 }
 
-/* Light guide cards: snowy overlay + zinc-100 copy is washed out - darken scrim + text */
-html.light .guide-lock-glitch__veil {
-  background: linear-gradient(
-    to bottom,
-    rgb(255 255 255 / 0%) 0%,
-    rgb(255 255 255 / 40%) 22%,
-    rgb(255 255 255 / 78%) 52%,
-    rgb(255 255 255 / 92%) 100%
-  );
-}
-
+/* Light guide cards: keep TV snow visible; readable copy lives on the frosted mini card */
 html.light .guide-lock-glitch > .relative.z-10 {
   background: rgb(255 255 255 / 0.88);
   backdrop-filter: blur(10px);
