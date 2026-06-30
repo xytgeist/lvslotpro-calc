@@ -27,6 +27,9 @@ const CANVAS_OFFSET_Y = -40
 // 251 frames @ 60 fps ≈ 4.2 s. Force-dismiss after 7 s if complete event is late.
 const SPLASH_MAX_MS = 7000
 
+/** Keep preFrameCover up this many drawn frames before reveal (compositing race on frame 1). */
+const PRE_FRAME_COVER_MIN_DRAWN_FRAMES = 3
+
 /** Viewport height used to detect iOS URL-bar / dvh settle before canvas measure. */
 function readSplashViewportHeight() {
   const vv = typeof window !== 'undefined' ? window.visualViewport : null
@@ -108,8 +111,8 @@ function measureSplashCanvas(canvas) {
  *                       Canvas size is measured after visualViewport height stabilizes
  *                       (iOS URL bar / dvh) so the bitmap is not vertically stretched.
  *   3. preFrameCover  - always bg-black. Hides the blank canvas while WASM boots.
- *                       Removed one rAF after the first Lottie frame to avoid a
- *                       transparent-canvas white flash.
+ *                       Removed after 3 drawn frames + rAF so the GPU has composited
+ *                       canvas content before the cover lifts (avoids pre-play flash).
  *   4. statusBar strip - height env(safe-area-inset-top), always bg-black. Sits in
  *                       the exact pixels iOS samples for its translucent status bar tint,
  *                       keeping the status bar dark for the full duration of the splash.
@@ -148,6 +151,7 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationStart, 
     let fallback = 0
     let cancelViewportWait = null
     let animationStartReported = false
+    let drawnFrameCount = 0
 
     const startPlayer = () => {
       if (cancelled) return
@@ -191,12 +195,13 @@ export default function LoungeAppSplash({ dismissing = false, onAnimationStart, 
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.drawImage(offscreen, 0, 0)
 
-        // Delay hiding the preFrameCover by one rAF so the canvas drawImage has been
-        // composited to screen first - prevents a transparent-canvas white flash.
-        if (preFrameCoverRef.current) {
+        drawnFrameCount += 1
+        if (preFrameCoverRef.current && drawnFrameCount >= PRE_FRAME_COVER_MIN_DRAWN_FRAMES) {
           const cover = preFrameCoverRef.current
           preFrameCoverRef.current = null
-          requestAnimationFrame(() => { cover.style.display = 'none' })
+          requestAnimationFrame(() => {
+            cover.style.display = 'none'
+          })
         }
 
         // Fade overlay + bottom cover via direct DOM mutation - not setState - so it works
