@@ -61,7 +61,13 @@ export default function SubscribeModal({
         aria-label="Close subscribe dialog"
         onClick={onClose}
       />
-      <div role="dialog" aria-modal="true" aria-labelledby="subscribe-modal-title" className={panelClass}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="subscribe-modal-title"
+        className={panelClass}
+        data-subscribe-modal
+      >
         <button
           type="button"
           onClick={onClose}
