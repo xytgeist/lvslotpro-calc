@@ -16278,6 +16278,7 @@ export default function SocialFeed({
                   disabled={profileGateBusy}
                   maxPills={null}
                   collapsibleSingleRow={false}
+                  sortAlphabetically
                   hint="Choose your tribes - helps us to deliver you better results."
                 />
               </div>

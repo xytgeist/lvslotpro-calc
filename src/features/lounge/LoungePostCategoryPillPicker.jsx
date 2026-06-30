@@ -21,6 +21,8 @@ export default function LoungePostCategoryPillPicker({
   hint = 'Optional — helps interested members find your post.',
   /** When true, show one row (most-used first) with a caret to expand the rest. */
   collapsibleSingleRow = true,
+  /** When true, list all pills A–Z by label (e.g. complete-your-profile gate). */
+  sortAlphabetically = false,
   className = '',
 }) {
   const uncapped = maxPills == null
@@ -38,10 +40,11 @@ export default function LoungePostCategoryPillPicker({
   const clipRef = useRef(null)
   const rowRef = useRef(null)
 
-  const sortedOptions = useMemo(
-    () => loungePostCategoryPillOptionsForPicker(selected, usageCounts),
-    [selected, usageCounts],
-  )
+  const sortedOptions = useMemo(() => {
+    const opts = loungePostCategoryPillOptionsForPicker(selected, usageCounts)
+    if (!sortAlphabetically) return opts
+    return [...opts].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+  }, [selected, usageCounts, sortAlphabetically])
 
   const measureRows = useCallback(() => {
     const row = rowRef.current

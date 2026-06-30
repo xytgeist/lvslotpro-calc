@@ -73,6 +73,26 @@ export function writeProfileGateAck(uid) {
   }
 }
 
+function removeUidFromLocalAckMap(storageKey, uid) {
+  if (!uid || typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(storageKey)
+    if (!raw) return
+    const o = JSON.parse(raw)
+    if (!o || typeof o !== 'object' || !Object.prototype.hasOwnProperty.call(o, uid)) return
+    const next = { ...o }
+    delete next[uid]
+    if (Object.keys(next).length === 0) window.localStorage.removeItem(storageKey)
+    else window.localStorage.setItem(storageKey, JSON.stringify(next))
+  } catch {
+    // ignore
+  }
+}
+
+export function clearProfileGateAck(uid) {
+  removeUidFromLocalAckMap(PROFILE_GATE_ACK_KEY, uid)
+}
+
 /** One-time Lounge feed welcome (guidelines + Slots menu hint) per user per browser. */
 const LOUNGE_WELCOME_ACK_KEY = 'lvslotpro_lounge_welcome_ack_v1'
 
@@ -99,6 +119,10 @@ export function writeLoungeWelcomeAck(uid) {
   } catch {
     // ignore
   }
+}
+
+export function clearLoungeWelcomeAck(uid) {
+  removeUidFromLocalAckMap(LOUNGE_WELCOME_ACK_KEY, uid)
 }
 
 const PROFILE_GATE_RECENT_PROFILE_MS = 7 * 24 * 60 * 60 * 1000

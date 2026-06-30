@@ -23,6 +23,7 @@ import {
   readLoungeComposerDraftPendingWork,
   shouldShowLoungeColdBootSplash,
 } from './utils/loungeColdBootSplash.js'
+import { clearAccountClientState } from './utils/clearAccountClientState.js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -550,6 +551,11 @@ function App() {
       return
     setDeleteAccountBusy(true)
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const userId = session?.user?.id ?? null
+
       const { data, error } = await supabase.functions.invoke('delete-own-account', {
         method: 'POST',
         body: {},
@@ -558,6 +564,8 @@ function App() {
       if (data && typeof data === 'object' && data.error) {
         throw new Error(String(data.error))
       }
+
+      clearAccountClientState(userId)
       await supabase.auth.signOut()
       window.location.href = `${window.location.origin}/`
     } catch (e) {
