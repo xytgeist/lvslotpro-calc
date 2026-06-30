@@ -51,7 +51,6 @@ export default function LoungeWelcomeModal({ open, onAcknowledge }) {
   const highlightBullets = [
     'This is a free speech platform. Say whatever tf you want, but keep it constructive. Disagreement is fine, harassment is not. Bottom line, just don\'t be a dick.',
     'Gambling, edge play, sports, trading, investing, bankroll, and related topics welcome. No spam.',
-    'Share real results and setups; do not mislead with fake wins or guaranteed systems.',
     'Respect privacy ... no doxing or posting other people without consent.',
   ]
 
@@ -92,10 +91,6 @@ export default function LoungeWelcomeModal({ open, onAcknowledge }) {
 
           <div className="mt-5 border-t border-zinc-800 pt-4">
             <h3 className="text-[15px] font-semibold text-white">Slot tools live in the menu</h3>
-            <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-400">
-              Calculators, offers calendar, bankroll, play logbook, and AP guides are one tap away from the
-              Lounge.
-            </p>
             <TitleBarMenuHint />
           </div>
         </div>
