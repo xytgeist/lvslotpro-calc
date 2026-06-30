@@ -1091,7 +1091,6 @@ function MHBCalculator({ onBack, supabaseClient = null, onOpenLogbook = null }) 
             ...playLogCalcEvPrefill({ expectedEvUsd: ev }),
           }}
           onOpenLogbook={onOpenLogbook}
-          accentBtnClass="bg-cyan-600 hover:bg-cyan-500"
         />
 
         <CalculatorDisclaimer className="mt-8" />

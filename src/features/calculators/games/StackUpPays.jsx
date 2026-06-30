@@ -651,7 +651,6 @@ function StackUpPays({ onBack, supabaseClient = null, onOpenLogbook = null }) {
             }),
           }}
           onOpenLogbook={onOpenLogbook}
-          accentBtnClass="bg-cyan-600 hover:bg-cyan-500"
         />
 
         {/* Acquisition Fee */}

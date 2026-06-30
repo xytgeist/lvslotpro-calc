@@ -73,6 +73,7 @@ import {
   showGuideLock,
 } from './guideAccess.js'
 import { resolveGuideAccent } from '../../utils/guideCardAccent.js'
+import { LOG_PLAY_LOGBOOK_BTN_CLASS } from '../calculators/CalculatorLogPlayButton.jsx'
 
 const ACTIVE_SUPABASE_HOST = (() => {
   try {
@@ -2056,7 +2057,8 @@ export default function GuidesScreen({
                               stashPlayLogPrefill({ templateSlug: machineSlug })
                               onOpenLogbook()
                             }}
-                            className="flex-1 min-h-11 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-bold touch-manipulation"
+                            className={`flex-1 min-h-11 rounded-2xl text-white text-sm font-bold touch-manipulation ${LOG_PLAY_LOGBOOK_BTN_CLASS}`}
+                            data-log-play-logbook-btn
                           >
                             Log play in Logbook
                           </button>

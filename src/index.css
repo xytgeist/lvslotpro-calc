@@ -2990,6 +2990,16 @@ html.light [data-session-row] {
   box-shadow: 0 4px 10px -3px rgba(0,0,0,0.12);
 }
 
+/* Log play in Logbook CTA - muted amber, distinct from Ask community (cyan) on guide cards + calcs */
+html.light [data-log-play-logbook-btn] {
+  background-color: #b45309 !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.22);
+}
+html.light [data-log-play-logbook-btn]:hover {
+  background-color: #d97706 !important;
+}
+
 /* Play Logbook page - light mode (Log Play sheet uses data-bankroll-sheet rules above) */
 html.light [data-play-logbook-card] {
   box-shadow: 0 4px 10px -3px rgba(0,0,0,0.12);

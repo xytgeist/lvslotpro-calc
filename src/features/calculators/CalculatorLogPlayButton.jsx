@@ -1,6 +1,9 @@
 import { stashPlayLogPrefill } from '../../utils/playLogPrefill.js'
 import { playLogCalcSnapshotNotes } from '../../utils/playLogCalcSnapshot.js'
 
+/** Shared with Guides card row - warm amber, distinct from Ask community (cyan). */
+export const LOG_PLAY_LOGBOOK_BTN_CLASS = 'bg-amber-700 hover:bg-amber-600 active:bg-amber-800'
+
 /**
  * Opens Play Logbook with fields pre-filled from the active calculator session.
  *
@@ -14,7 +17,7 @@ export default function CalculatorLogPlayButton({
   calculatorSlug,
   prefillValues = {},
   onOpenLogbook,
-  accentBtnClass = 'bg-cyan-600 hover:bg-cyan-500',
+  accentBtnClass = LOG_PLAY_LOGBOOK_BTN_CLASS,
 }) {
   if (!onOpenLogbook) return null
 
@@ -22,6 +25,7 @@ export default function CalculatorLogPlayButton({
     <div className="mb-6">
       <button
         type="button"
+        data-log-play-logbook-btn
         onClick={() => {
           stashPlayLogPrefill({
             calculatorSlug,
