@@ -3534,6 +3534,10 @@ html.light [data-pwa-install-title-chip][aria-expanded='true'] {
     0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
+html.light [data-lounge-welcome-modal] .lounge-welcome-kicker {
+  color: rgb(21 94 117) !important;
+}
+
 @keyframes pwa-install-drop-panel-in {
   from {
     opacity: 0;

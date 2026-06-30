@@ -1,8 +1,10 @@
 import { createPortal } from 'react-dom'
 import { Z_APP_MODAL } from '../../constants/appZIndex.js'
-import { getLegalDocument } from '../legal/legalDocuments.js'
 
 const SLOTS_TOOL_LABELS = ['Calcs', 'Calendar', 'Bankroll', 'Logbook', 'AP Guides']
+
+const WELCOME_GUIDELINES_INTRO =
+  'Whether you are here for trading, sports, poker, slots, or any other edge-hunting niche, this is a chill community for you to learn, share, troll, and have fun.'
 
 function TitleBarMenuHint() {
   return (
@@ -15,7 +17,13 @@ function TitleBarMenuHint() {
           <img
             src="/edge-lounge-logo-transparent.png"
             alt=""
-            className="h-4 w-auto max-w-[4.5rem] object-contain opacity-90"
+            className="edge-logo--dark h-4 w-auto max-w-[4.5rem] object-contain opacity-90"
+            loading="lazy"
+          />
+          <img
+            src="/edge-lounge-logo-light.png"
+            alt=""
+            className="edge-logo--light h-4 w-auto max-w-[4.5rem] object-contain opacity-90"
             loading="lazy"
           />
         </div>
@@ -40,7 +48,6 @@ function TitleBarMenuHint() {
 export default function LoungeWelcomeModal({ open, onAcknowledge }) {
   if (!open || typeof document === 'undefined') return null
 
-  const guidelines = getLegalDocument('guidelines')
   const highlightBullets = [
     'This is a free speech platform. Say whatever tf you want, but keep it constructive. Disagreement is fine, harassment is not. Bottom line, just don\'t be a dick.',
     'Gambling, edge play, sports, trading, investing, bankroll, and related topics welcome. No spam.',
@@ -59,14 +66,11 @@ export default function LoungeWelcomeModal({ open, onAcknowledge }) {
     >
       <div className="relative z-10 flex max-h-[min(88dvh,calc(100dvh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-zinc-700/85 bg-zinc-950/95 shadow-2xl backdrop-blur-md">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-4">
-          <p className="text-cyan-200 text-[13px] font-semibold uppercase tracking-wide">Welcome</p>
+          <p className="lounge-welcome-kicker text-cyan-200 text-[13px] font-semibold uppercase tracking-wide">Welcome</p>
           <h2 id="lounge-welcome-title" className="mt-1 text-xl font-bold text-white">
             Community Guidelines
           </h2>
-          <p className="mt-2 text-[14px] leading-relaxed text-zinc-400">
-            {guidelines?.intro ||
-              'These guidelines apply to the Lounge, comments, chat, and your profile.'}
-          </p>
+          <p className="mt-2 text-[14px] leading-relaxed text-zinc-400">{WELCOME_GUIDELINES_INTRO}</p>
 
           <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-zinc-200">
             {highlightBullets.map((line) => (
