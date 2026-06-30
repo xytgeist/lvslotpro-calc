@@ -100,6 +100,10 @@ import {
   writeLoungeWelcomeAck,
 } from './loungeStorage'
 import LoungeWelcomeModal from './LoungeWelcomeModal.jsx'
+import {
+  consumeReopenLoungeDockPanel,
+  consumeReopenLoungeWelcome,
+} from '../legal/index.js'
 import LoungePostDraftsSheet from './LoungePostDraftsSheet.jsx'
 import LoungeThreadComposeSheet from './LoungeThreadComposeSheet.jsx'
 import LoungeComposerMediaToolbar from './LoungeComposerMediaToolbar.jsx'
@@ -551,6 +555,8 @@ export default function SocialFeed({
   /** When set, opens the lounge profile modal for this user (e.g. from Chat member profile). */
   requestOpenProfileUserId = null,
   onRequestOpenProfileConsumed,
+  /** Open terms, privacy, or guidelines in-app with return navigation. */
+  onOpenLegalDocument = null,
 }) {
   const BOOKMARKS_STORAGE_KEY = 'lounge_bookmarks_v1'
   const loungeComposerBoot = () => {
@@ -915,6 +921,17 @@ export default function SocialFeed({
   const [loungeFeedDeleteBusyPostId, setLoungeFeedDeleteBusyPostId] = useState(null)
   /** Left dock: search / notifications / chat (Lounge shell). */
   const [loungeDockPanel, setLoungeDockPanel] = useState(null)
+
+  useEffect(() => {
+    if (consumeReopenLoungeWelcome()) {
+      loungeWelcomeScheduleRef.current = true
+      setLoungeWelcomeOpen(true)
+    }
+    const panel = consumeReopenLoungeDockPanel()
+    if (panel === 'settings') {
+      setLoungeDockPanel('settings')
+    }
+  }, [])
   const prevLoungeFeedActiveRef = useRef(isActivePage)
   const ensureLoungeFeedVisible = useCallback(() => {
     if (!isActivePage) onNavigateToLoungeFeed?.()
@@ -8150,6 +8167,11 @@ export default function SocialFeed({
     if (composerUserId) writeLoungeWelcomeAck(composerUserId)
     setLoungeWelcomeOpen(false)
   }, [composerUserId])
+
+  const onOpenGuidelinesFromWelcome = useCallback(() => {
+    setLoungeWelcomeOpen(false)
+    onOpenLegalDocument?.('guidelines', 'welcome')
+  }, [onOpenLegalDocument])
 
   useEffect(() => {
     if (!composerUserId) {
@@ -15603,6 +15625,7 @@ export default function SocialFeed({
           onLogout={onLogout}
           onDeleteAccount={onDeleteAccount}
           deleteAccountBusy={deleteAccountBusy}
+          onOpenLegalDocument={onOpenLegalDocument}
         />
       ) : null}
 
@@ -16159,7 +16182,11 @@ export default function SocialFeed({
         : null}
 
       {loungeWelcomeOpen ? (
-        <LoungeWelcomeModal open={loungeWelcomeOpen} onAcknowledge={onLoungeWelcomeAcknowledge} />
+        <LoungeWelcomeModal
+          open={loungeWelcomeOpen}
+          onAcknowledge={onLoungeWelcomeAcknowledge}
+          onOpenGuidelines={onOpenGuidelinesFromWelcome}
+        />
       ) : null}
 
       {profileGateOpen && typeof document !== 'undefined'

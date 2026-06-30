@@ -216,6 +216,7 @@ export default function AppShell({
   contentAccessGatesDbReady = false,
   onSetContentAccessGate,
   onRequireSubscribe,
+  onOpenLegalDocument,
 }) {
   const consoleLogHudEnabled = useSyncExternalStore(
     subscribeAppConsoleLogHudEnabled,
@@ -1207,6 +1208,7 @@ export default function AppShell({
             }}
             requestOpenProfileUserId={pendingLoungeProfileUserId}
             onRequestOpenProfileConsumed={() => setPendingLoungeProfileUserId(null)}
+            onOpenLegalDocument={onOpenLegalDocument}
           />
         </div>
       </Suspense>

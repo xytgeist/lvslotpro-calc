@@ -18,10 +18,11 @@ import {
   profileNeedsLegalAcceptance,
   markPendingLegalAcceptance,
   readPendingLegalAcceptance,
-  markLegalReturnToAuth,
-  readLegalReturnToAuth,
-  clearLegalReturnToAuth,
-  shouldReturnLegalToAuth,
+  markLegalReturnContext,
+  resolveLegalReturnContext,
+  clearLegalReturnContext,
+  readLegalReturnContext,
+  applyLegalReturnReopen,
 } from './features/legal'
 import {
   readLoungeComposerDraftPendingWork,
@@ -615,30 +616,43 @@ function App() {
     setVerificationSuccess(false)
   }, [])
 
-  const openLegalFromAuth = useCallback(
-    (slug) => {
-      if (slug !== 'terms' && slug !== 'privacy') return
-      markLegalReturnToAuth(authTab === 'signin' ? 'signin' : 'join')
+  const openLegalDocument = useCallback(
+    (slug, source = 'auth') => {
+      if (slug !== 'terms' && slug !== 'privacy' && slug !== 'guidelines') return
+      /** @type {import('./features/legal/legalDocumentNavigation.js').LegalReturnContext} */
+      const ctx = { source }
+      if (source === 'auth') {
+        ctx.authTab = authTab === 'signin' ? 'signin' : 'join'
+        setAuthPanelOpen(false)
+      }
+      markLegalReturnContext(ctx)
       setCurrentView(slug)
-      setAuthPanelOpen(false)
-      window.history.pushState({ lvLegalFromAuth: true }, '', `/${slug}?from=auth`)
+      window.history.pushState({ lvLegalReturn: true }, '', `/${slug}?from=${source}`)
     },
     [authTab],
   )
 
+  const finishLegalReturn = useCallback((ctx) => {
+    if (!ctx) return
+    clearLegalReturnContext()
+    setCurrentView('app')
+    window.history.replaceState({}, document.title, '/')
+    if (ctx.source === 'auth') {
+      setAuthTab(ctx.authTab === 'signin' ? 'signin' : 'join')
+      setAuthPanelOpen(true)
+      return
+    }
+    applyLegalReturnReopen(ctx)
+  }, [])
+
   const exitLegalDocument = useCallback(() => {
     const slug = currentView
-    if (
-      (slug === 'terms' || slug === 'privacy' || slug === 'guidelines') &&
-      shouldReturnLegalToAuth(slug)
-    ) {
-      const meta = readLegalReturnToAuth() || { tab: 'join' }
-      clearLegalReturnToAuth()
-      setAuthTab(meta.tab === 'signin' ? 'signin' : 'join')
-      setCurrentView('app')
-      setAuthPanelOpen(true)
-      window.history.replaceState({}, document.title, '/')
-      return
+    if (slug === 'terms' || slug === 'privacy' || slug === 'guidelines') {
+      const ctx = resolveLegalReturnContext(slug)
+      if (ctx) {
+        finishLegalReturn(ctx)
+        return
+      }
     }
     if (typeof window !== 'undefined' && window.history.length > 1) {
       window.history.back()
@@ -646,7 +660,7 @@ function App() {
     }
     setCurrentView('app')
     window.history.replaceState({}, document.title, '/')
-  }, [currentView])
+  }, [currentView, finishLegalReturn])
 
   useEffect(() => {
     const onPopState = () => {
@@ -656,16 +670,12 @@ function App() {
         return
       }
       setCurrentView('app')
-      const returnAuth = readLegalReturnToAuth()
-      if (returnAuth) {
-        setAuthTab(returnAuth.tab === 'signin' ? 'signin' : 'join')
-        setAuthPanelOpen(true)
-        clearLegalReturnToAuth()
-      }
+      const ctx = readLegalReturnContext()
+      if (ctx) finishLegalReturn(ctx)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  }, [finishLegalReturn])
 
   useEffect(() => {
     if (!authPanelOpen) return
@@ -777,6 +787,7 @@ function App() {
           deleteAccountBusy={deleteAccountBusy}
           supabaseClient={supabase}
           onRequireAuth={(mode) => openAuthPanel(mode === 'login' ? 'login' : 'create')}
+          onOpenLegalDocument={openLegalDocument}
         />
         <SubscribeModal
           open={subscribeModal.open}
@@ -790,6 +801,7 @@ function App() {
             busy={legalAcceptanceBusy}
             error={legalAcceptanceError}
             onAccept={() => void handleLegalAcceptance()}
+            onOpenLegalDocument={openLegalDocument}
           />
         ) : null}
         {authPanelOpen ? (
@@ -874,7 +886,7 @@ function App() {
                 isOAuthLoading={isOAuthLoading}
                 acceptedLegal={acceptedLegal}
                 onAcceptedLegalChange={setAcceptedLegal}
-                onOpenLegalFromAuth={openLegalFromAuth}
+                onOpenLegalDocument={(slug) => openLegalDocument(slug, 'auth')}
                 onGoogleSignIn={({ setErrorTarget }) => {
                   const setError =
                     setErrorTarget === 'forgot'

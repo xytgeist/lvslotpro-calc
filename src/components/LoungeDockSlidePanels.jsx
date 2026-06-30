@@ -177,6 +177,8 @@ export default function LoungeDockSlidePanels({
   /** Restore scroll after caption navigation return. */
   restorePanelScrollTop = null,
   onPanelScrollRestored = null,
+  /** Open a legal document in-app (e.g. Community Guidelines from Settings). */
+  onOpenLegalDocument = null,
 }) {
   const panelRef = useRef(null)
   const panelScrollRef = useRef(null)
@@ -1447,25 +1449,31 @@ export default function LoungeDockSlidePanels({
                       <div className="text-[15px] font-semibold text-zinc-100">Legal</div>
                       <div className="mt-2 flex flex-col gap-2 text-[14px]">
                         <a
-                          href="/terms"
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href="/terms?from=settings"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            onOpenLegalDocument?.('terms', 'settings')
+                          }}
                           className="min-h-11 inline-flex items-center text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation"
                         >
                           Terms &amp; Conditions
                         </a>
                         <a
-                          href="/privacy"
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href="/privacy?from=settings"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            onOpenLegalDocument?.('privacy', 'settings')
+                          }}
                           className="min-h-11 inline-flex items-center text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation"
                         >
                           Privacy Policy
                         </a>
                         <a
-                          href="/guidelines"
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href="/guidelines?from=settings"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            onOpenLegalDocument?.('guidelines', 'settings')
+                          }}
                           className="min-h-11 inline-flex items-center text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation"
                         >
                           Community Guidelines

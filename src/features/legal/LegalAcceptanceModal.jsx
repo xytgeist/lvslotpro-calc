@@ -5,6 +5,7 @@ export default function LegalAcceptanceModal({
   busy = false,
   error = '',
   onAccept,
+  onOpenLegalDocument,
 }) {
   return (
     <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -21,11 +22,25 @@ export default function LegalAcceptanceModal({
         </h2>
         <p className="mt-4 text-sm leading-relaxed text-zinc-300 text-center">
           Please review and accept our{' '}
-          <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-orange-400 underline">
+          <a
+            href="/terms?from=acceptance"
+            onClick={(e) => {
+              e.preventDefault()
+              onOpenLegalDocument?.('terms', 'acceptance')
+            }}
+            className="text-orange-400 underline"
+          >
             Terms &amp; Conditions
           </a>{' '}
           and{' '}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-orange-400 underline">
+          <a
+            href="/privacy?from=acceptance"
+            onClick={(e) => {
+              e.preventDefault()
+              onOpenLegalDocument?.('privacy', 'acceptance')
+            }}
+            className="text-orange-400 underline"
+          >
             Privacy Policy
           </a>{' '}
           (version {LEGAL_POLICY_VERSION}) to continue using Edge.

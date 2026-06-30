@@ -21,4 +21,13 @@ export {
   isLegalFromAuthUrl,
   shouldReturnLegalToAuth,
   legalDocumentPathFromAuth,
+  markLegalReturnContext,
+  readLegalReturnContext,
+  clearLegalReturnContext,
+  parseLegalReturnFromUrl,
+  resolveLegalReturnContext,
+  applyLegalReturnReopen,
+  consumeReopenLoungeWelcome,
+  consumeReopenLoungeDockPanel,
+  legalDocumentPathFromSource,
 } from './legalDocumentNavigation.js'

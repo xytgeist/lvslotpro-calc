@@ -3,7 +3,7 @@ import { getLegalDocument } from './legalDocuments.js'
 
 export default function LegalDocumentScreen({ slug, onBack, onGotIt }) {
   const doc = getLegalDocument(slug)
-  const showGotItFooter = slug === 'terms' || slug === 'privacy'
+  const showGotItFooter = Boolean(doc)
   const handleGotIt = onGotIt ?? onBack
   if (!doc) {
     return (

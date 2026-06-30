@@ -51,7 +51,7 @@ export default function AuthModalPanel({
   onGoogleSignIn,
   acceptedLegal = false,
   onAcceptedLegalChange,
-  onOpenLegalFromAuth,
+  onOpenLegalDocument,
 }) {
   /** Which signup control triggered the legal nudge: `google` | `create`. */
   const [legalNudgeSource, setLegalNudgeSource] = useState(null)
@@ -88,7 +88,7 @@ export default function AuthModalPanel({
         href="/terms?from=auth"
         onClick={(e) => {
           e.preventDefault()
-          onOpenLegalFromAuth?.('terms')
+          onOpenLegalDocument?.('terms')
         }}
         className="text-orange-400 underline underline-offset-2 hover:text-orange-300"
       >
@@ -99,7 +99,7 @@ export default function AuthModalPanel({
         href="/privacy?from=auth"
         onClick={(e) => {
           e.preventDefault()
-          onOpenLegalFromAuth?.('privacy')
+          onOpenLegalDocument?.('privacy')
         }}
         className="text-orange-400 underline underline-offset-2 hover:text-orange-300"
       >
@@ -350,7 +350,14 @@ export default function AuthModalPanel({
         {authTab === 'join' ? (
           <>
             Required to create an account. See also{' '}
-            <a href="/guidelines" target="_blank" rel="noopener noreferrer" className="text-orange-400/90 underline underline-offset-2">
+            <a
+              href="/guidelines?from=auth"
+              onClick={(e) => {
+                e.preventDefault()
+                onOpenLegalDocument?.('guidelines')
+              }}
+              className="text-orange-400/90 underline underline-offset-2"
+            >
               Community Guidelines
             </a>
             .
@@ -358,7 +365,14 @@ export default function AuthModalPanel({
         ) : (
           <>
             By signing in you agree to our {legalLinks}. See also{' '}
-            <a href="/guidelines" target="_blank" rel="noopener noreferrer" className="text-orange-400/90 underline underline-offset-2">
+            <a
+              href="/guidelines?from=auth"
+              onClick={(e) => {
+                e.preventDefault()
+                onOpenLegalDocument?.('guidelines')
+              }}
+              className="text-orange-400/90 underline underline-offset-2"
+            >
               Community Guidelines
             </a>
             .

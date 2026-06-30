@@ -45,7 +45,7 @@ function TitleBarMenuHint() {
   )
 }
 
-export default function LoungeWelcomeModal({ open, onAcknowledge }) {
+export default function LoungeWelcomeModal({ open, onAcknowledge, onOpenGuidelines }) {
   if (!open || typeof document === 'undefined') return null
 
   const highlightBullets = [
@@ -81,9 +81,11 @@ export default function LoungeWelcomeModal({ open, onAcknowledge }) {
           </ul>
 
           <a
-            href="/guidelines"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/guidelines?from=welcome"
+            onClick={(e) => {
+              e.preventDefault()
+              onOpenGuidelines?.()
+            }}
             className="mt-4 inline-flex min-h-11 items-center text-[14px] font-semibold text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation"
           >
             Read full Community Guidelines
