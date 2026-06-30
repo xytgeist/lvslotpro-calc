@@ -58,6 +58,8 @@ export default function WheelOfFortuneCollectorsEdition({
   onBack,
   supabaseClient = null,
   onOpenLogbook = null,
+  logPlayLocked = false,
+  onRequireSubscribe = null,
 }) {
   const [betCredits, setBetCredits] = useState(300)
   const [denom, setDenom] = useState(0.01)
@@ -299,6 +301,8 @@ export default function WheelOfFortuneCollectorsEdition({
           denom,
         }}
         onOpenLogbook={onOpenLogbook}
+        logPlayLocked={logPlayLocked}
+        onRequireSubscribe={onRequireSubscribe}
         accentBtnClass="wof-ce-btn"
       />
 

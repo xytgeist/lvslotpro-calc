@@ -22,7 +22,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 const MUST_HIT = 1888
 
-function PhoenixLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
+function PhoenixLink({ onBack, supabaseClient = null, onOpenLogbook = null, logPlayLocked = false, onRequireSubscribe = null }) {
   const [currentX, setCurrentX] = useState(1400)
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -408,6 +408,8 @@ function PhoenixLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
             }),
           }}
           onOpenLogbook={onOpenLogbook}
+          logPlayLocked={logPlayLocked}
+          onRequireSubscribe={onRequireSubscribe}
           accentBtnClass="bg-orange-600 hover:bg-orange-500"
         />
 

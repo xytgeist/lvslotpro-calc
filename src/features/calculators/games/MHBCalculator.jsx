@@ -261,7 +261,7 @@ function formatUsd(amount) {
   }).format(n)
 }
 
-function MHBCalculator({ onBack, supabaseClient = null, onOpenLogbook = null }) {
+function MHBCalculator({ onBack, supabaseClient = null, onOpenLogbook = null, logPlayLocked = false, onRequireSubscribe = null }) {
   const isLight = document.documentElement.classList.contains('light')
   const scrollThumb = isLight
     ? '[&::-webkit-scrollbar-thumb]:bg-blue-400/40 hover:[&::-webkit-scrollbar-thumb]:bg-blue-400/60 [scrollbar-color:rgba(96,165,250,0.45)_transparent]'
@@ -1091,6 +1091,8 @@ function MHBCalculator({ onBack, supabaseClient = null, onOpenLogbook = null }) 
             ...playLogCalcEvPrefill({ expectedEvUsd: ev }),
           }}
           onOpenLogbook={onOpenLogbook}
+          logPlayLocked={logPlayLocked}
+          onRequireSubscribe={onRequireSubscribe}
         />
 
         <CalculatorDisclaimer className="mt-8" />

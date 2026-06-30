@@ -63,6 +63,7 @@ import {
   isStaffTabErrorTest,
   resetTabErrorStrikes,
 } from './tabErrorBoundaryTools.js'
+import { useFreemiumToolUsage } from '../billing/useFreemiumToolUsage.js'
 
 const LOUNGE_ACTIVITY_INAPP_TOAST_MS = 7000
 const GUIDES_SCREEN_CHUNK_RELOAD_KEY = 'lvsp_guides_screen_chunk_reload'
@@ -275,6 +276,16 @@ export default function AppShell({
   const [menuOpen, setMenuOpen] = useState(false)
   const [tabErrorTestTrigger, setTabErrorTestTrigger] = useState(0)
   const [tabErrorTestOpen, setTabErrorTestOpen] = useState(false)
+  const {
+    canCreateBankrollSession,
+    canCreatePlayLog,
+    refreshFreemiumUsage,
+  } = useFreemiumToolUsage({
+    supabaseClient,
+    enabled: browseMode === 'member',
+    isStaff,
+    hasSlotsEdge: hasActiveSubscription,
+  })
   const [activeCalculator, setActiveCalculator] = useState(null) // 'phoenix' | 'buffalo-link' | 'stackup' | 'mhb' | null
   const [communityPosts, setCommunityPosts] = useState([])
   const [communityFeedLoading, setCommunityFeedLoading] = useState(false)
@@ -955,16 +966,6 @@ export default function AppShell({
   const showNavSubscriberLocks =
     browseMode === 'member' && !isStaff && !hasActiveSubscription
 
-  const SLOTS_EDGE_GATED_TABS = new Set(['bankroll', 'logbook'])
-
-  useEffect(() => {
-    if (isStaff || hasActiveSubscription) return
-    if (!SLOTS_EDGE_GATED_TABS.has(tab)) return
-    onRequireSubscribe?.('slots-edge')
-    setTab('home')
-    setMenuOpen(false)
-  }, [tab, isStaff, hasActiveSubscription, onRequireSubscribe])
-
   useEffect(() => {
     if (isStaff || hasActiveSubscription) return
     if (tab !== 'calculators' || !activeCalculator) return
@@ -1089,6 +1090,12 @@ export default function AppShell({
     onRequireAuth,
     onRequireSubscribe,
   ])
+
+  useEffect(() => {
+    if (isStaff || hasActiveSubscription) return
+    if (!['bankroll', 'logbook', 'guides', 'calculators'].includes(tab)) return
+    void refreshFreemiumUsage()
+  }, [tab, isStaff, hasActiveSubscription, refreshFreemiumUsage])
 
   useEffect(() => {
     if (browseMode !== 'anonymous') return
@@ -1301,6 +1308,7 @@ export default function AppShell({
           onSetContentGate={onSetContentAccessGate}
           onRequireSubscribe={onRequireSubscribe}
           onOpenLogbook={openLogbook}
+          logPlayLocked={!canCreatePlayLog}
           titleBarNavSlot={renderTitleBarNavSlot()}
           titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
           supabaseClient={supabaseClient}
@@ -1419,6 +1427,7 @@ export default function AppShell({
           gatesDbReady={contentAccessGatesDbReady}
           onSetContentGate={onSetContentAccessGate}
           onRequireSubscribe={onRequireSubscribe}
+          canCreatePlayLog={canCreatePlayLog}
           titleBarNavSlot={renderTitleBarNavSlot()}
           titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
           openCardSlug={guideOpenCardSlug}
@@ -1443,6 +1452,9 @@ export default function AppShell({
       visibleTab = (
         <BankrollTracker
           supabaseClient={supabaseClient}
+          canCreateBankrollSession={canCreateBankrollSession}
+          onRequireSubscribeForBankroll={() => onRequireSubscribe?.('slots-edge')}
+          onBankrollSessionCreated={refreshFreemiumUsage}
           titleBarNavSlot={renderTitleBarNavSlot()}
           titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
         />
@@ -1452,6 +1464,9 @@ export default function AppShell({
         <PlayLogbook
           supabaseClient={supabaseClient}
           isAdmin={isAdmin}
+          canCreatePlayLog={canCreatePlayLog}
+          onRequireSubscribeForPlayLog={() => onRequireSubscribe?.('slots-edge')}
+          onPlayLogCreated={refreshFreemiumUsage}
           titleBarNavSlot={renderTitleBarNavSlot()}
           titleBarToolCloseVisible={slotsToolTitleBarCloseVisible}
           highlightEntryId={pendingPlayLogEntryId}

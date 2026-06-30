@@ -148,6 +148,7 @@ export default function CalculatorsTab({
   titleBarToolCloseVisible = false,
   supabaseClient = null,
   onOpenLogbook = null,
+  logPlayLocked = false,
 }) {
   if (!activeCalculator) {
     return (
@@ -189,6 +190,8 @@ export default function CalculatorsTab({
             onBack={() => setActiveCalculator(null)}
             supabaseClient={supabaseClient}
             onOpenLogbook={onOpenLogbook}
+            logPlayLocked={logPlayLocked}
+            onRequireSubscribe={onRequireSubscribe}
           />
         </ScrollLinkedEdgeTitleBarShell>
       ) : null}
@@ -198,6 +201,8 @@ export default function CalculatorsTab({
             onBack={() => setActiveCalculator(null)}
             supabaseClient={supabaseClient}
             onOpenLogbook={onOpenLogbook}
+            logPlayLocked={logPlayLocked}
+            onRequireSubscribe={onRequireSubscribe}
           />
         </ScrollLinkedEdgeTitleBarShell>
       ) : null}
@@ -207,6 +212,8 @@ export default function CalculatorsTab({
             onBack={() => setActiveCalculator(null)}
             supabaseClient={supabaseClient}
             onOpenLogbook={onOpenLogbook}
+            logPlayLocked={logPlayLocked}
+            onRequireSubscribe={onRequireSubscribe}
           />
         </ScrollLinkedEdgeTitleBarShell>
       ) : null}
@@ -216,6 +223,8 @@ export default function CalculatorsTab({
             onBack={() => setActiveCalculator(null)}
             supabaseClient={supabaseClient}
             onOpenLogbook={onOpenLogbook}
+            logPlayLocked={logPlayLocked}
+            onRequireSubscribe={onRequireSubscribe}
           />
         </ScrollLinkedEdgeTitleBarShell>
       ) : null}
@@ -225,6 +234,8 @@ export default function CalculatorsTab({
             onBack={() => setActiveCalculator(null)}
             supabaseClient={supabaseClient}
             onOpenLogbook={onOpenLogbook}
+            logPlayLocked={logPlayLocked}
+            onRequireSubscribe={onRequireSubscribe}
           />
         </ScrollLinkedEdgeTitleBarShell>
       ) : null}
@@ -234,6 +245,8 @@ export default function CalculatorsTab({
             onBack={() => setActiveCalculator(null)}
             supabaseClient={supabaseClient}
             onOpenLogbook={onOpenLogbook}
+            logPlayLocked={logPlayLocked}
+            onRequireSubscribe={onRequireSubscribe}
           />
         </ScrollLinkedEdgeTitleBarShell>
       ) : null}

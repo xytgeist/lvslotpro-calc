@@ -24,7 +24,6 @@ export const QUICK_LINK_DESTINATIONS = [
     id: 'bankroll',
     label: 'Bankroll Manager',
     tab: 'bankroll',
-    requiresSlotsEdge: true,
   },
   {
     id: 'calculators',
@@ -40,7 +39,6 @@ export const QUICK_LINK_DESTINATIONS = [
     id: 'logbook',
     label: 'Logbook',
     tab: 'logbook',
-    requiresSlotsEdge: true,
   },
   {
     id: 'chat',

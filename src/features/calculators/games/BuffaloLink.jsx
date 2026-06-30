@@ -22,7 +22,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const MUST_HIT = 1800
 const RTP_FLOOR_COUNTER = 850
 
-function BuffaloLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
+function BuffaloLink({ onBack, supabaseClient = null, onOpenLogbook = null, logPlayLocked = false, onRequireSubscribe = null }) {
   const [currentX, setCurrentX] = useState(1234)   // Changed default to 1234
   const [betSize, setBetSize] = useState(25)
   const [denom, setDenom] = useState(1.00)
@@ -433,6 +433,8 @@ function BuffaloLink({ onBack, supabaseClient = null, onOpenLogbook = null }) {
             }),
           }}
           onOpenLogbook={onOpenLogbook}
+          logPlayLocked={logPlayLocked}
+          onRequireSubscribe={onRequireSubscribe}
           accentBtnClass="bg-amber-600 hover:bg-amber-500"
         />
 

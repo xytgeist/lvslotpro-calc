@@ -12,21 +12,32 @@ export const LOG_PLAY_LOGBOOK_BTN_CLASS = 'bg-amber-700 hover:bg-amber-600 activ
  * @param {Record<string, number | string>} props.prefillValues - metric slug → value
  * @param {() => void} props.onOpenLogbook
  * @param {string} [props.accentBtnClass]
+ * @param {boolean} [props.logPlayLocked]
+ * @param {() => void} [props.onRequireSubscribe]
  */
 export default function CalculatorLogPlayButton({
   calculatorSlug,
   prefillValues = {},
   onOpenLogbook,
   accentBtnClass = LOG_PLAY_LOGBOOK_BTN_CLASS,
+  logPlayLocked = false,
+  onRequireSubscribe = null,
 }) {
   if (!onOpenLogbook) return null
+
+  const locked = logPlayLocked && typeof onRequireSubscribe === 'function'
 
   return (
     <div className="mb-6">
       <button
         type="button"
         data-log-play-logbook-btn
+        data-log-play-logbook-locked={locked ? 'true' : undefined}
         onClick={() => {
+          if (locked) {
+            onRequireSubscribe?.('slots-edge')
+            return
+          }
           stashPlayLogPrefill({
             calculatorSlug,
             values: prefillValues,
@@ -34,7 +45,9 @@ export default function CalculatorLogPlayButton({
           })
           onOpenLogbook()
         }}
-        className={`w-full min-h-12 rounded-2xl px-4 text-sm font-bold text-white touch-manipulation active:opacity-90 ${accentBtnClass}`}
+        className={`w-full min-h-12 rounded-2xl px-4 text-sm font-bold text-white touch-manipulation active:opacity-90 ${accentBtnClass} ${
+          locked ? 'opacity-45 cursor-not-allowed' : ''
+        }`}
       >
         Log play in Logbook
       </button>

@@ -153,6 +153,9 @@ export default function PlayLogbook({
   titleBarToolCloseVisible = false,
   highlightEntryId = null,
   onHighlightEntryConsumed = null,
+  canCreatePlayLog = true,
+  onRequireSubscribeForPlayLog = null,
+  onPlayLogCreated = null,
 }) {
   const [userId, setUserId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -419,6 +422,10 @@ export default function PlayLogbook({
 
   const openLogPlay = useCallback(
     (opts = {}) => {
+      if (!canCreatePlayLog && !opts.allowWhenLocked) {
+        onRequireSubscribeForPlayLog?.()
+        return
+      }
       setViewingEntryId(null)
       setEditingEntryId(null)
       setEditingSessionId(null)
@@ -443,7 +450,7 @@ export default function PlayLogbook({
       setError('')
       if (!opts.casinoName && !opts.skipCasinoPopulate) populateCaptureCasino()
     },
-    [templates, templateById, populateCaptureCasino, userId, viewerProfile],
+    [templates, templateById, populateCaptureCasino, userId, viewerProfile, canCreatePlayLog, onRequireSubscribeForPlayLog],
   )
 
   const openEditEntry = useCallback(
@@ -502,6 +509,10 @@ export default function PlayLogbook({
     const tpl = resolvePlayLogPrefillTemplate(templates, pre)
     if (!tpl) return
     setActiveTab('log')
+    if (!canCreatePlayLog) {
+      onRequireSubscribeForPlayLog?.()
+      return
+    }
     openLogPlay({
       templateId: tpl.id,
       prefillValues: pre.values || {},
@@ -509,7 +520,7 @@ export default function PlayLogbook({
       casinoName: pre.casinoName || null,
       skipCasinoPopulate: Boolean(pre.casinoName),
     })
-  }, [loading, templates, openLogPlay])
+  }, [loading, templates, openLogPlay, canCreatePlayLog, onRequireSubscribeForPlayLog])
 
   const resetTemplateFormFields = () => {
     setCustomName('')
@@ -615,6 +626,10 @@ export default function PlayLogbook({
 
   const saveEntry = async () => {
     if (!userId || !selectedTemplate) return
+    if (!editingEntryId && !editingSessionId && !canCreatePlayLog) {
+      onRequireSubscribeForPlayLog?.()
+      return
+    }
     setError('')
     const validationMsg = getLogPlaySaveValidationError({
       selectedTemplateId,
@@ -698,6 +713,7 @@ export default function PlayLogbook({
       }
       closeSheet()
       await loadAll()
+      if (!editingEntryId && !sharedOnEdit) onPlayLogCreated?.()
     } catch (e) {
       setError(e?.message || (editingEntryId ? 'Failed to update entry' : 'Failed to save entry'))
     } finally {
@@ -970,7 +986,10 @@ export default function PlayLogbook({
                 onClick={() => openLogPlay()}
                 disabled={!sortedTemplates.length || schemaMissing}
                 data-play-logbook-primary-btn
-                className="w-full rounded-3xl bg-cyan-600 py-4 text-white font-bold text-base touch-manipulation active:bg-cyan-700 disabled:opacity-40"
+                data-play-logbook-primary-locked={!canCreatePlayLog ? 'true' : undefined}
+                className={`w-full rounded-3xl bg-cyan-600 py-4 text-white font-bold text-base touch-manipulation active:bg-cyan-700 disabled:opacity-40 ${
+                  canCreatePlayLog ? '' : 'opacity-45 cursor-not-allowed'
+                }`}
               >
                 + Log Play
               </button>

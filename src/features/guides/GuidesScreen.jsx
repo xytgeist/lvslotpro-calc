@@ -1442,6 +1442,7 @@ export default function GuidesScreen({
   gatesDbReady = false,
   onSetContentGate,
   onRequireSubscribe,
+  canCreatePlayLog = true,
   titleBarNavSlot = null,
   /** When set, scroll to and expand this guide card slug (used by Lounge guide embed tap). */
   openCardSlug = null,
@@ -2048,7 +2049,7 @@ export default function GuidesScreen({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              if (!hasSlotsEdge) {
+                              if (!canCreatePlayLog) {
                                 onRequireSubscribe?.('slots-edge')
                                 return
                               }
@@ -2057,8 +2058,11 @@ export default function GuidesScreen({
                               stashPlayLogPrefill({ templateSlug: machineSlug })
                               onOpenLogbook()
                             }}
-                            className={`flex-1 min-h-11 rounded-2xl text-white text-sm font-bold touch-manipulation ${LOG_PLAY_LOGBOOK_BTN_CLASS}`}
+                            className={`flex-1 min-h-11 rounded-2xl text-white text-sm font-bold touch-manipulation ${LOG_PLAY_LOGBOOK_BTN_CLASS} ${
+                              !canCreatePlayLog ? 'opacity-45 cursor-not-allowed' : ''
+                            }`}
                             data-log-play-logbook-btn
+                            data-log-play-logbook-locked={!canCreatePlayLog ? 'true' : undefined}
                           >
                             Log play in Logbook
                           </button>

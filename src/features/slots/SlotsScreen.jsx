@@ -19,7 +19,7 @@ const SLOTS_TOOLS = [
     Icon: Wallet,
     color: '#34d399',
     description: 'Track sessions and bankroll growth',
-    subscriberGated: () => true,
+    subscriberGated: () => false,
   },
   {
     id: 'calculators',
@@ -43,7 +43,7 @@ const SLOTS_TOOLS = [
     Icon: ClipboardList,
     color: '#f472b6',
     description: 'Log AP plays and analyze your data',
-    subscriberGated: () => true,
+    subscriberGated: () => false,
   },
   // Local Intel (`intel` tab) remains routable from AppShell for future use - not listed in hub (Ryan, 2026-05-29).
 ]

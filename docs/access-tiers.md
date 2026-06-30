@@ -62,13 +62,14 @@ If the user attempts **any** of the following, show the **create account** popup
 **Navigation**
 
 - May open **all** other app areas from the **hamburger menu** (no blanket “create account” wall).
-- **Hamburger UI:** Top-level rows are **Lounge**, **Slots** (hub), and **Team**. **Slots** opens a hub that links to Calcs, Calendar, Bankroll, Logbook, and AP Guides (**Local Intel** removed from hub UI — route/code retained; Lounge covers field intel for now). Hub tiles that are **subscriber-only at the product level** show a **lock icon** next to the label for free (non-subscriber) users; **staff** and **active subscribers** do not see those locks. (**Calendar** stays **unlocked** at the hub because the calendar is free; **alerts** and **OCR** stay subscribe-gated **inside** Calendar.)
+- **Hamburger UI:** Top-level rows are **Lounge**, **Slots** (hub), and **Team**. **Slots** opens a hub that links to Calcs, Calendar, Bankroll, Logbook, and AP Guides (**Local Intel** removed from hub UI — route/code retained; Lounge covers field intel for now). Hub tiles that are **subscriber-only at the product level** show a **lock icon** next to the label for free (non-subscriber) users; **staff** and **active subscribers** do not see those locks. (**Calendar**, **Bankroll**, and **Logbook** hub tiles stay **unlocked** for free users; bankroll/logbook **create** actions cap at 10 free uses — see §4 table; calendar **alerts** and **OCR** stay subscribe-gated **inside** Calendar.)
 
 **Per-feature subscribe requirements**
 
 | Area | Free tier |
 | --- | --- |
-| **Bankroll manager** | **Subscribe** to use (gate + subscribe CTA). |
+| **Bankroll manager** | **10 free sessions**; subscribe for unlimited. Hub tile unlocked; **Start Session** locks at limit. |
+| **Play Logbook** | **10 free play logs**; subscribe for unlimited. Hub tile unlocked; **+ Log Play** and **Log play in Logbook** lock at limit. |
 | **Calendar** | May use calendar **without** subscribe. **Subscribe** for **alerts** and for **image upload AI OCR** on offers. |
 | **Calculators** | **Subset unlocked**; **majority locked**. Locked rows: **lock icon** on calculator button; tap → **subscribe** popup with path to purchase. Unlocked calcs behave normally. |
 | **AP Guides** | **Some guides unlocked**, **many locked**; same pattern as calcs — lock affordance + tap → **subscribe** popup. |
@@ -112,7 +113,8 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | --- | --- | --- | --- | --- |
 | **Lounge** | Read-only full feed (no search/filter/post tap); forbidden actions → create account modal | Full + verified badge | Full + verified + subscriber on posts | Full + staff badges |
 | **Hamburger / other tabs** | Create account modal | Allowed; gated features show subscribe modal | Full | Full |
-| **Bankroll** | Create account modal | Subscribe | Full | Full |
+| **Bankroll** | Create account modal | 10 sessions free; subscribe for unlimited | Full | Full |
+| **Play Logbook** | Create account modal | 10 logs free; subscribe for unlimited | Full | Full |
 | **Calendar** | Create account modal | Calendar yes; **alerts + OCR** subscribe | Full | Full |
 | **Calculators** | Create account modal | Some unlocked; locks → subscribe | Full; add-on paywalls **offered to subscribers only** | Full |
 | **AP Guides** | Create account modal | Some unlocked; locks → subscribe | Full; new-game add-ons **offered to subscribers only** | Full |
@@ -124,7 +126,7 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | Modal | When |
 | --- | --- |
 | **Create account** | Anonymous user: navigation, post tap, search (when present), or any disallowed action. Dismiss → can still read the Lounge feed; modal returns on next violation. |
-| **Subscribe** | Free user hits a subscriber-only feature (bankroll, alerts, OCR, locked calc/guide, etc.). Include clear **Subscribe** action. |
+| **Subscribe** | Free user hits a subscriber-only feature (locked calc/guide, calendar alerts/OCR, bankroll/logbook over free limits, etc.). Include clear **Subscribe** action. |
 
 ---
 
@@ -137,4 +139,4 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | 2026-05-18 | Hamburger **Offers** row renamed **Calendar** (tab id `offers` unchanged; deep links `?tab=offers` unchanged). |
 | 2026-05-10 | Hamburger: lock icons on **Calcs**, **AP Guides**, **Bankroll** for free non-subscribers; staff/subscribers see no locks; Calendar menu row unlocked (gates in-feature). |
 | 2026-05-10 | **Signup:** no client **`allowed_emails`** whitelist; free tier = signed-in user until billing flags ship. |
-| 2026-05-24 | Multi-product Edge billing scaffold: **`slots-edge`** / **`sports-edge`** / **`crypto-edge`** slugs; Lounge free; calendar free; alerts free; OCR gated on **`slots-edge`**. |
+| 2026-06-27 | **Bankroll + Logbook:** free users get **10 bankroll sessions** and **10 play logs**; hub tiles unlocked; create buttons lock at limit → subscribe. Constants in **`freemiumToolLimits.js`**. |

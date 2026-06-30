@@ -101,6 +101,9 @@ export default function BankrollTracker({
   supabaseClient,
   titleBarNavSlot = null,
   titleBarToolCloseVisible = false,
+  canCreateBankrollSession = true,
+  onRequireSubscribeForBankroll = null,
+  onBankrollSessionCreated = null,
 }) {
   const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -267,6 +270,10 @@ export default function BankrollTracker({
     const amt = parseFloat(startAmount)
     if (isNaN(amt) || amt <= 0) { setError('Enter a valid starting amount.'); return }
     if (activeSession) { setError('You already have a session in progress.'); return }
+    if (!canCreateBankrollSession) {
+      onRequireSubscribeForBankroll?.()
+      return
+    }
     setSaving(true); setError('')
     try {
       const startAt = localDateTimeToIso(startDate, startTime)
@@ -277,6 +284,7 @@ export default function BankrollTracker({
       if (err) throw err
       setSessions(prev => [data, ...prev])
       setSheet(null); setStartCasino(''); setStartAmount(''); setStartGameType('slots')
+      onBankrollSessionCreated?.()
     } catch (e) {
       setError(e.message || 'Could not start session.')
     } finally {
@@ -380,6 +388,10 @@ export default function BankrollTracker({
   const saveLogPast = async () => {
     if (!pastFields.date) { setError('Select a date.'); return }
     if (!pastFields.start_time) { setError('Select a start time.'); return }
+    if (!canCreateBankrollSession) {
+      onRequireSubscribeForBankroll?.()
+      return
+    }
     const durationHrs = parseFloat(pastFields.duration_hours)
     if (isNaN(durationHrs) || durationHrs <= 0) { setError('Enter a session duration in hours.'); return }
     const rawStart = parseFloat(pastFields.start_amount)
@@ -426,6 +438,7 @@ export default function BankrollTracker({
       setSessions(prev => [data, ...prev].sort((a, b) => new Date(b.start_at) - new Date(a.start_at)))
       setProfile(updatedProfile)
       setSheet(null)
+      onBankrollSessionCreated?.()
     } catch (e) {
       setError(e.message || 'Could not save session.')
     } finally {
@@ -473,6 +486,10 @@ export default function BankrollTracker({
   }, [supabaseClient])
 
   const openLogPast = () => {
+    if (!canCreateBankrollSession) {
+      onRequireSubscribeForBankroll?.()
+      return
+    }
     const today = localYmd()
     setNearbyCasinos([])
     setPastFields({ casino_name: '', date: today, start_time: '', duration_hours: '4', start_amount: '', end_amount: '', win_loss: '', notes: '', game_type: 'slots' })
@@ -485,6 +502,10 @@ export default function BankrollTracker({
     setError(''); setSheet('setBankroll')
   }
   const openStartSession = () => {
+    if (!canCreateBankrollSession) {
+      onRequireSubscribeForBankroll?.()
+      return
+    }
     const now = new Date()
     const today = localYmd(now)
     const hh = String(now.getHours()).padStart(2, '0')
@@ -804,13 +825,20 @@ export default function BankrollTracker({
               <button
                 onClick={openStartSession}
                 data-start-session-btn
-                className="w-full rounded-3xl bg-cyan-600 py-4 text-white font-bold text-base touch-manipulation active:bg-cyan-700"
+                data-start-session-locked={!canCreateBankrollSession ? 'true' : undefined}
+                className={`w-full rounded-3xl bg-cyan-600 py-4 text-white font-bold text-base touch-manipulation active:bg-cyan-700 ${
+                  !canCreateBankrollSession ? 'opacity-45 cursor-not-allowed' : ''
+                }`}
               >
                 + Start Session
               </button>
               <button
                 onClick={openLogPast}
-                className="w-full rounded-2xl py-3 text-zinc-400 text-sm font-semibold touch-manipulation active:text-zinc-200"
+                data-log-past-session-btn
+                data-log-past-session-locked={!canCreateBankrollSession ? 'true' : undefined}
+                className={`w-full rounded-2xl py-3 text-zinc-400 text-sm font-semibold touch-manipulation active:text-zinc-200 ${
+                  !canCreateBankrollSession ? 'opacity-45 cursor-not-allowed' : ''
+                }`}
               >
                 Log previous session(s)
               </button>
