@@ -100,9 +100,14 @@ import {
   writeLoungeWelcomeAck,
   readLoungeSlotsMenuHintAck,
   writeLoungeSlotsMenuHintAck,
+  readLoungeFabHintAck,
+  writeLoungeFabHintAck,
+  readLoungeFabHintAnonAck,
+  writeLoungeFabHintAnonAck,
 } from './loungeStorage'
 import LoungeWelcomeModal from './LoungeWelcomeModal.jsx'
 import LoungeSlotsMenuHintOverlay from './LoungeSlotsMenuHintOverlay.jsx'
+import LoungeFabHintOverlay from './LoungeFabHintOverlay.jsx'
 import {
   consumeReopenLoungeDockPanel,
   consumeReopenLoungeWelcome,
@@ -717,6 +722,7 @@ export default function SocialFeed({
   const [loungeWelcomeOpen, setLoungeWelcomeOpen] = useState(false)
   const loungeWelcomeScheduleRef = useRef(false)
   const [slotsMenuHintOpen, setSlotsMenuHintOpen] = useState(false)
+  const [fabHintOpen, setFabHintOpen] = useState(false)
   const [profileGateBusy, setProfileGateBusy] = useState(false)
   const [profileGateErr, setProfileGateErr] = useState('')
   const [profileGateHandle, setProfileGateHandle] = useState('')
@@ -8181,6 +8187,12 @@ export default function SocialFeed({
     setSlotsMenuHintOpen(false)
   }, [composerUserId])
 
+  const onFabHintDismiss = useCallback(() => {
+    if (composerUserId) writeLoungeFabHintAck(composerUserId)
+    else writeLoungeFabHintAnonAck()
+    setFabHintOpen(false)
+  }, [composerUserId])
+
   useEffect(() => {
     if (!composerUserId) {
       setSlotsMenuHintOpen(false)
@@ -8188,14 +8200,14 @@ export default function SocialFeed({
     }
     if (!readLoungeWelcomeAck(composerUserId)) return undefined
     if (readLoungeSlotsMenuHintAck(composerUserId)) return undefined
-    if (slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen) return undefined
+    if (slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen || fabHintOpen) return undefined
     if (!isActivePage) return undefined
     if (loungeFeedBrowseMode !== 'member' || !authSessionReady || !composerAuthResolved) return undefined
     if (coldBootSplashVisible) return undefined
 
     const timer = window.setTimeout(() => {
       if (readLoungeSlotsMenuHintAck(composerUserId)) return
-      if (loungeWelcomeOpen || profileGateOpen) return
+      if (loungeWelcomeOpen || profileGateOpen || fabHintOpen) return
       setSlotsMenuHintOpen(true)
     }, 400)
 
@@ -8203,8 +8215,65 @@ export default function SocialFeed({
   }, [
     composerUserId,
     slotsMenuHintOpen,
+    fabHintOpen,
     loungeWelcomeOpen,
     profileGateOpen,
+    isActivePage,
+    loungeFeedBrowseMode,
+    authSessionReady,
+    composerAuthResolved,
+    coldBootSplashVisible,
+  ])
+
+  useEffect(() => {
+    if (!composerUserId) return undefined
+    if (!readLoungeWelcomeAck(composerUserId)) return undefined
+    if (!readLoungeSlotsMenuHintAck(composerUserId)) return undefined
+    if (readLoungeFabHintAck(composerUserId)) return undefined
+    if (fabHintOpen || slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen) return undefined
+    if (!isActivePage) return undefined
+    if (loungeFeedBrowseMode !== 'member' || !authSessionReady || !composerAuthResolved) return undefined
+    if (coldBootSplashVisible) return undefined
+
+    const timer = window.setTimeout(() => {
+      if (readLoungeFabHintAck(composerUserId)) return
+      if (slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen) return
+      setFabHintOpen(true)
+    }, 400)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    composerUserId,
+    fabHintOpen,
+    slotsMenuHintOpen,
+    loungeWelcomeOpen,
+    profileGateOpen,
+    isActivePage,
+    loungeFeedBrowseMode,
+    authSessionReady,
+    composerAuthResolved,
+    coldBootSplashVisible,
+  ])
+
+  useEffect(() => {
+    if (composerUserId) return undefined
+    if (readLoungeFabHintAnonAck()) return undefined
+    if (fabHintOpen || loungeWelcomeOpen) return undefined
+    if (!isActivePage) return undefined
+    if (loungeFeedBrowseMode !== 'anonymous' || !authSessionReady || !composerAuthResolved) return undefined
+    if (coldBootSplashVisible) return undefined
+
+    const timer = window.setTimeout(() => {
+      if (readLoungeFabHintAnonAck()) return
+      if (fabHintOpen || loungeWelcomeOpen) return
+      setFabHintOpen(true)
+    }, 600)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    composerUserId,
+    fabHintOpen,
+    loungeWelcomeOpen,
     isActivePage,
     loungeFeedBrowseMode,
     authSessionReady,
@@ -13769,7 +13838,9 @@ export default function SocialFeed({
             </div>
           ) : (
             <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
-              No posts yet. Tap the compose button to share, or post from Guides → Ask community.
+              {loungeReadOnly
+                ? 'No posts yet. Sign in to share, or browse what lands here from Guides → Ask community.'
+                : 'No posts yet. Tap the compose button to share, or post from Guides → Ask community.'}
             </div>
           )
         ) : (
@@ -16235,6 +16306,14 @@ export default function SocialFeed({
 
       {slotsMenuHintOpen ? (
         <LoungeSlotsMenuHintOverlay open={slotsMenuHintOpen} onDismiss={onSlotsMenuHintDismiss} />
+      ) : null}
+
+      {fabHintOpen ? (
+        <LoungeFabHintOverlay
+          open={fabHintOpen}
+          signedIn={Boolean(composerUserId && !loungeReadOnly)}
+          onDismiss={onFabHintDismiss}
+        />
       ) : null}
 
       {profileGateOpen && typeof document !== 'undefined'
