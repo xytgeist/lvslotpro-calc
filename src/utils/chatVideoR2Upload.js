@@ -1,0 +1,45 @@
+import { requestCfR2DirectUpload, uploadFileToCfR2PresignedUrl } from './loungeCfImageMedia.js'
+
+/**
+ * Mint a presigned PUT URL for a chat video MP4 from the lounge-chat-r2-video-upload Edge Function.
+ */
+async function requestChatVideoR2Upload(supabaseClient) {
+  const { data, error } = await supabaseClient.functions.invoke('lounge-chat-r2-video-upload', {
+    body: { contentType: 'video/mp4' },
+  })
+  if (error || !data?.uploadURL || !data?.publicUrl) {
+    throw new Error(error?.message || 'Failed to mint video upload URL.')
+  }
+  return { uploadURL: String(data.uploadURL), publicUrl: String(data.publicUrl) }
+}
+
+/**
+ * Upload an already-encoded MP4 file to Cloudflare R2 for chat.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {File} videoFile  compressed MP4 produced by encodeVideoForChat()
+ * @param {{ signal?: AbortSignal }} [opts]
+ * @returns {Promise<string>}  public URL of the stored video
+ */
+export async function uploadChatVideoToR2(supabaseClient, videoFile, opts = {}) {
+  const { uploadURL, publicUrl } = await requestChatVideoR2Upload(supabaseClient)
+  await uploadFileToCfR2PresignedUrl(uploadURL, videoFile, { signal: opts.signal })
+  return publicUrl
+}
+
+/**
+ * Upload a poster frame blob URL to Cloudflare R2.
+ * Re-uses the existing lounge-cf-r2-direct-upload Edge Function (accepts image/*).
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} posterBlobUrl  object-URL pointing at an in-memory JPEG
+ * @returns {Promise<string | null>}  public URL, or null when R2 is not configured
+ */
+export async function uploadChatPosterToR2(supabaseClient, posterBlobUrl) {
+  const blob = await fetch(posterBlobUrl).then((r) => r.blob())
+  const file = new File([blob], 'poster.jpg', { type: 'image/jpeg' })
+  const mint = await requestCfR2DirectUpload(supabaseClient, { contentType: 'image/jpeg' })
+  if (!mint.configured || !mint.data) return null
+  await uploadFileToCfR2PresignedUrl(mint.data.uploadURL, file)
+  return mint.data.publicUrl
+}

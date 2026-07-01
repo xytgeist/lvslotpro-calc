@@ -13,6 +13,27 @@ dist
 dist-ssr
 *.local
 
+# Supabase CLI / slot sync — keep test & prod service keys out of git
+.env.supabase.test
+.env.supabase.production
+
+# Machine Pro local export (member content — never commit)
+.machinepro-auth.json
+machinepro-export/
+
+# Advantage Slots local export (member content — never commit)
+.advantageslots-auth.json
+advantageslots-export/
+
+# AdvantagePlay.club local export (member content — never commit)
+.advantageplay-auth.json
+advantageplay-export/
+
+# SlotFarmers.club local export (member content — never commit)
+.slotfarmers-auth.json
+slotfarmers-export/
+ap-guide-workspace/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -26,3 +47,6 @@ dist-ssr
 
 supabase/.temp/
 supabase/.branches/
+
+# Cursor chat export state (stale � scripts removed 2026-05-25)
+.cursor/chat-export-state-*.json

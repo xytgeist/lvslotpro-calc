@@ -1,11 +1,39 @@
 import { useCallback } from 'react'
-import { dateFromDatetimeLocalValue, draftFromAiReviewPayload } from '../utils'
+import {
+  coerceAlertPresetForMode,
+  computeOfferAlertFireIso,
+  dateFromDatetimeLocalValue,
+  draftFromAiReviewPayload,
+  OFFER_ALERT_DAY_9AM
+} from '../utils'
+import {
+  requestCfR2DirectUpload,
+  uploadFileToCfR2PresignedUrl,
+  deleteCfR2OrphanObject,
+} from '../../../utils/loungeCfImageMedia'
+
+function isMissingAlertColumnsError(err) {
+  const code = String(err?.code || '')
+  const msg = `${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`.toLowerCase()
+  const mentionsMissingColumn = msg.includes('column') && (msg.includes('does not exist') || msg.includes('could not find'))
+  const mentionsAlertColumns = msg.includes('alert_preset') || msg.includes('alert_fire_at')
+  return code === '42703' || code === 'PGRST204' || (mentionsMissingColumn && mentionsAlertColumns)
+}
+
+function withoutAlertColumns(payload) {
+  const next = { ...payload }
+  delete next.alert_preset
+  delete next.alert_fire_at
+  return next
+}
 
 export default function useOffersCalendarMutations({
   supabaseClient,
   state,
   setters,
-  actions
+  actions,
+  hasSlotsEdge = true,
+  onRequireSubscribe,
 }) {
   const {
     draft,
@@ -16,11 +44,9 @@ export default function useOffersCalendarMutations({
     propagateCasinoOnSave,
     propagateTitleOnSave,
     propagateValueOnSave,
-    reviewSourceImagePath,
-    calendarMode
+    reviewSourceImagePath
   } = state
   const {
-    setCalendarMode,
     setCursorMonth,
     setWeekAnchor,
     setSelectedDays,
@@ -30,7 +56,7 @@ export default function useOffersCalendarMutations({
     setUploading,
     setActiveImportBatchId
   } = setters
-  const { closeForm, loadEvents, loadReviewQueue, refreshImportResults } = actions
+  const { closeForm, loadEvents, loadReviewQueue, refreshImportResults, resolveAlertPresetBeforeSave, onAfterSuccessfulSave } = actions
 
   const applyCurrentFieldsToAssociatedReviewItems = useCallback(async () => {
     if (!completingReviewUploadId || !completingReviewItemId) return
@@ -106,6 +132,8 @@ export default function useOffersCalendarMutations({
             if (!normalizedEnd || normalizedEnd.getTime() >= normalizedStart.getTime()) {
               const up = row.offer_uploads
               const associatedStoragePath = Array.isArray(up) ? up[0]?.storage_path : up?.storage_path
+              const assocPreset = coerceAlertPresetForMode(draft.alertPreset || OFFER_ALERT_DAY_9AM, associatedAllDay)
+              const assocFire = computeOfferAlertFireIso(assocPreset, normalizedStart, associatedAllDay)
               const insertPayload = {
                 user_id: user.id,
                 casino_name: merged.casinoName.trim(),
@@ -116,13 +144,24 @@ export default function useOffersCalendarMutations({
                 value_amount: merged.valueAmount !== '' ? Number(merged.valueAmount) : null,
                 notes: merged.notes?.trim() || null,
                 source_type: 'image_ai',
-                source_image_path: associatedStoragePath || reviewSourceImagePath || null
+                source_image_path: associatedStoragePath || reviewSourceImagePath || null,
+                alert_preset: assocPreset,
+                alert_fire_at: assocFire
               }
-              const { data: inserted, error: insertErr } = await supabaseClient
+              let { data: inserted, error: insertErr } = await supabaseClient
                 .from('offer_events')
                 .insert(insertPayload)
                 .select('id')
                 .single()
+              if (insertErr && isMissingAlertColumnsError(insertErr)) {
+                const retry = await supabaseClient
+                  .from('offer_events')
+                  .insert(withoutAlertColumns(insertPayload))
+                  .select('id')
+                  .single()
+                inserted = retry.data
+                insertErr = retry.error
+              }
               if (!insertErr && inserted?.id) {
                 const { error: resolveErr } = await supabaseClient
                   .from('offer_ai_review_items')
@@ -181,6 +220,7 @@ export default function useOffersCalendarMutations({
   ])
 
   const saveEvent = useCallback(async () => {
+    let saveCompleted = false
     setSaving(true)
     setError('')
     try {
@@ -199,6 +239,14 @@ export default function useOffersCalendarMutations({
         throw new Error('End date/time must be later than (or the same as) start.')
       }
 
+      const initialAlertPreset = coerceAlertPresetForMode(draft.alertPreset || OFFER_ALERT_DAY_9AM, allDay)
+      const alertPreset = resolveAlertPresetBeforeSave
+        ? await resolveAlertPresetBeforeSave(initialAlertPreset, {
+            allDay,
+            editingId: Boolean(editingId)
+          })
+        : initialAlertPreset
+      const alertFireAt = computeOfferAlertFireIso(alertPreset, normalizedStart, allDay)
       const payload = {
         casino_name: draft.casinoName.trim(),
         offer_type: draft.offerType,
@@ -206,11 +254,17 @@ export default function useOffersCalendarMutations({
         start_at: normalizedStart.toISOString(),
         end_at: normalizedEnd ? normalizedEnd.toISOString() : null,
         value_amount: draft.valueAmount !== '' ? Number(draft.valueAmount) : null,
-        notes: draft.notes.trim() || null
+        notes: draft.notes.trim() || null,
+        alert_preset: alertPreset,
+        alert_fire_at: alertFireAt
       }
 
       if (editingId) {
-        const { error: e } = await supabaseClient.from('offer_events').update(payload).eq('id', editingId)
+        let { error: e } = await supabaseClient.from('offer_events').update(payload).eq('id', editingId)
+        if (e && isMissingAlertColumnsError(e)) {
+          const retry = await supabaseClient.from('offer_events').update(withoutAlertColumns(payload)).eq('id', editingId)
+          e = retry.error
+        }
         if (e) throw e
       } else {
         const { data: sessionData } = await supabaseClient.auth.getSession()
@@ -226,7 +280,12 @@ export default function useOffersCalendarMutations({
           source_type: pendingReviewId ? 'image_ai' : 'manual',
           source_image_path: pendingReviewId ? pendingImg : null
         }
-        const { data: inserted, error: e } = await supabaseClient.from('offer_events').insert(insertPayload).select('id').single()
+        let { data: inserted, error: e } = await supabaseClient.from('offer_events').insert(insertPayload).select('id').single()
+        if (e && isMissingAlertColumnsError(e)) {
+          const retry = await supabaseClient.from('offer_events').insert(withoutAlertColumns(insertPayload)).select('id').single()
+          inserted = retry.data
+          e = retry.error
+        }
         if (e) throw e
         if (pendingReviewId && inserted?.id) {
           const { error: revErr } = await supabaseClient
@@ -238,25 +297,29 @@ export default function useOffersCalendarMutations({
             })
             .eq('id', pendingReviewId)
           if (revErr) {
-            // eslint-disable-next-line no-console
             console.warn('Could not mark AI review item resolved:', revErr)
           }
         }
       }
+      // Fire-and-forget: add casino name to global list if new
+      if (draft.casinoName?.trim()) {
+        supabaseClient.rpc('upsert_casino_name', { p_name: draft.casinoName.trim() }).then(() => {}).catch(() => {})
+      }
+
+      saveCompleted = true
       if (!editingId && !pendingReviewId) {
         const focusDate = new Date(normalizedStart.getFullYear(), normalizedStart.getMonth(), normalizedStart.getDate())
         setCursorMonth(new Date(focusDate.getFullYear(), focusDate.getMonth(), 1))
         setWeekAnchor(focusDate)
         setSelectedDays([])
-        if (calendarMode === 'agenda') setCalendarMode('month')
       }
-      closeForm()
       await loadEvents()
       await loadReviewQueue()
+      if (typeof onAfterSuccessfulSave === 'function') {
+        void onAfterSuccessfulSave()
+      }
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error('saveEvent error:', e)
-      // eslint-disable-next-line no-console
       console.error('saveEvent payload (partial):', {
         offer_type: draft?.offerType,
         startAt: draft?.startAt,
@@ -270,6 +333,13 @@ export default function useOffersCalendarMutations({
       if (e?.hint) parts.push(`hint: ${e.hint}`)
       setError(parts.join('\n') || 'Failed to save offer.')
     } finally {
+      if (saveCompleted) {
+        try {
+          closeForm()
+        } catch {
+          // Never allow close-flow errors to keep the form open after a successful save.
+        }
+      }
       setSaving(false)
     }
   }, [
@@ -288,15 +358,20 @@ export default function useOffersCalendarMutations({
     setCursorMonth,
     setWeekAnchor,
     setSelectedDays,
-    calendarMode,
-    setCalendarMode,
     closeForm,
     loadEvents,
-    loadReviewQueue
+    loadReviewQueue,
+    resolveAlertPresetBeforeSave,
+    onAfterSuccessfulSave
   ])
 
   const handleImportPhotos = useCallback(
     async (ev) => {
+      if (!hasSlotsEdge) {
+        onRequireSubscribe?.()
+        ev.target.value = ''
+        return
+      }
       const files = Array.from(ev.target.files || []).filter((f) => f.type.startsWith('image/'))
       ev.target.value = ''
       if (!files.length) return
@@ -318,24 +393,63 @@ export default function useOffersCalendarMutations({
           batchId = batchRow.id
         }
 
+        // Try R2 first for the first file to check if configured (avoid repeated 503s)
+        let r2Configured = null // null = unknown, true/false once determined
         for (const file of files) {
-          const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : ''
-          const safeName = `${crypto.randomUUID()}${ext}`
-          const path = `${user.id}/${safeName}`
-          const { error: upErr } = await supabaseClient.storage.from('offer-mailers').upload(path, file, {
-            cacheControl: '3600',
-            upsert: false
-          })
-          if (upErr) throw upErr
+          let storagePath = null
+          let bucketId = null
+
+          if (r2Configured !== false) {
+            // Attempt R2 presigned upload
+            let mint = null
+            try {
+              mint = await requestCfR2DirectUpload(supabaseClient, {
+                contentType: file.type || 'image/jpeg',
+                fileName: file.name || '',
+              })
+            } catch (r2Err) {
+              if (r2Configured === null) r2Configured = false
+            }
+            if (mint) {
+              if (!mint.configured) {
+                r2Configured = false
+              } else {
+                r2Configured = true
+                await uploadFileToCfR2PresignedUrl(mint.data.uploadURL, file)
+                storagePath = mint.data.publicUrl
+                bucketId = 'cf-r2'
+              }
+            }
+          }
+
+          if (!storagePath) {
+            // Fall back to Supabase Storage
+            const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : ''
+            const safeName = `${crypto.randomUUID()}${ext}`
+            const path = `${user.id}/${safeName}`
+            const { error: upErr } = await supabaseClient.storage.from('offer-mailers').upload(path, file, {
+              cacheControl: '3600',
+              upsert: false
+            })
+            if (upErr) throw upErr
+            storagePath = path
+            bucketId = 'offer-mailers'
+          }
+
           const row = {
-            storage_path: path,
+            storage_path: storagePath,
+            bucket_id: bucketId,
             file_name: file.name,
             mime_type: file.type || null,
             status: 'queued',
             ...(batchId ? { batch_id: batchId } : {})
           }
           const { error: rowErr } = await supabaseClient.from('offer_uploads').insert(row)
-          if (rowErr) throw rowErr
+          if (rowErr) {
+            // If we uploaded to R2 but failed to save the row, clean up the orphan
+            if (bucketId === 'cf-r2') void deleteCfR2OrphanObject(supabaseClient, storagePath)
+            throw rowErr
+          }
         }
 
         if (batchId) {
@@ -360,7 +474,7 @@ export default function useOffersCalendarMutations({
         setUploading(false)
       }
     },
-    [closeForm, refreshImportResults, setActiveImportBatchId, setError, setUploading, supabaseClient]
+    [closeForm, hasSlotsEdge, onRequireSubscribe, refreshImportResults, setActiveImportBatchId, setError, setUploading, supabaseClient]
   )
 
   return {

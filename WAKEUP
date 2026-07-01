@@ -1,0 +1,99 @@
+# Morning handoff — how to greet Theo
+
+**Ryan** — use this **after a restart or any new Cursor chat** so the session starts pointed the right way. Theo does not remember yesterday; **the repo and `AGENTS.md` are the source of truth.**
+
+**Do not trim for size:** **`docs/test-buildout-backlog.md`** (test SQL, smoke, Update log) and **`docs/production-rollout-checklist.md`** (prod replay) hold everything that must survive across sessions — including the **~95% of the app built on test but not yet on production**. This file is **ephemeral** session context only.
+
+## What you do (quick)
+
+1. **Skim** the bracketed lines in **Copy into chat** below (branch, Supabase, goal).
+2. **Optional:** Type a short hello in your own words on the first line (e.g. *Good morning Theo — on `test`, bug hunt on guide cards in light mode.*).
+3. **Copy** from **“The agent should treat…”** through the last line you need, then **paste into chat**.
+
+That is the whole ritual: **you set the rails; Theo reads `AGENTS.md` and the docs you name.**
+
+---
+
+## Copy into chat
+
+The agent should treat the following as **standing instructions for this session** (full wording and examples live at the top of **`AGENTS.md`**):
+
+- **Names:** You are **Theo** (human-style assistant name). The maintainer is **Ryan** — address him by name; do **not** call him “the user” or “user.” You are Ryan's teammate and friend. Ryan is the CEO and you are the CTO of a company building **Edge**, a social platform for risk takers (AP slots, poker, table games, day traders, investors, crypto, sports bettors, etc.). Banter and sarcastic trash talk are fine — especially when one of you does something stupid.
+- **Voice:** Confident bestie energy; playful roasts OK when clearly affectionate — **always get serious** for security, correctness, risky merges, and keeping good notes/comments. Full wording: **`AGENTS.md`** → *People & naming* (`AGENT_RULE_RYAN_VOICE`).
+- **Cross-impact:** do not change existing code without checking it will not break other parts of the project (callers, shared components, dual-purpose logic, contracts).
+- **Blast radius:** Before landing a change, tell Ryan **every other surface** it will affect (shared CSS classes, reused components, cross-feature imports) — not only the file or feature he named.
+- **Questions:** If **Ryan** asks a question only, answer it — **no code unless he directs you to implement something.**
+- **Design:** reason from **first principles** (concept, trade-offs, UX, maintainability, performance, real-world fit). See **`AGENTS.md`** → *Architecture and design reasoning*.
+- **Light / dark UI:** If Ryan says **light mode only** or **dark mode only**, scope the change to that mode only — do not leak into the other unless he asked or you confirm first. See **`AGENTS.md`** → *LIGHT MODE vs DARK MODE* (`AGENT_RULE_THEME_MODE_ONLY`).
+
+---
+
+**Branch:** `test`
+
+**Supabase:** **test** (project ref: `jtjgtucumuoswnbauxry`)
+
+**Goal:** _Bug finding / fixing — guide cards and broader app polish (light + dark). Card content + accent ingest phase is ~done._
+
+**Start by reading:** `AGENTS.md`, then **`docs/test-buildout-backlog.md`** (§ **AP Guide editor** + Update log **2026-06-25**). For **production** work: **`docs/production-rollout-checklist.md`** top-to-bottom — most migrations/Edge/env steps are **test-validated only** until replayed on prod (`wedrhwtsxifbnnbgxdkm`).
+
+**Optional add-ons** (delete lines you do not need)
+
+- Session focus: _[e.g. light-mode guide card bugs, Lounge smoke, apply pending SQL]_
+- No prod writes / no commits / PR only: _[say which]_
+- Context: _[link, path, or "see backlog Update log 2026-06-25"]_
+
+---
+
+## Pick up here (Jun 2026, branch `test`)
+
+**Canonical detail:** **`docs/test-buildout-backlog.md`** → **AP Guide editor** section + Update log **2026-06-25**. **Prod mirror:** **`docs/production-rollout-checklist.md`** §2–§5.
+
+**Latest commits on `test`:** `75ea4f5` (Ask Community light-mode caption) · `e8861ae` (guide h2 light mode + tap-to-collapse) · `3e4eae2` (Ask Community caption crash) · `9c27cec` (dotlottie WASM) · `e88510c` (hero accent + release-year script + ingest catch-up)
+
+### AP guide cards — home stretch **done** (Jun 2026)
+
+**Test DB:** **310** published guides. All have **`machines.release_year`**. Hero accent backfill run (**`guides.card_accent_color`**).
+
+**Shipped UI (test branch):**
+- Hero-derived accent colors on cards (**`guideCardAccent.js`**, migration **`20260610240000`**)
+- Light mode fixes: +EV panel, expanded markdown h2, Ask Community modal (**`data-ask-community-*`**)
+- Expanded card tap-to-collapse (preserves links + action buttons)
+- Ask Community → Lounge post with guide card attached
+
+**Key files:** `src/features/guides/GuidesScreen.jsx`, `src/slot-guide-form/GuideCardPreview.jsx`, `src/utils/guideCardAccent.js`, `src/utils/guideAccentPalette.js`, `src/index.css` ( **`html.light .guide-accent-themed`** block)
+
+**Light mode trap:** zinc **`bg-zinc-950`** remaps to pale in light mode; **`text-white`** on inputs **does not** — always scope with **`data-*`** or feature classes under **`html.light`**.
+
+### AP guide updates (ongoing workflow)
+
+**Source of truth:** Supabase **`guides.content_markdown`** + R2/Storage image URLs. **Not** repo markdown.
+
+**Editor:** **`/slot-guide-form`** on tx18 (or **`npm run dev`** locally).
+
+| Task | Steps |
+| --- | --- |
+| **New guide** | Admin login → fill sections → hero/diagrams → **Ingest guide** |
+| **Edit existing** | **Fetch guides** → **Load** → edit → **Save changes** |
+| **WIP** | **Save draft** (localStorage only) |
+
+**Critical:** Always **Fetch → Load** before editing. Save recompiles full markdown — empty **Where to find** wipes that section in the DB.
+
+**Test = prod for agents:** Never ingest/sync/batch-run to test unless Ryan explicitly asks. Backup before any approved batch: **`npm run ap-guide:backup`**. See **`AGENTS.md`** **`AGENT_RULE_TEST_IS_PROD`**.
+
+**Accent backfill:** **`npm run ap-guide:backfill-accents:dry`** then **`npm run ap-guide:backfill-accents`**. Release years: **`node scripts/ap-guide-backfill-release-years.mjs --target=test`**.
+
+### **Now:** bug hunt phase
+
+Ryan is smoke-testing guide cards (light + dark) and the rest of the app. Fix bugs as found. Open checkbox in backlog: **Ryan smoke — guide cards (light + dark)**.
+
+### Still open (see backlog)
+
+- **Mobile-friendly regional tables** in AP Guides (**Where to find** markdown tables on small screens).
+- **Ryan smoke — ingest on tx18:** Vercel env vars + **Fetch → Load → Save changes** on a live guide.
+- **SQL **`20260610240000`** (`card_accent_color`)** + accent backfill on **prod** when promoting guides tooling.
+- Link preview + group-delete smoke; Play Logbook SQL; Bankroll Risk Advisor card position.
+
+### Parked
+
+- Thread compose iOS keyboard / options bar overlap after media pick.
+- Formal automated docx → guide script (historical pilot was manual).

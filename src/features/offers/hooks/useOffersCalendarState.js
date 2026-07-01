@@ -1,7 +1,69 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { draftFromAiReviewPayload, emptyOfferDraft, localDateKeyFromDate, localDateKeyFromIso, shuffledCopy, toDatetimeLocalValue } from '../utils'
+import {
+  coerceAlertPresetForMode,
+  draftFromAiReviewPayload,
+  emptyOfferDraft,
+  localDateKeyFromDate,
+  localDateKeyFromIso,
+  OFFER_ALERT_DAY_9AM,
+  OFFER_ALERT_HOUR_BEFORE,
+  OFFER_ALERT_NONE,
+  shuffledCopy,
+  toDatetimeLocalValue
+} from '../utils'
 
-export default function useOffersCalendarState({ supabaseClient, normalizeLoadedEvent }) {
+const OFFERS_FORM_DRAFT_STORAGE_KEY = 'offers_form_draft_v1'
+const OFFERS_FORM_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const OFFER_EVENTS_BASE_SELECT = 'id,casino_name,offer_type,title,start_at,end_at,value_amount,notes,created_at,source_type,source_image_path'
+const OFFER_EVENTS_SELECT_WITH_ALERTS = `${OFFER_EVENTS_BASE_SELECT},alert_preset,alert_fire_at`
+
+function isMissingAlertColumnsError(err) {
+  const code = String(err?.code || '')
+  const msg = `${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`.toLowerCase()
+  const mentionsMissingColumn = msg.includes('column') && (msg.includes('does not exist') || msg.includes('could not find'))
+  const mentionsAlertColumns = msg.includes('alert_preset') || msg.includes('alert_fire_at')
+  return code === '42703' || code === 'PGRST204' || (mentionsMissingColumn && mentionsAlertColumns)
+}
+
+function readPersistedFormDraft() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(OFFERS_FORM_DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const savedAt = Number(parsed.savedAt || 0)
+    if (!Number.isFinite(savedAt) || Date.now() - savedAt > OFFERS_FORM_DRAFT_MAX_AGE_MS) return null
+    const draft = { ...emptyOfferDraft(), ...(parsed.draft || {}) }
+    return {
+      showForm: parsed.showForm === true,
+      draft,
+      allDay: parsed.allDay !== false
+    }
+  } catch {
+    return null
+  }
+}
+
+function clearPersistedFormDraft() {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(OFFERS_FORM_DRAFT_STORAGE_KEY)
+  } catch {
+    // Safari private mode / restricted storage can throw; never block close flow.
+  }
+}
+
+export default function useOffersCalendarState({
+  supabaseClient,
+  normalizeLoadedEvent,
+  newEventAlertPresetDefault = OFFER_ALERT_DAY_9AM
+}) {
+  const restoredFormDraft = readPersistedFormDraft()
+  const makeBaseDraft = useCallback(
+    () => ({ ...emptyOfferDraft(), alertPreset: newEventAlertPresetDefault || OFFER_ALERT_DAY_9AM }),
+    [newEventAlertPresetDefault]
+  )
   const fileInputRef = useRef(null)
   const longPressTimerRef = useRef(null)
   const casinoFieldRef = useRef(null)
@@ -30,15 +92,15 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
   const [reviewSourceImagePath, setReviewSourceImagePath] = useState(null)
   const [reviewSourceImageUrl, setReviewSourceImageUrl] = useState('')
   const [reviewSourceImageLoading, setReviewSourceImageLoading] = useState(false)
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(() => restoredFormDraft?.showForm === true)
   const [editingId, setEditingId] = useState(null)
   const [selectedDays, setSelectedDays] = useState([])
   const [cursorMonth, setCursorMonth] = useState(() => {
     const n = new Date()
     return new Date(n.getFullYear(), n.getMonth(), 1)
   })
-  const [draft, setDraft] = useState(() => emptyOfferDraft())
-  const [allDay, setAllDay] = useState(true)
+  const [draft, setDraft] = useState(() => restoredFormDraft?.draft || makeBaseDraft())
+  const [allDay, setAllDay] = useState(() => (restoredFormDraft ? restoredFormDraft.allDay : true))
   const [showCasinoSuggestions, setShowCasinoSuggestions] = useState(false)
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
   const [expandedEventId, setExpandedEventId] = useState(null)
@@ -47,7 +109,6 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
   /** 'auto' = week in landscape, month in portrait; 'month' | 'week' | 'agenda' = forced */
   const [calendarMode, setCalendarMode] = useState('auto')
   const [weekDetailEvent, setWeekDetailEvent] = useState(null)
-  const [showWeekPortraitHint, setShowWeekPortraitHint] = useState(false)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   const viewMenuRef = useRef(null)
   const [isLandscape, setIsLandscape] = useState(() =>
@@ -102,14 +163,14 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
 
   const offerTypeMeta = useMemo(
     () => ({
-      free_play: { label: 'Free play', dot: 'bg-violet-400', chip: 'bg-violet-500/15 text-violet-200 border-violet-500/40', card: 'bg-violet-500/18' },
-      hotel: { label: 'Hotel stay', dot: 'bg-sky-400', chip: 'bg-sky-500/15 text-sky-200 border-sky-500/40', card: 'bg-sky-500/16' },
-      dining: { label: 'Dining credit', dot: 'bg-emerald-400', chip: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/40', card: 'bg-emerald-500/16' },
-      gift: { label: 'Gift day', dot: 'bg-amber-400', chip: 'bg-amber-500/15 text-amber-200 border-amber-500/40', card: 'bg-amber-500/16' },
-      multiplier: { label: 'Tier multiplier', dot: 'bg-fuchsia-400', chip: 'bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-500/40', card: 'bg-fuchsia-500/16' },
-      tournament: { label: 'Tournament', dot: 'bg-rose-400', chip: 'bg-rose-500/15 text-rose-200 border-rose-500/40', card: 'bg-rose-500/16' },
-      drawing: { label: 'Drawing', dot: 'bg-cyan-400', chip: 'bg-cyan-500/15 text-cyan-200 border-cyan-500/40', card: 'bg-cyan-500/16' },
-      other: { label: 'Other', dot: 'bg-zinc-400', chip: 'bg-zinc-500/15 text-zinc-200 border-zinc-500/40', card: 'bg-zinc-700/45' }
+      free_play:  { label: 'Free play',       dot: 'bg-[#2979FF]', chip: 'bg-[#2979FF]/15 text-white border-[#2979FF]/40', card: 'bg-[#2979FF]/30' },
+      hotel:      { label: 'Hotel stay',      dot: 'bg-[#00BCD4]', chip: 'bg-[#00BCD4]/15 text-white border-[#00BCD4]/40', card: 'bg-[#00BCD4]/30' },
+      dining:     { label: 'Dining credit',   dot: 'bg-[#FF6D00]', chip: 'bg-[#FF6D00]/15 text-white border-[#FF6D00]/40', card: 'bg-[#FF6D00]/30' },
+      gift:       { label: 'Gift day',        dot: 'bg-[#FFD600]', chip: 'bg-[#FFD600]/15 text-white border-[#FFD600]/40', card: 'bg-[#FFD600]/30' },
+      multiplier: { label: 'Tier multiplier', dot: 'bg-[#E040FB]', chip: 'bg-[#E040FB]/15 text-white border-[#E040FB]/40', card: 'bg-[#E040FB]/30' },
+      tournament: { label: 'Tournament',      dot: 'bg-[#FF1744]', chip: 'bg-[#FF1744]/15 text-white border-[#FF1744]/40', card: 'bg-[#FF1744]/30' },
+      drawing:    { label: 'Drawing',         dot: 'bg-[#AA00FF]', chip: 'bg-[#AA00FF]/15 text-white border-[#AA00FF]/40', card: 'bg-[#AA00FF]/30' },
+      other:      { label: 'Other',           dot: 'bg-[#90A4AE]', chip: 'bg-[#90A4AE]/15 text-white border-[#90A4AE]/40', card: 'bg-[#90A4AE]/30' }
     }),
     []
   )
@@ -152,22 +213,60 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (activeImportBatchId) {
-      window.localStorage.setItem('offers_active_import_batch_id', activeImportBatchId)
+      try {
+        window.localStorage.setItem('offers_active_import_batch_id', activeImportBatchId)
+      } catch {
+        // Ignore storage failures in restricted/private environments.
+      }
     } else {
-      window.localStorage.removeItem('offers_active_import_batch_id')
+      try {
+        window.localStorage.removeItem('offers_active_import_batch_id')
+      } catch {
+        // Ignore storage failures in restricted/private environments.
+      }
     }
   }, [activeImportBatchId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    // Persist only unsaved "new event" drafts.
+    if (showForm && !editingId && !completingReviewItemId) {
+      const payload = {
+        savedAt: Date.now(),
+        showForm: true,
+        allDay,
+        draft
+      }
+      try {
+        window.localStorage.setItem(OFFERS_FORM_DRAFT_STORAGE_KEY, JSON.stringify(payload))
+      } catch {
+        // Ignore storage failures in restricted/private environments.
+      }
+      return
+    }
+    clearPersistedFormDraft()
+  }, [allDay, completingReviewItemId, draft, editingId, showForm])
 
   const loadEvents = useCallback(async () => {
     if (!supabaseClient) return
     setLoading(true)
     setError('')
     try {
-      const { data, error: e } = await supabaseClient
+      let { data, error: e } = await supabaseClient
         .from('offer_events')
-        .select('id,casino_name,offer_type,title,start_at,end_at,value_amount,notes,created_at,source_type,source_image_path')
+        .select(OFFER_EVENTS_SELECT_WITH_ALERTS)
         .order('start_at', { ascending: true })
         .limit(500)
+      // Backward-compatible fallback for databases that haven't added alert columns yet.
+      if (e && isMissingAlertColumnsError(e)) {
+        const fallback = await supabaseClient
+          .from('offer_events')
+          .select(OFFER_EVENTS_BASE_SELECT)
+          .order('start_at', { ascending: true })
+          .limit(500)
+        data = fallback.data
+        e = fallback.error
+      }
       if (e) throw e
       setEvents((data || []).map(normalizeLoadedEvent))
     } catch (e) {
@@ -252,7 +351,7 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
       const row = draftFromAiReviewPayload(item.draft || {})
       const hasSpecificTime = row.hasSpecificTime === true
       setAllDay(!hasSpecificTime)
-      setDraft({ ...emptyOfferDraft(), ...row })
+      setDraft({ ...makeBaseDraft(), ...row })
       setCompletingReviewItemId(item.id)
       const uploadId = item.upload_id || null
       setCompletingReviewUploadId(uploadId)
@@ -283,26 +382,31 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
         }
       }
       if (!path) return
+      // R2 images are full public URLs; Supabase Storage paths need a signed URL
+      if (path.startsWith('https://') || path.startsWith('http://')) {
+        setReviewSourceImageUrl(path)
+        return
+      }
       setReviewSourceImageLoading(true)
       try {
         const { data, error: signedErr } = await supabaseClient.storage.from('offer-mailers').createSignedUrl(path, 60 * 30)
         if (signedErr) throw signedErr
         setReviewSourceImageUrl(data?.signedUrl || '')
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.warn('Could not create signed URL for review image:', e)
         setReviewSourceImageUrl('')
       } finally {
         setReviewSourceImageLoading(false)
       }
     },
-    [supabaseClient]
+    [supabaseClient, makeBaseDraft]
   )
 
   const closeForm = useCallback(() => {
+    clearPersistedFormDraft()
     setShowForm(false)
     setEditingId(null)
-    setDraft(emptyOfferDraft())
+    setDraft(makeBaseDraft())
     setAllDay(true)
     setShowCasinoSuggestions(false)
     setShowTitleSuggestions(false)
@@ -314,7 +418,7 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     setReviewSourceImagePath(null)
     setReviewSourceImageUrl('')
     setReviewSourceImageLoading(false)
-  }, [])
+  }, [makeBaseDraft])
 
   const openForm = useCallback((dayKey = null) => {
     setCompletingReviewItemId(null)
@@ -329,16 +433,55 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     setEditingId(null)
     if (dayKey) {
       // Default to an all-day event when opening from a calendar day
-      setDraft((d) => ({ ...emptyOfferDraft(), startAt: `${dayKey}T00:00` }))
+      setDraft(() => ({ ...makeBaseDraft(), startAt: `${dayKey}T00:00`, endAt: `${dayKey}T00:00` }))
       setAllDay(true)
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
     } else {
-      setDraft(emptyOfferDraft())
+      const todayKey = localDateKeyFromDate(new Date())
+      setDraft(() => ({ ...makeBaseDraft(), startAt: `${todayKey}T00:00`, endAt: `${todayKey}T00:00` }))
       setAllDay(true)
       setShowCasinoSuggestions(false)
       setShowTitleSuggestions(false)
     }
+  }, [makeBaseDraft])
+
+  const beginDuplicate = useCallback((ev) => {
+    setCompletingReviewItemId(null)
+    setCompletingReviewUploadId(null)
+    setPropagateCasinoOnSave(false)
+    setPropagateTitleOnSave(false)
+    setPropagateValueOnSave(false)
+    setReviewSourceImagePath(null)
+    setReviewSourceImageUrl('')
+    setReviewSourceImageLoading(false)
+    setEditingId(null)
+    setShowForm(true)
+    const todayKey = localDateKeyFromDate(new Date())
+    const st = new Date(ev.start_at)
+    const stHasVisibleTime = st.getHours() !== 0 || st.getMinutes() !== 0
+    const en = ev.end_at ? new Date(ev.end_at) : null
+    const enHasVisibleTime = en ? en.getHours() !== 0 || en.getMinutes() !== 0 : false
+    const isAllDay = !(stHasVisibleTime || enHasVisibleTime)
+    setAllDay(isAllDay)
+    const ap = ev.alert_preset
+    const alertPreset =
+      ap === undefined || ap === null || ap === ''
+        ? OFFER_ALERT_NONE
+        : coerceAlertPresetForMode(String(ap), isAllDay)
+    setDraft({
+      casinoName: ev.casino_name || '',
+      offerType: ev.offer_type || 'free_play',
+      title: ev.title || '',
+      startAt: `${todayKey}T00:00`,
+      endAt: `${todayKey}T00:00`,
+      valueAmount: ev.value_amount !== null && ev.value_amount !== undefined ? String(ev.value_amount) : '',
+      notes: ev.notes || '',
+      alertPreset,
+    })
+    setShowCasinoSuggestions(false)
+    setShowTitleSuggestions(false)
+    setError('')
   }, [])
 
   const beginEdit = useCallback((ev) => {
@@ -357,6 +500,12 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     const en = ev.end_at ? new Date(ev.end_at) : null
     const enHasVisibleTime = en ? en.getHours() !== 0 || en.getMinutes() !== 0 : false
     setAllDay(!(stHasVisibleTime || enHasVisibleTime))
+    const allDayEdit = !(stHasVisibleTime || enHasVisibleTime)
+    const ap = ev.alert_preset
+    const alertPreset =
+      ap === undefined || ap === null || ap === ''
+        ? OFFER_ALERT_NONE
+        : coerceAlertPresetForMode(String(ap), allDayEdit)
     setDraft({
       casinoName: ev.casino_name || '',
       offerType: ev.offer_type || 'free_play',
@@ -364,7 +513,8 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
       startAt: toDatetimeLocalValue(ev.start_at),
       endAt: ev.end_at ? toDatetimeLocalValue(ev.end_at) : '',
       valueAmount: ev.value_amount !== null && ev.value_amount !== undefined ? String(ev.value_amount) : '',
-      notes: ev.notes || ''
+      notes: ev.notes || '',
+      alertPreset
     })
     setShowCasinoSuggestions(false)
     setShowTitleSuggestions(false)
@@ -462,8 +612,6 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     setCalendarMode,
     weekDetailEvent,
     setWeekDetailEvent,
-    showWeekPortraitHint,
-    setShowWeekPortraitHint,
     viewMenuOpen,
     setViewMenuOpen,
     viewMenuRef,
@@ -486,6 +634,7 @@ export default function useOffersCalendarState({ supabaseClient, normalizeLoaded
     skipCurrentReviewFromForm,
     closeForm,
     openForm,
-    beginEdit
+    beginEdit,
+    beginDuplicate,
   }
 }

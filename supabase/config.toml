@@ -1,0 +1,33 @@
+# Supabase CLI (deploy, local). Per-function Edge settings.
+# Purge is invoked from pg_net with sb_publishable/sb_secret OR legacy JWT — see migration + purge README.
+[functions.lounge-cf-stream-purge-pending-uploads]
+verify_jwt = false
+
+# Ops-only: legacy lounge-feed → R2 migration (service role bearer checked in function).
+[functions.lounge-cf-r2-migrate-lounge-feed]
+verify_jwt = false
+
+[functions.lounge-cf-r2-backfill-cache-control]
+verify_jwt = false
+
+# Lounge chat: JWT required (default); explicit for clarity alongside purge exception above.
+[functions.lounge-chat]
+verify_jwt = true
+
+[functions.lounge-link-unfurl]
+verify_jwt = true
+
+[functions.lounge-market-data]
+verify_jwt = true
+
+# Invoked from pg_net on activity_events INSERT; shared secret header (see migration + README).
+[functions.lounge-send-activity-push]
+verify_jwt = false
+
+# Stripe billing webhook (signed by Stripe, not Supabase JWT).
+[functions.stripe-webhook]
+verify_jwt = false
+
+# Guide image upload to R2: handles own auth (user JWT admin check OR service-role bearer).
+[functions.guide-cf-r2-upload]
+verify_jwt = false

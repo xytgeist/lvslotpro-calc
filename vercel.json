@@ -1,6 +1,22 @@
 {
+  "redirects": [
+    {
+      "source": "/guides/legends-of-the-phoenix/:path*",
+      "destination": "/guides/legend-of-the-phoenix/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/reset-password", "destination": "/index.html" },
+    {
+      "source": "/lounge/p/:postId",
+      "destination": "/api/lounge-post-og?postId=:postId"
+    },
+    {
+      "source": "/u/:handle",
+      "destination": "/api/lounge-profile-og?handle=:handle"
+    },
+    { "source": "/slot-guide-form", "destination": "/slot-guide-form.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

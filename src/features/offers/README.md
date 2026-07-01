@@ -1,8 +1,11 @@
 # Offers Feature Map
 
-This folder holds the Offers calendar feature extracted from `src/App.jsx`.
+This folder holds the **Offers calendar** feature. The main screen component is **`OffersCalendar.jsx`**, mounted from **`src/features/shell/AppShell.jsx`** (not from `App.jsx`).
 
 ## Structure
+
+- `OffersCalendar.jsx`
+  - Tab-level screen: calendar, forms, push/reminder UI, modals, and wiring into hooks below.
 
 - `utils.js`
   - Pure data/date helpers used by both hooks and components.
@@ -11,7 +14,6 @@ This folder holds the Offers calendar feature extracted from `src/App.jsx`.
 - `components/`
   - Presentational UI pieces for Offers.
   - Current components:
-    - `AddEventFab.jsx`
     - `DateTimeInput.jsx`
     - `OfferFormModal.jsx`
     - `ReviewQueuePanel.jsx`

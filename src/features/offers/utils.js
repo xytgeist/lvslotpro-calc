@@ -12,6 +12,43 @@ export function localDateKeyFromDate(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
+/** @param {Date} d */
+export function startOfLocalDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+/** Monday-based week start, local midnight. */
+export function startOfWeekMonday(d) {
+  const dt = startOfLocalDay(d)
+  const day = dt.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  dt.setDate(dt.getDate() + diff)
+  return dt
+}
+
+/**
+ * Include in the list when the offer's last local day is on or after `periodStart`.
+ * Multi-day offers stay visible while still running; browsing a past month shows its events + future.
+ * @param {{ start_at?: string, end_at?: string | null }} ev
+ * @param {Date} periodStart
+ */
+export function isOfferEventFromPeriodStart(ev, periodStart) {
+  if (!ev?.start_at) return false
+  const start = new Date(ev.start_at)
+  if (Number.isNaN(start.getTime())) return false
+  const endParsed = ev.end_at ? new Date(ev.end_at) : start
+  const end = Number.isNaN(endParsed.getTime()) ? start : endParsed
+  const periodDay = startOfLocalDay(periodStart)
+  const lastDay = end.getTime() >= start.getTime() ? end : start
+  const lastDayStart = startOfLocalDay(lastDay)
+  return lastDayStart.getTime() >= periodDay.getTime()
+}
+
+/** @deprecated name - use isOfferEventFromPeriodStart(ev, startOfLocalDay(now)) */
+export function isOfferEventCurrentOrUpcoming(ev, now = new Date()) {
+  return isOfferEventFromPeriodStart(ev, startOfLocalDay(now))
+}
+
 export function toDatetimeLocalValue(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -71,6 +108,104 @@ export function shuffledCopy(items) {
   return arr
 }
 
+export const OFFER_ALERT_NONE = 'none'
+export const OFFER_ALERT_DAY_9AM = 'day_9am'
+export const OFFER_ALERT_AT_TIME = 'at_time'
+export const OFFER_ALERT_5_MIN_BEFORE = '5_min_before'
+export const OFFER_ALERT_10_MIN_BEFORE = '10_min_before'
+export const OFFER_ALERT_15_MIN_BEFORE = '15_min_before'
+export const OFFER_ALERT_30_MIN_BEFORE = '30_min_before'
+export const OFFER_ALERT_HOUR_BEFORE = 'hour_before'
+export const OFFER_ALERT_2_HOURS_BEFORE = '2_hours_before'
+export const OFFER_ALERT_1_DAY_BEFORE = '1_day_before'
+export const OFFER_ALERT_2_DAYS_BEFORE = '2_days_before'
+export const OFFER_ALERT_1_WEEK_BEFORE = '1_week_before'
+
+const TIMED_ALERT_PRESET_TO_MS = {
+  [OFFER_ALERT_AT_TIME]: 0,
+  [OFFER_ALERT_5_MIN_BEFORE]: 5 * 60 * 1000,
+  [OFFER_ALERT_10_MIN_BEFORE]: 10 * 60 * 1000,
+  [OFFER_ALERT_15_MIN_BEFORE]: 15 * 60 * 1000,
+  [OFFER_ALERT_30_MIN_BEFORE]: 30 * 60 * 1000,
+  [OFFER_ALERT_HOUR_BEFORE]: 60 * 60 * 1000,
+  [OFFER_ALERT_2_HOURS_BEFORE]: 2 * 60 * 60 * 1000,
+  [OFFER_ALERT_1_DAY_BEFORE]: 24 * 60 * 60 * 1000,
+  [OFFER_ALERT_2_DAYS_BEFORE]: 2 * 24 * 60 * 60 * 1000,
+  [OFFER_ALERT_1_WEEK_BEFORE]: 7 * 24 * 60 * 60 * 1000
+}
+
+/** Default iOS-style alert when opening the form (All day is on by default). */
+export function defaultAlertPresetForAllDay(allDay) {
+  return allDay ? OFFER_ALERT_DAY_9AM : OFFER_ALERT_HOUR_BEFORE
+}
+
+/** Keep preset consistent with all-day vs timed mode. */
+export function coerceAlertPresetForMode(alertPreset, allDay) {
+  if (alertPreset === OFFER_ALERT_NONE) return OFFER_ALERT_NONE
+  if (allDay) {
+    if (
+      alertPreset === OFFER_ALERT_DAY_9AM ||
+      alertPreset === OFFER_ALERT_1_DAY_BEFORE ||
+      alertPreset === OFFER_ALERT_2_DAYS_BEFORE ||
+      alertPreset === OFFER_ALERT_1_WEEK_BEFORE
+    ) {
+      return alertPreset
+    }
+    return OFFER_ALERT_DAY_9AM
+  }
+  if (alertPreset === OFFER_ALERT_DAY_9AM) return OFFER_ALERT_HOUR_BEFORE
+  return Object.prototype.hasOwnProperty.call(TIMED_ALERT_PRESET_TO_MS, alertPreset) ? alertPreset : OFFER_ALERT_HOUR_BEFORE
+}
+
+/**
+ * When to send the reminder push (UTC ISO). null = no alert row / no push for this schedule.
+ * @param {string} alertPreset
+ * @param {Date} normalizedStart start instant (local all-day midnight or actual start)
+ * @param {boolean} allDay
+ */
+export function computeOfferAlertFireIso(alertPreset, normalizedStart, allDay) {
+  if (!normalizedStart || Number.isNaN(normalizedStart.getTime())) return null
+  const safe = coerceAlertPresetForMode(alertPreset, allDay)
+  if (safe === OFFER_ALERT_NONE) return null
+  if (allDay) {
+    const dayOffsets = {
+      [OFFER_ALERT_DAY_9AM]: 0,
+      [OFFER_ALERT_1_DAY_BEFORE]: 1,
+      [OFFER_ALERT_2_DAYS_BEFORE]: 2,
+      [OFFER_ALERT_1_WEEK_BEFORE]: 7
+    }
+    if (Object.prototype.hasOwnProperty.call(dayOffsets, safe)) {
+      const offsetDays = dayOffsets[safe]
+      const atNine = new Date(
+        normalizedStart.getFullYear(),
+        normalizedStart.getMonth(),
+        normalizedStart.getDate() - offsetDays,
+        9,
+        0,
+        0,
+        0
+      )
+      return atNine.toISOString()
+    }
+  }
+  if (!allDay && Object.prototype.hasOwnProperty.call(TIMED_ALERT_PRESET_TO_MS, safe)) {
+    return new Date(normalizedStart.getTime() - TIMED_ALERT_PRESET_TO_MS[safe]).toISOString()
+  }
+  if (safe === OFFER_ALERT_DAY_9AM) {
+    const atNine = new Date(
+      normalizedStart.getFullYear(),
+      normalizedStart.getMonth(),
+      normalizedStart.getDate(),
+      9,
+      0,
+      0,
+      0
+    )
+    return atNine.toISOString()
+  }
+  return null
+}
+
 export function emptyOfferDraft() {
   return {
     casinoName: '',
@@ -79,7 +214,8 @@ export function emptyOfferDraft() {
     startAt: '',
     endAt: '',
     valueAmount: '',
-    notes: ''
+    notes: '',
+    alertPreset: OFFER_ALERT_DAY_9AM
   }
 }
 
@@ -102,6 +238,7 @@ export function draftFromAiReviewPayload(raw) {
     other: 'Other'
   }
   const normalizedType = allowedTypes.has(ot) ? ot : 'free_play'
+  const hasSpecificTime = o.hasSpecificTime === true || o.has_specific_time === true
   return {
     casinoName: String(o.casinoName ?? o.casino_name ?? ''),
     offerType: normalizedType,
@@ -110,6 +247,7 @@ export function draftFromAiReviewPayload(raw) {
     endAt: String(o.endAt ?? o.end_at ?? ''),
     valueAmount: va !== undefined && va !== null ? String(va) : '',
     notes: String(o.notes ?? ''),
-    hasSpecificTime: o.hasSpecificTime === true || o.has_specific_time === true
+    hasSpecificTime,
+    alertPreset: defaultAlertPresetForAllDay(!hasSpecificTime)
   }
 }

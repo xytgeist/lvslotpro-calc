@@ -1,0 +1,33 @@
+# -- Build output & deps
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+.cache/
+.tmp/
+
+# -- Large generated / transient files
+*.log
+
+# -- Binary / media assets
+# /Slots/ = root-level slot guide content library (game guides, hero images, meta JSON)
+# src/features/slots/ is intentionally NOT ignored (source code)
+/Slots/
+public/guides/
+public/onboarding/
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.webp
+**/*.gif
+**/*.ico
+**/*.wasm
+**/*.ttf
+**/*.woff
+**/*.woff2
+
+# -- Minified / bundled JS
+*.min.js
+*.bundle.js

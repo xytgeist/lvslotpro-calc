@@ -1,1757 +1,96 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import 'react-datepicker/dist/react-datepicker.css'
-import PhoenixLink from './calculators/PhoenixLink'
-import BuffaloLink from './calculators/BuffaloLink'
-import StackUpPays from './calculators/StackUpPays'
-import MHBCalculator from './calculators/MHBCalculator'
+import { mobileShell, inputBase, btnPrimary, linkBtn } from './features/shell/shellClasses'
+import { readAuthCallbackParams, getOAuthCallbackMessage } from './features/auth/oauthCallback'
+import AuthModalPanel from './features/auth/AuthModalPanel'
+import AppShell from './features/shell'
+import { ensureDefaultProfileRow } from './features/profiles/profileGate'
+import SubscribeModal from './features/billing/SubscribeModal.jsx'
+import { PRODUCT_SLOTS_EDGE } from './features/billing/edgeProducts.js'
+import { startEdgeCheckout } from './features/billing/stripeBillingApi.js'
+import { useEdgeEntitlements } from './features/billing/useEdgeEntitlements.js'
+import { useContentAccessGates } from './features/billing/useContentAccessGates.js'
 import {
-  localDateKeyFromIso,
-  localDateKeyFromDate,
-  dateFromDatetimeLocalValue,
-  datetimeLocalValueFromDate,
-  normalizeLoadedEvent
-} from './features/offers/utils'
-import ReviewQueuePanel from './features/offers/components/ReviewQueuePanel'
-import UploadProgressOverlay from './features/offers/components/UploadProgressOverlay'
-import OfferFormModal from './features/offers/components/OfferFormModal'
-import WeekEventDetailModal from './features/offers/components/WeekEventDetailModal'
-import AddEventFab from './features/offers/components/AddEventFab'
-import useOffersCalendarState from './features/offers/hooks/useOffersCalendarState'
-import useOffersCalendarMutations from './features/offers/hooks/useOffersCalendarMutations'
+  LegalDocumentScreen,
+  LegalAcceptanceModal,
+  parseLegalPathname,
+  recordLegalAcceptance,
+  profileNeedsLegalAcceptance,
+  markPendingLegalAcceptance,
+  readPendingLegalAcceptance,
+  markLegalReturnContext,
+  resolveLegalReturnContext,
+  clearLegalReturnContext,
+  readLegalReturnContext,
+  applyLegalReturnReopen,
+} from './features/legal'
+import {
+  readLoungeComposerDraftPendingWork,
+  shouldShowLoungeColdBootSplash,
+} from './utils/loungeColdBootSplash.js'
+import { clearAccountClientState } from './utils/clearAccountClientState.js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Mobile-first: min 16px text (iOS won’t auto-zoom), ~48px min tap height, notched device padding
-const mobileShell = 'min-h-dvh bg-gray-950 flex items-center justify-center overflow-y-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]'
-const inputBase = 'w-full min-h-12 text-base text-white bg-gray-800 rounded-2xl border-0 px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-orange-500/50 touch-manipulation'
-const btnPrimary = 'w-full min-h-12 text-base font-bold touch-manipulation active:scale-[0.99] transition-transform'
-const btnSecondary = 'w-full min-h-12 text-base font-bold touch-manipulation active:scale-[0.99] transition-transform'
-const linkBtn = 'w-full min-h-12 text-base text-gray-400 hover:text-white touch-manipulation py-3 text-center flex items-center justify-center active:scale-[0.99]'
-
-/**
- * When OAuth fails, Supabase redirects back with error / error_code in the query or hash (not the signInWithOAuth return value).
- */
-function readAuthCallbackParams() {
-  const { search, hash } = window.location
-  const fromSearch = new URLSearchParams(search && search.startsWith('?') ? search.slice(1) : search)
-  const fromHash = new URLSearchParams((hash && hash.startsWith('#') ? hash.slice(1) : hash) || '')
-  const get = (k) => fromHash.get(k) ?? fromSearch.get(k)
-  let errorDescription = get('error_description') || ''
+function readBillingQueryParams() {
+  if (typeof window === 'undefined') return null
   try {
-    errorDescription = decodeURIComponent(errorDescription.replace(/\+/g, ' '))
+    const params = new URLSearchParams(window.location.search)
+    const billing = params.get('billing')
+    if (!billing) return null
+    return {
+      billing,
+      product: params.get('product') || PRODUCT_SLOTS_EDGE,
+    }
   } catch {
-    // keep raw
-  }
-  return {
-    error: get('error') || '',
-    errorCode: get('error_code') || '',
-    errorDescription
-  }
-}
-
-function getOAuthCallbackMessage(error, errorCode, errorDescription) {
-  if (!error && !errorCode && !errorDescription) return ''
-  const raw = `${error} ${errorCode} ${errorDescription}`.toLowerCase()
-  if (error === 'access_denied' || raw.includes('access_denied')) {
-    return 'Sign-in with Google was cancelled. You can try again or use your email and password.'
-  }
-  if (
-    raw.includes('identity_already_exists') ||
-    raw.includes('user_already_exists') ||
-    raw.includes('email address is already registered') ||
-    raw.includes('already been registered') ||
-    raw.includes('user already registered') ||
-    (raw.includes('already') && raw.includes('register'))
-  ) {
-    return 'This email already has an account. Please sign in with your email and password, or use Forgot password if you need to reset it.'
-  }
-  return errorDescription || 'Sign-in with Google could not be completed. Please try again or use your email and password.'
-}
-
-function OAuthDivider() {
-  return (
-    <div className="relative py-1">
-      <div className="absolute inset-0 flex items-center" aria-hidden>
-        <div className="w-full border-t border-gray-700" />
-      </div>
-      <div className="relative flex justify-center text-xs text-gray-500">
-        <span className="bg-gray-900 px-3">or continue with</span>
-      </div>
-    </div>
-  )
-}
-
-function GoogleIcon() {
-  return (
-    <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden>
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-    </svg>
-  )
-}
-
-function AppShell({ onLogout, supabaseClient }) {
-  const [tab, setTab] = useState('home')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [activeCalculator, setActiveCalculator] = useState(null) // 'phoenix' | 'buffalo' | 'stackup' | 'mhb' | null
-  const [intelView, setIntelView] = useState({ screen: 'home', cityId: null, casinoId: null })
-
-  const openCalculator = (key) => {
-    setActiveCalculator(key)
-    setTab('calculators')
-    setMenuOpen(false)
-  }
-
-  const navItems = [
-    { id: 'home', label: 'Home', icon: '🏠' },
-    { id: 'calculators', label: 'Calcs', icon: '🧮' },
-    { id: 'offers', label: 'Offers', icon: '📅' },
-    { id: 'guides', label: 'Guides', icon: '📘' },
-    { id: 'intel', label: 'Intel', icon: '📍' },
-    { id: 'team', label: 'Team', icon: '🤝' }
-  ]
-
-  const LocalIntel = () => {
-    const [cities, setCities] = useState([])
-    const [casinos, setCasinos] = useState([])
-    const [posts, setPosts] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
-    const [notice, setNotice] = useState('')
-    const [draft, setDraft] = useState({ postType: 'conditions', title: '', body: '' })
-    const [isPosting, setIsPosting] = useState(false)
-    const [follows, setFollows] = useState({ city: new Set(), casino: new Set() })
-
-    const loadFollows = async () => {
-      const { data, error: e } = await supabaseClient
-        .from('follows')
-        .select('target_type,target_id')
-        .limit(500)
-      if (e) throw e
-      const citySet = new Set()
-      const casinoSet = new Set()
-      ;(data || []).forEach((r) => {
-        if (r.target_type === 'city') citySet.add(r.target_id)
-        if (r.target_type === 'casino') casinoSet.add(r.target_id)
-      })
-      setFollows({ city: citySet, casino: casinoSet })
-    }
-
-    const loadCities = async () => {
-      const { data, error: e } = await supabaseClient.from('cities').select('id,name,region').order('name')
-      if (e) throw e
-      setCities(data || [])
-    }
-
-    const loadCasinosForCity = async (cityId) => {
-      const { data, error: e } = await supabaseClient
-        .from('casinos')
-        .select('id,name,city_id')
-        .eq('city_id', cityId)
-        .order('name')
-      if (e) throw e
-      setCasinos(data || [])
-    }
-
-    const loadPosts = async ({ targetType, targetId }) => {
-      const { data, error: e } = await supabaseClient
-        .from('intel_posts')
-        .select('id,target_type,target_id,post_type,title,body,created_at')
-        .eq('target_type', targetType)
-        .eq('target_id', targetId)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (e) throw e
-      setPosts(data || [])
-    }
-
-    const toggleFollow = async ({ targetType, targetId }) => {
-      const isFollowing = (targetType === 'city' ? follows.city : follows.casino).has(targetId)
-      if (isFollowing) {
-        const { error: e } = await supabaseClient
-          .from('follows')
-          .delete()
-          .eq('target_type', targetType)
-          .eq('target_id', targetId)
-        if (e) throw e
-      } else {
-        const { error: e } = await supabaseClient
-          .from('follows')
-          .insert({ target_type: targetType, target_id: targetId })
-        if (e) throw e
-      }
-      await loadFollows()
-    }
-
-    const submitPost = async () => {
-      setIsPosting(true)
-      setError('')
-      try {
-        const { screen, cityId, casinoId } = intelView
-        const targetType = screen === 'casino' ? 'casino' : 'city'
-        const targetId = screen === 'casino' ? casinoId : cityId
-        if (!targetId) throw new Error('Select a city/casino first.')
-        if (!draft.title.trim()) throw new Error('Add a title.')
-        if (!draft.body.trim()) throw new Error('Add details.')
-
-        const { error: e } = await supabaseClient.from('intel_posts').insert({
-          target_type: targetType,
-          target_id: targetId,
-          post_type: draft.postType,
-          title: draft.title.trim(),
-          body: draft.body.trim()
-        })
-        if (e) throw e
-        setDraft({ postType: 'conditions', title: '', body: '' })
-        await loadPosts({ targetType, targetId })
-      } catch (e) {
-        setError(e?.message || 'Failed to post.')
-      } finally {
-        setIsPosting(false)
-      }
-    }
-
-    useEffect(() => {
-      let cancelled = false
-      const run = async () => {
-        setLoading(true)
-        setError('')
-        try {
-          await Promise.all([loadCities(), loadFollows()])
-        } catch (e) {
-          if (!cancelled) setError(e?.message || 'Failed to load Local Intel.')
-        } finally {
-          if (!cancelled) setLoading(false)
-        }
-      }
-      void run()
-      return () => {
-        cancelled = true
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
-    useEffect(() => {
-      let cancelled = false
-      const run = async () => {
-        setError('')
-        try {
-          if (intelView.screen === 'city' && intelView.cityId) {
-            await Promise.all([
-              loadCasinosForCity(intelView.cityId),
-              loadPosts({ targetType: 'city', targetId: intelView.cityId })
-            ])
-          }
-          if (intelView.screen === 'casino' && intelView.casinoId) {
-            await loadPosts({ targetType: 'casino', targetId: intelView.casinoId })
-          }
-        } catch (e) {
-          if (!cancelled) setError(e?.message || 'Failed to load Intel.')
-        }
-      }
-      void run()
-      return () => {
-        cancelled = true
-      }
-    }, [intelView.screen, intelView.cityId, intelView.casinoId])
-
-    const Header = ({ title, subtitle, onBack, right }) => (
-      <div className="flex items-start justify-between gap-3 mb-5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-3xl leading-none text-zinc-300 hover:text-white -mt-0.5 mr-1 touch-manipulation"
-                aria-label="Back"
-              >
-                ‹
-              </button>
-            )}
-            <div className="text-white text-2xl font-black tracking-tight truncate">{title}</div>
-          </div>
-          {subtitle && <div className="text-zinc-400 text-sm mt-0.5">{subtitle}</div>}
-        </div>
-        {right}
-      </div>
-    )
-
-    const SetupHint = () => (
-      <div className="bg-amber-900/30 border border-amber-500/40 rounded-3xl p-5 mb-4">
-        <div className="text-amber-200 font-bold">Local Intel setup</div>
-        <div className="text-amber-200/80 text-sm leading-relaxed mt-1">
-          If you see errors like “relation does not exist”, you need to create the Supabase tables first. I added a SQL
-          script you can paste into Supabase.
-        </div>
-      </div>
-    )
-
-    if (intelView.screen === 'home') {
-      return (
-        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <Header title="Local Intel" subtitle="City + casino updates (skeleton)" />
-
-          <SetupHint />
-
-          {error && (
-            <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
-              {error}
-            </div>
-          )}
-
-          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
-            <div className="text-white font-bold mb-2">Browse cities</div>
-            {loading ? (
-              <div className="text-zinc-400 text-sm">Loading…</div>
-            ) : (
-              <div className="space-y-2">
-                {cities.slice(0, 30).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setIntelView({ screen: 'city', cityId: c.id, casinoId: null })}
-                    className="w-full text-left rounded-2xl bg-zinc-800/60 hover:bg-zinc-800 px-4 py-3 touch-manipulation"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-zinc-200 font-semibold truncate">{c.name}</div>
-                        {c.region && <div className="text-zinc-500 text-xs mt-0.5 truncate">{c.region}</div>}
-                      </div>
-                      <div className="text-zinc-500 text-sm">→</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )
-    }
-
-    if (intelView.screen === 'city') {
-      const city = cities.find((c) => c.id === intelView.cityId)
-      const isFollowing = intelView.cityId ? follows.city.has(intelView.cityId) : false
-      return (
-        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <Header
-            title={city?.name || 'City'}
-            subtitle="City feed + casinos"
-            onBack={() => setIntelView({ screen: 'home', cityId: null, casinoId: null })}
-            right={
-              intelView.cityId ? (
-                <button
-                  type="button"
-                  onClick={() => toggleFollow({ targetType: 'city', targetId: intelView.cityId })}
-                  className={`min-h-10 px-4 rounded-2xl text-sm font-bold touch-manipulation ${
-                    isFollowing ? 'bg-zinc-800 text-zinc-200' : 'bg-emerald-600 text-white'
-                  }`}
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </button>
-              ) : null
-            }
-          />
-
-          {error && (
-            <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
-              {error}
-            </div>
-          )}
-
-          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
-            <div className="text-white font-bold mb-3">Post an update</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-zinc-400 text-xs mb-1">Type</label>
-                <select
-                  value={draft.postType}
-                  onChange={(e) => setDraft((d) => ({ ...d, postType: e.target.value }))}
-                  className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 font-semibold text-sm outline-none focus:ring-2 focus:ring-emerald-500/30"
-                >
-                  <option value="conditions">Conditions</option>
-                  <option value="new_install">New install</option>
-                  <option value="paytable">Paytable</option>
-                  <option value="reset">Reset</option>
-                  <option value="question">Question</option>
-                  <option value="trip_report">Trip report</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={submitPost}
-                  disabled={isPosting}
-                  className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
-                >
-                  {isPosting ? 'Posting…' : 'Post'}
-                </button>
-              </div>
-            </div>
-            <div className="mt-3">
-              <label className="block text-zinc-400 text-xs mb-1">Title</label>
-              <input
-                value={draft.title}
-                onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-                className="w-full h-12 bg-zinc-800 rounded-2xl px-4 text-zinc-100 font-semibold outline-none focus:ring-2 focus:ring-emerald-500/30"
-                placeholder="Short summary"
-              />
-            </div>
-            <div className="mt-3">
-              <label className="block text-zinc-400 text-xs mb-1">Details</label>
-              <textarea
-                value={draft.body}
-                onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-                className="w-full min-h-24 bg-zinc-800 rounded-2xl px-4 py-3 text-zinc-100 outline-none focus:ring-2 focus:ring-emerald-500/30"
-                placeholder="What changed? Where on the floor? Any notes?"
-              />
-            </div>
-          </div>
-
-          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
-            <div className="text-white font-bold mb-2">Casinos</div>
-            {casinos.length === 0 ? (
-              <div className="text-zinc-500 text-sm">No casinos loaded for this city yet.</div>
-            ) : (
-              <div className="space-y-2">
-                {casinos.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setIntelView({ screen: 'casino', cityId: intelView.cityId, casinoId: c.id })}
-                    className="w-full text-left rounded-2xl bg-zinc-800/60 hover:bg-zinc-800 px-4 py-3 touch-manipulation"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-zinc-200 font-semibold truncate">{c.name}</div>
-                      <div className="text-zinc-500 text-sm">→</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-zinc-900 rounded-3xl p-5">
-            <div className="text-white font-bold mb-2">Latest updates</div>
-            {posts.length === 0 ? (
-              <div className="text-zinc-500 text-sm">No posts yet.</div>
-            ) : (
-              <div className="space-y-3">
-                {posts.map((p) => (
-                  <div key={p.id} className="rounded-2xl bg-zinc-800/70 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-zinc-200 font-semibold truncate">{p.title}</div>
-                      <div className="text-[11px] text-zinc-500 shrink-0">{new Date(p.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div className="text-zinc-500 text-[11px] mt-1 uppercase tracking-wide">{p.post_type}</div>
-                    <div className="text-zinc-300 text-sm mt-2 leading-relaxed whitespace-pre-wrap">{p.body}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )
-    }
-
-    if (intelView.screen === 'casino') {
-      const casino = casinos.find((c) => c.id === intelView.casinoId)
-      const isFollowing = intelView.casinoId ? follows.casino.has(intelView.casinoId) : false
-      return (
-        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <Header
-            title={casino?.name || 'Casino'}
-            subtitle="Casino-specific updates"
-            onBack={() => setIntelView({ screen: 'city', cityId: intelView.cityId, casinoId: null })}
-            right={
-              intelView.casinoId ? (
-                <button
-                  type="button"
-                  onClick={() => toggleFollow({ targetType: 'casino', targetId: intelView.casinoId })}
-                  className={`min-h-10 px-4 rounded-2xl text-sm font-bold touch-manipulation ${
-                    isFollowing ? 'bg-zinc-800 text-zinc-200' : 'bg-emerald-600 text-white'
-                  }`}
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </button>
-              ) : null
-            }
-          />
-
-          {error && (
-            <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
-              {error}
-            </div>
-          )}
-
-          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
-            <div className="text-white font-bold mb-3">Post an update</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-zinc-400 text-xs mb-1">Type</label>
-                <select
-                  value={draft.postType}
-                  onChange={(e) => setDraft((d) => ({ ...d, postType: e.target.value }))}
-                  className="w-full h-12 bg-zinc-800 rounded-2xl px-3 text-zinc-100 font-semibold text-sm outline-none focus:ring-2 focus:ring-emerald-500/30"
-                >
-                  <option value="conditions">Conditions</option>
-                  <option value="new_install">New install</option>
-                  <option value="paytable">Paytable</option>
-                  <option value="reset">Reset</option>
-                  <option value="question">Question</option>
-                  <option value="trip_report">Trip report</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={submitPost}
-                  disabled={isPosting}
-                  className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation"
-                >
-                  {isPosting ? 'Posting…' : 'Post'}
-                </button>
-              </div>
-            </div>
-            <div className="mt-3">
-              <label className="block text-zinc-400 text-xs mb-1">Title</label>
-              <input
-                value={draft.title}
-                onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-                className="w-full h-12 bg-zinc-800 rounded-2xl px-4 text-zinc-100 font-semibold outline-none focus:ring-2 focus:ring-emerald-500/30"
-                placeholder="Short summary"
-              />
-            </div>
-            <div className="mt-3">
-              <label className="block text-zinc-400 text-xs mb-1">Details</label>
-              <textarea
-                value={draft.body}
-                onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-                className="w-full min-h-24 bg-zinc-800 rounded-2xl px-4 py-3 text-zinc-100 outline-none focus:ring-2 focus:ring-emerald-500/30"
-                placeholder="What changed? Bank location? Any notes?"
-              />
-            </div>
-          </div>
-
-          <div className="bg-zinc-900 rounded-3xl p-5">
-            <div className="text-white font-bold mb-2">Latest updates</div>
-            {posts.length === 0 ? (
-              <div className="text-zinc-500 text-sm">No posts yet.</div>
-            ) : (
-              <div className="space-y-3">
-                {posts.map((p) => (
-                  <div key={p.id} className="rounded-2xl bg-zinc-800/70 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-zinc-200 font-semibold truncate">{p.title}</div>
-                      <div className="text-[11px] text-zinc-500 shrink-0">{new Date(p.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div className="text-zinc-500 text-[11px] mt-1 uppercase tracking-wide">{p.post_type}</div>
-                    <div className="text-zinc-300 text-sm mt-2 leading-relaxed whitespace-pre-wrap">{p.body}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )
-    }
-
     return null
   }
+}
 
-  const OffersCalendar = () => {
-    const {
-      fileInputRef,
-      longPressTimerRef,
-      casinoFieldRef,
-      titleFieldRef,
-      importSyncRunningRef,
-      events,
-      setEvents,
-      loading,
-      setLoading,
-      saving,
-      setSaving,
-      uploading,
-      setUploading,
-      syncingImportResults,
-      setSyncingImportResults,
-      activeImportBatchId,
-      setActiveImportBatchId,
-      error,
-      setError,
-      notice,
-      setNotice,
-      reviewQueue,
-      setReviewQueue,
-      completingReviewItemId,
-      setCompletingReviewItemId,
-      completingReviewUploadId,
-      setCompletingReviewUploadId,
-      propagateCasinoOnSave,
-      setPropagateCasinoOnSave,
-      propagateTitleOnSave,
-      setPropagateTitleOnSave,
-      propagateValueOnSave,
-      setPropagateValueOnSave,
-      reviewSourceImagePath,
-      setReviewSourceImagePath,
-      reviewSourceImageUrl,
-      setReviewSourceImageUrl,
-      reviewSourceImageLoading,
-      setReviewSourceImageLoading,
-      showForm,
-      setShowForm,
-      editingId,
-      setEditingId,
-      selectedDays,
-      setSelectedDays,
-      cursorMonth,
-      setCursorMonth,
-      draft,
-      setDraft,
-      allDay,
-      setAllDay,
-      showCasinoSuggestions,
-      setShowCasinoSuggestions,
-      showTitleSuggestions,
-      setShowTitleSuggestions,
-      expandedEventId,
-      setExpandedEventId,
-      notesPreviewRefs,
-      notesOverflowById,
-      setNotesOverflowById,
-      calendarMode,
-      setCalendarMode,
-      weekDetailEvent,
-      setWeekDetailEvent,
-      showWeekPortraitHint,
-      setShowWeekPortraitHint,
-      viewMenuOpen,
-      setViewMenuOpen,
-      viewMenuRef,
-      isLandscape,
-      setIsLandscape,
-      weekAnchor,
-      setWeekAnchor,
-      offerTypeMeta,
-      dayBuckets,
-      dayTypeDots,
-      calendarCells,
-      monthTitle,
-      todayKey,
-      uploadSpinnerMessage,
-      loadEvents,
-      loadReviewQueue,
-      refreshImportResults,
-      beginReviewItem,
-      skipReviewItem,
-      skipCurrentReviewFromForm,
-      closeForm,
-      openForm,
-      beginEdit
-    } = useOffersCalendarState({ supabaseClient, normalizeLoadedEvent })
-
-    useEffect(() => {
-      const handlePointerDown = (event) => {
-        const target = event.target
-        if (casinoFieldRef.current && !casinoFieldRef.current.contains(target)) {
-          setShowCasinoSuggestions(false)
-        }
-        if (titleFieldRef.current && !titleFieldRef.current.contains(target)) {
-          setShowTitleSuggestions(false)
-        }
-        if (viewMenuRef.current && !viewMenuRef.current.contains(target)) {
-          setViewMenuOpen(false)
-        }
-      }
-
-      document.addEventListener('pointerdown', handlePointerDown)
-      return () => document.removeEventListener('pointerdown', handlePointerDown)
-    }, [])
-
-    useEffect(() => {
-      if (typeof window === 'undefined') return undefined
-      const media = window.matchMedia('(orientation: landscape)')
-      const sync = () => setIsLandscape(media.matches)
-      sync()
-      media.addEventListener('change', sync)
-      return () => media.removeEventListener('change', sync)
-    }, [])
-
-    useEffect(() => {
-      const next = {}
-      for (const ev of filteredEvents) {
-        const el = notesPreviewRefs.current[ev.id]
-        if (!el) continue
-        next[ev.id] = el.scrollWidth > el.clientWidth
-      }
-      setNotesOverflowById(next)
-    }, [events, selectedDays, expandedEventId])
-
-    const toggleExpandedEvent = (eventId) => {
-      setExpandedEventId((id) => (id === eventId ? null : eventId))
-    }
-
-    const toggleSelectedDay = (dayKey) => {
-      setSelectedDays((current) => (current.includes(dayKey) ? current.filter((d) => d !== dayKey) : [...current, dayKey]))
-    }
-
-    const deleteEvent = async (id) => {
-      const { error: e } = await supabaseClient.from('offer_events').delete().eq('id', id)
-      if (e) {
-        setError(e?.message || 'Failed to delete event.')
-        return
-      }
-      if (editingId === id) closeForm()
-      await loadEvents()
-    }
-
-    const { applyCurrentFieldsToAssociatedReviewItems, saveEvent, handleImportPhotos } = useOffersCalendarMutations({
-      supabaseClient,
-      state: {
-        draft,
-        allDay,
-        editingId,
-        completingReviewItemId,
-        completingReviewUploadId,
-        propagateCasinoOnSave,
-        propagateTitleOnSave,
-        propagateValueOnSave,
-        reviewSourceImagePath,
-        calendarMode
-      },
-      setters: {
-        setCalendarMode,
-        setCursorMonth,
-        setWeekAnchor,
-        setSelectedDays,
-        setSaving,
-        setError,
-        setNotice,
-        setUploading,
-        setActiveImportBatchId
-      },
-      actions: {
-        closeForm,
-        loadEvents,
-        loadReviewQueue,
-        refreshImportResults
-      }
-    })
-
-    const filteredEvents = useMemo(() => {
-      if (selectedDays.length === 0) return events
-      const selectedSet = new Set(selectedDays)
-      return events.filter((ev) => selectedSet.has(localDateKeyFromIso(ev.start_at)))
-    }, [events, selectedDays])
-
-    const activeCalendarView = useMemo(() => {
-      if (calendarMode === 'agenda') return 'agenda'
-      if (calendarMode === 'week') return 'week'
-      if (calendarMode === 'month') return 'month'
-      return isLandscape ? 'week' : 'month'
-    }, [calendarMode, isLandscape])
-
-    useEffect(() => {
-      if (activeCalendarView !== 'week') setWeekDetailEvent(null)
-    }, [activeCalendarView])
-
-    useEffect(() => {
-      if (calendarMode !== 'week') setShowWeekPortraitHint(false)
-    }, [calendarMode])
-
-    useEffect(() => {
-      if (isLandscape) setShowWeekPortraitHint(false)
-    }, [isLandscape])
-
-    const startOfWeekMonday = (d) => {
-      const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-      const day = dt.getDay()
-      const diff = day === 0 ? -6 : 1 - day
-      dt.setDate(dt.getDate() + diff)
-      dt.setHours(0, 0, 0, 0)
-      return dt
-    }
-
-    const weekStart = useMemo(() => startOfWeekMonday(weekAnchor), [weekAnchor])
-    const weekDays = useMemo(() => {
-      return Array.from({ length: 7 }, (_, idx) => {
-        const d = new Date(weekStart)
-        d.setDate(weekStart.getDate() + idx)
-        return d
-      })
-    }, [weekStart])
-    const weekTitle = `${weekDays[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric'
-    })}`
-    const weekStartMs = weekDays[0].getTime()
-    const weekEndMs = new Date(weekDays[6].getFullYear(), weekDays[6].getMonth(), weekDays[6].getDate(), 23, 59, 59, 999).getTime()
-
-    const weekEvents = useMemo(() => {
-      return events
-        .map((ev) => {
-          const st = new Date(ev.start_at)
-          const enRaw = ev.end_at ? new Date(ev.end_at) : st
-          const en = Number.isNaN(enRaw.getTime()) ? st : enRaw
-          const startDay = new Date(st.getFullYear(), st.getMonth(), st.getDate()).getTime()
-          const endDay = new Date(en.getFullYear(), en.getMonth(), en.getDate(), 23, 59, 59, 999).getTime()
-          return { ...ev, _startMs: startDay, _endMs: endDay }
-        })
-        .filter((ev) => ev._endMs >= weekStartMs && ev._startMs <= weekEndMs)
-        .sort((a, b) => a._startMs - b._startMs)
-        .map((ev) => {
-          const startCol = Math.max(0, Math.floor((ev._startMs - weekStartMs) / 86400000))
-          const endCol = Math.min(6, Math.floor((ev._endMs - weekStartMs) / 86400000))
-          return { ...ev, _startCol: startCol, _span: endCol - startCol + 1 }
-        })
-    }, [events, weekStartMs, weekEndMs])
-    const weekEventLanes = useMemo(() => {
-      const lanes = []
-      for (const ev of weekEvents) {
-        let placed = false
-        for (const lane of lanes) {
-          const last = lane[lane.length - 1]
-          const lastEndCol = last._startCol + last._span - 1
-          if (ev._startCol > lastEndCol) {
-            lane.push(ev)
-            placed = true
-            break
-          }
-        }
-        if (!placed) lanes.push([ev])
-      }
-      return lanes
-    }, [weekEvents])
-
-    const upcomingEvents = useMemo(() => {
-      const now = new Date()
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-      return events.filter((ev) => new Date(ev.start_at).getTime() >= todayStart)
-    }, [events])
-
-    const casinoNameOptions = useMemo(() => {
-      return Array.from(new Set(events.map((ev) => ev.casino_name?.trim()).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
-      )
-    }, [events])
-
-    const titleOptions = useMemo(() => {
-      return Array.from(new Set(events.map((ev) => ev.title?.trim()).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
-      )
-    }, [events])
-
-    const filteredCasinoOptions = useMemo(() => {
-      const q = draft.casinoName.trim().toLowerCase()
-      if (!q) return casinoNameOptions.slice(0, 8)
-      return casinoNameOptions.filter((name) => name.toLowerCase().includes(q)).slice(0, 8)
-    }, [casinoNameOptions, draft.casinoName])
-
-    const filteredTitleOptions = useMemo(() => {
-      const q = draft.title.trim().toLowerCase()
-      if (!q) return titleOptions.slice(0, 8)
-      return titleOptions.filter((name) => name.toLowerCase().includes(q)).slice(0, 8)
-    }, [titleOptions, draft.title])
-
-    const startDayPress = (dayKey) => {
-      longPressTimerRef.current = window.setTimeout(() => {
-        openForm(dayKey)
-      }, 500)
-    }
-
-    const endDayPress = () => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current)
-        longPressTimerRef.current = null
-      }
-    }
-
-    const hasVisibleTime = (iso) => {
-      const d = new Date(iso)
-      return d.getHours() !== 0 || d.getMinutes() !== 0
-    }
-
-    const startSelected = dateFromDatetimeLocalValue(draft.startAt)
-    const endSelected = dateFromDatetimeLocalValue(draft.endAt)
-    const sameDayStartEnd =
-      !!startSelected &&
-      !!endSelected &&
-      startSelected.getFullYear() === endSelected.getFullYear() &&
-      startSelected.getMonth() === endSelected.getMonth() &&
-      startSelected.getDate() === endSelected.getDate()
-    const endMinTime =
-      !startSelected || !sameDayStartEnd
-        ? new Date(0, 0, 0, 0, 0)
-        : new Date(0, 0, 0, startSelected.getHours(), startSelected.getMinutes())
-    const endMaxTime = new Date(0, 0, 0, 23, 45)
-    const listEvents = activeCalendarView === 'agenda' ? upcomingEvents : filteredEvents
-    const listRows = useMemo(() => {
-      if (activeCalendarView === 'agenda') return listEvents.map((e) => ({ type: 'event', event: e }))
-      const today = new Date()
-      const todayStartMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-      const rows = []
-      let insertedTodayDivider = false
-      for (const e of listEvents) {
-        const startsTodayOrLater = new Date(e.start_at).getTime() >= todayStartMs
-        if (!insertedTodayDivider && startsTodayOrLater) {
-          rows.push({ type: 'today-divider' })
-          insertedTodayDivider = true
-        }
-        rows.push({ type: 'event', event: e })
-      }
-      return rows
-    }, [activeCalendarView, listEvents])
-
-    useEffect(() => {
-      if (activeCalendarView !== 'month' && selectedDays.length > 0) {
-        setSelectedDays([])
-      }
-    }, [activeCalendarView, selectedDays.length])
-
-    const isWeekView = activeCalendarView === 'week'
-    const weekLayoutFullBleed = isWeekView && isLandscape
-
-    return (
-      <div
-        className={`flex flex-col overflow-hidden px-4 pt-[max(0.5rem,env(safe-area-inset-top))] ${
-          weekLayoutFullBleed
-            ? 'w-full max-w-none h-[100dvh] pb-[max(4rem,env(safe-area-inset-bottom))] box-border'
-            : 'max-w-lg mx-auto pb-2'
-        }`}
-        style={weekLayoutFullBleed ? undefined : { height: 'calc(100dvh - env(safe-area-inset-bottom) - 0.5rem)' }}
-      >
-
-        {error && (
-          <div className="mb-4 p-4 rounded-3xl bg-red-900/40 border border-red-500/40 text-red-200 text-sm leading-relaxed">
-            {error}
-          </div>
-        )}
-
-        {notice && (
-          <div className="mb-4 p-3 rounded-2xl border border-emerald-500/35 bg-emerald-950/35 text-emerald-100 text-xs leading-relaxed">
-            {notice}
-          </div>
-        )}
-
-        {syncingImportResults && (
-          <div className="mb-4 p-3 rounded-2xl border border-violet-500/35 bg-violet-950/35 text-violet-100 text-xs leading-relaxed">
-            Syncing AI results... new events and review items will pop in automatically.
-          </div>
-        )}
-
-        <ReviewQueuePanel reviewQueue={reviewQueue} onComplete={beginReviewItem} onSkip={(itemId) => void skipReviewItem(itemId)} />
-
-        <div className={isWeekView ? 'flex flex-1 min-h-0 flex-col gap-2' : 'mb-2'}>
-            <div className={`flex shrink-0 items-center justify-between gap-2 ${isWeekView ? '' : 'mb-2'}`}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeCalendarView === 'agenda') return
-                  if (activeCalendarView === 'week') {
-                    setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7))
-                    return
-                  }
-                  setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
-                }}
-                className="min-h-9 min-w-9 rounded-xl bg-zinc-900 text-zinc-200 font-bold touch-manipulation"
-                aria-label={
-                  activeCalendarView === 'agenda' ? 'Agenda view' : activeCalendarView === 'week' ? 'Previous week' : 'Previous month'
-                }
-              >
-                ‹
-              </button>
-              <div className="text-white text-xl font-black tracking-tight text-center flex-1 truncate">
-                {activeCalendarView === 'agenda' ? 'Agenda' : activeCalendarView === 'week' ? weekTitle : monthTitle}
-              </div>
-              <div ref={viewMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setViewMenuOpen((v) => !v)}
-                  className="min-h-9 min-w-9 rounded-xl bg-zinc-900 text-zinc-200 font-bold touch-manipulation"
-                  aria-label="Calendar display options"
-                >
-                  ⋯
-                </button>
-                {viewMenuOpen && (
-                  <div className="absolute right-0 top-10 z-20 w-28 rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCalendarMode('month')
-                        setViewMenuOpen(false)
-                      }}
-                      className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                    >
-                      Calendar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCalendarMode('week')
-                        setViewMenuOpen(false)
-                        if (typeof window !== 'undefined' && !window.matchMedia('(orientation: landscape)').matches) {
-                          setShowWeekPortraitHint(true)
-                        }
-                      }}
-                      className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                    >
-                      Week
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCalendarMode('agenda')
-                        setViewMenuOpen(false)
-                      }}
-                      className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                    >
-                      Agenda
-                    </button>
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeCalendarView === 'agenda') return
-                  if (activeCalendarView === 'week') {
-                    setWeekAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7))
-                    return
-                  }
-                  setCursorMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
-                }}
-                className="min-h-9 min-w-9 rounded-xl bg-zinc-900 text-zinc-200 font-bold touch-manipulation"
-                aria-label={activeCalendarView === 'week' ? 'Next week' : 'Next month'}
-              >
-                ›
-              </button>
-            </div>
-
-            {activeCalendarView === 'agenda' ? null : activeCalendarView === 'month' ? (
-              <>
-                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-zinc-500">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((w, idx) => (
-                    <div key={`${w}-${idx}`} className="py-1">
-                      {w}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 mt-1">
-                  {calendarCells.map((cell, idx) => {
-                    if (!cell) return <div key={`empty-${idx}`} className="h-10" />
-                    const key = localDateKeyFromDate(cell)
-                    const isToday = key === todayKey
-                    const isSelected = selectedDays.includes(key)
-                    const dots = dayTypeDots[key] || []
-                    return (
-                      <button
-                        key={`${key}-${idx}`}
-                        type="button"
-                        onMouseDown={() => startDayPress(key)}
-                        onMouseUp={endDayPress}
-                        onMouseLeave={endDayPress}
-                        onTouchStart={() => startDayPress(key)}
-                        onTouchEnd={endDayPress}
-                        onClick={() => toggleSelectedDay(key)}
-                        className={`h-10 rounded-2xl text-sm touch-manipulation flex flex-col items-center justify-center gap-0.5 border ${
-                          isSelected
-                            ? 'border-violet-400 text-white'
-                            : isToday
-                              ? 'border-zinc-500 text-zinc-100'
-                              : 'border-transparent text-zinc-200'
-                        }`}
-                      >
-                        <span>{cell.getDate()}</span>
-                        <span className="h-2 flex items-center gap-1">
-                          {dots.map((t) => (
-                            <span key={`${key}-${t}`} className={`h-1.5 w-1.5 rounded-full ${offerTypeMeta[t]?.dot || 'bg-zinc-400'}`} />
-                          ))}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            ) : (
-              <div className={`flex min-h-0 flex-col rounded-2xl bg-zinc-900/60 p-1.5 ${isWeekView ? 'flex-1' : ''}`}>
-                <div className="grid shrink-0 grid-cols-7 gap-0 divide-x divide-zinc-500/20 border-b border-zinc-600/25 text-center text-[9px] font-semibold text-zinc-500">
-                  {weekDays.map((d) => {
-                    const dayKey = localDateKeyFromDate(d)
-                    return (
-                      <button
-                        key={d.toISOString()}
-                        type="button"
-                        className="touch-manipulation py-1 text-zinc-400 outline-none hover:bg-zinc-800/40 focus-visible:ring-2 focus-visible:ring-violet-500/40"
-                        onMouseDown={() => startDayPress(dayKey)}
-                        onMouseUp={endDayPress}
-                        onMouseLeave={endDayPress}
-                        onTouchStart={() => startDayPress(dayKey)}
-                        onTouchEnd={endDayPress}
-                        onTouchCancel={endDayPress}
-                      >
-                        <div>{d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
-                        <div className="text-[8px] font-normal text-zinc-500">{d.getDate()}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="mt-0.5 flex min-h-0 flex-1 flex-col space-y-0.5 overflow-y-auto">
-                  {weekEvents.length === 0 ? (
-                    <div className="relative min-h-[12rem] flex-1">
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                          <div key={i} className="border-r border-zinc-500/15 last:border-r-0" />
-                        ))}
-                      </div>
-                      <div className="absolute inset-0 z-[1] grid grid-cols-7 gap-0">
-                        {weekDays.map((d, i) => {
-                          const dk = localDateKeyFromDate(d)
-                          return (
-                            <button
-                              key={`empty-day-${i}`}
-                              type="button"
-                              aria-label={`Add event on ${dk}`}
-                              className="min-h-full touch-manipulation touch-none bg-transparent outline-none hover:bg-zinc-800/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500/30"
-                              onMouseDown={() => startDayPress(dk)}
-                              onMouseUp={endDayPress}
-                              onMouseLeave={endDayPress}
-                              onTouchStart={() => startDayPress(dk)}
-                              onTouchEnd={endDayPress}
-                              onTouchCancel={endDayPress}
-                            />
-                          )
-                        })}
-                      </div>
-                      <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center px-2 text-center text-zinc-500 text-xs">
-                        No events this week.
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {weekEventLanes.map((lane, laneIdx) => {
-                        return (
-                          <div key={`wk-lane-${laneIdx}`} className="relative min-h-[3.75rem]">
-                            <div
-                              aria-hidden
-                              className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
-                            >
-                              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                                <div key={i} className="border-r border-zinc-500/15 last:border-r-0" />
-                              ))}
-                            </div>
-                            <div className="absolute inset-0 z-[1] grid grid-cols-7 gap-0">
-                              {weekDays.map((d, i) => {
-                                const dk = localDateKeyFromDate(d)
-                                return (
-                                  <button
-                                    key={`row-lane-${laneIdx}-day-${i}`}
-                                    type="button"
-                                    aria-label={`Add event on ${dk}`}
-                                    className="min-h-full touch-manipulation touch-none bg-transparent outline-none hover:bg-zinc-800/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500/30"
-                                    onMouseDown={() => startDayPress(dk)}
-                                    onMouseUp={endDayPress}
-                                    onMouseLeave={endDayPress}
-                                    onTouchStart={() => startDayPress(dk)}
-                                    onTouchEnd={endDayPress}
-                                    onTouchCancel={endDayPress}
-                                  />
-                                )
-                              })}
-                            </div>
-                            <div className="pointer-events-none relative z-[2] grid grid-cols-7 gap-0">
-                              {lane.map((ev) => {
-                                const meta = offerTypeMeta[ev.offer_type] || offerTypeMeta.other
-                                return (
-                                  <button
-                                    key={`wk-${ev.id}-${ev._startCol}`}
-                                    type="button"
-                                    onClick={() => setWeekDetailEvent(ev)}
-                                    className={`pointer-events-auto ${meta.card} flex min-h-[3.5rem] min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg px-2 py-1.5 text-left text-[10px] leading-tight touch-manipulation`}
-                                    style={{ gridColumn: `${ev._startCol + 1} / span ${ev._span}` }}
-                                  >
-                                    <span className="w-full truncate text-left font-bold text-zinc-100">
-                                      {ev.casino_name || 'Event'}
-                                    </span>
-                                    {ev.title ? (
-                                      <span className="w-full truncate text-left italic text-zinc-300">{ev.title}</span>
-                                    ) : null}
-                                    {ev.value_amount !== null && (
-                                      <span className="w-full truncate text-left font-semibold tabular-nums text-emerald-400">
-                                        {ev.value_amount !== null ? `$${Number(ev.value_amount).toFixed(0)}` : ''}
-                                      </span>
-                                    )}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                      <div className="relative min-h-[10rem] flex-1 shrink-0">
-                        <div
-                          aria-hidden
-                          className="pointer-events-none absolute inset-0 z-0 grid grid-cols-7 gap-0"
-                        >
-                          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                            <div key={`pad-${i}`} className="border-r border-zinc-500/15 last:border-r-0" />
-                          ))}
-                        </div>
-                        <div className="absolute inset-0 z-[1] grid grid-cols-7 gap-0">
-                          {weekDays.map((d, i) => {
-                            const dk = localDateKeyFromDate(d)
-                            return (
-                              <button
-                                key={`footer-day-${i}`}
-                                type="button"
-                                aria-label={`Add event on ${dk}`}
-                                className="min-h-full touch-manipulation touch-none bg-transparent outline-none hover:bg-zinc-800/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500/30"
-                                onMouseDown={() => startDayPress(dk)}
-                                onMouseUp={endDayPress}
-                                onMouseLeave={endDayPress}
-                                onTouchStart={() => startDayPress(dk)}
-                                onTouchEnd={endDayPress}
-                                onTouchCancel={endDayPress}
-                              />
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-        {showWeekPortraitHint && activeCalendarView === 'week' && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="week-portrait-hint-title"
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-6 backdrop-blur-sm"
-            onClick={() => setShowWeekPortraitHint(false)}
-          >
-            <div
-              className="w-full max-w-sm rounded-3xl border border-violet-500/35 bg-gradient-to-b from-zinc-900 to-zinc-950 p-6 text-center shadow-2xl shadow-black/50"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/20 text-2xl text-violet-200" aria-hidden>
-                ↻
-              </div>
-              <p id="week-portrait-hint-title" className="text-lg font-bold tracking-tight text-zinc-50">
-                Rotate phone for better Week view
-              </p>
-              <button
-                type="button"
-                className="mt-8 w-full min-h-12 rounded-2xl bg-violet-600 text-base font-bold text-white shadow-lg shadow-violet-900/30 hover:bg-violet-500 touch-manipulation"
-                onClick={() => setShowWeekPortraitHint(false)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeCalendarView === 'month' && selectedDays.length > 0 && (
-          <div className="mb-3 flex items-center justify-between gap-3 px-1 py-1">
-            <div className="text-zinc-300 text-sm">
-              {selectedDays.length} day{selectedDays.length > 1 ? 's' : ''} selected
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedDays([])}
-              className="text-violet-300 text-sm font-semibold touch-manipulation"
-            >
-              Clear
-            </button>
-          </div>
-        )}
-
-        {!isWeekView && (
-        <div className="flex-1 min-h-0 flex flex-col">
-          <div className="text-white font-bold mb-2">{activeCalendarView === 'agenda' ? 'Agenda' : 'Events'}</div>
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-16">
-            {loading ? (
-              <div className="text-zinc-400 text-sm">Loading…</div>
-            ) : listEvents.length === 0 ? (
-              <div className="text-zinc-500 text-sm">
-                {activeCalendarView === 'agenda' ? 'No upcoming events.' : 'No events for the current filter.'}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {listRows.map((row, rowIdx) => {
-                  if (row.type === 'today-divider') {
-                    return (
-                      <div key={`today-divider-${rowIdx}`} className="flex items-center gap-2 px-1 py-1">
-                        <div className="h-px flex-1 bg-zinc-700/70" />
-                        <div className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200">
-                          Today
-                        </div>
-                        <div className="h-px flex-1 bg-zinc-700/70" />
-                      </div>
-                    )
-                  }
-                  const e = row.event
-                  const meta = offerTypeMeta[e.offer_type] || offerTypeMeta.other
-                  const isExpanded = expandedEventId === e.id
-                  const startDate = new Date(e.start_at)
-                  const endDate = e.end_at ? new Date(e.end_at) : null
-                  const showTime = hasVisibleTime(e.start_at) || (e.end_at ? hasVisibleTime(e.end_at) : false)
-                  const isMultiDay =
-                    !!endDate &&
-                    new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime() !==
-                      new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime()
-                  const dateRangeLabel = isMultiDay
-                    ? `${startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-                    : ''
-                  const timeLabel = showTime
-                    ? new Date(e.start_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                    : ''
-                  const dayLabel = startDate.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
-                  const dayNum = startDate.getDate()
-                  return (
-                    <button
-                      key={e.id}
-                      type="button"
-                      onClick={() => toggleExpandedEvent(e.id)}
-                      aria-expanded={isExpanded}
-                      className={`${meta.card} block w-full rounded-2xl p-2.5 text-left transition-colors hover:bg-opacity-90`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="w-10 shrink-0 text-center">
-                          <div className="text-zinc-500 text-[9px] font-semibold tracking-wide">{dayLabel}</div>
-                          <div className="text-zinc-100 text-xl leading-tight">{dayNum}</div>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`h-2.5 w-2.5 rounded-full ${meta.dot}`} />
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${meta.chip}`}>
-                              {meta.label}
-                            </span>
-                          </div>
-                          <div className={`text-zinc-100 text-base mt-0.5 leading-tight ${isExpanded ? 'whitespace-normal break-words' : 'truncate'}`}>
-                            {timeLabel ? `${timeLabel} ` : ''}
-                            {e.title}
-                          </div>
-                          {dateRangeLabel && <div className="text-zinc-300 text-xs mt-0.5">{dateRangeLabel}</div>}
-                          <div className={`mt-0.5 flex items-center gap-2 text-xs min-w-0 ${isExpanded ? 'flex-wrap' : ''}`}>
-                            <span className={`text-zinc-400 min-w-0 ${isExpanded ? 'whitespace-normal break-words' : 'truncate'}`}>{e.casino_name}</span>
-                            {e.value_amount !== null && (
-                              <span className={`text-emerald-300 min-w-0 ${isExpanded ? 'whitespace-normal break-words' : 'truncate'}`}>
-                                {e.value_amount !== null ? `$${Number(e.value_amount).toFixed(0)}` : ''}
-                              </span>
-                            )}
-                          </div>
-                          {e.notes && (
-                            <div
-                              ref={
-                                isExpanded
-                                  ? undefined
-                                  : (el) => {
-                                      notesPreviewRefs.current[e.id] = el
-                                    }
-                              }
-                              className={`text-zinc-400 text-xs mt-0.5 ${isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}
-                            >
-                              {e.notes}
-                            </div>
-                          )}
-                          {e.notes && !isExpanded && notesOverflowById[e.id] && (
-                            <div className="text-zinc-500 text-[10px] mt-0.5">Tap card to expand</div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mt-1 flex justify-end gap-3">
-                        <button
-                          type="button"
-                          onMouseDown={(ev) => ev.stopPropagation()}
-                          onClick={(ev) => {
-                            ev.stopPropagation()
-                            beginEdit(e)
-                          }}
-                          className="text-cyan-300 hover:text-cyan-200 text-[11px] font-semibold touch-manipulation"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onMouseDown={(ev) => ev.stopPropagation()}
-                          onClick={(ev) => {
-                            ev.stopPropagation()
-                            deleteEvent(e.id)
-                          }}
-                          className="text-red-300 hover:text-red-200 text-[11px] font-semibold touch-manipulation"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-        )}
-
-        <WeekEventDetailModal
-          event={weekDetailEvent}
-          offerTypeMeta={offerTypeMeta}
-          hasVisibleTime={hasVisibleTime}
-          onClose={() => setWeekDetailEvent(null)}
-          onEdit={(event) => {
-            setWeekDetailEvent(null)
-            beginEdit(event)
-          }}
-          onDelete={(eventId) => {
-            setWeekDetailEvent(null)
-            deleteEvent(eventId)
-          }}
-        />
-
-        <AddEventFab onClick={() => openForm(null)} />
-
-        <OfferFormModal
-          showForm={showForm}
-          editingId={editingId}
-          closeForm={closeForm}
-          completingReviewItemId={completingReviewItemId}
-          fileInputRef={fileInputRef}
-          handleImportPhotos={handleImportPhotos}
-          uploading={uploading}
-          reviewSourceImageLoading={reviewSourceImageLoading}
-          reviewSourceImageUrl={reviewSourceImageUrl}
-          draft={draft}
-          setDraft={setDraft}
-          setPropagateCasinoOnSave={setPropagateCasinoOnSave}
-          setShowCasinoSuggestions={setShowCasinoSuggestions}
-          showCasinoSuggestions={showCasinoSuggestions}
-          filteredCasinoOptions={filteredCasinoOptions}
-          setPropagateTitleOnSave={setPropagateTitleOnSave}
-          setShowTitleSuggestions={setShowTitleSuggestions}
-          showTitleSuggestions={showTitleSuggestions}
-          filteredTitleOptions={filteredTitleOptions}
-          allDay={allDay}
-          setAllDay={setAllDay}
-          startSelected={startSelected}
-          endSelected={endSelected}
-          endMinTime={endMinTime}
-          endMaxTime={endMaxTime}
-          saveEvent={saveEvent}
-          saving={saving}
-          notice={notice}
-          propagateCasinoOnSave={propagateCasinoOnSave}
-          setPropagateCasinoOnSaveChecked={setPropagateCasinoOnSave}
-          propagateTitleOnSave={propagateTitleOnSave}
-          setPropagateTitleOnSaveChecked={setPropagateTitleOnSave}
-          propagateValueOnSave={propagateValueOnSave}
-          setPropagateValueOnSaveChecked={setPropagateValueOnSave}
-          skipCurrentReviewFromForm={skipCurrentReviewFromForm}
-          casinoFieldRef={casinoFieldRef}
-          titleFieldRef={titleFieldRef}
-        />
-        <UploadProgressOverlay show={uploading} message={uploadSpinnerMessage} />
-      </div>
-    )
+function clearBillingQueryParams() {
+  if (typeof window === 'undefined') return
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('billing')
+    url.searchParams.delete('product')
+    const next = `${url.pathname}${url.search}${url.hash}`
+    window.history.replaceState({}, document.title, next || '/')
+  } catch {
+    // ignore
   }
-
-  const renderCalculatorsHome = () => (
-    <div className="max-w-lg mx-auto px-4 py-6 sm:py-8 pt-[max(0.5rem,env(safe-area-inset-top))]">
-      <div className="text-center mb-10 sm:mb-12">
-        <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Las Vegas Slot Pro</h1>
-        <p className="text-zinc-400 mt-3 text-base">Select a calculator</p>
-      </div>
-
-      <button
-        onClick={() => setActiveCalculator('phoenix')}
-        className="w-full bg-gray-900 hover:bg-gray-800 transition-colors p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation active:scale-[0.99]"
-      >
-        <img src="/phoenix-link-logo.png" alt="Phoenix" className="h-16 w-16 flex-shrink-0 rounded-xl" />
-        <div className="min-w-0 flex-1 self-center">
-          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-orange-400">Phoenix Link EV Calc</div>
-          <p className="mt-0.5 line-clamp-1 text-base leading-snug text-gray-400 sm:line-clamp-2">
-            Must-hit counter bonus analyzer
-          </p>
-        </div>
-      </button>
-
-      <button
-        onClick={() => setActiveCalculator('buffalo')}
-        className="w-full bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 hover:from-amber-500 hover:via-orange-500 hover:to-red-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]"
-      >
-        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-inner">
-          <img src="/buffalo-icon.png" alt="Buffalo" className="h-14 w-14 object-contain" />
-        </div>
-        <div className="min-w-0 flex-1 self-center">
-          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-amber-100">Buffalo Link EV Calc</div>
-          <p className="mt-0.5 line-clamp-1 text-base leading-snug text-amber-200 sm:line-clamp-2">
-            Midpoint-based counter analyzer
-          </p>
-        </div>
-      </button>
-
-      <button
-        onClick={() => setActiveCalculator('stackup')}
-        className="w-full bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]"
-      >
-        <img src="/stackup-icon.jpg" alt="Stack Up Pays" className="h-16 w-16 flex-shrink-0 rounded-2xl object-cover shadow-lg" />
-        <div className="min-w-0 flex-1 self-center">
-          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-cyan-100">Stack Up Pays</div>
-          <p
-            className="mt-0.5 line-clamp-1 text-base leading-snug text-cyan-200 sm:line-clamp-2"
-            title="Ascending Fortunes • 5-meter analyzer"
-          >
-            Ascending Fortunes • 5-meter analyzer
-          </p>
-        </div>
-      </button>
-
-      <button
-        onClick={() => setActiveCalculator('mhb')}
-        className="w-full bg-gradient-to-br from-purple-600 via-violet-600 to-fuchsia-700 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-600 p-6 sm:p-8 rounded-3xl text-left flex items-center gap-4 sm:gap-5 mb-4 min-h-[7rem] touch-manipulation transition-all active:scale-[0.985]"
-      >
-        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-400 to-fuchsia-400 text-5xl shadow-inner">
-          🎰
-        </div>
-        <div className="min-w-0 flex-1 self-center">
-          <div className="line-clamp-2 font-semibold text-2xl leading-snug text-purple-100">Must Hit By Jackpot</div>
-          <p className="mt-0.5 line-clamp-1 text-base leading-snug text-purple-200 sm:line-clamp-2">
-            Progressive must-hit analyzer
-          </p>
-        </div>
-      </button>
-
-      <div className="mt-10 sm:mt-12 text-center">
-        <button
-          onClick={onLogout}
-          className="min-h-12 inline-flex items-center justify-center text-base text-gray-400 hover:text-red-400 underline touch-manipulation transition-colors px-4 py-2"
-        >
-          Logout
-        </button>
-      </div>
-    </div>
-  )
-
-  const renderTabContent = () => {
-    if (tab === 'calculators') {
-      if (!activeCalculator) return renderCalculatorsHome()
-      if (activeCalculator === 'phoenix') return <PhoenixLink onBack={() => setActiveCalculator(null)} />
-      if (activeCalculator === 'buffalo') return <BuffaloLink onBack={() => setActiveCalculator(null)} />
-      if (activeCalculator === 'stackup') return <StackUpPays onBack={() => setActiveCalculator(null)} />
-      if (activeCalculator === 'mhb') return <MHBCalculator onBack={() => setActiveCalculator(null)} />
-      return renderCalculatorsHome()
-    }
-
-    if (tab === 'home') {
-      return (
-        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="text-white text-2xl font-black tracking-tight">Las Vegas Slot Pro</div>
-              <div className="text-zinc-400 text-sm mt-0.5">Home</div>
-            </div>
-            <button
-              onClick={onLogout}
-              className="min-h-10 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-semibold touch-manipulation"
-            >
-              Logout
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button
-              onClick={() => setTab('calculators')}
-              className="bg-zinc-900 rounded-3xl p-4 text-left touch-manipulation active:scale-[0.99]"
-            >
-              <div className="text-zinc-400 text-xs">Quick action</div>
-              <div className="text-white font-bold text-lg mt-1">Open calculators</div>
-              <div className="text-zinc-500 text-xs mt-1">Favorites + recent</div>
-            </button>
-            <button
-              onClick={() => openCalculator('stackup')}
-              className="bg-zinc-900 rounded-3xl p-4 text-left touch-manipulation active:scale-[0.99]"
-            >
-              <div className="text-zinc-400 text-xs">Quick eval</div>
-              <div className="text-white font-bold text-lg mt-1">Stack Up Pays</div>
-              <div className="text-zinc-500 text-xs mt-1">Jump into meters</div>
-            </button>
-          </div>
-
-          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-white font-bold">Feed (placeholder)</div>
-              <button
-                onClick={() => setTab('offers')}
-                className="text-cyan-300 text-sm font-semibold hover:text-cyan-200"
-              >
-                View offers →
-              </button>
-            </div>
-            <div className="space-y-3">
-              {[
-                { title: 'Big win post', body: 'Photo + caption + tags (coming soon).' },
-                { title: 'News/update', body: 'Machine changes, rules, resets (coming soon).' },
-              ].map((p) => (
-                <div key={p.title} className="rounded-2xl bg-zinc-800/70 p-4">
-                  <div className="text-zinc-200 font-semibold">{p.title}</div>
-                  <div className="text-zinc-400 text-sm mt-1 leading-relaxed">{p.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    if (tab === 'guides') {
-      return (
-        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <div className="mb-6">
-            <div className="text-white text-2xl font-black tracking-tight">Guides</div>
-            <div className="text-zinc-400 text-sm mt-0.5">How-to playbooks (skeleton)</div>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              { id: 'stackup', title: 'Stack Up Pays (Ascending Fortunes)', subtitle: 'What to look for + meter workflow' },
-              { id: 'phoenix', title: 'Phoenix Link', subtitle: 'Counter basics + volatility notes' },
-              { id: 'buffalo', title: 'Buffalo Link', subtitle: 'Midpoint method + walk-away' },
-            ].map((g) => (
-              <div key={g.id} className="bg-zinc-900 rounded-3xl p-5">
-                <div className="text-white font-bold text-lg">{g.title}</div>
-                <div className="text-zinc-400 text-sm mt-1">{g.subtitle}</div>
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => openCalculator(g.id)}
-                    className="flex-1 min-h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold touch-manipulation"
-                  >
-                    Open calculator
-                  </button>
-                  <button
-                    onClick={() => setTab('intel')}
-                    className="flex-1 min-h-11 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold touch-manipulation"
-                  >
-                    Ask locals
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )
-    }
-
-    if (tab === 'offers') return <OffersCalendar />
-    if (tab === 'intel') return <LocalIntel />
-
-    if (tab === 'team') {
-      return (
-        <div className="max-w-lg mx-auto px-4 py-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <div className="mb-6">
-            <div className="text-white text-2xl font-black tracking-tight">Team / Deals</div>
-            <div className="text-zinc-400 text-sm mt-0.5">Bring our team in (skeleton)</div>
-          </div>
-
-          <div className="bg-zinc-900 rounded-3xl p-5 mb-4">
-            <div className="text-white font-bold">Request help on a play</div>
-            <div className="text-zinc-400 text-sm mt-1">
-              Intake flow for large plays you can’t take solo. (Run it / buy it / partner.)
-            </div>
-            <button
-              type="button"
-              className="mt-4 w-full min-h-12 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold touch-manipulation"
-            >
-              Start intake (coming soon)
-            </button>
-          </div>
-
-          <div className="bg-zinc-900 rounded-3xl p-5">
-            <div className="text-white font-bold">Submission status</div>
-            <div className="text-zinc-500 text-sm mt-1">Submitted → Reviewing → Accepted → Coordinating</div>
-          </div>
-        </div>
-      )
-    }
-
-    return null
-  }
-
-  return (
-    <div className="min-h-dvh bg-gray-950">
-      {renderTabContent()}
-
-      {menuOpen && (
-        <button
-          type="button"
-          onClick={() => setMenuOpen(false)}
-          aria-label="Close navigation menu"
-          className="fixed inset-0 z-40 bg-black/35"
-        />
-      )}
-
-      <div className="fixed right-4 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-50 flex flex-col items-end gap-2">
-        {menuOpen && (
-          <div className="w-44 rounded-2xl bg-zinc-950/95 backdrop-blur px-2 py-2 shadow-xl">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setTab(item.id)
-                  if (item.id === 'calculators' && activeCalculator) setActiveCalculator(null)
-                  setMenuOpen(false)
-                }}
-                className={`w-full rounded-xl px-3 py-2.5 text-left text-sm flex items-center gap-2 touch-manipulation ${
-                  tab === item.id ? 'bg-zinc-800 text-white' : 'text-zinc-300 hover:bg-zinc-900'
-                }`}
-              >
-                <span aria-hidden>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label="Open navigation menu"
-          className="grid h-12 w-12 place-items-center rounded-full bg-zinc-900/95 text-white shadow-lg backdrop-blur touch-manipulation"
-        >
-          <span aria-hidden className="block leading-none text-2xl -translate-y-px">
-            {menuOpen ? '×' : '☰'}
-          </span>
-        </button>
-      </div>
-    </div>
-  )
 }
 
 function App() {
+  const AUTH_VIEW_STORAGE_KEY = 'lvslotpro-auth-view'
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isAllowed, setIsAllowed] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-  const [currentView, setCurrentView] = useState('app')
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window === 'undefined') return 'app'
+    return parseLegalPathname(window.location.pathname || '/') || 'app'
+  })
+  /** Login/signup as a modal over the app when the user chooses it or a feature calls onRequireAuth. */
+  const [authPanelOpen, setAuthPanelOpen] = useState(false)
+  /** Optional shell banner (e.g. future account notices). */
+  const [accessNotice, setAccessNotice] = useState('')
+  /** Moderator/admin: full access; hamburger hides subscriber-only lock icons. */
+  const [isStaffRole, setIsStaffRole] = useState(false)
+  /** Admin only: content access lock switches on calcs/guides, guide delete, play log system templates. */
+  const [isAdminRole, setIsAdminRole] = useState(false)
+  /** From `profiles.has_active_subscription` when column exists (see `supabase/profiles_tier_testing.sql`). */
+  const [hasActiveSubscriptionFromProfile, setHasActiveSubscriptionFromProfile] = useState(false)
+  const [stripeCustomerId, setStripeCustomerId] = useState(null)
+  const [subscribeModal, setSubscribeModal] = useState({ open: false, productSlug: PRODUCT_SLOTS_EDGE })
 
   // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotMessage, setForgotMessage] = useState('')
   const [forgotError, setForgotError] = useState('')
-  const [showCreateAccount, setShowCreateAccount] = useState(false)
+  const [authTab, setAuthTab] = useState('join')
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('')
@@ -1771,82 +110,277 @@ function App() {
   const [isSendingReset, setIsSendingReset] = useState(false)
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
   const [isOAuthLoading, setIsOAuthLoading] = useState(false)
+  const [deleteAccountBusy, setDeleteAccountBusy] = useState(false)
 
   // Verification success message
   const [verificationSuccess, setVerificationSuccess] = useState(false)
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
+  const [legalAcceptancePending, setLegalAcceptancePending] = useState(false)
+  const [legalAcceptanceBusy, setLegalAcceptanceBusy] = useState(false)
+  const [legalAcceptanceError, setLegalAcceptanceError] = useState('')
+  /** Suppress popstate from re-entering legal while programmatically exiting (Got it / Back). */
+  const legalExitViaPopRef = useRef(false)
 
   useEffect(() => {
-    const { error: oauthError, errorCode, errorDescription } = readAuthCallbackParams()
-    const oauthMsg = getOAuthCallbackMessage(oauthError, errorCode, errorDescription)
-    if (oauthMsg) {
-      setLoginError(oauthMsg)
-      window.history.replaceState({}, document.title, window.location.pathname || '/')
-    }
-
-    const hash = window.location.hash
-    const hashParams = new URLSearchParams(hash.replace('#', ''))
-    // Email confirmation uses type=signup; Google OAuth can too, but the hash includes provider_token
-    const isEmailOnlyVerification = (hash.includes('type=signup') || hash.includes('type=confirmation')) && !hash.includes('provider_token')
-    if (isEmailOnlyVerification) {
-      setVerificationSuccess(true)
-      setTimeout(() => {
-        if (window.location.hash) {
-          window.history.replaceState({}, document.title, window.location.pathname || '/')
+    queueMicrotask(() => {
+      try {
+        const pref = window.localStorage.getItem(AUTH_VIEW_STORAGE_KEY)
+        if (pref === 'create') {
+          setAuthTab('join')
+          setShowForgotPassword(false)
+          setAuthPanelOpen(true)
         }
-      }, 0)
-    }
+        if (pref === 'login') {
+          setAuthTab('signin')
+          setShowForgotPassword(false)
+          setAuthPanelOpen(true)
+        }
+        if (pref) window.localStorage.removeItem(AUTH_VIEW_STORAGE_KEY)
+      } catch {
+        // Ignore storage read failures.
+      }
+    })
+  }, [])
 
-    // Only trigger reset password for actual recovery links
-    if (hash.includes('type=recovery')) {
-      setCurrentView('reset-password')
-      const accessToken = hashParams.get('access_token')
-      const refreshToken = hashParams.get('refresh_token')
-
-      if (accessToken && refreshToken) {
-        void supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        })
+  useEffect(() => {
+    queueMicrotask(() => {
+      const legalSlug = parseLegalPathname(window.location.pathname || '/')
+      if (legalSlug) {
+        setCurrentView(legalSlug)
+        return
       }
 
-      window.history.replaceState({}, document.title, '/reset-password')
-    }
+      const { error: oauthError, errorCode, errorDescription } = readAuthCallbackParams()
+      const oauthMsg = getOAuthCallbackMessage(oauthError, errorCode, errorDescription)
+      if (oauthMsg) {
+        setAuthTab('signin')
+        setLoginError(oauthMsg)
+        setAuthPanelOpen(true)
+        window.history.replaceState({}, document.title, window.location.pathname || '/')
+      }
+
+      const hash = window.location.hash || ''
+      const search = window.location.search || ''
+      const combinedForType = `${hash}${search}`
+      const hashParams = new URLSearchParams(hash.replace('#', ''))
+      // Email confirmation uses type=signup (or type=confirmation); Google OAuth includes provider_token in the hash.
+      const isEmailOnlyVerification =
+        (combinedForType.includes('type=signup') || combinedForType.includes('type=confirmation')) &&
+        !combinedForType.includes('provider_token')
+      if (isEmailOnlyVerification) {
+        setVerificationSuccess(true)
+        setAuthTab('signin')
+        setShowForgotPassword(false)
+        setLoginError('')
+        setAuthPanelOpen(true)
+        setTimeout(() => {
+          if (window.location.hash) {
+            window.history.replaceState({}, document.title, window.location.pathname || '/')
+          }
+        }, 0)
+      }
+
+      // Only trigger reset password for actual recovery links
+      if (combinedForType.includes('type=recovery')) {
+        setCurrentView('reset-password')
+        const accessToken = hashParams.get('access_token')
+        const refreshToken = hashParams.get('refresh_token')
+
+        if (accessToken && refreshToken) {
+          void supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          })
+        }
+
+        window.history.replaceState({}, document.title, '/reset-password')
+      }
+    })
 
     void supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) checkWhitelist(session.user.email)
-      else setIsChecking(false)
+      setIsChecking(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) checkWhitelist(session.user.email)
-      else {
-        setIsAllowed(false)
-        setIsChecking(false)
-      }
+      if (!session?.user) setIsChecking(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  const checkWhitelist = async (userEmail) => {
-    if (!userEmail) {
-      setIsAllowed(false)
-      setIsChecking(false)
+  /** Seeds `profiles` when missing (avoids Lounge composer UUID hex initials like “65”) - OAuth and session restore, not only password login. */
+  useEffect(() => {
+    if (!user?.id) return
+    void ensureDefaultProfileRow(supabase, user)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when auth user id changes; not every new `user` reference from Supabase.
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id) {
+      queueMicrotask(() => {
+        setLegalAcceptancePending(false)
+        setLegalAcceptanceError('')
+      })
       return
     }
-    const { data } = await supabase.from('allowed_emails').select('email').eq('email', userEmail).maybeSingle()
-    if (!data) {
-      setIsAllowed(false)
-      setIsChecking(false)
-      setLoginError("Your account is not yet approved. Contact Ryan to be whitelisted.")
-      await supabase.auth.signOut()
+    let cancelled = false
+    const syncLegalAcceptance = async () => {
+      if (readPendingLegalAcceptance()) {
+        await ensureDefaultProfileRow(supabase, user)
+        const { error } = await recordLegalAcceptance(supabase, user.id)
+        if (cancelled) return
+        if (!error) {
+          setLegalAcceptancePending(false)
+          setLegalAcceptanceError('')
+          return
+        }
+      }
+      const needs = await profileNeedsLegalAcceptance(supabase, user.id)
+      if (!cancelled) setLegalAcceptancePending(needs)
+    }
+    void syncLegalAcceptance()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  const handleLegalAcceptance = useCallback(async () => {
+    if (!user?.id || legalAcceptanceBusy) return
+    setLegalAcceptanceBusy(true)
+    setLegalAcceptanceError('')
+    await ensureDefaultProfileRow(supabase, user)
+    const { error } = await recordLegalAcceptance(supabase, user.id)
+    if (error) {
+      setLegalAcceptanceError('Could not save your acceptance. Please try again.')
+      setLegalAcceptanceBusy(false)
       return
     }
-    setIsAllowed(true)
-    setIsChecking(false)
-  }
+    setLegalAcceptancePending(false)
+    setLegalAcceptanceBusy(false)
+  }, [user, legalAcceptanceBusy])
+
+  useEffect(() => {
+    if (!user?.id) {
+      queueMicrotask(() => {
+        setIsStaffRole(false)
+        setIsAdminRole(false)
+        setHasActiveSubscriptionFromProfile(false)
+        setStripeCustomerId(null)
+      })
+      return
+    }
+    let cancelled = false
+    const load = async () => {
+      const wide = await supabase
+        .from('profiles')
+        .select('role, has_active_subscription, stripe_customer_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (cancelled) return
+      if (wide.data) {
+        const r = wide.data.role
+        setIsStaffRole(r === 'moderator' || r === 'admin')
+        setIsAdminRole(r === 'admin')
+        setHasActiveSubscriptionFromProfile(Boolean(wide.data.has_active_subscription))
+        setStripeCustomerId(wide.data.stripe_customer_id ?? null)
+        return
+      }
+      if (wide.error?.code === 'PGRST116') {
+        setIsStaffRole(false)
+        setIsAdminRole(false)
+        setHasActiveSubscriptionFromProfile(false)
+        setStripeCustomerId(null)
+        return
+      }
+      if (wide.error) {
+        const narrow = await supabase.from('profiles').select('role').eq('user_id', user.id).maybeSingle()
+        if (cancelled) return
+        if (narrow.data) {
+          const r = narrow.data.role
+          setIsStaffRole(r === 'moderator' || r === 'admin')
+          setIsAdminRole(r === 'admin')
+        } else {
+          setIsStaffRole(false)
+          setIsAdminRole(false)
+        }
+        setHasActiveSubscriptionFromProfile(false)
+        setStripeCustomerId(null)
+        return
+      }
+      setIsStaffRole(false)
+      setIsAdminRole(false)
+      setHasActiveSubscriptionFromProfile(false)
+      setStripeCustomerId(null)
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  const {
+    entitlements,
+    refresh: refreshEntitlements,
+    hasSlotsEdge: hasSlotsEdgeFromRpc,
+  } = useEdgeEntitlements(supabase, user?.id)
+
+  const {
+    gatesMap: contentAccessGatesMap,
+    gatesDbReady: contentAccessGatesDbReady,
+    setContentGate: setContentAccessGate,
+  } = useContentAccessGates(supabase, isAdminRole)
+
+  useEffect(() => {
+    const billing = readBillingQueryParams()
+    if (!billing || !user?.id) return
+
+    let cancelled = false
+
+    const pollEntitlements = async () => {
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        if (cancelled) return
+        await refreshEntitlements()
+        const { data } = await supabase
+          .from('profiles')
+          .select('has_active_subscription, stripe_customer_id')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (data) {
+          setHasActiveSubscriptionFromProfile(Boolean(data.has_active_subscription))
+          setStripeCustomerId(data.stripe_customer_id ?? null)
+          if (data.has_active_subscription) return
+        }
+        await new Promise((r) => window.setTimeout(r, 1200))
+      }
+    }
+
+    if (billing.billing === 'success' || billing.billing === 'portal') {
+      void pollEntitlements()
+      setAccessNotice(
+        billing.billing === 'success'
+          ? 'Subscription updated - thanks for supporting Edge.'
+          : 'Billing settings saved.',
+      )
+    }
+    clearBillingQueryParams()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, refreshEntitlements])
+
+  const openSubscribeModal = useCallback((productSlug = PRODUCT_SLOTS_EDGE, options = {}) => {
+    if (options?.directCheckout) {
+      return startEdgeCheckout(supabase, productSlug)
+    }
+    setSubscribeModal({ open: true, productSlug })
+  }, [])
+
+  const closeSubscribeModal = useCallback(() => {
+    setSubscribeModal((s) => ({ ...s, open: false }))
+  }, [])
 
   const getFriendlyErrorMessage = (error, context = 'general') => {
     const message = error?.message || 'Unknown error'
@@ -1885,21 +419,20 @@ function App() {
       return
     }
 
-    const { data: whitelistData } = await supabase.from('allowed_emails').select('email').eq('email', email).single()
-    
-    if (whitelistData) {
-      setUser(data.user)
-      setIsAllowed(true)
-    } else {
-      await supabase.auth.signOut()
-      setLoginError("Your account is not yet approved. Contact Ryan to be whitelisted.")
-    }
     setIsLoggingIn(false)
+    setUser(data.user)
+    setAccessNotice('')
+    setVerificationSuccess(false)
+    setAuthPanelOpen(false)
+    await ensureDefaultProfileRow(supabase, data.user)
+    // Full reload so Lounge (and composer) mount with the new session; same-tab anon → member can leave feed UI stale otherwise.
+    window.location.reload()
   }
 
-  const handleOAuthSignIn = async (provider, { setError = setLoginError } = {}) => {
+  const handleOAuthSignIn = async (provider, { setError = setLoginError, markLegalPending = false } = {}) => {
     if (isOAuthLoading) return
     setError('')
+    if (markLegalPending) markPendingLegalAcceptance()
     setIsOAuthLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -1917,8 +450,10 @@ function App() {
     setSignupError('')
     setSignupMessage('')
     if (!signupEmail || !signupPassword || !signupConfirmPassword) return setSignupError("Please fill in all fields")
+    if (!acceptedLegal) return
     if (signupPassword !== signupConfirmPassword) return setSignupError("Passwords do not match")
     if (signupPassword.length < 6) return setSignupError("Password must be at least 6 characters")
+    markPendingLegalAcceptance()
     setIsSigningUp(true)
 
     const { data, error } = await supabase.auth.signUp({ 
@@ -1951,7 +486,13 @@ function App() {
     setSignupEmail('')
     setSignupPassword('')
     setSignupConfirmPassword('')
+    setAcceptedLegal(false)
     setIsSigningUp(false)
+    if (data?.session?.user) {
+      void ensureDefaultProfileRow(supabase, data.session.user).then(() =>
+        recordLegalAcceptance(supabase, data.session.user.id),
+      )
+    }
   }
 
   const handleForgotPassword = async (e) => {
@@ -2008,13 +549,203 @@ function App() {
     window.location.reload()
   }
 
-  if (isChecking) return <div className={`${mobileShell} text-white`}>Loading...</div>
+  const handleDeleteAccount = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Permanently delete this account? All data tied to it in this project (profile, Lounge posts, offers subscriptions, Auth flags, etc.) will be removed. This cannot be undone.'
+      )
+    )
+      return
+    setDeleteAccountBusy(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const userId = session?.user?.id ?? null
+
+      const { data, error } = await supabase.functions.invoke('delete-own-account', {
+        method: 'POST',
+        body: {},
+      })
+      if (error) throw error
+      if (data && typeof data === 'object' && data.error) {
+        throw new Error(String(data.error))
+      }
+
+      clearAccountClientState(userId)
+      await supabase.auth.signOut()
+      window.location.href = `${window.location.origin}/`
+    } catch (e) {
+      const fallback =
+        'Could not delete account. Deploy the delete-own-account Edge Function (see supabase/functions/delete-own-account/README.md).'
+      const msg = typeof e?.message === 'string' && e.message.trim() ? e.message.trim() : fallback
+      window.alert(msg)
+    } finally {
+      setDeleteAccountBusy(false)
+    }
+  }, [])
+
+  const switchAuthTab = useCallback(
+    (nextTab) => {
+      setAuthTab(nextTab)
+      setShowForgotPassword(false)
+      setLoginError('')
+      setSignupError('')
+      setSignupMessage('')
+      if (nextTab === 'join') {
+        setSignupEmail((prev) => (prev.trim() ? prev : email.trim()))
+      } else {
+        setEmail((prev) => (prev.trim() ? prev : signupEmail.trim()))
+      }
+    },
+    [email, signupEmail],
+  )
+
+  const openAuthPanel = (mode = 'create') => {
+    setAuthTab(mode === 'login' ? 'signin' : 'join')
+    setShowForgotPassword(false)
+    setLoginError('')
+    setSignupError('')
+    setSignupMessage('')
+    setAuthPanelOpen(true)
+  }
+
+  const closeAuthPanel = useCallback(() => {
+    setAuthPanelOpen(false)
+    setLoginError('')
+    setSignupError('')
+    setSignupMessage('')
+    setVerificationSuccess(false)
+  }, [])
+
+  const openLegalDocument = useCallback(
+    (slug, source = 'auth') => {
+      if (slug !== 'terms' && slug !== 'privacy' && slug !== 'guidelines') return
+      /** @type {import('./features/legal/legalDocumentNavigation.js').LegalReturnContext} */
+      const ctx = { source }
+      if (source === 'auth') {
+        ctx.authTab = authTab === 'signin' ? 'signin' : 'join'
+        setAuthPanelOpen(false)
+      }
+      markLegalReturnContext(ctx)
+      setCurrentView(slug)
+      window.history.pushState({ lvLegalReturn: true, slug, source }, '', `/${slug}?from=${source}`)
+    },
+    [authTab],
+  )
+
+  const applyLegalReturnUi = useCallback((ctx) => {
+    if (!ctx) return
+    if (ctx.source === 'auth') {
+      setAuthTab(ctx.authTab === 'signin' ? 'signin' : 'join')
+      setAuthPanelOpen(true)
+      return
+    }
+    applyLegalReturnReopen(ctx)
+  }, [])
+
+  const finishLegalReturn = useCallback(
+    (ctx) => {
+      if (!ctx) return
+      clearLegalReturnContext()
+      applyLegalReturnUi(ctx)
+      setCurrentView('app')
+      if (typeof window === 'undefined') return
+      if (window.history.state?.lvLegalReturn) {
+        legalExitViaPopRef.current = true
+        window.history.back()
+        return
+      }
+      window.history.replaceState({}, document.title, '/')
+    },
+    [applyLegalReturnUi],
+  )
+
+  const exitLegalDocument = useCallback(() => {
+    const slug = currentView
+    if (slug === 'terms' || slug === 'privacy' || slug === 'guidelines') {
+      const ctx = resolveLegalReturnContext(slug)
+      if (ctx) {
+        finishLegalReturn(ctx)
+        return
+      }
+    }
+    if (typeof window !== 'undefined') {
+      const pathSlug = parseLegalPathname(window.location.pathname)
+      if (!pathSlug) {
+        setCurrentView('app')
+        window.history.replaceState({}, document.title, '/')
+        return
+      }
+      if (window.history.length > 1) {
+        window.history.back()
+        return
+      }
+    }
+    setCurrentView('app')
+    window.history.replaceState({}, document.title, '/')
+  }, [currentView, finishLegalReturn])
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (legalExitViaPopRef.current) {
+        legalExitViaPopRef.current = false
+        setCurrentView('app')
+        return
+      }
+      const slug = parseLegalPathname(window.location.pathname)
+      if (slug) {
+        setCurrentView(slug)
+        return
+      }
+      setCurrentView('app')
+      const ctx = readLegalReturnContext()
+      if (ctx) finishLegalReturn(ctx)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [finishLegalReturn])
+
+  useEffect(() => {
+    if (!authPanelOpen) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeAuthPanel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [authPanelOpen, closeAuthPanel])
+
+  useEffect(() => {
+    if (!authPanelOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [authPanelOpen])
+
+  if (isChecking && !shouldShowLoungeColdBootSplash({
+    tab: 'home',
+    pendingWork: readLoungeComposerDraftPendingWork(),
+  }) && currentView === 'app') {
+    return <div className={`${mobileShell} text-zinc-50`}>Loading...</div>
+  }
+
+  if (currentView === 'terms' || currentView === 'privacy' || currentView === 'guidelines') {
+    return (
+      <LegalDocumentScreen
+        slug={currentView}
+        onBack={exitLegalDocument}
+        onGotIt={exitLegalDocument}
+      />
+    )
+  }
 
   // Reset Password Page
   if (currentView === 'reset-password') {
     return (
       <div className={mobileShell}>
-        <div className="bg-gray-900 p-6 sm:p-8 rounded-3xl max-w-sm w-full">
+        <div className="bg-gray-900 p-6 sm:p-8 rounded-3xl max-w-sm w-full" data-auth-modal>
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Reset Your Password</h2>
 
           {resetError && <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-2xl text-red-300 text-sm text-center">{resetError}</div>}
@@ -2057,186 +788,157 @@ function App() {
     )
   }
 
-  // Login Screen
-  if (!user || !isAllowed) {
-    return (
-      <div className={mobileShell}>
-        <div className="bg-gray-900 p-6 sm:p-8 rounded-3xl max-w-sm w-full">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">Las Vegas Slot Pro</h2>
+  const hasSlotsEdgeAccess =
+    isStaffRole ||
+    hasSlotsEdgeFromRpc ||
+    hasActiveSubscriptionFromProfile ||
+    String(import.meta.env.VITE_HAS_ACTIVE_SUBSCRIPTION || '').toLowerCase() === 'true'
 
-          {verificationSuccess && (
-            <div className="mb-6 p-4 bg-emerald-900/50 border border-emerald-500 rounded-2xl text-emerald-300 text-center text-sm sm:text-base font-medium leading-relaxed">
-              ✅ Account Verified - have fun!
-            </div>
-          )}
-
-          {!showForgotPassword && !showCreateAccount ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputBase}
-                autoComplete="email"
-                inputMode="email"
-                enterKeyHint="next"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputBase}
-                autoComplete="current-password"
-                inputMode="text"
-                enterKeyHint="go"
-                required
-              />
-              <button 
-                type="submit"
-                disabled={isLoggingIn}
-                className={`${btnPrimary} bg-orange-600 hover:bg-orange-500 rounded-2xl disabled:opacity-60 disabled:cursor-not-allowed`}
-              >
-                {isLoggingIn ? 'Logging In...' : 'Log In'}
-              </button>
-
-              {loginError && (
-                <div className="p-3 bg-red-900/50 border border-red-500 rounded-xl text-red-300 text-sm text-center leading-relaxed" role="alert">
-                  {loginError}
-                </div>
-              )}
-
-              <OAuthDivider />
-              <button
-                type="button"
-                disabled={isOAuthLoading}
-                onClick={() => handleOAuthSignIn('google')}
-                className={`${btnPrimary} flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed`}
-                aria-label="Continue with Google"
-              >
-                <GoogleIcon />
-                Google
-              </button>
-
-              <button 
-                type="button" 
-                onClick={() => {
-                  setShowCreateAccount(true)
-                  setShowForgotPassword(false)
-                  setSignupError('')
-                  setSignupMessage('')
-                }}
-                className={`${btnSecondary} bg-gray-700 hover:bg-gray-600 border border-orange-600 rounded-2xl text-white`}
-              >
-                Signup
-              </button>
-
-              <div className="pt-1">
-                <button type="button" onClick={() => setShowForgotPassword(true)} className="w-full min-h-12 text-base text-orange-400 hover:text-orange-300 touch-manipulation py-3 text-center">
-                  Forgot Password?
-                </button>
-              </div>
-            </form>
-          ) : showCreateAccount ? (
-            <form onSubmit={handleSignUp} className="space-y-4">
-              <input
-                type="email"
-                placeholder="Email"
-                value={signupEmail}
-                onChange={(e) => setSignupEmail(e.target.value)}
-                className={inputBase}
-                autoComplete="email"
-                inputMode="email"
-                enterKeyHint="next"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={signupPassword}
-                onChange={(e) => setSignupPassword(e.target.value)}
-                className={inputBase}
-                autoComplete="new-password"
-                inputMode="text"
-                enterKeyHint="next"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                value={signupConfirmPassword}
-                onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                className={inputBase}
-                autoComplete="new-password"
-                inputMode="text"
-                enterKeyHint="go"
-                required
-              />
-              {signupError && <div className="p-3 bg-red-900/50 border border-red-500 rounded-xl text-red-300 text-sm text-center leading-relaxed" role="alert">{signupError}</div>}
-              {signupMessage && <div className="p-3 bg-emerald-900/50 border border-emerald-500 rounded-xl text-emerald-300 text-sm text-center leading-relaxed">{signupMessage}</div>}
-              <button type="submit" disabled={isSigningUp} className={`${btnPrimary} bg-orange-600 hover:bg-orange-500 rounded-2xl disabled:opacity-60 disabled:cursor-not-allowed`}>
-                {isSigningUp ? 'Creating Account...' : 'Create Account'}
-              </button>
-              <OAuthDivider />
-              <button
-                type="button"
-                disabled={isOAuthLoading}
-                onClick={() => handleOAuthSignIn('google', { setError: setSignupError })}
-                className={`${btnPrimary} flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed`}
-                aria-label="Sign up with Google"
-              >
-                <GoogleIcon />
-                Google
-              </button>
-              <button type="button" onClick={() => {
-                setShowCreateAccount(false)
-                setSignupError('')
-                setSignupMessage('')
-              }} className={`${linkBtn} text-sm sm:text-base`}>← Back to Login</button>
-            </form>
-          ) : (
-            <form onSubmit={handleForgotPassword} className="space-y-4">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                className={inputBase}
-                autoComplete="email"
-                inputMode="email"
-                enterKeyHint="go"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                required
-              />
-              {forgotError && <div className="p-3 bg-red-900/50 border border-red-500 rounded-xl text-red-300 text-sm text-center leading-relaxed" role="alert">{forgotError}</div>}
-              {forgotMessage && <div className="p-3 bg-emerald-900/50 border border-emerald-500 rounded-xl text-emerald-300 text-sm text-center leading-relaxed">{forgotMessage}</div>}
-              <button type="submit" disabled={isSendingReset} className={`${btnPrimary} bg-orange-600 hover:bg-orange-500 rounded-2xl disabled:opacity-60 disabled:cursor-not-allowed`}>
-                {isSendingReset ? 'Sending...' : 'Send Reset Link'}
-              </button>
-              <button type="button" onClick={() => setShowForgotPassword(false)} className={`${linkBtn} text-sm sm:text-base`}>← Back to Login</button>
-            </form>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Logged-in app shell
+  // App shell (Lounge and tabs); sign-in / create-account open as a modal on top
   if (currentView === 'app') {
-    return <AppShell onLogout={handleLogout} supabaseClient={supabase} />
+    return (
+      <>
+        <AppShell
+          browseMode={user ? 'member' : 'anonymous'}
+          authSessionReady={!isChecking}
+          hasActiveSubscription={hasSlotsEdgeAccess}
+          isStaff={isStaffRole}
+          isAdmin={isAdminRole}
+          contentAccessGatesMap={contentAccessGatesMap}
+          contentAccessGatesDbReady={contentAccessGatesDbReady}
+          onSetContentAccessGate={setContentAccessGate}
+          onOpenAuth={openAuthPanel}
+          onRequireSubscribe={openSubscribeModal}
+          accessNotice={accessNotice}
+          onDismissAccessNotice={() => setAccessNotice('')}
+          onLogout={handleLogout}
+          onDeleteAccount={handleDeleteAccount}
+          deleteAccountBusy={deleteAccountBusy}
+          supabaseClient={supabase}
+          onRequireAuth={(mode) => openAuthPanel(mode === 'login' ? 'login' : 'create')}
+          onOpenLegalDocument={openLegalDocument}
+        />
+        <SubscribeModal
+          open={subscribeModal.open}
+          productSlug={subscribeModal.productSlug}
+          onClose={closeSubscribeModal}
+          supabaseClient={supabase}
+          hasBillingAccount={Boolean(stripeCustomerId)}
+        />
+        {legalAcceptancePending && user ? (
+          <LegalAcceptanceModal
+            busy={legalAcceptanceBusy}
+            error={legalAcceptanceError}
+            onAccept={() => void handleLegalAcceptance()}
+            onOpenLegalDocument={openLegalDocument}
+          />
+        ) : null}
+        {authPanelOpen ? (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              className="absolute inset-0 cursor-default bg-black/70 [-webkit-tap-highlight-color:transparent]"
+              aria-label="Close sign in"
+              onClick={closeAuthPanel}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="auth-modal-title"
+              className="relative z-10 w-full max-w-sm max-h-[min(90dvh,calc(100dvh-2rem))] overflow-y-auto overscroll-contain rounded-3xl border border-zinc-600/80 bg-gray-900 p-6 shadow-2xl sm:p-8"
+              data-auth-modal
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={closeAuthPanel}
+                className={`${linkBtn} mb-4 !min-h-11 w-full text-sm sm:text-base`}
+              >
+                ← Continue without signing in
+              </button>
+              <svg
+                id="auth-modal-title"
+                viewBox="0 0 260 32"
+                width="100%"
+                className="mb-6 mx-auto block max-w-[300px]"
+                aria-label="Find Your Edge"
+                role="img"
+              >
+                <text x="26" y="24" textAnchor="start" fontFamily="'Montserrat', sans-serif" fontWeight="300" fontSize="24" fill="currentColor">
+                  Find Your
+                </text>
+                <image href="/edge-lounge-logo-transparent.png" x="150" y="6" width="77" height="19" className="edge-logo--dark" />
+                <image href="/edge-lounge-logo-light.png"       x="150" y="6" width="77" height="19" className="edge-logo--light" />
+              </svg>
+
+              <AuthModalPanel
+                authTab={authTab}
+                onAuthTabChange={switchAuthTab}
+                showForgotPassword={showForgotPassword}
+                onOpenForgotPassword={() => {
+                  setShowForgotPassword(true)
+                  setForgotError('')
+                  setForgotMessage('')
+                  const addr = email.trim() || signupEmail.trim()
+                  if (addr && !forgotEmail.trim()) setForgotEmail(addr)
+                }}
+                onCloseForgotPassword={() => {
+                  setShowForgotPassword(false)
+                  setForgotError('')
+                  setForgotMessage('')
+                  switchAuthTab('signin')
+                }}
+                verificationSuccess={verificationSuccess}
+                email={email}
+                onEmailChange={setEmail}
+                password={password}
+                onPasswordChange={setPassword}
+                loginError={loginError}
+                isLoggingIn={isLoggingIn}
+                onLoginSubmit={handleLogin}
+                signupEmail={signupEmail}
+                onSignupEmailChange={setSignupEmail}
+                signupPassword={signupPassword}
+                onSignupPasswordChange={setSignupPassword}
+                signupConfirmPassword={signupConfirmPassword}
+                onSignupConfirmPasswordChange={setSignupConfirmPassword}
+                signupError={signupError}
+                signupMessage={signupMessage}
+                isSigningUp={isSigningUp}
+                onSignUpSubmit={handleSignUp}
+                forgotEmail={forgotEmail}
+                onForgotEmailChange={setForgotEmail}
+                forgotError={forgotError}
+                forgotMessage={forgotMessage}
+                isSendingReset={isSendingReset}
+                onForgotSubmit={handleForgotPassword}
+                isOAuthLoading={isOAuthLoading}
+                acceptedLegal={acceptedLegal}
+                onAcceptedLegalChange={setAcceptedLegal}
+                onOpenLegalDocument={(slug) => openLegalDocument(slug, 'auth')}
+                onGoogleSignIn={({ setErrorTarget }) => {
+                  const setError =
+                    setErrorTarget === 'forgot'
+                      ? setForgotError
+                      : setErrorTarget === 'join'
+                        ? setSignupError
+                        : setLoginError
+                  setError('')
+                  void handleOAuthSignIn('google', {
+                    setError,
+                    markLegalPending: authTab === 'join' && acceptedLegal,
+                  })
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </>
+    )
   }
 
   return null
 }
 
 export default App
+
