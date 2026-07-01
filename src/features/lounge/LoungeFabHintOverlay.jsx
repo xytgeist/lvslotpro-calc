@@ -66,9 +66,9 @@ function ArrowToFab({ fabRect, cardRect }) {
 
 /**
  * One-time hint: cyan arrow to the Lounge dock + FAB (compose, search, chat, settings).
- * Shown after the Slots menu hint for signed-in members, or once per browser when browsing signed out.
+ * Shown after the Slots menu hint on a signed-in member's first Lounge visit.
  */
-export default function LoungeFabHintOverlay({ open, signedIn = false, onDismiss }) {
+export default function LoungeFabHintOverlay({ open, onDismiss }) {
   const [fabRect, setFabRect] = useState(null)
   const [cardRect, setCardRect] = useState(null)
   const [cardPos, setCardPos] = useState(null)
@@ -172,17 +172,7 @@ export default function LoungeFabHintOverlay({ open, signedIn = false, onDismiss
         </h2>
         <p className="mt-2 text-[13px] leading-snug text-zinc-300">
           Tap the <span className="font-semibold text-cyan-300">+</span> button for{' '}
-          {signedIn ? (
-            <>
-              <span className="font-semibold text-zinc-100">New post</span>, search, chat, and settings.
-              Hold to move it.
-            </>
-          ) : (
-            <>
-              search and settings. <span className="font-semibold text-zinc-100">Sign in</span> when you are ready to
-              post.
-            </>
-          )}
+          <span className="font-semibold text-zinc-100">New post</span>, search, chat, and settings. Hold to move it.
         </p>
         <button
           type="button"

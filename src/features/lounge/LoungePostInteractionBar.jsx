@@ -701,6 +701,10 @@ export default function LoungePostInteractionBar({
             type="button"
             onClick={(e) => {
               e.stopPropagation()
+              if (ro) {
+                requireLoungeAuth?.()
+                return
+              }
               onShare()
             }}
             className={`${statBookmarkCls} box-border flex shrink-0 items-center justify-center ${shareClass}`}

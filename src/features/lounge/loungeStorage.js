@@ -102,9 +102,6 @@ const LOUNGE_SLOTS_MENU_HINT_ACK_KEY = 'lvslotpro_lounge_slots_menu_hint_ack_v1'
 /** One-time Lounge dock FAB hint (after Slots menu hint) per user per browser. */
 const LOUNGE_FAB_HINT_ACK_KEY = 'lvslotpro_lounge_fab_hint_ack_v1'
 
-/** One-time Lounge dock FAB hint when browsing signed out (per browser). */
-const LOUNGE_FAB_HINT_ANON_ACK_KEY = 'lvslotpro_lounge_fab_hint_anon_v1'
-
 export function readLoungeWelcomeAck(uid) {
   if (!uid || typeof window === 'undefined') return false
   try {
@@ -190,33 +187,6 @@ export function writeLoungeFabHintAck(uid) {
 
 export function clearLoungeFabHintAck(uid) {
   removeUidFromLocalAckMap(LOUNGE_FAB_HINT_ACK_KEY, uid)
-}
-
-export function readLoungeFabHintAnonAck() {
-  if (typeof window === 'undefined') return false
-  try {
-    return window.localStorage.getItem(LOUNGE_FAB_HINT_ANON_ACK_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-export function writeLoungeFabHintAnonAck() {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(LOUNGE_FAB_HINT_ANON_ACK_KEY, '1')
-  } catch {
-    // ignore
-  }
-}
-
-export function clearLoungeFabHintAnonAck() {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.removeItem(LOUNGE_FAB_HINT_ANON_ACK_KEY)
-  } catch {
-    // ignore
-  }
 }
 
 const PROFILE_GATE_RECENT_PROFILE_MS = 7 * 24 * 60 * 60 * 1000

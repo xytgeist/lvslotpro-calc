@@ -4,7 +4,6 @@ import {
   clearLoungeWelcomeAck,
   clearLoungeSlotsMenuHintAck,
   clearLoungeFabHintAck,
-  clearLoungeFabHintAnonAck,
   clearProfileGateAck,
   LOUNGE_PROFILE_CACHE_KEY,
 } from '../features/lounge/loungeStorage.js'
@@ -73,7 +72,6 @@ export function clearAccountClientState(userId) {
 
   removeLocalStorageKey(LOUNGE_DOCK_MENU_LAYOUT_INTRO_KEY)
   removeLocalStorageKey(LOUNGE_IOS_PWA_SETUP_SEEN_KEY)
-  clearLoungeFabHintAnonAck()
   clearPendingLegalAcceptance()
 
   removeSessionStorageKey(LOUNGE_PROFILE_CACHE_KEY)

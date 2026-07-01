@@ -102,8 +102,6 @@ import {
   writeLoungeSlotsMenuHintAck,
   readLoungeFabHintAck,
   writeLoungeFabHintAck,
-  readLoungeFabHintAnonAck,
-  writeLoungeFabHintAnonAck,
 } from './loungeStorage'
 import LoungeWelcomeModal from './LoungeWelcomeModal.jsx'
 import LoungeSlotsMenuHintOverlay from './LoungeSlotsMenuHintOverlay.jsx'
@@ -1595,6 +1593,10 @@ export default function SocialFeed({
   )
 
   const openMarketChartModal = useCallback(({ embed, embeds }) => {
+    if (loungeReadOnly) {
+      requireLoungeAuth()
+      return
+    }
     const list = Array.isArray(embeds) && embeds.length ? embeds : embed ? [embed] : []
     if (!list.length) return
     setMarketChartModal({
@@ -1602,7 +1604,7 @@ export default function SocialFeed({
       embeds: list,
       focusSymbol: embed?.display_symbol || embed?.symbol || list[0]?.display_symbol || null,
     })
-  }, [])
+  }, [loungeReadOnly, requireLoungeAuth])
 
   const closeMarketChartModal = useCallback(() => {
     setMarketChartModal({ open: false, embeds: [], focusSymbol: null })
@@ -2065,6 +2067,10 @@ export default function SocialFeed({
 
   const handleShareLoungePost = useCallback((post) => {
     if (!post?.id) return
+    if (loungeReadOnly) {
+      requireLoungeAuth()
+      return
+    }
     const url = buildLoungePostShareUrl(post.id)
     /** Omit `text` so iMessage does not show a second bubble; caption lives in OG `description` from `/lounge/p/…`. */
     void shareLoungePostHybrid({
@@ -2073,7 +2079,7 @@ export default function SocialFeed({
       onCopied: () => setLoungeShareFlash('Link copied to clipboard.'),
       onCopyFailed: () => setLoungeShareFlash('Could not copy link. Try copying from the address bar.'),
     })
-  }, [])
+  }, [loungeReadOnly, requireLoungeAuth])
 
   const handleShareLoungeProfile = useCallback((profileRow) => {
     const url = buildLoungeProfileShareUrl(profileRow)
@@ -8189,7 +8195,6 @@ export default function SocialFeed({
 
   const onFabHintDismiss = useCallback(() => {
     if (composerUserId) writeLoungeFabHintAck(composerUserId)
-    else writeLoungeFabHintAnonAck()
     setFabHintOpen(false)
   }, [composerUserId])
 
@@ -8255,32 +8260,6 @@ export default function SocialFeed({
     coldBootSplashVisible,
   ])
 
-  useEffect(() => {
-    if (composerUserId) return undefined
-    if (readLoungeFabHintAnonAck()) return undefined
-    if (fabHintOpen || loungeWelcomeOpen) return undefined
-    if (!isActivePage) return undefined
-    if (loungeFeedBrowseMode !== 'anonymous' || !authSessionReady || !composerAuthResolved) return undefined
-    if (coldBootSplashVisible) return undefined
-
-    const timer = window.setTimeout(() => {
-      if (readLoungeFabHintAnonAck()) return
-      if (fabHintOpen || loungeWelcomeOpen) return
-      setFabHintOpen(true)
-    }, 600)
-
-    return () => window.clearTimeout(timer)
-  }, [
-    composerUserId,
-    fabHintOpen,
-    loungeWelcomeOpen,
-    isActivePage,
-    loungeFeedBrowseMode,
-    authSessionReady,
-    composerAuthResolved,
-    coldBootSplashVisible,
-  ])
-
   const onOpenGuidelinesFromWelcome = useCallback(() => {
     setLoungeWelcomeOpen(false)
     onOpenLegalDocument?.('guidelines', 'welcome')
@@ -8319,7 +8298,7 @@ export default function SocialFeed({
     pullSpinnerRef,
     pullAriaRef,
     onRefresh: refreshCommunityFeed,
-    enabled: true,
+    enabled: !loungeReadOnly,
     pullRefreshing,
     setPullRefreshing,
   })
@@ -12428,6 +12407,10 @@ export default function SocialFeed({
     (entity, opts) => {
       const stub = profileEntityStub(entity)
       if (!stub?.user_id) return
+      if (loungeReadOnly && !opts?.fromPublicLink) {
+        onRequireAuth?.()
+        return
+      }
       if (openProfileGateIfNeeded()) return
       if (profileModalOpen || profileOverlayStack.length > 0) {
         pushProfileOverlay(entity)
@@ -12455,6 +12438,8 @@ export default function SocialFeed({
       profileOverlayStack.length,
       pushLoungeNavReturnContext,
       pushProfileOverlay,
+      loungeReadOnly,
+      onRequireAuth,
     ],
   )
 
@@ -12552,6 +12537,10 @@ export default function SocialFeed({
       e?.stopPropagation?.()
       e?.preventDefault?.()
       if (!handle) return
+      if (loungeReadOnly) {
+        onRequireAuth?.()
+        return
+      }
       if (openProfileGateIfNeeded()) return
       const cleanHandle = handle.startsWith('@') ? handle.slice(1) : handle
       try {
@@ -12581,6 +12570,8 @@ export default function SocialFeed({
       pushLoungeNavReturnContext,
       pushProfileOverlay,
       supabaseClient,
+      loungeReadOnly,
+      onRequireAuth,
     ],
   )
 
@@ -12712,18 +12703,34 @@ export default function SocialFeed({
       if (!url) return
       const postId = parseLoungePostIdFromUrl(url)
       if (postId) {
+        if (loungeReadOnly) {
+          onRequireAuth?.()
+          return
+        }
         pushLoungeNavReturnContext()
         void openLoungePostById(postId, { skipNavCapture: true })
         return
       }
       const handle = parseLoungeProfileHandleFromUrl(url)
       if (handle) {
+        if (loungeReadOnly) {
+          onRequireAuth?.()
+          return
+        }
         void openProfileByHandle(handle, e)
         return
       }
       const guideSlug = parseGuideSlugFromUrlOrScheme(url)
       if (guideSlug) {
+        if (loungeReadOnly) {
+          onRequireAuth?.()
+          return
+        }
         onOpenGuideCard?.(guideSlug)
+        return
+      }
+      if (loungeReadOnly) {
+        onRequireAuth?.()
         return
       }
       const openHref = hrefForExternalOpen(url)
@@ -12734,13 +12741,24 @@ export default function SocialFeed({
         /* */
       }
     },
-    [openLoungePostById, openProfileByHandle, onOpenGuideCard, pushLoungeNavReturnContext],
+    [
+      loungeReadOnly,
+      onRequireAuth,
+      openLoungePostById,
+      openProfileByHandle,
+      onOpenGuideCard,
+      pushLoungeNavReturnContext,
+    ],
   )
 
   const openLinkPreview = useCallback(
     (preview, e) => {
       e?.stopPropagation?.()
       e?.preventDefault?.()
+      if (loungeReadOnly) {
+        onRequireAuth?.()
+        return
+      }
       const postId = preview?.lounge_post_id
       if (postId && isLoungePostShareId(String(postId))) {
         void openLoungePostById(String(postId), { fromPublicLink: true })
@@ -12748,7 +12766,7 @@ export default function SocialFeed({
       }
       openCaptionLink(preview?.url, e)
     },
-    [openCaptionLink, openLoungePostById],
+    [loungeReadOnly, onRequireAuth, openCaptionLink, openLoungePostById],
   )
 
   const loungePostDetailRichCaptionOpts = useMemo(
@@ -13770,17 +13788,23 @@ export default function SocialFeed({
                 scope={loungeFeedScope}
                 onScopeChange={onLoungeFeedScopeChange}
                 disabled={communityFeedLoading && communityPosts.length === 0}
+                readOnly={loungeReadOnly}
+                onReadOnlyClick={requireLoungeAuth}
               />
               <LoungeFeedSortSwitch
                 value={loungeFeedSort}
                 onChange={onLoungeFeedSortChange}
                 disabled={communityFeedLoading && communityPosts.length === 0}
+                readOnly={loungeReadOnly}
+                onReadOnlyClick={requireLoungeAuth}
               />
             </div>
             <LoungeFeedCategoryFilter
               value={loungeFeedCategoryExcludedSlugs}
               onChange={onLoungeFeedCategoryFilterChange}
               disabled={communityFeedLoading && communityPosts.length === 0}
+              readOnly={loungeReadOnly}
+              onReadOnlyClick={requireLoungeAuth}
               className="shrink-0"
             />
           </div>
@@ -16309,11 +16333,7 @@ export default function SocialFeed({
       ) : null}
 
       {fabHintOpen ? (
-        <LoungeFabHintOverlay
-          open={fabHintOpen}
-          signedIn={Boolean(composerUserId && !loungeReadOnly)}
-          onDismiss={onFabHintDismiss}
-        />
+        <LoungeFabHintOverlay open={fabHintOpen} onDismiss={onFabHintDismiss} />
       ) : null}
 
       {profileGateOpen && typeof document !== 'undefined'
