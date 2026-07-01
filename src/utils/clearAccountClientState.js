@@ -3,6 +3,7 @@ import {
   clearLoungeComposerDraft,
   clearLoungeWelcomeAck,
   clearLoungeSlotsMenuHintAck,
+  clearLoungeFabHintAck,
   clearProfileGateAck,
   LOUNGE_PROFILE_CACHE_KEY,
 } from '../features/lounge/loungeStorage.js'
@@ -61,6 +62,7 @@ export function clearAccountClientState(userId) {
     clearProfileGateAck(userId)
     clearLoungeWelcomeAck(userId)
     clearLoungeSlotsMenuHintAck(userId)
+    clearLoungeFabHintAck(userId)
     for (const prefix of OFFERS_USER_KEY_PREFIXES) {
       removeLocalStorageKey(`${prefix}${userId}`)
     }

@@ -100,9 +100,12 @@ import {
   writeLoungeWelcomeAck,
   readLoungeSlotsMenuHintAck,
   writeLoungeSlotsMenuHintAck,
+  readLoungeFabHintAck,
+  writeLoungeFabHintAck,
 } from './loungeStorage'
 import LoungeWelcomeModal from './LoungeWelcomeModal.jsx'
 import LoungeSlotsMenuHintOverlay from './LoungeSlotsMenuHintOverlay.jsx'
+import LoungeFabHintOverlay from './LoungeFabHintOverlay.jsx'
 import {
   consumeReopenLoungeDockPanel,
   consumeReopenLoungeWelcome,
@@ -717,6 +720,7 @@ export default function SocialFeed({
   const [loungeWelcomeOpen, setLoungeWelcomeOpen] = useState(false)
   const loungeWelcomeScheduleRef = useRef(false)
   const [slotsMenuHintOpen, setSlotsMenuHintOpen] = useState(false)
+  const [fabHintOpen, setFabHintOpen] = useState(false)
   const [profileGateBusy, setProfileGateBusy] = useState(false)
   const [profileGateErr, setProfileGateErr] = useState('')
   const [profileGateHandle, setProfileGateHandle] = useState('')
@@ -1589,6 +1593,10 @@ export default function SocialFeed({
   )
 
   const openMarketChartModal = useCallback(({ embed, embeds }) => {
+    if (loungeReadOnly) {
+      requireLoungeAuth()
+      return
+    }
     const list = Array.isArray(embeds) && embeds.length ? embeds : embed ? [embed] : []
     if (!list.length) return
     setMarketChartModal({
@@ -1596,7 +1604,7 @@ export default function SocialFeed({
       embeds: list,
       focusSymbol: embed?.display_symbol || embed?.symbol || list[0]?.display_symbol || null,
     })
-  }, [])
+  }, [loungeReadOnly, requireLoungeAuth])
 
   const closeMarketChartModal = useCallback(() => {
     setMarketChartModal({ open: false, embeds: [], focusSymbol: null })
@@ -2059,6 +2067,10 @@ export default function SocialFeed({
 
   const handleShareLoungePost = useCallback((post) => {
     if (!post?.id) return
+    if (loungeReadOnly) {
+      requireLoungeAuth()
+      return
+    }
     const url = buildLoungePostShareUrl(post.id)
     /** Omit `text` so iMessage does not show a second bubble; caption lives in OG `description` from `/lounge/p/…`. */
     void shareLoungePostHybrid({
@@ -2067,7 +2079,7 @@ export default function SocialFeed({
       onCopied: () => setLoungeShareFlash('Link copied to clipboard.'),
       onCopyFailed: () => setLoungeShareFlash('Could not copy link. Try copying from the address bar.'),
     })
-  }, [])
+  }, [loungeReadOnly, requireLoungeAuth])
 
   const handleShareLoungeProfile = useCallback((profileRow) => {
     const url = buildLoungeProfileShareUrl(profileRow)
@@ -8181,6 +8193,11 @@ export default function SocialFeed({
     setSlotsMenuHintOpen(false)
   }, [composerUserId])
 
+  const onFabHintDismiss = useCallback(() => {
+    if (composerUserId) writeLoungeFabHintAck(composerUserId)
+    setFabHintOpen(false)
+  }, [composerUserId])
+
   useEffect(() => {
     if (!composerUserId) {
       setSlotsMenuHintOpen(false)
@@ -8188,20 +8205,51 @@ export default function SocialFeed({
     }
     if (!readLoungeWelcomeAck(composerUserId)) return undefined
     if (readLoungeSlotsMenuHintAck(composerUserId)) return undefined
-    if (slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen) return undefined
+    if (slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen || fabHintOpen) return undefined
     if (!isActivePage) return undefined
     if (loungeFeedBrowseMode !== 'member' || !authSessionReady || !composerAuthResolved) return undefined
     if (coldBootSplashVisible) return undefined
 
     const timer = window.setTimeout(() => {
       if (readLoungeSlotsMenuHintAck(composerUserId)) return
-      if (loungeWelcomeOpen || profileGateOpen) return
+      if (loungeWelcomeOpen || profileGateOpen || fabHintOpen) return
       setSlotsMenuHintOpen(true)
     }, 400)
 
     return () => window.clearTimeout(timer)
   }, [
     composerUserId,
+    slotsMenuHintOpen,
+    fabHintOpen,
+    loungeWelcomeOpen,
+    profileGateOpen,
+    isActivePage,
+    loungeFeedBrowseMode,
+    authSessionReady,
+    composerAuthResolved,
+    coldBootSplashVisible,
+  ])
+
+  useEffect(() => {
+    if (!composerUserId) return undefined
+    if (!readLoungeWelcomeAck(composerUserId)) return undefined
+    if (!readLoungeSlotsMenuHintAck(composerUserId)) return undefined
+    if (readLoungeFabHintAck(composerUserId)) return undefined
+    if (fabHintOpen || slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen) return undefined
+    if (!isActivePage) return undefined
+    if (loungeFeedBrowseMode !== 'member' || !authSessionReady || !composerAuthResolved) return undefined
+    if (coldBootSplashVisible) return undefined
+
+    const timer = window.setTimeout(() => {
+      if (readLoungeFabHintAck(composerUserId)) return
+      if (slotsMenuHintOpen || loungeWelcomeOpen || profileGateOpen) return
+      setFabHintOpen(true)
+    }, 400)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    composerUserId,
+    fabHintOpen,
     slotsMenuHintOpen,
     loungeWelcomeOpen,
     profileGateOpen,
@@ -8250,7 +8298,7 @@ export default function SocialFeed({
     pullSpinnerRef,
     pullAriaRef,
     onRefresh: refreshCommunityFeed,
-    enabled: true,
+    enabled: !loungeReadOnly,
     pullRefreshing,
     setPullRefreshing,
   })
@@ -12359,6 +12407,10 @@ export default function SocialFeed({
     (entity, opts) => {
       const stub = profileEntityStub(entity)
       if (!stub?.user_id) return
+      if (loungeReadOnly && !opts?.fromPublicLink) {
+        onRequireAuth?.()
+        return
+      }
       if (openProfileGateIfNeeded()) return
       if (profileModalOpen || profileOverlayStack.length > 0) {
         pushProfileOverlay(entity)
@@ -12386,6 +12438,8 @@ export default function SocialFeed({
       profileOverlayStack.length,
       pushLoungeNavReturnContext,
       pushProfileOverlay,
+      loungeReadOnly,
+      onRequireAuth,
     ],
   )
 
@@ -12483,6 +12537,10 @@ export default function SocialFeed({
       e?.stopPropagation?.()
       e?.preventDefault?.()
       if (!handle) return
+      if (loungeReadOnly) {
+        onRequireAuth?.()
+        return
+      }
       if (openProfileGateIfNeeded()) return
       const cleanHandle = handle.startsWith('@') ? handle.slice(1) : handle
       try {
@@ -12512,6 +12570,8 @@ export default function SocialFeed({
       pushLoungeNavReturnContext,
       pushProfileOverlay,
       supabaseClient,
+      loungeReadOnly,
+      onRequireAuth,
     ],
   )
 
@@ -12643,18 +12703,34 @@ export default function SocialFeed({
       if (!url) return
       const postId = parseLoungePostIdFromUrl(url)
       if (postId) {
+        if (loungeReadOnly) {
+          onRequireAuth?.()
+          return
+        }
         pushLoungeNavReturnContext()
         void openLoungePostById(postId, { skipNavCapture: true })
         return
       }
       const handle = parseLoungeProfileHandleFromUrl(url)
       if (handle) {
+        if (loungeReadOnly) {
+          onRequireAuth?.()
+          return
+        }
         void openProfileByHandle(handle, e)
         return
       }
       const guideSlug = parseGuideSlugFromUrlOrScheme(url)
       if (guideSlug) {
+        if (loungeReadOnly) {
+          onRequireAuth?.()
+          return
+        }
         onOpenGuideCard?.(guideSlug)
+        return
+      }
+      if (loungeReadOnly) {
+        onRequireAuth?.()
         return
       }
       const openHref = hrefForExternalOpen(url)
@@ -12665,13 +12741,24 @@ export default function SocialFeed({
         /* */
       }
     },
-    [openLoungePostById, openProfileByHandle, onOpenGuideCard, pushLoungeNavReturnContext],
+    [
+      loungeReadOnly,
+      onRequireAuth,
+      openLoungePostById,
+      openProfileByHandle,
+      onOpenGuideCard,
+      pushLoungeNavReturnContext,
+    ],
   )
 
   const openLinkPreview = useCallback(
     (preview, e) => {
       e?.stopPropagation?.()
       e?.preventDefault?.()
+      if (loungeReadOnly) {
+        onRequireAuth?.()
+        return
+      }
       const postId = preview?.lounge_post_id
       if (postId && isLoungePostShareId(String(postId))) {
         void openLoungePostById(String(postId), { fromPublicLink: true })
@@ -12679,7 +12766,7 @@ export default function SocialFeed({
       }
       openCaptionLink(preview?.url, e)
     },
-    [openCaptionLink, openLoungePostById],
+    [loungeReadOnly, onRequireAuth, openCaptionLink, openLoungePostById],
   )
 
   const loungePostDetailRichCaptionOpts = useMemo(
@@ -13701,17 +13788,23 @@ export default function SocialFeed({
                 scope={loungeFeedScope}
                 onScopeChange={onLoungeFeedScopeChange}
                 disabled={communityFeedLoading && communityPosts.length === 0}
+                readOnly={loungeReadOnly}
+                onReadOnlyClick={requireLoungeAuth}
               />
               <LoungeFeedSortSwitch
                 value={loungeFeedSort}
                 onChange={onLoungeFeedSortChange}
                 disabled={communityFeedLoading && communityPosts.length === 0}
+                readOnly={loungeReadOnly}
+                onReadOnlyClick={requireLoungeAuth}
               />
             </div>
             <LoungeFeedCategoryFilter
               value={loungeFeedCategoryExcludedSlugs}
               onChange={onLoungeFeedCategoryFilterChange}
               disabled={communityFeedLoading && communityPosts.length === 0}
+              readOnly={loungeReadOnly}
+              onReadOnlyClick={requireLoungeAuth}
               className="shrink-0"
             />
           </div>
@@ -13769,7 +13862,9 @@ export default function SocialFeed({
             </div>
           ) : (
             <div className="px-3 py-5 text-zinc-400 text-[17px] leading-relaxed">
-              No posts yet. Tap the compose button to share, or post from Guides → Ask community.
+              {loungeReadOnly
+                ? 'No posts yet. Sign in to share, or browse what lands here from Guides → Ask community.'
+                : 'No posts yet. Tap the compose button to share, or post from Guides → Ask community.'}
             </div>
           )
         ) : (
@@ -16235,6 +16330,10 @@ export default function SocialFeed({
 
       {slotsMenuHintOpen ? (
         <LoungeSlotsMenuHintOverlay open={slotsMenuHintOpen} onDismiss={onSlotsMenuHintDismiss} />
+      ) : null}
+
+      {fabHintOpen ? (
+        <LoungeFabHintOverlay open={fabHintOpen} onDismiss={onFabHintDismiss} />
       ) : null}
 
       {profileGateOpen && typeof document !== 'undefined'

@@ -121,7 +121,7 @@ export default function LoungePostArticle({
   /** In-app navigation for bare URLs in captions (Lounge permalinks, profiles, guides, external). */
   onLinkClick,
   /** Tap link preview card (prefers `lounge_post_id` when present). */
-  onLinkPreviewOpen,
+  onLinkPreviewOpen: onLinkPreviewOpenProp,
   /** Tap a market mini chart → full-screen modal. */
   onOpenMarketChart,
 }) {
@@ -137,7 +137,13 @@ export default function LoungePostArticle({
       <LoungeMarketChartStrip
         post={row}
         className={className}
-        onOpenChart={(embed, embeds) => onOpenMarketChart?.({ embed, embeds, post: row })}
+        onOpenChart={(embed, embeds) => {
+          if (ro) {
+            requireLoungeAuth?.()
+            return
+          }
+          onOpenMarketChart?.({ embed, embeds, post: row })
+        }}
       />
     ) : null
 
@@ -160,7 +166,7 @@ export default function LoungePostArticle({
   const showStaffPin =
     Boolean(loungeViewerIsStaff && !ro && !isPlainPostRepost && !isCommentRepost && typeof setLoungePostPinned === 'function')
   const showPostRowMenu = Boolean(
-    (!isPlainPostRepost && !isCommentRepost && typeof onSharePost === 'function') ||
+    (!ro && !isPlainPostRepost && !isCommentRepost && typeof onSharePost === 'function') ||
       showStaffPin ||
       (!ro &&
         viewerUserId &&
@@ -182,10 +188,26 @@ export default function LoungePostArticle({
     visibilityResetRootRef: repostMenuScrollRootRef,
     streamLightboxHost: post,
     streamLightboxSurface,
+    enableLightbox: !ro,
   }
+
+  const onLinkPreviewOpen = useCallback(
+    (preview, e) => {
+      if (ro) {
+        requireLoungeAuth?.()
+        return
+      }
+      onLinkPreviewOpenProp?.(preview, e)
+    },
+    [onLinkPreviewOpenProp, requireLoungeAuth, ro],
+  )
 
   const onAvatar = (e) => {
     e.stopPropagation()
+    if (ro) {
+      requireLoungeAuth?.()
+      return
+    }
     // For plain-repost cards, the avatar belongs to the original author / comment author
     const avatarEntity = isCommentRepost ? rc : displayPost
     if (suppressAvatarProfileNavigation && profileOwnerUserId && avatarEntity?.user_id === profileOwnerUserId) return
@@ -196,6 +218,10 @@ export default function LoungePostArticle({
 
   const onEmbeddedAuthorProfile = (e, embeddedPost) => {
     e.stopPropagation()
+    if (ro) {
+      requireLoungeAuth?.()
+      return
+    }
     if (openProfileGateIfNeeded?.()) return
     if (!embeddedPost?.user_id || typeof onAvatarClick !== 'function') return
     onAvatarClick(embeddedPost)
@@ -257,6 +283,11 @@ export default function LoungePostArticle({
     (e) => {
       if (!(e.target instanceof Element)) return
       if (e.target.closest('button, a')) return
+      if (ro) {
+        requireLoungeAuth?.()
+        e.stopPropagation()
+        return
+      }
       if (openProfileGateIfNeeded?.()) return
       if (isCommentRepost) {
         onOpenCommentDetail?.(rc)
@@ -280,6 +311,8 @@ export default function LoungePostArticle({
       openProfileGateIfNeeded,
       post,
       rc,
+      requireLoungeAuth,
+      ro,
     ],
   )
 

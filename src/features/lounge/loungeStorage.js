@@ -99,6 +99,9 @@ const LOUNGE_WELCOME_ACK_KEY = 'lvslotpro_lounge_welcome_ack_v1'
 /** One-time Slots menu hint (after welcome) per user per browser. */
 const LOUNGE_SLOTS_MENU_HINT_ACK_KEY = 'lvslotpro_lounge_slots_menu_hint_ack_v1'
 
+/** One-time Lounge dock FAB hint (after Slots menu hint) per user per browser. */
+const LOUNGE_FAB_HINT_ACK_KEY = 'lvslotpro_lounge_fab_hint_ack_v1'
+
 export function readLoungeWelcomeAck(uid) {
   if (!uid || typeof window === 'undefined') return false
   try {
@@ -155,6 +158,35 @@ export function writeLoungeSlotsMenuHintAck(uid) {
 
 export function clearLoungeSlotsMenuHintAck(uid) {
   removeUidFromLocalAckMap(LOUNGE_SLOTS_MENU_HINT_ACK_KEY, uid)
+}
+
+export function readLoungeFabHintAck(uid) {
+  if (!uid || typeof window === 'undefined') return false
+  try {
+    const raw = window.localStorage.getItem(LOUNGE_FAB_HINT_ACK_KEY)
+    if (!raw) return false
+    const o = JSON.parse(raw)
+    return Boolean(o && typeof o === 'object' && o[uid])
+  } catch {
+    return false
+  }
+}
+
+export function writeLoungeFabHintAck(uid) {
+  if (!uid || typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(LOUNGE_FAB_HINT_ACK_KEY)
+    const o = raw ? JSON.parse(raw) : {}
+    const next = o && typeof o === 'object' ? { ...o } : {}
+    next[uid] = true
+    window.localStorage.setItem(LOUNGE_FAB_HINT_ACK_KEY, JSON.stringify(next))
+  } catch {
+    // ignore
+  }
+}
+
+export function clearLoungeFabHintAck(uid) {
+  removeUidFromLocalAckMap(LOUNGE_FAB_HINT_ACK_KEY, uid)
 }
 
 const PROFILE_GATE_RECENT_PROFILE_MS = 7 * 24 * 60 * 60 * 1000

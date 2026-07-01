@@ -1828,6 +1828,7 @@ export default function LoungeDockArcCarouselPrototype({
 
       <div
         ref={fabHostRef}
+        data-lounge-dock-fab-host
         className={`pointer-events-none fixed overflow-visible transition-[opacity,transform] duration-300 ease-out will-change-[opacity,transform] ${
           isCornerL
             ? 'z-[25] transition-[left,top,opacity,transform] duration-300 ease-out'
