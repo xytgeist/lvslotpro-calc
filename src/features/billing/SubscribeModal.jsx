@@ -43,9 +43,9 @@ function isCarouselWrapJump(prevActive, nextActive, slideIndex) {
 }
 
 const SLIDE_POSES = {
-  left: { tx: -56, tz: -110, ry: 16, scale: 0.88, opacity: 0.92, z: 14 },
+  left: { tx: -56, tz: -110, ry: 16, scale: 0.88, opacity: 1, z: 14 },
   center: { tx: 0, tz: 96, ry: 0, scale: 1, opacity: 1, z: 30 },
-  right: { tx: 56, tz: -110, ry: -16, scale: 0.88, opacity: 0.92, z: 14 },
+  right: { tx: 56, tz: -110, ry: -16, scale: 0.88, opacity: 1, z: 14 },
 }
 
 /** @param {number} a @param {number} b @param {number} t */
@@ -151,10 +151,8 @@ function PlanFeature({ children }) {
 
 function planCardClass(selected, extra = '') {
   return [
-    'subscribe-plan-card subscribe-plan-card--starter group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border bg-zinc-950 px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
-    selected
-      ? 'subscribe-plan-card--selected border-emerald-400/60 ring-1 ring-emerald-400/35 shadow-[0_0_40px_rgba(16,185,129,0.12)]'
-      : 'border-zinc-800/90 hover:border-emerald-700/45',
+    'subscribe-plan-card subscribe-plan-card--starter group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
+    selected ? 'subscribe-plan-card--selected ring-1 ring-emerald-400/35 shadow-[0_0_40px_rgba(16,185,129,0.12)]' : '',
     extra,
   ]
     .filter(Boolean)
@@ -557,7 +555,7 @@ export default function SubscribeModal({
                     <div
                       className={[
                         'subscribe-plan-slide-3d',
-                        getSlideOffset(0, activeSlide) === 0 && !isDragging ? 'subscribe-plan-slide-3d--active' : 'subscribe-plan-slide-3d--side',
+                        getSlideOffset(0, activeSlide) === 0 ? 'subscribe-plan-slide-3d--active' : 'subscribe-plan-slide-3d--side',
                         instantSlideIndexes.has(0) ? 'subscribe-plan-slide-3d--instant' : '',
                         isDragging ? 'subscribe-plan-slide-3d--dragging' : '',
                       ].join(' ')}
@@ -665,7 +663,7 @@ export default function SubscribeModal({
                     <div
                       className={[
                         'subscribe-plan-slide-3d',
-                        getSlideOffset(1, activeSlide) === 0 && !isDragging ? 'subscribe-plan-slide-3d--active' : 'subscribe-plan-slide-3d--side',
+                        getSlideOffset(1, activeSlide) === 0 ? 'subscribe-plan-slide-3d--active' : 'subscribe-plan-slide-3d--side',
                         instantSlideIndexes.has(1) ? 'subscribe-plan-slide-3d--instant' : '',
                         isDragging ? 'subscribe-plan-slide-3d--dragging' : '',
                       ].join(' ')}
@@ -688,10 +686,8 @@ export default function SubscribeModal({
                         selectPlan(PRODUCT_SLOTS_EDGE, 1)
                       }}
                       className={[
-                        'subscribe-plan-card subscribe-plan-card--featured group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border bg-zinc-950 px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
-                        fullSelected
-                          ? 'subscribe-plan-card--selected border-cyan-400/70 ring-1 ring-cyan-400/40 shadow-[0_0_40px_rgba(6,182,212,0.16)]'
-                          : 'border-zinc-800/90 hover:border-zinc-700',
+                        'subscribe-plan-card subscribe-plan-card--featured group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
+                        fullSelected ? 'subscribe-plan-card--selected ring-1 ring-cyan-400/40 shadow-[0_0_40px_rgba(6,182,212,0.16)]' : '',
                         busy ? 'cursor-default' : 'cursor-pointer',
                       ].join(' ')}
                     >
@@ -774,7 +770,7 @@ export default function SubscribeModal({
                     <div
                       className={[
                         'subscribe-plan-slide-3d',
-                        getSlideOffset(2, activeSlide) === 0 && !isDragging ? 'subscribe-plan-slide-3d--active' : 'subscribe-plan-slide-3d--side',
+                        getSlideOffset(2, activeSlide) === 0 ? 'subscribe-plan-slide-3d--active' : 'subscribe-plan-slide-3d--side',
                         instantSlideIndexes.has(2) ? 'subscribe-plan-slide-3d--instant' : '',
                         isDragging ? 'subscribe-plan-slide-3d--dragging' : '',
                       ].join(' ')}
@@ -797,10 +793,8 @@ export default function SubscribeModal({
                         selectPlan(PRODUCT_SLOTS_EDGE_LIFETIME, 2)
                       }}
                       className={[
-                        'subscribe-plan-card subscribe-plan-card--lifetime group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border bg-zinc-950 px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
-                        lifetimeSelected
-                          ? 'subscribe-plan-card--selected border-amber-400/60 ring-1 ring-amber-400/35 shadow-[0_0_40px_rgba(245,158,11,0.12)]'
-                          : 'border-zinc-800/90 hover:border-amber-700/50',
+                        'subscribe-plan-card subscribe-plan-card--lifetime group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
+                        lifetimeSelected ? 'subscribe-plan-card--selected ring-1 ring-amber-400/35 shadow-[0_0_40px_rgba(245,158,11,0.12)]' : '',
                         busy ? 'cursor-default' : 'cursor-pointer',
                       ].join(' ')}
                     >

@@ -2117,25 +2117,30 @@ html.light [data-subscribe-modal] .subscribe-modal-hero {
   background: linear-gradient(180deg, rgba(6, 182, 212, 0.08) 0%, #ffffff 100%) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card {
-  background-color: #ffffff !important;
-  border-color: #e4e4e7 !important;
   opacity: 1 !important;
 }
-html.light [data-subscribe-modal] .subscribe-plan-card--selected,
-html.light [data-subscribe-modal] .subscribe-plan-card--featured.subscribe-plan-card--selected,
-html.light [data-subscribe-modal] .subscribe-plan-card--lifetime.subscribe-plan-card--selected {
+html.light [data-subscribe-modal] .subscribe-plan-card--starter {
+  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%) !important;
+  border-color: rgba(16, 185, 129, 0.38) !important;
+}
+html.light [data-subscribe-modal] .subscribe-plan-card--featured {
   background: linear-gradient(180deg, #ecfeff 0%, #ffffff 100%) !important;
-  border-color: rgba(6, 182, 212, 0.45) !important;
+  border-color: rgba(6, 182, 212, 0.38) !important;
+}
+html.light [data-subscribe-modal] .subscribe-plan-card--lifetime {
+  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%) !important;
+  border-color: rgba(245, 158, 11, 0.38) !important;
+}
+html.light [data-subscribe-modal] .subscribe-plan-card--featured.subscribe-plan-card--selected {
+  border-color: rgba(6, 182, 212, 0.55) !important;
   box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.12), 0 12px 32px rgba(6, 182, 212, 0.1) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--starter.subscribe-plan-card--selected {
-  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%) !important;
-  border-color: rgba(16, 185, 129, 0.45) !important;
+  border-color: rgba(16, 185, 129, 0.55) !important;
   box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.12), 0 12px 32px rgba(16, 185, 129, 0.1) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--lifetime.subscribe-plan-card--selected {
-  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%) !important;
-  border-color: rgba(245, 158, 11, 0.45) !important;
+  border-color: rgba(245, 158, 11, 0.55) !important;
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.12), 0 12px 32px rgba(245, 158, 11, 0.1) !important;
 }
 html.light [data-subscribe-modal] .bg-zinc-950,
@@ -2200,22 +2205,29 @@ html.light [data-subscribe-modal] button.border-zinc-700 {
 
 /* Subscribe plan 3D carousel */
 [data-subscribe-modal] .subscribe-plan-card {
-  background-color: #09090b;
-  opacity: 1;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-[data-subscribe-modal] .subscribe-plan-card--selected {
-  background-color: #09090b;
+[data-subscribe-modal] .subscribe-plan-card--starter {
+  background: linear-gradient(180deg, #064e3b 0%, #09090b 55%) !important;
+  border-color: rgba(16, 185, 129, 0.38);
+}
+[data-subscribe-modal] .subscribe-plan-card--featured {
+  background: linear-gradient(180deg, #042f2e 0%, #09090b 55%) !important;
+  border-color: rgba(6, 182, 212, 0.38);
+}
+[data-subscribe-modal] .subscribe-plan-card--lifetime {
+  background: linear-gradient(145deg, #451a03 0%, #09090b 58%) !important;
+  border-color: rgba(245, 158, 11, 0.38);
 }
 [data-subscribe-modal] .subscribe-plan-card--starter.subscribe-plan-card--selected {
-  background: linear-gradient(180deg, #064e3b 0%, #09090b 55%) !important;
+  border-color: rgba(16, 185, 129, 0.6);
 }
 [data-subscribe-modal] .subscribe-plan-card--featured.subscribe-plan-card--selected {
-  background: linear-gradient(180deg, #042f2e 0%, #09090b 55%) !important;
+  border-color: rgba(6, 182, 212, 0.65);
 }
 [data-subscribe-modal] .subscribe-plan-card--lifetime.subscribe-plan-card--selected {
-  background: linear-gradient(145deg, #451a03 0%, #09090b 58%) !important;
+  border-color: rgba(245, 158, 11, 0.6);
 }
 [data-subscribe-modal] .subscribe-plan-carousel-3d {
   perspective: 1600px;
@@ -2303,18 +2315,11 @@ html.light [data-subscribe-modal] .subscribe-plan-founding-badge-divider {
 [data-subscribe-modal] .subscribe-plan-slide-3d--side {
   cursor: pointer;
 }
-[data-subscribe-modal] .subscribe-plan-slide-3d--side .subscribe-plan-card {
-  filter: brightness(0.92) saturate(0.94);
-}
 [data-subscribe-modal] .subscribe-plan-slide-3d--active .subscribe-plan-card {
-  filter: none;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
 }
-html.light [data-subscribe-modal] .subscribe-plan-card {
-  background-color: #ffffff !important;
-}
-html.light [data-subscribe-modal] .subscribe-plan-slide-3d--side .subscribe-plan-card {
-  filter: brightness(0.98) saturate(0.96);
+html.light [data-subscribe-modal] .subscribe-plan-slide-3d--active .subscribe-plan-card {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-carousel-floor {
   background: radial-gradient(ellipse at center, rgba(6, 182, 212, 0.12) 0%, rgba(6, 182, 212, 0.03) 42%, transparent 72%);
