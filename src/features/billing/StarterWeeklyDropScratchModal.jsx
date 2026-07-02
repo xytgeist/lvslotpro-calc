@@ -8,31 +8,11 @@ import {
   navigateToGuideSlug,
 } from './starterWeeklyDropApi.js'
 import { ScratchRevealAudio } from './scratchRevealAudio.js'
+import { loadScratchFoilLogo, paintScratchFoil } from './scratchRevealFoil.js'
 
 const SCRATCH_BRUSH_RADIUS = 20
 const SCRATCH_REVEAL_RATIO = 0.62
 const SCRATCH_MIN_MS = 2500
-
-/**
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} width
- * @param {number} height
- */
-function paintScratchFoil(ctx, width, height) {
-  const gradient = ctx.createLinearGradient(0, 0, width, height)
-  gradient.addColorStop(0, '#c8cdd4')
-  gradient.addColorStop(0.45, '#eef1f5')
-  gradient.addColorStop(0.55, '#b8bec8')
-  gradient.addColorStop(1, '#dfe3ea')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, width, height)
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'
-  for (let i = 0; i < 18; i += 1) {
-    const x = Math.random() * width
-    const y = Math.random() * height
-    ctx.fillRect(x, y, 2, 14)
-  }
-}
 
 export default function StarterWeeklyDropScratchModal({
   open = false,
@@ -112,11 +92,14 @@ export default function StarterWeeklyDropScratchModal({
   useEffect(() => {
     if (!open || !payload || revealed) return undefined
 
-    const canvas = canvasRef.current
-    const wrap = heroWrapRef.current
-    if (!canvas || !wrap) return undefined
+    let cancelled = false
+    /** @type {HTMLImageElement | null} */
+    let logoImage = null
 
-    const resize = () => {
+    const repaintFoil = () => {
+      const canvas = canvasRef.current
+      const wrap = heroWrapRef.current
+      if (!canvas || !wrap || cancelled) return
       const rect = wrap.getBoundingClientRect()
       const w = Math.max(1, Math.floor(rect.width))
       const h = Math.max(1, Math.floor(rect.height))
@@ -126,16 +109,23 @@ export default function StarterWeeklyDropScratchModal({
       canvas.style.height = `${h}px`
       const ctx = canvas.getContext('2d')
       if (!ctx) return
-      paintScratchFoil(ctx, w, h)
+      paintScratchFoil(ctx, w, h, logoImage)
     }
 
-    resize()
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null
+    void loadScratchFoilLogo().then((img) => {
+      if (cancelled) return
+      logoImage = img
+      repaintFoil()
+    })
+
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(repaintFoil) : null
+    const wrap = heroWrapRef.current
     ro?.observe(wrap)
-    window.addEventListener('resize', resize)
+    window.addEventListener('resize', repaintFoil)
     return () => {
+      cancelled = true
       ro?.disconnect()
-      window.removeEventListener('resize', resize)
+      window.removeEventListener('resize', repaintFoil)
     }
   }, [open, payload, revealed])
 
@@ -279,7 +269,7 @@ export default function StarterWeeklyDropScratchModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="starter-weekly-drop-title"
-        className="starter-weekly-drop-dialog relative z-10 w-full max-w-sm rounded-3xl border border-zinc-600/80 bg-gray-900 p-5 shadow-2xl sm:p-6"
+        className="starter-weekly-drop-dialog relative z-10 w-full max-w-md rounded-3xl border border-zinc-600/80 bg-gray-900 p-4 shadow-2xl sm:p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="starter-weekly-drop-title" className="text-center text-lg font-bold text-white">
@@ -300,7 +290,7 @@ export default function StarterWeeklyDropScratchModal({
           <>
             <div
               ref={heroWrapRef}
-              className="relative mx-auto mt-4 aspect-[4/3] w-full max-w-[280px] overflow-hidden rounded-2xl border border-zinc-700/80 bg-zinc-950"
+              className="relative mx-auto mt-3 aspect-[4/3] w-full overflow-hidden rounded-2xl border border-zinc-700/80 bg-zinc-950"
             >
               {heroUrl ? (
                 <img src={heroUrl} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
