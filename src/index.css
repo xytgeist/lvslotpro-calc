@@ -2422,6 +2422,19 @@ html.light [data-starter-weekly-drop-modal] .starter-weekly-drop-hero-title {
   transform-style: preserve-3d;
   transform: translateZ(0);
 }
+@media (max-width: 639px) {
+  [data-subscribe-modal] .subscribe-plan-carousel-stage {
+    min-height: 19rem;
+    padding-top: 0.35rem;
+  }
+  [data-subscribe-modal] .subscribe-plan-slide-3d {
+    width: min(15.25rem, 66vw);
+    top: 52%;
+  }
+  [data-subscribe-modal] .subscribe-plan-carousel-3d {
+    perspective-origin: 50% 46%;
+  }
+}
 @media (min-width: 640px) {
   [data-subscribe-modal] .subscribe-plan-carousel-stage {
     min-height: 24rem;

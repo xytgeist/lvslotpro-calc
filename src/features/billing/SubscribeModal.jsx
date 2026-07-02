@@ -152,7 +152,7 @@ function PlanFeature({ children }) {
 
 function planCardClass(selected, extra = '') {
   return [
-    'subscribe-plan-card subscribe-plan-card--starter group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
+    'subscribe-plan-card subscribe-plan-card--starter group relative flex h-full min-h-[19rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-3.5 pt-9 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
     selected ? 'subscribe-plan-card--selected ring-1 ring-emerald-400/35 shadow-[0_0_40px_rgba(16,185,129,0.12)]' : '',
     extra,
   ]
@@ -514,9 +514,9 @@ export default function SubscribeModal({
         aria-modal="true"
         aria-labelledby="subscribe-modal-title"
         data-subscribe-modal
-        className="subscribe-modal-shell relative z-10 flex h-[90dvh] max-h-[90dvh] min-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-zinc-700/70 bg-zinc-950 shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:max-w-2xl sm:rounded-[1.75rem]"
+        className="subscribe-modal-shell relative z-10 flex h-[92dvh] max-h-[92dvh] min-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-zinc-700/70 bg-zinc-950 shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:h-[90dvh] sm:max-h-[90dvh] sm:min-h-[90dvh] sm:max-w-2xl sm:rounded-[1.75rem]"
       >
-        <div className="subscribe-modal-hero relative z-30 shrink-0 bg-zinc-950 px-6 pb-6 pt-6 sm:px-7 sm:pb-7 sm:pt-7">
+        <div className="subscribe-modal-hero relative z-30 shrink-0 bg-zinc-950 px-6 pb-4 pt-5 sm:px-7 sm:pb-7 sm:pt-7">
           <div
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(6,182,212,0.2),transparent_60%)]"
             aria-hidden
@@ -541,7 +541,7 @@ export default function SubscribeModal({
                 {hasSlotsEdgeLifetime ? 'You have Slots Edge Lifetime' : 'Choose your Edge AP Slots plan'}
               </h2>
               {!hasSlotsEdgeLifetime ? (
-                <p className="subscribe-modal-tagline mt-2 text-[13px] leading-snug text-zinc-400 sm:text-sm sm:leading-relaxed">
+                <p className="subscribe-modal-tagline mt-1.5 text-[12px] leading-snug text-zinc-400 sm:mt-2 sm:text-sm sm:leading-relaxed">
                   Yes, you can beat slots. Edge is the most comprehensive AP slots program on the market. Learn the
                   secrets that have made us millions.
                 </p>
@@ -568,7 +568,7 @@ export default function SubscribeModal({
             </div>
           ) : (
             <>
-              <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center overflow-visible px-1 py-2">
+              <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-visible px-1 pb-1 pt-3 sm:items-center sm:py-2">
                 <button
                   type="button"
                   aria-label="Previous plan"
@@ -737,7 +737,7 @@ export default function SubscribeModal({
                         selectPlan(PRODUCT_SLOTS_EDGE, 1)
                       }}
                       className={[
-                        'subscribe-plan-card subscribe-plan-card--featured group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
+                        'subscribe-plan-card subscribe-plan-card--featured group relative flex h-full min-h-[19rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-3.5 pt-9 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
                         fullSelected ? 'subscribe-plan-card--selected ring-1 ring-cyan-400/40 shadow-[0_0_40px_rgba(6,182,212,0.16)]' : '',
                         busy ? 'cursor-default' : 'cursor-pointer',
                       ].join(' ')}
@@ -852,7 +852,7 @@ export default function SubscribeModal({
                         selectPlan(PRODUCT_SLOTS_EDGE_LIFETIME, 2)
                       }}
                       className={[
-                        'subscribe-plan-card subscribe-plan-card--lifetime group relative flex h-full min-h-[22rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-4 pt-10 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
+                        'subscribe-plan-card subscribe-plan-card--lifetime group relative flex h-full min-h-[19rem] w-full flex-col rounded-[1.25rem] border px-3.5 pb-3.5 pt-9 text-left touch-manipulation transition-[border-color,box-shadow,filter] sm:min-h-[23.5rem] sm:rounded-[1.35rem] sm:px-4 sm:pb-4 sm:pt-10',
                         lifetimeSelected ? 'subscribe-plan-card--selected ring-1 ring-amber-400/35 shadow-[0_0_40px_rgba(245,158,11,0.12)]' : '',
                         busy ? 'cursor-default' : 'cursor-pointer',
                       ].join(' ')}
