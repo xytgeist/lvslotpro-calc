@@ -329,7 +329,6 @@ Deno.serve(async (req) => {
         success_url,
         cancel_url,
         client_reference_id: auth.user.id,
-        payment_method_collection: replaceSubscriptionIds.length > 0 ? 'always' : 'if_required',
         metadata: sessionMetadata,
         payment_intent_data: {
           metadata: sessionMetadata,
