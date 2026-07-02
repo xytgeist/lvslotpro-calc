@@ -27,6 +27,7 @@ export default function StarterWeeklyDropScratchModal({
   const [payload, setPayload] = useState(null)
   const [revealed, setRevealed] = useState(false)
   const [proUpgradeCount, setProUpgradeCount] = useState(0)
+  const [proUpgradeCountLoading, setProUpgradeCountLoading] = useState(false)
 
   const canvasRef = useRef(null)
   const heroWrapRef = useRef(null)
@@ -59,6 +60,7 @@ export default function StarterWeeklyDropScratchModal({
       setError('')
       setLoading(false)
       setProUpgradeCount(0)
+      setProUpgradeCountLoading(false)
       resetScratchState()
       return undefined
     }
@@ -93,11 +95,15 @@ export default function StarterWeeklyDropScratchModal({
 
   useEffect(() => {
     if (!open || !payload || !supabaseClient || guideAccessContext.hasSlotsEdge) {
-      if (!guideAccessContext.hasSlotsEdge) setProUpgradeCount(0)
+      if (!guideAccessContext.hasSlotsEdge) {
+        setProUpgradeCount(0)
+        setProUpgradeCountLoading(false)
+      }
       return undefined
     }
 
     let cancelled = false
+    setProUpgradeCountLoading(true)
     void (async () => {
       try {
         const { data: guides } = await supabaseClient
@@ -113,6 +119,8 @@ export default function StarterWeeklyDropScratchModal({
         )
       } catch {
         if (!cancelled) setProUpgradeCount(0)
+      } finally {
+        if (!cancelled) setProUpgradeCountLoading(false)
       }
     })()
 
@@ -277,6 +285,34 @@ export default function StarterWeeklyDropScratchModal({
   const heroUrl = payload?.hero_url || ''
   const showProCta = revealed && proUpgradeCount > 0
   const guideCountLabel = proUpgradeCount.toLocaleString()
+  const mayShowProCta = !guideAccessContext.hasSlotsEdge
+  const showProUpsell = revealed && mayShowProCta && (showProCta || proUpgradeCountLoading)
+
+  const proUpsellCard = (
+    <div className="starter-weekly-drop-pro-cta overflow-hidden rounded-2xl border border-cyan-500/35 bg-gradient-to-br from-cyan-950/50 via-zinc-950 to-zinc-950 p-4 shadow-[0_8px_28px_rgba(6,182,212,0.12)]">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300/90">
+        Upgrade to Slots Edge Pro
+      </p>
+      <p className="starter-weekly-drop-pro-copy mt-2 text-[15px] font-semibold leading-snug text-white">
+        Get immediate access to all{' '}
+        <span className="starter-weekly-drop-pro-count text-cyan-200">
+          {proUpgradeCountLoading ? '…' : guideCountLabel}
+        </span>{' '}
+        additional guides
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+        Full AP library, every calculator, bankroll, logbook, and calendar OCR ... unlocked now.
+      </p>
+      <button
+        type="button"
+        onClick={() => onRequireSubscribe?.('slots-edge')}
+        disabled={proUpgradeCountLoading}
+        className="starter-weekly-drop-pro-btn mt-4 w-full min-h-11 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_28px_rgba(59,130,246,0.28)] touch-manipulation transition-transform hover:from-cyan-500 hover:to-blue-500 active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
+      >
+        View plans
+      </button>
+    </div>
+  )
 
   return (
     <div
@@ -327,11 +363,14 @@ export default function StarterWeeklyDropScratchModal({
             </button>
           </div>
 
-          <div className="relative min-h-[4.25rem]">
+          <div className="relative min-h-[7rem]">
             <span className="starter-weekly-drop-kicker inline-flex items-center rounded-full border border-orange-500/35 bg-orange-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-orange-200">
               Weekly drop
             </span>
-            <h2 id="starter-weekly-drop-title" className="mt-2.5 text-xl font-bold tracking-tight text-white">
+            <h2
+              id="starter-weekly-drop-title"
+              className="mt-2.5 min-h-[3.25rem] text-xl font-bold leading-tight tracking-tight text-white sm:min-h-[2.75rem]"
+            >
               {revealed ? 'You unlocked a guide' : 'Scratch your guide'}
             </h2>
             <p className="starter-weekly-drop-subtitle mt-1.5 min-h-[2.75rem] text-sm leading-snug text-zinc-400">
@@ -390,35 +429,31 @@ export default function StarterWeeklyDropScratchModal({
                 ) : null}
               </div>
 
-              <div className="starter-weekly-drop-footer mt-4 min-h-[9.25rem]">
-                {!revealed ? (
-                  <button
-                    type="button"
-                    onClick={onTapReveal}
-                    className="starter-weekly-drop-skip w-full rounded-xl border border-zinc-700/80 bg-zinc-900/70 py-3 text-sm font-semibold text-zinc-200 touch-manipulation transition-colors hover:border-zinc-600 hover:bg-zinc-800/80 active:scale-[0.99]"
+              <div
+                className={`starter-weekly-drop-footer relative mt-4 shrink-0 ${
+                  mayShowProCta ? 'h-[11.5rem]' : 'h-[3.25rem]'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={onTapReveal}
+                  className={`starter-weekly-drop-skip absolute inset-x-0 top-0 w-full rounded-xl border border-zinc-700/80 bg-zinc-900/70 py-3 text-sm font-semibold text-zinc-200 touch-manipulation transition-colors hover:border-zinc-600 hover:bg-zinc-800/80 active:scale-[0.99] ${
+                    revealed ? 'invisible pointer-events-none' : ''
+                  }`}
+                  tabIndex={revealed ? -1 : 0}
+                  aria-hidden={revealed}
+                >
+                  Tap to reveal
+                </button>
+
+                {mayShowProCta ? (
+                  <div
+                    className={`absolute inset-x-0 top-0 ${
+                      showProUpsell ? '' : 'invisible pointer-events-none'
+                    }`}
+                    aria-hidden={!showProUpsell}
                   >
-                    Tap to reveal
-                  </button>
-                ) : showProCta ? (
-                  <div className="starter-weekly-drop-pro-cta overflow-hidden rounded-2xl border border-cyan-500/35 bg-gradient-to-br from-cyan-950/50 via-zinc-950 to-zinc-950 p-4 shadow-[0_8px_28px_rgba(6,182,212,0.12)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300/90">
-                      Upgrade to Slots Edge Pro
-                    </p>
-                    <p className="starter-weekly-drop-pro-copy mt-2 text-[15px] font-semibold leading-snug text-white">
-                      Get immediate access to all{' '}
-                      <span className="starter-weekly-drop-pro-count text-cyan-200">{guideCountLabel}</span>{' '}
-                      additional guides
-                    </p>
-                    <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-                      Full AP library, every calculator, bankroll, logbook, and calendar OCR ... unlocked now.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => onRequireSubscribe?.('slots-edge')}
-                      className="starter-weekly-drop-pro-btn mt-4 w-full min-h-11 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_28px_rgba(59,130,246,0.28)] touch-manipulation transition-transform hover:from-cyan-500 hover:to-blue-500 active:scale-[0.99]"
-                    >
-                      View plans
-                    </button>
+                    {showProCta || proUpgradeCountLoading ? proUpsellCard : null}
                   </div>
                 ) : null}
               </div>
