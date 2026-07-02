@@ -171,6 +171,11 @@ function FoundingMemberBadge() {
   )
 }
 
+/** @param {'monthly' | 'annual'} interval */
+function billingSwitchTargetInterval(interval) {
+  return interval === 'monthly' ? 'annual' : 'monthly'
+}
+
 /**
  * @param {{
  *   open: boolean,
@@ -181,6 +186,8 @@ function FoundingMemberBadge() {
  *   hasSlotsEdge?: boolean,
  *   hasSlotsEdgeLifetime?: boolean,
  *   hasSlotsEdgeStarter?: boolean,
+ *   starterPriceInterval?: 'monthly' | 'annual' | null,
+ *   fullPriceInterval?: 'monthly' | 'annual' | null,
  * }} props
  */
 export default function SubscribeModal({
@@ -192,6 +199,8 @@ export default function SubscribeModal({
   hasSlotsEdge = false,
   hasSlotsEdgeLifetime = false,
   hasSlotsEdgeStarter = false,
+  starterPriceInterval = null,
+  fullPriceInterval = null,
 }) {
   const defaultPlan = useMemo(() => {
     if (initialProductSlug === PRODUCT_SLOTS_EDGE_LIFETIME) return PRODUCT_SLOTS_EDGE_LIFETIME
@@ -221,8 +230,16 @@ export default function SubscribeModal({
   useEffect(() => {
     if (!open) return
     setSelectedPlan(defaultPlan)
-    setFullInterval('monthly')
-    setStarterInterval('monthly')
+    setStarterInterval(
+      hasSlotsEdgeStarter && starterPriceInterval
+        ? billingSwitchTargetInterval(starterPriceInterval)
+        : 'monthly',
+    )
+    setFullInterval(
+      hasSlotsEdge && !hasSlotsEdgeLifetime && fullPriceInterval
+        ? billingSwitchTargetInterval(fullPriceInterval)
+        : 'monthly',
+    )
     setError('')
     setBusy(false)
     setInstantSlideIndexes(new Set())
@@ -232,7 +249,15 @@ export default function SubscribeModal({
     isDraggingRef.current = false
     const idx = Math.max(0, PLAN_SLUGS.indexOf(defaultPlan))
     setActiveSlide(idx >= 0 ? idx : 1)
-  }, [open, defaultPlan])
+  }, [
+    open,
+    defaultPlan,
+    fullPriceInterval,
+    hasSlotsEdge,
+    hasSlotsEdgeLifetime,
+    hasSlotsEdgeStarter,
+    starterPriceInterval,
+  ])
 
   useEffect(() => {
     return () => {
@@ -420,19 +445,37 @@ export default function SubscribeModal({
   const lifetimeSelected = selectedPlan === PRODUCT_SLOTS_EDGE_LIFETIME
   const starterSelected = selectedPlan === PRODUCT_SLOTS_EDGE_STARTER
   const fullSelected = selectedPlan === PRODUCT_SLOTS_EDGE
+  const starterOnlySubscriber = hasSlotsEdgeStarter && !hasSlotsEdge
+  const fullSubscriber = hasSlotsEdge && !hasSlotsEdgeLifetime && !hasSlotsEdgeStarter
+  const starterMonthlyLocked = hasSlotsEdgeStarter && starterPriceInterval === 'monthly'
+  const starterAnnualLocked = hasSlotsEdgeStarter && starterPriceInterval === 'annual'
+  const fullMonthlyLocked = fullSubscriber && fullPriceInterval === 'monthly'
+  const fullAnnualLocked = fullSubscriber && fullPriceInterval === 'annual'
+  const selectedInterval =
+    selectedPlan === PRODUCT_SLOTS_EDGE_STARTER
+      ? starterInterval
+      : selectedPlan === PRODUCT_SLOTS_EDGE
+        ? fullInterval
+        : 'monthly'
+  const switchingBillingInterval =
+    (starterOnlySubscriber && starterSelected) || (fullSubscriber && fullSelected)
 
   const checkoutLabel =
     lifetimeSelected
       ? `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE_LIFETIME)}`
-      : hasSlotsEdgeStarter && selectedPlan === PRODUCT_SLOTS_EDGE
+      : starterOnlySubscriber && fullSelected
         ? `Upgrade to ${productDisplayName(PRODUCT_SLOTS_EDGE)}`
-        : selectedPlan === PRODUCT_SLOTS_EDGE_STARTER
-          ? starterInterval === 'annual'
-            ? `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE_STARTER)} Annual`
-            : `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE_STARTER)}`
-          : fullInterval === 'annual'
-            ? `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE)} Annual`
-            : `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE)}`
+        : switchingBillingInterval
+          ? selectedInterval === 'annual'
+            ? 'Switch to annual billing'
+            : 'Switch to monthly billing'
+          : selectedPlan === PRODUCT_SLOTS_EDGE_STARTER
+            ? starterInterval === 'annual'
+              ? `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE_STARTER)} Annual`
+              : `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE_STARTER)}`
+            : fullInterval === 'annual'
+              ? `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE)} Annual`
+              : `Continue with ${productDisplayName(PRODUCT_SLOTS_EDGE)}`
 
   const handleCheckout = async () => {
     setError('')
@@ -601,13 +644,14 @@ export default function SubscribeModal({
                           type="button"
                           role="tab"
                           aria-selected={starterInterval === 'monthly'}
-                          disabled={busy || hasSlotsEdgeStarter}
+                          disabled={busy || starterMonthlyLocked}
                           onClick={() => {
+                            if (starterMonthlyLocked) return
                             selectPlan(PRODUCT_SLOTS_EDGE_STARTER, 0)
                             setStarterInterval('monthly')
                           }}
                           className={[
-                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors',
+                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                             starterInterval === 'monthly'
                               ? 'bg-emerald-600 text-white shadow-sm'
                               : 'text-zinc-400 hover:text-zinc-200',
@@ -619,13 +663,14 @@ export default function SubscribeModal({
                           type="button"
                           role="tab"
                           aria-selected={starterInterval === 'annual'}
-                          disabled={busy || hasSlotsEdgeStarter}
+                          disabled={busy || starterAnnualLocked}
                           onClick={() => {
+                            if (starterAnnualLocked) return
                             selectPlan(PRODUCT_SLOTS_EDGE_STARTER, 0)
                             setStarterInterval('annual')
                           }}
                           className={[
-                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors',
+                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                             starterInterval === 'annual'
                               ? 'bg-emerald-600 text-white shadow-sm'
                               : 'text-zinc-400 hover:text-zinc-200',
@@ -708,13 +753,14 @@ export default function SubscribeModal({
                           type="button"
                           role="tab"
                           aria-selected={fullInterval === 'monthly'}
-                          disabled={busy}
+                          disabled={busy || fullMonthlyLocked}
                           onClick={() => {
+                            if (fullMonthlyLocked) return
                             selectPlan(PRODUCT_SLOTS_EDGE, 1)
                             setFullInterval('monthly')
                           }}
                           className={[
-                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors',
+                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                             fullInterval === 'monthly'
                               ? 'bg-cyan-600 text-white shadow-sm'
                               : 'text-zinc-400 hover:text-zinc-200',
@@ -726,13 +772,14 @@ export default function SubscribeModal({
                           type="button"
                           role="tab"
                           aria-selected={fullInterval === 'annual'}
-                          disabled={busy}
+                          disabled={busy || fullAnnualLocked}
                           onClick={() => {
+                            if (fullAnnualLocked) return
                             selectPlan(PRODUCT_SLOTS_EDGE, 1)
                             setFullInterval('annual')
                           }}
                           className={[
-                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors',
+                            'flex-1 min-h-8 rounded-lg text-xs font-semibold touch-manipulation transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                             fullInterval === 'annual'
                               ? 'bg-cyan-600 text-white shadow-sm'
                               : 'text-zinc-400 hover:text-zinc-200',
@@ -851,7 +898,7 @@ export default function SubscribeModal({
 
               <button
                 type="button"
-                disabled={busy || (hasSlotsEdgeStarter && starterSelected)}
+                disabled={busy}
                 onClick={() => void handleCheckout()}
                 className="subscribe-modal-checkout-btn mt-4 w-full min-h-12 shrink-0 rounded-2xl bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 disabled:opacity-50 font-bold text-white touch-manipulation shadow-[0_8px_28px_rgba(6,182,212,0.28)]"
               >

@@ -65,6 +65,12 @@ export function hasSlotsEdgeStarter(entitlements) {
   return hasEntitlement(entitlements, PRODUCT_SLOTS_EDGE_STARTER)
 }
 
+/** @param {Record<string, { price_interval?: string }> | null | undefined} entitlements @param {string} productSlug @returns {'monthly' | 'annual' | null} */
+export function entitlementPriceInterval(entitlements, productSlug) {
+  const raw = entitlements?.[productSlug]?.price_interval
+  return raw === 'monthly' || raw === 'annual' ? raw : null
+}
+
 export function productDisplayName(slug) {
   return EDGE_PRODUCTS.find((p) => p.slug === slug)?.displayName || slug
 }

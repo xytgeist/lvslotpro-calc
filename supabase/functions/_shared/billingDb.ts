@@ -59,6 +59,10 @@ export async function upsertUserSubscriptionFromStripe(
       ? new Date(subscription.current_period_end * 1000).toISOString()
       : null
 
+  const metaInterval = subscription.metadata?.price_interval?.trim().toLowerCase()
+  const priceInterval =
+    metaInterval === 'annual' ? 'annual' : metaInterval === 'monthly' ? 'monthly' : null
+
   const row = {
     user_id: userId,
     product_slug: productSlug,
@@ -67,6 +71,7 @@ export async function upsertUserSubscriptionFromStripe(
     status: subscription.status,
     current_period_end: periodEnd,
     cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+    price_interval: priceInterval,
     updated_at: new Date().toISOString(),
   }
 

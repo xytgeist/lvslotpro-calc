@@ -52,20 +52,95 @@ async function userHasActiveProduct(
   return data?.status === 'active' || data?.status === 'trialing'
 }
 
-async function getActiveStarterSubscription(
+async function getActiveSubscriptionRow(
   admin: ReturnType<typeof createBillingAdmin>,
   userId: string,
+  productSlug: string,
 ) {
   const { data, error } = await admin
     .from('user_subscriptions')
     .select('stripe_subscription_id, status')
     .eq('user_id', userId)
-    .eq('product_slug', STARTER_PRODUCT_SLUG)
+    .eq('product_slug', productSlug)
     .maybeSingle()
-  if (error) throw new Error(`user_subscriptions starter lookup: ${error.message}`)
+  if (error) throw new Error(`user_subscriptions lookup (${productSlug}): ${error.message}`)
   if (!data?.stripe_subscription_id) return null
   if (data.status !== 'active' && data.status !== 'trialing') return null
   return data
+}
+
+async function getActiveStarterSubscription(
+  admin: ReturnType<typeof createBillingAdmin>,
+  userId: string,
+) {
+  return getActiveSubscriptionRow(admin, userId, STARTER_PRODUCT_SLUG)
+}
+
+function subscriptionPriceIntervalForProduct(
+  subscription: Stripe.Subscription,
+  productSlug: string,
+): 'monthly' | 'annual' {
+  const metaInterval = subscription.metadata?.price_interval?.trim().toLowerCase()
+  if (metaInterval === 'annual') return 'annual'
+
+  const priceId = subscription.items.data[0]?.price?.id?.trim()
+  if (!priceId) return 'monthly'
+
+  try {
+    const annualPriceId = stripePriceSecretForProduct(productSlug, 'annual')
+    if (priceId === annualPriceId) return 'annual'
+  } catch {
+    // annual price not configured for this product
+  }
+
+  return 'monthly'
+}
+
+async function updateExistingSubscriptionPrice(
+  stripe: Stripe,
+  admin: ReturnType<typeof createBillingAdmin>,
+  args: {
+    userId: string
+    subscriptionId: string
+    productSlug: string
+    priceId: string
+    priceInterval: 'monthly' | 'annual'
+    couponId: string | null
+    upgradedFrom?: string | null
+  },
+) {
+  const subscription = await stripe.subscriptions.retrieve(args.subscriptionId)
+  if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+    throw new Error('Subscription is not active.')
+  }
+
+  const itemId = subscription.items.data[0]?.id
+  if (!itemId) throw new Error('Subscription has no billable item.')
+
+  const updateParams: Stripe.SubscriptionUpdateParams = {
+    items: [{ id: itemId, price: args.priceId }],
+    proration_behavior: 'always_invoice',
+    metadata: {
+      supabase_user_id: args.userId,
+      product_slug: args.productSlug,
+      price_interval: args.priceInterval,
+      ...(args.upgradedFrom ? { upgraded_from: args.upgradedFrom } : {}),
+    },
+  }
+
+  if (args.couponId) {
+    updateParams.discounts = [{ coupon: args.couponId }]
+  }
+
+  const updated = await stripe.subscriptions.update(args.subscriptionId, updateParams)
+
+  await upsertUserSubscriptionFromStripe(admin, {
+    userId: args.userId,
+    productSlug: args.productSlug,
+    subscription: updated,
+  })
+
+  return updated
 }
 
 async function upgradeStarterSubscriptionToFull(
@@ -79,38 +154,43 @@ async function upgradeStarterSubscriptionToFull(
     couponId: string | null
   },
 ) {
-  const subscription = await stripe.subscriptions.retrieve(args.starterSubscriptionId)
-  if (subscription.status !== 'active' && subscription.status !== 'trialing') {
-    throw new Error('Starter subscription is not active.')
-  }
-
-  const itemId = subscription.items.data[0]?.id
-  if (!itemId) throw new Error('Starter subscription has no billable item.')
-
-  const updateParams: Stripe.SubscriptionUpdateParams = {
-    items: [{ id: itemId, price: args.fullPriceId }],
-    proration_behavior: 'always_invoice',
-    metadata: {
-      supabase_user_id: args.userId,
-      product_slug: FULL_PRODUCT_SLUG,
-      price_interval: args.priceInterval,
-      upgraded_from: STARTER_PRODUCT_SLUG,
-    },
-  }
-
-  if (args.couponId) {
-    updateParams.discounts = [{ coupon: args.couponId }]
-  }
-
-  const updated = await stripe.subscriptions.update(args.starterSubscriptionId, updateParams)
-
-  await upsertUserSubscriptionFromStripe(admin, {
+  return updateExistingSubscriptionPrice(stripe, admin, {
     userId: args.userId,
+    subscriptionId: args.starterSubscriptionId,
     productSlug: FULL_PRODUCT_SLUG,
-    subscription: updated,
+    priceId: args.fullPriceId,
+    priceInterval: args.priceInterval,
+    couponId: args.couponId,
+    upgradedFrom: STARTER_PRODUCT_SLUG,
   })
+}
 
-  return updated
+async function changeSubscriptionBillingInterval(
+  stripe: Stripe,
+  admin: ReturnType<typeof createBillingAdmin>,
+  args: {
+    userId: string
+    subscriptionId: string
+    productSlug: string
+    priceInterval: 'monthly' | 'annual'
+    priceId: string
+    couponId: string | null
+  },
+) {
+  const subscription = await stripe.subscriptions.retrieve(args.subscriptionId)
+  const currentInterval = subscriptionPriceIntervalForProduct(subscription, args.productSlug)
+  if (currentInterval === args.priceInterval) {
+    throw new Error('You are already on this billing interval.')
+  }
+
+  return updateExistingSubscriptionPrice(stripe, admin, {
+    userId: args.userId,
+    subscriptionId: args.subscriptionId,
+    productSlug: args.productSlug,
+    priceId: args.priceId,
+    priceInterval: args.priceInterval,
+    couponId: args.couponId,
+  })
 }
 
 Deno.serve(async (req) => {
@@ -160,12 +240,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'You already have Slots Edge Lifetime on this account.' }, 400)
     }
 
-    if (!isLifetime && productSlug === FULL_PRODUCT_SLUG) {
-      if (await userHasActiveProduct(admin, auth.user.id, FULL_PRODUCT_SLUG)) {
-        return jsonResponse({ error: 'You already have Slots Edge Pro on this account.' }, 400)
-      }
-    }
-
     const priceId = stripePriceSecretForProduct(productSlug, priceInterval)
     const stripe = new Stripe(requireStripeSecretKey())
 
@@ -213,6 +287,38 @@ Deno.serve(async (req) => {
           upgraded: true,
         })
       }
+    }
+
+    if (
+      !isLifetime &&
+      (productSlug === FULL_PRODUCT_SLUG || productSlug === STARTER_PRODUCT_SLUG) &&
+      (await userHasActiveProduct(admin, auth.user.id, productSlug))
+    ) {
+      const activeRow = await getActiveSubscriptionRow(admin, auth.user.id, productSlug)
+      if (!activeRow?.stripe_subscription_id) {
+        return jsonResponse({ error: 'Active subscription record is missing a Stripe subscription id.' }, 400)
+      }
+
+      try {
+        const couponId = foundingCouponId(productSlug, priceInterval, false, wantsFounding)
+        await changeSubscriptionBillingInterval(stripe, admin, {
+          userId: auth.user.id,
+          subscriptionId: activeRow.stripe_subscription_id,
+          productSlug,
+          priceInterval,
+          priceId,
+          couponId,
+        })
+      } catch (intervalErr) {
+        const msg = intervalErr instanceof Error ? intervalErr.message : String(intervalErr)
+        return jsonResponse({ error: msg || 'Could not update billing interval.' }, 400)
+      }
+
+      return jsonResponse({
+        url: success_url,
+        product_slug: productSlug,
+        interval_changed: true,
+      })
     }
 
     if (isLifetime) {

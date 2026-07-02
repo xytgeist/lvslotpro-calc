@@ -2123,28 +2123,43 @@ html.light [data-subscribe-modal] .subscribe-plan-card {
   opacity: 1 !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--starter {
-  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%) !important;
-  border-color: rgba(16, 185, 129, 0.38) !important;
+  background: linear-gradient(180deg, #bbf7d0 0%, #ecfdf5 42%, #f4f4f5 100%) !important;
+  border-color: rgba(5, 150, 105, 0.58) !important;
+  box-shadow:
+    0 4px 16px rgba(16, 185, 129, 0.1),
+    0 0 0 1px rgba(16, 185, 129, 0.1) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--featured {
-  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%) !important;
-  border-color: rgba(59, 130, 246, 0.38) !important;
+  background: linear-gradient(180deg, #bfdbfe 0%, #eff6ff 42%, #f4f4f5 100%) !important;
+  border-color: rgba(37, 99, 235, 0.58) !important;
+  box-shadow:
+    0 4px 16px rgba(59, 130, 246, 0.12),
+    0 0 0 1px rgba(59, 130, 246, 0.1) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--lifetime {
-  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%) !important;
-  border-color: rgba(245, 158, 11, 0.38) !important;
+  background: linear-gradient(180deg, #fde68a 0%, #fffbeb 42%, #f4f4f5 100%) !important;
+  border-color: rgba(217, 119, 6, 0.58) !important;
+  box-shadow:
+    0 4px 16px rgba(245, 158, 11, 0.12),
+    0 0 0 1px rgba(245, 158, 11, 0.1) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--featured.subscribe-plan-card--selected {
-  border-color: rgba(59, 130, 246, 0.55) !important;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.12), 0 12px 32px rgba(59, 130, 246, 0.1) !important;
+  border-color: rgba(37, 99, 235, 0.78) !important;
+  box-shadow:
+    0 0 0 2px rgba(59, 130, 246, 0.2),
+    0 16px 36px rgba(59, 130, 246, 0.16) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--starter.subscribe-plan-card--selected {
-  border-color: rgba(16, 185, 129, 0.55) !important;
-  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.12), 0 12px 32px rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(5, 150, 105, 0.78) !important;
+  box-shadow:
+    0 0 0 2px rgba(16, 185, 129, 0.18),
+    0 16px 36px rgba(16, 185, 129, 0.14) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--lifetime.subscribe-plan-card--selected {
-  border-color: rgba(245, 158, 11, 0.55) !important;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.12), 0 12px 32px rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(217, 119, 6, 0.78) !important;
+  box-shadow:
+    0 0 0 2px rgba(245, 158, 11, 0.18),
+    0 16px 36px rgba(245, 158, 11, 0.14) !important;
 }
 html.light [data-subscribe-modal] .bg-zinc-950,
 html.light [data-subscribe-modal] .bg-zinc-950\/95,
@@ -2154,7 +2169,7 @@ html.light [data-subscribe-modal] .bg-zinc-950\/70 {
 html.light [data-subscribe-modal] .bg-zinc-900,
 html.light [data-subscribe-modal] .bg-zinc-900\/50,
 html.light [data-subscribe-modal] .bg-zinc-900\/80 {
-  background-color: #f4f4f5 !important;
+  background-color: #e4e4e7 !important;
 }
 html.light [data-subscribe-modal] .bg-gray-900 {
   background-color: #ffffff !important;
@@ -2170,7 +2185,10 @@ html.light [data-subscribe-modal] .text-zinc-400 {
   color: #71717a !important;
 }
 html.light [data-subscribe-modal] .text-zinc-500 {
-  color: #a1a1aa !important;
+  color: #52525b !important;
+}
+html.light [data-subscribe-modal] .subscribe-plan-card .text-zinc-400 {
+  color: #52525b !important;
 }
 html.light [data-subscribe-modal] .text-amber-100 {
   color: #78350f !important;
@@ -2189,6 +2207,9 @@ html.light [data-subscribe-modal] .text-emerald-300\/80 {
 html.light [data-subscribe-modal] .text-cyan-200,
 html.light [data-subscribe-modal] .text-cyan-300,
 html.light [data-subscribe-modal] .text-cyan-300\/80 {
+  color: #1d4ed8 !important;
+}
+html.light [data-subscribe-modal] .text-cyan-300 {
   color: #2563eb !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-card--starter .text-cyan-400 {
@@ -2201,27 +2222,27 @@ html.light [data-subscribe-modal] .subscribe-plan-card--lifetime .text-cyan-400 
   color: #d97706 !important;
 }
 html.light [data-subscribe-modal] .bg-emerald-500\/15 {
-  background-color: rgba(16, 185, 129, 0.12) !important;
+  background-color: rgba(16, 185, 129, 0.2) !important;
 }
 html.light [data-subscribe-modal] .ring-emerald-500\/30 {
-  --tw-ring-color: rgba(16, 185, 129, 0.35) !important;
+  --tw-ring-color: rgba(5, 150, 105, 0.45) !important;
 }
 html.light [data-subscribe-modal] .bg-cyan-500\/15 {
-  background-color: rgba(59, 130, 246, 0.12) !important;
+  background-color: rgba(59, 130, 246, 0.2) !important;
 }
 html.light [data-subscribe-modal] .ring-cyan-500\/30,
 html.light [data-subscribe-modal] .ring-cyan-400\/40 {
-  --tw-ring-color: rgba(59, 130, 246, 0.35) !important;
+  --tw-ring-color: rgba(37, 99, 235, 0.45) !important;
 }
 html.light [data-subscribe-modal] .bg-amber-500\/15 {
-  background-color: rgba(245, 158, 11, 0.12) !important;
+  background-color: rgba(245, 158, 11, 0.22) !important;
 }
 html.light [data-subscribe-modal] .ring-amber-500\/30,
 html.light [data-subscribe-modal] .ring-amber-400\/35 {
-  --tw-ring-color: rgba(245, 158, 11, 0.35) !important;
+  --tw-ring-color: rgba(217, 119, 6, 0.45) !important;
 }
 html.light [data-subscribe-modal] .ring-emerald-400\/35 {
-  --tw-ring-color: rgba(16, 185, 129, 0.35) !important;
+  --tw-ring-color: rgba(5, 150, 105, 0.42) !important;
 }
 html.light [data-subscribe-modal] .hover\:text-zinc-200:hover {
   color: #18181b !important;
@@ -2368,18 +2389,23 @@ html.light [data-subscribe-modal] button.border-zinc-700 {
   background: linear-gradient(180deg, #ca8a04 0%, #18181b 100%);
 }
 html.light [data-subscribe-modal] .subscribe-plan-founding-badge-inner {
-  background: linear-gradient(180deg, #fefce8 0%, #ffffff 100%) !important;
-  border-color: rgba(234, 179, 8, 0.5) !important;
-  box-shadow: 0 6px 20px rgba(234, 179, 8, 0.16) !important;
+  background: linear-gradient(180deg, #fde047 0%, #fbbf24 100%) !important;
+  border-color: rgba(180, 83, 9, 0.55) !important;
+  box-shadow:
+    0 8px 22px rgba(245, 158, 11, 0.28),
+    0 0 0 1px rgba(251, 191, 36, 0.45) !important;
+}
+html.light [data-subscribe-modal] .subscribe-plan-founding-badge-inner.ring-yellow-400\/30 {
+  --tw-ring-color: rgba(180, 83, 9, 0.35) !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-founding-badge-label {
-  color: #a16207 !important;
+  color: #713f12 !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-founding-badge-value {
-  color: #854d0e !important;
+  color: #451a03 !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-founding-badge-divider {
-  background-color: rgba(234, 179, 8, 0.45) !important;
+  background-color: rgba(69, 26, 3, 0.28) !important;
 }
 [data-subscribe-modal] .subscribe-plan-slide-3d--side {
   cursor: pointer;
@@ -2388,7 +2414,10 @@ html.light [data-subscribe-modal] .subscribe-plan-founding-badge-divider {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
 }
 html.light [data-subscribe-modal] .subscribe-plan-slide-3d--active .subscribe-plan-card {
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12) !important;
+  filter: none !important;
+}
+html.light [data-subscribe-modal] .subscribe-plan-slide-3d--side .subscribe-plan-card {
+  opacity: 0.92 !important;
 }
 html.light [data-subscribe-modal] .subscribe-plan-carousel-floor {
   background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.03) 42%, transparent 72%);

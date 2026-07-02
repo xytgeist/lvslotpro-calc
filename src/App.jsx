@@ -330,6 +330,8 @@ function App() {
     hasSlotsEdge: hasSlotsEdgeFromRpc,
     hasSlotsEdgeLifetime: hasSlotsEdgeLifetimeFromRpc,
     hasSlotsEdgeStarter: hasSlotsEdgeStarterFromRpc,
+    starterPriceInterval,
+    fullPriceInterval,
   } = useEdgeEntitlements(supabase, user?.id)
 
   const {
@@ -839,6 +841,8 @@ function App() {
           hasSlotsEdge={hasSlotsEdgeAccess}
           hasSlotsEdgeLifetime={hasSlotsEdgeLifetimeAccess}
           hasSlotsEdgeStarter={hasSlotsEdgeStarterAccess}
+          starterPriceInterval={starterPriceInterval}
+          fullPriceInterval={fullPriceInterval}
         />
         {legalAcceptancePending && user ? (
           <LegalAcceptanceModal
