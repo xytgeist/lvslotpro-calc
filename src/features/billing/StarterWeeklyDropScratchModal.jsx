@@ -11,7 +11,7 @@ import { loadScratchFoilLogo, paintScratchFoil } from './scratchRevealFoil.js'
 
 const SCRATCH_BRUSH_RADIUS = 20
 const SCRATCH_REVEAL_RATIO = 0.62
-const SCRATCH_MIN_MS = 2500
+const SCRATCH_MIN_MS = 2000
 
 export default function StarterWeeklyDropScratchModal({
   open = false,
@@ -207,6 +207,16 @@ export default function StarterWeeklyDropScratchModal({
     return total > 0 ? transparent / total : 0
   }, [])
 
+  const tryFinishReveal = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || revealed || scratchStartedAtRef.current == null) return
+    const ratio = sampleClearedRatio(canvas)
+    const elapsed = Date.now() - scratchStartedAtRef.current
+    if (ratio >= SCRATCH_REVEAL_RATIO && elapsed >= SCRATCH_MIN_MS) {
+      void finishReveal()
+    }
+  }, [finishReveal, revealed, sampleClearedRatio])
+
   const scratchAt = useCallback(
     (clientX, clientY) => {
       const canvas = canvasRef.current
@@ -225,7 +235,9 @@ export default function StarterWeeklyDropScratchModal({
         if (dist > 4) {
           if (!movementConfirmedRef.current) {
             movementConfirmedRef.current = true
-            scratchStartedAtRef.current = Date.now()
+            if (scratchStartedAtRef.current == null) {
+              scratchStartedAtRef.current = Date.now()
+            }
             audioRef.current?.start()
           }
           ctx.globalCompositeOperation = 'destination-out'
@@ -240,17 +252,13 @@ export default function StarterWeeklyDropScratchModal({
           ctx.arc(x, y, SCRATCH_BRUSH_RADIUS, 0, Math.PI * 2)
           ctx.fill()
 
-          const ratio = sampleClearedRatio(canvas)
-          const elapsed = Date.now() - (scratchStartedAtRef.current || Date.now())
-          if (ratio >= SCRATCH_REVEAL_RATIO && elapsed >= SCRATCH_MIN_MS) {
-            void finishReveal()
-          }
+          tryFinishReveal()
         }
       }
 
       lastPointRef.current = { x, y }
     },
-    [finishReveal, revealed, sampleClearedRatio],
+    [revealed, tryFinishReveal],
   )
 
   const onPointerDown = (event) => {
@@ -259,6 +267,7 @@ export default function StarterWeeklyDropScratchModal({
     lastPointRef.current = null
     movementConfirmedRef.current = false
     canvasRef.current?.setPointerCapture?.(event.pointerId)
+    tryFinishReveal()
   }
 
   const onPointerMove = (event) => {
@@ -271,6 +280,7 @@ export default function StarterWeeklyDropScratchModal({
     lastPointRef.current = null
     movementConfirmedRef.current = false
     audioRef.current?.stop()
+    tryFinishReveal()
   }
 
   const onTapReveal = () => {
