@@ -386,10 +386,10 @@ export default function StarterWeeklyDropScratchModal({
               id="starter-weekly-drop-title"
               className="mt-2.5 min-h-[3.25rem] text-xl font-bold leading-tight tracking-tight text-white sm:min-h-[2.75rem]"
             >
-              {revealed ? 'You unlocked a guide' : 'Scratch your guide'}
+              {revealed ? `You unlocked ${title}` : 'Scratch your guide'}
             </h2>
             <p className="starter-weekly-drop-subtitle mt-1.5 min-h-[2.75rem] text-sm leading-snug text-zinc-400">
-              {revealed ? 'Tap the card below to open your guide' : 'Rub the foil to reveal this week\u2019s premium pick'}
+              {revealed ? 'Tap the card to open the guide' : 'Rub the foil to reveal this week\u2019s premium pick'}
             </p>
           </div>
         </div>
