@@ -258,11 +258,11 @@ Deno.serve(async (req) => {
     const wantsFounding = body.apply_early_bird !== false
 
     let replaceStripeSubscriptionId: string | null = null
-    if (
+    const upgradeFromStarter =
       !isLifetime &&
       productSlug === FULL_PRODUCT_SLUG &&
       (await userHasActiveProduct(admin, auth.user.id, STARTER_PRODUCT_SLUG))
-    ) {
+    if (upgradeFromStarter) {
       const starterRow = await getActiveStarterSubscription(admin, auth.user.id)
       replaceStripeSubscriptionId = starterRow?.stripe_subscription_id?.trim() || null
     }
@@ -277,26 +277,38 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: 'Active subscription record is missing a Stripe subscription id.' }, 400)
       }
 
-      try {
-        const couponId = foundingCouponId(productSlug, priceInterval, false, wantsFounding)
-        await changeSubscriptionBillingInterval(stripe, admin, {
-          userId: auth.user.id,
-          subscriptionId: activeRow.stripe_subscription_id,
-          productSlug,
-          priceInterval,
-          priceId,
-          couponId,
-        })
-      } catch (intervalErr) {
-        const msg = intervalErr instanceof Error ? intervalErr.message : String(intervalErr)
-        return jsonResponse({ error: msg || 'Could not update billing interval.' }, 400)
+      const subscription = await stripe.subscriptions.retrieve(activeRow.stripe_subscription_id)
+      const currentInterval = subscriptionPriceIntervalForProduct(subscription, productSlug)
+      if (currentInterval === priceInterval) {
+        return jsonResponse({ error: 'You are already on this billing interval.' }, 400)
       }
 
-      return jsonResponse({
-        url: success_url,
-        product_slug: productSlug,
-        interval_changed: true,
-      })
+      if (currentInterval === 'monthly' && priceInterval === 'annual') {
+        if (!replaceStripeSubscriptionId) {
+          replaceStripeSubscriptionId = activeRow.stripe_subscription_id
+        }
+      } else {
+        try {
+          const couponId = foundingCouponId(productSlug, priceInterval, false, wantsFounding)
+          await changeSubscriptionBillingInterval(stripe, admin, {
+            userId: auth.user.id,
+            subscriptionId: activeRow.stripe_subscription_id,
+            productSlug,
+            priceInterval,
+            priceId,
+            couponId,
+          })
+        } catch (intervalErr) {
+          const msg = intervalErr instanceof Error ? intervalErr.message : String(intervalErr)
+          return jsonResponse({ error: msg || 'Could not update billing interval.' }, 400)
+        }
+
+        return jsonResponse({
+          url: success_url,
+          product_slug: productSlug,
+          interval_changed: true,
+        })
+      }
     }
 
     if (isLifetime) {
@@ -337,15 +349,17 @@ Deno.serve(async (req) => {
     }
 
     const couponId = foundingCouponId(productSlug, priceInterval, false, wantsFounding)
-    const upgradeFromStarter = Boolean(replaceStripeSubscriptionId)
+    const checkoutRequiresPayment = Boolean(replaceStripeSubscriptionId)
     const sessionMetadata: Record<string, string> = {
       supabase_user_id: auth.user.id,
       product_slug: productSlug,
       price_interval: priceInterval,
     }
-    if (upgradeFromStarter && replaceStripeSubscriptionId) {
-      sessionMetadata.upgraded_from = STARTER_PRODUCT_SLUG
+    if (replaceStripeSubscriptionId) {
       sessionMetadata.replaces_stripe_subscription_id = replaceStripeSubscriptionId
+      if (upgradeFromStarter) {
+        sessionMetadata.upgraded_from = STARTER_PRODUCT_SLUG
+      }
     }
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
@@ -355,7 +369,7 @@ Deno.serve(async (req) => {
       success_url,
       cancel_url,
       client_reference_id: auth.user.id,
-      payment_method_collection: upgradeFromStarter ? 'always' : 'if_required',
+      payment_method_collection: checkoutRequiresPayment ? 'always' : 'if_required',
       subscription_data: {
         metadata: sessionMetadata,
       },

@@ -58,7 +58,7 @@ Shared code: **`supabase/functions/_shared/billingDb.ts`** (stores `price_interv
 
 | Function | Auth | Role |
 | --- | --- | --- |
-| **`stripe-create-checkout-session`** | User JWT | New checkout; **Starter → Pro** upgrade (`upgraded: true`); **same plan, new interval** (`interval_changed: true`, no Checkout redirect) |
+| **`stripe-create-checkout-session`** | User JWT | New checkout; **Starter → Pro** upgrade via Checkout; **monthly → annual** (Starter or Pro) via Checkout; **annual → monthly** in-place (`interval_changed: true`) |
 | **`stripe-create-portal-session`** | User JWT | Cancel at period end + payment method; deep-links **`subscription_cancel`** when user has Starter/Pro recurring sub |
 | **`stripe-webhook`** | Stripe signature (`verify_jwt = false`) | Upserts **`user_subscriptions`**, syncs **`profiles.has_active_subscription`** for Full **`slots-edge`** |
 
@@ -133,7 +133,8 @@ Body: `{ "product_slug", "price_interval": "monthly"|"annual", "apply_early_bird
 | New subscriber | `{ url }` → Stripe Checkout |
 | Active **Starter** + checkout **Pro** | Stripe Checkout (`payment_method_collection: always`); webhook upserts Pro sub and **cancels** the Starter subscription |
 | Active **Starter or Pro** + checkout **Lifetime** | Stripe Checkout one-time payment; webhook grants Lifetime and **cancels** active recurring subscription(s) |
-| Active **Starter** or **Pro** + **different** interval | Updates sub in place → `{ interval_changed: true, url: success_url }` |
+| Active **Starter or Pro** monthly + checkout **annual** (same tier) | Stripe Checkout (`payment_method_collection: always`); webhook upserts annual sub and **cancels** the old monthly subscription |
+| Active **Starter or Pro** annual + checkout **monthly** (same tier) | Updates sub in place → `{ interval_changed: true, url: success_url }` |
 | Already on **Lifetime** | 400 |
 | Same interval as current | 400 from interval change path |
 
@@ -182,7 +183,7 @@ Success / portal return: `/?billing=success` or `/?billing=portal` → App polls
 - [ ] All three Stripe Edge functions deployed on test
 - [ ] Stripe **test** webhook delivering to test project
 - [ ] Free user: Subscribe modal → Starter monthly checkout completes
-- [ ] Starter monthly: modal shows **Annual** selected, Monthly disabled; **Switch to annual** works (`interval_changed`)
+- [ ] Starter monthly: modal shows **Annual** selected, Monthly disabled; **Switch to annual** opens Stripe Checkout and lands on annual after webhook
 - [ ] Starter → Pro upgrade from Pro card
 - [ ] Pro monthly: same interval tab behavior on Pro card
 - [ ] Settings → **Manage membership** opens; portal link works
