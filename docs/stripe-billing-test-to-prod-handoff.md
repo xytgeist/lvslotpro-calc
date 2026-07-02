@@ -1,6 +1,6 @@
-# Stripe billing — test → production handoff (2026-07-01 session)
+# Stripe billing — test → production handoff (2026-07-01)
 
-**Purpose:** Single checklist for everything shipped or in progress on **test** Stripe billing today. Run test smoke first; promote to **production** only after Ryan signs off.
+**Purpose:** Single checklist for Stripe billing shipped on **`origin/test`**. Run test smoke first; promote to **production** only after Ryan signs off.
 
 | Environment | Supabase project | Domain |
 | --- | --- | --- |
@@ -8,101 +8,143 @@
 | **Production** | `jtjgtucumuoswnbauxry` | `edgetilt.com` |
 
 **Canonical setup:** `supabase/functions/stripe-create-checkout-session/README.md`  
+**Portal:** `supabase/functions/stripe-create-portal-session/README.md`  
 **Product rules:** `docs/access-tiers.md` §5  
-**Tier testing SQL:** `docs/test-user-roles.md`
+**Tier testing / revoke SQL:** `docs/test-user-roles.md`  
+**Prod mirror checklist:** `docs/production-rollout-checklist.md` §2 + §4
 
 ---
 
-## Git state (as of 2026-07-01)
+## Git state (`origin/test` as of 2026-07-01)
 
-### Already on `origin/test`
+All billing work below is **committed and pushed** to **`origin/test`**.
 
 | Commit | Summary |
 | --- | --- |
-| `abebab2` | In-place monthly ↔ annual billing switch (Edge + Subscribe modal); `price_interval` migration; webhook upsert; light-mode subscribe modal contrast |
-| `38d1d53` | Light-mode guide lock + subscribe modal blues |
-| `b8c4668` | Remove duplicate Upgrade pill on locked guides |
-| `02419a7` | Slots Edge subscribe modal, tier renames, Starter → Pro upgrade billing |
 | `c9ab249` | Subscribe plan picker + checkout interval/coupon support |
+| `02419a7` | Subscribe modal, tier renames, early Starter → Pro billing |
+| `abebab2` | In-place annual ↔ monthly switch; `price_interval` migration; interval tab lock UX |
+| `3140616` | **BillingManageModal** + subscribe interval tab fixes; App hooks fix |
+| `884d2a4` | Fix duplicate `stripe_subscription_id` on Starter → Pro upgrade |
+| `daf383d` | Clear conflicting subscription rows before Pro upsert |
+| `311829c` | **Starter → Pro via Stripe Checkout**; webhook cancels replaced Starter sub |
+| `9b0a8ff` | Portal **subscription_cancel** deep-link + DELETE-based test revoke script |
+| `b3c84a8` | Pending cancel date in manage modal; hide portal btn when cancel scheduled |
+| `904075e` | **Monthly → annual via Stripe Checkout** (Starter + Pro) |
+| `dd780c8` | Lifetime checkout fix (no `payment_method_collection` on `mode: payment`) |
+| `a5427cd` | Light mode: Settings account + manage membership contrast |
+| `3949da2` | Subscribe modal tagline; smaller in-app toasts (shared layout constants) |
+| `6680e25` | Settings legal link spacing (cosmetic) |
 
-### Still uncommitted in working tree (commit before prod)
-
-- **`BillingManageModal.jsx`** (new) — Settings → **Manage membership** (upgrade / interval switch / Stripe portal / compare plans)
-- **`SubscribeModal.jsx`** — interval tab fixes: land on current tier card, assume monthly when `price_interval` null, allow Starter card interaction, Pro **Current** badge, `hasSlotsEdgePro` prop (not legacy access flag)
-- **`edgeProducts.js`** — `hasSlotsEdgePro`, `resolvedEntitlementBillingInterval()`
-- **`useEdgeEntitlements.js`** — exposes `hasSlotsEdgePro`, interval fields
-- **`App.jsx`** — wires both modals; billing manage opens subscribe for free users
-- **`AppShell.jsx`**, **`SocialFeed.jsx`**, **`LoungeDockSlidePanels.jsx`** — settings membership label + **Manage membership** button
+**Frontend deploy:** merge or promote **`test` → `main`** (or your Vercel production branch) so **`edgetilt.com`** serves this bundle.
 
 ---
 
-## SQL migrations (apply in order on test, then prod)
+## What we built (behavior summary)
 
-After base **`20260526120000_edge_subscriptions.sql`**:
+### Products (DB slugs)
+
+| Display name | Slug | Stripe |
+| --- | --- | --- |
+| Slots Edge | `slots-edge-starter` | $19.99/mo, $219.99/yr |
+| Slots Edge Pro | `slots-edge` | $59.99/mo, $660/yr |
+| Slots Edge Lifetime | `slots-edge-lifetime` | $1,699 one-time |
+
+Entitlements: **`get_my_entitlements()`** → `{ active, status, current_period_end, cancel_at_period_end, price_interval }` per slug.
+
+### Checkout flows (`stripe-create-checkout-session`)
+
+| User action | Stripe path |
+| --- | --- |
+| New subscriber | Checkout → webhook upsert |
+| **Starter → Pro** | Checkout (`payment_method_collection: always`); metadata `replaces_stripe_subscription_id`; webhook cancels Starter |
+| **Monthly → annual** (same tier) | Checkout + replace old monthly sub (same as tier upgrade pattern) |
+| **Annual → monthly** (same tier) | In-place subscription update → `{ interval_changed: true }` (no Checkout redirect) |
+| **→ Lifetime** | Checkout `mode: payment`; webhook grants lifetime + cancels recurring subs |
+| Already on Lifetime | 400 |
+
+### Portal (`stripe-create-portal-session`)
+
+- Ensures portal config with **cancel at period end** (or uses **`STRIPE_BILLING_PORTAL_CONFIGURATION_ID`**).
+- Deep-links **`subscription_cancel`** when user has active Starter/Pro recurring sub.
+- **Manage membership** hides portal button when `cancel_at_period_end` is already set; shows **Access until [date]** block.
+
+### Client surfaces
+
+- **Subscribe modal** — 3-tier carousel, interval tabs, founding pricing, tagline under headline.
+- **Settings → Account → Membership** — badge + **Manage membership** (or **View plans** if free).
+- **BillingManageModal** — switch interval, upgrade, portal, compare plans; refresh entitlements on open.
+- **Return URLs** — `/?billing=success` or `/?billing=portal` → App polls entitlements (portal polls longer than success early-exit).
+
+---
+
+## Bugs fixed during test (do not regress)
+
+| Issue | Fix |
+| --- | --- |
+| App crash opening manage membership (hooks after early return) | Moved `openBillingManageModal` callback above early returns in **`App.jsx`** |
+| Starter → Pro: duplicate key on `stripe_subscription_id` | Upsert by sub id + clear stale/conflicting rows in **`billingDb.ts`** |
+| Starter → Pro charged silently without Checkout | Route through Checkout + webhook cancel old sub |
+| Portal opened with no cancel option | Portal config + `flow_data.type = subscription_cancel` |
+| Cancel not shown in manage modal after portal | Poll entitlements on portal return; refresh on modal open; cancel UI block |
+| Monthly → annual changed without Checkout | Route monthly → annual through Checkout (annual → monthly still in-place) |
+| Lifetime checkout error: `payment_method_collection` on payment mode | Removed that param for `mode: payment` |
+| Light mode: washed-out membership buttons / legal links | Scoped **`html.light [data-settings-account]`** + **`[data-billing-manage-modal]`** |
+| Test reset left canceled rows / unique key noise | **`revoke_slots_edge_subscription_by_handle.sql`** now **DELETE** rows |
+
+---
+
+## SQL migrations (apply in order)
+
+After base **`20260526120000_edge_subscriptions.sql`** (if not already on target project):
 
 | Migration | What |
 | --- | --- |
 | `20260701120000_subscription_products_slots_edge_starter.sql` | `slots-edge-starter` product row |
 | `20260701130000_starter_weekly_guide_unlocks.sql` | Starter weekly guide drop RPC/table |
 | `20260701140000_subscription_products_slots_edge_lifetime.sql` | `slots-edge-lifetime` product row |
-| `20260701150000_subscription_product_tier_display_names.sql` | Display names: **Slots Edge**, **Slots Edge Pro**, **Slots Edge Lifetime** |
-| **`20260701160000_user_subscriptions_price_interval.sql`** | Column `user_subscriptions.price_interval`; **`get_my_entitlements()`** returns `price_interval` |
+| `20260701150000_subscription_product_tier_display_names.sql` | Display names Slots Edge / Pro / Lifetime |
+| **`20260701160000_user_subscriptions_price_interval.sql`** | `price_interval` column; **`get_my_entitlements()`** extended |
 
-**Backfill note:** Existing rows have `price_interval = null` until the next Stripe webhook or an in-app interval change. UI **assumes monthly** when null so interval tabs lock correctly for typical monthly subs.
+**Backfill:** existing subs have `price_interval = null` until webhook or interval change. UI **assumes monthly** when null.
+
+**Test reset (test only):** `supabase/scripts/revoke_slots_edge_subscription_by_handle.sql` — also cancel subs in Stripe if testing webhook cancel.
 
 ---
 
-## Edge Functions (deploy on test, then prod)
+## Edge Functions (deploy all three together)
 
-Shared code: **`supabase/functions/_shared/billingDb.ts`** (stores `price_interval` from subscription metadata on upsert).
-
-| Function | Auth | Role |
-| --- | --- | --- |
-| **`stripe-create-checkout-session`** | User JWT | New checkout; **Starter → Pro** upgrade via Checkout; **monthly → annual** (Starter or Pro) via Checkout; **annual → monthly** in-place (`interval_changed: true`) |
-| **`stripe-create-portal-session`** | User JWT | Cancel at period end + payment method; deep-links **`subscription_cancel`** when user has Starter/Pro recurring sub |
-| **`stripe-webhook`** | Stripe signature (`verify_jwt = false`) | Upserts **`user_subscriptions`**, syncs **`profiles.has_active_subscription`** for Full **`slots-edge`** |
-
-### Deploy commands
-
-**Test:**
+Shared: **`supabase/functions/_shared/billingDb.ts`**
 
 ```bash
+# Test
 supabase link --project-ref kcosfvmreeiosdjdzycb --yes
 supabase functions deploy stripe-create-checkout-session
 supabase functions deploy stripe-create-portal-session
 supabase functions deploy stripe-webhook
-```
 
-**Production (only after test sign-off):**
-
-```bash
+# Production (after test sign-off)
 supabase link --project-ref jtjgtucumuoswnbauxry --yes
 supabase functions deploy stripe-create-checkout-session
 supabase functions deploy stripe-create-portal-session
 supabase functions deploy stripe-webhook
 ```
 
+**`stripe-webhook`** must have **`verify_jwt = false`** in Supabase dashboard (Stripe signature only).
+
 ---
 
 ## Stripe Dashboard (separate test vs live)
 
-Create **live** Products/Prices/Coupons mirroring test. Price IDs differ per mode — set **live** secrets on prod Supabase.
-
-### Products / prices
-
-| Plan | Slug | Billing |
-| --- | --- | --- |
-| Slots Edge | `slots-edge-starter` | $19.99/mo, $219.99/yr |
-| Slots Edge Pro | `slots-edge` | $59.99/mo, $660/yr |
-| Slots Edge Lifetime | `slots-edge-lifetime` | $1,699 one-time |
+Mirror **test** catalog in **live** mode. Price IDs differ — set **live** values on prod Supabase secrets.
 
 ### Coupons (founding 25%)
 
 | Secret | Stripe coupon |
 | --- | --- |
-| `STRIPE_COUPON_FOUNDING_MONTHLY` | 25% off, repeating 12 months (monthly Starter + Pro) |
-| `STRIPE_COUPON_FOUNDING_ONCE` | 25% off once (annual Starter, annual Pro, Lifetime) |
-| `STRIPE_COUPON_EARLY_BIRD` | Legacy alias for monthly founding coupon |
+| `STRIPE_COUPON_FOUNDING_MONTHLY` | 25% off, repeating 12 months |
+| `STRIPE_COUPON_FOUNDING_ONCE` | 25% off once (annual + Lifetime) |
+| `STRIPE_COUPON_EARLY_BIRD` | Legacy alias for monthly founding |
 
 ### Supabase Edge secrets (names)
 
@@ -110,9 +152,11 @@ Create **live** Products/Prices/Coupons mirroring test. Price IDs differ per mod
 `STRIPE_PRICE_SLOTS_EDGE_STARTER`, `STRIPE_PRICE_SLOTS_EDGE_STARTER_ANNUAL`,  
 `STRIPE_PRICE_SLOTS_EDGE`, `STRIPE_PRICE_SLOTS_EDGE_ANNUAL`,  
 `STRIPE_PRICE_SLOTS_EDGE_LIFETIME`,  
-coupon ids above, optional `STRIPE_CHECKOUT_DEFAULT_ORIGIN` (`https://edgetilt.com` on prod).
+coupon ids above,  
+optional `STRIPE_CHECKOUT_DEFAULT_ORIGIN` (**`https://edgetilt.com`** on prod),  
+optional `STRIPE_BILLING_PORTAL_CONFIGURATION_ID` (`bpc_…`).
 
-### Webhook endpoint (per project)
+### Webhook (per project)
 
 `https://<project-ref>.supabase.co/functions/v1/stripe-webhook`
 
@@ -122,100 +166,91 @@ Enable **Customer Portal** in Stripe (test + live).
 
 ---
 
-## Edge API behavior (today)
+## Test smoke (complete before prod)
 
-### `POST stripe-create-checkout-session`
+Apply migrations through **`20260701160000`** on test, deploy all three Edge functions, confirm test webhook delivering.
 
-Body: `{ "product_slug", "price_interval": "monthly"|"annual", "apply_early_bird": true }`
+- [ ] Free user → Subscribe → **Starter monthly** Checkout completes; entitlements update
+- [ ] **Starter monthly** → switch to **annual** opens **Stripe Checkout** (not silent); lands on annual after webhook
+- [ ] **Starter → Pro** opens Checkout; Starter sub canceled in Stripe; only Pro row in DB
+- [ ] **Pro monthly → annual** same Checkout replace pattern
+- [ ] **Pro annual → monthly** in-place (`interval_changed`); no Checkout redirect
+- [ ] **→ Lifetime** Checkout completes (no `payment_method_collection` error); recurring subs canceled
+- [ ] **Manage membership** → portal cancel → **Access until [date]** shown; portal button hidden while pending cancel
+- [ ] `get_my_entitlements()` returns `price_interval` after checkout / webhook
+- [ ] Light mode: subscribe modal, manage membership, settings membership readable
+- [ ] Billing return: `/?billing=success` and `/?billing=portal` refresh entitlements
 
-| Case | Response |
-| --- | --- |
-| New subscriber | `{ url }` → Stripe Checkout |
-| Active **Starter** + checkout **Pro** | Stripe Checkout (`payment_method_collection: always`); webhook upserts Pro sub and **cancels** the Starter subscription |
-| Active **Starter or Pro** + checkout **Lifetime** | Stripe Checkout one-time payment; webhook grants Lifetime and **cancels** active recurring subscription(s) |
-| Active **Starter or Pro** monthly + checkout **annual** (same tier) | Stripe Checkout (`payment_method_collection: always`); webhook upserts annual sub and **cancels** the old monthly subscription |
-| Active **Starter or Pro** annual + checkout **monthly** (same tier) | Updates sub in place → `{ interval_changed: true, url: success_url }` |
-| Already on **Lifetime** | 400 |
-| Same interval as current | 400 from interval change path |
-
-Subscription metadata written on update: `supabase_user_id`, `product_slug`, `price_interval`, optional `upgraded_from`.
-
-### `POST stripe-create-portal-session`
-
-- Ensures a Customer Portal configuration with **subscription cancel** enabled (uses **`STRIPE_BILLING_PORTAL_CONFIGURATION_ID`** if set, else finds or creates one).
-- If the user has an active **Starter** or **Pro** recurring subscription, opens portal **`flow_data`** directly on **cancel subscription** (at period end).
-- **Lifetime** has no recurring sub ... use SQL revoke for test reset; portal button is hidden in **`BillingManageModal`** for lifetime holders.
-
-### Client checkout
-
-**`src/features/billing/stripeBillingApi.js`** — `startEdgeCheckout()`, `openBillingPortal()`, `fetchMyEntitlements()` via **`get_my_entitlements()`**.
-
-Success / portal return: `/?billing=success` or `/?billing=portal` → App polls entitlements.
+Use **`@smokewagon`** (or test account) + **`revoke_slots_edge_subscription_by_handle.sql`** between runs.
 
 ---
 
-## Client UX (shipped + in progress)
+## Production promotion — step by step (Ryan walkthrough)
 
-### Subscribe modal (`SubscribeModal.jsx`)
+Do these **in order**. Pause after each phase if anything fails on test replay first.
 
-- 3D carousel: **Slots Edge**, **Slots Edge Pro**, **Slots Edge Lifetime**
-- Monthly / annual tabs per subscription tier
-- **Existing monthly sub:** current tier card, **Annual selected**, **Monthly disabled** (and reverse for annual)
-- **Starter monthly user:** opens **Slots Edge** card (not Pro)
-- Checkout label: **Switch to annual/monthly billing** when changing cadence on current plan
-- Staff bypass: modals use **RPC entitlements only** (not `isStaff` gate flags)
+### Phase 0 — Preconditions
 
-### Manage membership (`BillingManageModal.jsx`) — uncommitted
+1. Confirm **`origin/test`** smoke above is signed off (or repeat on test before touching prod).
+2. Confirm Vercel **production** env vars point at **`jtjgtucumuoswnbauxry`** (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
+3. **Backup:** if any real prod subscribers exist, snapshot `user_subscriptions` / `profiles` before migration (unlikely on day one, but safe).
 
-- **Settings → Membership → Manage membership** (paid) or **View Edge AP Slots plans** (free)
-- Shows plan name, interval, renewal / cancel-at-period-end
-- Actions: switch interval, upgrade Starter → Pro, **Cancel or update payment in Stripe**, compare all plans
+### Phase 1 — Frontend
 
-### Settings membership badge
+4. Merge **`test` → `main`** (or your prod branch) and deploy **`edgetilt.com`**.
+5. Hard refresh / PWA reload after deploy.
 
-- **Slots Edge** / **Slots Edge Pro** / **Lifetime** / **Free** (not generic “Subscriber” only)
+### Phase 2 — Production database
+
+6. Supabase Dashboard → **`jtjgtucumuoswnbauxry`** → SQL Editor.
+7. Apply migrations **`20260701120000`** through **`20260701160000`** in order (skip any already applied).
+8. Verify:
+
+```sql
+select slug, display_name, active from public.subscription_products order by slug;
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'user_subscriptions' and column_name = 'price_interval';
+```
+
+### Phase 3 — Stripe live mode
+
+9. Stripe Dashboard → **live** mode: create Products/Prices matching test catalog.
+10. Create live founding coupons; copy coupon IDs.
+11. Enable Customer Portal (cancel at period end); optional: copy **`bpc_…`** to **`STRIPE_BILLING_PORTAL_CONFIGURATION_ID`** on prod.
+
+### Phase 4 — Supabase prod secrets + webhook
+
+12. Project **`jtjgtucumuoswnbauxry`** → Edge Functions → Secrets: set all **`STRIPE_*`** names with **live** values.
+13. Set **`STRIPE_CHECKOUT_DEFAULT_ORIGIN`** = `https://edgetilt.com`.
+14. Add live webhook endpoint → prod `stripe-webhook` URL; copy signing secret → **`STRIPE_WEBHOOK_SECRET`**.
+
+### Phase 5 — Deploy Edge on production
+
+15. Run prod deploy commands (three functions) from repo root.
+16. Confirm webhook shows successful test event in Stripe (optional: Stripe CLI or dashboard “Send test webhook”).
+
+### Phase 6 — Production smoke (minimal)
+
+17. Staff/test account on **live** (Ryan explicit approval for real charge):
+    - One **Starter monthly** checkout OR use test clock if configured
+    - **Manage membership** → portal cancel shows date (do not leave orphan live subs if aborting)
+18. Confirm **`get_my_entitlements()`** in SQL editor as that user (via impersonation or client network tab).
+19. Update **`docs/test-buildout-backlog.md`** Update log + **`docs/production-rollout-checklist.md`** when signed off.
+
+**Do not** in the same window: guide ingest to prod, batch AP payloads, or `npm run slots:sync:*` against production unless explicitly planned.
 
 ---
 
-## Test smoke (before prod)
+## Out of scope / not built
 
-- [ ] Migrations through **`20260701160000`** applied on test
-- [ ] All three Stripe Edge functions deployed on test
-- [ ] Stripe **test** webhook delivering to test project
-- [ ] Free user: Subscribe modal → Starter monthly checkout completes
-- [ ] Starter monthly: modal shows **Annual** selected, Monthly disabled; **Switch to annual** opens Stripe Checkout and lands on annual after webhook
-- [ ] Starter → Pro upgrade from Pro card
-- [ ] Pro monthly: same interval tab behavior on Pro card
-- [ ] Settings → **Manage membership** opens; portal link works
-- [ ] Lifetime one-time checkout (if enabled on test)
-- [ ] `get_my_entitlements()` returns `price_interval` after webhook or interval change
-- [ ] Light mode: subscribe modal + guide lock blues readable
-
----
-
-## Production promotion order
-
-1. Merge / deploy **frontend** to prod hosting (`edgetilt.com`).
-2. Apply SQL migrations **`20260701120000`** through **`20260701160000`** on **`jtjgtucumuoswnbauxry`** (SQL editor or `supabase db push` — match your usual prod process).
-3. Create **live** Stripe products, prices, coupons; set **live** Edge secrets on prod Supabase.
-4. Register **live** webhook → prod `stripe-webhook` URL; copy **`STRIPE_WEBHOOK_SECRET`** to prod secrets.
-5. Deploy Edge functions on **`jtjgtucumuoswnbauxry`** (commands above).
-6. Run prod smoke subset (one real checkout in live mode if Ryan approves, or staff test account).
-7. Update **`docs/test-buildout-backlog.md`** Update log + **`docs/production-rollout-checklist.md`** checkboxes when done.
-
-**Do not** run guide ingest or other prod DB scripts in the same window unless explicitly planned.
-
----
-
-## Out of scope / not built yet
-
-- **Downgrade Pro → Starter** (no Stripe path; cancel + resubscribe only)
-- Automatic **backfill** of `price_interval` for all existing subs (webhook on next Stripe event, or one-off script if needed)
-- **`stripe-create-portal-session`** redeploy after portal cancel / configuration changes (see **`supabase/functions/stripe-create-portal-session/README.md`**)
+- **Downgrade Pro → Starter** (cancel + resubscribe only)
+- Automatic **`price_interval` backfill** for all legacy subs (waits on next Stripe event)
+- **Pro → Starter** or tier downgrade in Stripe without cancel
 
 ---
 
 ## Update log
 
-- **2026-07-01:** Handoff doc created from Cursor session (interval switch, `price_interval`, Subscribe modal tab UX, Billing manage screen, settings entry).
-- **2026-07-01:** Starter → Pro goes through **Stripe Checkout** (not silent in-place upgrade); webhook cancels replaced Starter sub after checkout completes.
+- **2026-07-01:** Handoff doc created (interval switch, manage membership, settings entry).
+- **2026-07-01:** Starter → Pro + monthly → annual via Checkout; portal cancel; Lifetime payment mode fix; manage cancel UX; light mode; tagline.
+- **2026-07-01:** Full prod walkthrough + bug-fix table; all commits through **`6680e25`** on **`origin/test`**.
