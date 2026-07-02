@@ -54,6 +54,11 @@ export default function StarterWeeklyDropScratchModal({
   }, [])
 
   useEffect(() => {
+    if (!open) return
+    audioRef.current?.preload()
+  }, [open])
+
+  useEffect(() => {
     if (!open || !unlockId || !supabaseClient) {
       setPayload(null)
       setRevealed(false)
