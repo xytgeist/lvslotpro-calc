@@ -19,12 +19,21 @@ function billingSwitchTargetInterval(interval) {
   return interval === 'monthly' ? 'annual' : 'monthly'
 }
 
+/** @param {string | null | undefined} iso */
+function formatBillingAccessDate(iso) {
+  if (!iso) return null
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 /**
  * @param {{
  *   open: boolean,
  *   onClose: () => void,
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
  *   onCheckoutStarted?: () => void,
+ *   onRefreshEntitlements?: () => void | Promise<void>,
  *   onOpenSubscribe?: (productSlug?: string) => void,
  *   hasSlotsEdgeStarter?: boolean,
  *   hasSlotsEdgePro?: boolean,
@@ -39,6 +48,7 @@ export default function BillingManageModal({
   onClose,
   supabaseClient,
   onCheckoutStarted,
+  onRefreshEntitlements,
   onOpenSubscribe,
   hasSlotsEdgeStarter = false,
   hasSlotsEdgePro = false,
@@ -67,24 +77,25 @@ export default function BillingManageModal({
     return null
   }, [entitlements, hasSlotsEdgeLifetime, hasSlotsEdgePro, hasSlotsEdgeStarter])
 
+  const accessEndDate = useMemo(
+    () => formatBillingAccessDate(activeEntitlement?.current_period_end),
+    [activeEntitlement?.current_period_end],
+  )
+  const isPendingCancel = Boolean(activeEntitlement?.cancel_at_period_end) && !hasSlotsEdgeLifetime
+
   const renewalLabel = useMemo(() => {
     if (hasSlotsEdgeLifetime) return 'One-time founding pass ... no renewals.'
-    const end = activeEntitlement?.current_period_end
-    if (!end) return null
-    const date = new Date(end)
-    if (Number.isNaN(date.getTime())) return null
-    const formatted = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-    if (activeEntitlement?.cancel_at_period_end) {
-      return `Access until ${formatted} (canceled)`
-    }
-    return `Renews ${formatted}`
-  }, [activeEntitlement, hasSlotsEdgeLifetime])
+    if (isPendingCancel) return null
+    if (!accessEndDate) return null
+    return `Renews ${accessEndDate}`
+  }, [accessEndDate, hasSlotsEdgeLifetime, isPendingCancel])
 
   useEffect(() => {
     if (!open) return
     setBusyKey('')
     setError('')
-  }, [open])
+    void onRefreshEntitlements?.()
+  }, [open, onRefreshEntitlements])
 
   useEffect(() => {
     if (!open) return undefined
@@ -196,7 +207,23 @@ export default function BillingManageModal({
             {currentIntervalLabel ? (
               <div className="mt-1 text-sm text-zinc-400">{currentIntervalLabel} billing</div>
             ) : null}
-            {renewalLabel ? <div className="mt-2 text-xs text-zinc-500">{renewalLabel}</div> : null}
+            {isPendingCancel ? (
+              <div className="mt-3 rounded-xl border border-amber-500/35 bg-amber-950/30 px-3 py-2.5">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-400/90">
+                  Cancellation scheduled
+                </div>
+                <div className="mt-1 text-sm font-semibold text-amber-100">
+                  {accessEndDate ? `Access until ${accessEndDate}` : 'Cancellation pending'}
+                </div>
+                <div className="mt-1 text-xs leading-snug text-amber-200/75">
+                  {accessEndDate
+                    ? `Your membership stays active until ${accessEndDate}, then you will not be charged again.`
+                    : 'Your membership will end at the close of the current billing period.'}
+                </div>
+              </div>
+            ) : renewalLabel ? (
+              <div className="mt-2 text-xs text-zinc-500">{renewalLabel}</div>
+            ) : null}
           </div>
 
           <div className="mt-4 space-y-2">
@@ -214,7 +241,11 @@ export default function BillingManageModal({
               </button>
             ) : null}
 
-            {hasSlotsEdgeStarter && !hasSlotsEdgePro && !hasSlotsEdgeLifetime && starterCurrentInterval ? (
+            {hasSlotsEdgeStarter &&
+            !hasSlotsEdgePro &&
+            !hasSlotsEdgeLifetime &&
+            !isPendingCancel &&
+            starterCurrentInterval ? (
               <button
                 type="button"
                 disabled={Boolean(busyKey)}
@@ -246,7 +277,7 @@ export default function BillingManageModal({
               </button>
             ) : null}
 
-            {hasSlotsEdgePro && !hasSlotsEdgeLifetime && fullCurrentInterval ? (
+            {hasSlotsEdgePro && !hasSlotsEdgeLifetime && !isPendingCancel && fullCurrentInterval ? (
               <button
                 type="button"
                 disabled={Boolean(busyKey)}
@@ -261,7 +292,7 @@ export default function BillingManageModal({
               </button>
             ) : null}
 
-            {hasPaidPlan && !hasSlotsEdgeLifetime ? (
+            {hasPaidPlan && !hasSlotsEdgeLifetime && !isPendingCancel ? (
               <button
                 type="button"
                 disabled={Boolean(busyKey)}

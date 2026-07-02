@@ -350,7 +350,8 @@ function App() {
     let cancelled = false
 
     const pollEntitlements = async () => {
-      for (let attempt = 0; attempt < 15; attempt += 1) {
+      const maxAttempts = billing.billing === 'portal' ? 8 : 15
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         if (cancelled) return
         await refreshEntitlements()
         const { data } = await supabase
@@ -361,19 +362,20 @@ function App() {
         if (data) {
           setHasActiveSubscriptionFromProfile(Boolean(data.has_active_subscription))
           setStripeCustomerId(data.stripe_customer_id ?? null)
-          if (data.has_active_subscription) return
+          if (billing.billing === 'success' && data.has_active_subscription) return
         }
+        if (billing.billing === 'portal' && attempt >= maxAttempts - 1) return
         await new Promise((r) => window.setTimeout(r, 1200))
       }
     }
 
     if (billing.billing === 'success' || billing.billing === 'portal') {
       void pollEntitlements()
-      setAccessNotice(
-        billing.billing === 'success'
-          ? 'Subscription updated - thanks for supporting Edge.'
-          : 'Billing settings saved.',
-      )
+      if (billing.billing === 'success') {
+        setAccessNotice('Subscription updated - thanks for supporting Edge.')
+      } else {
+        setAccessNotice('Billing settings saved.')
+      }
     }
     clearBillingQueryParams()
 
@@ -877,6 +879,7 @@ function App() {
           onClose={closeBillingManageModal}
           supabaseClient={supabase}
           onCheckoutStarted={handleCheckoutStarted}
+          onRefreshEntitlements={refreshEntitlements}
           onOpenSubscribe={openSubscribeModal}
           hasSlotsEdgeStarter={hasSlotsEdgeStarterFromRpc}
           hasSlotsEdgePro={hasSlotsEdgeProFromRpc}
