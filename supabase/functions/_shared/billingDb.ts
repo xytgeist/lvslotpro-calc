@@ -75,10 +75,24 @@ export async function upsertUserSubscriptionFromStripe(
     updated_at: new Date().toISOString(),
   }
 
-  const { error } = await admin.from('user_subscriptions').upsert(row, {
-    onConflict: 'user_id,product_slug',
-  })
-  if (error) throw new Error(`user_subscriptions upsert: ${error.message}`)
+  // Same Stripe subscription id can move starter → pro in place. Updating by sub id avoids
+  // duplicate key on user_subscriptions_stripe_subscription_id_key when the starter row still exists.
+  const { data: existingBySubId, error: subLookupErr } = await admin
+    .from('user_subscriptions')
+    .select('id')
+    .eq('stripe_subscription_id', subscription.id)
+    .maybeSingle()
+  if (subLookupErr) throw new Error(`user_subscriptions lookup (${subscription.id}): ${subLookupErr.message}`)
+
+  if (existingBySubId?.id) {
+    const { error } = await admin.from('user_subscriptions').update(row).eq('id', existingBySubId.id)
+    if (error) throw new Error(`user_subscriptions update: ${error.message}`)
+  } else {
+    const { error } = await admin.from('user_subscriptions').upsert(row, {
+      onConflict: 'user_id,product_slug',
+    })
+    if (error) throw new Error(`user_subscriptions upsert: ${error.message}`)
+  }
 
   if (productSlug === 'slots-edge') {
     await clearStarterSubscriptionRow(admin, userId)
