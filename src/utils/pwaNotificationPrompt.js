@@ -34,6 +34,11 @@ export function isStandalonePwa() {
   return standaloneViaMedia || standaloneViaNavigator
 }
 
+/** Installed PWA (Add to Home Screen / Install app) — eligible for one-time push opt-in prompt. */
+export function isInstalledPwaNotifPromptEligible() {
+  return isStandalonePwa()
+}
+
 export function getPwaNotifPromptStorageKey(userId) {
   return `${OFFERS_IOS_PWA_NOTIF_PROMPT_KEY_PREFIX}${userId}`
 }

@@ -24,9 +24,8 @@ import {
 } from '../offers/offerStorageKeys'
 import {
   hasSeenPwaNotifPrompt,
-  isIosDevice,
+  isInstalledPwaNotifPromptEligible,
   isPwaNotifPromptAuthEvent,
-  isStandalonePwa,
   markPwaNotifPromptSeen,
   setPwaNotifEnablePending,
 } from '../../utils/pwaNotificationPrompt'
@@ -332,7 +331,7 @@ export default function AppShell({
   const loungeFeedPopularAsOfRef = useRef(/** @type {string | null} */ (null))
   /** True while the first page of the Lounge feed is being reloaded (including silent pull-to-refresh). */
   const communityFeedHeadReloadingRef = useRef(false)
-  const iosPwaNotifPromptInFlightRef = useRef(false)
+  const pwaNotifPromptInFlightRef = useRef(false)
   const [globalConfirmState, setGlobalConfirmState] = useState({
     open: false,
     title: '',
@@ -427,7 +426,7 @@ export default function AppShell({
     []
   )
 
-  /** User id queued for one-time iOS PWA notification opt-in (shown after member UI + splash settle). */
+  /** User id queued for one-time installed-PWA notification opt-in (shown after member UI + splash settle). */
   const [pwaNotifPromptUserId, setPwaNotifPromptUserId] = useState(null)
 
   const hydrateCommunityPosts = useCallback(
@@ -1203,17 +1202,17 @@ export default function AppShell({
     browseMode,
   })
 
-  /** Queue iOS Home Screen (PWA) notification opt-in on first auth - do not show until UI is stable. */
+  /** Queue installed PWA notification opt-in on first auth — iOS + Android Home Screen / Install app. */
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (!isIosDevice() || !isStandalonePwa()) return
+    if (!isInstalledPwaNotifPromptEligible()) return
 
     const {
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange((event, session) => {
       if (!isPwaNotifPromptAuthEvent(event)) return
       const userId = session?.user?.id
-      if (!userId || hasSeenPwaNotifPrompt(userId) || iosPwaNotifPromptInFlightRef.current) return
+      if (!userId || hasSeenPwaNotifPrompt(userId) || pwaNotifPromptInFlightRef.current) return
       const permission = window.Notification?.permission
       if (permission === 'granted' || permission === 'denied') {
         markPwaNotifPromptSeen(userId)
@@ -1232,20 +1231,20 @@ export default function AppShell({
   useEffect(() => {
     if (!pwaNotifPromptUserId) return
     if (browseMode !== 'member' || !authSessionReady || splashVisible) return
-    if (iosPwaNotifPromptInFlightRef.current) return
+    if (pwaNotifPromptInFlightRef.current) return
 
     const userId = pwaNotifPromptUserId
     const settleMs = 450
     const timer = window.setTimeout(() => {
-      if (iosPwaNotifPromptInFlightRef.current) return
-      iosPwaNotifPromptInFlightRef.current = true
+      if (pwaNotifPromptInFlightRef.current) return
+      pwaNotifPromptInFlightRef.current = true
       setPwaNotifPromptUserId(null)
 
       void (async () => {
         try {
           const shouldEnable = await showGlobalConfirm({
             title: 'Enable Notifications',
-            message: 'Allow notifications for this Home Screen app now?',
+            message: 'Allow notifications for this installed app now?',
             confirmLabel: 'Enable',
             cancelLabel: 'Not now',
           })
@@ -1258,7 +1257,7 @@ export default function AppShell({
         } catch {
           markPwaNotifPromptSeen(userId)
         } finally {
-          iosPwaNotifPromptInFlightRef.current = false
+          pwaNotifPromptInFlightRef.current = false
         }
       })()
     }, settleMs)

@@ -63,7 +63,7 @@ export default function useLoungePushNotifications({ supabaseClient, viewerUserI
     void syncLocalState()
   }, [viewerUserId, syncLocalState])
 
-  /** iOS PWA first-run prompt grants OS permission - register Lounge push on this device. */
+  /** Installed PWA first-run prompt grants OS permission — register Lounge push on this device. */
   useEffect(() => {
     if (!viewerUserId || iosPwaInstallRequired() || isBusy) return
     if (!consumePwaNotifEnablePending(viewerUserId)) return
