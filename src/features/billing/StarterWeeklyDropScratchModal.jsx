@@ -89,7 +89,7 @@ export default function StarterWeeklyDropScratchModal({
     }
   }, [open, unlockId, supabaseClient, resetScratchState])
 
-  const starterUnlockedSlugsKey = (guideAccessContext.starterUnlockedGuideSlugs || []).join('|')
+  const starterUnlockedSlugsKey = Array.from(guideAccessContext.starterUnlockedGuideSlugs || []).join('|')
 
   useEffect(() => {
     if (!open || !payload || !supabaseClient || guideAccessContext.hasSlotsEdge) {
