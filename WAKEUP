@@ -2,12 +2,12 @@
 
 **Ryan** — use this **after a restart or any new Cursor chat** so the session starts pointed the right way. Theo does not remember yesterday; **the repo and `AGENTS.md` are the source of truth.**
 
-**Do not trim for size:** **`docs/test-buildout-backlog.md`** (test SQL, smoke, Update log) and **`docs/production-rollout-checklist.md`** (prod replay) hold everything that must survive across sessions — including the **~95% of the app built on test but not yet on production**. This file is **ephemeral** session context only.
+**Do not trim for size:** **`docs/test-buildout-backlog.md`** (test SQL, smoke, Update log) and **`docs/production-rollout-checklist.md`** (prod replay) hold everything that must survive across sessions. This file is **ephemeral** session context only.
 
 ## What you do (quick)
 
 1. **Skim** the bracketed lines in **Copy into chat** below (branch, Supabase, goal).
-2. **Optional:** Type a short hello in your own words on the first line (e.g. *Good morning Theo — on `test`, bug hunt on guide cards in light mode.*).
+2. **Optional:** Type a short hello in your own words on the first line (e.g. *Good morning Theo — finish Stripe prod smoke on edgetilt.com.*).
 3. **Copy** from **“The agent should treat…”** through the last line you need, then **paste into chat**.
 
 That is the whole ritual: **you set the rails; Theo reads `AGENTS.md` and the docs you name.**
@@ -18,7 +18,7 @@ That is the whole ritual: **you set the rails; Theo reads `AGENTS.md` and the do
 
 The agent should treat the following as **standing instructions for this session** (full wording and examples live at the top of **`AGENTS.md`**):
 
-- **Names:** You are **Theo** (human-style assistant name). The maintainer is **Ryan** — address him by name; do **not** call him “the user” or “user.” You are Ryan's teammate and friend. Ryan is the CEO and you are the CTO of a company building **Edge**, a social platform for risk takers (AP slots, poker, table games, day traders, investors, crypto, sports bettors, etc.). Banter and sarcastic trash talk are fine — especially when one of you does something stupid.
+- **Names:** You are **Theo** (human-style assistant name). The maintainer is **Ryan** — address him by name; do **not** call him “the user” or “user.” You are Ryan's teammate and friend. Ryan is the CEO and you are the CTO of a company building **Edge** / **EdgeTilt**, a social platform for risk takers (AP slots, poker, table games, day traders, investors, crypto, sports bettors, etc.). Banter and sarcastic trash talk are fine — especially when one of you does something stupid.
 - **Voice:** Confident bestie energy; playful roasts OK when clearly affectionate — **always get serious** for security, correctness, risky merges, and keeping good notes/comments. Full wording: **`AGENTS.md`** → *People & naming* (`AGENT_RULE_RYAN_VOICE`).
 - **Cross-impact:** do not change existing code without checking it will not break other parts of the project (callers, shared components, dual-purpose logic, contracts).
 - **Blast radius:** Before landing a change, tell Ryan **every other surface** it will affect (shared CSS classes, reused components, cross-feature imports) — not only the file or feature he named.
@@ -28,72 +28,74 @@ The agent should treat the following as **standing instructions for this session
 
 ---
 
-**Branch:** `test`
+**Branch:** `test` ( **`origin/main`** and **`origin/test`** aligned at **`dea9eae`** as of **2026-07-01** )
 
-**Supabase:** **test** (project ref: `jtjgtucumuoswnbauxry`)
+**Supabase (do not swap these):**
 
-**Goal:** _Bug finding / fixing — guide cards and broader app polish (light + dark). Card content + accent ingest phase is ~done._
+| | Project ref | Domain |
+| --- | --- | --- |
+| **Production** | **`jtjgtucumuoswnbauxry`** | **`edgetilt.com`** |
+| **Test sandbox** | **`kcosfvmreeiosdjdzycb`** | **`lvslotpro.com`** |
 
-**Start by reading:** `AGENTS.md`, then **`docs/test-buildout-backlog.md`** (§ **AP Guide editor** + Update log **2026-06-25**). For **production** work: **`docs/production-rollout-checklist.md`** top-to-bottom — replay validated test work onto prod **`jtjgtucumuoswnbauxry`** (`edgetilt.com`). Test sandbox: **`kcosfvmreeiosdjdzycb`** (`edgetilt-sandbox`, `lvslotpro.com`).
+**Goal:** _Prod polish + remaining Stripe smoke; commit uncommitted legal fix; Starter weekly drop cron when ready._
+
+**Start by reading:** `AGENTS.md`, then **`docs/test-buildout-backlog.md`** Update log (**2026-07-01** tail). For **Stripe prod:** **`docs/stripe-billing-test-to-prod-handoff.md`**. For **prod replay gaps:** **`docs/production-rollout-checklist.md`** §1–§6. Cutover runbook: **`docs/edgetilt-production-cutover.md`**.
 
 **Optional add-ons** (delete lines you do not need)
 
-- Session focus: _[e.g. light-mode guide card bugs, Lounge smoke, apply pending SQL]_
+- Session focus: _[e.g. Stripe upgrade smoke, commit legal modal fix, guide card bugs]_
 - No prod writes / no commits / PR only: _[say which]_
-- Context: _[link, path, or "see backlog Update log 2026-06-25"]_
+- Context: _[e.g. "see backlog Update log 2026-07-01"]_
 
 ---
 
-## Pick up here (Jun 2026, branch `test`)
+## Pick up here (Jul 2026)
 
-**Canonical detail:** **`docs/test-buildout-backlog.md`** → **AP Guide editor** section + Update log **2026-06-25**. **Prod mirror:** **`docs/production-rollout-checklist.md`** §2–§5.
+**Latest commits (`main` / `test`):** `dea9eae` (Gmail-safe auth email header + template doc) · `9acf054` (Stripe portal opens billing home, not cancel deep-link) · `5af508f` (Stripe prod handoff doc) · `6680e25` (Settings legal link spacing) · `a5427cd` (light mode Settings/billing)
 
-**Latest commits on `test`:** `75ea4f5` (Ask Community light-mode caption) · `e8861ae` (guide h2 light mode + tap-to-collapse) · `3e4eae2` (Ask Community caption crash) · `9c27cec` (dotlottie WASM) · `e88510c` (hero accent + release-year script + ingest catch-up)
+### Shipped on production (`edgetilt.com`) — recent
 
-### AP guide cards — home stretch **done** (Jun 2026)
+| Area | Status |
+| --- | --- |
+| **EdgeTilt cutover** | **`edgetilt.com`** → prod Supabase; **`lvslotpro.com`** → test sandbox (Ryan sign-off **2026-07-01**) |
+| **Auth** | Google + email signup/reset; Resend SMTP **`noreply@auth.edgetilt.com`**; confirm + reset templates in Supabase (see **`docs/supabase-auth-email-templates.md`**) |
+| **Stripe billing** | Live catalog, webhooks, 3 Edge fns; migrations **`20260701120000`–`20260701160000`**; minimal smoke **PASSED** (Starter monthly + founding coupon **`QnYlzKuK`**) |
+| **Legal** | **`/terms`**, **`/privacy`**, **`/guidelines`** on **`edgetilt.com`** — counsel-reviewed; in-app routes = public legal URLs (Ryan **2026-07-01**); prod checklist §7 **closed** |
+| **Subscribe / billing UX** | Plan picker, interval tabs, manage membership modal, light-mode contrast fixes |
 
-**Test DB:** **310** published guides. All have **`machines.release_year`**. Hero accent backfill run (**`guides.card_accent_color`**).
+### Next priorities (ordered)
 
-**Shipped UI (test branch):**
-- Hero-derived accent colors on cards (**`guideCardAccent.js`**, migration **`20260610240000`**)
-- Light mode fixes: +EV panel, expanded markdown h2, Ask Community modal (**`data-ask-community-*`**)
-- Expanded card tap-to-collapse (preserves links + action buttons)
-- Ask Community → Lounge post with guide card attached
+1. **Stripe prod smoke matrix** — full interval/upgrade/Lifetime/portal cancel checklist in **`docs/stripe-billing-test-to-prod-handoff.md`** §Test plan
+2. **Starter weekly guide drop** — schema + RPC shipped; **cron scheduler + reveal UX** still open (`20260701130000`)
+3. **Billing RLS hardening** — entitlements (backlog)
+4. **Bug hunt** — guide cards light/dark, mobile **Where to find** tables, whatever Ryan finds in smoke
 
-**Key files:** `src/features/guides/GuidesScreen.jsx`, `src/slot-guide-form/GuideCardPreview.jsx`, `src/utils/guideCardAccent.js`, `src/utils/guideAccentPalette.js`, `src/index.css` ( **`html.light .guide-accent-themed`** block)
+**Do not commit:** untracked `public/edge-email-logo*` experiment PNGs/JPG unless Ryan asks.
 
-**Light mode trap:** zinc **`bg-zinc-950`** remaps to pale in light mode; **`text-white`** on inputs **does not** — always scope with **`data-*`** or feature classes under **`html.light`**.
+### AP guides (ongoing workflow)
 
-### AP guide updates (ongoing workflow)
+**Source of truth:** Supabase **`guides.content_markdown`** + R2 heroes. **Not** repo markdown.
 
-**Source of truth:** Supabase **`guides.content_markdown`** + R2/Storage image URLs. **Not** repo markdown.
-
-**Editor:** **`/slot-guide-form`** on tx18 (or **`npm run dev`** locally).
+**Editor:** **`/slot-guide-form`** on **`edgetilt.com`** (prod) or local **`npm run dev`**.
 
 | Task | Steps |
 | --- | --- |
-| **New guide** | Admin login → fill sections → hero/diagrams → **Ingest guide** |
+| **New guide** | Admin login → sections → hero → **Ingest guide** |
 | **Edit existing** | **Fetch guides** → **Load** → edit → **Save changes** |
 | **WIP** | **Save draft** (localStorage only) |
 
-**Critical:** Always **Fetch → Load** before editing. Save recompiles full markdown — empty **Where to find** wipes that section in the DB.
+**Critical:** Always **Fetch → Load** before editing. Empty **Where to find** on save wipes that section.
 
-**Test = prod for agents:** Never ingest/sync/batch-run to test unless Ryan explicitly asks. Backup before any approved batch: **`npm run ap-guide:backup`**. See **`AGENTS.md`** **`AGENT_RULE_TEST_IS_PROD`**.
+**Prod = prod for agents:** Never ingest/batch-run to **`jtjgtucumuoswnbauxry`** unless Ryan names the slug/batch. Backup first: **`node scripts/ap-guide-backup-test-guides.mjs --all-batch --target=production`**.
 
-**Accent backfill:** **`npm run ap-guide:backfill-accents:dry`** then **`npm run ap-guide:backfill-accents`**. Release years: **`node scripts/ap-guide-backfill-release-years.mjs --target=test`**.
+**Test DB:** **310** published guides; **`release_year`** + **`card_accent_color`** backfilled on test.
 
-### **Now:** bug hunt phase
-
-Ryan is smoke-testing guide cards (light + dark) and the rest of the app. Fix bugs as found. Open checkbox in backlog: **Ryan smoke — guide cards (light + dark)**.
-
-### Still open (see backlog)
-
-- **Mobile-friendly regional tables** in AP Guides (**Where to find** markdown tables on small screens).
-- **Ryan smoke — ingest on tx18:** Vercel env vars + **Fetch → Load → Save changes** on a live guide.
-- **SQL **`20260610240000`** (`card_accent_color`)** + accent backfill on **prod** when promoting guides tooling.
-- Link preview + group-delete smoke; Play Logbook SQL; Bankroll Risk Advisor card position.
+**Light mode trap:** zinc **`bg-zinc-950`** remaps pale in light mode; **`text-white`** on inputs does not — scope under **`html.light`** + **`data-*`** roots.
 
 ### Parked
 
-- Thread compose iOS keyboard / options bar overlap after media pick.
-- Formal automated docx → guide script (historical pilot was manual).
+- Thread compose iOS keyboard / options bar overlap after media pick
+- Automated docx → guide ingest script
+- Chat R2 video promote to prod; link-preview + group-delete smoke sign-off
+- Multiple Stream clips per post (v2 cap: 2)
+- Formal **`WAKEUP`** is not a substitute for backlog SQL apply order — grep migration dates in Update log before applying

@@ -10,6 +10,7 @@ export {
 export {
   recordLegalAcceptance,
   profileNeedsLegalAcceptance,
+  shouldShowLegalAcceptanceModal,
   markPendingLegalAcceptance,
   readPendingLegalAcceptance,
   clearPendingLegalAcceptance,

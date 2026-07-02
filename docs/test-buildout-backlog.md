@@ -702,6 +702,8 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-07-01: **Legal URLs (Ryan decision):** **`edgetilt.com/terms`**, **`/privacy`**, **`/guidelines`** in-app routes are sufficient; no separate hosted legal site. Prod checklist §7 closed.
+- 2026-07-01: **Legal counsel review (Ryan sign-off):** in-app **`/terms`**, **`/privacy`**, and **`/guidelines`** copy in **`src/features/legal/legalDocuments.js`** reviewed by counsel. Prod checklist §7 updated; policy version still **`2026-06-27`** (`legalPolicyVersion.js`).
 - 2026-07-01: **Stripe billing — production (Ryan sign-off):** **`jtjgtucumuoswnbauxry`** migrations through **`20260701160000`**, live **`STRIPE_*`** secrets + webhook, three Edge functions deployed; minimal smoke **PASSED** on **`edgetilt.com`** (Starter monthly Checkout, founding **25% × 12 mo** coupon **`QnYlzKuK`**). Handoff: **`docs/stripe-billing-test-to-prod-handoff.md`**. **Still open on test/prod:** full interval/upgrade/portal smoke matrix on prod; starter weekly drop cron; RLS hardening.
 - 2026-07-01: **Subscribe modal + checkout (code):** **`SubscribeModal`** plan picker (Starter vs Full, monthly/annual Full, early-bird list prices). Edge **`stripe-create-checkout-session`** accepts **`price_interval`** + optional **`STRIPE_COUPON_EARLY_BIRD`**. Test: Dashboard products/prices, Edge secrets, deploy, webhook smoke validated before prod promote.
 - 2026-07-01: **Free tier catalog (code):** **`FREE_GUIDE_SLUGS`** — 14 guides (5 Coin Frenzy, 88 Fortunes Emperor's Coins, AGS/Ainsworth/IGT MHB, World Cruise, Buffalo Link/Cash, Lightning Buffalo Link, Cashman Bingo, Crush Conquest/Dynasty, Dancing Phoenix, Golden Egypt). **`FREE_CALCULATOR_KEYS`** — Buffalo Link + MHB only.

@@ -3,6 +3,11 @@ import {
   requestCfR2DirectUpload,
   uploadFileToCfR2PresignedUrl,
 } from '../../utils/loungeCfImageMedia.js'
+import {
+  clearPendingLegalAcceptance,
+  readPendingLegalAcceptance,
+} from '../legal/legalAcceptance.js'
+import { LEGAL_POLICY_VERSION } from '../legal/legalPolicyVersion.js'
 
 /** Strip invisible chars that often sneak in from mobile paste/autocorrect. */
 const ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF]/g
@@ -311,6 +316,11 @@ export async function saveProfileWithHandleFallback({
       updated_at: nowIso,
       role: 'user',
     }
+    if (readPendingLegalAcceptance()) {
+      insertPayload.terms_accepted_at = nowIso
+      insertPayload.privacy_accepted_at = nowIso
+      insertPayload.legal_policy_version = LEGAL_POLICY_VERSION
+    }
     if (avatarUrl !== undefined) insertPayload.avatar_url = avatarUrl || null
     if (bannerUrl !== undefined) {
       insertPayload.banner_url = bannerUrl || null
@@ -328,6 +338,7 @@ export async function saveProfileWithHandleFallback({
       if (isProfileHandleUniqueViolation(error)) continue
       return { data: null, error }
     }
+    if (readPendingLegalAcceptance() && data?.user_id) clearPendingLegalAcceptance()
     return { data, error: null }
   }
 

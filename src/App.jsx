@@ -15,7 +15,7 @@ import {
   LegalAcceptanceModal,
   parseLegalPathname,
   recordLegalAcceptance,
-  profileNeedsLegalAcceptance,
+  shouldShowLegalAcceptanceModal,
   markPendingLegalAcceptance,
   readPendingLegalAcceptance,
   markLegalReturnContext,
@@ -243,7 +243,7 @@ function App() {
           return
         }
       }
-      const needs = await profileNeedsLegalAcceptance(supabase, user.id)
+      const needs = await shouldShowLegalAcceptanceModal(supabase, user.id)
       if (!cancelled) setLegalAcceptancePending(needs)
     }
     void syncLegalAcceptance()

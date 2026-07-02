@@ -194,9 +194,8 @@ Suggested future tightening:
 
 Already planned for Slot Pro backlog; prod cutover reminders:
 
-- [ ] Hosted **Terms**, **Privacy**, **Community guidelines** URLs (counsel-reviewed; entity **Quantum Capital Ventures, LLC, Wyoming** per your backlog).
-- [x] In-app **`/terms`** + **`/privacy`** pages + signup acceptance (migration **`20260627200000_profiles_legal_acceptance.sql`**). **Counsel review still recommended** before prod.
-- [x] In-app **`/guidelines`** (Community Guidelines). Counsel review still recommended before prod.
+- [x] Public legal URLs on **`edgetilt.com`** — **`/terms`**, **`/privacy`**, **`/guidelines`** (in-app routes; no separate static legal site required). Counsel-reviewed; entity **Quantum Capital Ventures, LLC, Wyoming** (Ryan sign-off **2026-07-01**).
+- [x] Signup acceptance + **`profiles`** legal timestamps (migration **`20260627200000_profiles_legal_acceptance.sql`**).
 
 ---
 

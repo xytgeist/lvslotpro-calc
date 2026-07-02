@@ -9,7 +9,7 @@ const PENDING_ACCEPT_STORAGE_KEY = 'lvslotpro-legal-pending-accept:v1'
 export async function recordLegalAcceptance(supabaseClient, userId) {
   if (!supabaseClient || !userId) return { error: new Error('Missing client or user') }
   const now = new Date().toISOString()
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from('profiles')
     .update({
       terms_accepted_at: now,
@@ -18,7 +18,10 @@ export async function recordLegalAcceptance(supabaseClient, userId) {
       updated_at: now,
     })
     .eq('user_id', userId)
+    .select('user_id')
+    .maybeSingle()
   if (error) return { error }
+  if (!data?.user_id) return { error: new Error('Profile row missing for legal acceptance') }
   clearPendingLegalAcceptance()
   return { error: null }
 }
@@ -29,7 +32,6 @@ export async function recordLegalAcceptance(supabaseClient, userId) {
  */
 export async function profileNeedsLegalAcceptance(supabaseClient, userId) {
   if (!supabaseClient || !userId) return false
-  if (readPendingLegalAcceptance()) return true
   const { data, error } = await supabaseClient
     .from('profiles')
     .select('terms_accepted_at, privacy_accepted_at, legal_policy_version')
@@ -38,14 +40,21 @@ export async function profileNeedsLegalAcceptance(supabaseClient, userId) {
   if (error) {
     const code = String(error.code || '')
     if (code === '42703' || /legal_policy_version|terms_accepted_at/i.test(String(error.message || ''))) {
-      return Boolean(readPendingLegalAcceptance())
+      return false
     }
     return false
   }
-  if (!data) return Boolean(readPendingLegalAcceptance())
+  if (!data) return false
   if (!data.terms_accepted_at || !data.privacy_accepted_at) return true
   if (data.legal_policy_version !== LEGAL_POLICY_VERSION) return true
   return false
+}
+
+/** Blocking modal: policy re-acceptance only (not signup checkbox flow). */
+export async function shouldShowLegalAcceptanceModal(supabaseClient, userId) {
+  if (!supabaseClient || !userId) return false
+  if (readPendingLegalAcceptance()) return false
+  return profileNeedsLegalAcceptance(supabaseClient, userId)
 }
 
 export function markPendingLegalAcceptance() {
