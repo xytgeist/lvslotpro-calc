@@ -853,7 +853,7 @@ export default function SubscribeModal({
                 type="button"
                 disabled={busy || (hasSlotsEdgeStarter && starterSelected)}
                 onClick={() => void handleCheckout()}
-                className="mt-4 w-full min-h-12 shrink-0 rounded-2xl bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 disabled:opacity-50 font-bold text-white touch-manipulation shadow-[0_8px_28px_rgba(6,182,212,0.28)]"
+                className="subscribe-modal-checkout-btn mt-4 w-full min-h-12 shrink-0 rounded-2xl bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 disabled:opacity-50 font-bold text-white touch-manipulation shadow-[0_8px_28px_rgba(6,182,212,0.28)]"
               >
                 {busy ? 'Redirecting to Stripe…' : checkoutLabel}
               </button>

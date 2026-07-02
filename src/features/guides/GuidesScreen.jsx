@@ -792,13 +792,19 @@ function GuideLockedPaywallOverlay({ onUnlock, upgradeMode = false }) {
       <GuideLockTvSnowCanvas className="guide-lock-glitch__tv-snow pointer-events-none absolute inset-0 overflow-hidden" />
       <div className="relative z-10 flex max-w-[16rem] flex-col items-center gap-3 text-center">
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl border shadow-[0_0_22px_rgba(255,255,255,0.08)] backdrop-blur-[2px] ${
+          className={[
+            'guide-lock-icon flex h-10 w-10 items-center justify-center rounded-2xl border backdrop-blur-[2px]',
             upgradeMode
-              ? 'border-cyan-500/40 bg-cyan-500/10 shadow-[0_0_22px_rgba(6,182,212,0.14)]'
-              : 'border-white/20 bg-white/5'
-          }`}
+              ? 'guide-lock-icon--upgrade border-cyan-500/40 bg-cyan-500/10 shadow-[0_0_22px_rgba(6,182,212,0.14)]'
+              : 'border-white/20 bg-white/5 shadow-[0_0_22px_rgba(255,255,255,0.08)]',
+          ].join(' ')}
         >
-          <NavLockGlyph className={`h-4 w-4 ${upgradeMode ? 'text-cyan-100/95' : 'text-white/90'}`} />
+          <NavLockGlyph
+            className={[
+              'guide-lock-icon-glyph h-4 w-4',
+              upgradeMode ? 'text-cyan-100/95' : 'text-white/90',
+            ].join(' ')}
+          />
         </div>
         <div>
           <p className="text-sm font-semibold leading-snug text-zinc-100 drop-shadow-[0_1px_8px_rgba(0,0,0,0.85)]">
