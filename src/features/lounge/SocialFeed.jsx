@@ -16,6 +16,12 @@ import {
 } from '../profiles/profileGate'
 import ProfileHandleConflictDialog from '../profiles/ProfileHandleConflictDialog.jsx'
 import { Z_APP_MODAL } from '../../constants/appZIndex.js'
+import {
+  IN_APP_TOAST_STACKED_TOP,
+  IN_APP_TOAST_STATUS_PILL_CYAN,
+  IN_APP_TOAST_STATUS_PILL_EMERALD,
+  IN_APP_TOAST_TOP,
+} from '../../constants/inAppToastLayout.js'
 import { adminSetProfileRole } from '../profiles/adminSetProfileRole.js'
 import {
   collectLoungePostInteractionHydrateIds,
@@ -13211,8 +13217,9 @@ export default function SocialFeed({
         <div
           role="status"
           aria-live="polite"
-          className={`pointer-events-none fixed left-1/2 w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-cyan-500/50 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-cyan-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
-          style={{ top: 'max(0.5rem, env(safe-area-inset-top))' }}
+          data-in-app-toast
+          className={`${IN_APP_TOAST_STATUS_PILL_CYAN} ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
+          style={{ top: IN_APP_TOAST_TOP }}
         >
           Sending your quote... You&apos;ll have 30 minutes to edit after it posts.
         </div>
@@ -13221,11 +13228,10 @@ export default function SocialFeed({
         <div
           role="status"
           aria-live="polite"
-          className={`pointer-events-none fixed left-1/2 w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-cyan-500/50 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-cyan-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
+          data-in-app-toast
+          className={`${IN_APP_TOAST_STATUS_PILL_CYAN} ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
           style={{
-            top: quoteRepostQueuedToast
-              ? 'max(4.25rem, calc(0.5rem + 3.25rem + env(safe-area-inset-top)))'
-              : 'max(0.5rem, env(safe-area-inset-top))',
+            top: quoteRepostQueuedToast ? IN_APP_TOAST_STACKED_TOP : IN_APP_TOAST_TOP,
           }}
         >
           Sending your reply… You&apos;ll have 30 minutes to edit after it posts.
@@ -13235,12 +13241,13 @@ export default function SocialFeed({
         <div
           role="status"
           aria-live="polite"
-          className={`pointer-events-none fixed left-1/2 w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 rounded-xl border border-emerald-500/45 bg-zinc-950/92 px-3 py-2.5 text-center text-[14px] font-medium leading-snug text-emerald-100 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
+          data-in-app-toast
+          className={`${IN_APP_TOAST_STATUS_PILL_EMERALD} ${loungePostDetailAboveProfile ? 'z-[107]' : 'z-[102]'}`}
           style={{
             top:
               quoteRepostQueuedToast || loungeDetailCommentQueuedToast
-                ? 'max(4.25rem, calc(0.5rem + 3.25rem + env(safe-area-inset-top)))'
-                : 'max(0.5rem, env(safe-area-inset-top))',
+                ? IN_APP_TOAST_STACKED_TOP
+                : IN_APP_TOAST_TOP,
           }}
         >
           {loungeShareFlash}

@@ -540,6 +540,12 @@ export default function SubscribeModal({
               <h2 id="subscribe-modal-title" className="text-lg font-bold tracking-tight text-white sm:text-xl">
                 {hasSlotsEdgeLifetime ? 'You have Slots Edge Lifetime' : 'Choose your Edge AP Slots plan'}
               </h2>
+              {!hasSlotsEdgeLifetime ? (
+                <p className="subscribe-modal-tagline mt-2 text-[13px] leading-snug text-zinc-400 sm:text-sm sm:leading-relaxed">
+                  Yes, you can beat slots. Edge is the most comprehensive AP slots program on the market. Learn the
+                  secrets that have made us millions.
+                </p>
+              ) : null}
             </div>
             <button
               type="button"

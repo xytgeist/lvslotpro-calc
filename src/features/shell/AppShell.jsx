@@ -42,6 +42,11 @@ import { shouldShowLoungeColdBootSplash } from '../../utils/loungeColdBootSplash
 import { Z_APP_ALERT } from '../../constants/appZIndex.js'
 import LoungeActivityInAppToast from '../lounge/LoungeActivityInAppToast.jsx'
 import {
+  IN_APP_TOAST_ACCESS_BANNER,
+  IN_APP_TOAST_ACCESS_BANNER_TEXT,
+  IN_APP_TOAST_ACCESS_WIDTH,
+} from '../../constants/inAppToastLayout.js'
+import {
   loungeActivityInAppPayloadFromMessage,
   navigateFromLoungeActivityPayload,
 } from '../../utils/loungeActivityInAppNavigate.js'
@@ -1614,8 +1619,8 @@ export default function AppShell({
           data-access-notice
           className="pointer-events-none fixed inset-x-0 top-0 z-[94] flex justify-center px-3 pt-[max(0.5rem,env(safe-area-inset-top))]"
         >
-          <div className="access-notice-banner w-[min(calc(100vw-1.5rem),20rem)] rounded-xl border border-cyan-500/45 bg-cyan-950/95 px-3 py-2 text-center shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md">
-            <p className="access-notice-banner-text text-[12px] font-medium leading-snug text-cyan-100">
+          <div className={`${IN_APP_TOAST_ACCESS_BANNER} ${IN_APP_TOAST_ACCESS_WIDTH}`}>
+            <p className={IN_APP_TOAST_ACCESS_BANNER_TEXT}>
               {accessNotice}
             </p>
           </div>
