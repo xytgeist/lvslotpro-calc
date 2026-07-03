@@ -23,7 +23,7 @@ import {
   lastRegularSessionLabel,
   regularSessionDaysBack,
 } from './usEquityMarketSession.ts'
-import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooResolveUsEquityCashtag, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
+import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooResolveUsEquityCashtag, yahooStockAllTimeCandles, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
 import { isCommonCryptoCashtag, coingeckoCoinIdForTicker } from './marketCashtagCrypto.ts'
 
 export type MarketProfile = {
@@ -38,7 +38,7 @@ export type MarketProfile = {
 export type MarketBar = MarketBarOhlc
 export type MarketAssetClass = 'stock' | 'crypto'
 export type MarketEmbedKind = 'rolling' | 'historical'
-export type MarketWindowKey = '1h' | '24h' | '3d' | '1w' | '1m' | '3m' | '6m' | '1y' | 'ytd'
+export type MarketWindowKey = '1h' | '24h' | '3d' | '1w' | '1m' | '3m' | '6m' | '1y' | 'ytd' | 'all'
 
 export type MarketEmbed = {
   symbol: string
@@ -292,6 +292,8 @@ export function windowRange(windowKey: MarketWindowKey): {
       return { fromSec: now - 183 * day, toSec: now, resolution: 'D' }
     case '1y':
       return { fromSec: now - 365 * day, toSec: now, resolution: 'D' }
+    case 'all':
+      return { fromSec: now - MARKET_HISTORY_MAX_LOOKBACK_SEC, toSec: now, resolution: 'W' }
     case 'ytd': {
       const y = new Date().getUTCFullYear()
       return { fromSec: Math.floor(Date.UTC(y, 0, 1) / 1000), toSec: now, resolution: 'D' }
@@ -381,6 +383,7 @@ const RESOLUTION_FALLBACKS: Record<MarketWindowKey, string[]> = {
   '6m': ['D'],
   '1y': ['D'],
   'ytd': ['D'],
+  all: ['W', 'D'],
 }
 
 function parseFinnhubCandlePayload(data: unknown): MarketBar[] {
@@ -592,6 +595,20 @@ async function resolveStockQuarterlyBars(symbol: string): Promise<MarketBar[]> {
   return []
 }
 
+/** Modal ALL path — max available history (weekly/monthly), not 1Y daily. */
+async function resolveStockAllTimeBars(symbol: string): Promise<MarketBar[]> {
+  const yahoo = await yahooStockAllTimeCandles(symbol)
+  if (yahoo.length >= 12) return normalizeMarketBars(yahoo)
+
+  const { fromSec, toSec } = windowRange('all')
+  const bars = await yahooStockCandles(symbol, fromSec, toSec, '1wk')
+  if (bars.length >= 12) return normalizeMarketBars(bars)
+
+  const finnhub = await finnhubCandles(symbol, 'stock', 'all')
+  if (finnhub.length >= 12) return normalizeMarketBars(finnhub)
+  return []
+}
+
 export async function resolveMarketBars(
   symbol: string,
   assetClass: MarketAssetClass,
@@ -610,6 +627,9 @@ export async function resolveMarketBars(
   }
   if (assetClass === 'stock' && windowKey === '3m') {
     return resolveStockQuarterlyBars(symbol)
+  }
+  if (assetClass === 'stock' && windowKey === 'all') {
+    return resolveStockAllTimeBars(symbol)
   }
 
   let bars = await finnhubCandles(symbol, assetClass, windowKey)

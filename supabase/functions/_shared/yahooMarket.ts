@@ -294,6 +294,8 @@ export function yahooIntervalForWindow(windowKey: string): string {
       return '1h'
     case '3m':
       return '1d'
+    case 'all':
+      return '1wk'
     default:
       return '1d'
   }
@@ -468,4 +470,27 @@ export async function yahooStockQuarterlyDailyCandles(symbol: string): Promise<Y
 
   const now = Math.floor(Date.now() / 1000)
   return yahooStockCandles(symbol, now - 90 * 86400, now, '1d')
+}
+
+/** Modal ALL — Yahoo `range=max` (falls back to 10y/5y), weekly or monthly bars. */
+export async function yahooStockAllTimeCandles(symbol: string): Promise<YahooBar[]> {
+  const ticker = yahooTicker(symbol)
+  if (!ticker) return []
+
+  const attempts: Array<[string, string]> = [
+    ['max', '1mo'],
+    ['10y', '1wk'],
+    ['5y', '1wk'],
+  ]
+  for (const [range, interval] of attempts) {
+    const url = new URL(`${YAHOO_CHART}/${encodeURIComponent(ticker)}`)
+    url.searchParams.set('range', range)
+    url.searchParams.set('interval', interval)
+    url.searchParams.set('includePrePost', 'false')
+    const bars = await fetchYahooChartUrl(url)
+    if (bars.length >= 12) return downsampleBars(bars, MAX_BARS)
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  return downsampleBars(await yahooStockCandles(symbol, now - 20 * 365 * 86400, now, '1wk'), MAX_BARS)
 }

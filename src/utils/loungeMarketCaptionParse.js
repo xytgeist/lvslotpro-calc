@@ -230,6 +230,8 @@ export function marketWindowRangeSec(windowKey) {
       return { fromSec: now - 183 * day, toSec: now }
     case '1y':
       return { fromSec: now - 365 * day, toSec: now }
+    case 'all':
+      return { fromSec: now - 20 * 365 * day, toSec: now }
     case 'ytd': {
       const y = new Date().getUTCFullYear()
       return { fromSec: Math.floor(Date.UTC(y, 0, 1) / 1000), toSec: now }
@@ -515,7 +517,7 @@ export const MARKET_MODAL_TIMEFRAMES = [
   { label: '1M', windowKey: '1m', kind: 'historical' },
   { label: '3M', windowKey: '3m', kind: 'historical' },
   { label: '1Y', windowKey: '1y', kind: 'historical' },
-  { label: 'ALL', windowKey: '1y', kind: 'historical' },
+  { label: 'ALL', windowKey: 'all', kind: 'historical' },
 ]
 
 /** Default modal tab on open - `1D`. */

@@ -260,6 +260,8 @@ export function coingeckoOhlcDaysForWindow(windowKey: string): '1' | '7' | '14' 
     case '1y':
     case 'ytd':
       return '365'
+    case 'all':
+      return '365'
     default:
       return '1'
   }
@@ -384,7 +386,7 @@ async function coingeckoCryptoCloseCandles(coinId: string, windowKey: string): P
 }
 
 /** CoinGecko `market_chart` days param for a window key. */
-export function coingeckoDaysForWindow(windowKey: string): number {
+export function coingeckoDaysForWindow(windowKey: string): number | 'max' {
   switch (windowKey) {
     case '1h':
     case '24h':
@@ -401,6 +403,8 @@ export function coingeckoDaysForWindow(windowKey: string): number {
       return 180
     case '1y':
       return 365
+    case 'all':
+      return 'max'
     case 'ytd': {
       const y = new Date().getUTCFullYear()
       const start = Date.UTC(y, 0, 1)
@@ -471,6 +475,10 @@ export async function coingeckoCryptoCandles(
 ): Promise<MarketBarOhlc[]> {
   const coinId = await coingeckoResolveCoinId(symbol, coinIdHint)
   if (!coinId) return []
+
+  if (windowKey === 'all') {
+    return coingeckoCryptoCloseCandles(coinId, 'all')
+  }
 
   const ohlc = await coingeckoCryptoOhlcCandles(coinId, windowKey)
   if (ohlc.length >= 2) return ohlc
