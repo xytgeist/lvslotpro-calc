@@ -47,6 +47,17 @@ const PAGE_SIZE = 50
 const IS_ANDROID = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
 const IS_IOS =
   typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+/** Chat composer uses contentEditable; textarea/input-only checks miss keyboard focus. */
+function chatComposerFieldFocused(composer) {
+  if (!composer) return false
+  const ae = document.activeElement
+  if (ae instanceof HTMLElement && composer.contains(ae)) {
+    if (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT') return true
+    if (ae.isContentEditable) return true
+  }
+  return false
+}
 /** Show scroll-to-bottom when this many newer messages are off-screen. */
 const SCROLL_UP_MSG_THRESHOLD = 20
 const REACTION_LIMIT = 3
@@ -741,8 +752,7 @@ export default function ChatConversation({
     const list = listRef.current
     if (!list) return
     const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80
-    const tag = document.activeElement?.tagName
-    const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
+    const inputFocused = chatComposerFieldFocused(composerBarRef.current)
     if (!force && !atBottomRef.current && !nearBottom && !inputFocused) return
 
     const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight)
@@ -786,8 +796,7 @@ export default function ChatConversation({
   /** True while composer/keyboard owns tail position - open-scroll must not fight it. */
   const isComposerKeyboardActive = useCallback(() => {
     if (composerFocusedRef.current) return true
-    const tag = document.activeElement?.tagName
-    if (tag === 'TEXTAREA' || tag === 'INPUT') return true
+    if (chatComposerFieldFocused(composerBarRef.current)) return true
     return kbTargetRef.current > iosSafeBottomRef.current + 2
   }, [])
 
@@ -1679,7 +1688,7 @@ export default function ChatConversation({
     const composer = composerBarRef.current
     if (!composer) return
     const sync = () => {
-      setComposerFocused(Boolean(composer.querySelector('textarea:focus, input:focus')))
+      setComposerFocused(chatComposerFieldFocused(composer))
     }
     const onFocusOut = () => requestAnimationFrame(sync)
     composer.addEventListener('focusin', sync)
@@ -1696,7 +1705,12 @@ export default function ChatConversation({
     if (!composer) return undefined
 
     const onFocusIn = (e) => {
-      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+      const t = e.target
+      if (
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLInputElement ||
+        (t instanceof HTMLElement && t.isContentEditable)
+      ) {
         composerFocusedRef.current = true
         openScrollPendingRef.current = false
         if (IS_IOS) pinIosKeyboardFrame()
@@ -1707,7 +1721,7 @@ export default function ChatConversation({
 
     const onFocusOut = () => {
       requestAnimationFrame(() => {
-        composerFocusedRef.current = Boolean(composer.querySelector('textarea:focus, input:focus'))
+        composerFocusedRef.current = chatComposerFieldFocused(composer)
       })
     }
 
@@ -1716,7 +1730,7 @@ export default function ChatConversation({
 
     const vv = window.visualViewport
     const onVvChange = () => {
-      if (!composerFocusedRef.current && !composer.querySelector('textarea:focus, input:focus')) return
+      if (!composerFocusedRef.current && !chatComposerFieldFocused(composer)) return
       if (IS_IOS) pinIosKeyboardFrame()
       else runTailPinFollow()
     }
@@ -1755,7 +1769,7 @@ export default function ChatConversation({
     syncInset()
     const ro = new ResizeObserver(() => {
       syncInset()
-      if (!composer.querySelector('textarea:focus, input:focus') && !composerFocusedRef.current) return
+      if (!chatComposerFieldFocused(composer) && !composerFocusedRef.current) return
       if (IS_IOS) pinIosKeyboardFrame()
       else pinListToTail({ force: true })
     })
@@ -1779,8 +1793,7 @@ export default function ChatConversation({
       const growing = h > prevH
       const shrinking = h < prevH
       const preservedGap = keyboardDismissPreserveRef.current
-      const tag = document.activeElement?.tagName
-      const inputFocused = tag === 'TEXTAREA' || tag === 'INPUT'
+      const inputFocused = chatComposerFieldFocused(composerBarRef.current)
 
       if (growing && preservedGap != null) {
         container.scrollTop = container.scrollHeight - container.clientHeight - preservedGap
@@ -1849,8 +1862,7 @@ export default function ChatConversation({
       startScrollTop = el.scrollTop
       startY = e.touches[0]?.clientY ?? 0
       startX = e.touches[0]?.clientX ?? 0
-      const tag = document.activeElement?.tagName
-      keyboardWasOpen = tag === 'TEXTAREA' || tag === 'INPUT'
+      keyboardWasOpen = chatComposerFieldFocused(composerBarRef.current)
     }
 
     const onMove = (e) => {
@@ -1974,8 +1986,13 @@ export default function ChatConversation({
       startScrollTop = listEl.scrollTop
       startY = e.touches[0]?.clientY ?? 0
       startX = e.touches[0]?.clientX ?? 0
-      const tag = document.activeElement?.tagName
-      keyboardWasOpen = tag === 'TEXTAREA' || tag === 'INPUT'
+      const t = e.target
+      if (t instanceof Element && t.closest('[data-chat-send-button]')) {
+        dismissedThisGesture = true
+        keyboardWasOpen = false
+        return
+      }
+      keyboardWasOpen = chatComposerFieldFocused(composerBarRef.current)
     }
 
     const onMove = (e) => {

@@ -707,7 +707,9 @@ export default function ChatComposer({
         {/* Textarea + inline send button */}
         <div
           ref={inputWrapRef}
-          className={`chat-header-glass relative flex flex-1 items-center overflow-hidden ${expanded ? '' : 'h-10'}`}
+          className={`chat-header-glass relative flex flex-1 overflow-hidden ${
+            expanded ? 'items-end' : 'items-center'
+          } ${expanded ? '' : 'h-10'}`}
           style={{ borderRadius: expanded ? COMPOSER_EXPANDED_RADIUS_PX : '9999px' }}
         >
           {/* contentEditable div - lets Android clipboard show images (textarea blocks them) */}
@@ -738,13 +740,12 @@ export default function ChatComposer({
                   }
                 : undefined
             }
-            className={`chat-composer-ce box-border w-full bg-transparent pl-4 text-[16px] text-zinc-100 outline-none ${
+            className={`chat-composer-ce min-w-0 flex-1 box-border bg-transparent pl-4 pr-2 text-[16px] text-zinc-100 outline-none ${
               disabled ? 'opacity-50 pointer-events-none' : ''
             } ${expanded ? 'leading-5 py-2.5' : 'h-full py-0'}`}
             style={{
               maxHeight: COMPOSER_MAX_H,
               overflowY: expanded ? 'auto' : 'hidden',
-              paddingRight: hasContent ? 46 : 12,
               WebkitUserSelect: 'text',
               userSelect: 'text',
               whiteSpace: 'pre-wrap',
@@ -752,31 +753,37 @@ export default function ChatComposer({
             }}
           />
 
-          {/* Send button - appears inside textarea when content exists */}
-          <button
-            type="button"
-            disabled={!canSend}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => void handleSend()}
-            aria-label="Send"
-            className={`absolute right-[5px] z-10 grid h-7 w-7 place-items-center rounded-full touch-manipulation transition-all ${
-              expanded ? 'bottom-1.5' : 'top-1/2 -translate-y-1/2'
-            } ${
-              hasContent
-                ? 'text-white opacity-100 active:opacity-50'
-                : 'pointer-events-none opacity-0'
-            }`}
-            style={hasContent ? { backgroundColor: '#3b82f6' } : undefined}
-          >
-            {sending ? (
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <line x1="12" y1="19" x2="12" y2="5" />
-                <polyline points="5 12 12 5 19 12" />
-              </svg>
-            )}
-          </button>
+          {hasContent ? (
+            <button
+              type="button"
+              disabled={!canSend}
+              data-chat-send-button
+              onPointerDown={(e) => {
+                if (!canSend) return
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!canSend) return
+                void handleSend()
+              }}
+              aria-label="Send"
+              className={`mr-1.5 grid h-10 w-10 shrink-0 place-items-center rounded-full touch-manipulation text-white transition-opacity active:opacity-50 [-webkit-tap-highlight-color:transparent] disabled:opacity-40 ${
+                expanded ? 'mb-1.5' : ''
+              }`}
+              style={{ backgroundColor: '#3b82f6' }}
+            >
+              {sending ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              )}
+            </button>
+          ) : null}
         </div>
       </div>
 
