@@ -22,6 +22,19 @@ export const LOUNGE_SEARCH_PAGE = {
 
 const SEARCH_DEBOUNCE_MS = 300
 
+/** Matches `#tag` body in `loungeCaption.jsx` (`[\p{L}\p{N}_-]+`). */
+const LOUNGE_HASHTAG_BODY_RE = /^[\p{L}\p{N}_-]+$/u
+
+/** Explicit `#tag` in search — tag body for `lounge_search_hashtag_posts`. */
+export function parseHashtagSearchQuery(query) {
+  const raw = String(query || '').trim()
+  if (!raw.startsWith('#')) return null
+  const tag = raw.slice(1).trim()
+  if (!tag || tag.includes(' ') || tag.length > LOUNGE_SEARCH_MAX_CHARS - 1) return null
+  if (!LOUNGE_HASHTAG_BODY_RE.test(tag)) return null
+  return tag
+}
+
 /** Explicit `$AAPL` in search — ticker for `lounge_search_cashtag_posts`. Bare words stay on `lounge_search`. */
 export function parseCashtagSearchQuery(query) {
   const raw = String(query || '').trim()
@@ -32,12 +45,36 @@ export function parseCashtagSearchQuery(query) {
 }
 
 /**
- * Dock search: strict cashtag post lookup when query is `$TICKER`, else bundled `lounge_search`.
+ * Dock search: strict `#tag` / `$TICKER` post lookup, else bundled `lounge_search`.
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {string} query
  * @param {Parameters<typeof loungeSearch>[2]} [opts]
  */
 export async function loungeSearchUnified(supabaseClient, query, opts = {}) {
+  const hashtag = parseHashtagSearchQuery(query)
+  if (hashtag) {
+    const {
+      sort = LOUNGE_SEARCH_SORT.ENGAGEMENT,
+      postsLimit = LOUNGE_SEARCH_PAGE.POSTS,
+      postsOffset = 0,
+    } = opts
+    const result = await loungeSearchHashtagPosts(supabaseClient, hashtag, {
+      sort,
+      limit: postsLimit,
+      offset: postsOffset,
+    })
+    return {
+      posts: result.posts,
+      profiles: [],
+      comments: [],
+      pagination: {
+        postsHasMore: result.pagination.postsHasMore,
+        profilesHasMore: false,
+        commentsHasMore: false,
+      },
+    }
+  }
+
   const cashtag = parseCashtagSearchQuery(query)
   if (cashtag) {
     const {
@@ -220,6 +257,38 @@ export async function loungeSearchCashtagPosts(supabaseClient, cashtag, opts = {
 
   const { data, error } = await supabaseClient.rpc('lounge_search_cashtag_posts', {
     p_cashtag: tag,
+    p_sort: sort,
+    p_limit: limit,
+    p_offset: offset,
+  })
+  if (error) throw error
+
+  const payload = data && typeof data === 'object' ? data : {}
+  const pagination = payload.pagination && typeof payload.pagination === 'object' ? payload.pagination : {}
+
+  return {
+    posts: Array.isArray(payload.posts) ? payload.posts : [],
+    pagination: {
+      postsHasMore: pagination.posts_has_more === true,
+    },
+  }
+}
+
+/**
+ * Strict literal #TAG post search (no fuzzy pg_trgm). Case-insensitive on tag body.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} hashtag Tag with or without leading `#`, e.g. `edgeai`
+ * @param {{ sort?: string, limit?: number, offset?: number }} [opts]
+ */
+export async function loungeSearchHashtagPosts(supabaseClient, hashtag, opts = {}) {
+  const tag = String(hashtag || '').trim()
+  if (!tag) {
+    return { posts: [], pagination: { postsHasMore: false } }
+  }
+  const { sort = LOUNGE_SEARCH_SORT.ENGAGEMENT, limit = LOUNGE_SEARCH_PAGE.POSTS, offset = 0 } = opts
+
+  const { data, error } = await supabaseClient.rpc('lounge_search_hashtag_posts', {
+    p_hashtag: tag,
     p_sort: sort,
     p_limit: limit,
     p_offset: offset,
