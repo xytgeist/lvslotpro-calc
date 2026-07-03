@@ -8,9 +8,12 @@ function formatRemaining(seconds) {
   return `-${m}:${String(r).padStart(2, '0')}`
 }
 
+const SEEK_EPSILON_SEC = 0.04
+const SEEK_TIMEOUT_MS = 380
+
 /**
  * Minimal hero lightbox transport: play/pause + scrubber (video paints behind overlay chrome).
- * Scrubber seeks live while dragging (not only on pointer up).
+ * Live scrub queues seeks (fastSeek when available) so iOS/HLS is not flooded during drag.
  * @param {{ current: HTMLVideoElement | null }} videoRef
  */
 export default function LoungeStreamVideoPlaybackControls({
@@ -26,6 +29,9 @@ export default function LoungeStreamVideoPlaybackControls({
   const [scrubPreview, setScrubPreview] = useState(0)
   const scrubbingRef = useRef(false)
   const wasPlayingBeforeScrubRef = useRef(false)
+  const seekInFlightRef = useRef(false)
+  const pendingSeekTimeRef = useRef(/** @type {number | null} */ (null))
+  const seekFinishTimerRef = useRef(0)
   const rafRef = useRef(0)
 
   const syncDuration = useCallback((v) => {
@@ -39,31 +45,123 @@ export default function LoungeStreamVideoPlaybackControls({
     return Math.max(0, next)
   }, [])
 
-  const seekVideoTo = useCallback(
-    (next, { liveScrub = false } = {}) => {
-      const v = videoRef?.current
-      const t = clampScrubTime(v, next)
-      setScrubPreview(t)
-      if (liveScrub || !scrubbingRef.current) {
-        setCurrentTime(t)
+  const clearSeekFinishTimer = useCallback(() => {
+    if (seekFinishTimerRef.current) {
+      window.clearTimeout(seekFinishTimerRef.current)
+      seekFinishTimerRef.current = 0
+    }
+  }, [])
+
+  const runQueuedSeek = useCallback(() => {
+    const v = videoRef?.current
+    if (!v) {
+      seekInFlightRef.current = false
+      pendingSeekTimeRef.current = null
+      return
+    }
+
+    if (seekInFlightRef.current) return
+
+    const target = pendingSeekTimeRef.current
+    if (target == null) return
+
+    pendingSeekTimeRef.current = null
+    const t = clampScrubTime(v, target)
+    if (Math.abs(v.currentTime - t) <= SEEK_EPSILON_SEC) {
+      if (pendingSeekTimeRef.current != null) runQueuedSeek()
+      return
+    }
+
+    seekInFlightRef.current = true
+    clearSeekFinishTimer()
+
+    const finishSeek = () => {
+      clearSeekFinishTimer()
+      seekInFlightRef.current = false
+      if (pendingSeekTimeRef.current != null) runQueuedSeek()
+    }
+
+    const onSeeked = () => {
+      v.removeEventListener('seeked', onSeeked)
+      finishSeek()
+    }
+
+    v.addEventListener('seeked', onSeeked)
+    seekFinishTimerRef.current = window.setTimeout(onSeeked, SEEK_TIMEOUT_MS)
+
+    try {
+      if (typeof v.fastSeek === 'function') {
+        v.fastSeek(t)
+      } else {
+        v.currentTime = t
       }
-      if (!v) return t
+    } catch {
+      v.removeEventListener('seeked', onSeeked)
+      finishSeek()
+    }
+  }, [videoRef, clampScrubTime, clearSeekFinishTimer])
+
+  const queueVideoSeek = useCallback(
+    (next) => {
+      pendingSeekTimeRef.current = next
+      if (!seekInFlightRef.current) runQueuedSeek()
+    },
+    [runQueuedSeek],
+  )
+
+  const flushVideoSeek = useCallback(
+    (next) => {
+      const v = videoRef?.current
+      if (!v) return
+      pendingSeekTimeRef.current = null
+      clearSeekFinishTimer()
+      seekInFlightRef.current = false
+      const t = clampScrubTime(v, next)
       try {
-        if (Math.abs(v.currentTime - t) > 0.035) {
+        if (typeof v.fastSeek === 'function') {
+          v.fastSeek(t)
+        } else {
           v.currentTime = t
         }
       } catch {
         // ignore
       }
+    },
+    [videoRef, clampScrubTime, clearSeekFinishTimer],
+  )
+
+  const seekVideoTo = useCallback(
+    (next, { liveScrub = false, flush = false } = {}) => {
+      const v = videoRef?.current
+      const t = clampScrubTime(v, next)
+      setScrubPreview(t)
+      if (liveScrub || !scrubbingRef.current || flush) {
+        setCurrentTime(t)
+      }
+      if (!v) return t
+      if (flush) {
+        flushVideoSeek(t)
+      } else {
+        queueVideoSeek(t)
+      }
       return t
     },
-    [videoRef, clampScrubTime],
+    [videoRef, clampScrubTime, queueVideoSeek, flushVideoSeek],
   )
 
   useEffect(() => {
     scrubbingRef.current = scrubbing
     onScrubbingChange?.(scrubbing)
   }, [scrubbing, onScrubbingChange])
+
+  useEffect(
+    () => () => {
+      clearSeekFinishTimer()
+      pendingSeekTimeRef.current = null
+      seekInFlightRef.current = false
+    },
+    [clearSeekFinishTimer],
+  )
 
   useEffect(() => {
     const v = videoRef?.current
@@ -189,7 +287,7 @@ export default function LoungeStreamVideoPlaybackControls({
       e?.stopPropagation?.()
       const fromInput = Number(e?.currentTarget?.value)
       const next = Number.isFinite(fromInput) ? fromInput : scrubPreview
-      seekVideoTo(next)
+      seekVideoTo(next, { flush: true })
       setScrubbing(false)
       const v = videoRef?.current
       if (v && wasPlayingBeforeScrubRef.current) {
@@ -209,6 +307,7 @@ export default function LoungeStreamVideoPlaybackControls({
   const max = duration > 0 ? duration : 1
   const displayTime = scrubbing ? scrubPreview : currentTime
   const remaining = duration > 0 ? duration - displayTime : 0
+  const scrubProgressPct = max > 0 ? Math.min(100, Math.max(0, (displayTime / max) * 100)) : 0
 
   return (
     <div
@@ -244,8 +343,11 @@ export default function LoungeStreamVideoPlaybackControls({
         onPointerUp={finishScrub}
         onPointerCancel={finishScrub}
         aria-label="Video progress"
-        className="min-w-0 flex-1 accent-white"
-        style={{ touchAction: 'none' }}
+        className="lounge-video-scrubber range-touch-target min-w-0 flex-1"
+        style={{
+          touchAction: 'none',
+          ['--lounge-scrub-progress']: `${scrubProgressPct}%`,
+        }}
       />
       <span className="w-10 shrink-0 text-right text-[12px] tabular-nums text-white/90">
         {formatRemaining(remaining)}

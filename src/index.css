@@ -183,6 +183,62 @@ input[type="range"].range-touch-target {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Lounge / chat video lightbox scrubber: white played, dim gray remainder, no thumb knob. */
+input[type="range"].lounge-video-scrubber {
+  --lounge-scrub-played: #ffffff;
+  --lounge-scrub-remaining: rgba(255, 255, 255, 0.32);
+  --lounge-scrub-progress: 0%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"].lounge-video-scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--lounge-scrub-played) 0%,
+    var(--lounge-scrub-played) var(--lounge-scrub-progress),
+    var(--lounge-scrub-remaining) var(--lounge-scrub-progress),
+    var(--lounge-scrub-remaining) 100%
+  );
+}
+
+input[type="range"].lounge-video-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0;
+  height: 0;
+  margin-top: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+input[type="range"].lounge-video-scrubber::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--lounge-scrub-remaining);
+}
+
+input[type="range"].lounge-video-scrubber::-moz-range-progress {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--lounge-scrub-played);
+}
+
+input[type="range"].lounge-video-scrubber::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
 /* Hide browser-native datalist/list picker glyph so custom chevron is the only indicator. */
 input[list]::-webkit-calendar-picker-indicator {
   display: none !important;
