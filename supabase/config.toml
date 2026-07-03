@@ -31,3 +31,7 @@ verify_jwt = false
 # Guide image upload to R2: handles own auth (user JWT admin check OR service-role bearer).
 [functions.guide-cf-r2-upload]
 verify_jwt = false
+
+# Edge Monitor Phase 3: admin JWT + profiles.role check inside function.
+[functions.admin-ops-external-health]
+verify_jwt = true

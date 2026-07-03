@@ -85,17 +85,26 @@ export function opsMonitorHeroKpis(snapshot) {
   ]
 }
 
-/** @param {Array<{ label?: string, day?: string }> | null | undefined} trends */
-export function opsMonitorTrendLabels(trends) {
+/** @param {Array<{ label?: string, day?: string, week_start?: string }> | null | undefined} trends @param {{ every?: number }} [opts] */
+export function opsMonitorTrendLabels(trends, opts = {}) {
   if (!Array.isArray(trends) || trends.length === 0) return []
+  const every = Math.max(1, opts.every || 1)
   return trends.map((row, i) => {
-    const label = String(row.label || '').slice(0, 3)
+    if (every > 1 && i % every !== 0 && i !== trends.length - 1) return ''
+    const label = String(row.label || '').slice(0, 6)
     if (label) return label
     if (row.day) {
       try {
-        return new Date(`${row.day}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3)
+        return new Date(`${row.day}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
       } catch {
         return `D${i + 1}`
+      }
+    }
+    if (row.week_start) {
+      try {
+        return new Date(`${row.week_start}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      } catch {
+        return `W${i + 1}`
       }
     }
     return `D${i + 1}`

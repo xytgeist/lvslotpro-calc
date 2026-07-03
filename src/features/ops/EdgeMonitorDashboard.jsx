@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { APP_BUILD_SHA } from '../../utils/appBuildInfo.js'
 import {
   formatOpsMonitorBreakdown,
   formatOpsMonitorCount,
+  formatOpsMonitorTopQueries,
   opsMonitorSupabaseProjectRef,
 } from './opsMonitorApi.js'
 import {
@@ -10,9 +11,12 @@ import {
   MonitorCompareBars,
   MonitorDoughnutChart,
   MonitorPulseChart,
+  MonitorSparklineChart,
   breakdownToDoughnut,
   buildPulseDatasets,
 } from './OpsMonitorCharts.jsx'
+import { evaluateOpsMonitorAlerts } from './opsMonitorAlerts.js'
+import { opsMonitorRunbookById, opsMonitorRunbooksForSection } from './opsMonitorRunbooks.js'
 import {
   OPS_CHART_COLORS,
   OPS_SECTION_THEMES,
@@ -21,6 +25,8 @@ import {
   opsMonitorTrendSeries,
 } from './opsMonitorTheme.js'
 import { useEdgeMonitorSnapshot } from './useEdgeMonitorSnapshot.js'
+import { useEdgeMonitorExternalHealth } from './useEdgeMonitorExternalHealth.js'
+import { useEdgeMonitorLivePulse } from './useEdgeMonitorLivePulse.js'
 import { EDGE_MONITOR_PATH } from './opsMonitorNavigation.js'
 
 function HeroKpiCard({ kpi, compact = false }) {
@@ -63,7 +69,28 @@ function MetricTile({ label, value, hint = '', accent = OPS_CHART_COLORS.cyan })
   )
 }
 
-function MonitorSection({ themeKey, title, subtitle, chart = null, children, className = '' }) {
+function RunbookLinks({ sectionKey }) {
+  const books = opsMonitorRunbooksForSection(sectionKey)
+  if (!books.length) return null
+  return (
+    <div className="mt-3 flex flex-wrap gap-2 col-span-2 sm:col-span-3">
+      {books.map((book) => (
+        <a
+          key={book.id}
+          href={book.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-lg bg-zinc-950/60 px-2.5 py-1 text-[10px] font-semibold text-cyan-300 ring-1 ring-cyan-500/25 hover:bg-zinc-900"
+          title={book.hint || book.title}
+        >
+          {book.title} ↗
+        </a>
+      ))}
+    </div>
+  )
+}
+
+function MonitorSection({ themeKey, title, subtitle, chart = null, children, className = '', showRunbooks = true }) {
   const theme = OPS_SECTION_THEMES[themeKey] || OPS_SECTION_THEMES.ops
   return (
     <section
@@ -89,19 +116,178 @@ function MonitorSection({ themeKey, title, subtitle, chart = null, children, cla
         </div>
         {chart ? <div className="mb-3">{chart}</div> : null}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{children}</div>
+        {showRunbooks ? <RunbookLinks sectionKey={themeKey} /> : null}
       </div>
     </section>
   )
 }
 
-const PLANNED_METRICS = [
-  'Sentry error rate + release health',
-  'Stripe MRR / churn dashboard',
-  'Cloudflare Stream pending uploads',
-  'Edge Function latency + deploy versions',
-  'Market API quota (Finnhub / CoinGecko)',
-  'Freemium lock → subscribe funnel',
-]
+function LivePulseStrip({ live, error }) {
+  if (error) {
+    return (
+      <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/30 px-4 py-2 text-amber-100 text-xs">
+        Live pulse unavailable ... apply migration <span className="font-mono">20260703120000</span>.
+      </div>
+    )
+  }
+  if (!live) return null
+  return (
+    <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {[
+        { label: 'Activity / min', value: live.rate_per_min, accent: OPS_CHART_COLORS.purple },
+        { label: 'Activity 1m', value: live.events_1m, accent: OPS_CHART_COLORS.cyan },
+        { label: 'Posts 1m', value: live.posts_1m, accent: OPS_CHART_COLORS.green },
+        { label: 'Chat 1m', value: live.chat_messages_1m, accent: OPS_CHART_COLORS.orange },
+      ].map((item) => (
+        <div
+          key={item.label}
+          className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-2"
+          style={{ borderLeftWidth: 3, borderLeftColor: `${item.accent}88` }}
+        >
+          <div className="text-[10px] uppercase tracking-wide text-zinc-500">{item.label}</div>
+          <div className="text-white text-lg font-bold tabular-nums">{formatOpsMonitorCount(item.value)}</div>
+          <div className="text-[10px] text-zinc-600">poll ~15s</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AlertsBanner({ alerts }) {
+  if (!alerts?.length) return null
+  return (
+    <div className="mb-4 space-y-2">
+      {alerts.map((alert) => (
+        <div
+          key={alert.id}
+          className={`rounded-2xl border px-4 py-3 text-sm flex flex-wrap items-start justify-between gap-2 ${
+            alert.severity === 'critical'
+              ? 'border-red-500/40 bg-red-950/40 text-red-100'
+              : 'border-amber-500/35 bg-amber-950/30 text-amber-100'
+          }`}
+        >
+          <div>
+            <div className="font-bold">{alert.label}</div>
+            <div className="text-xs opacity-80 mt-0.5">{alert.message}</div>
+          </div>
+          {alert.runbookId ? (
+            <a
+              href={opsMonitorRunbookById(alert.runbookId)?.href || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-lg bg-black/25 px-2.5 py-1 text-[11px] font-semibold ring-1 ring-white/10 hover:bg-black/40"
+            >
+              Runbook ↗
+            </a>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ExternalHealthPanel({ external, loading, error, onReload }) {
+  const probes = external?.probes || {}
+  const links = external?.links || {}
+  const cards = [
+    {
+      key: 'stripe',
+      title: 'Stripe',
+      probe: probes.stripe,
+      href: links.stripe || probes.stripe?.dashboard_url,
+    },
+    {
+      key: 'sentry',
+      title: 'Sentry',
+      probe: probes.sentry,
+      href: links.sentry || probes.sentry?.dashboard_url,
+    },
+    {
+      key: 'cloudflare',
+      title: 'Cloudflare Stream',
+      probe: probes.cloudflare,
+      href: links.cloudflare_stream || probes.cloudflare?.dashboard_url,
+    },
+    {
+      key: 'vercel',
+      title: 'Vercel',
+      probe: probes.vercel,
+      href: links.vercel || probes.vercel?.dashboard_url,
+    },
+    {
+      key: 'supabase',
+      title: 'Supabase',
+      probe: probes.supabase,
+      href: links.supabase || probes.supabase?.dashboard_url,
+    },
+  ]
+
+  return (
+    <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4 lg:p-5 lg:col-span-2">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-white font-bold text-[15px]">External health</div>
+          <div className="text-zinc-500 text-xs mt-0.5">Dashboard links + optional server probes (Phase 3)</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void onReload()}
+          disabled={loading}
+          className="min-h-8 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold disabled:opacity-50"
+        >
+          {loading ? 'Probing…' : 'Re-probe'}
+        </button>
+      </div>
+      {error ? (
+        <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-amber-100 text-xs">
+          {error} ... deploy Edge fn <span className="font-mono">admin-ops-external-health</span>.
+        </div>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map(({ key, title, probe, href }) => (
+          <div key={key} className="rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-3 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-white text-sm font-bold">{title}</div>
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-semibold text-cyan-300 hover:text-cyan-200"
+                >
+                  Open ↗
+                </a>
+              ) : null}
+            </div>
+            <div className="mt-2 text-[11px] text-zinc-400 leading-relaxed">
+              {!probe?.configured && key !== 'vercel' && key !== 'supabase' ? (
+                <span>Probe not configured on Edge.</span>
+              ) : null}
+              {key === 'stripe' && probe?.configured ? (
+                <span>
+                  Active ~{formatOpsMonitorCount(probe.subscriptions_active)} · past due{' '}
+                  {formatOpsMonitorCount(probe.subscriptions_past_due)}
+                </span>
+              ) : null}
+              {key === 'sentry' && probe?.configured && probe.ok ? (
+                <span>Unresolved: {formatOpsMonitorCount(probe.unresolved_issues)}</span>
+              ) : null}
+              {key === 'cloudflare' && probe?.configured && probe.ok ? (
+                <span>Pending uploads: {formatOpsMonitorCount(probe.pending_uploads)}</span>
+              ) : null}
+              {key === 'vercel' ? <span>Deploy SHA in header badge.</span> : null}
+              {key === 'supabase' ? (
+                <span>Project {probe?.project_ref || opsMonitorSupabaseProjectRef()}</span>
+              ) : null}
+              {probe?.error ? <span className="text-amber-300">{probe.error}</span> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+      <RunbookLinks sectionKey="external" />
+    </section>
+  )
+}
 
 /**
  * @param {{
@@ -120,7 +306,13 @@ export default function EdgeMonitorDashboard({
   headerSlot = null,
 }) {
   const isDesktop = layout === 'desktop'
-  const { snapshot, loading, error, refreshing, load } = useEdgeMonitorSnapshot(supabaseClient)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const { snapshot, loading, error, refreshing, load } = useEdgeMonitorSnapshot(supabaseClient, {
+    autoRefreshMs: autoRefresh ? 90_000 : 0,
+  })
+  const { external, loading: externalLoading, error: externalError, reload: reloadExternal } =
+    useEdgeMonitorExternalHealth(supabaseClient)
+  const { live, error: liveError } = useEdgeMonitorLivePulse(supabaseClient, { enabled: Boolean(snapshot) })
 
   const generatedAt = snapshot?.generated_at
     ? new Date(snapshot.generated_at).toLocaleString(undefined, {
@@ -147,10 +339,21 @@ export default function EdgeMonitorDashboard({
   const activity = snapshot?.activity || {}
   const stripeWebhooks = snapshot?.stripe_webhooks || {}
   const trends = snapshot?.trends
+  const trends30d = snapshot?.trends_30d
+  const trends90d = snapshot?.trends_90d
+  const freemiumFunnel = snapshot?.freemium_funnel || {}
+  const topQueries7d = search.top_queries_7d
+  const topQueries30d = search.top_queries_30d
 
   const heroKpis = useMemo(() => opsMonitorHeroKpis(snapshot), [snapshot])
   const trendLabels = useMemo(() => opsMonitorTrendLabels(trends), [trends])
+  const trendLabels30d = useMemo(() => opsMonitorTrendLabels(trends30d, { every: 5 }), [trends30d])
+  const trendLabels90d = useMemo(() => opsMonitorTrendLabels(trends90d, { every: 2 }), [trends90d])
   const pulseDatasets = useMemo(() => buildPulseDatasets(trends), [trends])
+  const alerts = useMemo(
+    () => evaluateOpsMonitorAlerts({ snapshot, external, live }),
+    [snapshot, external, live],
+  )
 
   const roleDoughnut = useMemo(
     () =>
@@ -329,6 +532,18 @@ export default function EdgeMonitorDashboard({
         <MetricTile label="Rate hits 24h" value={formatOpsMonitorCount(rateLimits.events_24h)} accent={OPS_CHART_COLORS.red} />
         <MetricTile label="Rate hits 7d" value={formatOpsMonitorCount(rateLimits.events_7d)} />
         <MetricTile label="Kinds 24h" value={formatOpsMonitorBreakdown(rateLimits.by_kind_24h, 'count')} />
+        <div className="col-span-2 sm:col-span-3 rounded-2xl bg-zinc-950/45 border border-zinc-800/70 px-3 py-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Top queries 7d</div>
+          <pre className="text-zinc-300 text-[11px] whitespace-pre-wrap font-sans leading-relaxed">
+            {formatOpsMonitorTopQueries(topQueries7d)}
+          </pre>
+        </div>
+        <div className="col-span-2 sm:col-span-3 rounded-2xl bg-zinc-950/45 border border-zinc-800/70 px-3 py-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Top queries 30d</div>
+          <pre className="text-zinc-300 text-[11px] whitespace-pre-wrap font-sans leading-relaxed">
+            {formatOpsMonitorTopQueries(topQueries30d)}
+          </pre>
+        </div>
       </MonitorSection>
 
       <MonitorSection
@@ -354,15 +569,26 @@ export default function EdgeMonitorDashboard({
         <MetricTile label="Members" value={formatOpsMonitorCount(chat.members_total)} />
       </MonitorSection>
 
-      <MonitorSection themeKey="tools" title="Guides & tools" subtitle="Catalog + session tools" className="mb-0">
+      <MonitorSection themeKey="tools" title="Guides & freemium funnel" subtitle="Catalog + cap pressure (8/9/10)" className="mb-0">
         <MetricTile label="Guides live" value={formatOpsMonitorCount(guides.published)} accent={OPS_CHART_COLORS.pink} />
         <MetricTile label="Drafts" value={formatOpsMonitorCount(guides.unpublished)} />
         <MetricTile label="Machines" value={formatOpsMonitorCount(guides.machines_total)} />
+        <MetricTile label="Limited users" value={formatOpsMonitorCount(freemiumFunnel.limited_users)} accent={OPS_CHART_COLORS.yellow} />
+        <MetricTile
+          label="Bankroll @ cap"
+          value={formatOpsMonitorCount(freemiumFunnel.bankroll?.at_10)}
+          hint={`8: ${formatOpsMonitorCount(freemiumFunnel.bankroll?.at_8)} · 9: ${formatOpsMonitorCount(freemiumFunnel.bankroll?.at_9)}`}
+          accent={OPS_CHART_COLORS.red}
+        />
+        <MetricTile
+          label="Play log @ cap"
+          value={formatOpsMonitorCount(freemiumFunnel.play_log?.at_10)}
+          hint={`8: ${formatOpsMonitorCount(freemiumFunnel.play_log?.at_8)} · 9: ${formatOpsMonitorCount(freemiumFunnel.play_log?.at_9)}`}
+          accent={OPS_CHART_COLORS.orange}
+        />
         <MetricTile label="Bankroll sessions" value={formatOpsMonitorCount(bankroll.sessions_total)} />
         <MetricTile label="Bankroll 7d" value={formatOpsMonitorCount(bankroll.sessions_7d)} accent={OPS_CHART_COLORS.cyan} />
         <MetricTile label="Play logs" value={formatOpsMonitorCount(playLog.entries_total)} />
-        <MetricTile label="Play logs 7d" value={formatOpsMonitorCount(playLog.entries_7d)} />
-        <MetricTile label="Logbook users" value={formatOpsMonitorCount(playLog.users_with_entries)} />
       </MonitorSection>
 
       <MonitorSection themeKey="ops" title="Offers · push · Starter" subtitle="Calendar, notifications, drops" className="mb-0">
@@ -371,22 +597,23 @@ export default function EdgeMonitorDashboard({
         <MetricTile label="Push subs" value={formatOpsMonitorCount(push.subscriptions_total)} accent={OPS_CHART_COLORS.cyan} />
         <MetricTile label="Starter unlocks" value={formatOpsMonitorCount(starterDrops.unlocks_total)} accent={OPS_CHART_COLORS.purple} />
         <MetricTile label="Pending scratch" value={formatOpsMonitorCount(starterDrops.pending_reveal)} accent={OPS_CHART_COLORS.yellow} />
+        <MetricTile label="Pool size" value={formatOpsMonitorCount(starterDrops.pool_size)} />
+        <MetricTile label="Active starter" value={formatOpsMonitorCount(starterDrops.active_starter_subs)} />
+        <MetricTile
+          label="Pool exhausted"
+          value={formatOpsMonitorCount(starterDrops.exhausted_starter_subs)}
+          accent={OPS_CHART_COLORS.red}
+          hint="Active starter subs with no slugs left"
+        />
         <MetricTile label="Activity 24h" value={formatOpsMonitorCount(activity.events_24h)} />
       </MonitorSection>
 
-      <section className="edge-monitor-panel rounded-3xl border border-dashed border-zinc-700/80 bg-zinc-900/50 p-4 lg:col-span-2">
-        <div className="text-transparent bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text font-bold text-[15px] mb-1">
-          Coming next
-        </div>
-        <ul className={`grid gap-2 ${isDesktop ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
-          {PLANNED_METRICS.map((item) => (
-            <li key={item} className="flex gap-2 text-zinc-400 text-xs leading-relaxed">
-              <span className="text-lv-purple shrink-0">◆</span>
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ExternalHealthPanel
+        external={external}
+        loading={externalLoading}
+        error={externalError}
+        onReload={reloadExternal}
+      />
     </>
   ) : null
 
@@ -472,6 +699,17 @@ export default function EdgeMonitorDashboard({
             >
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>
+            <button
+              type="button"
+              onClick={() => setAutoRefresh((v) => !v)}
+              className={`min-h-9 rounded-xl px-3 text-xs font-semibold touch-manipulation ring-1 ${
+                autoRefresh
+                  ? 'bg-emerald-950/60 text-emerald-200 ring-emerald-500/40'
+                  : 'bg-zinc-800/80 text-zinc-300 ring-zinc-600/50'
+              }`}
+            >
+              Auto 90s {autoRefresh ? 'ON' : 'OFF'}
+            </button>
           </div>
         </div>
       </div>
@@ -481,7 +719,8 @@ export default function EdgeMonitorDashboard({
           {error}
           <div className="mt-2 text-red-200/70 text-xs">
             Apply migrations <span className="font-mono">20260703100000</span> +{' '}
-            <span className="font-mono">20260703110000</span>, then refresh.
+            <span className="font-mono">20260703110000</span> +{' '}
+            <span className="font-mono">20260703120000</span>, then refresh.
           </div>
         </div>
       ) : null}
@@ -496,6 +735,9 @@ export default function EdgeMonitorDashboard({
 
       {snapshot ? (
         <>
+          <AlertsBanner alerts={alerts} />
+          <LivePulseStrip live={live} error={liveError} />
+
           <div className={`grid gap-3 mb-4 ${isDesktop ? 'grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
             {heroKpis.map((kpi) => (
               <HeroKpiCard key={kpi.id} kpi={kpi} compact={!isDesktop} />
@@ -523,6 +765,30 @@ export default function EdgeMonitorDashboard({
                   </div>
                   <MonitorCompareBars items={velocityCompare} height={220} />
                 </section>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+                    <div className="text-white font-bold text-sm mb-1">30-day signups</div>
+                    <div className="text-zinc-500 text-[10px] mb-2">UTC daily sparkline</div>
+                    <MonitorSparklineChart
+                      labels={trendLabels30d}
+                      values={opsMonitorTrendSeries(trends30d, 'signups')}
+                      color={OPS_CHART_COLORS.cyan}
+                      label="Signups"
+                      height={130}
+                    />
+                  </section>
+                  <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+                    <div className="text-white font-bold text-sm mb-1">90-day activity</div>
+                    <div className="text-zinc-500 text-[10px] mb-2">UTC weekly buckets</div>
+                    <MonitorSparklineChart
+                      labels={trendLabels90d}
+                      values={opsMonitorTrendSeries(trends90d, 'activity')}
+                      color={OPS_CHART_COLORS.purple}
+                      label="Activity"
+                      height={130}
+                    />
+                  </section>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
                     <div className="text-white font-bold text-sm mb-2">Roles</div>

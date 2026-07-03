@@ -30,38 +30,42 @@ Admin-only in-app ops dashboard for EdgeTilt. **v1 shipped:** DB snapshot via RP
 - Guides & tools (guides, machines, bankroll, play log)
 - Offers, push, Starter weekly drops, activity events
 
-Manual **Refresh** re-runs the RPC. No auto-poll yet.
+Manual **Refresh** re-runs the RPC. Optional **Auto 90s** snapshot poll.
 
-## Phase 2 — trends & charts
+## Phase 2 — trends & charts (shipped)
 
-- [ ] Time-series RPCs (daily signups, posts, messages, subs) for 30/90-day sparklines
-- [ ] Top search queries (aggregate `lounge_search_analytics.query`, admin-only)
-- [ ] Freemium funnel: users at 8/9/10 bankroll or play-log cap (from existing limit tables)
-- [ ] Starter drop pool exhaustion count (`starterWeeklyDropPoolExhausted` logic mirrored in SQL)
+**Migration:** **`20260703120000_admin_ops_monitor_phase2_5.sql`**
 
-## Phase 3 — external health (links + optional Edge proxies)
+- [x] Time-series RPCs: **`trends_30d`** (daily) + **`trends_90d`** (weekly) on snapshot
+- [x] Top search queries (**`top_queries_7d`** / **`top_queries_30d`** from `lounge_search_analytics`)
+- [x] Freemium funnel: users at 8/9/10 bankroll or play-log cap (`freemium_funnel` key)
+- [x] Starter drop pool stats: **`pool_size`**, **`exhausted_starter_subs`**, **`active_starter_subs`**
 
-Keep secrets off the client. Prefer dashboard deep links + optional server-side probes.
+## Phase 3 — external health (shipped)
+
+Keep secrets off the client. Dashboard deep links + server probes via Edge Function **`admin-ops-external-health`**.
 
 | Source | Metrics | Integration |
 | --- | --- | --- |
-| **Sentry** | Error rate, unresolved issues, release | Link + optional server proxy with auth |
-| **Stripe** | MRR, churn, failed invoices, webhook failures | Dashboard link; mirror key counts already in `user_subscriptions` |
-| **Cloudflare Stream** | Pending uploads, storage minutes, 404 manifest rate | Edge cron log tail or CF API via new admin Edge fn |
-| **Cloudflare R2** | Object count, bandwidth (guides + lounge media) | CF dashboard / audit scripts |
-| **Supabase** | Edge Function invocations, DB size, cron job last success | Dashboard + `pg_cron` job history |
-| **Vercel** | Deploy SHA (already in UI), build failures | Link to project deployments |
+| **Sentry** | Unresolved issue count (optional API) | Dashboard link + **`SENTRY_AUTH_TOKEN`** probe |
+| **Stripe** | Active / past_due subscription sample counts | Dashboard link; **`STRIPE_SECRET_KEY`** probe |
+| **Cloudflare Stream** | Pending uploads count | **`CLOUDFLARE_*`** probe + dashboard link |
+| **Cloudflare R2** | — | Dashboard link only |
+| **Supabase** | Project ref | Dashboard + Functions links |
+| **Vercel** | Deploy SHA (client header) | Dashboard link (**`OPS_MONITOR_VERCEL_PROJECT_URL`** override) |
 
-## Phase 4 — alerts & runbooks
+Deploy: **`supabase/functions/admin-ops-external-health/README.md`**
 
-- [ ] Threshold config (e.g. webhook 24h = 0, rate-limit spike)
-- [ ] Email or push to admin when threshold breached (reuse `send-test-push` pattern)
-- [ ] Inline runbook links per section (purge cron README, stripe handoff doc, prod checklist)
+## Phase 4 — alerts & runbooks (shipped)
 
-## Phase 5 — real-time
+- [x] Default threshold config (`opsMonitorAlerts.js` ... webhook 24h = 0, rate-limit spike, CF pending uploads, starter pool exhausted, Sentry unresolved)
+- [ ] Email or push to admin when threshold breached (deferred ... reuse `send-test-push` pattern later)
+- [x] Inline runbook links per section (`opsMonitorRunbooks.js` ... prod checklist, Stripe handoff, Stream purge README)
 
-- [ ] Supabase Realtime channel for `activity_events` insert rate (live counter)
-- [ ] Optional “live users” approximation (presence or heartbeat table ... TBD)
+## Phase 5 — real-time (shipped)
+
+- [x] **`admin_ops_monitor_live_pulse()`** RPC polled every ~15s (activity rate, posts/chat 1m counters)
+- [ ] Optional “live users” approximation (presence table ... TBD)
 
 ## Related docs
 
@@ -72,13 +76,16 @@ Keep secrets off the client. Prefer dashboard deep links + optional server-side 
 
 ## Smoke (test)
 
-1. Apply **`20260703100000_admin_ops_monitor_snapshot.sql`** on test Supabase.
-2. Set your test profile to **`role = admin`**.
-3. Open app → hamburger → **Monitor** (or `/?tab=monitor`).
-4. Confirm sections load; **Refresh** updates **Snapshot** timestamp.
-5. Non-admin account: tab shows “admin-only” (no RPC call required for gate test).
-6. **Desktop:** open **`/monitor`** in a wide browser window ... 12-col chart layout, sticky header, **Open app** / **Mobile tab** links.
+1. Apply **`20260703100000`**, **`20260703110000`**, **`20260703120000`** on test Supabase.
+2. Deploy Edge fn **`admin-ops-external-health`** on test.
+3. Set your test profile to **`role = admin`**.
+4. Open app → hamburger → **Monitor** (or `/?tab=monitor`).
+5. Confirm sections load; **Refresh** updates timestamp; **Live pulse** tiles update ~15s.
+6. **External health** cards show dashboard links; Stripe/CF probes if Edge secrets set.
+7. Non-admin account: tab shows “admin-only” (no RPC call required for gate test).
+8. **Desktop:** open **`/monitor`** ... 30/90d sparklines, alerts banner, auto-refresh toggle.
 
 ---
 
 _Update log: 2026-07-03 — v1 scaffold (RPC + EdgeMonitorScreen + AppShell tab)._
+_Update log: 2026-07-03 — Phases 2–5 (extended RPC, external-health Edge fn, alerts/runbooks, live pulse poll)._

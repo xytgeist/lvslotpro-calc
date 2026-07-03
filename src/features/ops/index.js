@@ -10,3 +10,5 @@ export {
 export { OPS_SECTION_THEMES } from './opsMonitorTheme.js'
 export { EDGE_MONITOR_PATH, parseMonitorPathname } from './opsMonitorNavigation.js'
 export { useEdgeMonitorSnapshot } from './useEdgeMonitorSnapshot.js'
+export { useEdgeMonitorExternalHealth } from './useEdgeMonitorExternalHealth.js'
+export { useEdgeMonitorLivePulse } from './useEdgeMonitorLivePulse.js'

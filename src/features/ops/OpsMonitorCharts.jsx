@@ -145,6 +145,63 @@ export function MonitorBarChart({ labels, values, color = OPS_CHART_COLORS.cyan,
   )
 }
 
+/** Compact single-series sparkline for 30/90d windows. */
+export function MonitorSparklineChart({
+  labels,
+  values,
+  color = OPS_CHART_COLORS.cyan,
+  label = 'Trend',
+  height = 120,
+}) {
+  if (!labels?.length || !values?.length) return null
+  return (
+    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950/50 border border-zinc-800/80 p-3" style={{ height }}>
+      <Line
+        data={{
+          labels,
+          datasets: [
+            {
+              label,
+              data: values,
+              borderColor: color,
+              backgroundColor: `${color}22`,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              pointHoverRadius: 3,
+              borderWidth: 2,
+            },
+          ],
+        }}
+        options={{
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(9, 9, 11, 0.92)',
+              borderColor: `${color}55`,
+              borderWidth: 1,
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: TICK, font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: GRID, drawBorder: false },
+              ticks: { color: TICK, font: { size: 9 }, precision: 0 },
+            },
+          },
+        }}
+      />
+    </div>
+  )
+}
+
 export function MonitorCompareBars({ items, height = 180 }) {
   if (!items?.length) return null
   const labels = items.map((i) => i.label)

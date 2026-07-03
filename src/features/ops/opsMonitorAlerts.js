@@ -1,0 +1,150 @@
+/** Default alert thresholds for Edge Monitor Phase 4. */
+
+export const OPS_MONITOR_THRESHOLDS_STORAGE_KEY = 'edge-monitor-thresholds-v1'
+
+/** @typedef {{ id: string, label: string, metric: string, op: 'lt' | 'lte' | 'gt' | 'gte' | 'eq', value: number, severity: 'warn' | 'critical', runbookId?: string }} OpsMonitorThreshold */
+
+/** @type {OpsMonitorThreshold[]} */
+export const OPS_MONITOR_DEFAULT_THRESHOLDS = [
+  {
+    id: 'stripe_webhooks_24h_zero',
+    label: 'Stripe webhooks 24h = 0',
+    metric: 'stripe_webhooks.events_24h',
+    op: 'eq',
+    value: 0,
+    severity: 'critical',
+    runbookId: 'stripe-handoff',
+  },
+  {
+    id: 'rate_limits_24h_spike',
+    label: 'Rate limit hits 24h > 50',
+    metric: 'rate_limits.events_24h',
+    op: 'gt',
+    value: 50,
+    severity: 'warn',
+    runbookId: 'prod-checklist',
+  },
+  {
+    id: 'cf_pending_uploads',
+    label: 'Stream pending uploads > 10',
+    metric: 'external.cloudflare.pending_uploads',
+    op: 'gt',
+    value: 10,
+    severity: 'warn',
+    runbookId: 'stream-purge',
+  },
+  {
+    id: 'starter_pool_exhausted',
+    label: 'Starter subs with exhausted pool > 0',
+    metric: 'starter_drops.exhausted_starter_subs',
+    op: 'gt',
+    value: 0,
+    severity: 'warn',
+    runbookId: 'starter-drops',
+  },
+  {
+    id: 'sentry_unresolved',
+    label: 'Sentry unresolved issues > 25',
+    metric: 'external.sentry.unresolved_issues',
+    op: 'gt',
+    value: 25,
+    severity: 'warn',
+    runbookId: 'sentry',
+  },
+]
+
+/** @param {OpsMonitorThreshold[]} thresholds */
+export function saveOpsMonitorThresholds(thresholds) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(OPS_MONITOR_THRESHOLDS_STORAGE_KEY, JSON.stringify(thresholds))
+  } catch {
+    /* ignore quota */
+  }
+}
+
+/** @returns {OpsMonitorThreshold[]} */
+export function loadOpsMonitorThresholds() {
+  if (typeof window === 'undefined') return OPS_MONITOR_DEFAULT_THRESHOLDS
+  try {
+    const raw = window.localStorage.getItem(OPS_MONITOR_THRESHOLDS_STORAGE_KEY)
+    if (!raw) return OPS_MONITOR_DEFAULT_THRESHOLDS
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : OPS_MONITOR_DEFAULT_THRESHOLDS
+  } catch {
+    return OPS_MONITOR_DEFAULT_THRESHOLDS
+  }
+}
+
+/** @param {string} path @param {object} root */
+export function opsMonitorMetricValue(path, root) {
+  if (!path || !root) return undefined
+  return path.split('.').reduce((acc, key) => {
+    if (acc == null || typeof acc !== 'object') return undefined
+    return acc[key]
+  }, root)
+}
+
+/**
+ * @param {OpsMonitorThreshold} threshold
+ * @param {number | undefined | null} actual
+ */
+function thresholdBreached(threshold, actual) {
+  if (actual == null || !Number.isFinite(Number(actual))) return false
+  const n = Number(actual)
+  const v = threshold.value
+  switch (threshold.op) {
+    case 'lt':
+      return n < v
+    case 'lte':
+      return n <= v
+    case 'gt':
+      return n > v
+    case 'gte':
+      return n >= v
+    case 'eq':
+      return n === v
+    default:
+      return false
+  }
+}
+
+/**
+ * @param {{
+ *   snapshot?: object | null,
+ *   external?: object | null,
+ *   live?: object | null,
+ *   thresholds?: OpsMonitorThreshold[],
+ * }} ctx
+ */
+export function evaluateOpsMonitorAlerts(ctx) {
+  const thresholds = ctx.thresholds || OPS_MONITOR_DEFAULT_THRESHOLDS
+  const metricRoot = {
+    ...(ctx.snapshot || {}),
+    external: {
+      cloudflare: ctx.external?.probes?.cloudflare || {},
+      sentry: ctx.external?.probes?.sentry || {},
+      stripe: ctx.external?.probes?.stripe || {},
+    },
+    live: ctx.live || {},
+  }
+
+  /** @type {Array<OpsMonitorThreshold & { actual: number | null, message: string }>} */
+  const alerts = []
+
+  for (const t of thresholds) {
+    const actualRaw = opsMonitorMetricValue(t.metric, metricRoot)
+    const actual = actualRaw == null ? null : Number(actualRaw)
+    if (!thresholdBreached(t, actual)) continue
+    alerts.push({
+      ...t,
+      actual,
+      message: `${t.label} (actual: ${actual ?? 'n/a'})`,
+    })
+  }
+
+  return alerts.sort((a, b) => {
+    if (a.severity === b.severity) return a.label.localeCompare(b.label)
+    return a.severity === 'critical' ? -1 : 1
+  })
+}
