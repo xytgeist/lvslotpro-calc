@@ -7,6 +7,7 @@ import {
 } from '../lounge/LoungeStreamVideoLightboxChrome.jsx'
 import { useLoungeLightboxSwipeDismiss } from '../lounge/loungeLightboxSwipeDismiss.js'
 import { useLoungeStreamHlsAttachment } from '../lounge/useLoungeStreamHlsAttachment.js'
+import LoungeStreamVideoPlaybackControls from '../lounge/LoungeStreamVideoPlaybackControls.jsx'
 import { notifyLoungeStreamLightboxOpen } from '../lounge/loungeStreamLightboxRegistry.js'
 import { loungeFeedImageDeliveryUrl } from '../../utils/loungeCfImageMedia.js'
 import { stopLoungeLightboxMedia } from '../../utils/loungeLightboxMediaControl.js'
@@ -26,6 +27,7 @@ export default function ChatVideoLightbox({
 }) {
   const videoRef = useRef(null)
   const lightboxRootRef = useRef(null)
+  const [scrubbing, setScrubbing] = useState(false)
   const [mediaEnabled, setMediaEnabled] = useState(true)
   const uid = videoUid ? String(videoUid).trim() : ''
   const url = videoUrl ? String(videoUrl).trim() : ''
@@ -63,10 +65,15 @@ export default function ChatVideoLightbox({
     }
   }, [])
 
+  const onScrubbingChange = useCallback((next) => {
+    setScrubbing(next)
+  }, [])
+
   const { swipeSurfaceProps } = useLoungeLightboxSwipeDismiss({
     onClose: handleClose,
     onTap: togglePlayPause,
     allowSwipeOnVideo: true,
+    enabled: !scrubbing,
   })
 
   const {
@@ -146,6 +153,16 @@ export default function ChatVideoLightbox({
               ←
             </span>
           </button>
+        </div>
+        <div
+          className={`pointer-events-auto w-full bg-gradient-to-t from-black/85 via-black/45 to-transparent ${LOUNGE_HERO_LIGHTBOX_CHROME_X_PAD} pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8`}
+          data-lounge-lightbox-no-swipe
+        >
+          <LoungeStreamVideoPlaybackControls
+            videoRef={videoRef}
+            visible
+            onScrubbingChange={onScrubbingChange}
+          />
         </div>
       </div>
       <div className="relative z-0 flex min-h-0 flex-1 flex-col">
