@@ -47,8 +47,8 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ### Smoke (test)
 - [ ] **Conversation list** — Chat tab loads; DMs + topic channels sorted unread-first; unread dot appears for rooms with messages newer than `last_read_at`.
-- [ ] **Inbox swipe actions** — Swipe a conversation **left** → **Archive** (hidden from inbox); swipe **right** → **Delete** (leave room). Long-press context menu still works. Apply migrations **`20260702150000_chat_room_member_archive.sql`** + **`20260702160000_chat_archived_rooms_list.sql`** on test first.
-- [ ] **Archived inbox** — Tab bar **Archived** opens archived list; swipe left (blue) → **Move to inbox**; long-press **Move to inbox**; swipe right → delete. While archived: **no DM push** (redeploy **`lounge-chat`**). **Reply from archived thread** auto-restores to Inbox + re-enables push; **inbound-only messages do not** auto-unarchive.
+- [x] **Inbox swipe actions** — Swipe a conversation **left** → **Archive** (hidden from inbox); swipe **right** → **Delete** (leave room). Long-press context menu still works. Apply migrations **`20260702150000_chat_room_member_archive.sql`** + **`20260702160000_chat_archived_rooms_list.sql`** on test first.
+- [x] **Archived inbox** — Tab bar **Archived** opens archived list; swipe left (blue) → **Move to inbox**; long-press **Move to inbox**; swipe right → delete. While archived: **no DM push** (redeploy **`lounge-chat`**). **Reply from archived thread** auto-restores to Inbox + re-enables push; **inbound-only messages do not** auto-unarchive.
 - [ ] **Send/receive** — Send a message in a DM; confirm Realtime INSERT appends it; second device receives it.
 - [ ] **Reply** — Long-press a bubble, tap Reply; reply quote strip shows in composer; sent message has `reply_to_preview` rendered above bubble.
 - [ ] **Reactions** — Long-press bubble; tap emoji; reaction row appears; **second device sees pill + attribution sheet update live via Realtime** (groups: tap pill emoji to toggle; tap pill → Reactions sheet). Apply **`20260606140000_chat_message_reactions_page.sql`** + **`20260606150000_chat_message_reactions_realtime.sql`** on test first.
@@ -704,6 +704,7 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-07-02: **Chat archive inbox — production (Ryan sign-off):** **`jtjgtucumuoswnbauxry`** migrations **`20260702150000`**–**`170000`** applied; **`lounge-chat`** redeployed; frontend **`origin/main`** through **`f31d9a7`** on **`edgetilt.com`**. Archive / restore swipe, push mute while archived, reply-unarchive validated.
 - 2026-07-02: **Chat archive reply-unarchive (code):** **`lounge-chat` `send_message`** clears sender **`archived_at`** on post (Gmail-style restore + push re-enabled). Inbound-only messages stay archived. Client: **`onInboxRestored`** refreshes lists and exits Archived view after send. Migration **`20260702170000`** documents push gate. **Redeploy `lounge-chat` on test.**
 - 2026-07-02: **Chat archived push mute + restore swipe (code):** `lounge-chat` **`enqueueChatDmPush`** / **`enqueueChatGroupInvitePush`** skip recipients with **`archived_at`**. Archived list: swipe left → **blue** move-to-inbox (inbox-up icon); inbox stays green archive. **Redeploy `lounge-chat` on test** after client deploy.
 - 2026-07-02: **Chat archived inbox (code):** migration **`20260702160000_chat_archived_rooms_list.sql`** — **`chat_archived_rooms_for_user`**, **`chat_archived_room_count`**, **`chat_unarchive_room`**. Client: Inbox tab bar **Archived** entry + back nav; archived list reuses swipe (left unarchive, right delete) + context menu **Move to inbox**. Apply with **`20260702150000`** on test before smoke.
