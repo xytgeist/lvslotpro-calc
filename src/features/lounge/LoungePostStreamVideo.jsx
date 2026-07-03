@@ -2095,6 +2095,11 @@ export default function LoungePostStreamVideo({
         }
         const v = videoRef.current
         if (v) {
+          try {
+            v.volume = 1
+          } catch {
+            // ignore
+          }
           v.muted = !snap.unmuted
           if (attachStreamRef.current || lazyStream) {
             const p = v.play()
@@ -2103,6 +2108,11 @@ export default function LoungePostStreamVideo({
         }
       } catch {
         // ignore
+      }
+    } else {
+      const v = videoRef.current
+      if (v) {
+        pauseLoungeHeroStreamForDismiss(v)
       }
     }
     finalizeHeroClose()
@@ -3054,7 +3064,15 @@ export default function LoungePostStreamVideo({
   const heroFlyoutShellClass = heroExpanded
     ? `overflow-hidden ${heroPhase === 'opening' ? 'bg-transparent' : 'bg-black'} touch-none`.trim()
     : 'absolute inset-0 z-[1] h-full w-full overflow-hidden bg-transparent'
-  const heroFlyoutPointerProps = {}
+  const heroFlyoutPointerProps =
+    heroExpanded && heroPhase === 'open'
+      ? {
+          onPointerDown: heroSwipePointerDown,
+          onPointerMove: heroSwipePointerMove,
+          onPointerUp: heroSwipePointerUp,
+          onPointerCancel: heroSwipePointerCancel,
+        }
+      : {}
   const inlineVideoOpacityClass =
     heroExpanded
       ? effectiveStreamFadeShowVideo

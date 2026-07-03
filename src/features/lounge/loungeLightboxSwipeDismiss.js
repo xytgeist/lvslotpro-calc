@@ -5,7 +5,7 @@ const TAP_SLOP_PX = 12
 
 function shouldIgnoreSwipeTarget(target, { allowSwipeOnVideo = false } = {}) {
   if (!(target instanceof Element)) return true
-  const blockers = ['button', 'a', 'input', 'textarea', 'select', '[data-lounge-lightbox-no-swipe]']
+  const blockers = ['button', 'a', 'input', 'textarea', 'select', 'iframe', '[data-lounge-lightbox-no-swipe]']
   if (!allowSwipeOnVideo) blockers.push('video')
   return Boolean(target.closest(blockers.join(', ')))
 }
