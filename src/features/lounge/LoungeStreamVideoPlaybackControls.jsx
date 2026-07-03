@@ -10,9 +10,24 @@ function formatRemaining(seconds) {
 
 const SEEK_EPSILON_SEC = 0.035
 
+function scrubDurationMax(video, durationState) {
+  const fromVideo = Number.isFinite(video?.duration) && video.duration > 0 ? video.duration : 0
+  if (fromVideo > 0) return fromVideo
+  if (durationState > 0) return durationState
+  return 1
+}
+
+/** Map pointer X on the range track to seconds (iOS zero-thumb sliders often skip input events). */
+function scrubTimeFromPointer(el, clientX, durationMax) {
+  const rect = el.getBoundingClientRect()
+  if (!rect.width) return 0
+  const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+  return ratio * durationMax
+}
+
 /**
  * Minimal hero lightbox transport: play/pause + scrubber (video paints behind overlay chrome).
- * Live scrub sets currentTime directly (fastSeek breaks HLS on iOS); coalesce to one seek per frame while dragging.
+ * Pointer-position scrubbing so hidden-thumb styling still seeks on iOS/Android.
  * @param {{ current: HTMLVideoElement | null }} videoRef
  */
 export default function LoungeStreamVideoPlaybackControls({
@@ -27,6 +42,8 @@ export default function LoungeStreamVideoPlaybackControls({
   const [scrubbing, setScrubbing] = useState(false)
   const [scrubPreview, setScrubPreview] = useState(0)
   const scrubbingRef = useRef(false)
+  const scrubPreviewRef = useRef(0)
+  const durationRef = useRef(0)
   const wasPlayingBeforeScrubRef = useRef(false)
   const scrubSeekRafRef = useRef(0)
   const pendingScrubTimeRef = useRef(/** @type {number | null} */ (null))
@@ -36,19 +53,26 @@ export default function LoungeStreamVideoPlaybackControls({
     setDuration(Number.isFinite(v?.duration) ? v.duration : 0)
   }, [])
 
+  useEffect(() => {
+    durationRef.current = duration
+  }, [duration])
+
   const clampScrubTime = useCallback((v, next) => {
     if (!Number.isFinite(next)) return 0
-    const cap = Number.isFinite(v?.duration) && v.duration > 0 ? v.duration : null
-    if (cap != null) return Math.min(Math.max(0, next), cap)
+    const cap = scrubDurationMax(v, durationRef.current)
+    if (cap > 0) return Math.min(Math.max(0, next), cap)
     return Math.max(0, next)
   }, [])
 
-  const applyVideoSeek = useCallback(
-    (next) => {
+  const seekVideoTo = useCallback(
+    (next, { liveScrub = false } = {}) => {
       const v = videoRef?.current
       const t = clampScrubTime(v, next)
+      scrubPreviewRef.current = t
       setScrubPreview(t)
-      setCurrentTime(t)
+      if (liveScrub || !scrubbingRef.current) {
+        setCurrentTime(t)
+      }
       if (!v) return t
       if (Math.abs(v.currentTime - t) <= SEEK_EPSILON_SEC) return t
       try {
@@ -70,41 +94,11 @@ export default function LoungeStreamVideoPlaybackControls({
         const target = pendingScrubTimeRef.current
         pendingScrubTimeRef.current = null
         if (target == null) return
-        applyVideoSeek(target)
+        seekVideoTo(target, { liveScrub: true })
       })
     },
-    [applyVideoSeek],
+    [seekVideoTo],
   )
-
-  const seekVideoThen = useCallback((v, t, onDone) => {
-    if (!v) {
-      onDone?.()
-      return
-    }
-    const clamped = clampScrubTime(v, t)
-    setScrubPreview(clamped)
-    setCurrentTime(clamped)
-    if (Math.abs(v.currentTime - clamped) <= SEEK_EPSILON_SEC) {
-      onDone?.()
-      return
-    }
-    let settled = false
-    const finish = () => {
-      if (settled) return
-      settled = true
-      v.removeEventListener('seeked', onSeeked)
-      window.clearTimeout(timeoutId)
-      onDone?.()
-    }
-    const onSeeked = () => finish()
-    const timeoutId = window.setTimeout(finish, 450)
-    v.addEventListener('seeked', onSeeked)
-    try {
-      v.currentTime = clamped
-    } catch {
-      finish()
-    }
-  }, [clampScrubTime])
 
   useEffect(() => {
     scrubbingRef.current = scrubbing
@@ -129,8 +123,10 @@ export default function LoungeStreamVideoPlaybackControls({
     syncPlayState()
     syncDuration(v)
     if (!scrubbingRef.current) {
-      setCurrentTime(v.currentTime || 0)
-      setScrubPreview(v.currentTime || 0)
+      const t = v.currentTime || 0
+      scrubPreviewRef.current = t
+      setCurrentTime(t)
+      setScrubPreview(t)
     }
 
     const onPlay = () => setPlaying(true)
@@ -157,6 +153,7 @@ export default function LoungeStreamVideoPlaybackControls({
     const tick = () => {
       if (!scrubbingRef.current) {
         const t = v.currentTime || 0
+        scrubPreviewRef.current = t
         setCurrentTime(t)
         setScrubPreview(t)
       }
@@ -223,10 +220,27 @@ export default function LoungeStreamVideoPlaybackControls({
       }
       pendingScrubTimeRef.current = null
       setScrubbing(true)
-      const t = v?.currentTime || currentTime
-      setScrubPreview(t)
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        // ignore
+      }
+      const max = scrubDurationMax(v, durationRef.current)
+      const t = scrubTimeFromPointer(e.currentTarget, e.clientX, max)
+      seekVideoTo(t, { liveScrub: true })
     },
-    [videoRef, currentTime, onUserActivity],
+    [videoRef, onUserActivity, seekVideoTo],
+  )
+
+  const onScrubPointerMove = useCallback(
+    (e) => {
+      if (!scrubbingRef.current) return
+      e.stopPropagation()
+      const max = scrubDurationMax(videoRef?.current, durationRef.current)
+      const t = scrubTimeFromPointer(e.currentTarget, e.clientX, max)
+      scheduleLiveScrubSeek(t)
+    },
+    [videoRef, scheduleLiveScrubSeek],
   )
 
   const onScrubInput = useCallback(
@@ -234,10 +248,9 @@ export default function LoungeStreamVideoPlaybackControls({
       e.stopPropagation()
       const next = Number(e.target.value)
       if (!Number.isFinite(next)) return
-      setScrubPreview(clampScrubTime(videoRef?.current, next))
       scheduleLiveScrubSeek(next)
     },
-    [videoRef, clampScrubTime, scheduleLiveScrubSeek],
+    [scheduleLiveScrubSeek],
   )
 
   const finishScrub = useCallback(
@@ -247,27 +260,43 @@ export default function LoungeStreamVideoPlaybackControls({
         cancelAnimationFrame(scrubSeekRafRef.current)
         scrubSeekRafRef.current = 0
       }
+      try {
+        e?.currentTarget?.releasePointerCapture?.(e.pointerId)
+      } catch {
+        // ignore
+      }
       const fromInput = Number(e?.currentTarget?.value)
-      const next = Number.isFinite(fromInput) ? fromInput : scrubPreview
+      const fromPointer =
+        e?.currentTarget && Number.isFinite(e.clientX)
+          ? scrubTimeFromPointer(
+              e.currentTarget,
+              e.clientX,
+              scrubDurationMax(videoRef?.current, durationRef.current),
+            )
+          : null
+      const next = Number.isFinite(fromPointer)
+        ? fromPointer
+        : Number.isFinite(fromInput)
+          ? fromInput
+          : scrubPreviewRef.current
       const resume = wasPlayingBeforeScrubRef.current
       wasPlayingBeforeScrubRef.current = false
       setScrubbing(false)
       pendingScrubTimeRef.current = null
 
+      seekVideoTo(next)
       const v = videoRef?.current
-      seekVideoThen(v, next, () => {
-        if (v && resume) {
-          try {
-            const p = v.play()
-            if (p && typeof p.catch === 'function') p.catch(() => {})
-          } catch {
-            // ignore
-          }
+      if (v && resume) {
+        try {
+          const p = v.play()
+          if (p && typeof p.catch === 'function') p.catch(() => {})
+        } catch {
+          // ignore
         }
-        onUserActivity?.()
-      })
+      }
+      onUserActivity?.()
     },
-    [videoRef, scrubPreview, seekVideoThen, onUserActivity],
+    [videoRef, seekVideoTo, onUserActivity],
   )
 
   const max = duration > 0 ? duration : 1
@@ -306,6 +335,7 @@ export default function LoungeStreamVideoPlaybackControls({
         onChange={onScrubInput}
         onInput={onScrubInput}
         onPointerDown={beginScrub}
+        onPointerMove={onScrubPointerMove}
         onPointerUp={finishScrub}
         onPointerCancel={finishScrub}
         aria-label="Video progress"

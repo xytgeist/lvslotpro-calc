@@ -211,9 +211,10 @@ input[type="range"].lounge-video-scrubber::-webkit-slider-runnable-track {
 input[type="range"].lounge-video-scrubber::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 0;
-  height: 0;
-  margin-top: 0;
+  /* Invisible but touchable — 0×0 thumbs break drag/value on iOS Safari. */
+  width: 44px;
+  height: 44px;
+  margin-top: -20px;
   border: none;
   background: transparent;
   box-shadow: none;
@@ -232,8 +233,8 @@ input[type="range"].lounge-video-scrubber::-moz-range-progress {
 }
 
 input[type="range"].lounge-video-scrubber::-moz-range-thumb {
-  width: 0;
-  height: 0;
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
   box-shadow: none;
