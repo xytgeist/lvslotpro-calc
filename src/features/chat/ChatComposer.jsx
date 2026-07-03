@@ -12,11 +12,6 @@ import {
   probeVideoFileDurationSeconds,
   LOUNGE_VIDEO_MAX_SECONDS,
 } from '../../utils/loungeVideoUpload.js'
-import {
-  COMPOSER_LINE_BREAK_INPUT_TYPES,
-  getCaretTextOffset,
-  setCaretTextOffset,
-} from '../lounge/loungeRichComposerDom.js'
 
 const MAX_BODY            = 4000
 const MAX_IMAGES          = 12
@@ -83,8 +78,7 @@ export default function ChatComposer({
   const fileInputRef   = useRef(null)
   const videoInputRef  = useRef(null)
   const plusBtnRef     = useRef(null)
-  const caretRef       = useRef(0)
-  const enterHandledRef = useRef(false)
+  const pendingSelectionRef = useRef(/** @type {number | null} */ (null))
 
   const hasContent = body.trim().length > 0 || imageSlots.length > 0
   const canSend = !disabled && !sending && hasContent
@@ -158,28 +152,20 @@ export default function ChatComposer({
     }
   }, [body, composerActive, footerHost])
 
-  const handleBodyInput = (e) => {
-    // Strip HTML - only keep plain text from the contenteditable div.
-    const raw = e.currentTarget.innerText ?? ''
-    const trimmed = raw.slice(0, MAX_BODY)
-    caretRef.current = getCaretTextOffset(e.currentTarget)
-    // If browser inserted HTML (e.g. from autocomplete), normalize back to text.
-    if (e.currentTarget.innerHTML !== trimmed && e.currentTarget.innerText !== trimmed) {
-      const sel = window.getSelection()
-      const offset = sel?.focusOffset ?? trimmed.length
-      e.currentTarget.innerText = trimmed
-      // Restore caret
-      try {
-        const range = document.createRange()
-        const textNode = e.currentTarget.firstChild
-        if (textNode) {
-          range.setStart(textNode, Math.min(offset, textNode.length))
-          range.collapse(true)
-          sel?.removeAllRanges()
-          sel?.addRange(range)
-        }
-      } catch { /* ignore caret restore errors */ }
+  useLayoutEffect(() => {
+    const el = textareaRef.current
+    if (!el || pendingSelectionRef.current == null) return
+    const pos = pendingSelectionRef.current
+    pendingSelectionRef.current = null
+    try {
+      el.setSelectionRange(pos, pos)
+    } catch {
+      // ignore
     }
+  }, [body])
+
+  const handleBodyChange = (e) => {
+    const trimmed = (e.target.value ?? '').slice(0, MAX_BODY)
     setBody(trimmed)
     onTyping(viewerDisplayName)
   }
@@ -284,7 +270,6 @@ export default function ChatComposer({
   }
 
   const handlePaste = useCallback(async (e) => {
-    // Path 1: standard paste event - works on iOS and desktop Chrome
     const items = Array.from(e.clipboardData?.items || [])
     const imageFiles = items
       .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
@@ -296,21 +281,7 @@ export default function ChatComposer({
       return
     }
 
-    // Prevent rich HTML from being pasted into contenteditable - allow only plain text.
-    // The browser will handle inserting the plain text string at the caret position;
-    // we don't need to do it manually since we're preventing the default and
-    // re-inserting via execCommand which falls back naturally.
-    const hasHtml = items.some((i) => i.kind === 'string' && i.type === 'text/html')
-    if (hasHtml) {
-      e.preventDefault()
-      const text = e.clipboardData?.getData('text/plain') ?? ''
-      if (text) document.execCommand('insertText', false, text.slice(0, MAX_BODY))
-      return
-    }
-
-    // Path 2: Clipboard API fallback - needed for Android Chrome where native-app
-    // images aren't exposed through clipboardData.items.
-    // Chrome will prompt for "clipboard-read" permission on first use.
+    // Clipboard API fallback for Android when app images are not in clipboardData.items.
     if (!navigator.clipboard?.read) return
     try {
       const clipItems = await navigator.clipboard.read()
@@ -324,7 +295,10 @@ export default function ChatComposer({
           }
         }
       }
-      if (files.length) enqueueImageFiles(files)
+      if (files.length) {
+        e.preventDefault()
+        enqueueImageFiles(files)
+      }
     } catch {
       // Permission denied or API not available - silently ignore
     }
@@ -486,7 +460,6 @@ export default function ChatComposer({
 
     // Clear composer immediately.
     setBody('')
-    if (textareaRef.current) textareaRef.current.innerText = ''
     setImageSlots([])
     uploadPromisesRef.current.clear()
     onClearReply()
@@ -508,53 +481,22 @@ export default function ChatComposer({
     }
   }, [canSend, body, imageSlots, replyTarget, onSend, onClearReply])
 
-  const insertChatNewlineAtCaret = useCallback(() => {
-    if (enterHandledRef.current) return true
-    const el = textareaRef.current
-    if (!el) return false
-
-    let caret = getCaretTextOffset(el)
-    if (!Number.isFinite(caret) || caret < 0) caret = caretRef.current
-    caret = Math.max(0, Math.min(caret, body.length))
-    const next = `${body.slice(0, caret)}\n${body.slice(caret)}`.slice(0, MAX_BODY)
-    if (next === body) return false
-
-    enterHandledRef.current = true
-    queueMicrotask(() => {
-      enterHandledRef.current = false
-    })
-
-    const nextCaret = Math.min(caret + 1, next.length)
-    el.innerText = next
-    setCaretTextOffset(el, nextCaret)
-    caretRef.current = nextCaret
-    setBody(next)
-    onTyping(viewerDisplayName)
-    return true
-  }, [body, onTyping, viewerDisplayName])
-
-  const handleBeforeInput = useCallback(
-    (e) => {
-      const isLineBreak =
-        COMPOSER_LINE_BREAK_INPUT_TYPES.has(e.inputType) ||
-        (e.inputType === 'insertText' && e.data === '\n')
-      if (!isLineBreak) return
-      e.preventDefault()
-      insertChatNewlineAtCaret()
-    },
-    [insertChatNewlineAtCaret],
-  )
-
   const handleKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault()
       void handleSend()
       return
     }
-    if ((e.key === 'Enter' || e.keyCode === 13) && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault()
-      insertChatNewlineAtCaret()
-    }
+    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey) return
+    e.preventDefault()
+    const ta = e.target
+    const start = ta.selectionStart ?? 0
+    const end = ta.selectionEnd ?? start
+    const next = `${ta.value.slice(0, start)}\n${ta.value.slice(end)}`.slice(0, MAX_BODY)
+    const nextCaret = Math.min(start + 1, next.length)
+    pendingSelectionRef.current = nextCaret
+    setBody(next)
+    onTyping(viewerDisplayName)
   }
 
   const openPlus = () => {
@@ -744,18 +686,15 @@ export default function ChatComposer({
           } ${expanded ? '' : 'h-10'}`}
           style={{ borderRadius: expanded ? COMPOSER_EXPANDED_RADIUS_PX : '9999px' }}
         >
-          {/* contentEditable div - lets Android clipboard show images (textarea blocks them) */}
-          <div
+          <textarea
             ref={textareaRef}
-            contentEditable={!disabled}
-            suppressContentEditableWarning
-            role="textbox"
-            aria-multiline="true"
+            value={body}
+            disabled={disabled}
+            rows={1}
+            enterKeyHint="enter"
             aria-label="Message"
-            aria-placeholder="Message…"
-            data-placeholder="Message…"
-            onInput={handleBodyInput}
-            onBeforeInput={handleBeforeInput}
+            placeholder="Message…"
+            onChange={handleBodyChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onPointerDown={handleComposerPointerDown}
@@ -773,16 +712,12 @@ export default function ChatComposer({
                   }
                 : undefined
             }
-            className={`chat-composer-ce min-w-0 flex-1 box-border bg-transparent pl-4 pr-2 text-[16px] text-zinc-100 outline-none ${
+            className={`chat-composer-ce min-w-0 flex-1 box-border resize-none border-0 bg-transparent pl-4 pr-2 text-[16px] text-zinc-100 outline-none whitespace-pre-wrap break-words [-webkit-tap-highlight-color:transparent] ${
               disabled ? 'opacity-50 pointer-events-none' : ''
             } ${expanded ? 'leading-5 py-2.5' : 'h-full py-0'}`}
             style={{
               maxHeight: COMPOSER_MAX_H,
               overflowY: expanded ? 'auto' : 'hidden',
-              WebkitUserSelect: 'text',
-              userSelect: 'text',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
             }}
           />
 

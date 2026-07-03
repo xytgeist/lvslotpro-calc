@@ -3801,7 +3801,7 @@ html.light [data-chat-feature] .chat-composer-ce {
   caret-color: #3b82f6;
 }
 
-/* contenteditable placeholder */
+/* contenteditable placeholder (legacy); native textarea uses ::placeholder below */
 .chat-composer-ce:empty::before {
   content: attr(data-placeholder);
   color: rgb(113 113 122); /* zinc-500 */
@@ -3810,6 +3810,12 @@ html.light [data-chat-feature] .chat-composer-ce {
 }
 html.light .chat-composer-ce:empty::before {
   color: rgb(161 161 170); /* zinc-400 - slightly lighter on white backgrounds */
+}
+.chat-composer-ce::placeholder {
+  color: rgb(113 113 122); /* zinc-500 */
+}
+html.light [data-chat-feature] .chat-composer-ce::placeholder {
+  color: rgb(161 161 170); /* zinc-400 */
 }
 /* Ensure line-height fills single-row wrapper so text is vertically centered */
 .chat-composer-ce:not(.leading-5) {
