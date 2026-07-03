@@ -9,6 +9,8 @@ function formatRemaining(seconds) {
 }
 
 const SEEK_EPSILON_SEC = 0.035
+const SEEK_SETTLE_MS = 500
+const RESUME_BUFFER_MS = 900
 
 function scrubDurationMax(video, durationState) {
   const fromVideo = Number.isFinite(video?.duration) && video.duration > 0 ? video.duration : 0
@@ -25,16 +27,99 @@ function scrubTimeFromPointer(el, clientX, durationMax) {
   return ratio * durationMax
 }
 
+/** hls.js on Android uses a blob: MediaSource URL; rapid mid-drag seeks there can stall playback. */
+function videoUsesMseBlob(v) {
+  const src = v?.currentSrc || v?.src || ''
+  return typeof src === 'string' && src.startsWith('blob:')
+}
+
+function shouldDeferLiveVideoSeek(v, liveScrub) {
+  return liveScrub && videoUsesMseBlob(v)
+}
+
+function waitSeekThen(v, target, timeoutMs, onDone) {
+  if (!v) {
+    onDone?.()
+    return
+  }
+  const clamped = target
+  if (Math.abs(v.currentTime - clamped) <= SEEK_EPSILON_SEC) {
+    onDone?.()
+    return
+  }
+  let settled = false
+  const finish = () => {
+    if (settled) return
+    settled = true
+    v.removeEventListener('seeked', onSeeked)
+    window.clearTimeout(timeoutId)
+    onDone?.()
+  }
+  const onSeeked = () => finish()
+  const timeoutId = window.setTimeout(finish, timeoutMs)
+  v.addEventListener('seeked', onSeeked)
+  try {
+    v.currentTime = clamped
+  } catch {
+    finish()
+  }
+}
+
+function resumePlaybackAfterSeek(v, generation, generationRef) {
+  if (!v || v.ended || generation !== generationRef.current) return
+
+  let cleaned = false
+  const cleanup = () => {
+    if (cleaned) return
+    cleaned = true
+    v.removeEventListener('canplay', onCanPlay)
+    window.clearTimeout(fallbackId)
+  }
+
+  const tryPlay = () => {
+    if (!v || v.ended || generation !== generationRef.current) return
+    try {
+      const p = v.play()
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          if (generation !== generationRef.current || v.paused || v.ended) return
+          if (v.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+            v.addEventListener('canplay', onCanPlay, { once: true })
+          }
+        }).catch(() => {})
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const onCanPlay = () => {
+    cleanup()
+    if (generation !== generationRef.current || v.ended) return
+    if (v.paused) tryPlay()
+  }
+
+  const fallbackId = window.setTimeout(() => {
+    cleanup()
+    if (generation !== generationRef.current || v.ended) return
+    if (v.paused) tryPlay()
+  }, RESUME_BUFFER_MS)
+
+  tryPlay()
+}
+
 /**
  * Minimal hero lightbox transport: play/pause + scrubber (video paints behind overlay chrome).
  * Pointer-position scrubbing so hidden-thumb styling still seeks on iOS/Android.
  * @param {{ current: HTMLVideoElement | null }} videoRef
+ * @param {(timeSec: number) => void} [onScrubTimeCommit] Sync feed saved-time when hero seek lands.
  */
 export default function LoungeStreamVideoPlaybackControls({
   videoRef,
   visible = true,
   onUserActivity,
   onScrubbingChange,
+  onScrubTimeCommit,
 }) {
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -47,6 +132,8 @@ export default function LoungeStreamVideoPlaybackControls({
   const wasPlayingBeforeScrubRef = useRef(false)
   const scrubSeekRafRef = useRef(0)
   const pendingScrubTimeRef = useRef(/** @type {number | null} */ (null))
+  const seekGenerationRef = useRef(0)
+  const resumeGenerationRef = useRef(0)
   const rafRef = useRef(0)
 
   const syncDuration = useCallback((v) => {
@@ -64,25 +151,33 @@ export default function LoungeStreamVideoPlaybackControls({
     return Math.max(0, next)
   }, [])
 
+  const commitScrubUi = useCallback((t, { liveScrub = false } = {}) => {
+    scrubPreviewRef.current = t
+    setScrubPreview(t)
+    if (liveScrub || !scrubbingRef.current) {
+      setCurrentTime(t)
+    }
+  }, [])
+
   const seekVideoTo = useCallback(
-    (next, { liveScrub = false } = {}) => {
+    (next, { liveScrub = false, commitSavedTime = false } = {}) => {
       const v = videoRef?.current
       const t = clampScrubTime(v, next)
-      scrubPreviewRef.current = t
-      setScrubPreview(t)
-      if (liveScrub || !scrubbingRef.current) {
-        setCurrentTime(t)
+      commitScrubUi(t, { liveScrub })
+      if (!v || shouldDeferLiveVideoSeek(v, liveScrub)) return t
+      if (Math.abs(v.currentTime - t) <= SEEK_EPSILON_SEC) {
+        if (commitSavedTime) onScrubTimeCommit?.(t)
+        return t
       }
-      if (!v) return t
-      if (Math.abs(v.currentTime - t) <= SEEK_EPSILON_SEC) return t
       try {
         v.currentTime = t
       } catch {
         // ignore
       }
+      if (commitSavedTime) onScrubTimeCommit?.(t)
       return t
     },
-    [videoRef, clampScrubTime],
+    [videoRef, clampScrubTime, commitScrubUi, onScrubTimeCommit],
   )
 
   const scheduleLiveScrubSeek = useCallback(
@@ -208,6 +303,8 @@ export default function LoungeStreamVideoPlaybackControls({
     (e) => {
       e.stopPropagation()
       onUserActivity?.()
+      seekGenerationRef.current += 1
+      resumeGenerationRef.current += 1
       const v = videoRef?.current
       wasPlayingBeforeScrubRef.current = Boolean(v && !v.paused && !v.ended)
       if (v && wasPlayingBeforeScrubRef.current) {
@@ -284,19 +381,20 @@ export default function LoungeStreamVideoPlaybackControls({
       setScrubbing(false)
       pendingScrubTimeRef.current = null
 
-      seekVideoTo(next)
       const v = videoRef?.current
-      if (v && resume) {
-        try {
-          const p = v.play()
-          if (p && typeof p.catch === 'function') p.catch(() => {})
-        } catch {
-          // ignore
-        }
-      }
-      onUserActivity?.()
+      const t = clampScrubTime(v, next)
+      commitScrubUi(t)
+      const seekGen = (seekGenerationRef.current += 1)
+      const resumeGen = (resumeGenerationRef.current += 1)
+
+      waitSeekThen(v, t, SEEK_SETTLE_MS, () => {
+        if (seekGen !== seekGenerationRef.current) return
+        onScrubTimeCommit?.(t)
+        if (v && resume) resumePlaybackAfterSeek(v, resumeGen, resumeGenerationRef)
+        onUserActivity?.()
+      })
     },
-    [videoRef, seekVideoTo, onUserActivity],
+    [videoRef, clampScrubTime, commitScrubUi, onScrubTimeCommit, onUserActivity],
   )
 
   const max = duration > 0 ? duration : 1

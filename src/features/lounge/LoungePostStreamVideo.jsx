@@ -2262,6 +2262,10 @@ export default function LoungePostStreamVideo({
     [bumpHeroChrome, clearHeroChromeHideTimer],
   )
 
+  const onHeroScrubTimeCommit = useCallback((t) => {
+    if (Number.isFinite(t) && t >= 0) savedStreamTimeRef.current = t
+  }, [])
+
   const onHeroGestureTap = useCallback(() => {
     if (heroPhaseRef.current !== 'open') return
     if (!heroChromeVisibleRef.current) {
@@ -3396,6 +3400,7 @@ export default function LoungePostStreamVideo({
                         visible={heroChromeVisible}
                         onUserActivity={bumpHeroChrome}
                         onScrubbingChange={onHeroChromeScrubbingChange}
+                        onScrubTimeCommit={onHeroScrubTimeCommit}
                       />
                     </div>
                   ) : (
@@ -3412,6 +3417,7 @@ export default function LoungePostStreamVideo({
                         visible={heroChromeVisible}
                         onUserActivity={bumpHeroChrome}
                         onScrubbingChange={onHeroChromeScrubbingChange}
+                        onScrubTimeCommit={onHeroScrubTimeCommit}
                       />
                     </div>
                   )}
