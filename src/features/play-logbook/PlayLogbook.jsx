@@ -376,11 +376,12 @@ export default function PlayLogbook({
   const populateCaptureCasino = useCallback(async () => {
     await resolveDefaultCaptureCasino(supabaseClient, {
       cacheRef: casinoCoordCacheRef,
+      userId,
       onLoading: setGpsLoading,
       onNearby: setNearbyCasinos,
       onCasino: setCaptureCasino,
     })
-  }, [supabaseClient])
+  }, [supabaseClient, userId])
 
   const sessionOwnerId = useCallback(
     (sessionId, entry = null) => {

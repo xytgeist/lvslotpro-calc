@@ -22,6 +22,7 @@ import {
   getPwaNotifPromptStorageKey,
   LOUNGE_IOS_PWA_SETUP_SEEN_KEY,
 } from './pwaNotificationPrompt.js'
+import { clearGeoLocationConsent } from './geoLocationConsent.js'
 
 const OFFERS_USER_KEY_PREFIXES = [
   OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX,
@@ -74,6 +75,7 @@ export function clearAccountClientState(userId) {
     }
     removeLocalStorageKey(getPwaNotifPromptStorageKey(userId))
     removeLocalStorageKey(getPwaNotifEnablePendingStorageKey(userId))
+    clearGeoLocationConsent(userId)
   }
 
   removeLocalStorageKey(LOUNGE_DOCK_MENU_LAYOUT_INTRO_KEY)

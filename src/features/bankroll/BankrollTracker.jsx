@@ -11,6 +11,7 @@ import BankrollTrendTab from './BankrollTrendTab.jsx'
 import BankrollChartsTab from './BankrollChartsTab.jsx'
 import BankrollLocationsTab from './BankrollLocationsTab.jsx'
 import BankrollImportSheet from './BankrollImportSheet.jsx'
+import { fetchNearbyCasinos } from '../../utils/nearbyCasinos.js'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -59,15 +60,6 @@ function hourlyRate(session) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 // ── Haversine distance (miles) ────────────────────────────────────────────────
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 3958.8
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLng = (lng2 - lng1) * Math.PI / 180
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
 function fmtMiles(mi) {
   return mi < 10 ? `${mi.toFixed(1)} mi` : `${Math.round(mi)} mi`
 }
@@ -470,41 +462,14 @@ export default function BankrollTracker({
   // ── GPS nearby ────────────────────────────────────────────────────────────
 
   const fetchNearby = useCallback(async (onNearest) => {
-    if (!navigator.geolocation) return
-    setGpsLoading(true)
-    try {
-      // Fetch casino coords once and cache in ref
-      if (!casinoCoordCacheRef.current) {
-        const { data } = await supabaseClient
-          .from('casinos')
-          .select('id, name, city, state, country, lat, lng')
-          .not('lat', 'is', null)
-          .not('lng', 'is', null)
-        casinoCoordCacheRef.current = data ?? []
-      }
-      const casinos = casinoCoordCacheRef.current
-      if (!casinos.length) return
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords
-          const withDist = casinos.map(c => ({
-            ...c,
-            distanceMi: haversine(latitude, longitude, c.lat, c.lng),
-          })).sort((a, b) => a.distanceMi - b.distanceMi)
-
-          const top5 = withDist.slice(0, 20)
-          setNearbyCasinos(top5)
-          if (top5.length > 0) onNearest(top5[0].name)
-          setGpsLoading(false)
-        },
-        () => setGpsLoading(false),
-        { timeout: 8000, maximumAge: 60000 }
-      )
-    } catch {
-      setGpsLoading(false)
-    }
-  }, [supabaseClient])
+    await fetchNearbyCasinos(supabaseClient, {
+      cacheRef: casinoCoordCacheRef,
+      userId,
+      onLoading: setGpsLoading,
+      onNearby: setNearbyCasinos,
+      onNearest,
+    })
+  }, [supabaseClient, userId])
 
   const openLogPast = () => {
     if (!canCreateBankrollSession) {

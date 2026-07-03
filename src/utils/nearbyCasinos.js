@@ -2,6 +2,8 @@
  * GPS-ranked nearby casinos (shared by Bankroll + Play Logbook).
  */
 
+import { ensureGeoLocationAccess } from './geoLocationConsent.js'
+
 /** @param {number} lat1 @param {number} lng1 @param {number} lat2 @param {number} lng2 */
 export function haversineMiles(lat1, lng1, lat2, lng2) {
   const R = 3958.8
@@ -16,15 +18,22 @@ export function haversineMiles(lat1, lng1, lat2, lng2) {
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {{
  *   cacheRef: { current: unknown[] | null },
+ *   userId?: string | null,
  *   onLoading?: (loading: boolean) => void,
  *   onNearby?: (casinos: Array<Record<string, unknown> & { distanceMi: number }>) => void,
  *   onNearest?: (name: string) => void,
  * }} opts
  */
-export async function fetchNearbyCasinos(supabaseClient, { cacheRef, onLoading, onNearby, onNearest }) {
+export async function fetchNearbyCasinos(supabaseClient, { cacheRef, userId, onLoading, onNearby, onNearest }) {
   if (!navigator.geolocation) return
   onLoading?.(true)
   try {
+    const allowed = await ensureGeoLocationAccess(userId)
+    if (!allowed) {
+      onLoading?.(false)
+      return
+    }
+
     if (!cacheRef.current) {
       const { data } = await supabaseClient
         .from('casinos')
@@ -79,12 +88,13 @@ export async function fetchActiveBankrollSession(supabaseClient) {
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {{
  *   cacheRef: { current: unknown[] | null },
+ *   userId?: string | null,
  *   onLoading?: (loading: boolean) => void,
  *   onNearby?: (casinos: Array<Record<string, unknown> & { distanceMi: number }>) => void,
  *   onCasino: (name: string) => void,
  * }} opts
  */
-export async function resolveDefaultCaptureCasino(supabaseClient, { cacheRef, onLoading, onNearby, onCasino }) {
+export async function resolveDefaultCaptureCasino(supabaseClient, { cacheRef, userId, onLoading, onNearby, onCasino }) {
   onNearby?.([])
   onLoading?.(false)
 
@@ -104,6 +114,7 @@ export async function resolveDefaultCaptureCasino(supabaseClient, { cacheRef, on
   onCasino('')
   await fetchNearbyCasinos(supabaseClient, {
     cacheRef,
+    userId,
     onLoading,
     onNearby,
     onNearest: onCasino,
