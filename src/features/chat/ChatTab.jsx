@@ -409,6 +409,18 @@ export default function ChatTab({
 
   const handleRoomAction = useCallback(async (action, room) => {
     setRoomMenu(null)
+    if (action === 'delete') {
+      const label = chatRoomLabel(room)
+      const confirmed = window.confirm(
+        room.kind === 'group'
+          ? `Leave "${label}"? It will be removed from your inbox.`
+          : `Delete "${label}"? It will be removed from your inbox.`,
+      )
+      if (!confirmed) {
+        setOpenSwipeRoomId(null)
+        return
+      }
+    }
     try {
       if (action === 'mark_unread') await chatMarkUnread(supabaseClient, room.id)
       else if (action === 'pin')    await chatPinRoom(supabaseClient, room.id)
@@ -896,9 +908,55 @@ export default function ChatTab({
 
 const ROOM_LONG_PRESS_MS = 380
 const ROOM_LONG_PRESS_MOVE_PX = 10
-const ROOM_SWIPE_ACTION_PX = 88
-const ROOM_SWIPE_COMMIT_PX = 72
 const ROOM_SWIPE_AXIS_LOCK_PX = 8
+const ROOM_SWIPE_COMMIT_RATIO = 0.38
+const ROOM_SWIPE_COMMIT_MIN_PX = 72
+const ROOM_SWIPE_SNAP_MS = 240
+
+function getRoomSwipeCommitThreshold(width) {
+  return Math.max(ROOM_SWIPE_COMMIT_MIN_PX, width * ROOM_SWIPE_COMMIT_RATIO)
+}
+
+function ChatSwipeTrashIcon({ className = 'h-6 w-6' }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4h6v2" />
+    </svg>
+  )
+}
+
+function ChatSwipeArchiveIcon({ className = 'h-6 w-6' }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+      <path d="M12 11v6" />
+      <path d="m9 14 3 3 3-3" />
+    </svg>
+  )
+}
 
 /** Inbox row with swipe actions + touch/mouse long-press. */
 function ChatRoomListRow({
@@ -914,6 +972,8 @@ function ChatRoomListRow({
 }) {
   const timerRef = useRef(null)
   const suppressClickRef = useRef(false)
+  const rowRef = useRef(null)
+  const rowWidthRef = useRef(320)
   const offsetRef = useRef(0)
   const gestureRef = useRef({
     startX: 0,
@@ -927,6 +987,18 @@ function ChatRoomListRow({
   const setOffset = useCallback((next) => {
     offsetRef.current = next
     setOffsetX(next)
+  }, [])
+
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return undefined
+    const measure = () => {
+      rowWidthRef.current = el.getBoundingClientRect().width || window.innerWidth
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [])
 
   useEffect(() => {
@@ -988,42 +1060,45 @@ function ChatRoomListRow({
     }
     if (g.axis !== 'x') return
     e.preventDefault()
-    const clamped = Math.max(-ROOM_SWIPE_ACTION_PX, Math.min(ROOM_SWIPE_ACTION_PX, dx))
+    const width = rowWidthRef.current || window.innerWidth
+    const clamped = Math.max(-width, Math.min(width, dx))
     setOffset(clamped)
   }, [clearTimer, onSwipeOpen, room.id, setOffset])
 
-  const finishGesture = useCallback(
-    (target) => {
-      clearTimer()
-      const g = gestureRef.current
-      if (g.axis === 'x') {
-        const offset = offsetRef.current
-        if (offset <= -ROOM_SWIPE_COMMIT_PX) {
-          setOffset(0)
-          onSwipeOpen?.(null)
-          onArchive?.(room)
-        } else if (offset >= ROOM_SWIPE_COMMIT_PX) {
-          setOffset(0)
-          onSwipeOpen?.(null)
-          onDelete?.(room)
-        } else if (target === -ROOM_SWIPE_ACTION_PX || target === ROOM_SWIPE_ACTION_PX) {
-          setOffset(target)
-          onSwipeOpen?.(room.id)
-        } else {
-          setOffset(0)
-          onSwipeOpen?.(null)
-        }
+  const finishGesture = useCallback(() => {
+    clearTimer()
+    const g = gestureRef.current
+    if (g.axis === 'x') {
+      const width = rowWidthRef.current || window.innerWidth
+      const offset = offsetRef.current
+      const commitAt = getRoomSwipeCommitThreshold(width)
+
+      const runActionAfterSnap = (targetOffset, action) => {
+        setSwipeDragging(false)
+        setOffset(targetOffset)
+        onSwipeOpen?.(null)
+        window.setTimeout(() => {
+          action?.()
+        }, ROOM_SWIPE_SNAP_MS)
       }
-      g.axis = null
-      g.pointerId = null
-      setSwipeDragging(false)
-    },
-    [clearTimer, onArchive, onDelete, onSwipeOpen, room, setOffset],
-  )
+
+      if (offset <= -commitAt) {
+        runActionAfterSnap(-width, () => onArchive?.(room))
+      } else if (offset >= commitAt) {
+        runActionAfterSnap(width, () => onDelete?.(room))
+      } else {
+        setSwipeDragging(false)
+        setOffset(0)
+        onSwipeOpen?.(null)
+      }
+    }
+    g.axis = null
+    g.pointerId = null
+  }, [clearTimer, onArchive, onDelete, onSwipeOpen, room, setOffset])
 
   const onPointerUp = useCallback(
     (e) => {
-      finishGesture(0)
+      finishGesture()
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {
@@ -1035,7 +1110,7 @@ function ChatRoomListRow({
 
   const onPointerCancel = useCallback(
     (e) => {
-      finishGesture(0)
+      finishGesture()
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
       } catch {
@@ -1050,7 +1125,7 @@ function ChatRoomListRow({
       suppressClickRef.current = false
       return
     }
-    if (Math.abs(offsetRef.current) >= ROOM_SWIPE_COMMIT_PX / 2) {
+    if (Math.abs(offsetRef.current) > 8) {
       setOffset(0)
       onSwipeOpen?.(null)
       return
@@ -1058,28 +1133,60 @@ function ChatRoomListRow({
     onOpen(room.id)
   }, [onOpen, onSwipeOpen, room.id, setOffset])
 
-  const rowTransition = swipeDragging ? 'none' : 'transform 0.28s cubic-bezier(0.33, 1, 0.45, 1)'
+  const rowWidth = rowWidthRef.current || 320
+  const commitAt = getRoomSwipeCommitThreshold(rowWidth)
+  const deleteProgress = offsetX > 0 ? Math.min(1, offsetX / commitAt) : 0
+  const archiveProgress = offsetX < 0 ? Math.min(1, -offsetX / commitAt) : 0
+  const rowTransition = swipeDragging ? 'none' : 'transform 240ms cubic-bezier(0.32, 0.72, 0, 1)'
 
   return (
-    <li className="relative overflow-hidden">
-      <div className="chat-room-swipe-actions pointer-events-none absolute inset-0 flex">
-        <div className="chat-room-swipe-delete flex w-[5.5rem] shrink-0 items-center justify-center px-2 text-center text-[13px] font-semibold text-white">
-          Delete
-        </div>
-        <div className="min-w-0 flex-1" aria-hidden />
-        <div className="chat-room-swipe-archive flex w-[5.5rem] shrink-0 items-center justify-center px-2 text-center text-[13px] font-semibold text-white">
-          Archive
-        </div>
+    <li ref={rowRef} className="relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        {offsetX > 0 && (
+          <div
+            className="chat-room-swipe-delete absolute inset-y-0 left-0 flex items-center pl-5"
+            style={{ width: offsetX }}
+            aria-hidden
+          >
+            <span
+              className="chat-room-swipe-icon"
+              style={{
+                opacity: deleteProgress,
+                transform: `scale(${0.84 + deleteProgress * 0.16})`,
+              }}
+            >
+              <ChatSwipeTrashIcon />
+            </span>
+          </div>
+        )}
+        {offsetX < 0 && (
+          <div
+            className="chat-room-swipe-archive absolute inset-y-0 right-0 flex items-center justify-end pr-5"
+            style={{ width: -offsetX }}
+            aria-hidden
+          >
+            <span
+              className="chat-room-swipe-icon"
+              style={{
+                opacity: archiveProgress,
+                transform: `scale(${0.84 + archiveProgress * 0.16})`,
+              }}
+            >
+              <ChatSwipeArchiveIcon />
+            </span>
+          </div>
+        )}
       </div>
 
       <div
         className="chat-room-swipe-foreground relative bg-zinc-950"
         style={{
-          transform: `translateX(${offsetX}px)`,
+          transform: `translate3d(${offsetX}px, 0, 0)`,
           transition: rowTransition,
           touchAction: 'pan-y',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',
+          willChange: swipeDragging ? 'transform' : 'auto',
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
