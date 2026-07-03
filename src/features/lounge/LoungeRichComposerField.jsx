@@ -1,11 +1,12 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import {
   getCaretTextOffset,
+  getCaretTextOffsetViaRange,
   insertComposerLineBreakViaExecCommand,
   insertPlainTextAtSelection,
   LOUNGE_IOS,
-  nudgeIosComposerCaretPaint,
   plainTextFromComposerRoot,
+  resyncComposerAfterIosLineBreak,
   syncComposerHtml,
 } from './loungeRichComposerDom.js'
 import { LOUNGE_CAPTION_MAX } from '../../utils/loungeCommentLimits.js'
@@ -114,22 +115,34 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
 
     if (composingRef.current) return true
 
-    const caret = getCaretTextOffset(el)
     let text = plainTextFromComposerRoot(el)
     text = normalizeCashtagsInCaption(text)
     if (maxLength != null && text.length > maxLength) {
       text = text.slice(0, maxLength)
     }
+
+    if (LOUNGE_IOS && variant !== 'feed') {
+      const nextCaret =
+        maxLength != null
+          ? Math.min(getCaretTextOffsetViaRange(el), text.length)
+          : getCaretTextOffsetViaRange(el)
+      skipRichSyncRef.current = false
+      resyncComposerAfterIosLineBreak(el, { text, caretOffset: nextCaret, rich: true })
+      lastValueRef.current = text
+      caretRef.current = nextCaret
+      notifyComposerInput(el, text, nextCaret, { sync: true })
+      if (text !== value) onChange?.(text)
+      setDomHasText(text.length > 0)
+      return true
+    }
+
+    const caret = getCaretTextOffset(el)
     const nextCaret = maxLength != null ? Math.min(caret, text.length) : caret
     lastValueRef.current = text
     caretRef.current = nextCaret
     notifyComposerInput(el, text, nextCaret, { sync: true })
     if (text !== value) onChange?.(text)
     setDomHasText(text.length > 0)
-    if (LOUNGE_IOS && variant !== 'feed') {
-      skipRichSyncRef.current = false
-      nudgeIosComposerCaretPaint(el, { text, caretOffset: nextCaret })
-    }
     return true
   }, [maxLength, notifyComposerInput, onChange, value, variant])
 

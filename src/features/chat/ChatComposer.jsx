@@ -14,9 +14,11 @@ import {
 } from '../../utils/loungeVideoUpload.js'
 import {
   getCaretTextOffset,
+  getCaretTextOffsetViaRange,
   insertComposerLineBreakViaExecCommand,
-  nudgeIosComposerCaretPaint,
+  LOUNGE_IOS,
   plainTextFromComposerRoot,
+  resyncComposerAfterIosLineBreak,
 } from '../lounge/loungeRichComposerDom.js'
 
 const MAX_BODY            = 4000
@@ -496,9 +498,14 @@ export default function ChatComposer({
     if (!insertComposerLineBreakViaExecCommand(el)) return false
 
     const text = plainTextFromComposerRoot(el).slice(0, MAX_BODY)
-    caretRef.current = getCaretTextOffset(el)
+    if (LOUNGE_IOS) {
+      const nextCaret = Math.min(getCaretTextOffsetViaRange(el), text.length)
+      caretRef.current = nextCaret
+      resyncComposerAfterIosLineBreak(el, { text, caretOffset: nextCaret, rich: false })
+    } else {
+      caretRef.current = getCaretTextOffsetViaRange(el)
+    }
     setBody(text)
-    nudgeIosComposerCaretPaint(el, { caretOffset: caretRef.current })
     onTyping(viewerDisplayName)
     return true
   }, [onTyping, viewerDisplayName])
