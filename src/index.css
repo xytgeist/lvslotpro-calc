@@ -1970,6 +1970,11 @@ html.light [data-lounge-market-chart-mini] .text-lv-green {
   color: #16a34a;
 }
 
+/* Lounge post $TICKER cashtags (positive day change) */
+html.light .lounge-cashtag-positive {
+  color: #16a34a !important;
+}
+
 html.light [data-lounge-market-chart-modal] .text-lv-red,
 html.light [data-lounge-market-chart-mini] .text-lv-red {
   color: #dc2626;

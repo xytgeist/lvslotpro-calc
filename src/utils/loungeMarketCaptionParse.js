@@ -177,7 +177,7 @@ export function guessCashtagAssetClass(ticker, embedClassByTicker) {
 export function marketCashtagColorClass(changePct) {
   const v = Number(changePct)
   if (!Number.isFinite(v)) return 'font-semibold text-cyan-400'
-  if (v > 0) return 'font-semibold text-lv-green'
+  if (v > 0) return 'font-semibold text-lv-green lounge-cashtag-positive'
   if (v < 0) return 'font-semibold text-lv-red'
   return 'font-semibold text-zinc-400'
 }

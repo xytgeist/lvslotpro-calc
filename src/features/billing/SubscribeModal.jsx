@@ -110,7 +110,7 @@ function getCarouselStepPx(widthPx) {
 }
 
 const STARTER_FEATURES = [
-  'Instant starter guide pack (80+ AP guides)',
+  'Starter guide pack (80+ AP guides)',
   'One mystery premium guide drop every week (fully randomized)',
   'Full access to Bankroll manager, Logbook & Calendar',
   'New Calculator unlocks',
@@ -700,7 +700,7 @@ export default function SubscribeModal({
                       </div>
                       <p className="mt-0.5 text-[11px] text-zinc-500">
                         {starterInterval === 'annual'
-                          ? `${starterAnnualEffective} effective · founding rate once at checkout`
+                          ? `${starterAnnualEffective} effective · founding rate`
                           : 'Founding rate on monthly checkout'}
                       </p>
                       <ul className="mt-3 flex-1 space-y-1.5">
