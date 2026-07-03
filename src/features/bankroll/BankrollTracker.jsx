@@ -99,6 +99,23 @@ function isoToLocalHm(iso) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+const LOG_PAST_HOURS_STEP = 0.25
+
+function parseDurationHoursField(raw) {
+  const n = parseFloat(raw)
+  return Number.isFinite(n) ? n : 0
+}
+
+/** Quarter-hour steps for log-past hours played (0, 0.25, 0.5, …). */
+function formatDurationHoursField(hours) {
+  const q = Math.max(0, Math.round(hours * 4) / 4)
+  return Number.isInteger(q) ? String(q) : String(q)
+}
+
+function stepDurationHoursField(raw, delta) {
+  return formatDurationHoursField(parseDurationHoursField(raw) + delta)
+}
+
 export default function BankrollTracker({
   supabaseClient,
   titleBarNavSlot = null,
@@ -1357,12 +1374,14 @@ export default function BankrollTracker({
                     <div className="flex items-center rounded-2xl bg-zinc-800 overflow-hidden min-h-12">
                       <button
                         type="button"
-                        onPointerDown={e => e.preventDefault()}
-                        onClick={() => {
-                          const v = Math.max(0, Math.round((parseFloat(pastFields.duration_hours || 0) - 0.1) * 10) / 10)
-                          setPastFields(p => ({ ...p, duration_hours: String(v) }))
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          setPastFields((p) => ({
+                            ...p,
+                            duration_hours: stepDurationHoursField(p.duration_hours, -LOG_PAST_HOURS_STEP),
+                          }))
                         }}
-                        className="px-4 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
+                        className="px-4 min-h-12 text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
                       >−</button>
                       <input
                         type="text"
@@ -1373,12 +1392,14 @@ export default function BankrollTracker({
                       />
                       <button
                         type="button"
-                        onPointerDown={e => e.preventDefault()}
-                        onClick={() => {
-                          const v = Math.round((parseFloat(pastFields.duration_hours || 0) + 0.1) * 10) / 10
-                          setPastFields(p => ({ ...p, duration_hours: String(v) }))
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          setPastFields((p) => ({
+                            ...p,
+                            duration_hours: stepDurationHoursField(p.duration_hours, LOG_PAST_HOURS_STEP),
+                          }))
                         }}
-                        className="px-4 h-full text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
+                        className="px-4 min-h-12 text-zinc-400 text-lg font-bold touch-manipulation active:text-white active:bg-zinc-700 select-none"
                       >+</button>
                     </div>
                   </div>
