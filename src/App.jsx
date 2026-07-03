@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { mobileShell, inputBase, btnPrimary, linkBtn } from './features/shell/shellClasses'
 import { readAuthCallbackParams, getOAuthCallbackMessage } from './features/auth/oauthCallback'
@@ -36,6 +36,9 @@ import {
   shouldShowLoungeColdBootSplash,
 } from './utils/loungeColdBootSplash.js'
 import { clearAccountClientState } from './utils/clearAccountClientState.js'
+import { parseMonitorPathname } from './features/ops/opsMonitorNavigation.js'
+
+const EdgeMonitorDesktopPage = lazy(() => import('./features/ops/EdgeMonitorDesktopPage.jsx'))
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -77,6 +80,7 @@ function App() {
   const [isChecking, setIsChecking] = useState(true)
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window === 'undefined') return 'app'
+    if (parseMonitorPathname(window.location.pathname || '/')) return 'monitor'
     return parseLegalPathname(window.location.pathname || '/') || 'app'
   })
   /** Login/signup as a modal over the app when the user chooses it or a feature calls onRequireAuth. */
@@ -767,6 +771,10 @@ function App() {
         setCurrentView(slug)
         return
       }
+      if (parseMonitorPathname(window.location.pathname)) {
+        setCurrentView('monitor')
+        return
+      }
       setCurrentView('app')
       const ctx = readLegalReturnContext()
       if (ctx) finishLegalReturn(ctx)
@@ -807,6 +815,129 @@ function App() {
         onBack={exitLegalDocument}
         onGotIt={exitLegalDocument}
       />
+    )
+  }
+
+  if (currentView === 'monitor') {
+    return (
+      <>
+        <Suspense
+          fallback={
+            <div className="min-h-screen bg-zinc-950 text-zinc-400 flex items-center justify-center">Loading…</div>
+          }
+        >
+          <EdgeMonitorDesktopPage
+            supabaseClient={supabase}
+            isAdmin={isAdminRole}
+            isChecking={isChecking}
+            userEmail={user?.email || ''}
+            onOpenAuth={() => openAuthPanel('login')}
+            onOpenApp={() => {
+              setCurrentView('app')
+              window.history.replaceState({}, document.title, '/')
+            }}
+          />
+        </Suspense>
+        {authPanelOpen ? (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              className="absolute inset-0 cursor-default bg-black/70 [-webkit-tap-highlight-color:transparent]"
+              aria-label="Close sign in"
+              onClick={closeAuthPanel}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="auth-modal-title-monitor"
+              className="relative z-10 w-full max-w-sm max-h-[min(90dvh,calc(100dvh-2rem))] overflow-y-auto overscroll-contain rounded-3xl border border-zinc-600/80 bg-gray-900 p-6 shadow-2xl sm:p-8"
+              data-auth-modal
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={closeAuthPanel}
+                className={`${linkBtn} mb-4 !min-h-11 w-full text-sm sm:text-base`}
+              >
+                ← Cancel
+              </button>
+              <svg
+                id="auth-modal-title-monitor"
+                viewBox="0 0 260 32"
+                width="100%"
+                className="mb-6 mx-auto block max-w-[300px]"
+                aria-label="Find Your Edge"
+                role="img"
+              >
+                <text x="26" y="24" textAnchor="start" fontFamily="'Montserrat', sans-serif" fontWeight="300" fontSize="24" fill="currentColor">
+                  Find Your
+                </text>
+                <image href="/edge-lounge-logo-transparent.png" x="150" y="6" width="77" height="19" className="edge-logo--dark" />
+                <image href="/edge-lounge-logo-light.png" x="150" y="6" width="77" height="19" className="edge-logo--light" />
+              </svg>
+              <AuthModalPanel
+                authTab={authTab}
+                onAuthTabChange={switchAuthTab}
+                showForgotPassword={showForgotPassword}
+                onOpenForgotPassword={() => {
+                  setShowForgotPassword(true)
+                  setForgotError('')
+                  setForgotMessage('')
+                  const addr = email.trim() || signupEmail.trim()
+                  if (addr && !forgotEmail.trim()) setForgotEmail(addr)
+                }}
+                onCloseForgotPassword={() => {
+                  setShowForgotPassword(false)
+                  setForgotError('')
+                  setForgotMessage('')
+                  switchAuthTab('signin')
+                }}
+                verificationSuccess={verificationSuccess}
+                email={email}
+                onEmailChange={setEmail}
+                password={password}
+                onPasswordChange={setPassword}
+                loginError={loginError}
+                isLoggingIn={isLoggingIn}
+                onLoginSubmit={handleLogin}
+                signupEmail={signupEmail}
+                onSignupEmailChange={setSignupEmail}
+                signupPassword={signupPassword}
+                onSignupPasswordChange={setSignupPassword}
+                signupConfirmPassword={signupConfirmPassword}
+                onSignupConfirmPasswordChange={setSignupConfirmPassword}
+                signupError={signupError}
+                signupMessage={signupMessage}
+                isSigningUp={isSigningUp}
+                onSignUpSubmit={handleSignUp}
+                forgotEmail={forgotEmail}
+                onForgotEmailChange={setForgotEmail}
+                forgotError={forgotError}
+                forgotMessage={forgotMessage}
+                isSendingReset={isSendingReset}
+                onForgotSubmit={handleForgotPassword}
+                isOAuthLoading={isOAuthLoading}
+                acceptedLegal={acceptedLegal}
+                onAcceptedLegalChange={setAcceptedLegal}
+                onOpenLegalDocument={(slug) => openLegalDocument(slug, 'auth')}
+                onGoogleSignIn={({ setErrorTarget }) => {
+                  const setError =
+                    setErrorTarget === 'forgot'
+                      ? setForgotError
+                      : setErrorTarget === 'join'
+                        ? setSignupError
+                        : setLoginError
+                  setError('')
+                  void handleOAuthSignIn('google', {
+                    setError,
+                    markLegalPending: authTab === 'join' && acceptedLegal,
+                  })
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </>
     )
   }
 

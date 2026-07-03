@@ -6,9 +6,11 @@ Admin-only in-app ops dashboard for EdgeTilt. **v1 shipped:** DB snapshot via RP
 
 | Who | Route | Gate |
 | --- | --- | --- |
-| Admin | `/?tab=monitor` | `isAdmin` in AppShell; RPC checks `play_log_viewer_is_admin()` |
+| Admin | **`/monitor`** | Desktop full-width page (`EdgeMonitorDesktopPage` in **`App.jsx`**) |
+| Admin | `/?tab=monitor` | In-app mobile tab (`AppShell` → **`EdgeMonitorScreen`**) |
+| Admin | Hamburger **Monitor** | Same as `?tab=monitor` |
 | Moderator | — | No access (metrics are product-wide, not moderation queue) |
-| Everyone else | — | Access denied panel if tab forced |
+| Everyone else | — | Access denied panel if tab/route forced |
 
 **Prod vs test:** Same UI; metrics reflect whichever Supabase project **`VITE_SUPABASE_URL`** points at. Badge shows project ref (first segment of host).
 
@@ -75,6 +77,7 @@ Keep secrets off the client. Prefer dashboard deep links + optional server-side 
 3. Open app → hamburger → **Monitor** (or `/?tab=monitor`).
 4. Confirm sections load; **Refresh** updates **Snapshot** timestamp.
 5. Non-admin account: tab shows “admin-only” (no RPC call required for gate test).
+6. **Desktop:** open **`/monitor`** in a wide browser window ... 12-col chart layout, sticky header, **Open app** / **Mobile tab** links.
 
 ---
 
