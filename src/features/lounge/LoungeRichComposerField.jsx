@@ -1,11 +1,23 @@
-import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import {
+  getCaretTextOffset,
+  insertComposerLineBreakAtSelection,
+  insertPlainTextAtSelection,
+  plainTextFromComposerRoot,
+  syncComposerHtml,
+} from './loungeRichComposerDom.js'
 import { LOUNGE_CAPTION_MAX } from '../../utils/loungeCommentLimits.js'
 import { normalizeCashtagsInCaption } from '../../utils/loungeMarketCaptionParse.js'
 import { LOUNGE_RICH_COMPOSER_VARIANTS } from './loungeRichComposerVariants.js'
 
+function isEnterKeyEvent(e) {
+  if (!e) return false
+  return e.key === 'Enter' || e.keyCode === 13
+}
+
 /**
- * Plain-text Lounge caption field (native textarea for reliable mobile Enter/newlines).
- * Value contract is plain text. @mention autocomplete uses selectionStart on the textarea.
+ * Contenteditable Lounge caption field with live @ / # / link styling.
+ * Enter inserts a DOM <br> (mobile-safe) then syncs plain-text state + rich HTML.
  */
 const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   {
@@ -31,8 +43,9 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
 ) {
   const rootRef = useRef(null)
   const lastValueRef = useRef(value)
+  const caretRef = useRef(0)
   const composingRef = useRef(false)
-  const pendingSelectionRef = useRef(/** @type {number | null} */ (null))
+  const enterHandledRef = useRef(false)
   const onInputRef = useRef(onInput)
   onInputRef.current = onInput
   const preset = LOUNGE_RICH_COMPOSER_VARIANTS[variant] || LOUNGE_RICH_COMPOSER_VARIANTS.feed
@@ -40,6 +53,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   useImperativeHandle(ref, () => rootRef.current, [])
 
   const notifyComposerInput = useCallback((el, text, caret, { sync = false } = {}) => {
+    caretRef.current = caret
     const payload = { target: el, text, caret }
     if (sync) onInputRef.current?.(payload)
     requestAnimationFrame(() => {
@@ -47,33 +61,71 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     })
   }, [])
 
-  const emitValue = useCallback(
-    (el, text, caret, { syncNotify = true } = {}) => {
-      let next = normalizeCashtagsInCaption(String(text ?? ''))
-      if (maxLength != null && next.length > maxLength) {
-        next = next.slice(0, maxLength)
-      }
-      const nextCaret =
-        maxLength != null ? Math.min(caret, next.length) : caret
-      lastValueRef.current = next
-      if (syncNotify) notifyComposerInput(el, next, nextCaret, { sync: true })
-      if (next !== value) onChange?.(next)
-      return { next, nextCaret }
-    },
-    [maxLength, notifyComposerInput, onChange, value],
-  )
+  const readAndEmit = useCallback(() => {
+    const el = rootRef.current
+    if (!el || composingRef.current) return
+    const caret = getCaretTextOffset(el)
+    let text = plainTextFromComposerRoot(el)
+    text = normalizeCashtagsInCaption(text)
+    const capped =
+      maxLength != null && text.length > maxLength ? text.slice(0, maxLength) : text
+    const nextCaret =
+      maxLength != null ? Math.min(caret, capped.length) : caret
+    lastValueRef.current = capped
+    caretRef.current = nextCaret
+    notifyComposerInput(el, capped, nextCaret, { sync: true })
+    syncComposerHtml(el, capped, nextCaret)
+    if (capped !== value) onChange?.(capped)
+  }, [maxLength, notifyComposerInput, onChange, value])
+
+  const insertEnterNewline = useCallback(() => {
+    if (enterHandledRef.current) return true
+    const el = rootRef.current
+    if (!el) return false
+
+    enterHandledRef.current = true
+    queueMicrotask(() => {
+      enterHandledRef.current = false
+    })
+
+    if (!insertComposerLineBreakAtSelection(el)) return false
+
+    if (composingRef.current) return true
+
+    const caret = getCaretTextOffset(el)
+    let text = plainTextFromComposerRoot(el)
+    text = normalizeCashtagsInCaption(text)
+    if (maxLength != null && text.length > maxLength) {
+      text = text.slice(0, maxLength)
+    }
+    const nextCaret = maxLength != null ? Math.min(caret, text.length) : caret
+    lastValueRef.current = text
+    caretRef.current = nextCaret
+    notifyComposerInput(el, text, nextCaret, { sync: true })
+    requestAnimationFrame(() => {
+      if (!el.isConnected) return
+      syncComposerHtml(el, text, nextCaret)
+    })
+    if (text !== value) onChange?.(text)
+    return true
+  }, [maxLength, notifyComposerInput, onChange, value])
 
   useLayoutEffect(() => {
-    lastValueRef.current = value
     const el = rootRef.current
-    if (!el || pendingSelectionRef.current == null) return
-    const pos = pendingSelectionRef.current
-    pendingSelectionRef.current = null
-    try {
-      el.setSelectionRange(pos, pos)
-    } catch {
-      // ignore
+    if (!el || composingRef.current) return
+    const domText = plainTextFromComposerRoot(el)
+    if (domText === value) {
+      lastValueRef.current = value
+      return
     }
+    if (domText === lastValueRef.current) return
+    lastValueRef.current = value
+    const caret =
+      document.activeElement === el
+        ? Math.min(getCaretTextOffset(el), value.length)
+        : value.length
+    caretRef.current = caret
+    syncComposerHtml(el, value, caret)
   }, [value])
 
   useLayoutEffect(() => {
@@ -91,69 +143,85 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     }
   }, [autoGrow, value])
 
-  const handleChange = useCallback(
-    (e) => {
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || disabled) return undefined
+    const onSelectionChange = () => {
       if (composingRef.current) return
-      const caret = e.target.selectionStart ?? e.target.value.length
-      emitValue(e.target, e.target.value, caret)
-    },
-    [emitValue],
-  )
+      const root = rootRef.current
+      if (!root) return
+      const active = document.activeElement
+      if (active !== root && !root.contains(active)) return
+      const caret = getCaretTextOffset(root)
+      caretRef.current = caret
+      notifyComposerInput(root, plainTextFromComposerRoot(root), caret)
+    }
+    document.addEventListener('selectionchange', onSelectionChange)
+    return () => document.removeEventListener('selectionchange', onSelectionChange)
+  }, [disabled, notifyComposerInput])
 
-  const handleSelect = useCallback(
+  const handleInput = useCallback(() => {
+    readAndEmit()
+  }, [readAndEmit])
+
+  const handlePaste = useCallback(
     (e) => {
-      if (composingRef.current) return
-      const el = e.target
-      const caret = el.selectionStart ?? 0
-      notifyComposerInput(el, el.value, caret)
+      e.preventDefault()
+      const text = e.clipboardData?.getData('text/plain') ?? ''
+      if (!text) return
+      insertPlainTextAtSelection(rootRef.current, text)
+      readAndEmit()
     },
-    [notifyComposerInput],
+    [readAndEmit],
   )
 
   const handleKeyDown = useCallback(
     (e) => {
       onKeyDown?.(e)
       if (e.defaultPrevented) return
-      if (!enterInsertsNewline || e.key !== 'Enter' || e.shiftKey) return
+      if (!enterInsertsNewline || !isEnterKeyEvent(e) || e.shiftKey) return
       e.preventDefault()
-      const ta = e.target
-      const start = ta.selectionStart ?? 0
-      const end = ta.selectionEnd ?? start
-      const next = `${ta.value.slice(0, start)}\n${ta.value.slice(end)}`
-      const { nextCaret } = emitValue(ta, next, start + 1, { syncNotify: true })
-      pendingSelectionRef.current = nextCaret
+      insertEnterNewline()
     },
-    [emitValue, enterInsertsNewline, onKeyDown],
+    [enterInsertsNewline, insertEnterNewline, onKeyDown],
   )
 
   return (
-    <textarea
-      ref={rootRef}
-      id={id}
-      value={value}
-      disabled={disabled}
-      rows={1}
-      enterKeyHint="enter"
-      aria-label={ariaLabel}
-      placeholder={placeholder}
-      maxLength={maxLength ?? undefined}
-      onChange={handleChange}
-      onSelect={handleSelect}
-      onKeyDown={handleKeyDown}
-      onKeyUp={onKeyUp}
-      onMouseUp={onMouseUp}
-      onBlur={onBlur}
-      onFocus={onFocus}
-      onCompositionStart={() => {
-        composingRef.current = true
-      }}
-      onCompositionEnd={(e) => {
-        composingRef.current = false
-        const caret = e.target.selectionStart ?? e.target.value.length
-        emitValue(e.target, e.target.value, caret)
-      }}
-      className={`block w-full touch-manipulation resize-none border-0 bg-transparent whitespace-pre-wrap break-words px-0 text-left text-zinc-100 outline-none selection:bg-cyan-500/25 [-webkit-tap-highlight-color:transparent] ${preset.fieldClass} ${autoGrow ? 'overflow-hidden' : 'overflow-y-auto'} ${className}`}
-    />
+    <div className="relative min-h-0 w-full">
+      {!value && placeholder ? (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute left-0 top-0 select-none whitespace-pre-wrap text-zinc-500 ${preset.placeholderClass}`}
+        >
+          {placeholder}
+        </span>
+      ) : null}
+      <div
+        ref={rootRef}
+        id={id}
+        role="textbox"
+        aria-multiline="true"
+        aria-label={ariaLabel}
+        contentEditable={disabled ? 'false' : 'true'}
+        suppressContentEditableWarning
+        spellCheck
+        onInput={handleInput}
+        onPaste={handlePaste}
+        onKeyDown={handleKeyDown}
+        onKeyUp={onKeyUp}
+        onMouseUp={onMouseUp}
+        onBlur={onBlur}
+        onFocus={onFocus}
+        onCompositionStart={() => {
+          composingRef.current = true
+        }}
+        onCompositionEnd={() => {
+          composingRef.current = false
+          readAndEmit()
+        }}
+        className={`w-full touch-manipulation whitespace-pre-wrap break-words px-0 text-left text-zinc-100 outline-none selection:bg-cyan-500/25 [-webkit-tap-highlight-color:transparent] ${preset.fieldClass} ${autoGrow ? 'overflow-hidden' : 'overflow-y-auto'} ${className}`}
+      />
+    </div>
   )
 })
 
