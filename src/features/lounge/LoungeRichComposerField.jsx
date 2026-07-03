@@ -4,6 +4,7 @@ import {
   insertComposerLineBreakViaExecCommand,
   insertPlainTextAtSelection,
   plainTextFromComposerRoot,
+  restoreComposerCaret,
   syncComposerHtml,
 } from './loungeRichComposerDom.js'
 import { LOUNGE_CAPTION_MAX } from '../../utils/loungeCommentLimits.js'
@@ -48,6 +49,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   const enterHandledRef = useRef(false)
   /** Skip one readAndEmit rich HTML rebuild right after Enter (DOM rewrite races mobile caret). */
   const skipRichSyncRef = useRef(false)
+  const pendingCaretRef = useRef(/** @type {number | null} */ (null))
   const onInputRef = useRef(onInput)
   onInputRef.current = onInput
   const preset = LOUNGE_RICH_COMPOSER_VARIANTS[variant] || LOUNGE_RICH_COMPOSER_VARIANTS.feed
@@ -104,6 +106,8 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
       enterHandledRef.current = false
     })
 
+    const beforeCaret = Math.max(getCaretTextOffset(el), caretRef.current)
+
     skipRichSyncRef.current = true
     if (!insertComposerLineBreakViaExecCommand(el)) {
       skipRichSyncRef.current = false
@@ -112,15 +116,16 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
 
     if (composingRef.current) return true
 
-    const caret = getCaretTextOffset(el)
     let text = plainTextFromComposerRoot(el)
     text = normalizeCashtagsInCaption(text)
     if (maxLength != null && text.length > maxLength) {
       text = text.slice(0, maxLength)
     }
-    const nextCaret = maxLength != null ? Math.min(caret, text.length) : caret
+    const nextCaret = Math.min(beforeCaret + 1, text.length)
     lastValueRef.current = text
     caretRef.current = nextCaret
+    pendingCaretRef.current = nextCaret
+    restoreComposerCaret(el, nextCaret)
     notifyComposerInput(el, text, nextCaret, { sync: true })
     if (text !== value) onChange?.(text)
     setDomHasText(text.length > 0)
@@ -130,6 +135,14 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   useEffect(() => {
     syncPlaceholderFromDom()
   }, [syncPlaceholderFromDom])
+
+  useLayoutEffect(() => {
+    const el = rootRef.current
+    if (!el || pendingCaretRef.current == null) return
+    const pos = pendingCaretRef.current
+    pendingCaretRef.current = null
+    restoreComposerCaret(el, pos)
+  }, [value])
 
   useLayoutEffect(() => {
     const el = rootRef.current
