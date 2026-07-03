@@ -10,6 +10,7 @@ function formatRemaining(seconds) {
 
 /**
  * Minimal hero lightbox transport: play/pause + scrubber (video paints behind overlay chrome).
+ * Scrubber seeks live while dragging (not only on pointer up).
  * @param {{ current: HTMLVideoElement | null }} videoRef
  */
 export default function LoungeStreamVideoPlaybackControls({
@@ -24,11 +25,40 @@ export default function LoungeStreamVideoPlaybackControls({
   const [scrubbing, setScrubbing] = useState(false)
   const [scrubPreview, setScrubPreview] = useState(0)
   const scrubbingRef = useRef(false)
+  const wasPlayingBeforeScrubRef = useRef(false)
   const rafRef = useRef(0)
 
   const syncDuration = useCallback((v) => {
     setDuration(Number.isFinite(v?.duration) ? v.duration : 0)
   }, [])
+
+  const clampScrubTime = useCallback((v, next) => {
+    if (!Number.isFinite(next)) return 0
+    const cap = Number.isFinite(v?.duration) && v.duration > 0 ? v.duration : null
+    if (cap != null) return Math.min(Math.max(0, next), cap)
+    return Math.max(0, next)
+  }, [])
+
+  const seekVideoTo = useCallback(
+    (next, { liveScrub = false } = {}) => {
+      const v = videoRef?.current
+      const t = clampScrubTime(v, next)
+      setScrubPreview(t)
+      if (liveScrub || !scrubbingRef.current) {
+        setCurrentTime(t)
+      }
+      if (!v) return t
+      try {
+        if (Math.abs(v.currentTime - t) > 0.035) {
+          v.currentTime = t
+        }
+      } catch {
+        // ignore
+      }
+      return t
+    },
+    [videoRef, clampScrubTime],
+  )
 
   useEffect(() => {
     scrubbingRef.current = scrubbing
@@ -128,8 +158,17 @@ export default function LoungeStreamVideoPlaybackControls({
       e.stopPropagation()
       onUserActivity?.()
       const v = videoRef?.current
-      const t = v?.currentTime || currentTime
+      wasPlayingBeforeScrubRef.current = Boolean(v && !v.paused && !v.ended)
+      if (v && wasPlayingBeforeScrubRef.current) {
+        try {
+          v.pause()
+        } catch {
+          // ignore
+        }
+        setPlaying(false)
+      }
       setScrubbing(true)
+      const t = v?.currentTime || currentTime
       setScrubPreview(t)
     },
     [videoRef, currentTime, onUserActivity],
@@ -140,29 +179,31 @@ export default function LoungeStreamVideoPlaybackControls({
       e.stopPropagation()
       const next = Number(e.target.value)
       if (!Number.isFinite(next)) return
-      setScrubPreview(next)
+      seekVideoTo(next, { liveScrub: true })
     },
-    [],
+    [seekVideoTo],
   )
 
   const finishScrub = useCallback(
     (e) => {
       e?.stopPropagation?.()
-      const v = videoRef?.current
       const fromInput = Number(e?.currentTarget?.value)
       const next = Number.isFinite(fromInput) ? fromInput : scrubPreview
+      seekVideoTo(next)
       setScrubbing(false)
-      setScrubPreview(next)
-      if (!v || !Number.isFinite(v.duration)) return
-      setCurrentTime(next)
-      try {
-        v.currentTime = next
-      } catch {
-        // ignore
+      const v = videoRef?.current
+      if (v && wasPlayingBeforeScrubRef.current) {
+        try {
+          const p = v.play()
+          if (p && typeof p.catch === 'function') p.catch(() => {})
+        } catch {
+          // ignore
+        }
       }
+      wasPlayingBeforeScrubRef.current = false
       onUserActivity?.()
     },
-    [videoRef, scrubPreview, onUserActivity],
+    [videoRef, scrubPreview, seekVideoTo, onUserActivity],
   )
 
   const max = duration > 0 ? duration : 1
