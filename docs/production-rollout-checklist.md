@@ -58,6 +58,7 @@ Track **everything else** already used on test that production must also have ap
 - [ ] **`supabase/migrations/20260701130000_starter_weekly_guide_unlocks.sql`** — Starter weekly drop table + **`grant_starter_weekly_guide_drop`** (included in Stripe billing chain through **`20260701160000`** if that promote already ran).
 - [ ] **`supabase/migrations/20260702120000_starter_weekly_drop_reveal_cron.sql`** — scratch reveal column, **`starter_weekly_guide_drop`** activity type, weekly pg_cron (**Mon 00:10 UTC**), reveal RPCs. **Prereqs:** **`pg_cron`** enabled; **`@edgelord`** profile exists (system actor for notifications). Redeploy **`lounge-send-activity-push`** (§4) after apply.
 - [x] **Chat archive inbox** — apply in order: **`20260702150000_chat_room_member_archive.sql`** (`archived_at`, **`chat_archive_room`**, inbox/unread exclude archived), **`20260702160000_chat_archived_rooms_list.sql`** (**`chat_unarchive_room`**, archived list RPCs), **`20260702170000_chat_unarchive_notifications_comment.sql`** (comments only; safe re-run). Redeploy **`lounge-chat`** (§4) after apply.
+- [x] **Lounge strict hashtag search** — **`20260702210000_lounge_search_strict_hashtag.sql`** (**`lounge_search_hashtag_posts`**; Ryan sign-off **2026-07-02**, client **`a496a97`**).
 - [ ] **Play Logbook (if prod ships Logbook):** apply test-validated chain through **`20260531540000_buffalo_calculator_slug_buffalo_link.sql`** — base **`20260529120000_play_logbook.sql`**, shared sessions **`20260531140000`**, manager/paid **`20260531190000`**, paid/unpaid notify repair order (**`20260531300000`** → **`20260531310000`**, repair **`20260531320000`** if needed), custom metrics **`20260531350000`**, admin primary templates **`20260531400000`**, MHB fields **`20260531500000`**, label migrations **`20260531330000`**–**`20260531360000`**, **`20260531510000`**–**`20260531530000`**, **`20260531540000`**. Redeploy **`lounge-send-activity-push`** after activity-event migrations.
 
 **After deploy — quick smoke SQL (production):**
@@ -169,6 +170,8 @@ Secrets (secrets / env vault in Supabase) for push + web-push must exist on prod
 
 **Lounge cashtag tap-to-search (2026-07-02):** **Ryan sign-off** — client-only **`efe255d`** on **`origin/main`** / **`edgetilt.com`**; tap **`$TICKER`** in feed caption → dock Search + cashtag post results smoke **PASSED**. No migration or Edge redeploy.
 
+**Lounge strict hashtag search (2026-07-02):** **Ryan sign-off** — migration **`20260702210000`**, client **`a496a97`** on **`edgetilt.com`**; tap **`#tag`** → literal hashtag post results only (no fuzzy prose matches) smoke **PASSED**.
+
 ---
 
 ## 5. Post-deploy smoke (application)
@@ -184,6 +187,7 @@ Secrets (secrets / env vault in Supabase) for push + web-push must exist on prod
 - [ ] **Lounge media lightbox:** image full-screen pinch-zoom + pan; Stream hero expand with interaction bar — spot-check feed + post detail (client-only; no extra deploy beyond app bundle).
 - [ ] **AP Guide editor (`/slot-guide-form`):** admin login → **+ New guide** → **Save draft** (optional) → **Ingest guide** with Vercel **§1** Supabase service vars set → **Fetch guides** → **Load** → edit section → **Save changes**. Spot-check **Buffalo Link** calculator slug **`buffalo-link`** in app after **`20260531540000`** on prod DB.
 - [ ] **Starter weekly guide drop:** on a **Slots Edge Starter** prod account, SQL grant + activity event per **`docs/test-user-roles.md`** → scratch modal, real rub audio, tap-to-open guide, Pro CTA; notification tap deep-links with **`starterDrop=`**. Cron **`starter_weekly_guide_drop_weekly`** scheduled (Mon **00:10 UTC**). Do **not** run bulk **`run_starter_weekly_guide_drop_job()`** on prod without intent.
+- [x] **Lounge strict hashtag search:** tap **`#edgeai`** (or any hashtag) → dock **Search** returns only posts with that literal hashtag (case variants OK; no bare **`edge`** / **`edgeai`** prose); migration **`20260702210000`**, client **`a496a97`**.
 - [x] **Lounge cashtag tap-to-search:** tap **`$AAPL`** (or any cashtag) in a feed caption → dock **Search** opens with **`$TICKER`** query and cashtag post results (client-only; **`efe255d`**).
 - [x] **Chat archive inbox:** swipe left → archive (green); **Archived** tab → swipe left restore (blue) or reply from thread → returns to Inbox; inbound while archived → **no push**; restore or reply → push resumes.
 
@@ -211,4 +215,4 @@ Already planned for Slot Pro backlog; prod cutover reminders:
 
 ---
 
-_Last updated: **Lounge cashtag tap-to-search** prod **sign-off** (**`efe255d`**, client-only). Prior: **Chat archive inbox** prod **sign-off** (**`20260702150000`**–**`170000`**, **`lounge-chat`**, **`main`** **`f31d9a7`**). Prior: prod merge **`889a927`**. Prior: **Starter weekly drop** (**`20260702120000`**, **`lounge-send-activity-push`**, **`66d6ed7`**). Frontend: `docs/frontend-architecture.md`; test tracking: `docs/test-buildout-backlog.md`._
+_Last updated: **Lounge strict hashtag search** prod **sign-off** (**`20260702210000`**, client **`a496a97`**). Prior: **Lounge cashtag tap-to-search** (**`efe255d`**). Prior: **Chat archive inbox** (**`20260702150000`**–**`170000`**, **`lounge-chat`**, **`f31d9a7`**). Frontend: `docs/frontend-architecture.md`; test tracking: `docs/test-buildout-backlog.md`._
