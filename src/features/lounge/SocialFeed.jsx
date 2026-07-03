@@ -251,6 +251,7 @@ import LoungeMarketChartModal from './LoungeMarketChartModal.jsx'
 import LoungeMarketChartStrip from './LoungeMarketChartStrip.jsx'
 import { LoungeMarketFeedProvider } from './LoungeMarketFeedContext.jsx'
 import { useLoungeMarketPollActivityTracker } from './loungeMarketPollActivity.js'
+import { LOUNGE_IOS } from './useLoungeKeyboardOverlapPx.js'
 import LoungeMarketSymbolPickerSheet from './LoungeMarketSymbolPickerSheet.jsx'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import PwaInstallTitleBarRow from '../../components/PwaInstallBanner.jsx'
@@ -813,6 +814,8 @@ export default function SocialFeed({
   const loungePostDetailPostAvatarRef = useRef(null)
   const loungePostDetailCommentConnectorRef = useRef(null)
   const loungeDetailCommentFieldRef = useRef(null)
+  /** iOS: skip visualViewport scroll + footer RO churn while typing in the reply field. */
+  const loungeDetailCommentFieldFocusedRef = useRef(false)
   const loungeDetailCommentDraftRef = useRef('')
   const loungePostDetailTitleBarRef = useRef(null)
   const loungePostDetailTitleRevealRef = useRef(1)
@@ -1741,7 +1744,7 @@ export default function SocialFeed({
     }
     const vv = typeof window !== 'undefined' ? window.visualViewport : null
     if (!vv) return undefined
-    const sync = () => {
+    const applyOverlap = () => {
       try {
         const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
         setLoungeDetailCommentKbOverlapPx(Number.isFinite(overlap) ? overlap : 0)
@@ -1749,12 +1752,16 @@ export default function SocialFeed({
         setLoungeDetailCommentKbOverlapPx(0)
       }
     }
-    sync()
-    vv.addEventListener('resize', sync)
-    vv.addEventListener('scroll', sync)
+    const onVvScroll = () => {
+      if (LOUNGE_IOS && loungeDetailCommentFieldFocusedRef.current) return
+      applyOverlap()
+    }
+    applyOverlap()
+    vv.addEventListener('resize', applyOverlap)
+    vv.addEventListener('scroll', onVvScroll)
     return () => {
-      vv.removeEventListener('resize', sync)
-      vv.removeEventListener('scroll', sync)
+      vv.removeEventListener('resize', applyOverlap)
+      vv.removeEventListener('scroll', onVvScroll)
       setLoungeDetailCommentKbOverlapPx(0)
     }
   }, [loungePostDetail, loungeReadOnly])
@@ -1767,6 +1774,7 @@ export default function SocialFeed({
     const footer = loungeDetailCommentFooterRef.current
     if (!footer) return undefined
     const syncInset = () => {
+      if (LOUNGE_IOS && loungeDetailCommentFieldFocusedRef.current) return
       setLoungeDetailCommentFooterInsetPx(
         footer.offsetHeight + LOUNGE_DETAIL_COMMENT_FOOTER_SCROLL_GAP_PX,
       )
@@ -15570,7 +15578,35 @@ export default function SocialFeed({
                           onKeyUp={mentionDetailComment.onCursorMove}
                           onMouseUp={mentionDetailComment.onCursorMove}
                           onInput={mentionDetailComment.onCursorMove}
+                          onFocus={() => {
+                            loungeDetailCommentFieldFocusedRef.current = true
+                          }}
                           onBlur={(e) => {
+                            loungeDetailCommentFieldFocusedRef.current = false
+                            if (LOUNGE_IOS) {
+                              requestAnimationFrame(() => {
+                                const footerEl = loungeDetailCommentFooterRef.current
+                                if (footerEl) {
+                                  setLoungeDetailCommentFooterInsetPx(
+                                    footerEl.offsetHeight + LOUNGE_DETAIL_COMMENT_FOOTER_SCROLL_GAP_PX,
+                                  )
+                                }
+                                const vv = window.visualViewport
+                                if (vv) {
+                                  try {
+                                    const overlap = Math.max(
+                                      0,
+                                      window.innerHeight - vv.height - vv.offsetTop,
+                                    )
+                                    setLoungeDetailCommentKbOverlapPx(
+                                      Number.isFinite(overlap) ? overlap : 0,
+                                    )
+                                  } catch {
+                                    setLoungeDetailCommentKbOverlapPx(0)
+                                  }
+                                }
+                              })
+                            }
                             const host = e.currentTarget.closest('[data-lounge-detail-comment-host]')
                             const next = e.relatedTarget
                             if (host && next instanceof Node && host.contains(next)) return
