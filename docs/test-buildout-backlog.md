@@ -704,6 +704,8 @@ Ryan (2026-05-29): **Only** Calcs, Calendar, Bankroll, Logbook, AP Guides — no
 
 ## Update log
 
+- 2026-07-02: **Lounge market chart ALL timeframe (Ryan sign-off):** Quick modal **ALL** pill no longer aliases **1Y** — **`window_key: all`** with max-history fetch (Yahoo `range=max` / CoinGecko `days=max`). Client **`6c2c811`** + **`lounge-market-data`** redeploy on **`edgetilt.com`**. **PASSED** smoke: ALL shows longer span than 1Y.
+- 2026-07-02: **Lounge market chart ALL timeframe (code):** **`MARKET_MODAL_TIMEFRAMES`** ALL → **`all`**; Edge **`finnhubMarket`/`yahooMarket`/`coingeckoMarket`** max-history paths. **Redeploy `lounge-market-data`** on test + prod.
 - 2026-07-02: **Chat archive inbox — production (Ryan sign-off):** **`jtjgtucumuoswnbauxry`** migrations **`20260702150000`**–**`170000`** applied; **`lounge-chat`** redeployed; frontend **`origin/main`** through **`f31d9a7`** on **`edgetilt.com`**. Archive / restore swipe, push mute while archived, reply-unarchive validated.
 - 2026-07-02: **Chat archive reply-unarchive (code):** **`lounge-chat` `send_message`** clears sender **`archived_at`** on post (Gmail-style restore + push re-enabled). Inbound-only messages stay archived. Client: **`onInboxRestored`** refreshes lists and exits Archived view after send. Migration **`20260702170000`** documents push gate. **Redeploy `lounge-chat` on test.**
 - 2026-07-02: **Chat archived push mute + restore swipe (code):** `lounge-chat` **`enqueueChatDmPush`** / **`enqueueChatGroupInvitePush`** skip recipients with **`archived_at`**. Archived list: swipe left → **blue** move-to-inbox (inbox-up icon); inbox stays green archive. **Redeploy `lounge-chat` on test** after client deploy.
