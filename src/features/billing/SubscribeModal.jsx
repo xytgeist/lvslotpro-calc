@@ -111,9 +111,9 @@ function getCarouselStepPx(widthPx) {
 
 const STARTER_FEATURES = [
   'Instant starter guide pack (80+ AP guides)',
-  'One random premium guide drop every week',
-  'Calculators paired with guides you unlock',
-  'Subscriber badge and Lounge perks',
+  'One mystery premium guide drop every week (fully randomized)',
+  'Full access to Bankroll manager, Logbook & Calendar',
+  'New Calculator unlocks',
 ]
 
 const FULL_FEATURES = [
@@ -637,7 +637,7 @@ export default function SubscribeModal({
                           Current
                         </span>
                       ) : null}
-                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300/80">Guide-first</div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300/80">Starter Pack</div>
                       <div className="mt-0.5 text-lg font-bold text-white">{productDisplayName(PRODUCT_SLOTS_EDGE_STARTER)}</div>
                       <p className="mt-0.5 text-xs text-zinc-400">Build your library week by week.</p>
                       <div
