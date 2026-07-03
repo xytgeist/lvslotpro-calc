@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import {
   getCaretTextOffset,
-  insertComposerLineBreakAtSelection,
+  insertComposerLineBreakViaExecCommand,
   insertPlainTextAtSelection,
   plainTextFromComposerRoot,
   syncComposerHtml,
@@ -17,7 +17,7 @@ function isEnterKeyEvent(e) {
 
 /**
  * Contenteditable Lounge caption field with live @ / # / link styling.
- * Enter inserts a DOM <br> (mobile-safe) then syncs plain-text state + rich HTML.
+ * Enter uses execCommand insertLineBreak (X-style); rich HTML sync waits for the next keystroke.
  */
 const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   {
@@ -46,6 +46,8 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   const caretRef = useRef(0)
   const composingRef = useRef(false)
   const enterHandledRef = useRef(false)
+  /** Skip one readAndEmit rich HTML rebuild right after Enter (DOM rewrite races mobile caret). */
+  const skipRichSyncRef = useRef(false)
   const onInputRef = useRef(onInput)
   onInputRef.current = onInput
   const preset = LOUNGE_RICH_COMPOSER_VARIANTS[variant] || LOUNGE_RICH_COMPOSER_VARIANTS.feed
@@ -74,7 +76,11 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     lastValueRef.current = capped
     caretRef.current = nextCaret
     notifyComposerInput(el, capped, nextCaret, { sync: true })
-    syncComposerHtml(el, capped, nextCaret)
+    if (skipRichSyncRef.current) {
+      skipRichSyncRef.current = false
+    } else {
+      syncComposerHtml(el, capped, nextCaret)
+    }
     if (capped !== value) onChange?.(capped)
   }, [maxLength, notifyComposerInput, onChange, value])
 
@@ -88,7 +94,11 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
       enterHandledRef.current = false
     })
 
-    if (!insertComposerLineBreakAtSelection(el)) return false
+    skipRichSyncRef.current = true
+    if (!insertComposerLineBreakViaExecCommand(el)) {
+      skipRichSyncRef.current = false
+      return false
+    }
 
     if (composingRef.current) return true
 
@@ -102,10 +112,6 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     lastValueRef.current = text
     caretRef.current = nextCaret
     notifyComposerInput(el, text, nextCaret, { sync: true })
-    requestAnimationFrame(() => {
-      if (!el.isConnected) return
-      syncComposerHtml(el, text, nextCaret)
-    })
     if (text !== value) onChange?.(text)
     return true
   }, [maxLength, notifyComposerInput, onChange, value])
@@ -179,7 +185,8 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     (e) => {
       onKeyDown?.(e)
       if (e.defaultPrevented) return
-      if (!enterInsertsNewline || !isEnterKeyEvent(e) || e.shiftKey) return
+      if (!enterInsertsNewline || !isEnterKeyEvent(e)) return
+      if (e.ctrlKey || e.metaKey) return
       e.preventDefault()
       insertEnterNewline()
     },

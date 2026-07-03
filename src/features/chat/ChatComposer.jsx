@@ -14,7 +14,7 @@ import {
 } from '../../utils/loungeVideoUpload.js'
 import {
   getCaretTextOffset,
-  insertComposerLineBreakAtSelection,
+  insertComposerLineBreakViaExecCommand,
   plainTextFromComposerRoot,
 } from '../lounge/loungeRichComposerDom.js'
 
@@ -492,7 +492,7 @@ export default function ChatComposer({
       enterHandledRef.current = false
     })
 
-    if (!insertComposerLineBreakAtSelection(el)) return false
+    if (!insertComposerLineBreakViaExecCommand(el)) return false
 
     const text = plainTextFromComposerRoot(el).slice(0, MAX_BODY)
     caretRef.current = getCaretTextOffset(el)
@@ -507,7 +507,7 @@ export default function ChatComposer({
       void handleSend()
       return
     }
-    if ((e.key === 'Enter' || e.keyCode === 13) && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    if ((e.key === 'Enter' || e.keyCode === 13) && !e.ctrlKey && !e.metaKey) {
       e.preventDefault()
       insertChatNewlineAtCaret()
     }

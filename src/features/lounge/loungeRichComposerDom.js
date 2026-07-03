@@ -363,6 +363,35 @@ export function insertPlainTextAtSelection(root, text) {
   return true
 }
 
+/**
+ * Insert a line break via execCommand (X/Twitter-style, best on iOS/Android contenteditable).
+ * Falls back to manual <br> when execCommand is unavailable.
+ */
+export function insertComposerLineBreakViaExecCommand(root) {
+  if (!root || typeof document === 'undefined') return false
+  if (!ensureComposerSelection(root)) return false
+  try {
+    root.focus({ preventScroll: true })
+  } catch {
+    try {
+      root.focus()
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    if (document.execCommand('insertLineBreak', false, null)) return true
+  } catch {
+    // ignore
+  }
+  try {
+    if (document.execCommand('insertHTML', false, '<br>')) return true
+  } catch {
+    // ignore
+  }
+  return insertComposerLineBreakAtSelection(root)
+}
+
 /** Insert a visible line break at the current selection (mobile Enter / newline). */
 export function insertComposerLineBreakAtSelection(root) {
   if (!root || typeof document === 'undefined') return false
