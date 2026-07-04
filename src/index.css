@@ -2078,6 +2078,22 @@ html.light [data-lounge-market-chart-mini] .text-lv-green {
   color: #16a34a;
 }
 
+/* Lounge feed caption Show more expand control (dark: cyan, light: blue) */
+.lounge-caption-more {
+  font-weight: 500;
+  color: rgb(34 211 238 / 0.92);
+}
+.lounge-caption-more:hover {
+  color: rgb(103 232 249);
+}
+
+html.light .lounge-caption-more {
+  color: #2563eb !important;
+}
+html.light .lounge-caption-more:hover {
+  color: #1d4ed8 !important;
+}
+
 /* Lounge post $TICKER cashtags (positive day change) */
 html.light .lounge-cashtag-positive {
   color: #16a34a !important;

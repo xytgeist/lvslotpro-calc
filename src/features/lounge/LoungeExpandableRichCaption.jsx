@@ -5,7 +5,7 @@ import { useLoungeMarketFeedQuotes } from './LoungeMarketFeedContext.jsx'
 
 /**
  * Rich caption with optional collapse at {@link LOUNGE_CAPTION_DISPLAY_MAX} chars /
- * {@link LOUNGE_CAPTION_DISPLAY_MAX_LINES} lines + inline …more.
+ * {@link LOUNGE_CAPTION_DISPLAY_MAX_LINES} lines + inline Show more.
  *
  * @param {{
  *   text: string,
@@ -20,7 +20,7 @@ import { useLoungeMarketFeedQuotes } from './LoungeMarketFeedContext.jsx'
 export default function LoungeExpandableRichCaption({
   text,
   className = '',
-  moreClassName = 'font-medium text-zinc-400 hover:text-zinc-200',
+  moreClassName = 'lounge-caption-more touch-manipulation [-webkit-tap-highlight-color:transparent]',
   displayMax = LOUNGE_CAPTION_DISPLAY_MAX,
   displayMaxLines = LOUNGE_CAPTION_DISPLAY_MAX_LINES,
   startExpanded = false,
@@ -66,9 +66,9 @@ export default function LoungeExpandableRichCaption({
               setExpanded(true)
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className={`inline touch-manipulation [-webkit-tap-highlight-color:transparent] ${moreClassName}`}
+            className={`inline ${moreClassName}`}
           >
-            more
+            Show more
           </button>
         </>
       ) : null}
