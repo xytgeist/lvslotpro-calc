@@ -688,7 +688,10 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
 
         <div className="mt-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
-            Default category pills (max 3)
+            Default post pills (max 3)
+          </div>
+          <div className="text-zinc-600 text-[10px] mb-2">
+            Tags on automated posts. Profile interest tribes are under Lounge profile → Edit.
           </div>
           <div className="flex flex-wrap gap-2">
             {LOUNGE_POST_CATEGORY_PILL_SLUGS.map((slug) => {

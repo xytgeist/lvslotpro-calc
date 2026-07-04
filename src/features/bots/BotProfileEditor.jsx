@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import LoungePostCategoryPillPicker from '../lounge/LoungePostCategoryPillPicker.jsx'
 import { DEFAULT_PROFILE_BANNER_PATHS } from '../profiles/defaultProfileBanners.js'
 import { uploadProfileAvatar, uploadProfileBanner } from '../profiles/profileGate.js'
 import { isProbablyImageFile, prepareAvatarImageForUpload } from '../../utils/compressImageForUpload.js'
+import { normalizeLoungeProfileCategoryPills } from '../../utils/loungePostCategoryPills.js'
 import { saveBotSettings } from './botPortalApi.js'
 
 const ProfileAvatarCropModal = lazy(() => import('../lounge/ProfileAvatarCropModal.jsx'))
@@ -20,6 +22,7 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
     handle: '',
     bio: '',
     aboutMe: '',
+    profileTribes: [],
   })
 
   useEffect(() => {
@@ -28,8 +31,9 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
       handle: bot.handle || '',
       bio: bot.bio || '',
       aboutMe: bot.about_me || '',
+      profileTribes: normalizeLoungeProfileCategoryPills(bot.category_pills),
     })
-  }, [bot?.user_id, bot?.handle, bot?.bio, bot?.about_me])
+  }, [bot?.user_id, bot?.handle, bot?.bio, bot?.about_me, bot?.category_pills])
 
   useEffect(() => {
     setProfileExpanded(false)
@@ -132,6 +136,7 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
         handle,
         bio: draft.bio.trim(),
         about_me: draft.aboutMe.trim(),
+        category_pills: normalizeLoungeProfileCategoryPills(draft.profileTribes),
       },
       'Profile saved.',
     )
@@ -281,6 +286,18 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
             className="mt-1 w-full rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2 text-white text-sm resize-y focus:border-cyan-500/50 focus:outline-none"
           />
         </label>
+        <div className="block sm:col-span-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-1">
+            Interest tribes
+          </div>
+          <LoungePostCategoryPillPicker
+            value={draft.profileTribes}
+            onChange={(next) => setDraft((d) => ({ ...d, profileTribes: next }))}
+            disabled={Boolean(busy)}
+            maxPills={null}
+            hint="Shown on Scott's Lounge profile. Separate from default post pills in Settings."
+          />
+        </div>
       </div>
 
       <button
