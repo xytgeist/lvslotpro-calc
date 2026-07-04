@@ -7,25 +7,26 @@ Background odds poller for sports bots.
 | `action` | Behavior |
 | --- | --- |
 | `poll_edges` | Fetch each calendar-active sport today; publish **⚡ +EV** alerts when EV clears `min_edge_pct` (devig h2h). |
-| `daily_slates` | Post one **slate check-in** per calendar sport (if not already posted today). |
+| `daily_slates` | Post one **morning slate** per calendar sport (today's PT games only: best ML line + book per outcome). |
 
-## Cron (test / prod)
+### Morning slate window (cron)
 
-Schedule **`poll_edges`** every 30 minutes during active hours, and **`daily_slates`** once each morning (PT).
+`daily_slates` only publishes between **7:00am and 10:00am PT**. Each bot gets a **stable random minute** in that window per day (derived from `bot_user_id` + PT date) so posts do not land at the same time every morning.
 
-Example Supabase cron (adjust slug + service role):
+**Cron:** invoke every **15 minutes** from **7:00-9:59am PT** with service role:
 
-```sql
--- Edge scan every 30 min (service role invokes Edge Function)
--- Daily slates at 8am PT — wire via dashboard cron or pg_cron + http extension
+```json
+{ "slug": "sharpesignal", "action": "daily_slates" }
 ```
 
-Manual smoke from bot portal: **Scan all · edge** and **Post all slates**.
+First tick after the bot's scheduled minute posts one slate per active calendar sport (deduped per sport/day).
 
-Deploy with:
+**Portal:** **Post morning slates** sends `force: true` to bypass the time gate for manual smoke.
+
+## Deploy
 
 ```bash
 supabase functions deploy lounge-odds-poll --project-ref YOUR_PROJECT_REF
 ```
 
-Requires **`THE_ODDS_API_KEY`** and migration **`20260704150000_lounge_bot_odds_slate_edge.sql`**.
+Requires **`THE_ODDS_API_KEY`** and migrations through **`20260704150000`**.

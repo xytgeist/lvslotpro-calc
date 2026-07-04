@@ -1,6 +1,6 @@
 # Lounge bot — sports odds / +EV plays
 
-**Status:** **Shipped on test (code, Jul 2026)** — migrations through **`20260704170000`**, Edge fns **`lounge-odds-ingest`** + **`lounge-odds-poll`**, admin portal **`/?tab=bots`**. **Ryan smoke pending** on **`kcosfvmreeiosdjdzycb`**.
+**Status:** **Shipped on test (code, Jul 2026)** — migrations through **`20260704180000`**, Edge fns **`lounge-odds-ingest`** + **`lounge-odds-poll`**, admin portal **`/?tab=bots`**. **Ryan smoke pending** on **`kcosfvmreeiosdjdzycb`**.
 
 **Live bot (test):** **Scott Share** — `@sharpesignal`, pipeline **`odds_api`**, category pill **`sports`**.
 
@@ -34,11 +34,18 @@ Fair +652 (9 books)
 
 **Slate example:**
 ```text
-World Cup: France vs Paraguay, Sat Jul 4 at 2pm PT
+World Cup slate
 
-12 matches in next 48h
-No +EV above threshold
+France vs Paraguay, Sat Jul 4 at 2pm PT
+France +145 (DraftKings), Draw +652 (FanDuel), Paraguay +718 (MyBookie)
+
+Germany vs Portugal, Sat Jul 4 at 5pm PT
+Germany -110 (FanDuel), Portugal +105 (DraftKings)
 ```
+
+Long slates truncate with `+N more games today.` at the 500-char caption cap. **+EV alerts and morning slates** only consider games **kicking off today (PT)** that have not started yet.
+
+**Morning automation:** cron calls **`lounge-odds-poll`** with **`daily_slates`** every 15 min between **7-10am PT**; each bot fires once per day at a random minute in that window. See **`lounge-odds-poll/README.md`**.
 
 **`review_mode`:** `automatic`. Target volume: **~2 posts/day** + optional edge alerts when lines misprice (caps below).
 
@@ -60,7 +67,7 @@ No +EV above threshold
 
 Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`**
 
-1. Filter events: **48h** window, **3+ books**, in-season sport keys from The Odds API **`active`**
+1. Filter events: **today (PT)** kickoffs not yet started (after optional **48h** API pre-filter), **3+ books**, in-season sport keys from The Odds API **`active`**
 2. **h2h only** for alerts (spreads fetched for cache/context, not +EV v1)
 3. Per book: devig both sides → fair implied prob per outcome
 4. **Consensus:** average fair probs across books
@@ -146,6 +153,20 @@ Captions prefix category label from calendar row (e.g. `Wimbledon · …`).
 | **`20260704150000`** | Slate/edge post kinds + caps |
 | **`20260704160000`** | `min_edge_pct` semantics + default 2 |
 | **`20260704170000`** | Portal save **`min_edge_pct`** |
+| **`20260704180000`** | Manual post + comment as bot (`admin_lounge_bot_publish_post`, `admin_lounge_bot_post_comment`) |
+
+---
+
+## Manual posts and replies (portal)
+
+On **`/?tab=bots`**, any bot card includes:
+
+| Control | RPC / behavior |
+| --- | --- |
+| **Post as @handle** | **`admin_lounge_bot_publish_post`** — inserts feed post as bot; logs **`post_kind: other`** |
+| **Replies** on each recent post | Load thread from **`feed_comments`**; **Reply as bot** → **`admin_lounge_bot_post_comment`** |
+
+Works for Scott Share and all other bots. Does not bypass day/hour caps on automated ingest (manual posts are separate).
 
 ---
 

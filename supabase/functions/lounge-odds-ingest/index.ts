@@ -8,7 +8,6 @@ import {
   buildOddsEdgeAlertCaption,
   buildOddsSlateCaption,
   DEFAULT_MIN_EV_PCT,
-  pickFeaturedEvent,
 } from '../_shared/loungeBotOddsCaption.ts'
 import {
   countPublishedKindToday,
@@ -155,12 +154,10 @@ Deno.serve(async (req) => {
       ? buildOddsEdgeAlertCaption(edgePick, { categoryLabel: calendarPick.categoryLabel })
       : buildOddsSlateCaption({
         categoryLabel: calendarPick.categoryLabel,
-        eventsInWindow: ctx.eventsInWindow,
-        featured: pickFeaturedEvent(ctx.upcoming),
+        events: ctx.upcoming,
       })
 
     if (dryRun) {
-      const featured = pickFeaturedEvent(ctx.upcoming)
       const wouldPost = wantEdge && edgePick && edgePick.edgePct >= minEdge ? 'edge' : 'slate'
       return adminOpsJson(200, {
         ok: true,
@@ -176,9 +173,8 @@ Deno.serve(async (req) => {
           : null,
         slatePreview: buildOddsSlateCaption({
           categoryLabel: calendarPick.categoryLabel,
-          eventsInWindow: ctx.eventsInWindow,
-          featured,
-        }).slice(0, 220),
+          events: ctx.upcoming,
+        }).slice(0, 320),
         requestsRemaining: ctx.requestsRemaining,
       })
     }

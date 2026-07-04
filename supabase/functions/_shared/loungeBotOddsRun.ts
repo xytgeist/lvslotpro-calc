@@ -11,8 +11,8 @@ import {
   DEFAULT_ODDS_WINDOW_HOURS,
   edgeAlertDedupeKey,
   filterOddsEventsByWindow,
+  filterOddsEventsForPtCalendarDay,
   pickBestOddsCandidate,
-  pickFeaturedEvent,
   slateDedupeKey,
   type OddsPick,
 } from './loungeBotOddsCaption.ts'
@@ -68,6 +68,63 @@ export function ptDayStartIso(): string {
   const m = parts.find((p) => p.type === 'month')?.value
   const d = parts.find((p) => p.type === 'day')?.value
   return new Date(`${y}-${m}-${d}T00:00:00-07:00`).toISOString()
+}
+
+const MORNING_SLATE_START_MIN_PT = 7 * 60
+const MORNING_SLATE_END_MIN_PT = 10 * 60
+
+function hashString(input: string): number {
+  let h = 0
+  for (let i = 0; i < input.length; i++) {
+    h = (Math.imul(31, h) + input.charCodeAt(i)) | 0
+  }
+  return Math.abs(h)
+}
+
+/** Minutes since midnight in America/Los_Angeles (0-1439). */
+export function ptMinutesSinceMidnightPt(now = new Date()): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(now)
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
+  return hour * 60 + minute
+}
+
+/** Stable random minute between 7:00 and 9:59am PT for this bot + calendar day. */
+export function morningSlateScheduledMinutePt(botUserId: string, ptDate = ptTodayDate()): number {
+  const span = MORNING_SLATE_END_MIN_PT - MORNING_SLATE_START_MIN_PT
+  return MORNING_SLATE_START_MIN_PT + (hashString(`${botUserId}:${ptDate}`) % span)
+}
+
+export function formatPtMinuteAsClock(totalMinutes: number): string {
+  const h24 = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  const h12 = h24 % 12 || 12
+  const suffix = h24 >= 12 ? 'pm' : 'am'
+  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`
+}
+
+export function morningSlateShouldRunNow(
+  botUserId: string,
+  opts: { force?: boolean } = {},
+): { shouldRun: boolean; reason?: string; scheduledMinute?: number; nowMinute?: number } {
+  const nowMinute = ptMinutesSinceMidnightPt()
+  const scheduledMinute = morningSlateScheduledMinutePt(botUserId)
+
+  if (opts.force) {
+    return { shouldRun: true, scheduledMinute, nowMinute }
+  }
+  if (nowMinute < MORNING_SLATE_START_MIN_PT || nowMinute >= MORNING_SLATE_END_MIN_PT) {
+    return { shouldRun: false, reason: 'outside_morning_window', scheduledMinute, nowMinute }
+  }
+  if (nowMinute < scheduledMinute) {
+    return { shouldRun: false, reason: 'before_scheduled_time', scheduledMinute, nowMinute }
+  }
+  return { shouldRun: true, scheduledMinute, nowMinute }
 }
 
 export async function fetchActiveSportKeys(): Promise<Set<string>> {
@@ -192,7 +249,8 @@ export async function loadSportOddsContext(
 ): Promise<SportOddsContext> {
   const { events, remaining } = await fetchSportOdds(sportKey, regions, markets)
   const raw = Array.isArray(events) ? events : []
-  const upcoming = filterOddsEventsByWindow(raw, DEFAULT_ODDS_WINDOW_HOURS)
+  const inWindow = filterOddsEventsByWindow(raw, DEFAULT_ODDS_WINDOW_HOURS)
+  const upcoming = filterOddsEventsForPtCalendarDay(inWindow, ptTodayDate())
 
   if (!dryRun) {
     await admin.from('lounge_odds_snapshots').insert({
@@ -202,7 +260,9 @@ export async function loadSportOddsContext(
         calendarSlug: calendarPick.calendarSlug,
         categoryLabel: calendarPick.categoryLabel,
         rawCount: raw.length,
-        windowCount: upcoming.length,
+        windowCount: inWindow.length,
+        todayCount: upcoming.length,
+        ptDate: ptTodayDate(),
         events: upcoming,
       },
     })
@@ -282,20 +342,22 @@ export async function tryPublishSlateCheckIn(
   ctx: SportOddsContext,
   dayStart: string,
   dryRun: boolean,
-): Promise<{ published: boolean; skipped?: string }> {
-  const dedupeKey = slateDedupeKey(ctx.calendarSlug, ptTodayDate())
-  if (!dryRun && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) {
-    return { published: false, skipped: 'slate_already_posted' }
+): Promise<{ published: boolean; skipped?: string; gamesToday?: number }> {
+  if (ctx.eventsInWindow <= 0) {
+    return { published: false, skipped: 'no_games_today', gamesToday: 0 }
   }
 
-  const featured = pickFeaturedEvent(ctx.upcoming)
+  const dedupeKey = slateDedupeKey(ctx.calendarSlug, ptTodayDate())
+  if (!dryRun && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) {
+    return { published: false, skipped: 'slate_already_posted', gamesToday: ctx.eventsInWindow }
+  }
+
   const caption = buildOddsSlateCaption({
     categoryLabel: ctx.categoryLabel,
-    eventsInWindow: ctx.eventsInWindow,
-    featured,
+    events: ctx.upcoming,
   })
 
-  if (dryRun) return { published: false }
+  if (dryRun) return { published: false, gamesToday: ctx.eventsInWindow }
 
   const pills = bot.category_pills_default?.length ? bot.category_pills_default : ['sports']
   const result = await publishLoungeBotPost(admin, {

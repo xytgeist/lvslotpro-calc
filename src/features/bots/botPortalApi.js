@@ -123,7 +123,7 @@ export async function invokeLoungeOddsIngest(supabaseClient, opts = {}) {
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
- * @param {{ slug?: string, action?: 'poll_edges' | 'daily_slates', dryRun?: boolean }} [opts]
+ * @param {{ slug?: string, action?: 'poll_edges' | 'daily_slates', dryRun?: boolean, force?: boolean }} [opts]
  */
 export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
   const { data, error } = await supabaseClient.functions.invoke('lounge-odds-poll', {
@@ -131,6 +131,7 @@ export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
       slug: opts.slug,
       action: opts.action || 'poll_edges',
       dryRun: opts.dryRun === true,
+      force: opts.force === true,
     },
   })
   if (error) return { data: null, error: new Error(error.message || 'lounge-odds-poll failed') }
@@ -171,6 +172,50 @@ export async function invokeLoungeBotPublishDue(supabaseClient, opts = {}) {
  * @param {string} postId
  * @param {string} caption
  */
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ botUserId: string, caption: string, categoryPills?: string[] }} opts
+ */
+export async function publishBotPost(supabaseClient, opts) {
+  const { data, error } = await supabaseClient.rpc('admin_lounge_bot_publish_post', {
+    p_bot_user_id: opts.botUserId,
+    p_caption: String(opts.caption || '').trim(),
+    p_category_pills: opts.categoryPills?.length ? opts.categoryPills : null,
+  })
+  if (error) return { data: null, error }
+  return { data, error: null }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ botUserId: string, postId: string, body: string, parentId?: string | null }} opts
+ */
+export async function postBotComment(supabaseClient, opts) {
+  const { data, error } = await supabaseClient.rpc('admin_lounge_bot_post_comment', {
+    p_bot_user_id: opts.botUserId,
+    p_post_id: opts.postId,
+    p_body: String(opts.body || '').trim(),
+    p_parent_id: opts.parentId || null,
+  })
+  if (error) return { data: null, error }
+  return { data, error: null }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} postId
+ */
+export async function fetchBotPostComments(supabaseClient, postId) {
+  const { data, error } = await supabaseClient
+    .from('feed_comments')
+    .select('id, body, user_id, parent_id, created_at, comment_count')
+    .eq('post_id', postId)
+    .is('hidden_at', null)
+    .order('created_at', { ascending: true })
+    .limit(100)
+  return { data: data || [], error }
+}
+
 export async function updateBotPostCaption(supabaseClient, postId, caption) {
   const { data, error } = await supabaseClient
     .from('community_feed_posts')

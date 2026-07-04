@@ -125,6 +125,32 @@ export function filterOddsEventsByWindow(
   })
 }
 
+/** PT calendar date (YYYY-MM-DD) for an ISO kickoff. */
+export function ptDateFromCommenceIso(iso: string): string {
+  const t = Date.parse(String(iso || ''))
+  if (!Number.isFinite(t)) return ''
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(t))
+}
+
+/** Morning slate: games kicking off on one PT calendar day (default today), not yet started. */
+export function filterOddsEventsForPtCalendarDay(
+  events: OddsEvent[],
+  ptDate: string,
+): OddsEvent[] {
+  const now = Date.now()
+  return events.filter((ev) => {
+    const iso = String(ev.commence_time || '')
+    if (ptDateFromCommenceIso(iso) !== ptDate) return false
+    const t = Date.parse(iso)
+    return Number.isFinite(t) && t > now
+  })
+}
+
 export function formatOddsCommenceTime(iso: string): string {
   const t = Date.parse(String(iso || ''))
   if (!Number.isFinite(t)) return ''
@@ -330,38 +356,136 @@ export function buildOddsEdgeAlertCaption(pick: OddsPick, opts?: { categoryLabel
 
 export type SlateCaptionInput = {
   categoryLabel: string
-  eventsInWindow: number
-  featured: OddsFeaturedEvent | null
+  events: OddsEvent[]
+}
+
+export type SlateGameBestLine = {
+  awayTeam: string
+  homeTeam: string
+  commenceTime: string
+  picks: { label: string; price: number; book: string }[]
+}
+
+function shortBookName(title: string): string {
+  const t = String(title || 'Book').trim()
+  if (t.length <= 16) return t
+  return `${t.slice(0, 14)}..`
+}
+
+function formatOutcomeLabel(name: string): string {
+  const n = String(name || '').trim()
+  if (!n) return 'Pick'
+  if (/^draw$/i.test(n) || /^tie$/i.test(n)) return 'Draw'
+  return shortDisplayName(n)
+}
+
+function outcomeSortRank(name: string, away: string, home: string): number {
+  const n = name.trim().toLowerCase()
+  const a = away.trim().toLowerCase()
+  const h = home.trim().toLowerCase()
+  if (n === a || n.endsWith(` ${a.split(' ').pop()}`)) return 0
+  if (n === h || n.endsWith(` ${h.split(' ').pop()}`)) return 1
+  if (/^draw$|^tie$/.test(n)) return 2
+  return 3
+}
+
+/** Best h2h price per outcome for each upcoming game (slate listing). */
+export function extractSlateGameBestLines(events: OddsEvent[]): SlateGameBestLine[] {
+  const rows: SlateGameBestLine[] = []
+
+  for (const ev of events) {
+    const home = String(ev.home_team || '').trim()
+    const away = String(ev.away_team || '').trim()
+    const commenceTime = String(ev.commence_time || '').trim()
+    if (!home || !away || !commenceTime) continue
+
+    const bestByOutcome = new Map<string, { price: number; book: string }>()
+
+    for (const book of ev.bookmakers || []) {
+      const market = (book.markets || []).find((m) => m.key === 'h2h')
+      if (!market) continue
+      const bookTitle = String(book.title || book.key || 'Book')
+
+      for (const out of market.outcomes || []) {
+        const name = String(out.name || '').trim()
+        const price = Number(out.price)
+        if (!name || !Number.isFinite(price)) continue
+        const cur = bestByOutcome.get(name)
+        if (!cur || price > cur.price) {
+          bestByOutcome.set(name, { price, book: bookTitle })
+        }
+      }
+    }
+
+    if (!bestByOutcome.size) continue
+
+    const names = [...bestByOutcome.keys()].sort(
+      (a, b) => outcomeSortRank(a, away, home) - outcomeSortRank(b, away, home),
+    )
+    const picks = names.map((name) => {
+      const row = bestByOutcome.get(name)!
+      return {
+        label: formatOutcomeLabel(name),
+        price: row.price,
+        book: row.book,
+      }
+    })
+
+    rows.push({ awayTeam: away, homeTeam: home, commenceTime, picks })
+  }
+
+  rows.sort((a, b) => Date.parse(a.commenceTime) - Date.parse(b.commenceTime))
+  return rows
+}
+
+function formatSlateGameBlock(game: SlateGameBestLine): string {
+  const away = shortDisplayName(game.awayTeam)
+  const home = shortDisplayName(game.homeTeam)
+  const when = formatOddsCommenceTimeShort(game.commenceTime)
+  const head = formatEventMatchupLine(undefined, away, home, when)
+  const oddsLine = game.picks
+    .map((p) => `${p.label} ${formatAmericanOdds(p.price)} (${shortBookName(p.book)})`)
+    .join(', ')
+  return `${head}\n${oddsLine}`
 }
 
 export function buildOddsSlateCaption(input: SlateCaptionInput): string {
-  const { categoryLabel, eventsInWindow, featured } = input
-  const event = categoryLabel?.trim()
+  const event = input.categoryLabel?.trim()
+  const header = event ? `${event} slate` : 'Slate'
+  const games = extractSlateGameBestLines(input.events)
 
-  if (eventsInWindow <= 0) {
-    return joinCaptionLines([event || 'Slate', '', 'No matches in 48h window'])
+  if (!games.length) {
+    return joinCaptionLines([header, '', 'No games on today\'s slate.'])
   }
 
-  const matchWord = eventsInWindow === 1 ? 'match' : 'matches'
+  const lines: string[] = [header, '']
+  let included = 0
 
-  if (featured) {
-    const when = formatOddsCommenceTimeShort(featured.commenceTime)
-    const away = shortDisplayName(featured.awayTeam)
-    const home = shortDisplayName(featured.homeTeam)
-    return joinCaptionLines([
-      formatEventMatchupLine(event, away, home, when),
-      '',
-      `${eventsInWindow} ${matchWord} in next 48h`,
-      'No +EV above threshold',
-    ])
+  for (let i = 0; i < games.length; i++) {
+    const trialLines = [...lines, formatSlateGameBlock(games[i]), '']
+    const omitted = games.length - i - 1
+    if (omitted > 0) trialLines.push(`+${omitted} more games today.`)
+    if (joinCaptionLines(trialLines).length <= CAPTION_MAX) {
+      included = i + 1
+    } else if (included === 0 && i === 0) {
+      // Single game too long (unlikely): hard truncate odds line
+      lines.push(formatSlateGameBlock(games[0]).slice(0, 200))
+      included = 1
+      break
+    } else {
+      break
+    }
   }
 
-  return joinCaptionLines([
-    event ? `${event} slate` : 'Slate',
-    '',
-    `${eventsInWindow} ${matchWord} in next 48h`,
-    'No +EV above threshold',
-  ])
+  for (let i = 0; i < included; i++) {
+    lines.push(formatSlateGameBlock(games[i]))
+    lines.push('')
+  }
+
+  const omitted = games.length - included
+  if (omitted > 0) lines.push(`+${omitted} more games today.`)
+
+  return joinCaptionLines(lines)
 }
 
 /** @deprecated use buildOddsEdgeAlertCaption */

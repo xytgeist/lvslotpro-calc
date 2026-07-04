@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import BotCreateWizard from './BotCreateWizard.jsx'
 import BotEditorialInbox from './BotEditorialInbox.jsx'
+import BotPostRepliesPanel from './BotPostRepliesPanel.jsx'
 import BotProfileEditor from './BotProfileEditor.jsx'
 import {
   BOT_PIPELINE_LABELS,
@@ -14,6 +15,7 @@ import {
   deleteBotPost,
   addBotXSource,
   fetchSportsBettingCalendarToday,
+  publishBotPost,
   invokeLoungeNewsPoll,
   invokeLoungeOddsIngest,
   invokeLoungeOddsPoll,
@@ -105,6 +107,8 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
   const [newXHandle, setNewXHandle] = useState('')
   const [calendarToday, setCalendarToday] = useState([])
   const [selectedCalendarSlug, setSelectedCalendarSlug] = useState('')
+  const [composeCaption, setComposeCaption] = useState('')
+  const [composePills, setComposePills] = useState([])
 
   useEffect(() => {
     if (bot?.pipeline !== 'odds_api') {
@@ -166,6 +170,8 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       categoryPills: Array.isArray(bot.category_pills_default) ? [...bot.category_pills_default] : [],
       watchlistText: watchlist,
     })
+    setComposeCaption('')
+    setComposePills(Array.isArray(bot.category_pills_default) ? [...bot.category_pills_default] : [])
   }, [
     bot?.user_id,
     bot?.max_posts_per_day,
@@ -311,6 +317,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       slug: bot.slug,
       action,
       dryRun,
+      force: action === 'daily_slates' && !dryRun,
     })
     setBusy('')
     if (result.error) {
@@ -320,11 +327,15 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     const d = result.data || {}
     if (d.skipped === 'no_calendar_today') {
       setToast('No major events on the betting calendar today.')
+    } else if (d.skipped === 'before_scheduled_time') {
+      setToast(`Morning slates fire at ${d.scheduledPt || '?'} PT today (random 7-10am window).`)
+    } else if (d.skipped === 'outside_morning_window') {
+      setToast('Morning slates only run between 7am and 10am PT.')
     } else if (action === 'daily_slates') {
       setToast(
         dryRun
-          ? `Dry run · would post up to ${d.sportsChecked ?? 0} slate check-ins`
-          : `Posted ${d.publishedSlates ?? 0} slate check-in${d.publishedSlates === 1 ? '' : 's'} (${d.sportsChecked ?? 0} sports checked)`,
+          ? `Dry run: would post up to ${d.sportsChecked ?? 0} morning slates${d.scheduledPt ? ` (cron window opens ${d.scheduledPt} PT)` : ''}`
+          : `Posted ${d.publishedSlates ?? 0} morning slate${d.publishedSlates === 1 ? '' : 's'} (${d.sportsChecked ?? 0} sports checked)`,
       )
     } else {
       setToast(
@@ -343,6 +354,33 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       if (cur.length >= 3) return d
       return { ...d, categoryPills: [...cur, slug] }
     })
+  }
+
+  const toggleComposePill = (slug) => {
+    setComposePills((cur) => {
+      if (cur.includes(slug)) return cur.filter((s) => s !== slug)
+      if (cur.length >= 3) return cur
+      return [...cur, slug]
+    })
+  }
+
+  const handlePublishPost = async () => {
+    const caption = composeCaption.trim()
+    if (!caption) return
+    setBusy('compose-post')
+    const { error } = await publishBotPost(supabaseClient, {
+      botUserId: bot.user_id,
+      caption,
+      categoryPills: composePills,
+    })
+    setBusy('')
+    if (error) {
+      setToast(error.message || 'Could not publish post.')
+      return
+    }
+    setComposeCaption('')
+    setToast(`Posted as @${bot.handle || bot.slug}.`)
+    void onReload()
   }
 
   const handleSavePost = async (caption) => {
@@ -516,7 +554,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                   onClick={() => void runOddsPoll('daily_slates', false)}
                   className="min-h-8 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold disabled:opacity-50"
                 >
-                  {busy === 'slates' ? '…' : 'Post all slates'}
+                  {busy === 'slates' ? '…' : 'Post morning slates'}
                 </button>
               </>
             ) : null}
@@ -727,6 +765,56 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       ) : null}
 
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+        <div className="text-white font-bold text-sm mb-1">Post as @{bot.handle || bot.slug}</div>
+        <div className="text-zinc-500 text-[11px] mb-3">
+          Manual feed post from the bot account. Automated odds posts still run separately.
+        </div>
+        <textarea
+          value={composeCaption}
+          maxLength={LOUNGE_CAPTION_MAX}
+          rows={5}
+          onChange={(e) => setComposeCaption(e.target.value)}
+          placeholder="Write a caption…"
+          className="w-full rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2 text-white text-sm leading-relaxed resize-y focus:border-cyan-500/50 focus:outline-none"
+        />
+        <div className="text-zinc-500 text-[10px] mt-1 tabular-nums">
+          {composeCaption.length}/{LOUNGE_CAPTION_MAX}
+        </div>
+        <div className="mt-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+            Category pills (max 3)
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {LOUNGE_POST_CATEGORY_PILL_SLUGS.map((slug) => {
+              const selected = composePills.includes(slug)
+              return (
+                <button
+                  key={`compose-${slug}`}
+                  type="button"
+                  onClick={() => toggleComposePill(slug)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${
+                    selected
+                      ? 'bg-cyan-950/60 text-cyan-200 ring-cyan-500/40'
+                      : 'bg-zinc-950/50 text-zinc-400 ring-zinc-700 hover:text-zinc-200'
+                  }`}
+                >
+                  {loungePostCategoryPillLabel(slug) || slug}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={busy === 'compose-post' || !composeCaption.trim()}
+          onClick={() => void handlePublishPost()}
+          className="mt-4 min-h-10 rounded-xl bg-cyan-700 px-5 text-white text-sm font-bold hover:bg-cyan-600 disabled:opacity-50"
+        >
+          {busy === 'compose-post' ? 'Publishing…' : 'Publish post'}
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
         <div className="text-white font-bold text-sm mb-3">Feed posts</div>
         {Array.isArray(bot.recent_posts) && bot.recent_posts.length > 0 ? (
           <ul className="space-y-2">
@@ -759,6 +847,15 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                   </div>
                 </div>
                 <div className="text-zinc-300 text-xs mt-1 leading-relaxed whitespace-pre-wrap">{post.caption}</div>
+                <BotPostRepliesPanel
+                  postId={post.post_id}
+                  botUserId={bot.user_id}
+                  botHandle={bot.handle}
+                  commentCount={post.comment_count}
+                  supabaseClient={supabaseClient}
+                  setToast={setToast}
+                  onReload={onReload}
+                />
               </li>
             ))}
           </ul>
