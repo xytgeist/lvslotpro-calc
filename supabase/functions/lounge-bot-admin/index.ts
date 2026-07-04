@@ -73,7 +73,7 @@ async function seedPipelineExtras(
   if (pipeline === 'odds_api') {
     await admin.from('lounge_bot_odds_config').upsert({
       bot_user_id: botUserId,
-      sports_keys: ['americanfootball_nfl', 'basketball_nba', 'baseball_mlb'],
+      sports_keys: ['baseball_mlb', 'basketball_wnba', 'americanfootball_nfl', 'basketball_nba'],
       regions: ['us'],
       markets: ['h2h', 'spreads'],
       min_edge_pct: 4,

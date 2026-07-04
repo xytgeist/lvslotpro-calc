@@ -6,6 +6,10 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
 import {
   buildOddsPickCaption,
+  DEFAULT_MAX_EDGE_PCT,
+  DEFAULT_MIN_BOOKS,
+  DEFAULT_ODDS_WINDOW_HOURS,
+  filterOddsEventsByWindow,
   oddsExternalKey,
   pickBestOddsCandidate,
   type OddsPick,
@@ -29,6 +33,21 @@ async function authorize(req: Request): Promise<SupabaseClient> {
 
 function oddsKey(): string {
   return String(Deno.env.get('THE_ODDS_API_KEY') || '').trim()
+}
+
+async function fetchActiveSportKeys(): Promise<Set<string>> {
+  const key = oddsKey()
+  if (!key) throw new Error('THE_ODDS_API_KEY not set on Edge.')
+  const res = await fetch(`${ODDS_BASE}/sports/?apiKey=${encodeURIComponent(key)}`)
+  if (!res.ok) throw new Error(`Odds API sports list ${res.status}`)
+  const sports = await res.json()
+  const active = new Set<string>()
+  if (Array.isArray(sports)) {
+    for (const row of sports) {
+      if (row?.active === true && typeof row.key === 'string') active.add(row.key)
+    }
+  }
+  return active
 }
 
 async function fetchSportOdds(sport: string, regions: string[], markets: string[]) {
@@ -108,21 +127,53 @@ Deno.serve(async (req) => {
       return adminOpsJson(200, { ok: true, skipped: 'daily_cap', slug, publishedToday })
     }
 
+    const activeSports = await fetchActiveSportKeys()
+    const sportsToPoll = sports.filter((s) => activeSports.has(s))
+    if (!sportsToPoll.length) {
+      return adminOpsJson(200, {
+        ok: true,
+        skipped: 'no_active_sports',
+        slug,
+        configuredSports: sports,
+      })
+    }
+
     const candidates: OddsPick[] = []
     let requestsRemaining: string | null = null
+    let eventsInWindow = 0
 
-    for (const sport of sports) {
+    for (const sport of sportsToPoll) {
       const { events, remaining } = await fetchSportOdds(sport, regions, markets)
       requestsRemaining = remaining
+      const raw = Array.isArray(events) ? events : []
+      const upcoming = filterOddsEventsByWindow(raw, DEFAULT_ODDS_WINDOW_HOURS)
+      eventsInWindow += upcoming.length
+
       if (!dryRun) {
         await admin.from('lounge_odds_snapshots').insert({
           bot_user_id: bot.user_id,
           sport,
-          payload: events,
+          payload: { rawCount: raw.length, windowCount: upcoming.length, events: upcoming },
         })
       }
-      const pick = pickBestOddsCandidate(Array.isArray(events) ? events : [], sport)
+
+      const pick = pickBestOddsCandidate(upcoming, sport, {
+        minBooks: DEFAULT_MIN_BOOKS,
+        maxEdgePct: DEFAULT_MAX_EDGE_PCT,
+      })
       if (pick && pick.edgePct >= minEdge) candidates.push(pick)
+    }
+
+    if (!candidates.length && !dryRun) {
+      return adminOpsJson(200, {
+        ok: true,
+        skipped: eventsInWindow > 0 ? 'no_edge_picks' : 'no_upcoming_games',
+        slug,
+        sportsPolled: sportsToPoll,
+        eventsInWindow,
+        windowHours: DEFAULT_ODDS_WINDOW_HOURS,
+        requestsRemaining,
+      })
     }
 
     candidates.sort((a, b) => b.edgePct - a.edgePct)
@@ -182,11 +233,16 @@ Deno.serve(async (req) => {
       ok: true,
       slug,
       dryRun,
+      sportsPolled: sportsToPoll,
+      eventsInWindow,
+      windowHours: DEFAULT_ODDS_WINDOW_HOURS,
       candidateCount: candidates.length,
       published,
       requestsRemaining,
       topCandidates: toPublish.map((p) => ({
         edge: p.edgePct,
+        commenceTime: p.commenceTime,
+        books: p.bookCount,
         caption: buildOddsPickCaption(p).slice(0, 120),
       })),
     })

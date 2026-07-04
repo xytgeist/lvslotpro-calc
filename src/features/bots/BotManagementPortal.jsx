@@ -194,10 +194,20 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     }
     const d = result.data || {}
     if (bot.pipeline === 'odds_api') {
+      const skipMsg =
+        d.skipped === 'no_upcoming_games'
+          ? 'No games in the next 48h (NFL/NBA off-season lines ignored).'
+          : d.skipped === 'no_active_sports'
+            ? 'No in-season sports in your config right now.'
+            : d.skipped === 'no_edge_picks'
+              ? `${d.eventsInWindow ?? 0} games in window, none cleared the edge bar.`
+              : d.skipped === 'daily_cap'
+                ? 'Daily post cap reached.'
+                : null
       setToast(
         dryRun
-          ? `Dry run: ${d.candidateCount ?? 0} candidates`
-          : `Published ${d.published ?? 0} picks`,
+          ? `Dry run: ${d.candidateCount ?? 0} candidates (${d.eventsInWindow ?? 0} games in 48h window)`
+          : skipMsg || `Published ${d.published ?? 0} picks`,
       )
     } else if (bot.pipeline === 'x') {
       setToast(dryRun ? `Dry run: ${d.ingested ?? 0} drafts` : `Ingested ${d.ingested ?? 0} to inbox`)
