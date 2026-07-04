@@ -221,6 +221,7 @@ Deno.serve(async (req) => {
           gamesToday: coffeeResult.gamesToday ?? null,
           coverCount: coffeeResult.coverCount ?? null,
           mlCount: coffeeResult.mlCount ?? null,
+          onTapCount: coffeeResult.onTapCount ?? null,
           hasCovers: coffeeResult.hasCovers ?? null,
           threadPartCount: coffeeResult.threadPartCount ?? null,
           sportsIncluded: coffeeResult.sportsIncluded ?? null,

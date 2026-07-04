@@ -63,6 +63,15 @@ export function ptTodayDate(): string {
   }).format(new Date())
 }
 
+export function ptTomorrowDate(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(Date.now() + 86_400_000))
+}
+
 export function ptDayStartIso(): string {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Los_Angeles',
@@ -241,7 +250,9 @@ export type SportOddsContext = {
   calendarSlug: string
   categoryLabel: string
   upcoming: ReturnType<typeof filterOddsEventsByWindow>
+  tomorrow: ReturnType<typeof filterOddsEventsForPtCalendarDay>
   eventsInWindow: number
+  eventsTomorrow: number
   requestsRemaining: string | null
 }
 
@@ -258,6 +269,7 @@ export async function loadSportOddsContext(
   const raw = Array.isArray(events) ? events : []
   const inWindow = filterOddsEventsByWindow(raw, DEFAULT_ODDS_WINDOW_HOURS)
   const upcoming = filterOddsEventsForPtCalendarDay(inWindow, ptTodayDate())
+  const tomorrow = filterOddsEventsForPtCalendarDay(inWindow, ptTomorrowDate())
 
   if (!dryRun) {
     await admin.from('lounge_odds_snapshots').insert({
@@ -269,6 +281,7 @@ export async function loadSportOddsContext(
         rawCount: raw.length,
         windowCount: inWindow.length,
         todayCount: upcoming.length,
+        tomorrowCount: tomorrow.length,
         ptDate: ptTodayDate(),
         events: upcoming,
       },
@@ -280,7 +293,9 @@ export async function loadSportOddsContext(
     calendarSlug: calendarPick.calendarSlug,
     categoryLabel: calendarPick.categoryLabel,
     upcoming,
+    tomorrow,
     eventsInWindow: upcoming.length,
+    eventsTomorrow: tomorrow.length,
     requestsRemaining: remaining,
   }
 }
@@ -374,6 +389,7 @@ export async function tryPublishCoffeeAndCovers(
     categoryLabel: ctx.categoryLabel,
     sportKey: ctx.sportKey,
     events: ctx.upcoming,
+    eventsTomorrow: ctx.tomorrow,
   })
 
   if (dryRun) {
@@ -382,6 +398,7 @@ export async function tryPublishCoffeeAndCovers(
       gamesToday: ctx.eventsInWindow,
       coverCount: generated.coverPicks.length,
       mlCount: generated.mlPicks.length,
+      onTapCount: generated.onTapPicks.length,
       hasCovers: generated.hasCovers,
     }
   }
@@ -413,6 +430,7 @@ export async function tryPublishCoffeeAndCovers(
       gamesToday: generated.gameCount,
       coverCount: generated.coverPicks.length,
       mlCount: generated.mlPicks.length,
+      onTapCount: generated.onTapPicks.length,
       hasCovers: generated.hasCovers,
     }
   }
@@ -441,6 +459,7 @@ export async function tryPublishCombinedCoffeeAndCovers(
   gamesToday?: number
   coverCount?: number
   mlCount?: number
+  onTapCount?: number
   hasCovers?: boolean
   threadPartCount?: number
   sportsIncluded?: number
@@ -468,11 +487,14 @@ export async function tryPublishCombinedCoffeeAndCovers(
     }
   }
 
-  const inputs: CoffeeAndCoversOptions[] = withGames.map((ctx) => ({
-    categoryLabel: ctx.categoryLabel,
-    sportKey: ctx.sportKey,
-    events: ctx.upcoming,
-  }))
+  const inputs: CoffeeAndCoversOptions[] = sportContexts
+    .filter((ctx) => ctx.eventsInWindow > 0 || ctx.eventsTomorrow > 0)
+    .map((ctx) => ({
+      categoryLabel: ctx.categoryLabel,
+      sportKey: ctx.sportKey,
+      events: ctx.upcoming,
+      eventsTomorrow: ctx.tomorrow,
+    }))
   const generated = generateCombinedCoffeeAndCovers(inputs)
 
   if (dryRun) {
@@ -481,6 +503,7 @@ export async function tryPublishCombinedCoffeeAndCovers(
       gamesToday: generated.gameCount,
       coverCount: generated.coverPicks.length,
       mlCount: generated.mlPicks.length,
+      onTapCount: generated.onTapPicks.length,
       hasCovers: generated.hasCovers,
       threadPartCount: generated.threadParts.length,
       sportsIncluded: withGames.length,
@@ -514,6 +537,7 @@ export async function tryPublishCombinedCoffeeAndCovers(
       gamesToday: generated.gameCount,
       coverCount: generated.coverPicks.length,
       mlCount: generated.mlPicks.length,
+      onTapCount: generated.onTapPicks.length,
       hasCovers: generated.hasCovers,
       threadPartCount: result.threadPartCount ?? (1 + generated.threadParts.length),
       sportsIncluded: withGames.length,

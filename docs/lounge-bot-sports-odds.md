@@ -50,6 +50,11 @@ Biggest dogs
 World Cup · Paraguay vs France, Sat Jul 4 at 2pm PT
 Paraguay ML +718 at MyBookie
 
+🍺 On tap:
+MLB · Red Sox vs Yankees, Sun Jul 5 at 10am PT
+Red Sox +3.5 (-105) at FanDuel
+Fair -115 (8 books) · +3.6% EV
+
 Best lines in 🧵👇
 ```
 
@@ -116,6 +121,7 @@ Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`** (h2h aler
 | **Covers** (spread/handicap) | **+4%** EV on $1 | **3** per sport (merged in root) |
 | **ML spots** | **+3%** EV on $1 | **3** per sport (merged in root) |
 | **Biggest dogs** | Longest h2h price on today's board | **One line per calendar sport** |
+| **On tap** | Tomorrow spread/ML at or within **1%** of bar | **Max 3** across all sports |
 | **Best lines** | Best ML + book per outcome | One **thread part** per calendar sport |
 
 Spread devig mirrors h2h: per-book no-vig fair probs on each spread side, consensus average, EV at best juice. Dedupe key: **`coffee:daily:{ptDay}`** (one post per bot per PT day). Log **`post_kind: coffee_covers`**. Root post ends with **`Best lines in 🧵👇`**; lines board lives in author thread parts (`feed_comments.is_thread_part`).

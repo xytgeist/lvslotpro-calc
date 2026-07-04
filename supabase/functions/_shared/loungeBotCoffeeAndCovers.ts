@@ -25,7 +25,12 @@ export const COFFEE_MAX_PICKS_PER_SPORT = 3
 
 export const COFFEE_COVERS_HEADER = '☕ Coffee & Covers 💵'
 export const COFFEE_COVERS_SECTION = 'Covers'
+export const COFFEE_ON_TAP_SECTION = '🍺 On tap:'
 export const COFFEE_BEST_LINES_TEASER = 'Best lines in 🧵👇'
+/** Max tomorrow lookahead calls in the morning post. */
+export const COFFEE_ON_TAP_MAX_PICKS = 3
+/** Include tomorrow picks within this many % of the spread/ML bar. */
+export const COFFEE_ON_TAP_NEAR_THRESHOLD_PCT = 1
 
 const CAPTION_MAX = 2000
 const NO_COVERS_LINE =
@@ -54,11 +59,15 @@ export type CoffeeAndCoversOptions = {
   categoryLabel: string
   sportKey: string
   events: OddsEvent[]
+  /** Tomorrow (PT) games for On tap lookahead. */
+  eventsTomorrow?: OddsEvent[]
   minBooks?: number
   mlEvThresholdPct?: number
   spreadEvThresholdPct?: number
   maxPicksPerSport?: number
   maxEvPct?: number
+  onTapMaxPicks?: number
+  onTapNearThresholdPct?: number
 }
 
 export type CoffeeThreadPart = {
@@ -76,6 +85,10 @@ export type BiggestDog = {
   bookTitle: string
 }
 
+export type OnTapPick =
+  | { kind: 'spread'; categoryLabel: string; pick: SpreadPick; edgePct: number }
+  | { kind: 'ml'; categoryLabel: string; pick: OddsPick; edgePct: number }
+
 export type CoffeeAndCoversResult = {
   /** Root post caption (covers + teaser only). */
   caption: string
@@ -83,6 +96,7 @@ export type CoffeeAndCoversResult = {
   coverPicks: SpreadPick[]
   mlPicks: OddsPick[]
   biggestDogs: BiggestDog[]
+  onTapPicks: OnTapPick[]
   gameCount: number
   hasCovers: boolean
 }
@@ -243,6 +257,65 @@ export function findBiggestDog(categoryLabel: string, events: OddsEvent[]): Bigg
   return best
 }
 
+/** Tomorrow spread/ML spots at or near the Coffee & Covers bars. */
+export function findOnTapPicks(input: CoffeeAndCoversOptions): OnTapPick[] {
+  const categoryLabel = String(input.categoryLabel || '').trim()
+  const sportKey = String(input.sportKey || '').trim()
+  const events = Array.isArray(input.eventsTomorrow) ? input.eventsTomorrow : []
+  if (!events.length || !categoryLabel || !sportKey) return []
+
+  const minBooks = input.minBooks ?? DEFAULT_MIN_BOOKS
+  const mlThreshold = input.mlEvThresholdPct ?? COFFEE_ML_EV_THRESHOLD_PCT
+  const spreadThreshold = input.spreadEvThresholdPct ?? COFFEE_SPREAD_EV_THRESHOLD_PCT
+  const near = input.onTapNearThresholdPct ?? COFFEE_ON_TAP_NEAR_THRESHOLD_PCT
+  const maxEvPct = input.maxEvPct ?? DEFAULT_MAX_EV_PCT
+
+  const spreadMin = Math.max(0, spreadThreshold - near)
+  const mlMin = Math.max(0, mlThreshold - near)
+
+  const spreads = findPlusEvSpreadOpportunities(events, sportKey, {
+    minBooks,
+    minEvPct: spreadMin,
+    maxEvPct,
+  })
+  const mls = findPlusEvOpportunities(events, sportKey, {
+    minBooks,
+    minEvPct: mlMin,
+    maxEvPct,
+  })
+
+  const merged: OnTapPick[] = [
+    ...spreads.map((pick) => ({
+      kind: 'spread' as const,
+      categoryLabel,
+      pick,
+      edgePct: pick.edgePct,
+    })),
+    ...mls.map((pick) => ({
+      kind: 'ml' as const,
+      categoryLabel,
+      pick,
+      edgePct: pick.edgePct,
+    })),
+  ]
+
+  merged.sort((a, b) => b.edgePct - a.edgePct)
+  return merged
+}
+
+function formatOnTapPickLine(entry: OnTapPick): string {
+  if (entry.kind === 'spread') {
+    return formatSpreadPickLine(entry.pick, entry.categoryLabel)
+  }
+  return formatMlSpotLine(entry.pick, entry.categoryLabel)
+}
+
+function mergeOnTapPicks(slices: OnTapPick[][]): OnTapPick[] {
+  const merged = slices.flat()
+  merged.sort((a, b) => b.edgePct - a.edgePct)
+  return merged.slice(0, COFFEE_ON_TAP_MAX_PICKS)
+}
+
 function formatSlateGameBlock(game: ReturnType<typeof extractSlateGameBestLines>[number]): string {
   const away = shortDisplayName(game.awayTeam)
   const home = shortDisplayName(game.homeTeam)
@@ -292,6 +365,7 @@ function buildMainCaption(
   coverPicks: SpreadPick[],
   mlPicks: OddsPick[],
   biggestDogs: BiggestDog[],
+  onTapPicks: OnTapPick[],
   sportLabelByPick?: (pick: SpreadPick | OddsPick) => string | undefined,
 ): string {
   const lines: string[] = [COFFEE_COVERS_HEADER, '', COFFEE_COVERS_SECTION]
@@ -320,6 +394,14 @@ function buildMainCaption(
     lines.push('Biggest dogs')
     for (const dog of biggestDogs) {
       lines.push(formatBiggestDogLine(dog))
+      lines.push('')
+    }
+  }
+
+  if (onTapPicks.length) {
+    lines.push(COFFEE_ON_TAP_SECTION)
+    for (const entry of onTapPicks) {
+      lines.push(formatOnTapPickLine(entry))
       lines.push('')
     }
   }
@@ -440,17 +522,19 @@ export function generateCoffeeAndCovers(input: CoffeeAndCoversOptions): CoffeeAn
   const games = extractSlateGameBestLines(events)
   const biggestDog = findBiggestDog(categoryLabel, events)
   const biggestDogs = biggestDog ? [biggestDog] : []
+  const onTapPicks = findOnTapPicks(input).slice(0, input.onTapMaxPicks ?? COFFEE_ON_TAP_MAX_PICKS)
   const threadBody = buildSportLinesThreadBody(categoryLabel, events)
   const threadParts: CoffeeThreadPart[] = threadBody
     ? [{ categoryLabel, body: threadBody }]
     : []
 
   return {
-    caption: buildMainCaption(coverPicks, mlPicks, biggestDogs),
+    caption: buildMainCaption(coverPicks, mlPicks, biggestDogs, onTapPicks),
     threadParts,
     coverPicks,
     mlPicks,
     biggestDogs,
+    onTapPicks,
     gameCount: games.length,
     hasCovers: coverPicks.length > 0,
   }
@@ -514,6 +598,7 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
 
   const threadParts: CoffeeThreadPart[] = []
   const biggestDogs: BiggestDog[] = []
+  const onTapSlices: OnTapPick[][] = []
   for (const slice of slices) {
     if (slice.gameCount <= 0 || !slice.categoryLabel) continue
     const body = buildSportLinesThreadBody(slice.categoryLabel, slice.events)
@@ -521,9 +606,13 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
     const dog = findBiggestDog(slice.categoryLabel, slice.events)
     if (dog) biggestDogs.push(dog)
   }
+  for (const input of inputs) {
+    onTapSlices.push(findOnTapPicks(input))
+  }
+  const onTapPicks = mergeOnTapPicks(onTapSlices)
 
   return {
-    caption: buildMainCaption(coverPicks, mlPicks, biggestDogs, (pick) => {
+    caption: buildMainCaption(coverPicks, mlPicks, biggestDogs, onTapPicks, (pick) => {
       if ('pickPoint' in pick) return sportLabelForSpread(pick as SpreadPick)
       return sportLabelForMl(pick as OddsPick)
     }),
@@ -531,6 +620,7 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
     coverPicks,
     mlPicks,
     biggestDogs,
+    onTapPicks,
     gameCount,
     hasCovers: coverPicks.length > 0,
   }

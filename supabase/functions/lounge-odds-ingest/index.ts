@@ -175,6 +175,7 @@ Deno.serve(async (req) => {
         categoryLabel: calendarPick.categoryLabel,
         sportKey,
         events: ctx.upcoming,
+        eventsTomorrow: ctx.tomorrow,
       }).caption
       : buildOddsSlateCaption({
         categoryLabel: calendarPick.categoryLabel,
