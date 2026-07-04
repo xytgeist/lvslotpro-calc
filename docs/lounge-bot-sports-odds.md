@@ -36,17 +36,17 @@ Fair +652 (9 books)
 ```text
 ☕ Coffee & Covers 💵
 No strong covers today - sitting on hands until we see better value.
-Best ML Spots Right Now -
+- Best ML Spots Right Now -
 • World Cup - France vs Paraguay (Sat 2PM PT)
 Draw ML +718 @ MyBookie (+9.6% EV)
 • World Cup - Morocco vs Canada (Sat 10AM PT)
 Canada ML +490 @ BetUS (+3.1% EV)
-Biggest Dogs -
+- Biggest Dogs -
 • MLB - Padres vs Dodgers (Sat 7:11PM PT)
 Padres ML +219 @ LowVig
 • Wimbledon - Zverev vs Giron (Sat 6:30AM PT)
 Giron ML +900 @ DraftKings
-🍺 On Tap Tomorrow -
+- 🍺 On Tap Tomorrow -
 • Wimbledon - Mochizuki vs Sinner: Mochizuki +1600 (+8.1% EV)
 • World Cup - Norway vs Brazil: Norway +367 (+2.8% EV)
 Best lines 👇

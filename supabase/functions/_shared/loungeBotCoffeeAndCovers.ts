@@ -26,9 +26,9 @@ export const COFFEE_MAX_PICKS_PER_SPORT = 3
 export const COFFEE_COVERS_HEADER = '☕ Coffee & Covers 💵'
 export const COFFEE_NO_COVERS_LINE =
   'No strong covers today - sitting on hands until we see better value.'
-export const COFFEE_ML_SECTION = 'Best ML Spots Right Now -'
-export const COFFEE_DOGS_SECTION = 'Biggest Dogs -'
-export const COFFEE_ON_TAP_SECTION = '🍺 On Tap Tomorrow -'
+export const COFFEE_ML_SECTION = '- Best ML Spots Right Now -'
+export const COFFEE_DOGS_SECTION = '- Biggest Dogs -'
+export const COFFEE_ON_TAP_SECTION = '- 🍺 On Tap Tomorrow -'
 export const COFFEE_BEST_LINES_TEASER = 'Best lines 👇'
 /** Max ML spots listed in the combined morning post (global, sorted by EV). */
 export const COFFEE_ML_SPOTS_MAX_TOTAL = 8
