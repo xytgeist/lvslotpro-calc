@@ -7,8 +7,8 @@ export const APP_UPDATE_AVAILABLE_EVENT = 'edge-app-update-available'
 const APP_UPDATE_DISMISS_KEY = 'lvsp_app_update_dismissed_token'
 const DEPLOY_POLL_MS = 5 * 60 * 1000
 const BUILD_SHA_META = 'edge-build-sha'
-/** Refocus path: show banner briefly, then silent reload. */
-export const APP_UPDATE_VISIBILITY_RELOAD_MS = 3000
+/** Refocus path: show banner, then silent reload (time to tap Refresh or Not now). */
+export const APP_UPDATE_VISIBILITY_RELOAD_MS = 20_000
 
 /** @type {number | null} */
 let pendingReloadId = null
@@ -122,7 +122,7 @@ export function isStandalonePwa() {
 
 /**
  * Poll live deploy while the tab is open.
- * - Refocus: banner + silent reload after ~3s (cancelable via Not now).
+ * - Refocus: banner + silent reload after ~20s (cancelable via Not now).
  * - Interval (foreground): immediate silent reload (chunk safety if they never backgrounded).
  */
 export function installDeployVersionWatch() {
