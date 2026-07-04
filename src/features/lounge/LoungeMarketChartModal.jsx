@@ -459,6 +459,73 @@ function MarketChartIndicatorsControl({
   )
 }
 
+function MarketChartInsertPostConfirmDialog({
+  open,
+  busy = false,
+  saveLabel,
+  onContinue,
+  onSaveToPhotos,
+  onCancel,
+}) {
+  if (!open) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/55 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-8 backdrop-blur-[3px] sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="market-chart-insert-post-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default touch-manipulation bg-transparent"
+        aria-label="Close"
+        disabled={busy}
+        onClick={onCancel}
+      />
+      <div
+        className="relative z-10 w-full max-w-sm rounded-2xl border border-zinc-700/85 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="market-chart-insert-post-title" className="text-[17px] font-bold text-white">
+          Add chart to post?
+        </h2>
+        <p className="mt-2 text-[14px] leading-snug text-zinc-400">
+          Adding to post will take you directly to the composer and you will lose your chart layout and
+          any annotations. If you&apos;re still working on the chart, choose Save to Photos and add to
+          your post manually.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            className="min-h-11 rounded-xl bg-cyan-600 px-4 text-[15px] font-semibold text-white hover:bg-cyan-500 touch-manipulation disabled:opacity-50"
+            onClick={() => void onContinue()}
+          >
+            {busy ? 'Adding…' : 'Continue'}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            className="min-h-11 rounded-xl border border-zinc-600 px-4 text-[15px] font-semibold text-zinc-200 hover:bg-zinc-800 touch-manipulation disabled:opacity-50"
+            onClick={() => void onSaveToPhotos()}
+          >
+            {saveLabel}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            className="min-h-11 rounded-xl border border-zinc-700/80 px-4 text-[15px] font-semibold text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 touch-manipulation disabled:opacity-50"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MarketChartSnapshotButton({
   menuRef,
   menuOpen,
@@ -922,6 +989,7 @@ export default function LoungeMarketChartModal({
   const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false)
   const [snapshotBusy, setSnapshotBusy] = useState(false)
   const [snapshotFlash, setSnapshotFlash] = useState('')
+  const [insertPostConfirmOpen, setInsertPostConfirmOpen] = useState(false)
   const [annotateMode, setAnnotateMode] = useState(false)
   const [annotationTool, setAnnotationTool] = useState(/** @type {'pen' | 'text'} */ ('pen'))
   const [chartAnnotations, setChartAnnotations] = useState(
@@ -1023,6 +1091,7 @@ export default function LoungeMarketChartModal({
       setResolutionMenuOpen(false)
       setSnapshotMenuOpen(false)
       setSnapshotFlash('')
+      setInsertPostConfirmOpen(false)
       setAnnotateMode(false)
       setChartAnnotations([])
       setAdvancedFullscreenOpen(false)
@@ -1070,6 +1139,7 @@ export default function LoungeMarketChartModal({
       if (!chart || snapshotBusy || advancedLoading) return
       setSnapshotBusy(true)
       setSnapshotMenuOpen(false)
+      setInsertPostConfirmOpen(false)
       try {
         const filename = marketChartSnapshotFilename(active?.display_symbol || active?.symbol)
         const branding = marketChartSnapshotBrandingFromCapture({
@@ -1123,6 +1193,11 @@ export default function LoungeMarketChartModal({
 
   const clearChartAnnotations = useCallback(() => {
     setChartAnnotations([])
+  }, [])
+
+  const openInsertPostConfirm = useCallback(() => {
+    setSnapshotMenuOpen(false)
+    setInsertPostConfirmOpen(true)
   }, [])
 
   const toggleSnapshotMenu = useCallback(() => {
@@ -1190,6 +1265,7 @@ export default function LoungeMarketChartModal({
     advancedResolutionSessionPickedRef.current = false
     setAdvancedFullscreenOpen(false)
     closeAnnotateMenus()
+    setInsertPostConfirmOpen(false)
     setAnnotateMode(false)
     setChartAnnotations([])
     setScrubQuote(null)
@@ -1755,6 +1831,11 @@ export default function LoungeMarketChartModal({
           setSnapshotMenuOpen(false)
           return
         }
+        if (insertPostConfirmOpen) {
+          e.stopPropagation()
+          setInsertPostConfirmOpen(false)
+          return
+        }
         if (annotateMode) {
           e.stopPropagation()
           setAnnotateMode(false)
@@ -1775,7 +1856,7 @@ export default function LoungeMarketChartModal({
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [advancedFullscreenOpen, annotateMode, chartTypeMenuOpen, closeAdvancedFullscreen, dismissSheet, indicatorMenuOpen, open, resolutionMenuOpen, snapshotMenuOpen, timeframeMenuOpen])
+  }, [advancedFullscreenOpen, annotateMode, chartTypeMenuOpen, closeAdvancedFullscreen, dismissSheet, indicatorMenuOpen, insertPostConfirmOpen, open, resolutionMenuOpen, snapshotMenuOpen, timeframeMenuOpen])
 
   useEffect(() => {
     const el = advancedFullscreenOpen ? advancedChartHostRef.current : chartHostRef.current
@@ -2648,7 +2729,7 @@ export default function LoungeMarketChartModal({
                         status={snapshotFlash}
                         canInsert={typeof onInsertSnapshot === 'function'}
                         onSave={() => void runMarketChartSnapshot('save')}
-                        onInsert={() => void runMarketChartSnapshot('insert')}
+                        onInsert={openInsertPostConfirm}
                         mutedClass={mutedClass}
                       />
                       </div>
@@ -2658,6 +2739,14 @@ export default function LoungeMarketChartModal({
                 </div>
               </div>
             </div>
+            <MarketChartInsertPostConfirmDialog
+              open={insertPostConfirmOpen}
+              busy={snapshotBusy}
+              saveLabel={marketChartSnapshotSaveMenuLabel()}
+              onContinue={() => void runMarketChartSnapshot('insert')}
+              onSaveToPhotos={() => void runMarketChartSnapshot('save')}
+              onCancel={() => setInsertPostConfirmOpen(false)}
+            />
           </div>,
           document.body,
         )
