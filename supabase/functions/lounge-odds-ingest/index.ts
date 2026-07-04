@@ -1,6 +1,6 @@
 /**
  * Sports odds bot — fetch The Odds API, pick, auto-publish.
- * Body: { "slug": "sports-odds", "dryRun": false }
+ * Body: { "slug": "sports-odds", "sportKey": "soccer_fifa_world_cup", "calendarSlug": "fifa-world-cup-2026", "dryRun": false }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
@@ -18,6 +18,13 @@ import { publishLoungeBotPost } from '../_shared/loungeBotPublish.ts'
 
 const ODDS_BASE = 'https://api.the-odds-api.com/v4'
 
+type CalendarRow = {
+  slug: string
+  label_short: string
+  caption_prefix: string | null
+  odds_sport_keys: string[]
+}
+
 async function authorize(req: Request): Promise<SupabaseClient> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim()
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
@@ -33,6 +40,15 @@ async function authorize(req: Request): Promise<SupabaseClient> {
 
 function oddsKey(): string {
   return String(Deno.env.get('THE_ODDS_API_KEY') || '').trim()
+}
+
+function ptTodayDate(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
 }
 
 async function fetchActiveSportKeys(): Promise<Set<string>> {
@@ -64,6 +80,46 @@ async function fetchSportOdds(sport: string, regions: string[], markets: string[
   return { events: await res.json(), remaining: res.headers.get('x-requests-remaining') }
 }
 
+async function loadTodayCalendarRows(admin: SupabaseClient): Promise<CalendarRow[]> {
+  const today = ptTodayDate()
+  const { data, error } = await admin
+    .from('lounge_sports_betting_calendar')
+    .select('slug, label_short, caption_prefix, odds_sport_keys')
+    .eq('enabled', true)
+    .lte('start_date', today)
+    .gte('end_date', today)
+    .order('priority', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return (data || []) as CalendarRow[]
+}
+
+function resolveCalendarSelection(
+  rows: CalendarRow[],
+  sportKey: string,
+  calendarSlug: string,
+): { ok: true; categoryLabel: string; calendarSlug: string } | { ok: false; error: string } {
+  const matches = rows.filter((row) => (row.odds_sport_keys || []).includes(sportKey))
+  if (!matches.length) {
+    return { ok: false, error: 'Selected sport is not on today\'s major events calendar.' }
+  }
+
+  let row = matches[0]
+  if (calendarSlug) {
+    const picked = matches.find((r) => r.slug === calendarSlug)
+    if (!picked) {
+      return { ok: false, error: 'Calendar selection does not match the sport key.' }
+    }
+    row = picked
+  }
+
+  return {
+    ok: true,
+    calendarSlug: row.slug,
+    categoryLabel: String(row.caption_prefix || row.label_short || '').trim(),
+  }
+}
+
 function ptDayStartIso(): string {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Los_Angeles',
@@ -87,6 +143,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const slug = String(body?.slug || 'sports-odds').trim()
     const dryRun = body?.dryRun === true
+    const sportKey = String(body?.sportKey || '').trim()
+    const calendarSlug = String(body?.calendarSlug || '').trim()
+
+    if (!sportKey) {
+      return adminOpsJson(400, { error: 'sportKey required. Pick today\'s sport in the bot portal.' })
+    }
 
     const { data: bot, error: botErr } = await admin
       .from('lounge_bot_accounts')
@@ -101,13 +163,39 @@ Deno.serve(async (req) => {
       return adminOpsJson(200, { ok: true, skipped: bot.run_state, slug })
     }
 
+    const calendarRows = await loadTodayCalendarRows(admin)
+    if (!calendarRows.length) {
+      return adminOpsJson(200, {
+        ok: true,
+        skipped: 'no_calendar_today',
+        slug,
+        message: 'No major events on the betting calendar for today.',
+      })
+    }
+
+    const calendarPick = resolveCalendarSelection(calendarRows, sportKey, calendarSlug)
+    if (!calendarPick.ok) {
+      return adminOpsJson(400, { error: calendarPick.error })
+    }
+
+    const activeSports = await fetchActiveSportKeys()
+    if (!activeSports.has(sportKey)) {
+      return adminOpsJson(200, {
+        ok: true,
+        skipped: 'sport_not_active',
+        slug,
+        sportKey,
+        calendarSlug: calendarPick.calendarSlug,
+        categoryLabel: calendarPick.categoryLabel,
+      })
+    }
+
     const { data: oddsCfg } = await admin
       .from('lounge_bot_odds_config')
       .select('*')
       .eq('bot_user_id', bot.user_id)
       .maybeSingle()
 
-    const sports = (oddsCfg?.sports_keys as string[]) || ['americanfootball_nfl', 'basketball_nba']
     const regions = (oddsCfg?.regions as string[]) || ['us']
     const markets = (oddsCfg?.markets as string[]) || ['h2h', 'spreads']
     const minEdge = Number(oddsCfg?.min_edge_pct) || 4
@@ -127,64 +215,54 @@ Deno.serve(async (req) => {
       return adminOpsJson(200, { ok: true, skipped: 'daily_cap', slug, publishedToday })
     }
 
-    const activeSports = await fetchActiveSportKeys()
-    const sportsToPoll = sports.filter((s) => activeSports.has(s))
-    if (!sportsToPoll.length) {
-      return adminOpsJson(200, {
-        ok: true,
-        skipped: 'no_active_sports',
-        slug,
-        configuredSports: sports,
+    const { events, remaining: requestsRemaining } = await fetchSportOdds(sportKey, regions, markets)
+    const raw = Array.isArray(events) ? events : []
+    const upcoming = filterOddsEventsByWindow(raw, DEFAULT_ODDS_WINDOW_HOURS)
+    const eventsInWindow = upcoming.length
+
+    if (!dryRun) {
+      await admin.from('lounge_odds_snapshots').insert({
+        bot_user_id: bot.user_id,
+        sport: sportKey,
+        payload: {
+          calendarSlug: calendarPick.calendarSlug,
+          categoryLabel: calendarPick.categoryLabel,
+          rawCount: raw.length,
+          windowCount: upcoming.length,
+          events: upcoming,
+        },
       })
     }
 
-    const candidates: OddsPick[] = []
-    let requestsRemaining: string | null = null
-    let eventsInWindow = 0
+    const pick = pickBestOddsCandidate(upcoming, sportKey, {
+      minBooks: DEFAULT_MIN_BOOKS,
+      maxEdgePct: DEFAULT_MAX_EDGE_PCT,
+    })
 
-    for (const sport of sportsToPoll) {
-      const { events, remaining } = await fetchSportOdds(sport, regions, markets)
-      requestsRemaining = remaining
-      const raw = Array.isArray(events) ? events : []
-      const upcoming = filterOddsEventsByWindow(raw, DEFAULT_ODDS_WINDOW_HOURS)
-      eventsInWindow += upcoming.length
-
-      if (!dryRun) {
-        await admin.from('lounge_odds_snapshots').insert({
-          bot_user_id: bot.user_id,
-          sport,
-          payload: { rawCount: raw.length, windowCount: upcoming.length, events: upcoming },
-        })
-      }
-
-      const pick = pickBestOddsCandidate(upcoming, sport, {
-        minBooks: DEFAULT_MIN_BOOKS,
-        maxEdgePct: DEFAULT_MAX_EDGE_PCT,
-      })
-      if (pick && pick.edgePct >= minEdge) candidates.push(pick)
-    }
+    const candidates: OddsPick[] = pick && pick.edgePct >= minEdge ? [pick] : []
 
     if (!candidates.length && !dryRun) {
       return adminOpsJson(200, {
         ok: true,
         skipped: eventsInWindow > 0 ? 'no_edge_picks' : 'no_upcoming_games',
         slug,
-        sportsPolled: sportsToPoll,
+        sportKey,
+        calendarSlug: calendarPick.calendarSlug,
+        categoryLabel: calendarPick.categoryLabel,
         eventsInWindow,
         windowHours: DEFAULT_ODDS_WINDOW_HOURS,
         requestsRemaining,
       })
     }
 
-    candidates.sort((a, b) => b.edgePct - a.edgePct)
-    const toPublish = candidates.slice(0, dryRun ? 3 : Math.min(maxPicks, room))
+    const toPublish = candidates.slice(0, dryRun ? 1 : Math.min(maxPicks, room))
+    const captionOpts = { categoryLabel: calendarPick.categoryLabel }
 
     let published = 0
-    for (const pick of toPublish) {
-      const caption = buildOddsPickCaption(pick)
+    for (const p of toPublish) {
+      const caption = buildOddsPickCaption(p, captionOpts)
       if (dryRun) continue
 
-      const ext = oddsExternalKey(pick)
       const { data: dupe } = await admin
         .from('lounge_bot_publish_log')
         .select('id')
@@ -207,14 +285,14 @@ Deno.serve(async (req) => {
           bot_user_id: bot.user_id,
           post_id: result.postId,
           caption,
-          score: pick.edgePct,
+          score: p.edgePct,
           status: 'published',
         })
       } else {
         await admin.from('lounge_bot_publish_log').insert({
           bot_user_id: bot.user_id,
           caption,
-          score: pick.edgePct,
+          score: p.edgePct,
           status: 'failed',
           error_message: result.error?.slice(0, 400),
         })
@@ -233,7 +311,9 @@ Deno.serve(async (req) => {
       ok: true,
       slug,
       dryRun,
-      sportsPolled: sportsToPoll,
+      sportKey,
+      calendarSlug: calendarPick.calendarSlug,
+      categoryLabel: calendarPick.categoryLabel,
       eventsInWindow,
       windowHours: DEFAULT_ODDS_WINDOW_HOURS,
       candidateCount: candidates.length,
@@ -243,7 +323,7 @@ Deno.serve(async (req) => {
         edge: p.edgePct,
         commenceTime: p.commenceTime,
         books: p.bookCount,
-        caption: buildOddsPickCaption(p).slice(0, 120),
+        caption: buildOddsPickCaption(p, captionOpts).slice(0, 120),
       })),
     })
   } catch (err) {

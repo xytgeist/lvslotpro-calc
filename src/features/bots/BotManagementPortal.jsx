@@ -13,6 +13,7 @@ import {
 import {
   deleteBotPost,
   addBotXSource,
+  fetchSportsBettingCalendarToday,
   invokeLoungeNewsPoll,
   invokeLoungeOddsIngest,
   invokeLoungeXIngest,
@@ -100,6 +101,51 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
   const [editPost, setEditPost] = useState(null)
   const [draft, setDraft] = useState(null)
   const [newXHandle, setNewXHandle] = useState('')
+  const [calendarToday, setCalendarToday] = useState([])
+  const [selectedCalendarSlug, setSelectedCalendarSlug] = useState('')
+
+  useEffect(() => {
+    if (bot?.pipeline !== 'odds_api') {
+      setCalendarToday([])
+      setSelectedCalendarSlug('')
+      return undefined
+    }
+    let cancelled = false
+    void fetchSportsBettingCalendarToday(supabaseClient).then(({ data, error }) => {
+      if (cancelled || error) return
+      setCalendarToday(Array.isArray(data) ? data : [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [bot?.pipeline, bot?.user_id, supabaseClient])
+
+  useEffect(() => {
+    if (bot?.pipeline !== 'odds_api' || !calendarToday.length) {
+      setSelectedCalendarSlug('')
+      return
+    }
+    const storageKey = `bot-odds-calendar-${bot.user_id}`
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null
+    if (stored && calendarToday.some((row) => row.slug === stored)) {
+      setSelectedCalendarSlug(stored)
+      return
+    }
+    setSelectedCalendarSlug(calendarToday[0]?.slug || '')
+  }, [bot?.pipeline, bot?.user_id, calendarToday])
+
+  const selectedCalendarEntry = useMemo(
+    () => calendarToday.find((row) => row.slug === selectedCalendarSlug) || null,
+    [calendarToday, selectedCalendarSlug],
+  )
+  const selectedSportKey = selectedCalendarEntry?.odds_sport_keys?.[0] || ''
+
+  const handleCalendarChange = (slug) => {
+    setSelectedCalendarSlug(slug)
+    if (bot?.user_id && typeof localStorage !== 'undefined') {
+      localStorage.setItem(`bot-odds-calendar-${bot.user_id}`, slug)
+    }
+  }
 
   useEffect(() => {
     if (!bot) {
@@ -178,7 +224,21 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         force: true,
       })
     } else if (bot.pipeline === 'odds_api') {
-      result = await invokeLoungeOddsIngest(supabaseClient, { slug: bot.slug, dryRun })
+      if (!selectedSportKey) {
+        setBusy('')
+        setToast(
+          calendarToday.length
+            ? 'Pick today\'s major sport from the dropdown first.'
+            : 'No major events on the betting calendar today.',
+        )
+        return
+      }
+      result = await invokeLoungeOddsIngest(supabaseClient, {
+        slug: bot.slug,
+        dryRun,
+        sportKey: selectedSportKey,
+        calendarSlug: selectedCalendarSlug,
+      })
     } else if (bot.pipeline === 'x') {
       result = await invokeLoungeXIngest(supabaseClient, { slug: bot.slug, dryRun })
     } else {
@@ -196,18 +256,20 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     if (bot.pipeline === 'odds_api') {
       const skipMsg =
         d.skipped === 'no_upcoming_games'
-          ? 'No games in the next 48h (NFL/NBA off-season lines ignored).'
-          : d.skipped === 'no_active_sports'
-            ? 'No in-season sports in your config right now.'
-            : d.skipped === 'no_edge_picks'
-              ? `${d.eventsInWindow ?? 0} games in window, none cleared the edge bar.`
-              : d.skipped === 'daily_cap'
-                ? 'Daily post cap reached.'
-                : null
+          ? `${d.categoryLabel || 'Sport'}: no games in the next 48h.`
+          : d.skipped === 'no_calendar_today'
+            ? 'No major events on the betting calendar today.'
+            : d.skipped === 'sport_not_active'
+              ? `${d.categoryLabel || d.sportKey || 'Sport'} is off-season at The Odds API right now.`
+              : d.skipped === 'no_edge_picks'
+                ? `${d.categoryLabel || 'Sport'}: ${d.eventsInWindow ?? 0} games in window, none cleared the edge bar.`
+                : d.skipped === 'daily_cap'
+                  ? 'Daily post cap reached.'
+                  : null
       setToast(
         dryRun
-          ? `Dry run: ${d.candidateCount ?? 0} candidates (${d.eventsInWindow ?? 0} games in 48h window)`
-          : skipMsg || `Published ${d.published ?? 0} picks`,
+          ? `Dry run (${d.categoryLabel || selectedCalendarEntry?.label_short || 'sport'}): ${d.candidateCount ?? 0} candidates (${d.eventsInWindow ?? 0} games in 48h)`
+          : skipMsg || `Published ${d.published ?? 0} pick${d.published === 1 ? '' : 's'} · ${d.categoryLabel || selectedCalendarEntry?.label_short || 'sport'}`,
       )
     } else if (bot.pipeline === 'x') {
       setToast(dryRun ? `Dry run: ${d.ingested ?? 0} drafts` : `Ingested ${d.ingested ?? 0} to inbox`)
@@ -332,11 +394,49 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
           ))}
         </div>
 
+        {isAutomatic && bot.pipeline === 'odds_api' ? (
+          <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-3 py-3">
+            <label className="block min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-300/90">
+                Today&apos;s major sport
+              </div>
+              {calendarToday.length ? (
+                <>
+                  <select
+                    value={selectedCalendarSlug}
+                    onChange={(e) => handleCalendarChange(e.target.value)}
+                    className="mt-1.5 w-full max-w-md rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none"
+                  >
+                    {calendarToday.map((row) => (
+                      <option key={row.slug} value={row.slug}>
+                        {row.label_short}
+                        {row.title && row.title !== row.label_short ? ` · ${row.title}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-zinc-500 text-[10px] mt-1.5">
+                    Fetch odds runs only for{' '}
+                    <span className="text-zinc-400 font-mono">{selectedSportKey || '…'}</span>
+                    {bot.odds_config?.min_edge_pct != null
+                      ? ` · min edge ${bot.odds_config.min_edge_pct}%`
+                      : ' · min edge 4%'}
+                  </div>
+                </>
+              ) : (
+                <div className="text-amber-200/80 text-xs mt-2">
+                  No major events on the calendar today. Add or extend rows in{' '}
+                  <span className="font-mono text-[10px]">lounge_sports_betting_calendar</span>.
+                </div>
+              )}
+            </label>
+          </div>
+        ) : null}
+
         {isAutomatic ? (
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={Boolean(busy)}
+              disabled={Boolean(busy) || (bot.pipeline === 'odds_api' && !selectedSportKey)}
               onClick={() => void runPipeline(true)}
               className="min-h-8 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold disabled:opacity-50"
             >
@@ -344,7 +444,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
             </button>
             <button
               type="button"
-              disabled={Boolean(busy) || bot.run_state !== 'running'}
+              disabled={Boolean(busy) || bot.run_state !== 'running' || (bot.pipeline === 'odds_api' && !selectedSportKey)}
               onClick={() => void runPipeline(false)}
               className="min-h-8 rounded-lg bg-gradient-to-r from-cyan-700 to-violet-700 px-3 text-white text-[11px] font-bold disabled:opacity-50"
             >
@@ -404,7 +504,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
             max={30}
             onChange={(v) => setDraft((d) => ({ ...d, maxPostsHour: v }))}
           />
-          {isAutomatic ? (
+          {isAutomatic && bot.pipeline !== 'odds_api' ? (
             <NumberField
               label="Publish score min"
               value={draft.scoreThreshold}

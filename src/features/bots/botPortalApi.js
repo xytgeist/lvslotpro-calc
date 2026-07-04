@@ -95,11 +95,25 @@ export async function invokeLoungeNewsPoll(supabaseClient, opts = {}) {
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
- * @param {{ slug?: string, dryRun?: boolean }} [opts]
+ */
+export async function fetchSportsBettingCalendarToday(supabaseClient) {
+  const { data, error } = await supabaseClient.rpc('admin_lounge_sports_betting_calendar_today')
+  const rows = Array.isArray(data) ? data : []
+  return { data: rows, error }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ slug?: string, dryRun?: boolean, sportKey?: string, calendarSlug?: string }} [opts]
  */
 export async function invokeLoungeOddsIngest(supabaseClient, opts = {}) {
   const { data, error } = await supabaseClient.functions.invoke('lounge-odds-ingest', {
-    body: { slug: opts.slug, dryRun: opts.dryRun === true },
+    body: {
+      slug: opts.slug,
+      dryRun: opts.dryRun === true,
+      sportKey: opts.sportKey || undefined,
+      calendarSlug: opts.calendarSlug || undefined,
+    },
   })
   if (error) return { data: null, error: new Error(error.message || 'lounge-odds-ingest failed') }
   if (data?.error) return { data: null, error: new Error(String(data.error)) }

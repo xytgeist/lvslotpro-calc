@@ -165,7 +165,7 @@ export function pickBestOddsCandidate(
   return best
 }
 
-export function buildOddsPickCaption(pick: OddsPick): string {
+export function buildOddsPickCaption(pick: OddsPick, opts?: { categoryLabel?: string }): string {
   const when = formatOddsCommenceTime(pick.commenceTime)
   const priceStr = pick.pickPrice > 0 ? `+${pick.pickPrice}` : String(pick.pickPrice)
   const line =
@@ -173,8 +173,9 @@ export function buildOddsPickCaption(pick: OddsPick): string {
       ? `${pick.pickName} spread ${priceStr} at ${pick.bookTitle}.`
       : `Best bet: ${pick.pickName} ML ${priceStr} at ${pick.bookTitle}.`
 
-  const prefix = when ? `${when}: ${pick.awayTeam} @ ${pick.homeTeam}.` : `${pick.awayTeam} @ ${pick.homeTeam}.`
-  const cap = `${prefix} ${line} Edge ~${pick.edgePct}% vs ${pick.bookCount}-book consensus.`
+  const category = opts?.categoryLabel ? `${opts.categoryLabel} · ` : ''
+  const matchup = when ? `${when}: ${pick.awayTeam} @ ${pick.homeTeam}.` : `${pick.awayTeam} @ ${pick.homeTeam}.`
+  const cap = `${category}${matchup} ${line} Edge ~${pick.edgePct}% vs ${pick.bookCount}-book consensus.`
   return cap.length <= CAPTION_MAX ? cap : cap.slice(0, CAPTION_MAX - 1) + '…'
 }
 

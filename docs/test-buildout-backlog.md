@@ -751,6 +751,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-04: **Sports betting calendar + manual slate picker:** migration **`20260704140000`** (`lounge_sports_betting_calendar`, 2026 seed, **`admin_lounge_sports_betting_calendar_today`**); odds bot portal dropdown picks today's major sport before **Fetch odds**; **`lounge-odds-ingest`** requires **`sportKey`** + validates against calendar; captions prefix category (e.g. `World Cup · …`). Apply migration on test; redeploy **`lounge-odds-ingest`**.
 - 2026-07-04: **Odds ingest sanity (off-season fix):** **`lounge-odds-ingest`** now polls **in-season sports only** (The Odds API `active`), drops games outside a **48h** window, requires **3+ books**, medians **implied** probs (not raw American odds), caps edge at **18%**, and includes **kickoff time** in captions. Redeploy **`lounge-odds-ingest`** on test; delete bogus Scott Share post manually.
 - 2026-07-04: **Bot portal profile editor:** **`BotProfileEditor`** in **`/?tab=bots`** (avatar crop, banner upload/presets, handle, bio, about); migration **`20260704130000`** extends **`admin_lounge_bot_save_settings`** + portal snapshot profile fields. Apply on test.
 - 2026-07-04: **Sports tribe (`sports`):** new Lounge category pill + profile tribe; migration **`20260704120000`** updates **`lounge_allowed_category_slugs()`** + post/profile CHECK constraints; green chip in feed/compose; sports odds bot defaults to **`sports`** (was **`gaming`**). Apply on test before tagging posts.
