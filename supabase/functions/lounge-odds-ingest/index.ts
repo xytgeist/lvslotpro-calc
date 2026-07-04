@@ -1,5 +1,5 @@
 /**
- * Sports odds bot — manual fetch for one sport (edge alert or slate check-in).
+ * Sports odds bot — manual fetch for one sport (edge alert or morning post).
  * Body: { slug, sportKey, calendarSlug?, dryRun?, postMode?: 'auto'|'edge_only'|'slate_only' }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
@@ -9,6 +9,7 @@ import {
   buildOddsSlateCaption,
   DEFAULT_MIN_EV_PCT,
 } from '../_shared/loungeBotOddsCaption.ts'
+import { generateCoffeeAndCovers } from '../_shared/loungeBotCoffeeAndCovers.ts'
 import {
   countPublishedKindToday,
   fetchActiveSportKeys,
@@ -16,6 +17,7 @@ import {
   loadTodayCalendarRows,
   ptDayStartIso,
   resolveCalendarSelection,
+  tryPublishCoffeeAndCovers,
   tryPublishEdgeAlert,
   tryPublishSlateCheckIn,
   type OddsCfgRow,
@@ -95,11 +97,13 @@ Deno.serve(async (req) => {
     const markets = oddsCfg.markets || ['h2h', 'spreads']
     const minEdge = Number(oddsCfg.min_edge_pct) ?? DEFAULT_MIN_EV_PCT
     const maxEdgeAlerts = Number(oddsCfg.max_edge_alerts_per_day) || 6
-    const maxSlates = Number(oddsCfg.max_slate_posts_per_day) || 10
+    const maxMorningPosts = Number(oddsCfg.max_slate_posts_per_day) || 10
+    const coffeeCoversEnabled = oddsCfg.coffee_covers_enabled !== false
 
     const dayStart = ptDayStartIso()
     const edgeCount = await countPublishedKindToday(admin, bot.user_id, 'edge', dayStart)
-    const slateCount = await countPublishedKindToday(admin, bot.user_id, 'slate', dayStart)
+    const morningPostKind = coffeeCoversEnabled ? 'coffee_covers' : 'slate'
+    const morningCount = await countPublishedKindToday(admin, bot.user_id, morningPostKind, dayStart)
 
     const ctx = await loadSportOddsContext(
       admin,
@@ -112,12 +116,13 @@ Deno.serve(async (req) => {
     )
 
     let publishedEdge = false
-    let publishedSlate = false
-    let postKind: 'edge' | 'slate' | null = null
+    let publishedMorning = false
+    let postKind: 'edge' | 'slate' | 'coffee_covers' | null = null
     let edgePick = null
+    let coffeeMeta: { coverCount?: number; mlCount?: number; hasCovers?: boolean } = {}
 
     const wantEdge = postMode === 'auto' || postMode === 'edge_only'
-    const wantSlate = postMode === 'auto' || postMode === 'slate_only'
+    const wantMorning = postMode === 'auto' || postMode === 'slate_only'
 
     if (wantEdge && edgeCount < maxEdgeAlerts) {
       const edgeResult = await tryPublishEdgeAlert(admin, bot, ctx, minEdge, dayStart, dryRun)
@@ -130,35 +135,60 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!publishedEdge && wantSlate && slateCount < maxSlates) {
-      const slateResult = await tryPublishSlateCheckIn(admin, bot, ctx, dayStart, dryRun)
-      if (slateResult.published) {
-        publishedSlate = true
-        postKind = 'slate'
-      } else if (postMode !== 'edge_only') {
-        postKind = 'slate'
+    if (!publishedEdge && wantMorning && morningCount < maxMorningPosts) {
+      if (coffeeCoversEnabled) {
+        const coffeeResult = await tryPublishCoffeeAndCovers(admin, bot, ctx, dayStart, dryRun)
+        coffeeMeta = {
+          coverCount: coffeeResult.coverCount,
+          mlCount: coffeeResult.mlCount,
+          hasCovers: coffeeResult.hasCovers,
+        }
+        if (coffeeResult.published) {
+          publishedMorning = true
+          postKind = 'coffee_covers'
+        } else if (postMode !== 'edge_only') {
+          postKind = 'coffee_covers'
+        }
+      } else {
+        const slateResult = await tryPublishSlateCheckIn(admin, bot, ctx, dayStart, dryRun)
+        if (slateResult.published) {
+          publishedMorning = true
+          postKind = 'slate'
+        } else if (postMode !== 'edge_only') {
+          postKind = 'slate'
+        }
       }
     }
 
     if (!dryRun) {
       await admin.from('lounge_bot_accounts').update({
         last_poll_at: new Date().toISOString(),
-        last_publish_at: (publishedEdge || publishedSlate)
+        last_publish_at: (publishedEdge || publishedMorning)
           ? new Date().toISOString()
           : undefined,
         updated_at: new Date().toISOString(),
       }).eq('user_id', bot.user_id)
     }
 
-    const previewCaption = publishedEdge && edgePick
-      ? buildOddsEdgeAlertCaption(edgePick, { categoryLabel: calendarPick.categoryLabel })
+    const morningPreview = coffeeCoversEnabled
+      ? generateCoffeeAndCovers({
+        categoryLabel: calendarPick.categoryLabel,
+        sportKey,
+        events: ctx.upcoming,
+      }).caption
       : buildOddsSlateCaption({
         categoryLabel: calendarPick.categoryLabel,
         events: ctx.upcoming,
       })
 
+    const previewCaption = publishedEdge && edgePick
+      ? buildOddsEdgeAlertCaption(edgePick, { categoryLabel: calendarPick.categoryLabel })
+      : morningPreview
+
     if (dryRun) {
-      const wouldPost = wantEdge && edgePick && edgePick.edgePct >= minEdge ? 'edge' : 'slate'
+      const wouldPost = wantEdge && edgePick && edgePick.edgePct >= minEdge
+        ? 'edge'
+        : (coffeeCoversEnabled ? 'coffee_covers' : 'slate')
       return adminOpsJson(200, {
         ok: true,
         slug,
@@ -167,19 +197,20 @@ Deno.serve(async (req) => {
         calendarSlug: calendarPick.calendarSlug,
         categoryLabel: calendarPick.categoryLabel,
         eventsInWindow: ctx.eventsInWindow,
+        coffeeCoversEnabled,
         wouldPostKind: wouldPost,
         edgeCandidate: edgePick
           ? { ev: edgePick.edgePct, clearsBar: edgePick.edgePct >= minEdge, consensusProb: edgePick.consensusProb }
           : null,
-        slatePreview: buildOddsSlateCaption({
-          categoryLabel: calendarPick.categoryLabel,
-          events: ctx.upcoming,
-        }).slice(0, 320),
+        morningPreview: morningPreview.slice(0, 320),
+        coverCount: coffeeMeta.coverCount ?? null,
+        mlCount: coffeeMeta.mlCount ?? null,
+        hasCovers: coffeeMeta.hasCovers ?? null,
         requestsRemaining: ctx.requestsRemaining,
       })
     }
 
-    if (!publishedEdge && !publishedSlate) {
+    if (!publishedEdge && !publishedMorning) {
       return adminOpsJson(200, {
         ok: true,
         skipped: postMode === 'edge_only' ? 'no_edge_picks' : 'already_posted_or_capped',
@@ -189,7 +220,8 @@ Deno.serve(async (req) => {
         categoryLabel: calendarPick.categoryLabel,
         eventsInWindow: ctx.eventsInWindow,
         edgeCount,
-        slateCount,
+        morningCount,
+        coffeeCoversEnabled,
         requestsRemaining: ctx.requestsRemaining,
       })
     }
@@ -201,10 +233,14 @@ Deno.serve(async (req) => {
       calendarSlug: calendarPick.calendarSlug,
       categoryLabel: calendarPick.categoryLabel,
       eventsInWindow: ctx.eventsInWindow,
-      published: (publishedEdge ? 1 : 0) + (publishedSlate ? 1 : 0),
+      published: (publishedEdge ? 1 : 0) + (publishedMorning ? 1 : 0),
       postKind,
       publishedEdge,
-      publishedSlate,
+      publishedMorning,
+      coffeeCoversEnabled,
+      coverCount: coffeeMeta.coverCount ?? null,
+      mlCount: coffeeMeta.mlCount ?? null,
+      hasCovers: coffeeMeta.hasCovers ?? null,
       evPct: publishedEdge && edgePick ? edgePick.edgePct : null,
       requestsRemaining: ctx.requestsRemaining,
       captionPreview: previewCaption.slice(0, 160),

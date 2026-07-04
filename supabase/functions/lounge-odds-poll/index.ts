@@ -1,5 +1,5 @@
 /**
- * Background odds poller — edge alerts + morning slate batch.
+ * Background odds poller — edge alerts + morning Coffee & Covers batch.
  * Body: { slug, action: 'poll_edges' | 'daily_slates', dryRun?: boolean, force?: boolean }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
@@ -12,6 +12,7 @@ import {
   loadTodayCalendarRows,
   morningSlateShouldRunNow,
   ptDayStartIso,
+  tryPublishCoffeeAndCovers,
   tryPublishEdgeAlert,
   tryPublishSlateCheckIn,
   type OddsCfgRow,
@@ -76,8 +77,9 @@ Deno.serve(async (req) => {
     const markets = oddsCfg.markets || ['h2h', 'spreads']
     const minEdge = Number(oddsCfg.min_edge_pct) ?? DEFAULT_MIN_EV_PCT
     const maxEdgeAlerts = Number(oddsCfg.max_edge_alerts_per_day) || 6
-    const maxSlates = Number(oddsCfg.max_slate_posts_per_day) || 10
-    const slatesEnabled = oddsCfg.daily_slate_enabled !== false
+    const maxMorningPosts = Number(oddsCfg.max_slate_posts_per_day) || 10
+    const morningEnabled = oddsCfg.daily_slate_enabled !== false
+    const coffeeCoversEnabled = oddsCfg.coffee_covers_enabled !== false
 
     if (action === 'daily_slates' && !dryRun) {
       const gate = morningSlateShouldRunNow(bot.user_id, { force })
@@ -101,10 +103,12 @@ Deno.serve(async (req) => {
 
     const dayStart = ptDayStartIso()
     let edgeCount = await countPublishedKindToday(admin, bot.user_id, 'edge', dayStart)
-    let slateCount = await countPublishedKindToday(admin, bot.user_id, 'slate', dayStart)
+    const morningPostKind = coffeeCoversEnabled ? 'coffee_covers' : 'slate'
+    let morningCount = await countPublishedKindToday(admin, bot.user_id, morningPostKind, dayStart)
 
     const activeSports = await fetchActiveSportKeys()
     let publishedEdges = 0
+    let publishedCoffeeCovers = 0
     let publishedSlates = 0
     let requestsRemaining: string | null = null
     const details: Record<string, unknown>[] = []
@@ -151,23 +155,42 @@ Deno.serve(async (req) => {
             edge: edgeResult.pick?.edgePct ?? null,
             skipped: edgeResult.skipped,
           })
-        } else if (slatesEnabled) {
-          if (slateCount >= maxSlates) {
-            details.push({ calendarSlug: row.slug, skipped: 'slate_cap' })
+        } else if (morningEnabled) {
+          if (morningCount >= maxMorningPosts) {
+            details.push({ calendarSlug: row.slug, skipped: 'morning_cap' })
             continue
           }
-          const slateResult = await tryPublishSlateCheckIn(admin, bot, ctx, dayStart, dryRun)
-          if (slateResult.published) {
-            publishedSlates += 1
-            slateCount += 1
+
+          if (coffeeCoversEnabled) {
+            const coffeeResult = await tryPublishCoffeeAndCovers(admin, bot, ctx, dayStart, dryRun)
+            if (coffeeResult.published) {
+              publishedCoffeeCovers += 1
+              morningCount += 1
+            }
+            details.push({
+              calendarSlug: row.slug,
+              sportKey,
+              publishedCoffeeCovers: coffeeResult.published,
+              gamesToday: coffeeResult.gamesToday ?? null,
+              coverCount: coffeeResult.coverCount ?? null,
+              mlCount: coffeeResult.mlCount ?? null,
+              hasCovers: coffeeResult.hasCovers ?? null,
+              skipped: coffeeResult.skipped,
+            })
+          } else {
+            const slateResult = await tryPublishSlateCheckIn(admin, bot, ctx, dayStart, dryRun)
+            if (slateResult.published) {
+              publishedSlates += 1
+              morningCount += 1
+            }
+            details.push({
+              calendarSlug: row.slug,
+              sportKey,
+              publishedSlate: slateResult.published,
+              gamesToday: slateResult.gamesToday ?? null,
+              skipped: slateResult.skipped,
+            })
           }
-          details.push({
-            calendarSlug: row.slug,
-            sportKey,
-            publishedSlate: slateResult.published,
-            gamesToday: slateResult.gamesToday ?? null,
-            skipped: slateResult.skipped,
-          })
         }
       } catch (err) {
         details.push({
@@ -178,7 +201,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!dryRun && (publishedEdges > 0 || publishedSlates > 0)) {
+    const publishedMorning = publishedCoffeeCovers + publishedSlates
+
+    if (!dryRun && (publishedEdges > 0 || publishedMorning > 0)) {
       await admin.from('lounge_bot_accounts').update({
         last_poll_at: new Date().toISOString(),
         last_publish_at: new Date().toISOString(),
@@ -196,9 +221,12 @@ Deno.serve(async (req) => {
       slug,
       action,
       dryRun,
+      coffeeCoversEnabled,
       sportsChecked: details.length,
       publishedEdges,
+      publishedCoffeeCovers,
       publishedSlates,
+      publishedMorning,
       requestsRemaining,
       scheduledPt: morningGate?.scheduledMinute != null
         ? formatPtMinuteAsClock(morningGate.scheduledMinute)

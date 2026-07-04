@@ -7,11 +7,13 @@ Background odds poller for sports bots.
 | `action` | Behavior |
 | --- | --- |
 | `poll_edges` | Fetch each calendar-active sport today; publish **⚡ +EV** alerts when EV clears `min_edge_pct` (devig h2h). |
-| `daily_slates` | Post one **morning slate** per calendar sport (today's PT games only: best ML line + book per outcome). |
+| `daily_slates` | Post one **Coffee & Covers** roundup per calendar sport (today's PT games). Legacy slate check-ins when `coffee_covers_enabled = false`. |
 
-### Morning slate window (cron)
+### Coffee & Covers (morning cron)
 
 `daily_slates` only publishes between **7:00am and 10:00am PT**. Each bot gets a **stable random minute** in that window per day (derived from `bot_user_id` + PT date) so posts do not land at the same time every morning.
+
+Each post leads with **cover picks** (spread +EV at **+4%** threshold, max **3** per sport). If none qualify, Scott opens with *"Sitting on hands today until we find something worth calling."* Optional **ML spots** at **+3%** +EV, then **Today's lines** (best ML + book per outcome).
 
 **Cron:** invoke every **15 minutes** from **7:00-9:59am PT** with service role:
 
@@ -19,9 +21,9 @@ Background odds poller for sports bots.
 { "slug": "sharpesignal", "action": "daily_slates" }
 ```
 
-First tick after the bot's scheduled minute posts one slate per active calendar sport (deduped per sport/day).
+First tick after the bot's scheduled minute posts one roundup per active calendar sport (deduped per sport/day via `coffee:{calendarSlug}:{ptDay}`).
 
-**Portal:** **Post morning slates** sends `force: true` to bypass the time gate for manual smoke.
+**Portal:** **Post Coffee & Covers** sends `force: true` to bypass the time gate for manual smoke.
 
 ## Deploy
 
@@ -29,4 +31,4 @@ First tick after the bot's scheduled minute posts one slate per active calendar 
 supabase functions deploy lounge-odds-poll --project-ref YOUR_PROJECT_REF
 ```
 
-Requires **`THE_ODDS_API_KEY`** and migrations through **`20260704150000`**.
+Requires **`THE_ODDS_API_KEY`** and migrations through **`20260704200000`**.

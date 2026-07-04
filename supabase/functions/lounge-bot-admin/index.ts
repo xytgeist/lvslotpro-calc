@@ -81,6 +81,7 @@ async function seedPipelineExtras(
       max_edge_alerts_per_day: 6,
       max_slate_posts_per_day: 10,
       daily_slate_enabled: true,
+      coffee_covers_enabled: true,
       enabled: true,
     })
   }

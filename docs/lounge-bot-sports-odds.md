@@ -1,6 +1,6 @@
 # Lounge bot — sports odds / +EV plays
 
-**Status:** **Shipped on test (code, Jul 2026)** — migrations through **`20260704180000`**, Edge fns **`lounge-odds-ingest`** + **`lounge-odds-poll`**, admin portal **`/?tab=bots`**. **Ryan smoke pending** on **`kcosfvmreeiosdjdzycb`**.
+**Status:** **Shipped on test (code, Jul 2026)** — migrations through **`20260704200000`**, Edge fns **`lounge-odds-ingest`** + **`lounge-odds-poll`**, admin portal **`/?tab=bots`**. **Ryan smoke pending** on **`kcosfvmreeiosdjdzycb`**.
 
 **Live bot (test):** **Scott Share** — `@sharpesignal`, pipeline **`odds_api`**, category pill **`sports`**.
 
@@ -12,13 +12,14 @@
 
 ```text
 Calendar sport pick (portal)  →  lounge-odds-ingest (manual) or lounge-odds-poll (cron)
-  →  +EV engine (h2h devig)  →  ⚡ edge alert OR slate check-in  →  feed
+  →  +EV engine (h2h devig)  →  ⚡ edge alert OR Coffee & Covers morning post  →  feed
 ```
 
 | Post kind | When | Example tone |
 | --- | --- | --- |
 | **Edge** | Best h2h line clears **`min_edge_pct`** | See example below |
-| **Slate** | No edge clears (or **`daily_slates`** poll) | See example below |
+| **Coffee & Covers** | No edge on manual fetch, or **`daily_slates`** morning poll | See example below |
+| **Slate** (legacy) | When **`coffee_covers_enabled = false`** | See legacy example below |
 
 **Caption style:** factual labels only (no opinion phrases). Line breaks between sections. Plain keyboard punctuation. Sportsbook names use brand labels (FanDuel, MyBookie) ... not bare domains (avoids auto-linkify in feed).
 
@@ -31,7 +32,29 @@ Fair +652 (9 books)
 +8.8% edge on ML
 ```
 
-**Slate example:**
+**Coffee & Covers example:**
+```text
+Coffee & Covers
+World Cup
+
+Covers
+France vs Paraguay, Sat Jul 4 at 2pm PT
+France -1.5 (+105) at FanDuel
+Fair -115 (9 books) · +4.2% EV
+
+ML spots
+Germany vs Portugal, Sat Jul 4 at 5pm PT
+Germany ML +145 at DraftKings
+Fair +132 (8 books) · +3.1% EV
+
+Today's lines
+France vs Paraguay, Sat Jul 4 at 2pm PT
+France +145 (DraftKings), Draw +652 (FanDuel), Paraguay +718 (MyBookie)
+```
+
+When no spread clears **+4%** EV, the **Covers** section opens with: *Sitting on hands today until we find something worth calling.*
+
+**Legacy slate example:**
 ```text
 World Cup slate
 
@@ -42,7 +65,7 @@ Germany vs Portugal, Sat Jul 4 at 5pm PT
 Germany -110 (FanDuel), Portugal +105 (DraftKings)
 ```
 
-Long slates may still truncate with `+N more games today.` at the **2000-char** caption cap (subscriber/bot tier). **+EV alerts and morning slates** only consider games **kicking off today (PT)** that have not started yet.
+Long posts may still truncate with `+N more games today.` at the **2000-char** caption cap (subscriber/bot tier). **+EV alerts and morning posts** only consider games **kicking off today (PT)** that have not started yet.
 
 **Morning automation:** cron calls **`lounge-odds-poll`** with **`daily_slates`** every 15 min between **7-10am PT**; each bot fires once per day at a random minute in that window. See **`lounge-odds-poll/README.md`**.
 
@@ -55,23 +78,39 @@ Long slates may still truncate with `+N more games today.` at the **2000-char** 
 | Control | Behavior |
 | --- | --- |
 | **Today's major sport** | Dropdown from **`lounge_sports_betting_calendar`** (PT day) |
-| **Fetch odds** | One sport: try edge, else slate (`postMode: auto`) |
+| **Fetch odds** | One sport: try edge, else Coffee & Covers (`postMode: auto`) |
 | **Scan all · edge** | All calendar sports today → edge alerts only |
-| **Post all slates** | One slate per sport/day (dedupe) |
+| **Post Coffee & Covers** | One morning roundup per sport/day (dedupe) |
 | **Min +EV %** | Settings field **0.5–15** → **`lounge_bot_odds_config.min_edge_pct`** via **`admin_lounge_bot_save_settings`** |
 
 ---
 
-## +EV engine (h2h only)
+## +EV engine
 
-Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`**
+Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`** (h2h alerts) and **`loungeBotCoffeeAndCovers.ts`** (morning covers + ML spots).
+
+### Edge alerts (h2h)
 
 1. Filter events: **today (PT)** kickoffs not yet started (after optional **48h** API pre-filter), **3+ books**, in-season sport keys from The Odds API **`active`**
-2. **h2h only** for alerts (spreads fetched for cache/context, not +EV v1)
+2. **h2h only** for ⚡ alerts
 3. Per book: devig both sides → fair implied prob per outcome
 4. **Consensus:** average fair probs across books
 5. **EV on $1** at best available American price vs consensus
 6. Publish if **`evPct >= min_edge_pct`** and **`evPct <= 15`** (stale-data filter)
+
+### Coffee & Covers (morning)
+
+**`generateCoffeeAndCovers()`** in **`loungeBotCoffeeAndCovers.ts`**:
+
+| Section | Threshold | Max per sport |
+| --- | --- | --- |
+| **Covers** (spread/handicap) | **+4%** EV on $1 | **3** |
+| **ML spots** | **+3%** EV on $1 | **3** |
+| **Today's lines** | Best ML + book per outcome (all games today) | Truncates at 2000 chars |
+
+Spread devig mirrors h2h: per-book no-vig fair probs on each spread side, consensus average, EV at best juice. Dedupe key: **`coffee:{calendarSlug}:{ptDay}`**. Log **`post_kind: coffee_covers`**.
+
+Set **`coffee_covers_enabled = false`** on **`lounge_bot_odds_config`** to fall back to legacy slate check-ins.
 
 **`min_edge_pct`:** minimum **+EV percent on $1 stake** (default **2**). Column default + new bots use **2**; existing rows may still be **4** until saved in portal.
 
@@ -85,7 +124,7 @@ Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`**
 | **`lounge-odds-poll`** | Background: **`poll_edges`** \| **`daily_slates`** |
 | **`lounge-bot-admin`** | Create bot + seed **`lounge_bot_odds_config`** |
 
-Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**
+Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**, **`loungeBotCoffeeAndCovers.ts`**
 
 Deploy:
 
@@ -120,12 +159,13 @@ Current fetch: **`h2h` + `spreads`**, region **`us`** → **~2 credits/call**.
 | `min_edge_pct` | Min +EV % on $1 (default **2**); editable in portal |
 | `max_edge_alerts_per_day` | Default **6** |
 | `max_slate_posts_per_day` | Default **10** |
-| `daily_slate_enabled` | Default **true** |
+| `daily_slate_enabled` | Default **true** — gates **`daily_slates`** poll |
+| `coffee_covers_enabled` | Default **true** — Coffee & Covers vs legacy slate |
 | `sports_keys` | Fallback list; calendar drives manual picks |
 | `regions` | `['us']` |
 | `markets` | `['h2h','spreads']` |
 
-Publish log: **`post_kind`** (`edge` \| `slate`), **`dedupe_key`** — migration **`20260704150000`**.
+Publish log: **`post_kind`** (`edge` \| `slate` \| `coffee_covers`), **`dedupe_key`** — migrations **`20260704150000`**, **`20260704200000`**.
 
 ---
 
@@ -153,6 +193,8 @@ Captions prefix category label from calendar row (e.g. `Wimbledon · …`).
 | **`20260704160000`** | `min_edge_pct` semantics + default 2 |
 | **`20260704170000`** | Portal save **`min_edge_pct`** |
 | **`20260704180000`** | Manual post + comment as bot (`admin_lounge_bot_publish_post`, `admin_lounge_bot_post_comment`) |
+| **`20260704190000`** | Subscriber 2000-char lounge caption cap |
+| **`20260704200000`** | **`coffee_covers`** post kind + **`coffee_covers_enabled`** |
 
 ---
 
@@ -173,10 +215,10 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| **1** | Manual fetch + devig +EV + slate check-ins + portal | **Code shipped** |
-| **2** | **`lounge-odds-poll`** cron (30-min edge scan, morning slates) | **Fn shipped; cron not wired** |
+| **1** | Manual fetch + devig +EV + Coffee & Covers + portal | **Code shipped** |
+| **2** | **`lounge-odds-poll`** cron (30-min edge scan, morning Coffee & Covers) | **Fn shipped; cron not wired** |
 | **3** | Line movement vs snapshot ("moved from -2.5 to -3.5") | Not started |
-| **4** | Spreads/totals +EV, props, rich cards | Not started |
+| **4** | Props, rich cards | Not started |
 
 **Legal/compliance (before prod):** Nevada/gambling content policy, no guaranteed-profit claims, disclaimer on profile or posts — counsel review.
 
@@ -189,6 +231,7 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 | Spec (this file) | **`docs/lounge-bot-sports-odds.md`** |
 | Portal UI | **`src/features/bots/BotManagementPortal.jsx`**, **`botPortalApi.js`** |
 | +EV math | **`supabase/functions/_shared/loungeBotOddsCaption.ts`** |
+| Coffee & Covers | **`supabase/functions/_shared/loungeBotCoffeeAndCovers.ts`** |
 | Ingest / poll | **`lounge-odds-ingest/`**, **`lounge-odds-poll/`** |
 | Poll README | **`supabase/functions/lounge-odds-poll/README.md`** |
 | Backlog smoke | **`docs/test-buildout-backlog.md`** → Planned (Lounge bots) |
@@ -204,4 +247,4 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 
 ---
 
-_Updated 2026-07-04: Scott Share session — calendar picker, devig +EV, slate check-ins, portal Min +EV field._
+_Updated 2026-07-04: Coffee & Covers morning roundup (spread +4% / ML +3% thresholds), legacy slate fallback via `coffee_covers_enabled`._

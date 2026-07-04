@@ -56,16 +56,16 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 - [ ] **Create financial-wire bot user** + `lounge_bot_accounts` row + `lounge_bot_seed_financial_wire_sources()` — see **`supabase/functions/lounge-news-poll/README.md`**
 - [ ] **Deploy `lounge-news-poll` on test** (requires **`FINNHUB_API_KEY`**)
 - [x] **Market news bot v1 (code):** Finnhub general + M&A poll → score → auto-publish; migration + Edge fn + Edge Monitor Bot ops panel. **`docs/lounge-bot-market-news.md`**
-- [x] **Bot ops UI (code):** **`/?tab=bots`** Bot Portal — all bots, run/pause/stop, caps, score threshold, watchlist, source toggles, edit/delete posts, **manual post + reply as bot**, automation log, **Scott Share odds controls** (calendar picker, Fetch odds, Scan all · edge, Post morning slates, **Min +EV %**). Edge Monitor links here.
+- [x] **Bot ops UI (code):** **`/?tab=bots`** Bot Portal — all bots, run/pause/stop, caps, score threshold, watchlist, source toggles, edit/delete posts, **manual post + reply as bot**, automation log, **Scott Share odds controls** (calendar picker, Fetch odds, Scan all · edge, **Post Coffee & Covers**, **Min +EV %**). Edge Monitor links here.
 - [ ] **Market news smoke (test):** dry run → enable bot → poll now → confirm Lounge post as bot user; verify day/hour caps.
 - [ ] **Sports odds bot smoke (test):** **`docs/lounge-bot-sports-odds.md`**
-  - [ ] Apply migrations **`20260704120000`** through **`20260704190000`** on **`kcosfvmreeiosdjdzycb`** (skip any already applied)
+  - [ ] Apply migrations **`20260704120000`** through **`20260704200000`** on **`kcosfvmreeiosdjdzycb`** (skip any already applied)
   - [ ] Deploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**; frontend deploy for portal
   - [ ] **`THE_ODDS_API_KEY`** on test Edge
   - [ ] Portal → Scott Share (`@sharpesignal`): **Min +EV %** = **2** if row still **4** → Save settings
-  - [ ] **Dry run** today's calendar sport → `wouldPostKind` edge or slate
-  - [ ] **Fetch odds** → ⚡ +EV or slate post on Lounge
-  - [ ] **Scan all · edge** + **Post morning slates** on multi-sport calendar day
+  - [ ] **Dry run** today's calendar sport → `wouldPostKind` edge or `coffee_covers`
+  - [ ] **Fetch odds** → ⚡ +EV or Coffee & Covers post on Lounge
+  - [ ] **Scan all · edge** + **Post Coffee & Covers** on multi-sport calendar day
   - [ ] **Manual post as Scott** + **reply to a comment** on that post from portal
   - [ ] Wire Supabase cron: **`daily_slates`** every 15 min **7-10am PT** (see **`lounge-odds-poll/README.md`**)
 
@@ -760,6 +760,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-04: **Coffee & Covers morning post:** migration **`20260704200000`** (`post_kind: coffee_covers`, `coffee_covers_enabled`); **`loungeBotCoffeeAndCovers.ts`** — spread covers **+4%** EV, ML spots **+3%**, today's lines board, sitting-on-hands copy when no covers; **`daily_slates`** poll + manual fetch fallback use Coffee & Covers (legacy slate when disabled). Portal: **Post Coffee & Covers**. Apply **`20260704200000`** on test; redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Subscriber lounge caption 2000:** migration **`20260704190000`** — hard max 2000 on posts/comments/drafts; **`lounge_feed_caption_max_for_user`** + triggers (free **500**, subscriber/bot/staff **2000**). Scott slate cap in **`loungeBotOddsCaption.ts`**. Apply on test; redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**; frontend deploy for composer limits.
 - 2026-07-04: **Odds caption format:** factual multi-line posts (no opinion phrases); line breaks in feed via `whitespace-pre-wrap` — **`loungeBotOddsCaption.ts`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Odds caption voice:** edge + slate posts use plain sentences (short names, fair as American odds, `vs` matchups, compact PT kickoff) — **`loungeBotOddsCaption.ts`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.

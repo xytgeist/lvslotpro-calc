@@ -16,6 +16,10 @@ import {
   slateDedupeKey,
   type OddsPick,
 } from './loungeBotOddsCaption.ts'
+import {
+  coffeeCoversDedupeKey,
+  generateCoffeeAndCovers,
+} from './loungeBotCoffeeAndCovers.ts'
 import { publishLoungeBotPost } from './loungeBotPublish.ts'
 
 const ODDS_BASE = 'https://api.the-odds-api.com/v4'
@@ -41,6 +45,7 @@ export type OddsCfgRow = {
   max_edge_alerts_per_day: number | null
   max_slate_posts_per_day: number | null
   daily_slate_enabled: boolean | null
+  coffee_covers_enabled: boolean | null
 }
 
 export function oddsApiKey(): string {
@@ -199,7 +204,7 @@ export function resolveCalendarSelection(
 export async function countPublishedKindToday(
   admin: SupabaseClient,
   botUserId: string,
-  postKind: 'edge' | 'slate',
+  postKind: 'edge' | 'slate' | 'coffee_covers',
   dayStart: string,
 ): Promise<number> {
   const { count } = await admin
@@ -336,6 +341,91 @@ export async function tryPublishEdgeAlert(
   return { published: false, pick, skipped: 'publish_failed' }
 }
 
+export async function tryPublishCoffeeAndCovers(
+  admin: SupabaseClient,
+  bot: OddsBotRow,
+  ctx: SportOddsContext,
+  dayStart: string,
+  dryRun: boolean,
+): Promise<{
+  published: boolean
+  skipped?: string
+  gamesToday?: number
+  coverCount?: number
+  mlCount?: number
+  hasCovers?: boolean
+}> {
+  if (ctx.eventsInWindow <= 0) {
+    return { published: false, skipped: 'no_games_today', gamesToday: 0, coverCount: 0, mlCount: 0, hasCovers: false }
+  }
+
+  const dedupeKey = coffeeCoversDedupeKey(ctx.calendarSlug, ptTodayDate())
+  if (!dryRun && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) {
+    return {
+      published: false,
+      skipped: 'coffee_already_posted',
+      gamesToday: ctx.eventsInWindow,
+    }
+  }
+
+  const generated = generateCoffeeAndCovers({
+    categoryLabel: ctx.categoryLabel,
+    sportKey: ctx.sportKey,
+    events: ctx.upcoming,
+  })
+
+  if (dryRun) {
+    return {
+      published: false,
+      gamesToday: ctx.eventsInWindow,
+      coverCount: generated.coverPicks.length,
+      mlCount: generated.mlPicks.length,
+      hasCovers: generated.hasCovers,
+    }
+  }
+
+  const pills = bot.category_pills_default?.length ? bot.category_pills_default : ['sports']
+  const result = await publishLoungeBotPost(admin, {
+    botUserId: bot.user_id,
+    caption: generated.caption,
+    categoryPills: pills,
+  })
+
+  const topScore = generated.coverPicks[0]?.edgePct
+    ?? generated.mlPicks[0]?.edgePct
+    ?? null
+
+  if (result.postId) {
+    await admin.from('lounge_bot_publish_log').insert({
+      bot_user_id: bot.user_id,
+      post_id: result.postId,
+      caption: generated.caption,
+      score: topScore,
+      status: 'published',
+      post_kind: 'coffee_covers',
+      dedupe_key: dedupeKey,
+    })
+    return {
+      published: true,
+      gamesToday: generated.gameCount,
+      coverCount: generated.coverPicks.length,
+      mlCount: generated.mlPicks.length,
+      hasCovers: generated.hasCovers,
+    }
+  }
+
+  await admin.from('lounge_bot_publish_log').insert({
+    bot_user_id: bot.user_id,
+    caption: generated.caption,
+    status: 'failed',
+    post_kind: 'coffee_covers',
+    dedupe_key: dedupeKey,
+    error_message: result.error?.slice(0, 400),
+  })
+  return { published: false, skipped: 'publish_failed', gamesToday: generated.gameCount }
+}
+
+/** Legacy morning slate when Coffee & Covers is disabled. */
 export async function tryPublishSlateCheckIn(
   admin: SupabaseClient,
   bot: OddsBotRow,
@@ -376,7 +466,7 @@ export async function tryPublishSlateCheckIn(
       post_kind: 'slate',
       dedupe_key: dedupeKey,
     })
-    return { published: true }
+    return { published: true, gamesToday: ctx.eventsInWindow }
   }
 
   await admin.from('lounge_bot_publish_log').insert({
@@ -387,5 +477,5 @@ export async function tryPublishSlateCheckIn(
     dedupe_key: dedupeKey,
     error_message: result.error?.slice(0, 400),
   })
-  return { published: false, skipped: 'publish_failed' }
+  return { published: false, skipped: 'publish_failed', gamesToday: ctx.eventsInWindow }
 }

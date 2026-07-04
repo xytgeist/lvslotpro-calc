@@ -326,19 +326,28 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
             : d.skipped === 'already_posted_or_capped'
               ? `${d.categoryLabel || selectedCalendarEntry?.label_short || 'Sport'}: already posted today or cap reached.`
               : d.skipped === 'no_edge_picks'
-                ? `${d.categoryLabel || 'Sport'}: no edge alert (slate-only mode).`
+                ? `${d.categoryLabel || 'Sport'}: no edge alert (morning post mode).`
                 : null
       const label = d.categoryLabel || selectedCalendarEntry?.label_short || 'sport'
+      const morningKind = d.wouldPostKind === 'coffee_covers' || d.coffeeCoversEnabled !== false
+        ? 'Coffee & Covers'
+        : 'slate check-in'
       if (dryRun) {
         setToast(
           d.wouldPostKind === 'edge'
             ? `Dry run · would post ⚡ +EV (${label})${d.edgeCandidate?.ev != null ? ` · +${d.edgeCandidate.ev}% EV` : ''}`
-            : `Dry run · would post slate check-in (${label}) · ${d.eventsInWindow ?? 0} games`,
+            : d.wouldPostKind === 'coffee_covers'
+              ? `Dry run · would post Coffee & Covers (${label}) · ${d.coverCount ?? 0} covers, ${d.mlCount ?? 0} ML spots · ${d.eventsInWindow ?? 0} games`
+              : `Dry run · would post ${morningKind} (${label}) · ${d.eventsInWindow ?? 0} games`,
         )
       } else if (d.publishedEdge) {
         setToast(`⚡ +EV alert posted · ${label}${d.evPct != null ? ` (+${d.evPct}% EV)` : ''}`)
-      } else if (d.publishedSlate) {
-        setToast(`Slate check-in posted · ${label}`)
+      } else if (d.publishedMorning) {
+        setToast(
+          d.postKind === 'coffee_covers'
+            ? `Coffee & Covers posted · ${label}${d.coverCount != null ? ` · ${d.coverCount} cover${d.coverCount === 1 ? '' : 's'}` : ''}`
+            : `Slate check-in posted · ${label}`,
+        )
       } else {
         setToast(skipMsg || `Done · ${label}`)
       }
@@ -371,14 +380,15 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     if (d.skipped === 'no_calendar_today') {
       setToast('No major events on the betting calendar today.')
     } else if (d.skipped === 'before_scheduled_time') {
-      setToast(`Morning slates fire at ${d.scheduledPt || '?'} PT today (random 7-10am window).`)
+      setToast(`Coffee & Covers fires at ${d.scheduledPt || '?'} PT today (random 7-10am window).`)
     } else if (d.skipped === 'outside_morning_window') {
-      setToast('Morning slates only run between 7am and 10am PT.')
+      setToast('Coffee & Covers only runs between 7am and 10am PT.')
     } else if (action === 'daily_slates') {
+      const morningCount = d.publishedMorning ?? d.publishedCoffeeCovers ?? d.publishedSlates ?? 0
       setToast(
         dryRun
-          ? `Dry run: would post up to ${d.sportsChecked ?? 0} morning slates${d.scheduledPt ? ` (cron window opens ${d.scheduledPt} PT)` : ''}`
-          : `Posted ${d.publishedSlates ?? 0} morning slate${d.publishedSlates === 1 ? '' : 's'} (${d.sportsChecked ?? 0} sports checked)`,
+          ? `Dry run: would post up to ${d.sportsChecked ?? 0} Coffee & Covers roundups${d.scheduledPt ? ` (cron window opens ${d.scheduledPt} PT)` : ''}`
+          : `Posted ${morningCount} Coffee & Covers post${morningCount === 1 ? '' : 's'} (${d.sportsChecked ?? 0} sports checked)`,
       )
     } else {
       setToast(
@@ -549,7 +559,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                     ))}
                   </select>
                   <div className="text-zinc-500 text-[10px] mt-1.5">
-                    Fetch odds posts ⚡ +EV if one clears the bar, otherwise a daily slate check-in.{' '}
+                    Fetch odds posts ⚡ +EV if one clears the bar, otherwise Coffee & Covers.{' '}
                     <span className="font-mono text-zinc-400">{selectedSportKey || '…'}</span>
                   </div>
                 </>
@@ -597,7 +607,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                   onClick={() => void runOddsPoll('daily_slates', false)}
                   className="min-h-8 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold disabled:opacity-50"
                 >
-                  {busy === 'slates' ? '…' : 'Post morning slates'}
+                  {busy === 'slates' ? '…' : 'Post Coffee & Covers'}
                 </button>
               </>
             ) : null}
