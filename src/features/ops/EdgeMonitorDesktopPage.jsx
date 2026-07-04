@@ -114,6 +114,12 @@ export default function EdgeMonitorDesktopPage({
               Open app
             </a>
             <a
+              href="/?tab=bots"
+              className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800/80 px-3 text-zinc-400 text-xs font-semibold hover:bg-zinc-700 hover:text-zinc-200"
+            >
+              Bot Portal
+            </a>
+            <a
               href="/?tab=monitor"
               className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800/80 px-3 text-zinc-400 text-xs font-semibold hover:bg-zinc-700 hover:text-zinc-200"
             >
@@ -124,7 +130,14 @@ export default function EdgeMonitorDesktopPage({
       </header>
       <main className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
         <div className="mx-auto max-w-[1680px] px-6 py-8 pb-16">
-          <EdgeMonitorDashboard supabaseClient={supabaseClient} layout="desktop" showDesktopLink={false} />
+          <EdgeMonitorDashboard
+            supabaseClient={supabaseClient}
+            layout="desktop"
+            showDesktopLink={false}
+            onOpenBotPortal={() => {
+              window.location.href = '/?tab=bots'
+            }}
+          />
         </div>
       </main>
     </div>

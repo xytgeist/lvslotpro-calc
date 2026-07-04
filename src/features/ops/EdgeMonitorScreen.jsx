@@ -6,13 +6,19 @@ export default function EdgeMonitorScreen({
   supabaseClient,
   titleBarNavSlot = null,
   onBack,
+  onOpenBotPortal,
 }) {
   return (
     <ScrollLinkedEdgeTitleBarShell
       titleBarNavSlot={titleBarNavSlot}
       contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]"
     >
-      <EdgeMonitorDashboard supabaseClient={supabaseClient} layout="mobile" onBack={onBack} />
+      <EdgeMonitorDashboard
+        supabaseClient={supabaseClient}
+        layout="mobile"
+        onBack={onBack}
+        onOpenBotPortal={onOpenBotPortal}
+      />
     </ScrollLinkedEdgeTitleBarShell>
   )
 }

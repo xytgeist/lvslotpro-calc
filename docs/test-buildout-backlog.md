@@ -39,6 +39,40 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ---
 
+## Planned (Lounge bots)
+
+**Two tracks (Ryan 2026-07-03):**
+
+| Track | Bots | Ryan's role |
+| --- | --- | --- |
+| **Self-contained** | Sports odds, financial wire | Tune config, audit log, kill switch ... **no daily inbox** |
+| **Editorial (X only)** | Crypto, smart money, poker, slots/AP, ... | **Morning inbox:** edit, skip, schedule |
+
+**Roster:** one Edge profile per niche. Spec: **`docs/lounge-bot-editorial-queue.md`** (X editorial), **`docs/lounge-bot-sports-odds.md`**, **`docs/lounge-bot-market-news.md`**.
+
+### Self-contained (parallel)
+
+- [ ] **Apply migration `20260703140000_lounge_bot_financial_wire.sql` on test**
+- [ ] **Create financial-wire bot user** + `lounge_bot_accounts` row + `lounge_bot_seed_financial_wire_sources()` — see **`supabase/functions/lounge-news-poll/README.md`**
+- [ ] **Deploy `lounge-news-poll` on test** (requires **`FINNHUB_API_KEY`**)
+- [x] **Market news bot v1 (code):** Finnhub general + M&A poll → score → auto-publish; migration + Edge fn + Edge Monitor Bot ops panel. **`docs/lounge-bot-market-news.md`**
+- [x] **Bot ops UI (code):** **`/?tab=bots`** Bot Portal — all bots, run/pause/stop, caps, score threshold, watchlist, source toggles, edit/delete posts, automation log. Edge Monitor links here.
+- [ ] **Market news smoke (test):** dry run → enable bot → poll now → confirm Lounge post as bot user; verify day/hour caps.
+- [ ] **Sports odds bot (test):** Odds API → rule templates → auto-schedule ~2/day → publish. **`docs/lounge-bot-sports-odds.md`**
+
+### X editorial
+
+- [ ] **Phase 0 (test):** `lounge_bot_accounts` + `lounge_bot_queue` + admin **X editorial** inbox UI (**`/?tab=bots` → Editorial inbox**); manual paste tweet → edit → schedule → publish (RPC **`admin_lounge_bot_queue_manual_draft`**).
+- [ ] **Phase 1 (test):** `lounge_bot_x_sources` + `lounge-x-ingest` cron; LLM rewrite → `pending_review`.
+- [ ] **X-tracker bots (incremental):** one profile per niche (crypto, investing, poker, slots/AP); handles in `lounge_bot_x_sources`.
+- [ ] **X smoke:** Ryan morning pass ... edit 3 drafts, schedule, confirm feed posts; skip audit.
+
+### Prod
+
+- [ ] Prod only after checklist + sign-off; API secrets on prod Edge; bot profiles on prod Supabase.
+
+---
+
 ## Chat
 
 ### Schema (apply before client deploy)
@@ -492,6 +526,8 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
   - **Migration:** run **`20260608000000_chat_messages_video_url.sql`** on test before client deploy (adds `video_url TEXT` column; rebuilds `chat_messages_page` + `chat_messages_window` RPCs to include it).
   - **Smoke (test):** send a video in chat — progress bar encodes then uploads; bubble appears immediately with poster; tap bubble → native `<video>` plays; delete message → R2 objects removed. Legacy `stream_video_uid` messages still render via CF iframe unchanged.
 
+- [ ] **`lounge-news-poll`** (financial wire bot — Finnhub allowlist → score → auto-publish to Lounge) — deploy on **test** with **`FINNHUB_API_KEY`**; migration **`20260703140000`**; cron every 3 min or Edge Monitor **Poll now**. Source: `supabase/functions/lounge-news-poll/README.md`.
+
 - [ ] Function-by-function smoke notes captured  
   - Change: Record minimal expected input/output for each function.
   - Source: function `README.md` files
@@ -715,6 +751,9 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-03: **Bot portal wizard + editorial inbox + odds fetch (code):** migration **`20260703160000`** (`lounge_bot_queue`, `lounge_bot_x_sources`, odds config, editorial RPCs); Edge **`lounge-bot-admin`**, **`lounge-odds-ingest`**, **`lounge-x-ingest`**, **`lounge-bot-publish-due`**; UI **`/?tab=bots`**: **+ Create bot** wizard, **Editorial inbox** tab, sports odds **Fetch odds** button. Apply **`20260703140000`** through **`20260703160000`** on test; deploy Edge fns + secrets before smoke.
+- 2026-07-03: **Bot management portal (code):** migration **`20260703150000`** (`run_state` running/paused/stopped, **`admin_lounge_bot_portal_snapshot`**, **`admin_lounge_bot_save_settings`**); in-app **`/?tab=bots`** admin tab; edit/delete bot posts, caps, sources, pipeline run. Apply **`20260703140000`** + **`20260703150000`** on test.
+- 2026-07-03: **Lounge bot roster (Ryan):** **One Edge profile per niche** ... sports odds + financial wire = **self-contained auto-publish**; X-tracker bots (crypto, investing, poker, slots/AP) = **morning editorial inbox only**. Docs updated.
 - 2026-07-03: **Lounge caption cap 500 + feed collapse 320:** client **`LOUNGE_CAPTION_MAX`** / **`LOUNGE_COMMENT_BODY_MAX`** = **500**; **`LOUNGE_CAPTION_DISPLAY_MAX`** = **320** (…more in feed). Migration **`20260703130000_lounge_caption_500.sql`** — posts, comments, drafts, **`thread_captions[]`** validator. **Apply on test before prod.**
 - 2026-07-03: **Lightbox video scrubber (Ryan sign-off):** Shared **`LoungeStreamVideoPlaybackControls`** on feed hero + chat lightbox: two-tone track, pointer-position seek (iOS hidden-thumb fix), seeked-gated resume on Android **hls.js** MSE, hero **`savedStreamTimeRef`** sync on commit. Live scrub while dragging not required; tap/drag release seek **PASSED** on test (iOS + Android). Client **`14372ac`** on **`origin/main`** / **`edgetilt.com`**.
 - 2026-07-03: **Android chat video lightbox (Ryan sign-off):** Android chat videos use lounge-style **`ChatVideoLightbox`** (swipe dismiss, ← back, play/pause + scrubber); no OS **`requestFullscreen`** bypass. Native HLS + hard media stop on dismiss; feed hero shrink mute unchanged. Client **`ac9a948`** on **`origin/main`** / **`edgetilt.com`**. **PASSED** on test then prod.

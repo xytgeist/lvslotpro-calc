@@ -89,6 +89,7 @@ const PlayLogbook = lazyRoute(() => import('../play-logbook/PlayLogbook.jsx'))
 const SlotsScreen = lazyRoute(() => import('../slots/SlotsScreen.jsx'))
 const ChatTab = lazyRoute(() => import('../chat/ChatTab.jsx'))
 const EdgeMonitorScreen = lazyRoute(() => import('../ops/EdgeMonitorScreen.jsx'))
+const BotManagementScreen = lazyRoute(() => import('../bots/BotManagementScreen.jsx'))
 
 function TabLoadingFallback() {
   return (
@@ -847,6 +848,14 @@ export default function AppShell({
           setMenuOpen(false)
         }
       }
+      if (targetTab === 'bots') {
+        if (browseMode === 'anonymous') {
+          onRequireAuthRef.current?.()
+        } else if (isAdmin) {
+          setTab('bots')
+          setMenuOpen(false)
+        }
+      }
       const guideFromQuery = (params.get('guide') || '').trim()
       const guideFromPath = parseGuideSlugFromPathname(window.location.pathname || '')
       const guideSlug = guideFromQuery || guideFromPath
@@ -1012,6 +1021,7 @@ export default function AppShell({
     { id: 'slots', label: 'Slots', icon: '🎰', subscriberGated: false },
     { id: 'chat', label: 'Chat', icon: '💬', subscriberGated: false },
     ...(isAdmin ? [{ id: 'monitor', label: 'Monitor', icon: '📊', subscriberGated: false }] : []),
+    ...(isAdmin ? [{ id: 'bots', label: 'Bots', icon: '🤖', subscriberGated: false }] : []),
   ]
 
   const showNavSubscriberLocks =
@@ -1603,11 +1613,29 @@ export default function AppShell({
           supabaseClient={supabaseClient}
           titleBarNavSlot={renderTitleBarNavSlot()}
           onBack={() => setTab('home')}
+          onOpenBotPortal={() => {
+            setTab('bots')
+            setMenuOpen(false)
+          }}
         />
       ) : (
         <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
           <div className="rounded-2xl bg-zinc-900 p-5 text-zinc-400 text-sm leading-relaxed">
             Edge Monitor is admin-only.
+          </div>
+        </ScrollLinkedEdgeTitleBarShell>
+      )
+    } else if (tab === 'bots') {
+      visibleTab = isAdmin ? (
+        <BotManagementScreen
+          supabaseClient={supabaseClient}
+          titleBarNavSlot={renderTitleBarNavSlot()}
+          onBack={() => setTab('home')}
+        />
+      ) : (
+        <ScrollLinkedEdgeTitleBarShell titleBarNavSlot={renderTitleBarNavSlot()} contentClassName="px-3 py-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
+          <div className="rounded-2xl bg-zinc-900 p-5 text-zinc-400 text-sm leading-relaxed">
+            Bot Portal is admin-only.
           </div>
         </ScrollLinkedEdgeTitleBarShell>
       )

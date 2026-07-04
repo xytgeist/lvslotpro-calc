@@ -329,6 +329,21 @@ When extending beyond the MVP slice: ship with **TLS in transit** + **managed en
 
 ---
 
+## Lounge bots (planned, not shipped)
+
+**Decision (2026-07-03):** **Many unique Edge profiles**, each a **niche specialist**. **Two automation tracks:**
+
+| Track | Examples | Workflow |
+| --- | --- | --- |
+| **Self-contained** | Sports odds, financial wire | Ingest → rules/scoring → **auto-publish** (no daily Ryan review) |
+| **Editorial (X only)** | Crypto, poker, slots/AP X trackers | Ingest → LLM rewrite → **morning inbox** → schedule → publish |
+
+**Specs:** **`docs/lounge-bot-editorial-queue.md`** (X only) · **`docs/lounge-bot-sports-odds.md`** · **`docs/lounge-bot-market-news.md`**
+
+**Backlog:** `docs/test-buildout-backlog.md` → **Planned (Lounge bots)**.
+
+---
+
 ## Risks to flag early
 
 - Video transcoding path: a single Edge Function running ffmpeg may hit platform runtime/memory limits. Confirm where transcoding executes before D2 (Supabase-compatible patterns vs external worker).

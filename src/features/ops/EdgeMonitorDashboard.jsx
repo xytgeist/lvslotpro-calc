@@ -26,6 +26,8 @@ import {
 } from './opsMonitorTheme.js'
 import { useEdgeMonitorSnapshot } from './useEdgeMonitorSnapshot.js'
 import { useEdgeMonitorExternalHealth } from './useEdgeMonitorExternalHealth.js'
+import { useLoungeBotOps } from './useLoungeBotOps.js'
+import EdgeMonitorBotOpsPanel from './EdgeMonitorBotOpsPanel.jsx'
 import { useEdgeMonitorLivePulse } from './useEdgeMonitorLivePulse.js'
 import { EDGE_MONITOR_PATH } from './opsMonitorNavigation.js'
 
@@ -302,6 +304,7 @@ export default function EdgeMonitorDashboard({
   supabaseClient,
   layout = 'mobile',
   onBack,
+  onOpenBotPortal,
   showDesktopLink = layout === 'mobile',
   headerSlot = null,
 }) {
@@ -312,6 +315,8 @@ export default function EdgeMonitorDashboard({
   })
   const { external, loading: externalLoading, error: externalError, reload: reloadExternal } =
     useEdgeMonitorExternalHealth(supabaseClient)
+  const { botOps, loading: botOpsLoading, error: botOpsError, reload: reloadBotOps } =
+    useLoungeBotOps(supabaseClient)
   const { live, error: liveError } = useEdgeMonitorLivePulse(supabaseClient, { enabled: Boolean(snapshot) })
 
   const generatedAt = snapshot?.generated_at
@@ -607,6 +612,13 @@ export default function EdgeMonitorDashboard({
         />
         <MetricTile label="Activity 24h" value={formatOpsMonitorCount(activity.events_24h)} />
       </MonitorSection>
+
+      <EdgeMonitorBotOpsPanel
+        botOps={botOps}
+        loading={botOpsLoading}
+        error={botOpsError}
+        onOpenPortal={onOpenBotPortal}
+      />
 
       <ExternalHealthPanel
         external={external}
