@@ -760,6 +760,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-04: **Coffee & Covers thread format:** root post **☕💰 Coffee & Covers** + Covers (+ ML spots) + **`Best lines in 🧵👇`**; best lines moved to author **thread parts** (one per calendar sport). **`daily_slates`** poll posts **one** combined thread/day (`coffee:daily:{ptDay}`). Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`** (no new SQL).
 - 2026-07-04: **Coffee & Covers morning post:** migration **`20260704200000`** (`post_kind: coffee_covers`, `coffee_covers_enabled`); **`loungeBotCoffeeAndCovers.ts`** — spread covers **+4%** EV, ML spots **+3%**, today's lines board, sitting-on-hands copy when no covers; **`daily_slates`** poll + manual fetch fallback use Coffee & Covers (legacy slate when disabled). Portal: **Post Coffee & Covers**. Apply **`20260704200000`** on test; redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Subscriber lounge caption 2000:** migration **`20260704190000`** — hard max 2000 on posts/comments/drafts; **`lounge_feed_caption_max_for_user`** + triggers (free **500**, subscriber/bot/staff **2000**). Scott slate cap in **`loungeBotOddsCaption.ts`**. Apply on test; redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**; frontend deploy for composer limits.
 - 2026-07-04: **Odds caption format:** factual multi-line posts (no opinion phrases); line breaks in feed via `whitespace-pre-wrap` — **`loungeBotOddsCaption.ts`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.

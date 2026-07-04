@@ -384,11 +384,19 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     } else if (d.skipped === 'outside_morning_window') {
       setToast('Coffee & Covers only runs between 7am and 10am PT.')
     } else if (action === 'daily_slates') {
-      const morningCount = d.publishedMorning ?? d.publishedCoffeeCovers ?? d.publishedSlates ?? 0
+      const combined = (d.details || []).find((row) => row?.combinedCoffee)
+      const threadParts = combined?.threadPartCount != null
+        ? Math.max(0, Number(combined.threadPartCount) - 1)
+        : null
+      const sportsIncluded = combined?.sportsIncluded ?? d.sportsChecked ?? 0
       setToast(
         dryRun
-          ? `Dry run: would post up to ${d.sportsChecked ?? 0} Coffee & Covers roundups${d.scheduledPt ? ` (cron window opens ${d.scheduledPt} PT)` : ''}`
-          : `Posted ${morningCount} Coffee & Covers post${morningCount === 1 ? '' : 's'} (${d.sportsChecked ?? 0} sports checked)`,
+          ? `Dry run · would post one Coffee & Covers thread (${sportsIncluded} sport${sportsIncluded === 1 ? '' : 's'}${threadParts != null ? ` · ${threadParts} line part${threadParts === 1 ? '' : 's'}` : ''})${d.scheduledPt ? ` · cron opens ${d.scheduledPt} PT` : ''}`
+          : combined?.publishedCoffeeCovers
+            ? `Coffee & Covers posted · ${combined.coverCount ?? 0} cover${combined.coverCount === 1 ? '' : 's'} · ${threadParts ?? '?'} thread part${threadParts === 1 ? '' : 's'} (${sportsIncluded} sport${sportsIncluded === 1 ? '' : 's'})`
+            : combined?.skipped === 'coffee_already_posted'
+              ? 'Coffee & Covers already posted today.'
+              : `No Coffee & Covers posted (${combined?.skipped || 'no games'}) · ${sportsIncluded} sport${sportsIncluded === 1 ? '' : 's'} checked`,
       )
     } else {
       setToast(

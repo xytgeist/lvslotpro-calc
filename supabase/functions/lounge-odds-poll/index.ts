@@ -12,10 +12,11 @@ import {
   loadTodayCalendarRows,
   morningSlateShouldRunNow,
   ptDayStartIso,
-  tryPublishCoffeeAndCovers,
+  tryPublishCombinedCoffeeAndCovers,
   tryPublishEdgeAlert,
   tryPublishSlateCheckIn,
   type OddsCfgRow,
+  type SportOddsContext,
 } from '../_shared/loungeBotOddsRun.ts'
 import { DEFAULT_MIN_EV_PCT } from '../_shared/loungeBotOddsCaption.ts'
 
@@ -112,6 +113,7 @@ Deno.serve(async (req) => {
     let publishedSlates = 0
     let requestsRemaining: string | null = null
     const details: Record<string, unknown>[] = []
+    const coffeeSportContexts: SportOddsContext[] = []
 
     for (const row of calendarRows) {
       const sportKey = row.odds_sport_keys?.[0]
@@ -156,28 +158,20 @@ Deno.serve(async (req) => {
             skipped: edgeResult.skipped,
           })
         } else if (morningEnabled) {
-          if (morningCount >= maxMorningPosts) {
-            details.push({ calendarSlug: row.slug, skipped: 'morning_cap' })
-            continue
-          }
-
           if (coffeeCoversEnabled) {
-            const coffeeResult = await tryPublishCoffeeAndCovers(admin, bot, ctx, dayStart, dryRun)
-            if (coffeeResult.published) {
-              publishedCoffeeCovers += 1
-              morningCount += 1
-            }
+            coffeeSportContexts.push(ctx)
             details.push({
               calendarSlug: row.slug,
               sportKey,
-              publishedCoffeeCovers: coffeeResult.published,
-              gamesToday: coffeeResult.gamesToday ?? null,
-              coverCount: coffeeResult.coverCount ?? null,
-              mlCount: coffeeResult.mlCount ?? null,
-              hasCovers: coffeeResult.hasCovers ?? null,
-              skipped: coffeeResult.skipped,
+              gamesToday: ctx.eventsInWindow,
+              queuedForCombinedCoffee: ctx.eventsInWindow > 0,
             })
           } else {
+            if (morningCount >= maxMorningPosts) {
+              details.push({ calendarSlug: row.slug, skipped: 'morning_cap' })
+              continue
+            }
+
             const slateResult = await tryPublishSlateCheckIn(admin, bot, ctx, dayStart, dryRun)
             if (slateResult.published) {
               publishedSlates += 1
@@ -197,6 +191,40 @@ Deno.serve(async (req) => {
           calendarSlug: row.slug,
           sportKey,
           error: err instanceof Error ? err.message : 'fetch failed',
+        })
+      }
+    }
+
+    if (
+      action === 'daily_slates'
+      && morningEnabled
+      && coffeeCoversEnabled
+      && coffeeSportContexts.length > 0
+    ) {
+      if (morningCount >= maxMorningPosts) {
+        details.push({ combinedCoffee: true, skipped: 'morning_cap' })
+      } else {
+        const coffeeResult = await tryPublishCombinedCoffeeAndCovers(
+          admin,
+          bot,
+          coffeeSportContexts,
+          dayStart,
+          dryRun,
+        )
+        if (coffeeResult.published) {
+          publishedCoffeeCovers = 1
+          morningCount += 1
+        }
+        details.push({
+          combinedCoffee: true,
+          publishedCoffeeCovers: coffeeResult.published,
+          gamesToday: coffeeResult.gamesToday ?? null,
+          coverCount: coffeeResult.coverCount ?? null,
+          mlCount: coffeeResult.mlCount ?? null,
+          hasCovers: coffeeResult.hasCovers ?? null,
+          threadPartCount: coffeeResult.threadPartCount ?? null,
+          sportsIncluded: coffeeResult.sportsIncluded ?? null,
+          skipped: coffeeResult.skipped,
         })
       }
     }

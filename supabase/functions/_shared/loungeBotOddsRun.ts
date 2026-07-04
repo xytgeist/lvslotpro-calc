@@ -17,10 +17,12 @@ import {
   type OddsPick,
 } from './loungeBotOddsCaption.ts'
 import {
-  coffeeCoversDedupeKey,
+  coffeeDailyDedupeKey,
   generateCoffeeAndCovers,
+  generateCombinedCoffeeAndCovers,
+  type CoffeeAndCoversOptions,
 } from './loungeBotCoffeeAndCovers.ts'
-import { publishLoungeBotPost } from './loungeBotPublish.ts'
+import { publishLoungeBotPost, publishLoungeBotPostWithThread } from './loungeBotPublish.ts'
 
 const ODDS_BASE = 'https://api.the-odds-api.com/v4'
 
@@ -359,7 +361,7 @@ export async function tryPublishCoffeeAndCovers(
     return { published: false, skipped: 'no_games_today', gamesToday: 0, coverCount: 0, mlCount: 0, hasCovers: false }
   }
 
-  const dedupeKey = coffeeCoversDedupeKey(ctx.calendarSlug, ptTodayDate())
+  const dedupeKey = coffeeDailyDedupeKey(ptTodayDate())
   if (!dryRun && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) {
     return {
       published: false,
@@ -385,10 +387,11 @@ export async function tryPublishCoffeeAndCovers(
   }
 
   const pills = bot.category_pills_default?.length ? bot.category_pills_default : ['sports']
-  const result = await publishLoungeBotPost(admin, {
+  const result = await publishLoungeBotPostWithThread(admin, {
     botUserId: bot.user_id,
     caption: generated.caption,
     categoryPills: pills,
+    threadParts: generated.threadParts.map((part) => ({ body: part.body })),
   })
 
   const topScore = generated.coverPicks[0]?.edgePct
@@ -423,6 +426,114 @@ export async function tryPublishCoffeeAndCovers(
     error_message: result.error?.slice(0, 400),
   })
   return { published: false, skipped: 'publish_failed', gamesToday: generated.gameCount }
+}
+
+/** Morning batch: one Coffee & Covers root post with a thread part per calendar sport. */
+export async function tryPublishCombinedCoffeeAndCovers(
+  admin: SupabaseClient,
+  bot: OddsBotRow,
+  sportContexts: SportOddsContext[],
+  dayStart: string,
+  dryRun: boolean,
+): Promise<{
+  published: boolean
+  skipped?: string
+  gamesToday?: number
+  coverCount?: number
+  mlCount?: number
+  hasCovers?: boolean
+  threadPartCount?: number
+  sportsIncluded?: number
+}> {
+  const withGames = sportContexts.filter((ctx) => ctx.eventsInWindow > 0)
+  if (!withGames.length) {
+    return {
+      published: false,
+      skipped: 'no_games_today',
+      gamesToday: 0,
+      coverCount: 0,
+      mlCount: 0,
+      hasCovers: false,
+      sportsIncluded: 0,
+    }
+  }
+
+  const dedupeKey = coffeeDailyDedupeKey(ptTodayDate())
+  if (!dryRun && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) {
+    return {
+      published: false,
+      skipped: 'coffee_already_posted',
+      gamesToday: withGames.reduce((sum, ctx) => sum + ctx.eventsInWindow, 0),
+      sportsIncluded: withGames.length,
+    }
+  }
+
+  const inputs: CoffeeAndCoversOptions[] = withGames.map((ctx) => ({
+    categoryLabel: ctx.categoryLabel,
+    sportKey: ctx.sportKey,
+    events: ctx.upcoming,
+  }))
+  const generated = generateCombinedCoffeeAndCovers(inputs)
+
+  if (dryRun) {
+    return {
+      published: false,
+      gamesToday: generated.gameCount,
+      coverCount: generated.coverPicks.length,
+      mlCount: generated.mlPicks.length,
+      hasCovers: generated.hasCovers,
+      threadPartCount: generated.threadParts.length,
+      sportsIncluded: withGames.length,
+    }
+  }
+
+  const pills = bot.category_pills_default?.length ? bot.category_pills_default : ['sports']
+  const result = await publishLoungeBotPostWithThread(admin, {
+    botUserId: bot.user_id,
+    caption: generated.caption,
+    categoryPills: pills,
+    threadParts: generated.threadParts.map((part) => ({ body: part.body })),
+  })
+
+  const topScore = generated.coverPicks[0]?.edgePct
+    ?? generated.mlPicks[0]?.edgePct
+    ?? null
+
+  if (result.postId) {
+    await admin.from('lounge_bot_publish_log').insert({
+      bot_user_id: bot.user_id,
+      post_id: result.postId,
+      caption: generated.caption,
+      score: topScore,
+      status: 'published',
+      post_kind: 'coffee_covers',
+      dedupe_key: dedupeKey,
+    })
+    return {
+      published: true,
+      gamesToday: generated.gameCount,
+      coverCount: generated.coverPicks.length,
+      mlCount: generated.mlPicks.length,
+      hasCovers: generated.hasCovers,
+      threadPartCount: result.threadPartCount ?? (1 + generated.threadParts.length),
+      sportsIncluded: withGames.length,
+    }
+  }
+
+  await admin.from('lounge_bot_publish_log').insert({
+    bot_user_id: bot.user_id,
+    caption: generated.caption,
+    status: 'failed',
+    post_kind: 'coffee_covers',
+    dedupe_key: dedupeKey,
+    error_message: result.error?.slice(0, 400),
+  })
+  return {
+    published: false,
+    skipped: 'publish_failed',
+    gamesToday: generated.gameCount,
+    sportsIncluded: withGames.length,
+  }
 }
 
 /** Legacy morning slate when Coffee & Covers is disabled. */

@@ -1,6 +1,7 @@
 /**
  * Coffee & Covers — Scott Sharpe morning roundup.
- * Covers (spread +EV) lead the post; then optional ML spots; then today's best lines board.
+ * Root post: covers (+ optional ML spots) and a thread teaser.
+ * Best lines board lives in thread parts (one per calendar sport).
  */
 
 import {
@@ -21,6 +22,10 @@ export const COFFEE_ML_EV_THRESHOLD_PCT = 3
 export const COFFEE_SPREAD_EV_THRESHOLD_PCT = 4
 /** Max cover or ML highlights per sport in one post. */
 export const COFFEE_MAX_PICKS_PER_SPORT = 3
+
+export const COFFEE_COVERS_HEADER = '☕ Coffee & Covers 💵'
+export const COFFEE_COVERS_SECTION = 'Covers'
+export const COFFEE_BEST_LINES_TEASER = 'Best lines in 🧵👇'
 
 const CAPTION_MAX = 2000
 const NO_COVERS_LINE =
@@ -56,10 +61,28 @@ export type CoffeeAndCoversOptions = {
   maxEvPct?: number
 }
 
+export type CoffeeThreadPart = {
+  categoryLabel: string
+  body: string
+}
+
+export type BiggestDog = {
+  categoryLabel: string
+  pickName: string
+  awayTeam: string
+  homeTeam: string
+  commenceTime: string
+  pickPrice: number
+  bookTitle: string
+}
+
 export type CoffeeAndCoversResult = {
+  /** Root post caption (covers + teaser only). */
   caption: string
+  threadParts: CoffeeThreadPart[]
   coverPicks: SpreadPick[]
   mlPicks: OddsPick[]
+  biggestDogs: BiggestDog[]
   gameCount: number
   hasCovers: boolean
 }
@@ -130,7 +153,12 @@ function formatSpreadPoint(point: number): string {
   return rounded > 0 ? `+${rounded}` : String(rounded)
 }
 
-function formatSpreadPickLine(pick: SpreadPick): string {
+function joinCaptionLines(lines: string[]): string {
+  const cap = lines.join('\n').trim()
+  return cap.length <= CAPTION_MAX ? cap : `${cap.slice(0, CAPTION_MAX - 3)}...`
+}
+
+function formatSpreadPickLine(pick: SpreadPick, sportLabel?: string): string {
   const team = shortDisplayName(pick.pickName)
   const spread = formatSpreadPoint(pick.pickPoint)
   const juice = formatAmericanOdds(pick.pickPrice)
@@ -138,25 +166,81 @@ function formatSpreadPickLine(pick: SpreadPick): string {
   const when = formatOddsCommenceTimeShort(pick.commenceTime)
   const away = shortDisplayName(pick.awayTeam)
   const home = shortDisplayName(pick.homeTeam)
+  const matchup = `${away} vs ${home}, ${when}`
   return [
-    `${away} vs ${home}, ${when}`,
+    sportLabel ? `${sportLabel} · ${matchup}` : matchup,
     `${team} ${spread} (${juice}) at ${pick.bookTitle}`,
     `Fair ${fair} (${pick.bookCount} books) · +${pick.edgePct}% EV`,
   ].join('\n')
 }
 
-function formatMlSpotLine(pick: OddsPick): string {
+function formatMlSpotLine(pick: OddsPick, sportLabel?: string): string {
   const team = shortDisplayName(pick.pickName)
   const odds = formatAmericanOdds(pick.pickPrice)
   const fair = formatAmericanOdds(pick.consensusPrice)
   const when = formatOddsCommenceTimeShort(pick.commenceTime)
   const away = shortDisplayName(pick.awayTeam)
   const home = shortDisplayName(pick.homeTeam)
+  const matchup = `${away} vs ${home}, ${when}`
   return [
-    `${away} vs ${home}, ${when}`,
+    sportLabel ? `${sportLabel} · ${matchup}` : matchup,
     `${team} ML ${odds} at ${pick.bookTitle}`,
     `Fair ${fair} (${pick.bookCount} books) · +${pick.edgePct}% EV`,
   ].join('\n')
+}
+
+function formatBiggestDogLine(dog: BiggestDog): string {
+  const odds = formatAmericanOdds(dog.pickPrice)
+  const when = formatOddsCommenceTimeShort(dog.commenceTime)
+  const away = shortDisplayName(dog.awayTeam)
+  const home = shortDisplayName(dog.homeTeam)
+  const name = String(dog.pickName || '').trim()
+  const isDraw = /^draw$|^tie$/i.test(name)
+  const pickLabel = isDraw ? 'Draw' : shortDisplayName(name)
+  return [
+    `${dog.categoryLabel} · ${away} vs ${home}, ${when}`,
+    `${pickLabel} ML ${odds} at ${dog.bookTitle}`,
+  ].join('\n')
+}
+
+/** Longest h2h price on today's board for one calendar sport. */
+export function findBiggestDog(categoryLabel: string, events: OddsEvent[]): BiggestDog | null {
+  const label = String(categoryLabel || '').trim()
+  if (!label) return null
+
+  let best: BiggestDog | null = null
+
+  for (const ev of events) {
+    const home = String(ev.home_team || 'Home').trim()
+    const away = String(ev.away_team || 'Away').trim()
+    const commenceTime = String(ev.commence_time || '').trim()
+    if (!home || !away || !commenceTime) continue
+
+    for (const book of ev.bookmakers || []) {
+      const market = (book.markets || []).find((m) => m.key === 'h2h')
+      if (!market) continue
+      const bookLabel = formatBookDisplayName(String(book.title || ''), book.key)
+
+      for (const out of market.outcomes || []) {
+        const name = String(out.name || '').trim()
+        const price = Number(out.price)
+        if (!name || !Number.isFinite(price)) continue
+        if (!best || price > best.pickPrice) {
+          best = {
+            categoryLabel: label,
+            pickName: name,
+            awayTeam: away,
+            homeTeam: home,
+            commenceTime,
+            pickPrice: price,
+            bookTitle: bookLabel,
+          }
+        }
+      }
+    }
+  }
+
+  return best
 }
 
 function formatSlateGameBlock(game: ReturnType<typeof extractSlateGameBestLines>[number]): string {
@@ -170,9 +254,78 @@ function formatSlateGameBlock(game: ReturnType<typeof extractSlateGameBestLines>
   return `${head}\n${oddsLine}`
 }
 
-function joinCaptionLines(lines: string[]): string {
-  const cap = lines.join('\n').trim()
-  return cap.length <= CAPTION_MAX ? cap : `${cap.slice(0, CAPTION_MAX - 3)}...`
+/** Thread body: sport header + today's best lines for every game (truncates at cap). */
+export function buildSportLinesThreadBody(categoryLabel: string, events: OddsEvent[]): string {
+  const label = String(categoryLabel || '').trim()
+  const games = extractSlateGameBestLines(events)
+  if (!games.length || !label) return ''
+
+  const lines: string[] = [label, '']
+  let included = 0
+
+  for (let i = 0; i < games.length; i++) {
+    const trialLines = [...lines, formatSlateGameBlock(games[i]), '']
+    const omitted = games.length - i - 1
+    if (omitted > 0) trialLines.push(`+${omitted} more games today.`)
+    if (joinCaptionLines(trialLines).length <= CAPTION_MAX) {
+      included = i + 1
+    } else if (included === 0 && i === 0) {
+      included = 1
+      break
+    } else {
+      break
+    }
+  }
+
+  for (let i = 0; i < included; i++) {
+    lines.push(formatSlateGameBlock(games[i]))
+    lines.push('')
+  }
+
+  const omitted = games.length - included
+  if (omitted > 0) lines.push(`+${omitted} more games today.`)
+
+  return joinCaptionLines(lines)
+}
+
+function buildMainCaption(
+  coverPicks: SpreadPick[],
+  mlPicks: OddsPick[],
+  biggestDogs: BiggestDog[],
+  sportLabelByPick?: (pick: SpreadPick | OddsPick) => string | undefined,
+): string {
+  const lines: string[] = [COFFEE_COVERS_HEADER, '', COFFEE_COVERS_SECTION]
+
+  if (coverPicks.length) {
+    for (const pick of coverPicks) {
+      const label = sportLabelByPick?.(pick)
+      lines.push(formatSpreadPickLine(pick, label))
+      lines.push('')
+    }
+  } else {
+    lines.push(NO_COVERS_LINE)
+    lines.push('')
+  }
+
+  if (mlPicks.length) {
+    lines.push('ML spots')
+    for (const pick of mlPicks) {
+      const label = sportLabelByPick?.(pick)
+      lines.push(formatMlSpotLine(pick, label))
+      lines.push('')
+    }
+  }
+
+  if (biggestDogs.length) {
+    lines.push('Biggest dogs')
+    for (const dog of biggestDogs) {
+      lines.push(formatBiggestDogLine(dog))
+      lines.push('')
+    }
+  }
+
+  lines.push(COFFEE_BEST_LINES_TEASER)
+  return joinCaptionLines(lines)
 }
 
 /**
@@ -260,7 +413,7 @@ export function findPlusEvSpreadOpportunities(
 }
 
 /**
- * Build the Coffee & Covers morning caption for one calendar sport.
+ * Build Coffee & Covers for one calendar sport (single-sport manual fetch).
  */
 export function generateCoffeeAndCovers(input: CoffeeAndCoversOptions): CoffeeAndCoversResult {
   const categoryLabel = String(input.categoryLabel || '').trim()
@@ -285,64 +438,110 @@ export function generateCoffeeAndCovers(input: CoffeeAndCoversOptions): CoffeeAn
   }).slice(0, maxPicks)
 
   const games = extractSlateGameBestLines(events)
-  const lines: string[] = ['Coffee & Covers']
-  if (categoryLabel) lines.push(categoryLabel)
-  lines.push('')
-
-  lines.push('Covers')
-  if (coverPicks.length) {
-    for (const pick of coverPicks) {
-      lines.push(formatSpreadPickLine(pick))
-      lines.push('')
-    }
-  } else {
-    lines.push(NO_COVERS_LINE)
-    lines.push('')
-  }
-
-  if (mlPicks.length) {
-    lines.push('ML spots')
-    for (const pick of mlPicks) {
-      lines.push(formatMlSpotLine(pick))
-      lines.push('')
-    }
-  }
-
-  lines.push("Today's lines")
-  if (!games.length) {
-    lines.push('No games on today\'s board.')
-  } else {
-    let included = 0
-    for (let i = 0; i < games.length; i++) {
-      const trialLines = [...lines, formatSlateGameBlock(games[i]), '']
-      const omitted = games.length - i - 1
-      if (omitted > 0) trialLines.push(`+${omitted} more games today.`)
-      if (joinCaptionLines(trialLines).length <= CAPTION_MAX) {
-        included = i + 1
-      } else if (included === 0 && i === 0) {
-        included = 1
-        break
-      } else {
-        break
-      }
-    }
-    for (let i = 0; i < included; i++) {
-      lines.push(formatSlateGameBlock(games[i]))
-      lines.push('')
-    }
-    const omitted = games.length - included
-    if (omitted > 0) lines.push(`+${omitted} more games today.`)
-  }
+  const biggestDog = findBiggestDog(categoryLabel, events)
+  const biggestDogs = biggestDog ? [biggestDog] : []
+  const threadBody = buildSportLinesThreadBody(categoryLabel, events)
+  const threadParts: CoffeeThreadPart[] = threadBody
+    ? [{ categoryLabel, body: threadBody }]
+    : []
 
   return {
-    caption: joinCaptionLines(lines),
+    caption: buildMainCaption(coverPicks, mlPicks, biggestDogs),
+    threadParts,
     coverPicks,
     mlPicks,
+    biggestDogs,
     gameCount: games.length,
     hasCovers: coverPicks.length > 0,
   }
 }
 
+type SportCoffeeSlice = {
+  categoryLabel: string
+  sportKey: string
+  events: OddsEvent[]
+  coverPicks: SpreadPick[]
+  mlPicks: OddsPick[]
+  gameCount: number
+}
+
+function buildSportSlice(input: CoffeeAndCoversOptions): SportCoffeeSlice {
+  const categoryLabel = String(input.categoryLabel || '').trim()
+  const sportKey = String(input.sportKey || '').trim()
+  const events = Array.isArray(input.events) ? input.events : []
+  const minBooks = input.minBooks ?? DEFAULT_MIN_BOOKS
+  const mlThreshold = input.mlEvThresholdPct ?? COFFEE_ML_EV_THRESHOLD_PCT
+  const spreadThreshold = input.spreadEvThresholdPct ?? COFFEE_SPREAD_EV_THRESHOLD_PCT
+  const maxPicks = input.maxPicksPerSport ?? COFFEE_MAX_PICKS_PER_SPORT
+  const maxEvPct = input.maxEvPct ?? DEFAULT_MAX_EV_PCT
+
+  const coverPicks = findPlusEvSpreadOpportunities(events, sportKey, {
+    minBooks,
+    minEvPct: spreadThreshold,
+    maxEvPct,
+  }).slice(0, maxPicks)
+
+  const mlPicks = findPlusEvOpportunities(events, sportKey, {
+    minBooks,
+    minEvPct: mlThreshold,
+    maxEvPct,
+  }).slice(0, maxPicks)
+
+  return {
+    categoryLabel,
+    sportKey,
+    events,
+    coverPicks,
+    mlPicks,
+    gameCount: extractSlateGameBestLines(events).length,
+  }
+}
+
+/**
+ * One morning post across all calendar sports: merged covers/ML in root, lines per sport in thread.
+ */
+export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]): CoffeeAndCoversResult {
+  const slices = inputs.map(buildSportSlice)
+  const coverPicks = slices.flatMap((s) => s.coverPicks)
+  const mlPicks = slices.flatMap((s) => s.mlPicks)
+  const gameCount = slices.reduce((sum, s) => sum + s.gameCount, 0)
+
+  const sportLabelForSpread = (pick: SpreadPick) =>
+    slices.find((s) => s.sportKey === pick.sportKey)?.categoryLabel
+
+  const sportLabelForMl = (pick: OddsPick) =>
+    slices.find((s) => s.sportKey === pick.sportKey)?.categoryLabel
+
+  const threadParts: CoffeeThreadPart[] = []
+  const biggestDogs: BiggestDog[] = []
+  for (const slice of slices) {
+    if (slice.gameCount <= 0 || !slice.categoryLabel) continue
+    const body = buildSportLinesThreadBody(slice.categoryLabel, slice.events)
+    if (body) threadParts.push({ categoryLabel: slice.categoryLabel, body })
+    const dog = findBiggestDog(slice.categoryLabel, slice.events)
+    if (dog) biggestDogs.push(dog)
+  }
+
+  return {
+    caption: buildMainCaption(coverPicks, mlPicks, biggestDogs, (pick) => {
+      if ('pickPoint' in pick) return sportLabelForSpread(pick as SpreadPick)
+      return sportLabelForMl(pick as OddsPick)
+    }),
+    threadParts,
+    coverPicks,
+    mlPicks,
+    biggestDogs,
+    gameCount,
+    hasCovers: coverPicks.length > 0,
+  }
+}
+
+/** One Coffee & Covers post per bot per PT day (all sports in thread). */
+export function coffeeDailyDedupeKey(ptDay: string): string {
+  return `coffee:daily:${ptDay}`
+}
+
+/** @deprecated per-sport dedupe; use coffeeDailyDedupeKey for morning batch */
 export function coffeeCoversDedupeKey(calendarSlug: string, ptDay: string): string {
   return `coffee:${calendarSlug}:${ptDay}`
 }

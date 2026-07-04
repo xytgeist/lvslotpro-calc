@@ -15,6 +15,11 @@ export type BotPublishInput = {
 export type BotPublishResult = {
   postId: string | null
   error: string | null
+  threadPartCount?: number
+}
+
+export type BotThreadPart = {
+  body: string
 }
 
 export function serviceAdmin(): SupabaseClient {
@@ -70,4 +75,50 @@ export async function publishLoungeBotPost(
   }
 
   return { postId: data.id as string, error: null }
+}
+
+/** Publish root post plus author thread parts (feed_comments.is_thread_part). */
+export async function publishLoungeBotPostWithThread(
+  admin: SupabaseClient,
+  input: BotPublishInput & { threadParts?: BotThreadPart[] },
+): Promise<BotPublishResult> {
+  const root = await publishLoungeBotPost(admin, input)
+  if (!root.postId) return root
+
+  const parts = (input.threadParts || [])
+    .map((part) => String(part?.body || '').trim())
+    .filter(Boolean)
+
+  if (!parts.length) {
+    return { ...root, threadPartCount: 1 }
+  }
+
+  for (let i = 0; i < parts.length; i++) {
+    let body = parts[i]!
+    if (body.length > 2000) body = `${body.slice(0, 1997)}...`
+
+    const { error } = await admin.from('feed_comments').insert({
+      post_id: root.postId,
+      user_id: input.botUserId,
+      body,
+      is_thread_part: true,
+      thread_part_index: i + 1,
+    })
+
+    if (error) {
+      return {
+        postId: root.postId,
+        error: `Thread part ${i + 1}: ${error.message}`,
+        threadPartCount: 1 + i,
+      }
+    }
+  }
+
+  const threadPartCount = 1 + parts.length
+  await admin
+    .from('community_feed_posts')
+    .update({ thread_part_count: threadPartCount })
+    .eq('id', root.postId)
+
+  return { postId: root.postId, error: null, threadPartCount }
 }

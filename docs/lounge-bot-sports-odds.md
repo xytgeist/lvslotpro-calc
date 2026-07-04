@@ -34,8 +34,7 @@ Fair +652 (9 books)
 
 **Coffee & Covers example:**
 ```text
-Coffee & Covers
-World Cup
+☕ Coffee & Covers 💵
 
 Covers
 France vs Paraguay, Sat Jul 4 at 2pm PT
@@ -47,9 +46,19 @@ Germany vs Portugal, Sat Jul 4 at 5pm PT
 Germany ML +145 at DraftKings
 Fair +132 (8 books) · +3.1% EV
 
-Today's lines
-France vs Paraguay, Sat Jul 4 at 2pm PT
-France +145 (DraftKings), Draw +652 (FanDuel), Paraguay +718 (MyBookie)
+Biggest dogs
+World Cup · Paraguay vs France, Sat Jul 4 at 2pm PT
+Paraguay ML +718 at MyBookie
+
+Best lines in 🧵👇
+```
+
+**Thread part (one per calendar sport today), e.g. MLB:**
+```text
+MLB
+
+Yankees vs Red Sox, Sat Jul 4 at 1pm PT
+Yankees -110 (FanDuel), Red Sox +105 (DraftKings)
 ```
 
 When no spread clears **+4%** EV, the **Covers** section opens with: *Sitting on hands today until we find something worth calling.*
@@ -80,7 +89,7 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 | **Today's major sport** | Dropdown from **`lounge_sports_betting_calendar`** (PT day) |
 | **Fetch odds** | One sport: try edge, else Coffee & Covers (`postMode: auto`) |
 | **Scan all · edge** | All calendar sports today → edge alerts only |
-| **Post Coffee & Covers** | One morning roundup per sport/day (dedupe) |
+| **Post Coffee & Covers** | One morning post/day (dedupe) with thread parts per sport |
 | **Min +EV %** | Settings field **0.5–15** → **`lounge_bot_odds_config.min_edge_pct`** via **`admin_lounge_bot_save_settings`** |
 
 ---
@@ -104,11 +113,12 @@ Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`** (h2h aler
 
 | Section | Threshold | Max per sport |
 | --- | --- | --- |
-| **Covers** (spread/handicap) | **+4%** EV on $1 | **3** |
-| **ML spots** | **+3%** EV on $1 | **3** |
-| **Today's lines** | Best ML + book per outcome (all games today) | Truncates at 2000 chars |
+| **Covers** (spread/handicap) | **+4%** EV on $1 | **3** per sport (merged in root) |
+| **ML spots** | **+3%** EV on $1 | **3** per sport (merged in root) |
+| **Biggest dogs** | Longest h2h price on today's board | **One line per calendar sport** |
+| **Best lines** | Best ML + book per outcome | One **thread part** per calendar sport |
 
-Spread devig mirrors h2h: per-book no-vig fair probs on each spread side, consensus average, EV at best juice. Dedupe key: **`coffee:{calendarSlug}:{ptDay}`**. Log **`post_kind: coffee_covers`**.
+Spread devig mirrors h2h: per-book no-vig fair probs on each spread side, consensus average, EV at best juice. Dedupe key: **`coffee:daily:{ptDay}`** (one post per bot per PT day). Log **`post_kind: coffee_covers`**. Root post ends with **`Best lines in 🧵👇`**; lines board lives in author thread parts (`feed_comments.is_thread_part`).
 
 Set **`coffee_covers_enabled = false`** on **`lounge_bot_odds_config`** to fall back to legacy slate check-ins.
 

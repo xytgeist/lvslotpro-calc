@@ -7,13 +7,13 @@ Background odds poller for sports bots.
 | `action` | Behavior |
 | --- | --- |
 | `poll_edges` | Fetch each calendar-active sport today; publish **⚡ +EV** alerts when EV clears `min_edge_pct` (devig h2h). |
-| `daily_slates` | Post one **Coffee & Covers** roundup per calendar sport (today's PT games). Legacy slate check-ins when `coffee_covers_enabled = false`. |
+| `daily_slates` | Post **one Coffee & Covers thread** per bot/day (covers in root, best lines in thread parts per sport). Legacy slate check-ins when `coffee_covers_enabled = false`. |
 
 ### Coffee & Covers (morning cron)
 
 `daily_slates` only publishes between **7:00am and 10:00am PT**. Each bot gets a **stable random minute** in that window per day (derived from `bot_user_id` + PT date) so posts do not land at the same time every morning.
 
-Each post leads with **cover picks** (spread +EV at **+4%** threshold, max **3** per sport). If none qualify, Scott opens with *"Sitting on hands today until we find something worth calling."* Optional **ML spots** at **+3%** +EV, then **Today's lines** (best ML + book per outcome).
+Each post opens with **☕ Coffee & Covers 💵**, then **Covers** (spread +EV at **+4%**, max **3** per sport). If none qualify, Scott opens with *"Sitting on hands today until we find something worth calling."* Optional **ML spots** at **+3%** +EV, then **`Best lines in 🧵👇`**. Today's lines live in **thread parts** (one per calendar sport with games).
 
 **Cron:** invoke every **15 minutes** from **7:00-9:59am PT** with service role:
 
@@ -21,7 +21,7 @@ Each post leads with **cover picks** (spread +EV at **+4%** threshold, max **3**
 { "slug": "sharpesignal", "action": "daily_slates" }
 ```
 
-First tick after the bot's scheduled minute posts one roundup per active calendar sport (deduped per sport/day via `coffee:{calendarSlug}:{ptDay}`).
+First tick after the bot's scheduled minute posts **one** combined thread (deduped via `coffee:daily:{ptDay}`).
 
 **Portal:** **Post Coffee & Covers** sends `force: true` to bypass the time gate for manual smoke.
 
