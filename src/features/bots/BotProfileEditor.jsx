@@ -15,6 +15,7 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
   const bannerInputRef = useRef(null)
   const avatarInputRef = useRef(null)
   const [avatarCropFile, setAvatarCropFile] = useState(null)
+  const [profileExpanded, setProfileExpanded] = useState(false)
   const [draft, setDraft] = useState({
     handle: '',
     bio: '',
@@ -29,6 +30,10 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
       aboutMe: bot.about_me || '',
     })
   }, [bot?.user_id, bot?.handle, bot?.bio, bot?.about_me])
+
+  useEffect(() => {
+    setProfileExpanded(false)
+  }, [bot?.user_id])
 
   if (!bot) return null
 
@@ -134,9 +139,39 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
 
   return (
     <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4 overflow-hidden">
-      <div className="text-white font-bold text-sm mb-3">Lounge profile</div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-white font-bold text-sm">Lounge profile</div>
+        <button
+          type="button"
+          onClick={() => setProfileExpanded((open) => !open)}
+          className="min-h-8 shrink-0 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold hover:bg-zinc-700"
+        >
+          {profileExpanded ? 'Done' : 'Edit'}
+        </button>
+      </div>
 
-      <div className="rounded-xl border border-zinc-800/70 overflow-hidden mb-4">
+      {!profileExpanded ? (
+        <div className="mt-3 flex items-center gap-3 min-w-0">
+          <div className="relative h-11 w-11 shrink-0 rounded-full ring-2 ring-zinc-800 overflow-hidden bg-zinc-800">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-zinc-400 text-xs font-bold">
+                {profileInitials(displayName, bot.handle)}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-white text-sm font-semibold truncate">{displayName}</div>
+            <div className="text-zinc-500 text-xs truncate">@{bot.handle || 'no-handle'}</div>
+            {draft.bio ? (
+              <div className="text-zinc-400 text-[11px] mt-0.5 truncate">{draft.bio}</div>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <>
+      <div className="rounded-xl border border-zinc-800/70 overflow-hidden mb-4 mt-3">
         <div className="relative h-24 sm:h-28 bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950">
           {bannerUrl ? (
             <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
@@ -270,6 +305,8 @@ export default function BotProfileEditor({ bot, supabaseClient, onReload, setToa
           />
         </Suspense>
       ) : null}
+        </>
+      )}
     </div>
   )
 }
