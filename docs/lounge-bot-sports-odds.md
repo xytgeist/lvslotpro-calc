@@ -17,10 +17,28 @@ Calendar sport pick (portal)  →  lounge-odds-ingest (manual) or lounge-odds-po
 
 | Post kind | When | Example tone |
 | --- | --- | --- |
-| **Edge** | Best h2h line clears **`min_edge_pct`** | `⚡ Wimbledon: Mochizuki +1700 at Bovada looks like the play. Fair closer to +1520 across 6 books, roughly +11% edge on the ML. Mochizuki vs Sinner, Sun Jul 5 at 3am PT.` |
-| **Slate** | No edge clears (or **`daily_slates`** poll) | `Wimbledon: Ran 12 matches in the next 48h... books look aligned, nothing +EV enough to fire today. Next up: Sinner vs Mochizuki, Sun Jul 5 at 3am PT.` |
+| **Edge** | Best h2h line clears **`min_edge_pct`** | See example below |
+| **Slate** | No edge clears (or **`daily_slates`** poll) | See example below |
 
-**Caption punctuation:** plain keyboard characters only (periods, commas, colons, `...`). No middle dots, em dashes, or en dashes in published copy.
+**Caption style:** factual labels only (no opinion phrases). Line breaks between sections. Plain keyboard punctuation.
+
+**+EV example:**
+```text
+⚡ +EV
+World Cup: France vs Paraguay, Sat Jul 4 at 2pm PT
+
+Draw ML +718 at MyBookie.ag
+Fair +652 (9 books)
++8.8% edge on ML
+```
+
+**Slate example:**
+```text
+World Cup: France vs Paraguay, Sat Jul 4 at 2pm PT
+
+12 matches in next 48h
+No +EV above threshold
+```
 
 **`review_mode`:** `automatic`. Target volume: **~2 posts/day** + optional edge alerts when lines misprice (caps below).
 

@@ -760,6 +760,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-04: **Odds caption format:** factual multi-line posts (no opinion phrases); line breaks in feed via `whitespace-pre-wrap` — **`loungeBotOddsCaption.ts`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Odds caption voice:** edge + slate posts use plain sentences (short names, fair as American odds, `vs` matchups, compact PT kickoff) — **`loungeBotOddsCaption.ts`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Continuity docs refresh:** **`WAKEUP`**, **`docs/lounge-bot-sports-odds.md`** (shipped v1 spec), **`docs/frontend-architecture.md`** **`bots/`** row, backlog sports-odds smoke checklist expanded.
 - 2026-07-04: **Odds min +EV portal field:** **`/?tab=bots`** Settings shows **Min +EV %** for **`odds_api`** bots (0.5–15); **`admin_lounge_bot_save_settings`** patch **`min_edge_pct`** → **`lounge_bot_odds_config`**. Migration **`20260704170000`**. Apply on test.

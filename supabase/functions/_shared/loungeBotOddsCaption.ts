@@ -292,6 +292,23 @@ export function pickFeaturedEvent(events: OddsEvent[]): OddsFeaturedEvent | null
   return best
 }
 
+function joinCaptionLines(lines: string[]): string {
+  const cap = lines.join('\n').trim()
+  return cap.length <= CAPTION_MAX ? cap : `${cap.slice(0, CAPTION_MAX - 3)}...`
+}
+
+/** e.g. "World Cup: France vs Paraguay, Sat Jul 4 at 2pm PT" */
+function formatEventMatchupLine(
+  event: string | undefined,
+  away: string,
+  home: string,
+  when: string,
+): string {
+  const matchup = `${away} vs ${home}`
+  const body = when ? `${matchup}, ${when}` : matchup
+  return event ? `${event}: ${body}` : body
+}
+
 export function buildOddsEdgeAlertCaption(pick: OddsPick, opts?: { categoryLabel?: string }): string {
   const pickLabel = shortDisplayName(pick.pickName)
   const away = shortDisplayName(pick.awayTeam)
@@ -301,14 +318,14 @@ export function buildOddsEdgeAlertCaption(pick: OddsPick, opts?: { categoryLabel
   const when = formatOddsCommenceTimeShort(pick.commenceTime)
   const event = opts?.categoryLabel?.trim()
 
-  const opener = event ? `${event}: ` : ''
-  const matchup = when ? `${away} vs ${home}, ${when}` : `${away} vs ${home}`
-  const cap =
-    `⚡ ${opener}${pickLabel} ${odds} at ${pick.bookTitle} looks like the play. ` +
-    `Fair closer to ${fair} across ${pick.bookCount} books, roughly +${pick.edgePct}% edge on the ML. ` +
-    `${matchup}.`
-
-  return cap.length <= CAPTION_MAX ? cap : `${cap.slice(0, CAPTION_MAX - 3)}...`
+  return joinCaptionLines([
+    '⚡ +EV',
+    formatEventMatchupLine(event, away, home, when),
+    '',
+    `${pickLabel} ML ${odds} at ${pick.bookTitle}`,
+    `Fair ${fair} (${pick.bookCount} books)`,
+    `+${pick.edgePct}% edge on ML`,
+  ])
 }
 
 export type SlateCaptionInput = {
@@ -320,11 +337,9 @@ export type SlateCaptionInput = {
 export function buildOddsSlateCaption(input: SlateCaptionInput): string {
   const { categoryLabel, eventsInWindow, featured } = input
   const event = categoryLabel?.trim()
-  const label = event ? `${event}: ` : ''
 
   if (eventsInWindow <= 0) {
-    const cap = `${label}Checked the board... no matches in our 48h window. Nothing to post today.`
-    return cap.length <= CAPTION_MAX ? cap : `${cap.slice(0, CAPTION_MAX - 3)}...`
+    return joinCaptionLines([event || 'Slate', '', 'No matches in 48h window'])
   }
 
   const matchWord = eventsInWindow === 1 ? 'match' : 'matches'
@@ -333,16 +348,20 @@ export function buildOddsSlateCaption(input: SlateCaptionInput): string {
     const when = formatOddsCommenceTimeShort(featured.commenceTime)
     const away = shortDisplayName(featured.awayTeam)
     const home = shortDisplayName(featured.homeTeam)
-    const nextUp = when ? `${away} vs ${home}, ${when}` : `${away} vs ${home}`
-    const cap =
-      `${label}Ran ${eventsInWindow} ${matchWord} in the next 48h... books look aligned, nothing +EV enough to fire today. ` +
-      `Next up: ${nextUp}.`
-    return cap.length <= CAPTION_MAX ? cap : `${cap.slice(0, CAPTION_MAX - 3)}...`
+    return joinCaptionLines([
+      formatEventMatchupLine(event, away, home, when),
+      '',
+      `${eventsInWindow} ${matchWord} in next 48h`,
+      'No +EV above threshold',
+    ])
   }
 
-  const cap =
-    `${label}Ran ${eventsInWindow} ${matchWord} in the next 48h... market's tight, nothing we like enough to post today.`
-  return cap.length <= CAPTION_MAX ? cap : `${cap.slice(0, CAPTION_MAX - 3)}...`
+  return joinCaptionLines([
+    event ? `${event} slate` : 'Slate',
+    '',
+    `${eventsInWindow} ${matchWord} in next 48h`,
+    'No +EV above threshold',
+  ])
 }
 
 /** @deprecated use buildOddsEdgeAlertCaption */
