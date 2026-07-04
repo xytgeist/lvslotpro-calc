@@ -672,6 +672,33 @@ input[list]::-webkit-list-button {
   }
 }
 
+/* Lounge badge hover/tap tips - match badge asset / icon colors */
+html:not(.light) [data-lounge-badge-tip-tone="og"] {
+  color: #ecc51d !important;
+  filter: drop-shadow(0 0 6px rgba(236, 197, 29, 0.75)) !important;
+}
+html:not(.light) [data-lounge-badge-tip-tone="admin"] {
+  color: #fbbf24 !important;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.65)) !important;
+}
+html:not(.light) [data-lounge-badge-tip-tone="mod"] {
+  color: #3b82f6 !important;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.65)) !important;
+}
+
+html.light [data-lounge-badge-tip-tone="og"] {
+  color: #000000 !important;
+  filter: drop-shadow(0 0 5px rgba(236, 197, 29, 0.55)) !important;
+}
+html.light [data-lounge-badge-tip-tone="admin"] {
+  color: #fbbf24 !important;
+  filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.5)) !important;
+}
+html.light [data-lounge-badge-tip-tone="mod"] {
+  color: #3b82f6 !important;
+  filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5)) !important;
+}
+
 /* ── Focused-comment highlight flash ──────────────────────────────────────── */
 @keyframes lounge-focus-flash {
   0%   { background-color: transparent; }
@@ -1478,8 +1505,6 @@ html.light .lounge-dock-fab-center {
   color: #ffffff !important;
   outline: none !important;
 }
-
-/* OG badge - light mode color shift (placeholder, remove if unused) */
 
 /* Title bar nav button (hamburger/close) - white, hairline black border, red shadow in light mode */
 html.light .lounge-title-nav-btn {

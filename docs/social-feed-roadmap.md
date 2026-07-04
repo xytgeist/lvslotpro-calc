@@ -98,7 +98,7 @@ Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity)
 
 ### A2. Evolve `community_feed_posts` (or rename to `feed_posts`)
 
-- **v1 on test:** single user-authored text column **`caption`** (≤280 chars). Legacy **`title` / `body`** were removed after a one-time backfill in `feed_phase_a_profiles_public_read.sql` (test-only data acceptable).
+- **v1 on test:** single user-authored text column **`caption`** (currently **≤500** chars; feed UI collapses at **320** before …more). Legacy **`title` / `body`** were removed after a one-time backfill in `feed_phase_a_profiles_public_read.sql` (test-only data acceptable).
 - Keep optional **`game_slug` / `game_title`** in v1 (FK later if needed).
 - Moderation / edit metadata:
   - `edited_at` (maintained by trigger on `caption` updates)
@@ -220,7 +220,7 @@ Primary Lounge nav is a **draggable cyan FAB** + **arc spin wheel** (`LoungeDock
 ## Phase E - Comments (threaded)
 
 - **Shipped (test, first slice):** `supabase/feed_interactions_phase_ef.sql` defines `feed_comments` + RLS + top-level-only post `comment_count` triggers; Lounge post detail lists **top-level** comments and drill-down for full threads. **Inline OP replies (post detail only):** replies authored by the **post owner** (`user_id === post.user_id`) with `parent_id` set to a **root** comment render **below** that parent in `LoungePostCommentThread.jsx` with the **same horizontal layout** as other comments; a **vertical connector** at the parent avatar column marks the thread (other replies stay drill-down only). **Relevant sort (client, validated test 2026-05-21 @ `f40ff0e`):** post-detail **Relevant** mode in **`src/utils/loungeFeedCommentSort.js`** — weighted engagement (likes, reposts×2, bookmarks×1.5, replies×2) with gravity/time decay; viewer just-posted pins stay on top; modest boosts for post-author roots and followed authors; nested drill-down replies **oldest-first** in Relevant mode; list order frozen on like/unlike until sort change or leave screen. Anon teaser rules and quality/collapse tuning still phased.
-- Table: `feed_comments` with `parent_id`, `post_id`, `body` (max **280** chars, same as post captions), `created_at`, `edited_at`, `hidden_at`.
+- Table: `feed_comments` with `parent_id`, `post_id`, `body` (max **500** chars, same as post captions), `created_at`, `edited_at`, `hidden_at`.
 - RLS:
   - logged-out: no full comment body access (counts/teasers only as needed)
   - signed-in: full thread access by policy

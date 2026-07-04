@@ -327,6 +327,7 @@ export default function LoungeDockArcCarouselPrototype({
   const fabHostRef = useRef(null)
   const fabDragRef = useRef(null)
   const spinRef = useRef(null)
+  const spinCaptureTargetRef = useRef(null)
   const spinMovedRef = useRef(false)
   const fabPosRef = useRef(null)
   const repositioningRef = useRef(false)
@@ -622,6 +623,17 @@ export default function LoungeDockArcCarouselPrototype({
     pointerGuardCaptureCleanupRef.current = null
   }, [])
 
+  const disarmPointerGuard = useCallback(() => {
+    if (pointerGuardTimerRef.current) {
+      window.clearTimeout(pointerGuardTimerRef.current)
+      pointerGuardTimerRef.current = 0
+    }
+    pointerGuardRef.current = false
+    setClickShield(false)
+    clearPointerGuardCapture()
+    syncPointerBlock()
+  }, [clearPointerGuardCapture, syncPointerBlock])
+
   const armPointerGuard = useCallback(
     (durationMs = POINTER_GUARD_MS) => {
       pointerGuardRef.current = true
@@ -640,24 +652,17 @@ export default function LoungeDockArcCarouselPrototype({
       if (pointerGuardTimerRef.current) window.clearTimeout(pointerGuardTimerRef.current)
       pointerGuardTimerRef.current = window.setTimeout(() => {
         pointerGuardTimerRef.current = 0
-        pointerGuardRef.current = false
-        setClickShield(false)
-        clearPointerGuardCapture()
-        syncPointerBlock()
+        disarmPointerGuard()
       }, durationMs)
     },
-    [clearPointerGuardCapture, syncPointerBlock],
+    [clearPointerGuardCapture, disarmPointerGuard, syncPointerBlock],
   )
 
   useEffect(() => {
     return () => {
-      if (pointerGuardTimerRef.current) {
-        window.clearTimeout(pointerGuardTimerRef.current)
-        pointerGuardTimerRef.current = 0
-      }
-      clearPointerGuardCapture()
+      disarmPointerGuard()
     }
-  }, [clearPointerGuardCapture])
+  }, [disarmPointerGuard])
 
   const clearRepositionCapture = useCallback(() => {
     repositionCaptureCleanupRef.current?.()
@@ -1049,13 +1054,15 @@ export default function LoungeDockArcCarouselPrototype({
 
   useEffect(
     () => () => {
-      if (pointerGuardTimerRef.current) window.clearTimeout(pointerGuardTimerRef.current)
+      disarmPointerGuard()
       clearRepositionCapture()
       cancelFabLongPress()
       clearFabLongPressProgress()
       clearFabIdleTimer()
       clearFabCompactTimer()
       if (fabWakePopTimerRef.current) window.clearTimeout(fabWakePopTimerRef.current)
+      endFabReposition()
+      setFabSelectionLock(false)
     },
     [
       cancelFabLongPress,
@@ -1063,8 +1070,41 @@ export default function LoungeDockArcCarouselPrototype({
       clearFabIdleTimer,
       clearFabCompactTimer,
       clearRepositionCapture,
+      disarmPointerGuard,
+      endFabReposition,
     ],
   )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const resetTransientPointerState = () => {
+      disarmPointerGuard()
+      clearRepositionCapture()
+      if (fabDragRef.current) {
+        fabDragRef.current = null
+        endFabReposition()
+        setFabSelectionLock(false)
+      }
+      const spin = spinRef.current
+      const captureTarget = spinCaptureTargetRef.current
+      if (captureTarget && spin?.pointerId != null) {
+        try {
+          captureTarget.releasePointerCapture(spin.pointerId)
+        } catch {
+          /* already released */
+        }
+      }
+      spinRef.current = null
+      spinCaptureTargetRef.current = null
+      setSpinning(false)
+    }
+    window.addEventListener('blur', resetTransientPointerState)
+    window.addEventListener('pointercancel', resetTransientPointerState, true)
+    return () => {
+      window.removeEventListener('blur', resetTransientPointerState)
+      window.removeEventListener('pointercancel', resetTransientPointerState, true)
+    }
+  }, [clearRepositionCapture, disarmPointerGuard, endFabReposition])
 
   const snapCarouselToPicker = useCallback(
     (rotation) => {
@@ -1347,6 +1387,11 @@ export default function LoungeDockArcCarouselPrototype({
       }
       endFabReposition()
       fabDragRef.current = null
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        /* already released */
+      }
     },
     [
       persistFabPrefs,
@@ -1373,6 +1418,7 @@ export default function LoungeDockArcCarouselPrototype({
         startPointerAngle: angleFromPointer(fabCenterX, fabCenterY, e.clientX, e.clientY),
         startRotation: carouselRotationRef.current,
       }
+      spinCaptureTargetRef.current = e.currentTarget
       setSpinning(true)
       e.currentTarget.setPointerCapture(e.pointerId)
       return true
@@ -1413,7 +1459,16 @@ export default function LoungeDockArcCarouselPrototype({
     (pointerId) => {
       const spin = spinRef.current
       if (!spin || spin.pointerId !== pointerId) return false
+      const captureTarget = spinCaptureTargetRef.current
+      if (captureTarget) {
+        try {
+          captureTarget.releasePointerCapture(pointerId)
+        } catch {
+          /* already released */
+        }
+      }
       spinRef.current = null
+      spinCaptureTargetRef.current = null
       setSpinning(false)
       applyCarouselSnap(carouselRotationRef.current)
       return true
@@ -1447,6 +1502,22 @@ export default function LoungeDockArcCarouselPrototype({
     window.addEventListener('wheel', onWheel, { passive: false })
     return () => window.removeEventListener('wheel', onWheel)
   }, [open, spinEnabled, onSpinWheel])
+
+  useEffect(() => {
+    if (open) return
+    const spin = spinRef.current
+    const captureTarget = spinCaptureTargetRef.current
+    if (captureTarget && spin?.pointerId != null) {
+      try {
+        captureTarget.releasePointerCapture(spin.pointerId)
+      } catch {
+        /* already released */
+      }
+    }
+    spinRef.current = null
+    spinCaptureTargetRef.current = null
+    setSpinning(false)
+  }, [open])
 
   useEffect(() => {
     if (!spinning || typeof document === 'undefined') return undefined
@@ -1817,7 +1888,7 @@ export default function LoungeDockArcCarouselPrototype({
       {menuExpanded && fabVisible ? (
         <button
           type="button"
-          className="lounge-dock-backdrop pointer-events-auto fixed inset-0 z-[5] bg-black/35 backdrop-blur-[2px] [-webkit-tap-highlight-color:transparent]"
+          className="lounge-dock-backdrop pointer-events-auto fixed inset-0 z-[5] cursor-default bg-black/35 backdrop-blur-[2px] [-webkit-tap-highlight-color:transparent]"
           aria-label="Close menu"
           onPointerDown={onBackdropPointerDown}
           onPointerMove={onBackdropPointerMove}

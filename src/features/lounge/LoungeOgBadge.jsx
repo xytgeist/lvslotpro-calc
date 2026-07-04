@@ -1,6 +1,20 @@
+import { useSyncExternalStore } from 'react'
 import LoungeBadgeHoverTip from './LoungeBadgeHoverTip.jsx'
 
-const BADGE_SRC = `${import.meta.env.BASE_URL}og-cohort-badge.svg`
+const BASE = import.meta.env.BASE_URL
+const OG_BADGE_SRC_LIGHT = `${BASE}og-cohort-badge-light.svg`
+const OG_BADGE_SRC_DARK = `${BASE}og-cohort-badge-dark.svg`
+
+function readIsLightTheme() {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('light')
+}
+
+function subscribeLightTheme(onStoreChange) {
+  if (typeof document === 'undefined') return () => {}
+  const obs = new MutationObserver(onStoreChange)
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  return () => obs.disconnect()
+}
 
 /** @type {Record<'feed' | 'detail' | 'modal', { cls: string, px: number, yClass?: string }>} */
 const OG_BADGE_SIZE = {
@@ -12,21 +26,33 @@ const OG_BADGE_SIZE = {
 
 /**
  * Earliest-adopter marker from `profiles.is_og` (first 1k profiles by created_at).
- * Flat gold OG + laurel (`public/og-cohort-badge.svg`); swap for PNG at same path if preferred.
+ * Light mode: gold wreath + black OG (`og-cohort-badge-light.svg`).
+ * Dark mode: all gold (`og-cohort-badge-dark.svg`).
  * Hover tip in `LoungeBadgeHoverTip`.
  *
  * @param {{ isOg?: boolean | null, size?: 'feed' | 'detail' | 'modal' }} props
  */
 export default function LoungeOgBadge({ isOg, size = 'feed' }) {
+  const isLight = useSyncExternalStore(subscribeLightTheme, readIsLightTheme, () => false)
+
   if (isOg !== true) return null
   const s = OG_BADGE_SIZE[size] ?? OG_BADGE_SIZE.feed
   const iconClass = `${s.cls} shrink-0 object-contain`
   const tipClass = `inline-flex items-center ${s.yClass ?? 'translate-y-[3px]'}`
+  const badgeSrc = isLight ? OG_BADGE_SRC_LIGHT : OG_BADGE_SRC_DARK
 
   return (
-    <LoungeBadgeHoverTip tip="OG" tone="amber" className={tipClass}>
+    <LoungeBadgeHoverTip tip="OG" tone="og" className={tipClass}>
       <span className="inline-flex items-center leading-none" role="img" aria-label="OG">
-        <img src={BADGE_SRC} alt="" className={`lounge-og-badge ${iconClass}`} draggable={false} width={s.px} height={s.px} aria-hidden />
+        <img
+          src={badgeSrc}
+          alt=""
+          className={`lounge-og-badge ${iconClass}`}
+          draggable={false}
+          width={s.px}
+          height={s.px}
+          aria-hidden
+        />
       </span>
     </LoungeBadgeHoverTip>
   )

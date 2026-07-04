@@ -1725,7 +1725,7 @@ export default function AppShell({
           type="button"
           onClick={() => setMenuOpen(false)}
           aria-label="Close navigation menu"
-          className="fixed inset-0 z-40 bg-black/35"
+          className="fixed inset-0 z-40 cursor-default bg-black/35"
         />
       )}
 

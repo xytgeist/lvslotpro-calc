@@ -23,25 +23,27 @@ function isBadgeTipOutAnimation(name) {
 }
 
 const TONE = {
-  amber: 'text-amber-200/95 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]',
-  /** Matches admin crown icon (`text-amber-400`). */
-  crown: 'text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.35)]',
-  violet: 'text-violet-200/95 drop-shadow-[0_0_4px_rgba(167,139,250,0.35)]',
-  sky: 'text-sky-200/95 drop-shadow-[0_0_4px_rgba(125,211,252,0.3)]',
+  /** Matches `og-cohort-badge-*.svg` laurel gold (dark) / OG letter black (light). */
+  og: '',
+  /** Matches admin crown `text-amber-400`. */
+  admin: '',
+  /** Matches mod shield `text-blue-500`. */
+  mod: '',
+  violet: '',
 }
 
 /**
- * Small hover / tap tooltip for Lounge role + OG badges.
- * Portaled above the anchor so feed scroll / overflow / paint containment cannot clip it,
- * with a short leave delay so the pointer can reach the tip (tip uses pointer-events).
- * Outside **pointerdown** (capture) and **Escape** dismiss the tip so it does not stick when `mouseleave` does not fire.
+ * Small tap/click tooltip for Lounge role + OG badges.
+ * Portaled above the anchor so feed scroll / overflow / paint containment cannot clip it.
+ * Opens on **click/tap only** (not hover) so the label does not flash while moving the mouse over feed rows.
+ * Outside **pointerdown** (capture) and **Escape** dismiss the tip.
  *
  * Enter on iOS WebKit: same keyframes as Android but paused until positioned, then unpaused once.
  * Layout listeners must not depend on anim state - that re-ran the effect and turbo-compressed the rise.
  *
- * @param {{ tip: string, tone?: 'amber' | 'crown' | 'violet' | 'sky', children: import('react').ReactNode, className?: string }} props
+ * @param {{ tip: string, tone?: 'og' | 'admin' | 'mod' | 'violet', children: import('react').ReactNode, className?: string }} props
  */
-export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, className = '' }) {
+export default function LoungeBadgeHoverTip({ tip, tone = 'og', children, className = '' }) {
   const anchorRef = useRef(null)
   const tipShellRef = useRef(null)
   const tipTextRef = useRef(null)
@@ -59,6 +61,7 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
   const positionFrameRef = useRef(null)
   const animStartFrameRef = useRef(null)
   const showGenerationRef = useRef(0)
+  const mountedRef = useRef(false)
   const scrollPosCountRef = useRef(0)
   const needsDeferredEnter = useMemo(() => detectAppleWebKitInlineStream(), [])
 
@@ -77,6 +80,7 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
     animInReady: false,
   })
   debugStateRef.current = { mounted, exiting, animInReady: animInReadyRef.current }
+  mountedRef.current = mounted
 
   const syncDebugSnapshot = useCallback(() => {
     const s = debugStateRef.current
@@ -357,50 +361,25 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
     return () => window.clearInterval(id)
   }, [mounted, syncDebugSnapshot])
 
-  const onEnterAnchor = useCallback(() => {
-    if (!prefersFinePointerHover()) {
-      logLoungeBadgeTipDebug(tip, 'hover', 'mouseenter ignored (coarse pointer)', debugDom())
-      return
-    }
-    openTip('mouseenter')
-  }, [debugDom, openTip, tip])
-
-  const onLeaveAnchor = useCallback(() => {
-    if (!prefersFinePointerHover()) return
-    clearLeaveDelay()
-    leaveDelayTRef.current = window.setTimeout(() => {
-      leaveDelayTRef.current = null
-      beginExit('mouseleave-anchor')
-    }, LEAVE_DELAY_MS)
-  }, [beginExit, clearLeaveDelay])
-
-  const onEnterTip = useCallback(() => {
-    if (!prefersFinePointerHover()) return
-    clearAllTimers()
-    exitingRef.current = false
-    setExiting(false)
-    logLoungeBadgeTipDebug(tip, 'hover', 'enter portaled tip', debugDom())
-  }, [clearAllTimers, debugDom, tip])
-
-  const onLeaveTip = useCallback(() => {
-    if (!prefersFinePointerHover()) return
-    beginExit('mouseleave-tip')
-  }, [beginExit])
-
-  const onWrapperClick = useCallback(
+  const onBadgeActivate = useCallback(
     (e) => {
       e.stopPropagation()
-      if (prefersFinePointerHover()) return
+      if (mountedRef.current && !exitingRef.current) {
+        beginExit('click-toggle')
+        return
+      }
       openTip('click')
-      tapDismissTRef.current = window.setTimeout(() => {
-        tapDismissTRef.current = null
-        beginExit('tap-timeout')
-      }, TAP_TIP_MS)
+      if (!prefersFinePointerHover()) {
+        tapDismissTRef.current = window.setTimeout(() => {
+          tapDismissTRef.current = null
+          beginExit('tap-timeout')
+        }, TAP_TIP_MS)
+      }
     },
     [beginExit, openTip],
   )
 
-  const toneCls = TONE[tone] ?? TONE.amber
+  const toneCls = TONE[tone] ?? ''
   const tipAnimClass = exiting ? 'lounge-badge-tip-out' : 'lounge-badge-tip-in'
   const tipEnterPaused = needsDeferredEnter && !exiting && !animInReady
 
@@ -411,20 +390,16 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
             ref={tipShellRef}
             data-lounge-badge-tip
             role="tooltip"
-            className="pointer-events-auto fixed z-[10050] max-w-[13rem] text-center"
+            className="pointer-events-none fixed z-[10050] max-w-[13rem] text-center"
             style={{
               left: 0,
               top: 0,
               transform: 'translateX(-50%)',
               visibility: 'hidden',
             }}
-            onMouseEnter={onEnterTip}
-            onMouseLeave={onLeaveTip}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Tone + drop-shadow on a static wrapper - iOS Safari stutters when filter + transform animate on one node. */}
-            <span className={`inline-block ${toneCls}`}>
+            <span className={`inline-block ${toneCls}`} data-lounge-badge-tip-tone={tone}>
               <span
                 ref={tipTextRef}
                 data-tip-enter-paused={tipEnterPaused ? '' : undefined}
@@ -444,11 +419,8 @@ export default function LoungeBadgeHoverTip({ tip, tone = 'amber', children, cla
       <span
         ref={anchorRef}
         data-lounge-badge-tip
-        className={`relative inline-flex shrink-0 cursor-help touch-manipulation ${className}`}
-        onMouseEnter={onEnterAnchor}
-        onMouseLeave={onLeaveAnchor}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={onWrapperClick}
+        className={`relative inline-flex shrink-0 cursor-default touch-manipulation ${className}`}
+        onClick={onBadgeActivate}
       >
         {children}
       </span>

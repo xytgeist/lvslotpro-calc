@@ -60,7 +60,7 @@ export default function LoungeStaffRoleBadge({ role, size = 'feed' }) {
 
   if (r === 'admin') {
     return (
-      <LoungeBadgeHoverTip tip="Admin" tone="crown" className={`inline-flex items-center ${layout.wrap}`}>
+      <LoungeBadgeHoverTip tip="Admin" tone="admin" className={`inline-flex items-center ${layout.wrap}`}>
         <span className="inline-flex items-baseline gap-x-0.5" role="img" aria-label="Admin">
           <span className={`inline-flex ${layout.crown}`}>
             <CrownIcon className={`${crownClass} text-amber-400`} />
@@ -74,7 +74,7 @@ export default function LoungeStaffRoleBadge({ role, size = 'feed' }) {
   }
 
   return (
-    <LoungeBadgeHoverTip tip="Mod" tone="sky" className={layout.wrap}>
+    <LoungeBadgeHoverTip tip="Mod" tone="mod" className={layout.wrap}>
       <span
         className={`inline-flex items-center justify-center ${layout.modInner}`}
         role="img"
