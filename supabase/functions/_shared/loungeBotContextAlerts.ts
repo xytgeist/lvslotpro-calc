@@ -25,12 +25,18 @@ import {
   submitLoungeBotAlertPost,
 } from './loungeBotPublishSchedule.ts'
 import {
+  evaluateRestTravelMatchup,
+  buildTeamRestProfile,
+  loadRestTravelSchedule,
+  pickMatchesTeamName,
+  type RestTravelMatchup,
+} from './loungeBotRestTravel.ts'
+import {
   confirmedStartersFromRundown,
   hasConfirmedStarterInfo,
   injuryImpactPlayers,
-  ptYesterdayDate,
+  ptDateFromIso,
   resolveRundownEvent,
-  rundownTeamIdsPlayedOnDate,
   sportContextLabelFromKey,
   supportsRundownSchedule,
   type ConfirmedStarters,
@@ -58,8 +64,7 @@ export type ContextAlertCandidate = {
   rundown: ResolvedRundownEvent
   starters?: ConfirmedStarters
   injuryPlayer?: { name: string; status: string }
-  b2bTeam?: string
-  restedTeam?: string
+  restTravel?: RestTravelMatchup
 }
 
 function joinCaptionLines(lines: string[]): string {
@@ -155,17 +160,16 @@ export function buildRestTravelEdgeCaption(
   awayTeam: string,
   homeTeam: string,
   commenceTime: string,
-  b2bTeam: string,
-  restedTeam: string,
+  restTravel: RestTravelMatchup,
   pick: OddsPick,
 ): string {
   return joinCaptionLines([
-    '🛫 Rest Advantage',
+    '🛫 Rest + Travel Advantage',
     '',
     formatMatchupParen(awayTeam, homeTeam, commenceTime),
     '',
-    `${shortDisplayName(b2bTeam)} on back-to-back (2nd game in 2 nights)`,
-    `${shortDisplayName(restedTeam)} had full day of rest`,
+    restTravel.fatiguedLine,
+    restTravel.restedLine,
     '',
     formatPickArrowLine(pick),
   ])
@@ -217,8 +221,7 @@ export function contextAlertCaption(candidate: ContextAlertCandidate): string {
         candidate.awayTeam,
         candidate.homeTeam,
         candidate.commenceTime,
-        candidate.b2bTeam!,
-        candidate.restedTeam!,
+        candidate.restTravel!,
         candidate.pick,
       )
     default:
@@ -228,6 +231,24 @@ export function contextAlertCaption(candidate: ContextAlertCandidate): string {
 
 export function contextAlertDedupeKey(kind: ContextAlertKind, eventId: string, ptDay = ptTodayDate()): string {
   return `${kind}:${ptDay}:${eventId}`
+}
+
+function bestPickForRestedTeam(
+  events: OddsEvent[],
+  sportKey: string,
+  eventId: string,
+  minEvPct: number,
+  restedTeamName: string,
+): OddsPick | null {
+  const picks = findPlusEvOpportunities(events, sportKey, {
+    minEvPct,
+    marketKeys: CONTEXT_MARKETS,
+  })
+  return picks
+    .filter((p) => p.eventId === eventId)
+    .filter((p) => p.marketKey !== 'totals')
+    .filter((p) => pickMatchesTeamName(p.pickName, restedTeamName))
+    .sort((a, b) => b.edgePct - a.edgePct)[0] ?? null
 }
 
 function bestPickForEvent(
@@ -297,7 +318,7 @@ async function collectContextCandidates(
   events: OddsEvent[],
   sportKey: string,
   minEvPct: number,
-  playedYesterday: Set<number>,
+  schedulePack: Awaited<ReturnType<typeof loadRestTravelSchedule>>,
 ): Promise<ContextAlertCandidate[]> {
   const out: ContextAlertCandidate[] = []
   const ptDay = ptTodayDate()
@@ -355,35 +376,62 @@ async function collectContextCandidates(
       })
     }
 
-    if (supportsRundownSchedule(sportKey) && rundown.awayTeamId && rundown.homeTeamId) {
-      const awayB2b = playedYesterday.has(rundown.awayTeamId)
-      const homeB2b = playedYesterday.has(rundown.homeTeamId)
-      if (awayB2b && !homeB2b) {
-        out.push({
-          kind: 'rest_travel_edge',
-          eventId,
+    if (schedulePack && rundown.awayTeamId && rundown.homeTeamId) {
+      const tonightPt = ptDateFromIso(commenceTime)
+      const tonightMs = Date.parse(commenceTime)
+      const awayProfile = buildTeamRestProfile(
+        schedulePack.sportId,
+        sportKey,
+        schedulePack.events,
+        rundown.awayTeamId,
+        awayTeam,
+        false,
+        tonightPt,
+        tonightMs,
+        rundown.eventId,
+        homeTeam,
+      )
+      const homeProfile = buildTeamRestProfile(
+        schedulePack.sportId,
+        sportKey,
+        schedulePack.events,
+        rundown.homeTeamId,
+        homeTeam,
+        true,
+        tonightPt,
+        tonightMs,
+        rundown.eventId,
+        awayTeam,
+      )
+      const matchup = evaluateRestTravelMatchup(
+        schedulePack.sportId,
+        sportKey,
+        awayTeam,
+        homeTeam,
+        awayProfile,
+        homeProfile,
+      )
+      if (matchup) {
+        const restedPick = bestPickForRestedTeam(
+          events,
           sportKey,
-          awayTeam,
-          homeTeam,
-          commenceTime,
-          pick,
-          rundown,
-          b2bTeam: awayTeam,
-          restedTeam: homeTeam,
-        })
-      } else if (homeB2b && !awayB2b) {
-        out.push({
-          kind: 'rest_travel_edge',
           eventId,
-          sportKey,
-          awayTeam,
-          homeTeam,
-          commenceTime,
-          pick,
-          rundown,
-          b2bTeam: homeTeam,
-          restedTeam: awayTeam,
-        })
+          minEvPct,
+          matchup.restedTeam,
+        )
+        if (restedPick) {
+          out.push({
+            kind: 'rest_travel_edge',
+            eventId,
+            sportKey,
+            awayTeam,
+            homeTeam,
+            commenceTime,
+            pick: restedPick,
+            rundown,
+            restTravel: matchup,
+          })
+        }
       }
     }
 
@@ -439,11 +487,11 @@ export async function tryPublishContextAlert(
   }
 
   const minEv = Number(oddsCfg.min_edge_pct) || 2
-  const playedYesterday = supportsRundownSchedule(sportKey)
-    ? await rundownTeamIdsPlayedOnDate(sportKey, ptYesterdayDate())
-    : new Set<number>()
+  const schedulePack = supportsRundownSchedule(sportKey)
+    ? await loadRestTravelSchedule(sportKey, ptTodayDate())
+    : null
 
-  const candidates = await collectContextCandidates(events, sportKey, minEv, playedYesterday)
+  const candidates = await collectContextCandidates(events, sportKey, minEv, schedulePack)
   const best = pickBestCandidate(candidates, oddsCfg)
   if (!best) return { published: false, skipped: 'no_qualifying_context' }
 

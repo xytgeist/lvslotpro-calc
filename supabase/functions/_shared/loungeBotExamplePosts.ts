@@ -233,16 +233,16 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
   },
   {
     postKind: 'rest_travel_edge',
-    label: 'Rest Advantage',
+    label: 'Rest + Travel Advantage',
     caption: [
-      '🛫 Rest Advantage',
+      '🛫 Rest + Travel Advantage',
       '',
       'Lakers vs Warriors (Sat 7:30 PM PT)',
       '',
-      'Lakers on back-to-back (2nd game in 2 nights)',
-      'Warriors had full day of rest',
+      'Lakers on back-to-back + cross-time-zone travel (East to West)',
+      'Warriors had 2 days of rest at home',
       '',
-      '→ Warriors -4.5 showing +3.9% EV',
+      '→ Warriors -4.5 @ DraftKings (+3.9% EV)',
     ].join('\n'),
   },
   {

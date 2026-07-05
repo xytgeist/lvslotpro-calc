@@ -15,7 +15,7 @@ export const SCOTT_EXAMPLE_POST_LABELS = [
   'Period / Halftime Report',
   'Starter Spotlight',
   'Injury Impact',
-  'Rest Advantage',
+  'Rest + Travel Advantage',
   'Confirmed Starters',
   'Fade the Public',
 ]

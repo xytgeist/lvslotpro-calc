@@ -53,7 +53,7 @@ export const ODDS_ALERT_AUDIENCE_ROWS = Object.freeze([
   { key: 'starter_spotlight', label: 'Starter Spotlight' },
   { key: 'confirmed_starters', label: 'Confirmed Starters' },
   { key: 'injury_impact', label: 'Injury Impact' },
-  { key: 'rest_travel_edge', label: 'Rest Advantage' },
+  { key: 'rest_travel_edge', label: 'Rest + Travel Advantage' },
   { key: 'fade_the_public', label: 'Fade the Public' },
 ])
 

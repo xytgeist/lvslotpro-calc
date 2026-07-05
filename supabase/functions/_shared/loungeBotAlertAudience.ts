@@ -67,7 +67,7 @@ export const ALERT_AUDIENCE_LABELS: Record<OddsAlertAudienceKey, string> = {
   starter_spotlight: 'Starter Spotlight',
   confirmed_starters: 'Confirmed Starters',
   injury_impact: 'Injury Impact',
-  rest_travel_edge: 'Rest Advantage',
+  rest_travel_edge: 'Rest + Travel Advantage',
   fade_the_public: 'Fade the Public',
 }
 

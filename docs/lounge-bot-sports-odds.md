@@ -241,7 +241,7 @@ Odds alerts no longer burst-post when several qualify in one **`poll_edges`** ti
 | --- | --- | --- |
 | **Urgent** | Arb Watch | ~15s–2min after min gap |
 | **Normal** | +EV edge, Best Bet, Value Radar, in-game edge, Starter Spotlight, Injury Impact | ~2–10min after min gap |
-| **Low** | Line movement, Sharp Report, period reports, Confirmed Starters, Rest Advantage | ~6–20min after min gap |
+| **Low** | Line movement, Sharp Report, period reports, Confirmed Starters, Rest + Travel | ~6–20min after min gap |
 
 **`min_post_gap_minutes`** (default **8**) enforces minimum spacing between any Scott posts. **`lounge_bot_scheduled_posts`** is drained every minute by pg_cron **`lounge_bot_publish_scheduled_odds`** → **`lounge-bot-publish-due`** (`publishScheduledOdds: true`). Stale pending rows (**> 3h**) cancel automatically. **Coffee & Covers** still posts immediately (threaded morning post).
 
@@ -266,10 +266,31 @@ Disable via **`value_bet_radar_enabled = false`**. Default audience **`all`** (s
 | **`starter_spotlight`** | 🔦 Starter Spotlight | Confirmed starters (pitchers, QBs, etc. when Rundown has data) + best +EV pick |
 | **`confirmed_starters`** | ✅ Confirmed Starters | Compact starter list + pick (skipped if Starter Spotlight already posted/scheduled that day for same game) |
 | **`injury_impact`** | ⚠️ Injury Impact | Hard injury status (OUT, IR, etc.) + pick |
-| **`rest_travel_edge`** | 🛫 Rest Advantage | B2B vs rested team (any Rundown-scheduled sport) + pick |
+| **`rest_travel_edge`** | 🛫 Rest + Travel Advantage | 7-day Rundown schedule + venue table: rest gap ≥ 1 day, +EV on **rested** team; optional travel line (≥800 mi or cross-TZ) |
 | **`fade_the_public`** | 🚫 Fade the Public | **Off by default** — needs public betting % feed (not in Rundown OpenAPI) |
 
 Priority when multiple qualify: injury → starter spotlight → rest → confirmed starters. Daily cap **`max_context_alerts_per_day`** (default **8**). Toggle per kind via **`starter_spotlight_enabled`**, **`confirmed_starters_enabled`**, **`injury_impact_enabled`**, **`rest_travel_edge_enabled`**, **`fade_the_public_enabled`**. Default audience **Subs**.
+
+**Rest + Travel logic (`loungeBotRestTravel.ts` + `loungeSportsVenues.ts`):**
+
+1. Load Rundown events for **today + prior 7 PT days** (cached 45m per sport/date).
+2. Per team: days since last game, B2B (`days === 1`), NFL short week (`days < 6`), bye (no game in window).
+3. Qualify when fatigued side is B2B or NFL short week and rested side has **≥1 day** more rest (or bye vs short week).
+4. **+EV pick must be on the rested team** (h2h/spreads only).
+5. Travel line only when Haversine **≥800 mi** or home-market TZ bucket changes (`loungeSportsVenues.ts` seed). Pre-game: falls back to home-team arena coords when Rundown `venue_location` is blank.
+6. Copy stays **team schedule** only (never pitcher workload).
+
+Example:
+```text
+🛫 Rest + Travel Advantage
+
+Lakers vs Warriors (Sat 7:30 PM PT)
+
+Lakers on back-to-back + cross-time-zone travel (East to West)
+Warriors had 2 days of rest at home
+
+→ Warriors -4.5 @ DraftKings (+3.9% EV)
+```
 
 Example Starter Spotlight:
 ```text
@@ -359,7 +380,7 @@ Fast multi-book steam ... number syncing toward Chiefs right now.
 | **`lounge-odds-poll`** | Background: **`poll_edges`** \| **`daily_slates`** \| **`best_bet_hour`** \| **`value_bet_radar`** |
 | **`lounge-bot-admin`** | Create bot + seed **`lounge_bot_odds_config`** |
 
-Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**, **`loungeBotCoffeeAndCovers.ts`**, **`loungeBotLineMovement.ts`**, **`loungeBotBestBetHour.ts`**, **`loungeBotValueBetRadar.ts`**, **`loungeBotContextAlerts.ts`**, **`loungeBotRundownContext.ts`**
+Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**, **`loungeBotCoffeeAndCovers.ts`**, **`loungeBotLineMovement.ts`**, **`loungeBotBestBetHour.ts`**, **`loungeBotValueBetRadar.ts`**, **`loungeBotContextAlerts.ts`**, **`loungeBotRestTravel.ts`**, **`loungeSportsVenues.ts`**, **`loungeBotRundownContext.ts`**
 
 Deploy:
 
@@ -420,7 +441,7 @@ Current fetch: **`h2h` + `spreads`**, region **`us`** → **~2 credits/call**.
 | `starter_spotlight_enabled` | Default **true** — starter spotlight on **`poll_edges`** when Rundown confirms starters |
 | `confirmed_starters_enabled` | Default **true** — compact confirmed-starters list |
 | `injury_impact_enabled` | Default **true** — hard injury status + pick |
-| `rest_travel_edge_enabled` | Default **true** — B2B vs rest (Rundown schedule, all mapped sports) |
+| `rest_travel_edge_enabled` | Default **true** — Rest + Travel (7-day schedule, venue table, +EV on rested team) |
 | `fade_the_public_enabled` | Default **false** — needs public betting % feed |
 | `max_context_alerts_per_day` | Default **8** — cap across all context kinds |
 | `min_post_gap_minutes` | Default **8** — min minutes between Scott feed posts (queue spacing) |

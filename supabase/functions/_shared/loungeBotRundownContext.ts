@@ -57,7 +57,11 @@ type RundownEvent = {
   pitcher_away?: RundownPitcher
   pitcher_home?: RundownPitcher
   schedule?: { event_headline?: string }
-  score?: { event_status?: string }
+  score?: {
+    event_status?: string
+    venue_name?: string
+    venue_location?: string
+  }
 }
 
 export type ResolvedRundownEvent = {
@@ -658,4 +662,39 @@ export function hasConfirmedStarterInfo(
   const starters = confirmedStartersFromRundown(ctx, sportKey)
   if (!starters) return false
   return starters.away !== 'TBD' || starters.home !== 'TBD'
+}
+
+export function ptCalendarDaysBetween(earlierPt: string, laterPt: string): number {
+  const a = new Date(`${earlierPt}T12:00:00-07:00`).getTime()
+  const b = new Date(`${laterPt}T12:00:00-07:00`).getTime()
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0
+  return Math.max(0, Math.round((b - a) / 86_400_000))
+}
+
+export function ptDatesBackFrom(ptDate: string, count: number): string[] {
+  const out: string[] = []
+  const base = new Date(`${ptDate}T12:00:00-07:00`)
+  for (let i = 1; i <= count; i++) {
+    const d = new Date(base.getTime() - i * 86_400_000)
+    out.push(ptDateFromIso(d.toISOString()))
+  }
+  return out
+}
+
+export async function loadRundownDayEvents(sportId: number, ptDate: string): Promise<RundownEvent[]> {
+  return loadDayEvents(sportId, ptDate)
+}
+
+export async function loadRundownRecentEvents(
+  sportId: number,
+  ptEndDate: string,
+  daysBack = 7,
+): Promise<RundownEvent[]> {
+  const dates = [ptEndDate, ...ptDatesBackFrom(ptEndDate, daysBack)]
+  const all: RundownEvent[] = []
+  for (const d of dates) {
+    const rows = await loadDayEvents(sportId, d)
+    all.push(...rows)
+  }
+  return all
 }
