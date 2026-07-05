@@ -44,6 +44,7 @@ export type CalendarRow = {
   label_short: string
   caption_prefix: string | null
   odds_sport_keys: string[]
+  priority?: number
 }
 
 export type OddsBotRow = {
@@ -72,6 +73,11 @@ export type OddsCfgRow = {
   min_live_edge_pct?: number | null
   max_live_alerts_per_day?: number | null
   max_period_reports_per_day?: number | null
+  best_bet_hour_enabled?: boolean | null
+  min_best_bet_hour_ev_pct?: number | null
+  arb_watch_enabled?: boolean | null
+  min_arb_profit_pct?: number | null
+  max_arb_alerts_per_day?: number | null
 }
 
 export function oddsApiKey(): string {
@@ -200,7 +206,7 @@ export async function loadTodayCalendarRows(admin: SupabaseClient): Promise<Cale
   const today = ptTodayDate()
   const { data, error } = await admin
     .from('lounge_sports_betting_calendar')
-    .select('slug, label_short, caption_prefix, odds_sport_keys')
+    .select('slug, label_short, caption_prefix, odds_sport_keys, priority')
     .eq('enabled', true)
     .lte('start_date', today)
     .gte('end_date', today)

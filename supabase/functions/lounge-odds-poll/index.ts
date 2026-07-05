@@ -1,9 +1,11 @@
 /**
- * Background odds poller — edge alerts + morning Coffee & Covers batch.
- * Body: { slug, action: 'poll_edges' | 'daily_slates', dryRun?: boolean, force?: boolean }
+ * Background odds poller — edge alerts + morning Coffee & Covers batch + hourly best bet.
+ * Body: { slug, action: 'poll_edges' | 'daily_slates' | 'best_bet_hour', dryRun?: boolean, force?: boolean }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import { tryPublishArbWatchAlerts } from '../_shared/loungeBotArbWatch.ts'
+import { runBestBetHourPoll } from '../_shared/loungeBotBestBetHour.ts'
 import { tryPublishLiveGameContent } from '../_shared/loungeBotLiveContent.ts'
 import {
   countPublishedKindToday,
@@ -48,13 +50,13 @@ Deno.serve(async (req) => {
     const dryRun = body?.dryRun === true
     const force = body?.force === true
 
-    if (!['poll_edges', 'daily_slates'].includes(action)) {
-      return adminOpsJson(400, { error: 'action must be poll_edges or daily_slates.' })
+    if (!['poll_edges', 'daily_slates', 'best_bet_hour'].includes(action)) {
+      return adminOpsJson(400, { error: 'action must be poll_edges, daily_slates, or best_bet_hour.' })
     }
 
     const { data: bot, error: botErr } = await admin
       .from('lounge_bot_accounts')
-      .select('user_id, slug, run_state, pipeline, category_pills_default')
+      .select('user_id, slug, run_state, pipeline, category_pills_default, display_name')
       .eq('slug', slug)
       .maybeSingle()
 
@@ -65,11 +67,6 @@ Deno.serve(async (req) => {
       return adminOpsJson(200, { ok: true, skipped: bot.run_state, slug })
     }
 
-    const calendarRows = await loadTodayCalendarRows(admin)
-    if (!calendarRows.length) {
-      return adminOpsJson(200, { ok: true, skipped: 'no_calendar_today', slug, action })
-    }
-
     const { data: oddsCfgRaw } = await admin
       .from('lounge_bot_odds_config')
       .select('*')
@@ -77,6 +74,17 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     const oddsCfg = (oddsCfgRaw || {}) as OddsCfgRow
+
+    if (action === 'best_bet_hour') {
+      const result = await runBestBetHourPoll(admin, bot, oddsCfg, dryRun)
+      return adminOpsJson(200, result)
+    }
+
+    const calendarRows = await loadTodayCalendarRows(admin)
+    if (!calendarRows.length) {
+      return adminOpsJson(200, { ok: true, skipped: 'no_calendar_today', slug, action })
+    }
+
     const regions = oddsCfg.regions || ['us']
     const lineMovementEnabled = oddsCfg.line_movement_enabled !== false
     const markets = marketsForOddsPoll(oddsCfg, lineMovementEnabled)
@@ -116,6 +124,7 @@ Deno.serve(async (req) => {
     let publishedLineMoves = 0
     let publishedLiveEdges = 0
     let publishedPeriodReports = 0
+    let publishedArbWatch = 0
     let publishedCoffeeCovers = 0
     let publishedSlates = 0
     let requestsRemaining: string | null = null
@@ -178,6 +187,18 @@ Deno.serve(async (req) => {
             publishedLineMoves += lineResult.published
           }
 
+          const arbResult = await tryPublishArbWatchAlerts(
+            admin,
+            bot,
+            ctx.upcoming,
+            sportKey,
+            calendarPick.categoryLabel,
+            oddsCfg,
+            dayStart,
+            dryRun,
+          )
+          if (arbResult.published > 0) publishedArbWatch += arbResult.published
+
           const liveResult = await tryPublishLiveGameContent(
             admin,
             bot,
@@ -202,6 +223,10 @@ Deno.serve(async (req) => {
             publishedLineMoves: lineResult.published,
             lineMovementsDetected: lineResult.detected,
             lineSkipped: lineResult.skipped,
+            publishedArbWatch: arbResult.published,
+            arbsDetected: arbResult.detected,
+            arbSkipped: arbResult.skipped,
+            arbBestProfitPct: arbResult.best?.profitPct ?? null,
             publishedLiveEdges: liveResult.publishedLiveEdges,
             publishedPeriodReports: liveResult.publishedPeriodReports,
             liveSkipped: liveResult.skipped,
@@ -290,7 +315,7 @@ Deno.serve(async (req) => {
 
     const publishedMorning = publishedCoffeeCovers + publishedSlates
 
-    if (!dryRun && (publishedEdges > 0 || publishedLineMoves > 0 || publishedLiveEdges > 0
+    if (!dryRun && (publishedEdges > 0 || publishedLineMoves > 0 || publishedArbWatch > 0 || publishedLiveEdges > 0
       || publishedPeriodReports > 0 || publishedMorning > 0)) {
       await admin.from('lounge_bot_accounts').update({
         last_poll_at: new Date().toISOString(),
@@ -313,6 +338,7 @@ Deno.serve(async (req) => {
       sportsChecked: details.length,
       publishedEdges,
       publishedLineMoves,
+      publishedArbWatch,
       publishedLiveEdges,
       publishedPeriodReports,
       publishedCoffeeCovers,

@@ -373,7 +373,8 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
   }
 
   const runOddsPoll = async (action, dryRun = false) => {
-    setBusy(dryRun ? 'poll-dry' : action === 'daily_slates' ? 'slates' : 'poll-all')
+    const busyKey = action === 'daily_slates' ? 'slates' : action === 'best_bet_hour' ? 'best-hour' : 'poll-all'
+    setBusy(dryRun ? 'poll-dry' : busyKey)
     const result = await invokeLoungeOddsPoll(supabaseClient, {
       slug: bot.slug,
       action,
@@ -392,6 +393,25 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       setToast(`Coffee & Covers fires at ${d.scheduledPt || '?'} PT today (random 6-8am window).`)
     } else if (d.skipped === 'outside_morning_window') {
       setToast('Coffee & Covers only runs between 6am and 8am PT.')
+    } else if (action === 'best_bet_hour') {
+      const ev = d.pick?.edgePct != null ? `${Math.round(d.pick.edgePct * 10) / 10}%` : null
+      if (d.skipped === 'already_posted_this_hour') {
+        setToast('Best Bet of the Hour already posted this PT hour.')
+      } else if (d.skipped === 'best_bet_hour_disabled') {
+        setToast('Best Bet of the Hour is disabled in odds config.')
+      } else if (d.skipped === 'no_qualifying_edge') {
+        setToast(
+          dryRun
+            ? `Dry run · no play cleared +${d.minEv ?? 4}% EV (${d.sportsScanned ?? 0} sports scanned)`
+            : `No Best Bet posted · nothing cleared +${d.minEv ?? 4}% EV (${d.sportsScanned ?? 0} sports)`,
+        )
+      } else if (d.published) {
+        setToast(`🔥 Best Bet of the Hour posted${ev ? ` · +${ev} EV` : ''}`)
+      } else if (dryRun && d.captionPreview) {
+        setToast(`Dry run · would post Best Bet${ev ? ` (+${ev} EV)` : ''}: ${d.captionPreview.slice(0, 120)}…`)
+      } else {
+        setToast(d.skipped ? `Best Bet skipped (${d.skipped})` : 'Best Bet hour poll finished.')
+      }
     } else if (action === 'daily_slates') {
       const combined = (d.details || []).find((row) => row?.combinedCoffee)
       const threadParts = combined?.threadPartCount != null
@@ -625,6 +645,14 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                   className="min-h-8 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold disabled:opacity-50"
                 >
                   {busy === 'slates' ? '…' : 'Post Coffee & Covers'}
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(busy) || bot.run_state !== 'running'}
+                  onClick={() => void runOddsPoll('best_bet_hour', false)}
+                  className="min-h-8 rounded-lg bg-rose-900/70 px-3 text-rose-100 text-[11px] font-semibold disabled:opacity-50"
+                >
+                  {busy === 'best-hour' ? '…' : 'Best bet · hour'}
                 </button>
               </>
             ) : null}

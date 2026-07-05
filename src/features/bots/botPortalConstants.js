@@ -46,6 +46,8 @@ export const ODDS_ALERT_AUDIENCE_ROWS = Object.freeze([
   { key: 'line_movement', label: 'Line Movement' },
   { key: 'in_game_edge', label: 'In-Game Edge' },
   { key: 'period_report', label: 'Period / Halftime Report' },
+  { key: 'best_bet_hour', label: 'Best Bet of the Hour' },
+  { key: 'arb_watch', label: 'Arb Watch' },
 ])
 
 export const DEFAULT_ODDS_ALERT_AUDIENCE = Object.freeze({
@@ -54,6 +56,8 @@ export const DEFAULT_ODDS_ALERT_AUDIENCE = Object.freeze({
   line_movement: 'subscribers',
   in_game_edge: 'subscribers',
   period_report: 'subscribers',
+  best_bet_hour: 'subscribers',
+  arb_watch: 'subscribers',
 })
 
 /** @param {string} tone */

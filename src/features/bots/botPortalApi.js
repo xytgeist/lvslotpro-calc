@@ -123,7 +123,7 @@ export async function invokeLoungeOddsIngest(supabaseClient, opts = {}) {
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
- * @param {{ slug?: string, action?: 'poll_edges' | 'daily_slates', dryRun?: boolean, force?: boolean }} [opts]
+ * @param {{ slug?: string, action?: 'poll_edges' | 'daily_slates' | 'best_bet_hour', dryRun?: boolean, force?: boolean }} [opts]
  */
 export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
   const { data, error } = await supabaseClient.functions.invoke('lounge-odds-poll', {
