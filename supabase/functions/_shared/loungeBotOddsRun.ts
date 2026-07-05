@@ -86,8 +86,8 @@ export function ptDayStartIso(): string {
   return new Date(`${y}-${m}-${d}T00:00:00-07:00`).toISOString()
 }
 
-const MORNING_SLATE_START_MIN_PT = 7 * 60
-const MORNING_SLATE_END_MIN_PT = 10 * 60
+const MORNING_SLATE_START_MIN_PT = 6 * 60
+const MORNING_SLATE_END_MIN_PT = 8 * 60
 
 function hashString(input: string): number {
   let h = 0
@@ -110,7 +110,7 @@ export function ptMinutesSinceMidnightPt(now = new Date()): number {
   return hour * 60 + minute
 }
 
-/** Stable random minute between 7:00 and 9:59am PT for this bot + calendar day. */
+/** Stable random minute between 6:00 and 7:59am PT for this bot + calendar day. */
 export function morningSlateScheduledMinutePt(botUserId: string, ptDate = ptTodayDate()): number {
   const span = MORNING_SLATE_END_MIN_PT - MORNING_SLATE_START_MIN_PT
   return MORNING_SLATE_START_MIN_PT + (hashString(`${botUserId}:${ptDate}`) % span)

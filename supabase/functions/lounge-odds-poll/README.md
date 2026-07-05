@@ -11,17 +11,18 @@ Background odds poller for sports bots.
 
 ### Coffee & Covers (morning cron)
 
-`daily_slates` only publishes between **7:00am and 10:00am PT**. Each bot gets a **stable random minute** in that window per day (derived from `bot_user_id` + PT date) so posts do not land at the same time every morning.
+`daily_slates` only publishes between **6:00am and 8:00am PT** (random minute per bot/day). Each bot gets a **stable random minute** in that window per day (derived from `bot_user_id` + PT date) so posts do not land at the same time every morning.
 
 Each post opens with **☕ Coffee & Covers 💵**. If no spread clears **+4%** EV, Scott opens with *"No strong covers today - sitting on hands until we see better value."* Then **- Best ML Spots Right Now -**, **- Biggest Dogs -**, **- 🍺 On Tap Tomorrow -**, and **`Best lines 👇`**. Today's lines live in **thread parts** (one per calendar sport with games).
 
-**Cron (pg_cron):** migration **`20260704230000_lounge_odds_poll_pg_cron.sql`**
+**Cron (pg_cron):** migrations **`20260704230000`** + **`20260704240000`**
 
 | Job | Schedule (PDT / UTC-7) | `action` |
 | --- | --- | --- |
-| `lounge_odds_poll_daily_slates` | Every **5 min**, **7:00-9:59am PT** (`*/5 14-16 * * *`) | `daily_slates` |
-| `lounge_odds_poll_edges_pt_day` | Every **30 min**, **8am-4pm PT** (`0,30 15-23 * * *`) | `poll_edges` |
-| `lounge_odds_poll_edges_pt_evening` | Every **30 min**, **5pm-8pm PT** (`0,30 0-3 * * *`) | `poll_edges` |
+| `lounge_odds_poll_daily_slates` | Every **5 min**, **6:00-7:59am PT** (`*/5 13-14 * * *`) | `daily_slates` |
+| `lounge_odds_poll_edges` | Every **15 min**, **24/7** (`*/15 * * * *`) | `poll_edges` |
+
+**+EV posts:** no time-of-day gate ... only games **on today's PT calendar** that **have not started**. Cron runs 24/7; Edge filters events.
 
 Invokes **each** `odds_api` bot with `run_state = running` via **`invoke_lounge_odds_poll(action)`**.
 
@@ -49,4 +50,4 @@ First morning tick after the bot's scheduled random minute posts **one** combine
 supabase functions deploy lounge-odds-poll --project-ref YOUR_PROJECT_REF
 ```
 
-Requires **`THE_ODDS_API_KEY`**, migrations through **`20260704230000`**, and Vault secrets above.
+Requires **`THE_ODDS_API_KEY`**, migrations through **`20260704240000`**, and Vault secrets above.

@@ -381,9 +381,9 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     if (d.skipped === 'no_calendar_today') {
       setToast('No major events on the betting calendar today.')
     } else if (d.skipped === 'before_scheduled_time') {
-      setToast(`Coffee & Covers fires at ${d.scheduledPt || '?'} PT today (random 7-10am window).`)
+      setToast(`Coffee & Covers fires at ${d.scheduledPt || '?'} PT today (random 6-8am window).`)
     } else if (d.skipped === 'outside_morning_window') {
-      setToast('Coffee & Covers only runs between 7am and 10am PT.')
+      setToast('Coffee & Covers only runs between 6am and 8am PT.')
     } else if (action === 'daily_slates') {
       const combined = (d.details || []).find((row) => row?.combinedCoffee)
       const threadParts = combined?.threadPartCount != null

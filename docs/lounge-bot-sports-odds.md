@@ -75,7 +75,7 @@ Germany -110 (FanDuel), Portugal +105 (DraftKings)
 
 Long posts may still truncate with `+N more games today.` at the **2000-char** caption cap (subscriber/bot tier). **+EV alerts and morning posts** only consider games **kicking off today (PT)** that have not started yet.
 
-**Morning automation:** pg_cron calls **`invoke_lounge_odds_poll('daily_slates')`** every **5 min** between **7-10am PT**; each bot fires once per day at a random minute in that window. Edge scan: **`poll_edges`** every **30 min**, **8am-8pm PT**. Migration **`20260704230000`** + Vault secrets — see **`lounge-odds-poll/README.md`**.
+**Morning automation:** pg_cron **`daily_slates`** every **5 min**, **6-8am PT** (random post minute per bot). **`poll_edges`** every **15 min**, **24/7** ... posts ⚡ when a line clears **`min_edge_pct`** on **today's unplayed** games (no time-of-day gate). Migrations **`20260704230000`** + **`20260704240000`** + Vault — see **`lounge-odds-poll/README.md`**.
 
 **`review_mode`:** `automatic`. Target volume: **~2 posts/day** + optional edge alerts when lines misprice (caps below).
 
@@ -156,7 +156,7 @@ Current fetch: **`h2h` + `spreads`**, region **`us`** → **~2 credits/call**.
 | Usage | Rough monthly credits |
 | --- | --- |
 | 2 manual posts/day | ~120 |
-| 30-min poll, ~4 calendar sports, 12h/day | ~11k |
+| 15-min poll, ~4 calendar sports, 24h/day | ~23k (monitor `x-requests-remaining`) |
 
 **Plan:** Ryan on **$30 / 20k credits**. Monitor `x-requests-remaining` header.
 
@@ -208,6 +208,7 @@ Captions prefix category label from calendar row (e.g. `Wimbledon: ...`).
 | **`20260704210000`** | Bot profile interest tribes on **`admin_lounge_bot_save_settings`** |
 | **`20260704220000`** | Bot portal reply on any visible post (**`admin_lounge_bot_post_comment`**) |
 | **`20260704230000`** | pg_cron **`daily_slates`** + **`poll_edges`** → **`lounge-odds-poll`** (Vault secrets) |
+| **`20260704240000`** | Reschedule: Coffee & Covers **6-8am PT**; **`poll_edges`** every **15 min** **24/7** |
 
 ---
 
