@@ -4,7 +4,7 @@
  * Body: { slug, action: 'publish_examples' } — portal example post pack (no sportKey).
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import { adminOpsCorsHeaders, adminOpsJson, authorizeServiceRoleOrAdmin } from '../_shared/adminAuth.ts'
 import { publishScottExamplePosts } from '../_shared/loungeBotExamplePosts.ts'
 import {
   buildOddsEdgeAlertCaption,
@@ -26,16 +26,7 @@ import {
 } from '../_shared/loungeBotOddsRun.ts'
 
 async function authorize(req: Request): Promise<SupabaseClient> {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim()
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
-  if (!supabaseUrl || !serviceRoleKey) throw adminOpsJson(503, { error: 'Missing env.' })
-
-  const authHeader = req.headers.get('Authorization') || ''
-  if (authHeader.replace(/^Bearer\s+/i, '').trim() === serviceRoleKey) {
-    return createClient(supabaseUrl, serviceRoleKey)
-  }
-  await requireAdminUser(req)
-  return createClient(supabaseUrl, serviceRoleKey)
+  return authorizeServiceRoleOrAdmin(req)
 }
 
 Deno.serve(async (req) => {
@@ -237,9 +228,12 @@ Deno.serve(async (req) => {
       : morningPreview
 
     if (dryRun) {
-      const wouldPost = wantEdge && edgePick && edgePick.edgePct >= minEdge
+      const clearsEdge = Boolean(wantEdge && edgePick && edgePick.edgePct >= minEdge)
+      const wouldPost = clearsEdge
         ? 'edge'
-        : (coffeeCoversEnabled ? 'coffee_covers' : 'slate')
+        : postMode === 'edge_only'
+          ? 'none'
+          : (coffeeCoversEnabled ? 'coffee_covers' : 'slate')
       return adminOpsJson(200, {
         ok: true,
         slug,

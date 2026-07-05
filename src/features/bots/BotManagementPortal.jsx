@@ -322,6 +322,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         dryRun,
         sportKey: selectedSportKey,
         calendarSlug: selectedCalendarSlug,
+        postMode: 'edge_only',
       })
     } else if (bot.pipeline === 'x') {
       result = await invokeLoungeXIngest(supabaseClient, { slug: bot.slug, dryRun })
@@ -346,28 +347,21 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
             : d.skipped === 'already_posted_or_capped'
               ? `${d.categoryLabel || selectedCalendarEntry?.label_short || 'Sport'}: already posted today or cap reached.`
               : d.skipped === 'no_edge_picks'
-                ? `${d.categoryLabel || 'Sport'}: no edge alert (morning post mode).`
+                ? `${d.categoryLabel || 'Sport'}: no ⚡ +EV clears the bar.`
                 : null
       const label = d.categoryLabel || selectedCalendarEntry?.label_short || 'sport'
-      const morningKind = d.wouldPostKind === 'coffee_covers' || d.coffeeCoversEnabled !== false
-        ? 'Coffee & Covers'
-        : 'slate check-in'
       if (dryRun) {
         setToast(
           d.wouldPostKind === 'edge'
             ? `Dry run · would post ⚡ +EV (${label})${d.edgeCandidate?.ev != null ? ` · +${d.edgeCandidate.ev}% EV` : ''}`
-            : d.wouldPostKind === 'coffee_covers'
-              ? `Dry run · would post Coffee & Covers (${label}) · ${d.coverCount ?? 0} covers, ${d.mlCount ?? 0} ML spots · ${d.eventsInWindow ?? 0} games`
-              : `Dry run · would post ${morningKind} (${label}) · ${d.eventsInWindow ?? 0} games`,
+            : d.wouldPostKind === 'none'
+              ? `Dry run · no ⚡ +EV clears the bar (${label}) · ${d.eventsInWindow ?? 0} games`
+              : d.wouldPostKind === 'coffee_covers'
+                ? `Dry run · would post Coffee & Covers (${label}) · ${d.coverCount ?? 0} covers, ${d.mlCount ?? 0} ML spots · ${d.eventsInWindow ?? 0} games`
+                : `Dry run · would post slate check-in (${label}) · ${d.eventsInWindow ?? 0} games`,
         )
       } else if (d.publishedEdge) {
         setToast(`⚡ +EV alert posted · ${label}${d.evPct != null ? ` (+${d.evPct}% EV)` : ''}`)
-      } else if (d.publishedMorning) {
-        setToast(
-          d.postKind === 'coffee_covers'
-            ? `Coffee & Covers posted · ${label}${d.coverCount != null ? ` · ${d.coverCount} cover${d.coverCount === 1 ? '' : 's'}` : ''}`
-            : `Slate check-in posted · ${label}`,
-        )
       } else {
         setToast(skipMsg || `Done · ${label}`)
       }
@@ -404,19 +398,6 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
     const d = result.data || {}
-    if (d.asyncQueued) {
-      const label =
-        action === 'daily_slates'
-          ? 'Coffee & Covers'
-          : action === 'best_bet_hour'
-            ? 'Best Bet of the Hour'
-            : action === 'value_bet_radar'
-              ? 'Value Bet Radar'
-              : 'Edge scan'
-      setToast(`${label} queued… Scott runs in the background. Check the Lounge feed in ~1 min.`)
-      window.setTimeout(() => void onReload(), 45000)
-      return
-    }
     if (d.skipped === 'no_calendar_today') {
       setToast('No major events on the betting calendar today.')
     } else if (d.skipped === 'before_scheduled_time') {
@@ -675,7 +656,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                     ))}
                   </select>
                   <div className="text-zinc-500 text-[10px] mt-1.5">
-                    Fetch odds posts ⚡ +EV if one clears the bar, otherwise Coffee & Covers.{' '}
+                    Fetch odds posts a ⚡ +EV alert for the selected sport when one clears the bar. Coffee & Covers is only via its own button or the 6–8am PT cron.{' '}
                     <span className="font-mono text-zinc-400">{selectedSportKey || '…'}</span>
                   </div>
                 </>

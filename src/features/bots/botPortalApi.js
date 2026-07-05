@@ -159,26 +159,12 @@ export async function invokeLoungeOddsPublishExamples(supabaseClient, opts = {})
  * @param {{ slug?: string, action?: 'poll_edges' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar', dryRun?: boolean, force?: boolean }} [opts]
  */
 export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
-  const dryRun = opts.dryRun === true
   const action = opts.action || 'poll_edges'
-
-  if (!dryRun) {
-    const { data, error } = await supabaseClient.rpc('admin_lounge_bot_queue_odds_poll', {
-      p_slug: opts.slug,
-      p_action: action,
-      p_dry_run: false,
-      p_force: opts.force === true,
-    })
-    if (error) return { data: null, error: new Error(error.message || 'lounge-odds-poll queue failed') }
-    if (data?.error) return { data: null, error: new Error(String(data.error)) }
-    return { data: { ...(data || {}), asyncQueued: true }, error: null }
-  }
-
   const { data, error } = await supabaseClient.functions.invoke('lounge-odds-poll', {
     body: {
       slug: opts.slug,
       action,
-      dryRun: true,
+      dryRun: opts.dryRun === true,
       force: opts.force === true,
     },
   })

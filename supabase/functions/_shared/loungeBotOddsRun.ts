@@ -165,9 +165,9 @@ export function ptMinutesSinceMidnightPt(now = new Date()): number {
   return hour * 60 + minute
 }
 
-/** Stable random minute between 6:00 and 7:59am PT for this bot + calendar day. */
+/** Stable random minute between 6:00 and 7:49am PT (must finish before last pg_cron tick ~7:55am). */
 export function morningSlateScheduledMinutePt(botUserId: string, ptDate = ptTodayDate()): number {
-  const span = MORNING_SLATE_END_MIN_PT - MORNING_SLATE_START_MIN_PT
+  const span = MORNING_SLATE_END_MIN_PT - MORNING_SLATE_START_MIN_PT - 10
   return MORNING_SLATE_START_MIN_PT + (hashString(`${botUserId}:${ptDate}`) % span)
 }
 

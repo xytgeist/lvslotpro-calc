@@ -12,7 +12,7 @@
 
 ```text
 Calendar sport pick (portal)  →  lounge-odds-ingest (manual) or lounge-odds-poll (cron)
-  →  +EV engine (h2h / spreads / totals devig)  →  ⚡ edge alert OR Coffee & Covers morning post  →  feed
+  →  +EV engine (h2h / spreads / totals devig)  →  ⚡ edge alert (Fetch odds) OR Coffee & Covers (morning cron / portal button)  →  feed
 ```
 
 | **Post kind** | When | Example tone |
@@ -98,7 +98,7 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 | Control | Behavior |
 | --- | --- |
 | **Today's major sport** | Dropdown from **`lounge_sports_betting_calendar`** (PT day) |
-| **Fetch odds** | One sport: try edge, else Coffee & Covers (`postMode: auto`) |
+| **Fetch odds** | One sport: ⚡ +EV only (`postMode: edge_only`) — use **Post Coffee & Covers** or morning cron for Coffee |
 | **Scan all · edge** | All calendar sports today → edge alerts only |
 | **Post Coffee & Covers** | One morning post/day (dedupe) with thread parts per sport |
 | **Best bet · hour** | Manual smoke for hourly strongest +EV post (same logic as cron) |
