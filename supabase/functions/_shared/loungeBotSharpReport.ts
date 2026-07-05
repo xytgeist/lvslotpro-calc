@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { resolveAlertSubscriberOnly } from './loungeBotAlertAudience.ts'
-import { sportPopularityRank } from './loungeBotBestBetHour.ts'
+import { compareMovementWithCoverage, coverageRankForSport, type CalendarCoverageInput } from './loungeBotCoverageScope.ts'
 import {
   detectLineMovements,
   loadStoredEventLines,
@@ -30,8 +30,10 @@ export type SharpReportCandidate = {
   sportKey: string
   categoryLabel: string
   snapshotAgeMs: number
-  popularityRank: number
+  coverageRank: number
   movementScore: number
+  /** @deprecated use coverageRank */
+  popularityRank: number
 }
 
 function shortName(name: string): string {
@@ -85,9 +87,7 @@ export function qualifiesForSharpReport(alert: LineMovementAlert): boolean {
 }
 
 export function compareSharpReportCandidates(a: SharpReportCandidate, b: SharpReportCandidate): number {
-  if (b.movementScore !== a.movementScore) return b.movementScore - a.movementScore
-  if (b.popularityRank !== a.popularityRank) return b.popularityRank - a.popularityRank
-  return b.alert.commenceTime.localeCompare(a.alert.commenceTime)
+  return compareMovementWithCoverage(a, b)
 }
 
 export function pickBestSharpReportCandidate(
@@ -178,6 +178,7 @@ export async function findSharpReportCandidateForSport(
   sportKey: string,
   categoryLabel: string,
   cfg: LineMovementConfig,
+  calendarRow?: CalendarCoverageInput | null,
 ): Promise<SharpReportCandidate | null> {
   if (!events.length) return null
 
@@ -195,12 +196,14 @@ export async function findSharpReportCandidateForSport(
   if (!qualifying.length) return null
 
   const bestAlert = qualifying.sort((a, b) => movementScore(b) - movementScore(a))[0]!
+  const coverageRank = coverageRankForSport(sportKey, calendarRow ?? { odds_sport_keys: [sportKey] })
   return {
     alert: bestAlert,
     sportKey,
     categoryLabel,
     snapshotAgeMs,
-    popularityRank: sportPopularityRank(sportKey),
+    coverageRank,
+    popularityRank: coverageRank,
     movementScore: movementScore(bestAlert),
   }
 }

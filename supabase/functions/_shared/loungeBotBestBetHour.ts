@@ -31,40 +31,24 @@ import {
   hasPendingScheduleDedupe,
   submitLoungeBotAlertPost,
 } from './loungeBotPublishSchedule.ts'
+import {
+  compareByCoverageThenEv,
+  coverageRankForSport,
+  type CalendarCoverageInput,
+} from './loungeBotCoverageScope.ts'
 
 const HOURLY_MARKETS: Array<'h2h' | 'spreads' | 'totals'> = ['h2h', 'spreads', 'totals']
 const CAPTION_MAX = 2000
 
-/** Higher = bigger game for tie-breaks (NFL > NBA > MLB, etc.). */
-const SPORT_POPULARITY: Record<string, number> = {
-  americanfootball_nfl: 100,
-  americanfootball_ncaaf: 85,
-  basketball_nba: 90,
-  basketball_wnba: 72,
-  basketball_ncaab: 70,
-  baseball_mlb: 80,
-  icehockey_nhl: 65,
-  americanfootball_cfl: 55,
-  soccer_usa_mls: 50,
-}
-
 export type HourlyBestPick = OddsPick & {
   categoryLabel: string
   calendarPriority: number
+  coverageRank: number
+  /** @deprecated use coverageRank */
   popularityRank: number
 }
 
-export function sportPopularityRank(sportKey: string): number {
-  const sk = String(sportKey || '').trim().toLowerCase()
-  if (SPORT_POPULARITY[sk] != null) return SPORT_POPULARITY[sk]!
-  if (sk.startsWith('americanfootball')) return 75
-  if (sk.startsWith('basketball')) return 60
-  if (sk.startsWith('baseball')) return 55
-  if (sk.startsWith('icehockey')) return 50
-  if (sk.startsWith('soccer')) return 40
-  if (sk.startsWith('tennis')) return 35
-  return 25
-}
+export { coverageRankForSport as sportPopularityRank } from './loungeBotCoverageScope.ts'
 
 /** PT hour bucket for dedupe (YYYY-MM-DDTHH). */
 export function ptHourBucket(now = new Date()): string {
@@ -120,10 +104,7 @@ export function eventsForBestBetHourScan(events: OddsEvent[]): OddsEvent[] {
 }
 
 export function compareHourlyPicks(a: HourlyBestPick, b: HourlyBestPick): number {
-  if (b.edgePct !== a.edgePct) return b.edgePct - a.edgePct
-  if (b.popularityRank !== a.popularityRank) return b.popularityRank - a.popularityRank
-  if (b.calendarPriority !== a.calendarPriority) return b.calendarPriority - a.calendarPriority
-  return b.bookCount - a.bookCount
+  return compareByCoverageThenEv(a, b)
 }
 
 export function findBestBetOfHour(
@@ -132,6 +113,7 @@ export function findBestBetOfHour(
   categoryLabel: string,
   calendarPriority: number,
   minEvPct: number,
+  calendarRow?: CalendarCoverageInput | null,
 ): HourlyBestPick | null {
   const scanEvents = eventsForBestBetHourScan(events)
   if (!scanEvents.length) return null
@@ -145,12 +127,16 @@ export function findBestBetOfHour(
 
   if (!picks.length) return null
 
-  const popularityRank = sportPopularityRank(sportKey)
+  const coverageRank = coverageRankForSport(sportKey, calendarRow ?? {
+    priority: calendarPriority,
+    odds_sport_keys: [sportKey],
+  })
   const hourly: HourlyBestPick[] = picks.map((pick) => ({
     ...pick,
     categoryLabel,
     calendarPriority,
-    popularityRank,
+    coverageRank,
+    popularityRank: coverageRank,
   }))
 
   hourly.sort(compareHourlyPicks)
@@ -283,7 +269,7 @@ export async function runBestBetHourPoll(
       const { events, remaining } = await fetchSportOdds(sportKey, regions, markets)
       requestsRemaining = remaining
       const raw = Array.isArray(events) ? events : []
-      const pick = findBestBetOfHour(raw, sportKey, categoryLabel, calendarPriority, minEv)
+      const pick = findBestBetOfHour(raw, sportKey, categoryLabel, calendarPriority, minEv, row)
       if (pick) candidates.push(pick)
     } catch {
       // Skip sport on fetch failure; continue scan.

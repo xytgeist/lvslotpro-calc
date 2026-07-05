@@ -4,6 +4,19 @@ import {
   saveSportsBettingCalendarRow,
 } from './botPortalApi.js'
 
+const COVERAGE_TIERS = [
+  { id: '', label: 'Auto (from sport key)' },
+  { id: '1', label: 'Tier 1 · Heavy' },
+  { id: '2', label: 'Tier 2 · Medium' },
+  { id: '3', label: 'Tier 3 · Opportunistic' },
+]
+
+const TIER_LABELS = {
+  1: 'T1',
+  2: 'T2',
+  3: 'T3',
+}
+
 const CALENDAR_KINDS = [
   { id: 'season', label: 'Season' },
   { id: 'tournament', label: 'Tournament' },
@@ -28,6 +41,7 @@ function emptyDraft() {
     start_date: '',
     end_date: '',
     priority: 50,
+    coverage_tier: '',
     caption_prefix: '',
     enabled: true,
   }
@@ -45,6 +59,7 @@ function rowToDraft(row) {
     start_date: row?.start_date || '',
     end_date: row?.end_date || '',
     priority: row?.priority ?? 50,
+    coverage_tier: row?.coverage_tier != null ? String(row.coverage_tier) : '',
     caption_prefix: row?.caption_prefix || '',
     enabled: row?.enabled !== false,
   }
@@ -67,6 +82,7 @@ function draftToPayload(draft) {
     caption_prefix: String(draft.caption_prefix || '').trim() || null,
     enabled: draft.enabled !== false,
   }
+  if (draft.coverage_tier) payload.coverage_tier = Number(draft.coverage_tier)
   if (draft.id) payload.id = draft.id
   return payload
 }
@@ -203,6 +219,18 @@ function CalendarEditorModal({ open, draft, setDraft, onClose, onSave, busy }) {
               onChange={(e) => setDraft((d) => ({ ...d, priority: Number(e.target.value) }))}
               className="mt-1 w-full rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2 text-white text-sm tabular-nums focus:border-cyan-500/50 focus:outline-none"
             />
+          </label>
+          <label className="block">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Coverage tier</div>
+            <select
+              value={draft.coverage_tier}
+              onChange={(e) => setDraft((d) => ({ ...d, coverage_tier: e.target.value }))}
+              className="mt-1 w-full rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none"
+            >
+              {COVERAGE_TIERS.map((t) => (
+                <option key={t.id || 'auto'} value={t.id}>{t.label}</option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Caption prefix</div>
@@ -459,6 +487,11 @@ export default function BotSportsCalendarPanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-white text-sm font-semibold">{row.label_short}</span>
+                      {row.coverage_tier ? (
+                        <span className="text-cyan-300/90 text-[9px] font-bold uppercase tracking-wide">
+                          {TIER_LABELS[row.coverage_tier] || `T${row.coverage_tier}`}
+                        </span>
+                      ) : null}
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ring-1 ${STATUS_STYLES[filter === 'on_date' ? statusOnDate : row.status] || STATUS_STYLES.past}`}>
                         {filter === 'on_date' && onSlate
                           ? queryIsToday ? 'Today' : 'On date'

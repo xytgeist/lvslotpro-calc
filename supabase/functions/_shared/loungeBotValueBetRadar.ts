@@ -3,7 +3,12 @@
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { resolveAlertSubscriberOnly } from './loungeBotAlertAudience.ts'
-import { eventsForBestBetHourScan, sportPopularityRank } from './loungeBotBestBetHour.ts'
+import { eventsForBestBetHourScan } from './loungeBotBestBetHour.ts'
+import {
+  compareByCoverageThenEv,
+  coverageRankForSport,
+  type CalendarCoverageInput,
+} from './loungeBotCoverageScope.ts'
 import {
   DEFAULT_MAX_EV_PCT,
   DEFAULT_MIN_BOOKS,
@@ -38,6 +43,9 @@ const PEAK_END_MIN_PT = 22 * 60
 
 export type RadarPick = OddsPick & {
   categoryLabel: string
+  coverageRank: number
+  calendarPriority: number
+  /** @deprecated use coverageRank */
   popularityRank: number
 }
 
@@ -90,6 +98,7 @@ export function collectRadarPicksFromEvents(
   sportKey: string,
   categoryLabel: string,
   minEvPct: number,
+  calendarRow?: CalendarCoverageInput | null,
 ): RadarPick[] {
   const scanEvents = eventsForBestBetHourScan(events)
   if (!scanEvents.length) return []
@@ -101,11 +110,17 @@ export function collectRadarPicksFromEvents(
     marketKeys: RADAR_MARKETS,
   })
 
-  const popularityRank = sportPopularityRank(sportKey)
+  const calendarPriority = Number(calendarRow?.priority) || 50
+  const coverageRank = coverageRankForSport(sportKey, calendarRow ?? {
+    priority: calendarPriority,
+    odds_sport_keys: [sportKey],
+  })
   return picks.map((pick) => ({
     ...pick,
     categoryLabel,
-    popularityRank,
+    calendarPriority,
+    coverageRank,
+    popularityRank: coverageRank,
   }))
 }
 
@@ -116,11 +131,7 @@ export function selectValueBetRadarPicks(
 ): RadarPick[] {
   const minPicks = opts?.minPicks ?? MIN_RADAR_PICKS
   const maxPicks = opts?.maxPicks ?? MAX_RADAR_PICKS
-  const sorted = [...candidates].sort((a, b) => {
-    if (b.edgePct !== a.edgePct) return b.edgePct - a.edgePct
-    if (b.popularityRank !== a.popularityRank) return b.popularityRank - a.popularityRank
-    return b.bookCount - a.bookCount
-  })
+  const sorted = [...candidates].sort((a, b) => compareByCoverageThenEv(a, b))
 
   const picked: RadarPick[] = []
   const usedEvents = new Set<string>()
@@ -300,7 +311,7 @@ export async function runValueBetRadarPoll(
       const { events, remaining } = await fetchSportOdds(sportKey, regions, markets)
       requestsRemaining = remaining
       const raw = Array.isArray(events) ? events : []
-      allCandidates.push(...collectRadarPicksFromEvents(raw, sportKey, categoryLabel, minEv))
+      allCandidates.push(...collectRadarPicksFromEvents(raw, sportKey, categoryLabel, minEv, row))
     } catch {
       // Skip sport on fetch failure.
     }

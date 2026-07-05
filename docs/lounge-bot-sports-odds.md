@@ -373,7 +373,30 @@ RPC **`admin_lounge_sports_betting_calendar_today()`** → portal dropdown.
 
 Captions prefix category label from calendar row (e.g. `Wimbledon: ...`).
 
-**Portal calendar editor:** Scott bot **`/?tab=bots`** → **View calendar** → list all rows, filter **Active today** / **Upcoming**, **Add event** / **Edit** (migration **`20260704320000`**).
+**Portal calendar editor:** Scott bot **`/?tab=bots`** → **View calendar** → date picker, **Add event** / **Edit** (migration **`20260704320000`**). Rows include optional **`coverage_tier`** (migration **`20260704330000`**).
+
+---
+
+## Scott coverage scope (priority tiers)
+
+Canonical logic: **`supabase/functions/_shared/loungeBotCoverageScope.ts`**.
+
+| Tier | Cover | Examples |
+| --- | --- | --- |
+| **1 · Heavy** | Always prioritize | NFL, NBA, MLB, NCAAF, NHL, Premier League / top European soccer, World Cup |
+| **2 · Medium** | Regular rotation | Grand Slam tennis, PGA majors, UFC/MMA, WNBA, NCAA basketball (incl. March Madness) |
+| **3 · Opportunistic** | When signal is strong | Olympics, F1, boxing, esports |
+
+**Rules (Edge + portal):**
+
+- **`poll_edges`** scans calendar rows sorted by coverage rank (tier + priority + tournament/marquee boost).
+- **Best Bet of the Hour**, **Value Bet Radar**, and **Sharp Report** compare candidates by **coverage rank first**.
+- A lower tier wins only on **exceptional +EV** (default **+2%** gap vs the other pick) or **exceptional line movement** (movement score gap **≥ 15**).
+- Big events: set **`kind`** = `tournament` or `marquee` and raise **`priority`** (e.g. World Cup **100**, UFC 329 **95**) for a temporary boost on active dates.
+
+**Calendar seed (`20260704330000`):** adds Premier League, top Euro soccer, NCAA basketball season, **UFC 329 (Jul 11)**, four men's golf majors, boxing marquee. Placeholder rows for Winter Olympics / F1 / esports ship **disabled** until Odds API keys are confirmed.
+
+**Golf note:** major keys are **outright winner** markets (`golf_masters_tournament_winner`, etc.) ... Scott's +EV engine today targets **h2h / spreads / totals** game markets. Calendar rows prime captions and future outright support; live scans skip inactive API keys.
 
 ---
 
@@ -403,6 +426,7 @@ Captions prefix category label from calendar row (e.g. `Wimbledon: ...`).
 | **`20260704300000`** | **Value Bet Radar** (`value_bet_radar` — 2–3 top +EV plays, ~30 min peak cron) |
 | **`20260704310000`** | **Human-paced publish queue** (`lounge_bot_scheduled_posts`, minute drain cron) |
 | **`20260704320000`** | **Sports calendar portal** (list + save RPCs, Scott bot calendar UI) |
+| **`20260704330000`** | **Scott coverage tiers** (`coverage_tier` on calendar, expanded 2026 seed incl. UFC 329) |
 
 ---
 

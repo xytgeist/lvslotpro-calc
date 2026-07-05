@@ -41,6 +41,7 @@ import {
   hasPendingScheduleDedupe,
   submitLoungeBotAlertPost,
 } from './loungeBotPublishSchedule.ts'
+import { sortCalendarRowsByCoverage } from './loungeBotCoverageScope.ts'
 
 const ODDS_BASE = 'https://api.the-odds-api.com/v4'
 
@@ -50,6 +51,8 @@ export type CalendarRow = {
   caption_prefix: string | null
   odds_sport_keys: string[]
   priority?: number
+  coverage_tier?: number | null
+  kind?: string | null
 }
 
 export type OddsBotRow = {
@@ -217,14 +220,13 @@ export async function loadTodayCalendarRows(admin: SupabaseClient): Promise<Cale
   const today = ptTodayDate()
   const { data, error } = await admin
     .from('lounge_sports_betting_calendar')
-    .select('slug, label_short, caption_prefix, odds_sport_keys, priority')
+    .select('slug, label_short, caption_prefix, odds_sport_keys, priority, coverage_tier, kind')
     .eq('enabled', true)
     .lte('start_date', today)
     .gte('end_date', today)
-    .order('priority', { ascending: false })
 
   if (error) throw new Error(error.message)
-  return (data || []) as CalendarRow[]
+  return sortCalendarRowsByCoverage((data || []) as CalendarRow[])
 }
 
 export function resolveCalendarSelection(

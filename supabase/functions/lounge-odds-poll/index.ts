@@ -206,6 +206,7 @@ Deno.serve(async (req) => {
             sportKey,
             calendarPick.categoryLabel,
             lineMovementCfg,
+            row,
           )
           if (sharpCandidate) sharpReportCandidates.push(sharpCandidate)
 

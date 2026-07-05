@@ -776,6 +776,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-04: **Scott coverage scope:** migration **`20260704330000`** — tier 1/2/3 on **`lounge_sports_betting_calendar`**, expanded seed (Premier League, Euro soccer, UFC 329 Jul 11, golf majors, boxing). Edge **`loungeBotCoverageScope.ts`** drives Best Bet / Value Radar / Sharp Report tie-breaks + poll scan order. Redeploy **`lounge-odds-poll`**; frontend deploy for calendar tier editor.
 - 2026-07-04: **Sports calendar portal UI:** migration **`20260704320000`** — **`admin_lounge_sports_betting_calendar_list`** + **`_save`**; Scott bot **View calendar** / **Add event** / **Edit** in **`/?tab=bots`**. Frontend deploy + apply SQL on test/prod.
 - 2026-07-04: **Human-paced Scott publishing:** migration **`20260704310000`** — odds alerts queue to **`lounge_bot_scheduled_posts`** with randomized delay (**`min_post_gap_minutes`** default **8**); minute cron drains via **`lounge-bot-publish-due`**. Redeploy **`lounge-odds-poll`** + **`lounge-bot-publish-due`**.
 - 2026-07-04: **Value Bet Radar:** migration **`20260704300000`** — cron **`value_bet_radar`** every ~30 min (8am–10pm PT) posts 2–3 strongest +EV plays (ML/spreads/totals, min **3.5%** EV, sport variety). Portal: **Value radar** button + **All | Subs** row (default **All**). Redeploy **`lounge-odds-poll`**; apply SQL on test/prod.
