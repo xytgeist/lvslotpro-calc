@@ -38,6 +38,7 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       '- Best ML Spots Right Now -',
       '• World Cup - France vs Paraguay (Sat 2PM PT)',
       'France ML +718 @ MyBookie (+9.6% EV)',
+      'France missing key midfielder due to suspension.',
       '• World Cup - Morocco vs Canada (Sat 10AM PT)',
       'Canada ML +490 @ BetUS (+3.1% EV)',
       '',
@@ -88,7 +89,7 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       'Padres ML +219 @ lowvig',
       '+7.8% EV',
       '',
-      'Market consensus implies ~42% chance Padres win, but they are available at +219. This is currently the sharpest edge on the board.',
+      'Dylan Cease confirmed starting for Padres.',
     ].join('\n'),
   },
   {
@@ -97,7 +98,7 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
     caption: [
       '📡 Value Bet Radar',
       '',
-      '• Padres ML +219 @ lowvig (+7.8% EV) · MLB · Sat 7:11 PM PT',
+      '• Padres ML +219 @ lowvig (+7.8% EV) · MLB · Sat 7:11 PM PT – Dylan Cease starting',
       '• Canada ML +490 @ BetUS (+3.1% EV) · World Cup · Sat 10AM PT',
       '• Giron ML +900 @ DraftKings (+4.2% EV) · Wimbledon · Sat 6:30 AM PT',
     ].join('\n'),
@@ -126,7 +127,7 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       '',
       'Chiefs -4 moved from -3 to -4 at multiple sharp books.',
       '',
-      'Sharp money appears to be coming in on Kansas City as the number shortens across books. Line has steamed over the last ~15 minutes.',
+      'Rashee Rice listed as OUT. Sharp money coming in on KC as the line shortens.',
       '',
       'NFL',
       'Chiefs vs Raiders · Sun 1:25 PM PT',
@@ -188,6 +189,8 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       '',
       'Lakers -4.5 (+105) @ DraftKings',
       '+5.2% EV on the spread',
+      '',
+      'LeBron James playing through ankle concern.',
     ].join('\n'),
   },
   {

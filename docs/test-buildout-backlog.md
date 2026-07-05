@@ -62,6 +62,7 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
   - [ ] Apply migrations **`20260704120000`** through **`20260704230000`** on **`kcosfvmreeiosdjdzycb`** (skip any already applied)
   - [ ] Deploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**; frontend deploy for portal
   - [ ] **`THE_ODDS_API_KEY`** on test Edge
+  - [ ] **`THERUNDOWN_API_KEY`** on test Edge (optional Scott context: pitchers, status, headlines)
   - [ ] Portal → Scott Share (`@sharpesignal`): **Min +EV %** = **2** if row still **4** → Save settings
   - [ ] **Dry run** today's calendar sport → `wouldPostKind` edge or `coffee_covers`
   - [ ] **Fetch odds** → ⚡ +EV or Coffee & Covers post on Lounge
@@ -776,6 +777,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-04: **Scott TheRundown context layer:** **`loungeBotRundownContext.ts`** — optional **`THERUNDOWN_API_KEY`** enriches Best Bet, Sharp Report, Coffee/Dog, Value Radar (inline starter), line-move, live edge, period reports with verified MLB pitchers, roster status, headlines, live foul trouble. Fetch at publish only; no key = unchanged captions. Redeploy **`lounge-odds-poll`** + **`lounge-odds-ingest`**.
 - 2026-07-04: **Scott line-movement consolidation + caption scaffold:** minor **`line_movement`** no longer posts to feed (still feeds Sharp Report); published kinds **`sharp_move`** / **`steam`** / **`rlm`** with distinct copy (**Sharp Money Move** vs **Steam Coming In**). Shared sport · matchup · time block across alert types; Value Radar bullets include sport + kickoff. Example pack **12** posts (removed standalone Line Movement). Redeploy **`lounge-odds-poll`** + **`lounge-odds-ingest`**.
 - 2026-07-04: **Scott caption format polish:** standardized line-movement layout (header → matchup → move → Books → why → timestamp), Value Radar bullet list, live edge period labels + compact scores, halftime score in header + "2nd half" picks line, +EV edge one-liner with fair odds. Example pack + **`lounge-bot-sports-odds.md`** examples updated. Redeploy **`lounge-odds-poll`** + **`lounge-odds-ingest`**.
 - 2026-07-04: **Scott example post pack:** portal **Post all examples** button → **`lounge-odds-ingest`** `action: publish_examples` publishes **12** 🧪 Example captions (all alert types + Coffee thread part). Redeploy **`lounge-odds-ingest`** + frontend.

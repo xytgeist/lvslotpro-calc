@@ -32,6 +32,7 @@ import {
   hasPendingScheduleDedupe,
   submitLoungeBotAlertPost,
 } from './loungeBotPublishSchedule.ts'
+import { fetchRundownContextNote, lineMovementMovedTeam } from './loungeBotRundownContext.ts'
 
 const RADAR_MARKETS: Array<'h2h' | 'spreads' | 'totals'> = ['h2h', 'spreads', 'totals']
 const CAPTION_MAX = 2000
@@ -154,7 +155,7 @@ export function selectValueBetRadarPicks(
   return picked.slice(0, maxPicks)
 }
 
-function formatRadarPickLine(pick: RadarPick): string {
+function formatRadarPickLine(pick: RadarPick, inlineNote?: string): string {
   const ev = Math.round(pick.edgePct * 10) / 10
   const ctx = formatScottPickContextSuffix({
     awayTeam: pick.awayTeam,
@@ -162,14 +163,19 @@ function formatRadarPickLine(pick: RadarPick): string {
     commenceTime: pick.commenceTime,
     categoryLabel: pick.categoryLabel,
   })
-  return `• ${formatOddsPickLine(pick)} @ ${pick.bookTitle} (+${ev}% EV)${ctx}`
+  const note = inlineNote?.trim()
+  const suffix = note ? ` – ${note}` : ''
+  return `• ${formatOddsPickLine(pick)} @ ${pick.bookTitle} (+${ev}% EV)${ctx}${suffix}`
 }
 
-export function buildValueBetRadarCaption(picks: RadarPick[]): string {
+export function buildValueBetRadarCaption(
+  picks: RadarPick[],
+  inlineNotes?: Map<string, string>,
+): string {
   return joinCaptionLines([
     '📡 Value Bet Radar',
     '',
-    ...picks.map(formatRadarPickLine),
+    ...picks.map((pick) => formatRadarPickLine(pick, inlineNotes?.get(radarEventKey(pick)))),
   ])
 }
 
@@ -300,7 +306,21 @@ export async function runValueBetRadarPoll(
     }
   }
 
-  const caption = buildValueBetRadarCaption(selected)
+  const inlineNotes = new Map<string, string>()
+  for (const pick of selected) {
+    const key = radarEventKey(pick)
+    if (inlineNotes.has(key)) continue
+    const note = await fetchRundownContextNote('value_bet_radar', {
+      sportKey: pick.sportKey,
+      homeTeam: pick.homeTeam,
+      awayTeam: pick.awayTeam,
+      commenceTime: pick.commenceTime,
+      pickTeamName: pick.pickName,
+    })
+    if (note) inlineNotes.set(key, note)
+  }
+
+  const caption = buildValueBetRadarCaption(selected, inlineNotes)
   const pickMeta = selected.map((p) => ({
     edgePct: p.edgePct,
     sportKey: p.sportKey,

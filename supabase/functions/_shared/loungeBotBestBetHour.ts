@@ -37,6 +37,7 @@ import {
   type CalendarCoverageInput,
 } from './loungeBotCoverageScope.ts'
 import { effectiveMinEvPct } from './loungeBotSportAnalysis.ts'
+import { fetchRundownContextNote } from './loungeBotRundownContext.ts'
 
 const HOURLY_MARKETS: Array<'h2h' | 'spreads' | 'totals'> = ['h2h', 'spreads', 'totals']
 const CAPTION_MAX = 2000
@@ -171,10 +172,11 @@ function buildBestBetHourReason(pick: HourlyBestPick): string {
 
 export function buildBestBetHourCaption(
   pick: HourlyBestPick,
-  _opts?: { displayName?: string },
+  opts?: { displayName?: string; contextNote?: string },
 ): string {
   const pickLine = formatOddsPickLine(pick)
   const ev = Math.round(pick.edgePct * 10) / 10
+  const footer = opts?.contextNote?.trim() || buildBestBetHourReason(pick)
 
   return joinCaptionLines([
     '🔥 Best Bet of the Hour',
@@ -189,7 +191,7 @@ export function buildBestBetHourCaption(
     `${pickLine} @ ${pick.bookTitle}`,
     `+${ev}% EV`,
     '',
-    buildBestBetHourReason(pick),
+    footer,
   ])
 }
 
@@ -298,7 +300,17 @@ export async function runBestBetHourPoll(
     }
   }
 
-  const caption = buildBestBetHourCaption(best, { displayName: bot.display_name || 'Scott Sharpe' })
+  const contextNote = await fetchRundownContextNote('best_bet_hour', {
+    sportKey: best.sportKey,
+    homeTeam: best.homeTeam,
+    awayTeam: best.awayTeam,
+    commenceTime: best.commenceTime,
+    pickTeamName: best.pickName,
+  })
+  const caption = buildBestBetHourCaption(best, {
+    displayName: bot.display_name || 'Scott Sharpe',
+    contextNote: contextNote || undefined,
+  })
 
   if (dryRun) {
     return {

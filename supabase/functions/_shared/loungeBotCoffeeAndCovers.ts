@@ -16,6 +16,10 @@ import {
   type OddsPick,
 } from './loungeBotOddsCaption.ts'
 import { effectiveMinEvPct } from './loungeBotSportAnalysis.ts'
+import {
+  fetchRundownContextNotesForPicks,
+  rundownEventKey,
+} from './loungeBotRundownContext.ts'
 
 /** Min +EV % on $1 for ML spots in the morning post. */
 export const COFFEE_ML_EV_THRESHOLD_PCT = 3
@@ -257,7 +261,11 @@ function formatMatchupTeams(awayTeam: string, homeTeam: string): string {
   return `${shortDisplayName(awayTeam)} vs ${shortDisplayName(homeTeam)}`
 }
 
-function formatCoverBulletLines(pick: SpreadPick, categoryLabel: string): string[] {
+function formatCoverBulletLines(
+  pick: SpreadPick,
+  categoryLabel: string,
+  contextNote?: string,
+): string[] {
   const when = formatOddsCommenceTimeShort(pick.commenceTime)
   const team = formatPickNameLabel(pick.pickName)
   const spread = formatSpreadPoint(pick.pickPoint)
@@ -266,13 +274,19 @@ function formatCoverBulletLines(pick: SpreadPick, categoryLabel: string): string
   const head = label
     ? `• ${label} - ${formatMatchupTeams(pick.awayTeam, pick.homeTeam)} (${when})`
     : `• ${formatMatchupTeams(pick.awayTeam, pick.homeTeam)} (${when})`
-  return [
+  const lines = [
     head,
     `${team} ${spread} (${juice}) @ ${pick.bookTitle} ${formatEvSuffix(pick.edgePct)}`,
   ]
+  if (contextNote?.trim()) lines.push(contextNote.trim())
+  return lines
 }
 
-function formatMlSpotBulletLines(pick: OddsPick, categoryLabel: string): string[] {
+function formatMlSpotBulletLines(
+  pick: OddsPick,
+  categoryLabel: string,
+  contextNote?: string,
+): string[] {
   const when = formatOddsCommenceTimeShort(pick.commenceTime)
   const team = formatPickNameLabel(pick.pickName)
   const odds = formatAmericanOdds(pick.pickPrice)
@@ -280,10 +294,12 @@ function formatMlSpotBulletLines(pick: OddsPick, categoryLabel: string): string[
   const head = label
     ? `• ${label} - ${formatMatchupTeams(pick.awayTeam, pick.homeTeam)} (${when})`
     : `• ${formatMatchupTeams(pick.awayTeam, pick.homeTeam)} (${when})`
-  return [
+  const lines = [
     head,
     `${team} ML ${odds} @ ${pick.bookTitle} ${formatEvSuffix(pick.edgePct)}`,
   ]
+  if (contextNote?.trim()) lines.push(contextNote.trim())
+  return lines
 }
 
 /** Min +EV to qualify as Dog of the Day (underdog ML or spread). */
@@ -313,7 +329,7 @@ function buildDogOfTheDayReason(dog: DogOfTheDay): string {
     : `Top moneyline underdog +EV on the slate.`
 }
 
-function formatDogOfTheDayLines(dog: DogOfTheDay): string[] {
+function formatDogOfTheDayLines(dog: DogOfTheDay, contextNote?: string): string[] {
   const when = formatOddsCommenceTimeShort(dog.commenceTime)
   const pickLabel = formatPickNameLabel(dog.pickName)
   const odds = formatAmericanOdds(dog.pickPrice)
@@ -322,7 +338,9 @@ function formatDogOfTheDayLines(dog: DogOfTheDay): string[] {
   const pickLine = dog.kind === 'spread' && dog.linePoint != null
     ? `${pickLabel} ${formatSpreadPoint(dog.linePoint)} (${odds}) @ ${dog.bookTitle} ${ev}`
     : `${pickLabel} ML ${odds} @ ${dog.bookTitle} ${ev}`
-  return [head, pickLine, buildDogOfTheDayReason(dog)]
+  const lines = [head, pickLine, buildDogOfTheDayReason(dog)]
+  if (contextNote?.trim()) lines.push(contextNote.trim())
+  return lines
 }
 
 /**
@@ -550,6 +568,7 @@ function buildMainCaption(
   dogOfTheDay: DogOfTheDay | null,
   onTapPicks: OnTapPick[],
   sportLabelByPick?: (pick: SpreadPick | OddsPick) => string | undefined,
+  contextByEventKey?: Map<string, string>,
 ): string {
   const lines: string[] = [COFFEE_COVERS_HEADER, '']
 
@@ -557,7 +576,8 @@ function buildMainCaption(
   if (coverSorted.length) {
     for (const pick of coverSorted) {
       const label = sportLabelByPick?.(pick) ?? ''
-      lines.push(...formatCoverBulletLines(pick, label))
+      const note = contextByEventKey?.get(rundownEventKey(pick))
+      lines.push(...formatCoverBulletLines(pick, label, note))
     }
   } else {
     lines.push(COFFEE_NO_COVERS_LINE)
@@ -569,7 +589,8 @@ function buildMainCaption(
   if (mlSorted.length) {
     for (const pick of mlSorted) {
       const label = sportLabelByPick?.(pick) ?? ''
-      lines.push(...formatMlSpotBulletLines(pick, label))
+      const note = contextByEventKey?.get(rundownEventKey(pick))
+      lines.push(...formatMlSpotBulletLines(pick, label, note))
     }
   } else {
     lines.push('Nothing clearing the ML bar right now.')
@@ -577,7 +598,13 @@ function buildMainCaption(
 
   lines.push('', COFFEE_DOG_SECTION)
   if (dogOfTheDay) {
-    lines.push(...formatDogOfTheDayLines(dogOfTheDay))
+    const dogKey = rundownEventKey({
+      homeTeam: dogOfTheDay.homeTeam,
+      awayTeam: dogOfTheDay.awayTeam,
+      commenceTime: dogOfTheDay.commenceTime,
+    })
+    const dogNote = contextByEventKey?.get(dogKey)
+    lines.push(...formatDogOfTheDayLines(dogOfTheDay, dogNote))
   } else {
     lines.push('No underdog clearing +EV on today\'s slate.')
   }
@@ -812,6 +839,105 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
     gameCount,
     hasCovers: coverPicks.length > 0,
   }
+}
+
+type CoffeeCaptionLabelFn = (pick: SpreadPick | OddsPick) => string | undefined
+
+function coffeePicksForContext(
+  generated: CoffeeAndCoversResult,
+  sportKeyFallback: string,
+): Array<{
+  sportKey: string
+  homeTeam: string
+  awayTeam: string
+  commenceTime: string
+  pickName: string
+  eventId?: string
+  postKind: 'coffee_covers' | 'dog_of_the_day'
+}> {
+  const out: Array<{
+    sportKey: string
+    homeTeam: string
+    awayTeam: string
+    commenceTime: string
+    pickName: string
+    eventId?: string
+    postKind: 'coffee_covers' | 'dog_of_the_day'
+  }> = []
+
+  const topCover = [...generated.coverPicks].sort((a, b) => b.edgePct - a.edgePct)[0]
+  if (topCover) {
+    out.push({
+      sportKey: topCover.sportKey,
+      homeTeam: topCover.homeTeam,
+      awayTeam: topCover.awayTeam,
+      commenceTime: topCover.commenceTime,
+      pickName: topCover.pickName,
+      eventId: topCover.eventId,
+      postKind: 'coffee_covers',
+    })
+  }
+
+  const topMl = [...generated.mlPicks].sort((a, b) => b.edgePct - a.edgePct)[0]
+  if (topMl) {
+    out.push({
+      sportKey: topMl.sportKey,
+      homeTeam: topMl.homeTeam,
+      awayTeam: topMl.awayTeam,
+      commenceTime: topMl.commenceTime,
+      pickName: topMl.pickName,
+      eventId: topMl.eventId,
+      postKind: 'coffee_covers',
+    })
+  }
+
+  if (generated.dogOfTheDay) {
+    const dog = generated.dogOfTheDay
+    const dogSportKey = generated.coverPicks.find((p) =>
+      p.homeTeam === dog.homeTeam && p.awayTeam === dog.awayTeam
+    )?.sportKey
+      ?? generated.mlPicks.find((p) => p.homeTeam === dog.homeTeam && p.awayTeam === dog.awayTeam)?.sportKey
+      ?? sportKeyFallback
+    out.push({
+      sportKey: dogSportKey,
+      homeTeam: dog.homeTeam,
+      awayTeam: dog.awayTeam,
+      commenceTime: dog.commenceTime,
+      pickName: dog.pickName,
+      postKind: 'dog_of_the_day',
+    })
+  }
+
+  return out
+}
+
+/** Rebuild Coffee caption with verified Rundown context notes when available. */
+export async function enrichCoffeeAndCoversCaption(
+  generated: CoffeeAndCoversResult,
+  sportLabelByPick: CoffeeCaptionLabelFn | undefined,
+  sportKeyFallback: string,
+): Promise<string> {
+  const contextByEventKey = new Map<string, string>()
+  const picks = coffeePicksForContext(generated, sportKeyFallback)
+
+  for (const pick of picks) {
+    const key = rundownEventKey(pick)
+    if (contextByEventKey.has(key)) continue
+    const notes = await fetchRundownContextNotesForPicks(pick.postKind, [pick], 1)
+    const note = notes.get(key)
+    if (note) contextByEventKey.set(key, note)
+  }
+
+  if (!contextByEventKey.size) return generated.caption
+
+  return buildMainCaption(
+    generated.coverPicks,
+    generated.mlPicks,
+    generated.dogOfTheDay,
+    generated.onTapPicks,
+    sportLabelByPick,
+    contextByEventKey,
+  )
 }
 
 /** One Coffee & Covers post per bot per PT day (all sports in thread). */

@@ -20,6 +20,7 @@ import {
   hasPendingScheduleDedupe,
   submitLoungeBotAlertPost,
 } from './loungeBotPublishSchedule.ts'
+import { fetchRundownContextNote } from './loungeBotRundownContext.ts'
 
 const ODDS_BASE = 'https://api.the-odds-api.com/v4'
 const LIVE_MARKETS: Array<'h2h' | 'spreads' | 'totals'> = ['h2h', 'spreads', 'totals']
@@ -241,7 +242,7 @@ export function formatLiveClockHint(sportKey: string, commenceIso: string, now =
 
 export function buildInGameEdgeCaption(
   pick: OddsPick,
-  opts: { categoryLabel?: string; scoreLine?: string; periodLabel?: string },
+  opts: { categoryLabel?: string; scoreLine?: string; periodLabel?: string; contextNote?: string },
 ): string {
   const matchup = opts.scoreLine || `${shortName(pick.awayTeam)} vs ${shortName(pick.homeTeam)}`
   const pickLine = formatOddsPickLine(pick)
@@ -251,14 +252,18 @@ export function buildInGameEdgeCaption(
   const sport = String(opts.categoryLabel || '').trim()
   const contextLines = sport ? [sport, matchup] : [matchup]
 
-  return [
+  const lines = [
     header,
     '',
     ...contextLines,
     '',
     `${pickLine} @ ${pick.bookTitle}`,
     `+${ev}% EV on the ${marketLabel(pick.marketKey)}`,
-  ].join('\n').trim()
+  ]
+  if (opts.contextNote?.trim()) {
+    lines.push('', opts.contextNote.trim())
+  }
+  return lines.join('\n').trim()
 }
 
 function periodReportPicksHeading(periodLabel: string): string {
@@ -276,6 +281,7 @@ export function buildPeriodReportCaption(
     categoryLabel?: string
     periodLabel: string
     scoreLine?: string
+    contextNote?: string
   },
 ): string {
   const away = shortName(String(event.away_team || 'Away'))
@@ -296,6 +302,10 @@ export function buildPeriodReportCaption(
       const ev = Math.round(pick.edgePct * 10) / 10
       lines.push(`• ${formatOddsPickLine(pick)} @ ${pick.bookTitle} (+${ev}% EV)`)
     }
+  }
+
+  if (opts.contextNote?.trim()) {
+    lines.push('', opts.contextNote.trim())
   }
 
   return lines.join('\n').trim()
@@ -467,7 +477,22 @@ export async function tryPublishLiveGameContent(
       const scoreRow = scoreById.get(pick.eventId)
       const scoreLine = formatLiveScoreLine(pick.homeTeam, pick.awayTeam, scoreRow?.scores)
       const periodLabel = formatLivePeriodLabel(sportKey, pick.commenceTime)
-      const caption = buildInGameEdgeCaption(pick, { categoryLabel, scoreLine, periodLabel })
+      const contextNote = dryRun
+        ? null
+        : await fetchRundownContextNote('in_game_edge', {
+          sportKey: pick.sportKey,
+          homeTeam: pick.homeTeam,
+          awayTeam: pick.awayTeam,
+          commenceTime: pick.commenceTime,
+          pickTeamName: pick.pickName,
+          live: true,
+        })
+      const caption = buildInGameEdgeCaption(pick, {
+        categoryLabel,
+        scoreLine,
+        periodLabel,
+        contextNote: contextNote || undefined,
+      })
 
       if (dryRun) {
         if (!topLivePick) topLivePick = pick
@@ -525,10 +550,21 @@ export async function tryPublishLiveGameContent(
       const scoreLine = formatLiveScoreLine(home, away, scoreRow?.scores)
 
       const eventPicks = livePicks.filter((p) => p.eventId === eventId)
+      const contextNote = dryRun
+        ? null
+        : await fetchRundownContextNote('period_report', {
+          sportKey,
+          homeTeam: home,
+          awayTeam: away,
+          commenceTime: commence,
+          pickTeamName: eventPicks[0]?.pickName,
+          live: true,
+        })
       const caption = buildPeriodReportCaption(ev, eventPicks, {
         categoryLabel,
         periodLabel: milestone.label,
         scoreLine,
+        contextNote: contextNote || undefined,
       })
 
       const dedupeKey = periodReportDedupeKey(sportKey, eventId, milestone.key, ptDay)

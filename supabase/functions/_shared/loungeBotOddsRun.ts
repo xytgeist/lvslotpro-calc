@@ -20,6 +20,7 @@ import {
 import { effectiveMinEvPct } from './loungeBotSportAnalysis.ts'
 import {
   coffeeDailyDedupeKey,
+  enrichCoffeeAndCoversCaption,
   generateCoffeeAndCovers,
   generateCombinedCoffeeAndCovers,
   type CoffeeAndCoversOptions,
@@ -36,6 +37,7 @@ import {
   upsertEventLines,
   type LineMovementAlert,
 } from './loungeBotLineMovement.ts'
+import { fetchRundownContextNote, lineMovementMovedTeam } from './loungeBotRundownContext.ts'
 import { resolveAlertSubscriberOnly } from './loungeBotAlertAudience.ts'
 import { publishLoungeBotPost, publishLoungeBotPostWithThread } from './loungeBotPublish.ts'
 import {
@@ -493,11 +495,17 @@ export async function tryPublishCoffeeAndCovers(
     }
   }
 
+  const caption = await enrichCoffeeAndCoversCaption(
+    generated,
+    () => ctx.categoryLabel,
+    ctx.sportKey,
+  )
+
   const pills = bot.category_pills_default?.length ? bot.category_pills_default : ['sports']
   const subscriberOnly = resolveAlertSubscriberOnly('coffee_covers', alertAudience)
   const result = await publishLoungeBotPostWithThread(admin, {
     botUserId: bot.user_id,
-    caption: generated.caption,
+    caption,
     categoryPills: pills,
     threadParts: generated.threadParts.map((part) => ({ body: part.body })),
     subscriberOnly,
@@ -511,7 +519,7 @@ export async function tryPublishCoffeeAndCovers(
     await admin.from('lounge_bot_publish_log').insert({
       bot_user_id: bot.user_id,
       post_id: result.postId,
-      caption: generated.caption,
+      caption,
       score: topScore,
       status: 'published',
       post_kind: 'coffee_covers',
@@ -529,7 +537,7 @@ export async function tryPublishCoffeeAndCovers(
 
   await admin.from('lounge_bot_publish_log').insert({
     bot_user_id: bot.user_id,
-    caption: generated.caption,
+    caption,
     status: 'failed',
     post_kind: 'coffee_covers',
     dedupe_key: dedupeKey,
@@ -603,11 +611,19 @@ export async function tryPublishCombinedCoffeeAndCovers(
     }
   }
 
+  const sportLabelByPick = (pick: { sportKey: string }) =>
+    inputs.find((row) => row.sportKey === pick.sportKey)?.categoryLabel
+  const caption = await enrichCoffeeAndCoversCaption(
+    generated,
+    sportLabelByPick,
+    inputs[0]?.sportKey || 'baseball_mlb',
+  )
+
   const pills = bot.category_pills_default?.length ? bot.category_pills_default : ['sports']
   const subscriberOnly = resolveAlertSubscriberOnly('coffee_covers', alertAudience)
   const result = await publishLoungeBotPostWithThread(admin, {
     botUserId: bot.user_id,
-    caption: generated.caption,
+    caption,
     categoryPills: pills,
     threadParts: generated.threadParts.map((part) => ({ body: part.body })),
     subscriberOnly,
@@ -621,7 +637,7 @@ export async function tryPublishCombinedCoffeeAndCovers(
     await admin.from('lounge_bot_publish_log').insert({
       bot_user_id: bot.user_id,
       post_id: result.postId,
-      caption: generated.caption,
+      caption,
       score: topScore,
       status: 'published',
       post_kind: 'coffee_covers',
@@ -641,7 +657,7 @@ export async function tryPublishCombinedCoffeeAndCovers(
 
   await admin.from('lounge_bot_publish_log').insert({
     bot_user_id: bot.user_id,
-    caption: generated.caption,
+    caption,
     status: 'failed',
     post_kind: 'coffee_covers',
     dedupe_key: dedupeKey,
@@ -786,7 +802,18 @@ export async function tryPublishLineMovementAlerts(
     if (await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) continue
     if (await hasPendingScheduleDedupe(admin, bot.user_id, dedupeKey)) continue
 
-    const caption = buildLineMovementCaption(alert, { categoryLabel: ctx.categoryLabel })
+    const movedTeam = lineMovementMovedTeam(alert)
+    const contextNote = await fetchRundownContextNote(alert.kind, {
+      sportKey: alert.sportKey,
+      homeTeam: alert.homeTeam,
+      awayTeam: alert.awayTeam,
+      commenceTime: alert.commenceTime,
+      movedTeamName: movedTeam,
+    })
+    const caption = buildLineMovementCaption(alert, {
+      categoryLabel: ctx.categoryLabel,
+      contextNote: contextNote || undefined,
+    })
     const subscriberOnly = resolveAlertSubscriberOnly(alert.kind, oddsCfg.alert_audience)
     const minGap = Number(oddsCfg.min_post_gap_minutes) || DEFAULT_MIN_POST_GAP_MINUTES
     const result = await submitLoungeBotAlertPost(admin, {

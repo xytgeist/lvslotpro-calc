@@ -1,6 +1,6 @@
 /**
  * Sport-specific analysis profiles for Scott Sharpe (+EV pick ranking, market scan set).
- * Future: enrich captions with SportsDataIO (pitchers, injuries, etc.) — not wired yet.
+ * Future: enrich captions with TheRundown (pitchers, injuries, etc.) — see loungeBotRundownContext.ts
  */
 
 export type SportMarketKey = 'h2h' | 'spreads' | 'totals'

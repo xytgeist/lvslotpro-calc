@@ -332,6 +332,8 @@ supabase functions deploy lounge-odds-poll --project-ref kcosfvmreeiosdjdzycb
 
 **Secret:** **`THE_ODDS_API_KEY`** on Edge only.
 
+**Optional context:** **`THERUNDOWN_API_KEY`** on Edge ... enriches captions with verified MLB pitchers, player status, event headlines, and live foul trouble when data exists. No key → posts unchanged.
+
 ---
 
 ## API credits (The Odds API)
@@ -437,7 +439,7 @@ Canonical logic: **`supabase/functions/_shared/loungeBotSportAnalysis.ts`**.
 - **Best Bet of the Hour**, **Value Bet Radar**, **live in-game edge** ... inherit WNBA bump via `effectiveMinEvPct`
 - **Coffee & Covers** spread covers + Dog of the Day ... WNBA bump on spread thresholds too
 
-**Still deferred until a stats feed (e.g. SportsDataIO):** player props, fight method, starting pitcher / injury narrative in captions. Sharp Report injury copy today is template-only when we lack a feed.
+**Still deferred without verified Rundown (or other) feed data:** player props, fight method narratives. Injury/headline copy is appended **only** when **`THERUNDOWN_API_KEY`** returns a matching status or `event_headline`.
 
 ### Target voice per sport (caption examples)
 
@@ -491,16 +493,37 @@ Use these as editorial north stars; post kinds may differ but tone should match.
 Dog of the Day – Underdog +450 (+6.1% EV)
 ```
 
-### Future: SportsDataIO (or similar)
+### TheRundown context layer
 
-Planned enrichment layer **after** API access:
+Canonical logic: **`supabase/functions/_shared/loungeBotRundownContext.ts`**.
+
+| Post kind | Benefit | Context sources |
+| --- | --- | --- |
+| Best Bet of the Hour | High | MLB starting pitcher; key OUT/status on picked team |
+| Sharp Report Card | High | OUT/status on moved side; `event_headline` |
+| Coffee & Covers / Dog of the Day | High | Pitchers, OUT/status, soccer-style headlines |
+| In-Game Edge / Halftime | High | Live foul trouble; questionable/doubtful status |
+| Value Bet Radar | Medium | Inline MLB starter suffix on bullet |
+| Line Movement / Steam / RLM | Medium | OUT/status or headline when relevant |
+| Arb Watch | Low | Skipped |
+
+**Fetch policy:** resolve Rundown `event_id` once per game (team names + PT date, `offset=420`), cache ~45 min, fetch at **publish** time only (not every odds poll). Never fabricate context.
+
+**Setup:**
+
+```bash
+supabase secrets set THERUNDOWN_API_KEY="your_key" --project-ref kcosfvmreeiosdjdzycb
+```
+
+### Future enrichment
+
+Planned additions **after** more feed coverage:
 
 - MLB starting pitchers + bullpen context in Coffee & Covers / Sharp Report
 - NBA/WNBA injury availability for live edge captions
 - UFC fight method / weight-class metadata for prop expansion
-- Soccer lineups / suspension flags for draw / total reasoning
 
-Until then, Scott stays **odds-consensus + line-movement** only ... no fabricated injury or matchup copy.
+Player props and deep injury narratives may still need a dedicated injuries feed beyond Rundown roster `status`.
 
 ---
 
@@ -592,7 +615,7 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 
 ---
 
-_Updated 2026-07-04: Sport-specific analysis (`loungeBotSportAnalysis.ts`) — market weights, WNBA +0.5% min EV, multi-market edge alerts; SportsDataIO enrichment deferred._
+_Updated 2026-07-04: TheRundown context layer (`loungeBotRundownContext.ts`) for pitchers, status, headlines on publish; optional `THERUNDOWN_API_KEY`._
 
 ---
 

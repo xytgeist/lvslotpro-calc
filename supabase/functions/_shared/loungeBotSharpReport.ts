@@ -19,6 +19,7 @@ import {
   hasPendingScheduleDedupe,
   submitLoungeBotAlertPost,
 } from './loungeBotPublishSchedule.ts'
+import { fetchRundownContextNote } from './loungeBotRundownContext.ts'
 
 const CAPTION_MAX = 2000
 /** Wider than per-tick line alerts (8–22 min) — report uses 10–60 min snapshot age. */
@@ -148,15 +149,19 @@ export function buildSharpReportAnalysis(
   return `${team} odds lengthening over ${lookback} ... market may be offering value on the dog side.`
 }
 
-export function buildSharpReportCaption(candidate: SharpReportCandidate): string {
+export function buildSharpReportCaption(
+  candidate: SharpReportCandidate,
+  opts?: { contextNote?: string },
+): string {
   const { alert, snapshotAgeMs, categoryLabel } = candidate
+  const analysis = opts?.contextNote?.trim() || buildSharpReportAnalysis(alert, snapshotAgeMs)
 
   return joinCaptionLines([
     '📊 Sharp Report Card',
     '',
     buildSharpReportMovementLine(alert),
     '',
-    buildSharpReportAnalysis(alert, snapshotAgeMs),
+    analysis,
     '',
     ...formatScottSportContextLines(alert.awayTeam, alert.homeTeam, alert.commenceTime, categoryLabel),
   ])
@@ -247,7 +252,14 @@ export async function tryPublishSharpReport(
     return { published: false, skipped: 'already_scheduled', candidate: null }
   }
 
-  const caption = buildSharpReportCaption(best)
+  const contextNote = await fetchRundownContextNote('sharp_report', {
+    sportKey: best.sportKey,
+    homeTeam: best.alert.homeTeam,
+    awayTeam: best.alert.awayTeam,
+    commenceTime: best.alert.commenceTime,
+    movedTeamName: best.alert.outcomeName,
+  })
+  const caption = buildSharpReportCaption(best, { contextNote: contextNote || undefined })
   const meta = {
     sportKey: best.sportKey,
     eventId: best.alert.eventId,

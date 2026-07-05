@@ -384,7 +384,7 @@ export function lineMovementDedupeKey(alert: LineMovementAlert, ptDate = ptToday
 
 export function buildLineMovementCaption(
   alert: LineMovementAlert,
-  opts?: { categoryLabel?: string },
+  opts?: { categoryLabel?: string; contextNote?: string },
 ): string {
   const moveLine = formatMarketMoveLabel(
     alert.marketKey,
@@ -406,7 +406,7 @@ export function buildLineMovementCaption(
     opts?.categoryLabel,
   )
 
-  return [
+  const lines = [
     header,
     '',
     ...contextLines,
@@ -415,7 +415,11 @@ export function buildLineMovementCaption(
     `Books: ${books}`,
     '',
     alert.meaning,
-  ].join('\n')
+  ]
+  if (opts?.contextNote?.trim()) {
+    lines.push('', opts.contextNote.trim())
+  }
+  return lines.join('\n')
 }
 
 export async function loadStoredEventLines(
