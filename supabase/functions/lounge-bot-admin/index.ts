@@ -5,6 +5,7 @@
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import { DEFAULT_MARKET_NEWS_SOURCES } from '../_shared/loungeBotMarketNewsDefaults.ts'
 
 type CreateBotBody = {
   action: 'create_bot'
@@ -50,15 +51,11 @@ async function seedPipelineExtras(
   admin: SupabaseClient,
   botUserId: string,
   pipeline: string,
-  slug: string,
   xHandles: string[],
+  config: Record<string, unknown> | null,
 ) {
   if (pipeline === 'market_news') {
-    const sources = [
-      { name: 'Finnhub general market', kind: 'finnhub_general', api_config: { category: 'general' }, poll_interval_sec: 180 },
-      { name: 'Finnhub M&A', kind: 'finnhub_category', api_config: { category: 'merger' }, poll_interval_sec: 300 },
-    ]
-    for (const s of sources) {
+    for (const s of DEFAULT_MARKET_NEWS_SOURCES) {
       const { data: exists } = await admin
         .from('lounge_news_sources')
         .select('id')
@@ -66,8 +63,46 @@ async function seedPipelineExtras(
         .eq('name', s.name)
         .maybeSingle()
       if (!exists?.id) {
-        await admin.from('lounge_news_sources').insert({ bot_user_id: botUserId, ...s, enabled: true })
+        await admin.from('lounge_news_sources').insert({
+          bot_user_id: botUserId,
+          name: s.name,
+          kind: s.kind,
+          poll_url: s.poll_url ?? null,
+          api_config: s.api_config ?? {},
+          poll_interval_sec: s.poll_interval_sec,
+          enabled: true,
+        })
       }
+    }
+
+    const raw = config?.watchlist_tickers
+    const watchlist = Array.isArray(raw)
+      ? raw.map((t) => String(t || '').trim().toUpperCase()).filter(Boolean)
+      : []
+
+    const { data: companySources } = await admin
+      .from('lounge_news_sources')
+      .select('api_config')
+      .eq('bot_user_id', botUserId)
+      .eq('kind', 'finnhub_company')
+
+    const existingSymbols = new Set(
+      (companySources || [])
+        .map((row) => String((row.api_config as Record<string, unknown>)?.symbol || '').trim().toUpperCase())
+        .filter(Boolean),
+    )
+
+    for (const symbol of watchlist) {
+      if (existingSymbols.has(symbol)) continue
+      await admin.from('lounge_news_sources').insert({
+        bot_user_id: botUserId,
+        name: `Finnhub ${symbol}`,
+        kind: 'finnhub_company',
+        api_config: { symbol },
+        poll_interval_sec: 600,
+        enabled: true,
+      })
+      existingSymbols.add(symbol)
     }
   }
   if (pipeline === 'odds_api') {
@@ -171,7 +206,7 @@ Deno.serve(async (req) => {
       return adminOpsJson(500, { error: botErr.message })
     }
 
-    await seedPipelineExtras(admin, userId, pipeline, slug, body.x_handles || [])
+    await seedPipelineExtras(admin, userId, pipeline, body.x_handles || [], body.config || null)
 
     return adminOpsJson(200, {
       ok: true,

@@ -920,7 +920,10 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         {bot.pipeline === 'market_news' ? (
           <label className="block mt-4">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-              Watchlist tickers (comma or space separated)
+              Optional ticker boost (comma or space separated)
+            </div>
+            <div className="text-zinc-600 text-[10px] mt-0.5 mb-1">
+              Market Edge publishes on topic tiers (macro, earnings, geopolitics, commodities, regs, M&A). Tickers here are optional — extra company feeds + small score nudge only.
             </div>
             <textarea
               value={draft.watchlistText}

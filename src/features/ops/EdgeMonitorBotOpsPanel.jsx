@@ -4,8 +4,9 @@ import { formatOpsMonitorCount } from './opsMonitorApi.js'
  * Compact Edge Monitor card linking to full Bot Portal.
  */
 export default function EdgeMonitorBotOpsPanel({ botOps, loading, error, onOpenPortal }) {
-  const wire = botOps?.financial_wire || {}
-  const configured = wire.configured === true
+  const marketNews = botOps?.market_news || botOps?.financial_wire || {}
+  const configured = marketNews.configured === true
+  const monitorLabel = marketNews.display_name || 'Market Edge'
 
   return (
     <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4 lg:p-5 lg:col-span-2">
@@ -38,20 +39,20 @@ export default function EdgeMonitorBotOpsPanel({ botOps, loading, error, onOpenP
       {configured ? (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
           <div className="rounded-xl bg-zinc-950/50 border border-zinc-800/70 px-3 py-2">
-            <div className="text-zinc-500 text-[10px] uppercase">Financial wire</div>
-            <div className="text-white font-bold mt-0.5 capitalize">{wire.run_state || (wire.enabled ? 'running' : 'stopped')}</div>
+            <div className="text-zinc-500 text-[10px] uppercase">{monitorLabel}</div>
+            <div className="text-white font-bold mt-0.5 capitalize">{marketNews.run_state || (marketNews.enabled ? 'running' : 'stopped')}</div>
           </div>
           <div className="rounded-xl bg-zinc-950/50 border border-zinc-800/70 px-3 py-2">
             <div className="text-zinc-500 text-[10px] uppercase">Posts today</div>
-            <div className="text-white font-bold tabular-nums mt-0.5">{formatOpsMonitorCount(wire.posts_today)}</div>
+            <div className="text-white font-bold tabular-nums mt-0.5">{formatOpsMonitorCount(marketNews.posts_today)}</div>
           </div>
           <div className="rounded-xl bg-zinc-950/50 border border-zinc-800/70 px-3 py-2">
             <div className="text-zinc-500 text-[10px] uppercase">Cap / day</div>
-            <div className="text-white font-bold tabular-nums mt-0.5">{formatOpsMonitorCount(wire.max_posts_per_day)}</div>
+            <div className="text-white font-bold tabular-nums mt-0.5">{formatOpsMonitorCount(marketNews.max_posts_per_day)}</div>
           </div>
           <div className="rounded-xl bg-zinc-950/50 border border-zinc-800/70 px-3 py-2">
             <div className="text-zinc-500 text-[10px] uppercase">Sources on</div>
-            <div className="text-white font-bold tabular-nums mt-0.5">{formatOpsMonitorCount(wire.sources_enabled)}</div>
+            <div className="text-white font-bold tabular-nums mt-0.5">{formatOpsMonitorCount(marketNews.sources_enabled)}</div>
           </div>
         </div>
       ) : (

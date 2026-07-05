@@ -1,4 +1,4 @@
--- Financial wire bot setup (test) — run AFTER creating auth user + profile for the bot.
+-- Deprecated — use supabase/seed/lounge_market_edge_bot.sql (Market Edge / market-edge slug).
 -- Replace <BOT_USER_UUID> with the auth.users id.
 
 -- insert into public.lounge_bot_accounts (

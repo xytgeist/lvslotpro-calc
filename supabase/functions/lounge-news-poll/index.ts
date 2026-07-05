@@ -6,7 +6,7 @@
  *   - Admin user JWT (manual "Poll now" from Edge Monitor)
  *
  * Body (optional JSON):
- *   { "slug": "financial-wire", "dryRun": false, "force": false }
+ *   { "slug": "market-edge", "dryRun": false, "force": false }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
@@ -15,8 +15,10 @@ import {
   extractTickers,
   normalizeTitleHash,
   scoreNewsCandidate,
-  type NewsCandidate,
 } from '../_shared/loungeBotNewsScore.ts'
+import { DEFAULT_MARKET_EDGE_SLUG } from '../_shared/loungeBotMarketNewsDefaults.ts'
+import { fetchEdgarCurrentFilings, secEdgarUserAgent } from '../_shared/loungeBotEdgarFetch.ts'
+import { fetchAllowlistedFeed, type NormalizedNewsItem } from '../_shared/loungeBotRssFetch.ts'
 import { publishLoungeBotPost } from '../_shared/loungeBotPublish.ts'
 
 type BotAccount = {
@@ -42,12 +44,7 @@ type NewsSource = {
   last_polled_at: string | null
 }
 
-type NormalizedItem = NewsCandidate & {
-  externalId: string
-  contentHash: string
-  publishedAtIso: string | null
-  raw: Record<string, unknown>
-}
+type NormalizedItem = NormalizedNewsItem
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
 
@@ -76,6 +73,33 @@ function watchlistFromConfig(config: Record<string, unknown> | null): string[] {
   const raw = config?.watchlist_tickers
   if (!Array.isArray(raw)) return []
   return raw.map((t) => String(t || '').trim().toUpperCase()).filter(Boolean)
+}
+
+async function ensureWatchlistCompanySources(
+  admin: SupabaseClient,
+  botUserId: string,
+  watchlist: string[],
+  existingSources: NewsSource[],
+): Promise<void> {
+  const existingSymbols = new Set(
+    existingSources
+      .filter((s) => s.kind === 'finnhub_company')
+      .map((s) => String(s.api_config?.symbol || '').trim().toUpperCase())
+      .filter(Boolean),
+  )
+
+  for (const symbol of watchlist) {
+    if (existingSymbols.has(symbol)) continue
+    await admin.from('lounge_news_sources').insert({
+      bot_user_id: botUserId,
+      name: `Finnhub ${symbol}`,
+      kind: 'finnhub_company',
+      api_config: { symbol },
+      poll_interval_sec: 600,
+      enabled: true,
+    })
+    existingSymbols.add(symbol)
+  }
 }
 
 async function finnhubFetch(path: string, params: Record<string, string>): Promise<unknown> {
@@ -134,50 +158,6 @@ async function fetchFinnhubCompany(symbol: string): Promise<NormalizedItem[]> {
   return rows.map(parseFinnhubNewsRow).filter(Boolean) as NormalizedItem[]
 }
 
-function parseRssItems(xml: string): NormalizedItem[] {
-  const items: NormalizedItem[] = []
-  const blocks = xml.match(/<item[\s\S]*?<\/item>/gi) || []
-  for (const block of blocks.slice(0, 30)) {
-    const title = (block.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '')
-      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, '$1')
-      .replace(/<[^>]+>/g, '')
-      .trim()
-    if (!title) continue
-    const link = (block.match(/<link[^>]*>([\s\S]*?)<\/link>/i)?.[1] || '')
-      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, '$1')
-      .trim()
-    const guid = (block.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i)?.[1] || link || title).trim()
-    const pubRaw = (block.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i)?.[1] || '').trim()
-    const desc = (block.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] || '')
-      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, '$1')
-      .replace(/<[^>]+>/g, ' ')
-      .trim()
-    const publishedAtIso = pubRaw ? new Date(pubRaw).toISOString() : null
-    items.push({
-      title,
-      summary: desc || undefined,
-      url: link || undefined,
-      publishedAt: publishedAtIso,
-      tickers: extractTickers(`${title} ${desc}`),
-      sourceName: 'RSS',
-      externalId: guid.slice(0, 240),
-      contentHash: normalizeTitleHash(title),
-      publishedAtIso,
-      raw: { title, link, guid, pubRaw },
-    })
-  }
-  return items
-}
-
-async function fetchRss(url: string): Promise<NormalizedItem[]> {
-  const res = await fetch(url, {
-    headers: { Accept: 'application/rss+xml, application/xml, text/xml' },
-  })
-  if (!res.ok) throw new Error(`RSS fetch ${res.status}`)
-  const xml = await res.text()
-  return parseRssItems(xml)
-}
-
 async function fetchSourceItems(source: NewsSource): Promise<NormalizedItem[]> {
   const cfg = source.api_config || {}
   switch (source.kind) {
@@ -190,10 +170,22 @@ async function fetchSourceItems(source: NewsSource): Promise<NormalizedItem[]> {
       if (!sym) return []
       return fetchFinnhubCompany(sym)
     }
+    case 'edgar':
+      return fetchEdgarCurrentFilings({
+        filingType: String(cfg.filing_type || ''),
+        count: Number(cfg.count) || 40,
+        sourceLabel: source.name,
+      })
     case 'rss': {
       const url = String(source.poll_url || cfg.url || '').trim()
       if (!url) return []
-      return fetchRss(url)
+      const label = String(cfg.source_label || source.name || 'RSS').trim()
+      const headers: Record<string, string> = {}
+      if (url.includes('sec.gov')) {
+        headers['User-Agent'] = secEdgarUserAgent()
+      }
+      const items = await fetchAllowlistedFeed(url, label, headers)
+      return items
     }
     default:
       return []
@@ -265,7 +257,7 @@ Deno.serve(async (req) => {
   try {
     const admin = await authorize(req)
     const body = await req.json().catch(() => ({}))
-    const slug = String(body?.slug || 'financial-wire').trim()
+    const slug = String(body?.slug || DEFAULT_MARKET_EDGE_SLUG).trim()
     const dryRun = body?.dryRun === true
     const force = body?.force === true
 
@@ -301,6 +293,21 @@ Deno.serve(async (req) => {
     const roomHour = Math.max(0, hourCap - publishedHour)
     const roomDay = Math.max(0, dayCap - publishedDay)
     const publishBudget = Math.min(roomHour, roomDay)
+
+    const { data: allSources, error: allSrcErr } = await admin
+      .from('lounge_news_sources')
+      .select('*')
+      .eq('bot_user_id', account.user_id)
+      .order('last_polled_at', { ascending: true, nullsFirst: true })
+
+    if (allSrcErr) return adminOpsJson(500, { error: allSrcErr.message })
+
+    await ensureWatchlistCompanySources(
+      admin,
+      account.user_id,
+      watchlist,
+      (allSources || []) as NewsSource[],
+    )
 
     const { data: sources, error: srcErr } = await admin
       .from('lounge_news_sources')

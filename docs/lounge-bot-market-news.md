@@ -1,6 +1,8 @@
 # Lounge bot — market news (Walter Bloomberg / Financial Juice style) (planned)
 
-**Status:** Design only ... not implemented. **Dedicated Edge account** ... posts **timely financial / market news only** (Walter Bloomberg / Financial Juice **style**, not casino-stock-only). **Self-contained** ... automated allowlist ingest, scoring, caption, publish. **No morning inbox.** X editorial queue: `docs/lounge-bot-editorial-queue.md` (X bots only).
+**Status:** **Code shipped (Jul 2026)** — migration `20260703140000` + `20260705020000`, Edge **`lounge-news-poll`**, portal **`/?tab=bots`**. **Persona:** **Market Edge** (`@marketedge`, slug `market-edge`). **Ryan smoke pending** on test sandbox.
+
+**Live bot (test):** not yet created — use Bot Portal wizard or `supabase/seed/lounge_market_edge_bot.sql`.
 
 **Ryan context (2026-07-03):** Lifetime **Benzinga Pro user subscription** ... useful for **tuning** what the bot cares about, **not** for daily manual review of every post. **Not API access.** See § Benzinga below.
 
@@ -46,48 +48,116 @@ If you want Benzinga-quality **automated** ingest, license **Benzinga API** sepa
 
 ---
 
+## Default allowlist (shipped)
+
+Migration **`20260705040000`**. Headline rewrite + source link only ... no full-body republish.
+
+| Source | Kind | Poll interval | Role |
+| --- | --- | --- | --- |
+| Finnhub general | `finnhub_general` | 3 min | Broad market headlines |
+| Finnhub M&A | `finnhub_category` | 5 min | Deals, takeovers |
+| Finnhub forex | `finnhub_category` | 5 min | Macro / FX |
+| Finnhub crypto | `finnhub_category` | 5 min | Digital assets, crypto regs |
+| **SEC EDGAR 8-K** | `edgar` | 3 min | Material events (official Atom) |
+| **SEC EDGAR 10-Q** | `edgar` | 10 min | Quarterly filings |
+| **SEC EDGAR 10-K** | `edgar` | 15 min | Annual filings |
+| **SEC press releases** | `rss` | 5 min | Enforcement, rule proposals |
+| **Federal Reserve press** | `rss` | 5 min | FOMC, Fed speakers, policy |
+| **US Treasury press** | `rss` | 7 min | Fiscal, debt ceiling, sanctions |
+| **CFTC press releases** | `rss` | 7 min | Derivatives / crypto enforcement |
+| **EIA Today in Energy** | `rss` | 10 min | Oil, gas, energy macro |
+| **BBC Business** | `rss` | 5 min | Geopolitical / global business *(link out)* |
+| **NPR Business** | `rss` | 7 min | US business / economy *(link out)* |
+
+**SEC requirement:** set Edge secret **`SEC_EDGAR_USER_AGENT`** (e.g. `EdgeTilt MarketEdge/1.0 (support@edgetilt.com)`). Defaults if unset.
+
+**Also required:** **`FINNHUB_API_KEY`** (same key as Lounge market charts).
+
+Toggle any source off in **`/?tab=bots`** without removing the row.
+
+---
+
 ## Automated ingest (self-contained)
 
-| Source | Already in EdgeTilt? | Notes |
+| Source | Shipped? | Notes |
 | --- | --- | --- |
-| **Finnhub** company news | Yes (`lounge-market-data`, `finnhubLatestNews`) | Good for `$AAPL`-style headlines; free tier limits |
-| **Yahoo** news search | Yes (fallback in market modal) | Secondary |
-| **Benzinga API** | No | Requires license; best match to Pro content quality if budget OK |
-| **Alpaca / Polygon** news | No | Alternatives to evaluate |
-| **SEC EDGAR** filings | No | Slower, different voice (8-K alerts) |
-| **Allowlisted RSS** | No | PR wires, company IR ... verify ToS per feed |
-
-**Practical v1:** **`lounge-news-poll`** ... allowlisted RSS/EDGAR + Finnhub. Score → caption template → **auto-publish** on **financial wire** `bot_user_id` only.
+| **Finnhub** categories | Yes | general, merger, forex, crypto |
+| **SEC EDGAR** Atom | Yes | 8-K, 10-Q, 10-K current filings |
+| **Gov/reg RSS** | Yes | SEC, Fed, Treasury, CFTC, EIA |
+| **Publisher RSS** | Yes | BBC Business, NPR Business (headline + link) |
+| **Benzinga API** | No | Requires license |
+| **Options flow** | No | Phase 2 vendor |
 
 Reuse **`market_embeds`** / `$TICKER` in caption ... ties to existing Lounge market chart modal.
 
 ---
 
-## Bot persona (one account, one niche)
+## Bot concept — Market Edge
 
-**One Edge profile** for market/finance wire ... broad timely finance (equities, macro, earnings, rates, major `$TICKER` moves). **Not** the sports odds bot; **not** crypto/poker/slots X bots.
+**Style:** Clean, fast, neutral-to-sharp with dry humor **sparingly**. Walter Bloomberg + Financial Juice mix.
 
-- **`lounge_bot_accounts.pipeline`** = `market_news`
-- **`review_mode`** = `automatic`
-- Category pills default: **`stocks`**, **`trading`**, **`investing`**
+**Core focus (topic-tier scoring, not a ticker watchlist):**
+
+| Tier | What publishes |
+| --- | --- |
+| **Economic data** | CPI, PPI, jobs, GDP, retail sales, PMI, claims, housing, sentiment |
+| **Fed / central banks** | FOMC, Powell, ECB, BOJ, rate cuts/hikes, Treasury, yield curve |
+| **Earnings & guidance** | Beats/misses, outlook cuts/raises, pre/after-market prints |
+| **Geopolitical** | Sanctions, conflict headlines, trade war, supply disruption |
+| **Regulatory** | SEC, DOJ, CFTC, antitrust, crypto regulation, tariffs, FDA market movers |
+| **M&A / distress / activist** | Mergers, bankruptcies, Chapter 11, activist stakes, IPOs |
+| **Commodities** | Oil/WTI/Brent, OPEC, gold, copper, nat gas, grain shocks |
+| **Crypto / risk assets** | BTC, ETH, stablecoin, ETF flows, exchange/reg headlines |
+| **Options flow** | Unusual activity, whale blocks *(when sourced — not in v1)* |
+| **Macro risk** | Inflation, recession, VIX, credit spreads, fiscal/stimulus |
+
+Stories **without** a topic-tier match stay **below** the default publish threshold (~55). Optional portal tickers add company feeds + a **small** nudge only.
+
+**Ingest v1:** Finnhub + **SEC EDGAR** + **allowlisted RSS** (see table above). Topic-tier score gates publish volume.
+
+---
+
+## Bot persona (Market Edge)
+
+**One Edge profile** for market/finance wire ... broad timely finance (equities, macro, earnings, rates, major `$TICKER` moves).
+
+| Field | Value |
+| --- | --- |
+| **Handle** | `@marketedge` |
+| **Display name** | Market Edge |
+| **Bio** | 24/7 Breaking News headlines for professional day traders. |
+| **Slug** | `market-edge` |
+| **`pipeline`** | `market_news` |
+| **`review_mode`** | `automatic` |
+| **Audience** | Public (all feed posts) |
+| **Category pills** | `stocks`, `trading` |
 
 Volume: **~3–12 posts/day** when scoring thresholds fire ... tunable via config, not a daily Ryan review pass.
 
 ---
 
-## Example captions (Financial Juice style)
-
-**Earnings:**  
-`$DKNG beats Q2 revenue. Stock +6% pre. Sportsbook handle growth called out on call.`
+## Example captions (Market Edge voice)
 
 **Macro:**  
-`Fed speaker hawkish on rates. $SPY -0.8%, $QQQ -1.1% in first hour.`
+`CPI hotter than expected. $SPY -0.6% on the print. Core sticky ... rate-cut bets pushed out.`
 
-**Gaming:**  
-`$MGM guidance tweak on Vegas strip. Peers $WYNN $LVS watching.`
+**Fed:**  
+`Powell: inflation progress "uneven." $QQQ fades from highs; 2Y yield ticks up.`
 
-**M&A / legal:**  
-`$PENN strategic review headlines hitting tape. Volume spike vs 20d avg.`
+**Geopolitical:**  
+`Oil +3% on Middle East supply headlines. Energy leads S&P; airlines lag.`
+
+**Earnings:**  
+`$NVDA beats on data-center revenue. Guides Q3 above Street. Stock +8% after hours.`
+
+**M&A / distress:**  
+`$XYZ files Chapter 11. Creditors take equity; equity wiped at open.`
+
+**Commodities:**  
+`WTI breaks $85 on inventory draw. Refiners rally; airlines under pressure.`
+
+**Regulatory:**  
+`SEC charges crypto exchange. $BTC -2% in 15 minutes; altcoins wider.`
 
 Always **rewrite** ... do not paste licensed wire text verbatim unless API contract allows full embed.
 
@@ -97,10 +167,9 @@ Always **rewrite** ... do not paste licensed wire text verbatim unless API contr
 
 | Phase | Ingest | Benzinga role |
 | --- | --- | --- |
-| **0** | One allowlisted RSS + hard-coded template on **test** → auto-publish | Pro = tune watchlists only |
-| **1** | Finnhub/Yahoo + RSS/EDGAR poll → score → auto-publish | Pro = tune scoring weights |
-| **2** | Benzinga API (if licensed) | Automated wire in allowlist |
-| **3** | "Why Is It Moving" + tighter filters | Higher signal, fewer posts |
+| **0** | Finnhub + EDGAR + gov/publisher RSS on **test** | Pro = tune keyword tiers |
+| **1** | Title clustering + economic calendar hooks | Pro = tune thresholds |
+| **2** | Benzinga API (if licensed) + options-flow source | Higher signal wire |
 
 ---
 

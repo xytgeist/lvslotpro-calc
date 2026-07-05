@@ -52,10 +52,11 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 
 ### Self-contained (parallel)
 
-- [ ] **Apply migration `20260703140000_lounge_bot_financial_wire.sql` on test**
-- [ ] **Create financial-wire bot user** + `lounge_bot_accounts` row + `lounge_bot_seed_financial_wire_sources()` — see **`supabase/functions/lounge-news-poll/README.md`**
-- [ ] **Deploy `lounge-news-poll` on test** (requires **`FINNHUB_API_KEY`**)
-- [x] **Market news bot v1 (code):** Finnhub general + M&A poll → score → auto-publish; migration + Edge fn + Edge Monitor Bot ops panel. **`docs/lounge-bot-market-news.md`**
+- [ ] **Apply migrations `20260703140000` through `20260705040000` on test + prod**
+- [ ] **Create Market Edge bot** (`market-edge` / `@marketedge`) via **`/?tab=bots`** wizard or **`supabase/seed/lounge_market_edge_bot.sql`** + **`lounge_bot_seed_market_news_sources()`**
+- [ ] **Deploy `lounge-news-poll` + `lounge-bot-admin` on test** (requires **`FINNHUB_API_KEY`**)
+- [x] **Market news bot v1 (code):** Finnhub general + M&A + watchlist company feeds → score → auto-publish; migration + Edge fn + Bot Portal. **`docs/lounge-bot-market-news.md`**
+- [x] **Market Edge persona + cron (code):** migration **`20260705020000`** (`invoke_lounge_news_poll`, pg_cron every 3 min, watchlist seed); wizard defaults **Market Edge** / `@marketedge`.
 - [x] **Bot ops UI (code):** **`/?tab=bots`** Bot Portal — all bots, run/pause/stop, caps, score threshold, watchlist, source toggles, edit/delete posts, **manual post + reply as bot**, automation log, **Scott Share odds controls** (calendar picker, Fetch odds, Scan all · edge, **Post Coffee & Covers**, **Min +EV %**, **Alert audience All | Subs**). Edge Monitor links here.
 - [ ] **Market news smoke (test):** dry run → enable bot → poll now → confirm Lounge post as bot user; verify day/hour caps.
 - [ ] **Sports odds bot smoke (test):** **`docs/lounge-bot-sports-odds.md`**
@@ -552,7 +553,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
   - **Migration:** run **`20260608000000_chat_messages_video_url.sql`** on test before client deploy (adds `video_url TEXT` column; rebuilds `chat_messages_page` + `chat_messages_window` RPCs to include it).
   - **Smoke (test):** send a video in chat — progress bar encodes then uploads; bubble appears immediately with poster; tap bubble → native `<video>` plays; delete message → R2 objects removed. Legacy `stream_video_uid` messages still render via CF iframe unchanged.
 
-- [ ] **`lounge-news-poll`** (financial wire bot — Finnhub allowlist → score → auto-publish to Lounge) — deploy on **test** with **`FINNHUB_API_KEY`**; migration **`20260703140000`**; cron every 3 min or Edge Monitor **Poll now**. Source: `supabase/functions/lounge-news-poll/README.md`.
+- [ ] **`lounge-news-poll`** (Market Edge — Finnhub allowlist → score → auto-publish) — deploy on **test** with **`FINNHUB_API_KEY`**; migrations **`20260703140000`** + **`20260705020000`**; cron **`lounge_news_poll_market_edge`** every 3 min or Bot Portal **Poll now**. Source: `supabase/functions/lounge-news-poll/README.md`.
 
 - [ ] Function-by-function smoke notes captured  
   - Change: Record minimal expected input/output for each function.
@@ -815,6 +816,9 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 - 2026-07-04: **Odds caption voice:** edge + slate posts use plain sentences (short names, fair as American odds, `vs` matchups, compact PT kickoff) — **`loungeBotOddsCaption.ts`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Continuity docs refresh:** **`WAKEUP`**, **`docs/lounge-bot-sports-odds.md`** (shipped v1 spec), **`docs/frontend-architecture.md`** **`bots/`** row, backlog sports-odds smoke checklist expanded.
 - 2026-07-04: **Odds min +EV portal field:** **`/?tab=bots`** Settings shows **Min +EV %** for **`odds_api`** bots (0.5–15); **`admin_lounge_bot_save_settings`** patch **`min_edge_pct`** → **`lounge_bot_odds_config`**. Migration **`20260704170000`**. Apply on test.
+- 2026-07-05: **Market Edge EDGAR + RSS allowlist:** migration **`20260705040000`** — SEC EDGAR 8-K/10-Q/10-K Atom, SEC/Fed/Treasury/CFTC/EIA RSS, BBC + NPR Business; `loungeBotEdgarFetch.ts` + `loungeBotRssFetch.ts`; optional **`SEC_EDGAR_USER_AGENT`** Edge secret.
+- 2026-07-05: **Market Edge topic scoring:** replaced ticker-blend watchlist with **topic-tier** keywords (macro, Fed, earnings, geopolitics, regs, commodities, crypto, M&A); Finnhub **forex + crypto** category sources; optional portal tickers only. Migration **`20260705030000`**. **`docs/lounge-bot-market-news.md`** concept section.
+- 2026-07-05: **Market Edge financial news bot (code):** persona **`@marketedge`** / slug **`market-edge`**; migration **`20260705020000`** (pg_cron **`invoke_lounge_news_poll`**, watchlist Finnhub company sources); **`lounge-news-poll`** syncs watchlist feeds on poll; Bot Portal wizard defaults + public audience. Apply migration on test + prod schema; deploy Edge; create bot + smoke on **test only** before **Running** on prod.
 - 2026-07-04: **+EV engine (devig h2h):** `pickBestOddsCandidate` uses per-book no-vig fair probs, average consensus, and EV on $1 (`min_edge_pct` = min +EV %, default **2**); migration **`20260704160000`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Odds slate check-ins + edge alerts:** migration **`20260704150000`** (`post_kind`, `dedupe_key`, slate/edge caps on odds config); **`lounge-odds-ingest`** auto-posts ⚡ EDGE or daily slate check-in; new **`lounge-odds-poll`** (`poll_edges`, `daily_slates`). Portal: **Scan all · edge**, **Post all slates**. Apply **`20260704150000`** on test; redeploy **`lounge-odds-ingest`** + deploy **`lounge-odds-poll`**.
 - 2026-07-04: **Sports betting calendar + manual slate picker:** migration **`20260704140000`** (`lounge_sports_betting_calendar`, 2026 seed, **`admin_lounge_sports_betting_calendar_today`**); odds bot portal dropdown picks today's major sport before **Fetch odds**; **`lounge-odds-ingest`** requires **`sportKey`** + validates against calendar; captions prefix category (e.g. `World Cup · …`). Apply migration on test; redeploy **`lounge-odds-ingest`**.

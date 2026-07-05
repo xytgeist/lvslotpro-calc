@@ -64,7 +64,7 @@ export async function invokeLoungeNewsPoll(supabaseClient, opts = {}) {
   }
   const { data, error } = await supabaseClient.functions.invoke('lounge-news-poll', {
     body: {
-      slug: opts.slug || 'financial-wire',
+      slug: opts.slug || 'market-edge',
       dryRun: opts.dryRun === true,
       force: opts.force === true,
     },
