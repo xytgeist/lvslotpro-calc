@@ -76,6 +76,42 @@ function formatDateRange(start, end) {
   return `${start} → ${end}`
 }
 
+/** Today's calendar date in America/Los_Angeles (YYYY-MM-DD). */
+function ptTodayIso() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
+function formatQueryDateLabel(dateIso) {
+  if (!dateIso) return 'selected day'
+  const dt = new Date(`${dateIso}T12:00:00`)
+  if (Number.isNaN(dt.getTime())) return dateIso
+  return dt.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function rowActiveOnDate(row, dateIso) {
+  if (!dateIso || !row?.start_date || !row?.end_date) return false
+  return dateIso >= row.start_date && dateIso <= row.end_date
+}
+
+function rowStatusOnDate(row, dateIso) {
+  if (!row?.enabled) return 'disabled'
+  if (!rowActiveOnDate(row, dateIso)) {
+    if (dateIso < row.start_date) return 'upcoming'
+    return 'past'
+  }
+  return 'active'
+}
+
 function CalendarEditorModal({ open, draft, setDraft, onClose, onSave, busy }) {
   if (!open) return null
 
@@ -218,7 +254,8 @@ export default function BotSportsCalendarPanel({
   onCalendarUpdated,
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState('on_date')
+  const [queryDate, setQueryDate] = useState(() => ptTodayIso())
   const [rows, setRows] = useState([])
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -245,12 +282,27 @@ export default function BotSportsCalendarPanel({
   }, [expanded, loadCalendar])
 
   const filteredRows = useMemo(() => {
-    if (filter === 'active') return rows.filter((r) => r.status === 'active')
-    if (filter === 'upcoming') return rows.filter((r) => r.status === 'upcoming')
+    if (filter === 'on_date') {
+      return rows
+        .filter((r) => rowActiveOnDate(r, queryDate))
+        .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || String(a.label_short).localeCompare(String(b.label_short)))
+    }
+    if (filter === 'upcoming') {
+      return rows
+        .filter((r) => r.enabled && String(r.start_date) > queryDate)
+        .sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)))
+    }
     return rows
-  }, [rows, filter])
+  }, [rows, filter, queryDate])
+
+  const onDateCount = useMemo(
+    () => rows.filter((r) => r.enabled && rowActiveOnDate(r, queryDate)).length,
+    [rows, queryDate],
+  )
 
   const activeTodayCount = useMemo(() => rows.filter((r) => r.active_today).length, [rows])
+  const ptToday = ptTodayIso()
+  const queryIsToday = queryDate === ptToday
 
   const openNew = () => {
     setEditorDraft(emptyDraft())
@@ -289,7 +341,8 @@ export default function BotSportsCalendarPanel({
             Sports betting calendar
           </div>
           <div className="text-zinc-500 text-[10px] mt-0.5">
-            PT dates · {activeTodayCount} active today · powers cron + manual fetch
+            PT dates · {onDateCount} on slate {queryIsToday ? 'today' : `on ${formatQueryDateLabel(queryDate)}`}
+            {queryIsToday ? '' : ` · ${activeTodayCount} active today`}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -333,11 +386,44 @@ export default function BotSportsCalendarPanel({
             </div>
           ) : null}
 
+          <div className="flex flex-wrap items-end gap-3 mb-3">
+            <label className="block min-w-[10rem]">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                Query date (PT)
+              </div>
+              <input
+                type="date"
+                value={queryDate}
+                onChange={(e) => {
+                  const next = e.target.value
+                  if (next) {
+                    setQueryDate(next)
+                    setFilter('on_date')
+                  }
+                }}
+                className="mt-1 w-full rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setQueryDate(ptTodayIso())
+                setFilter('on_date')
+              }}
+              className="min-h-[38px] rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold"
+            >
+              Today
+            </button>
+            <div className="text-zinc-600 text-[10px] pb-1">
+              Scott cron + manual fetch use this day&apos;s enabled windows.
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2 mb-3">
             {[
-              { id: 'all', label: 'All' },
-              { id: 'active', label: 'Active today' },
-              { id: 'upcoming', label: 'Upcoming' },
+              { id: 'on_date', label: 'On selected date' },
+              { id: 'all', label: 'All entries' },
+              { id: 'upcoming', label: 'Upcoming from date' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -355,10 +441,17 @@ export default function BotSportsCalendarPanel({
           </div>
 
           {!loading && !filteredRows.length ? (
-            <div className="text-zinc-500 text-xs py-4 text-center">No calendar rows match this filter.</div>
+            <div className="text-zinc-500 text-xs py-4 text-center">
+              {filter === 'on_date'
+                ? `No sporting events on the calendar for ${formatQueryDateLabel(queryDate)}.`
+                : 'No calendar rows match this filter.'}
+            </div>
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {filteredRows.map((row) => (
+              {filteredRows.map((row) => {
+                const statusOnDate = rowStatusOnDate(row, queryDate)
+                const onSlate = row.enabled && rowActiveOnDate(row, queryDate)
+                return (
                 <div
                   key={row.id || row.slug}
                   className="rounded-xl border border-zinc-800/80 bg-zinc-900/80 px-3 py-2.5 flex flex-wrap items-start justify-between gap-2"
@@ -366,11 +459,18 @@ export default function BotSportsCalendarPanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-white text-sm font-semibold">{row.label_short}</span>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ring-1 ${STATUS_STYLES[row.status] || STATUS_STYLES.past}`}>
-                        {row.status === 'active' && row.active_today ? 'Today' : row.status}
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ring-1 ${STATUS_STYLES[filter === 'on_date' ? statusOnDate : row.status] || STATUS_STYLES.past}`}>
+                        {filter === 'on_date' && onSlate
+                          ? queryIsToday ? 'Today' : 'On date'
+                          : row.status === 'active' && row.active_today
+                            ? 'Today'
+                            : (filter === 'on_date' ? statusOnDate : row.status)}
                       </span>
-                      {row.active_today ? (
+                      {onSlate && filter === 'on_date' ? (
                         <span className="text-emerald-400/90 text-[10px] font-semibold">On slate</span>
+                      ) : null}
+                      {!row.enabled && filter === 'on_date' ? (
+                        <span className="text-amber-300/80 text-[10px] font-semibold">Disabled</span>
                       ) : null}
                     </div>
                     <div className="text-zinc-400 text-xs mt-0.5 truncate">{row.title}</div>
@@ -390,7 +490,8 @@ export default function BotSportsCalendarPanel({
                     Edit
                   </button>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
