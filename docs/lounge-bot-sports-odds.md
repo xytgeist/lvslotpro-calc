@@ -141,6 +141,15 @@ Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`**, **`loung
 | **On Tap (tomorrow)** | Tomorrow spread/ML at or within **1%** of bar | **Max 3** across all sports |
 | **Best Lines 👇** | Best ML + book per outcome | One **thread part** per calendar sport (header: sport emoji + label, e.g. `🎾 Wimbledon`) |
 
+**NCAAB / March Madness slate cap:** On `basketball_ncaab`, Coffee & Covers filters today's board to **~20-40 high-interest games** (max **40**) before covers, ML spots, Dog of the Day, On Tap, and the best-lines thread. Priority waterfall:
+
+1. Any game with an **AP Top 25** team (`ncaab-ap-top25-keys.json` ... update weekly in season)
+2. **Power-conference** matchups (ACC, Big Ten, Big 12, SEC, Big East)
+3. **Spread line movement ≥ 0.5 pt** vs prior `lounge_odds_event_lines` snapshot (15-min poll)
+4. **Rivalry** games or **high totals** (consensus O/U **≥ 155**)
+
+Thread footer shows `+N more games today` against the full unfiltered slate count.
+
 Spread devig mirrors h2h: per-book no-vig fair probs on each spread side, consensus average, EV at best juice. Dedupe key: **`coffee:daily:{ptDay}`** (one post per bot per PT day). Log **`post_kind: coffee_covers`**. Root post ends with **`Best Lines 👇`**; lines board lives in author thread parts (`feed_comments.is_thread_part`).
 
 Set **`coffee_covers_enabled = false`** on **`lounge_bot_odds_config`** to fall back to legacy slate check-ins.
@@ -280,7 +289,7 @@ Priority when multiple qualify: injury → starter spotlight → rest → confir
 5. Travel line only when Haversine **≥800 mi** or home-market TZ bucket changes (`loungeSportsVenues.ts` seed). Resolve order: Rundown **`venue_location`** when present → home-team arena → opponent home arena. Unknown team → rest-only caption (no travel line).
 6. Copy stays **team schedule** only (never pitcher workload).
 
-**Venue seed (Phase 2):** `loungeSportsVenues.ts` — NBA (30), MLB (30), NFL (32), WNBA (13), NHL (32). Expand via **`scripts/geocode-sports-venues.mjs`** (one-time Google geocode, no runtime Maps calls).
+**Venue seed (Phase 2):** `loungeSportsVenues.ts` — NBA (30), MLB (30), NFL (32), WNBA (13), NHL (32), NCAAF FBS (80), NCAAB (153 rows: full Pac-12/WCC/MWC/American/A-10/MVC + power conferences). Seed: **`scripts/lib/ncaab-venues-seed.mjs`**, **`scripts/lib/college-sports-venues-seed.mjs`**. Re-sync: **`scripts/sync-college-venues-to-ts.mjs`**; coord refresh: **`scripts/geocode-sports-venues.mjs`** (no runtime Maps calls).
 
 Example:
 ```text
@@ -665,6 +674,7 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 | Example post pack | **`supabase/functions/_shared/loungeBotExamplePosts.ts`** |
 | Coverage tiers | **`supabase/functions/_shared/loungeBotCoverageScope.ts`** |
 | Coffee & Covers | **`supabase/functions/_shared/loungeBotCoffeeAndCovers.ts`** |
+| NCAAB Coffee filter | **`supabase/functions/_shared/loungeBotNcaabCoffeeFilter.ts`** |
 | Best Bet of the Hour | **`supabase/functions/_shared/loungeBotBestBetHour.ts`** |
 | Arb Watch | **`supabase/functions/_shared/loungeBotArbWatch.ts`** |
 | Sharp Report | **`supabase/functions/_shared/loungeBotSharpReport.ts`** |

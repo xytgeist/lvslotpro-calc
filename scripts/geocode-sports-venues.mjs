@@ -4,25 +4,19 @@
  * Usage:
  *   GOOGLE_MAPS_API_KEY=your_key node scripts/geocode-sports-venues.mjs
  *
- * Edit VENUES_TO_GEOCODE below, run once, paste printed rows into
- * supabase/functions/_shared/loungeSportsVenues.ts
+ * Sources:
+ *   - scripts/lib/college-sports-venues-seed.mjs (NCAAF)
+ *   - scripts/lib/ncaab-venues-seed.mjs (NCAAB)
+ *
+ * Rows with lat/lng already set are printed as-is; missing coords are geocoded.
  */
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { COLLEGE_SPORTS_VENUES } from './lib/college-sports-venues-seed.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const API_KEY = process.env.GOOGLE_MAPS_API_KEY
-if (!API_KEY) {
-  console.error('ERROR: Set GOOGLE_MAPS_API_KEY')
-  process.exit(1)
-}
-
-/** sportIds: NBA=4, MLB=3, NFL=2, WNBA=8, NHL=6, NCAAF=1, NCAAB=5 */
-const VENUES_TO_GEOCODE = [
-  // Example — add rows you need, then run:
-  // { sportIds: [1], keys: ['alabama crimson tide', 'alabama'], venueName: 'Bryant-Denny Stadium', query: 'Bryant-Denny Stadium, Tuscaloosa, AL', city: 'Tuscaloosa', tz: 'CT' },
-]
 
 const TZ_LNG_RANGES = [
   { tz: 'PT', min: -125, max: -115 },
@@ -38,7 +32,18 @@ function inferTz(lng, fallback = 'ET') {
   return fallback
 }
 
+function esc(value) {
+  return String(value).replace(/'/g, "\\'")
+}
+
+function formatRow(v, lat, lng, tz) {
+  const sportIds = `[${v.sportIds.join(', ')}]`
+  const keys = v.keys.map((k) => `'${esc(k)}'`).join(', ')
+  return `  { sportIds: ${sportIds}, keys: [${keys}], venueName: '${esc(v.venueName)}', city: '${esc(v.city)}', lat: ${lat.toFixed(3)}, lng: ${lng.toFixed(3)}, tz: '${tz}' },`
+}
+
 async function geocode(query) {
+  if (!API_KEY) throw new Error('GOOGLE_MAPS_API_KEY required for geocode refresh')
   const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
   url.searchParams.set('address', query)
   url.searchParams.set('key', API_KEY)
@@ -51,31 +56,30 @@ async function geocode(query) {
   return { lat, lng }
 }
 
-function formatRow(v, lat, lng, tz) {
-  const sportIds = `[${v.sportIds.join(', ')}]`
-  const keys = v.keys.map((k) => `'${k.replace(/'/g, "\\'")}'`).join(', ')
-  return `  { sportIds: ${sportIds}, keys: [${keys}], venueName: '${v.venueName.replace(/'/g, "\\'")}', city: '${v.city}', lat: ${lat.toFixed(3)}, lng: ${lng.toFixed(3)}, tz: '${tz}' },`
+async function resolveCoords(v) {
+  if (Number.isFinite(v.lat) && Number.isFinite(v.lng)) {
+    return { lat: v.lat, lng: v.lng, tz: v.tz || inferTz(v.lng) }
+  }
+  const query = v.query || `${v.venueName}, ${v.city}`
+  const { lat, lng } = await geocode(query)
+  return { lat, lng, tz: v.tz || inferTz(lng) }
 }
 
 async function main() {
-  if (!VENUES_TO_GEOCODE.length) {
-    console.log('VENUES_TO_GEOCODE is empty — add entries in scripts/geocode-sports-venues.mjs')
-    process.exit(0)
-  }
-
+  const venues = [...COLLEGE_SPORTS_VENUES]
   const lines = []
-  for (const v of VENUES_TO_GEOCODE) {
-    const { lat, lng } = await geocode(v.query)
-    const tz = v.tz || inferTz(lng)
+
+  for (const v of venues) {
+    const { lat, lng, tz } = await resolveCoords(v)
     lines.push(formatRow(v, lat, lng, tz))
-    await new Promise((r) => setTimeout(r, 200))
+    if (!Number.isFinite(v.lat)) await new Promise((r) => setTimeout(r, 200))
   }
 
   const out = lines.join('\n')
   console.log('\n// Paste into loungeSportsVenues.ts SPORTS_VENUES:\n')
   console.log(out)
   fs.writeFileSync(path.join(__dirname, 'geocode-sports-venues-result.txt'), `${out}\n`, 'utf8')
-  console.log('\nWrote scripts/geocode-sports-venues-result.txt')
+  console.log(`\nWrote ${lines.length} rows to scripts/geocode-sports-venues-result.txt`)
 }
 
 main().catch((err) => {

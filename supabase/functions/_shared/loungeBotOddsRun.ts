@@ -38,6 +38,7 @@ import {
   type LineMovementAlert,
 } from './loungeBotLineMovement.ts'
 import { fetchRundownContextNote, lineMovementMovedTeam } from './loungeBotRundownContext.ts'
+import { isNcaabCoffeeSport } from './loungeBotNcaabCoffeeFilter.ts'
 import { resolveAlertSubscriberOnly } from './loungeBotAlertAudience.ts'
 import { publishLoungeBotPost, publishLoungeBotPostWithThread } from './loungeBotPublish.ts'
 import {
@@ -455,6 +456,21 @@ export async function tryPublishEdgeAlert(
   return { published: false, pick, skipped: 'schedule_failed' }
 }
 
+async function loadNcaabCoffeePreviousLines(
+  admin: SupabaseClient,
+  botUserId: string,
+  sportContexts: SportOddsContext[],
+): Promise<ReturnType<typeof loadStoredEventLines>['lines']> {
+  const eventIds = sportContexts
+    .filter((ctx) => isNcaabCoffeeSport(ctx.sportKey, ctx.categoryLabel))
+    .flatMap((ctx) => ctx.upcoming)
+    .map((ev) => String(ev.id || '').trim())
+    .filter(Boolean)
+  if (!eventIds.length) return []
+  const { lines } = await loadStoredEventLines(admin, botUserId, eventIds)
+  return lines
+}
+
 export async function tryPublishCoffeeAndCovers(
   admin: SupabaseClient,
   bot: OddsBotRow,
@@ -483,11 +499,20 @@ export async function tryPublishCoffeeAndCovers(
     }
   }
 
+  const ncaabPrevious = !dryRun && isNcaabCoffeeSport(ctx.sportKey, ctx.categoryLabel)
+    ? (await loadStoredEventLines(
+      admin,
+      bot.user_id,
+      ctx.upcoming.map((ev) => String(ev.id || '').trim()).filter(Boolean),
+    )).lines
+    : []
+
   const generated = generateCoffeeAndCovers({
     categoryLabel: ctx.categoryLabel,
     sportKey: ctx.sportKey,
     events: ctx.upcoming,
     eventsTomorrow: ctx.tomorrow,
+    previousEventLines: ncaabPrevious,
   })
 
   if (dryRun) {
@@ -594,6 +619,10 @@ export async function tryPublishCombinedCoffeeAndCovers(
     }
   }
 
+  const ncaabPrevious = dryRun
+    ? []
+    : await loadNcaabCoffeePreviousLines(admin, bot.user_id, sportContexts)
+
   const inputs: CoffeeAndCoversOptions[] = sportContexts
     .filter((ctx) => ctx.eventsInWindow > 0 || ctx.eventsTomorrow > 0)
     .map((ctx) => ({
@@ -601,6 +630,9 @@ export async function tryPublishCombinedCoffeeAndCovers(
       sportKey: ctx.sportKey,
       events: ctx.upcoming,
       eventsTomorrow: ctx.tomorrow,
+      previousEventLines: isNcaabCoffeeSport(ctx.sportKey, ctx.categoryLabel)
+        ? ncaabPrevious
+        : undefined,
     }))
   const generated = generateCombinedCoffeeAndCovers(inputs)
 

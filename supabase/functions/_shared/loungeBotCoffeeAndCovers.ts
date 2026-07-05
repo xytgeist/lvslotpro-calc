@@ -20,6 +20,8 @@ import {
   fetchRundownContextNotesForPicks,
   rundownEventKey,
 } from './loungeBotRundownContext.ts'
+import { type EventLineRow } from './loungeBotLineMovement.ts'
+import { maybeFilterNcaabCoffeeEvents } from './loungeBotNcaabCoffeeFilter.ts'
 
 /** Min +EV % on $1 for ML spots in the morning post. */
 export const COFFEE_ML_EV_THRESHOLD_PCT = 3
@@ -131,6 +133,8 @@ export type CoffeeAndCoversOptions = {
   maxEvPct?: number
   onTapMaxPicks?: number
   onTapNearThresholdPct?: number
+  /** Prior poll snapshot for NCAAB line-movement tier (optional). */
+  previousEventLines?: EventLineRow[]
 }
 
 export type CoffeeThreadPart = {
@@ -422,7 +426,7 @@ export function findDogOfTheDay(
 export function findDogOfTheDayAcrossSports(inputs: CoffeeAndCoversOptions[]): DogOfTheDay | null {
   let best: DogOfTheDay | null = null
   for (const input of inputs) {
-    const events = Array.isArray(input.events) ? input.events : []
+    const { events } = coffeeEventsForInput(input)
     if (!events.length) continue
     const dog = findDogOfTheDay(input.categoryLabel, input.sportKey, events, {
       minBooks: input.minBooks,
@@ -529,6 +533,7 @@ export function buildSportLinesThreadBody(
   categoryLabel: string,
   events: OddsEvent[],
   sportKey?: string,
+  totalUnfiltered?: number,
 ): string {
   const label = String(categoryLabel || '').trim()
   const games = extractSlateGameBestLines(events)
@@ -539,7 +544,8 @@ export function buildSportLinesThreadBody(
 
   for (let i = 0; i < games.length; i++) {
     const trialLines = [...lines, formatSlateGameBlock(games[i]), '']
-    const omitted = games.length - i - 1
+    const slateTotal = totalUnfiltered ?? games.length
+    const omitted = slateTotal - i - 1
     if (omitted > 0) trialLines.push(`+${omitted} more games today.`)
     if (joinCaptionLines(trialLines).length <= CAPTION_MAX) {
       included = i + 1
@@ -556,10 +562,24 @@ export function buildSportLinesThreadBody(
     lines.push('')
   }
 
-  const omitted = games.length - included
+  const omitted = (totalUnfiltered ?? games.length) - included
   if (omitted > 0) lines.push(`+${omitted} more games today.`)
 
   return joinCaptionLines(lines)
+}
+
+function coffeeEventsForInput(input: CoffeeAndCoversOptions): {
+  events: OddsEvent[]
+  totalBefore: number
+} {
+  const raw = Array.isArray(input.events) ? input.events : []
+  const previous = input.previousEventLines ?? []
+  return maybeFilterNcaabCoffeeEvents(
+    raw,
+    input.sportKey,
+    input.categoryLabel,
+    previous,
+  )
 }
 
 function buildMainCaption(
@@ -713,7 +733,7 @@ export function findPlusEvSpreadOpportunities(
 export function generateCoffeeAndCovers(input: CoffeeAndCoversOptions): CoffeeAndCoversResult {
   const categoryLabel = String(input.categoryLabel || '').trim()
   const sportKey = String(input.sportKey || '').trim()
-  const events = Array.isArray(input.events) ? input.events : []
+  const { events, totalBefore } = coffeeEventsForInput(input)
   const minBooks = input.minBooks ?? DEFAULT_MIN_BOOKS
   const mlThreshold = input.mlEvThresholdPct ?? COFFEE_ML_EV_THRESHOLD_PCT
   const spreadThreshold = input.spreadEvThresholdPct ?? COFFEE_SPREAD_EV_THRESHOLD_PCT
@@ -738,7 +758,7 @@ export function generateCoffeeAndCovers(input: CoffeeAndCoversOptions): CoffeeAn
     maxEvPct,
   })
   const onTapPicks = findOnTapPicks(input).slice(0, input.onTapMaxPicks ?? COFFEE_ON_TAP_MAX_PICKS)
-  const threadBody = buildSportLinesThreadBody(categoryLabel, events, sportKey)
+  const threadBody = buildSportLinesThreadBody(categoryLabel, events, sportKey, totalBefore)
   const threadParts: CoffeeThreadPart[] = threadBody
     ? [{ categoryLabel, body: threadBody }]
     : []
@@ -763,12 +783,13 @@ type SportCoffeeSlice = {
   coverPicks: SpreadPick[]
   mlPicks: OddsPick[]
   gameCount: number
+  totalBefore: number
 }
 
 function buildSportSlice(input: CoffeeAndCoversOptions): SportCoffeeSlice {
   const categoryLabel = String(input.categoryLabel || '').trim()
   const sportKey = String(input.sportKey || '').trim()
-  const events = Array.isArray(input.events) ? input.events : []
+  const { events, totalBefore } = coffeeEventsForInput(input)
   const minBooks = input.minBooks ?? DEFAULT_MIN_BOOKS
   const mlThreshold = input.mlEvThresholdPct ?? COFFEE_ML_EV_THRESHOLD_PCT
   const spreadThreshold = input.spreadEvThresholdPct ?? COFFEE_SPREAD_EV_THRESHOLD_PCT
@@ -794,6 +815,7 @@ function buildSportSlice(input: CoffeeAndCoversOptions): SportCoffeeSlice {
     coverPicks,
     mlPicks,
     gameCount: extractSlateGameBestLines(events).length,
+    totalBefore,
   }
 }
 
@@ -816,11 +838,21 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
   const onTapSlices: OnTapPick[][] = []
   for (const slice of slices) {
     if (slice.gameCount <= 0 || !slice.categoryLabel) continue
-    const body = buildSportLinesThreadBody(slice.categoryLabel, slice.events, slice.sportKey)
+    const body = buildSportLinesThreadBody(
+      slice.categoryLabel,
+      slice.events,
+      slice.sportKey,
+      slice.totalBefore,
+    )
     if (body) threadParts.push({ categoryLabel: slice.categoryLabel, body })
   }
   for (const input of inputs) {
-    onTapSlices.push(findOnTapPicks(input))
+    const tomorrow = coffeeEventsForInput({
+      ...input,
+      events: Array.isArray(input.eventsTomorrow) ? input.eventsTomorrow : [],
+      previousEventLines: [],
+    }).events
+    onTapSlices.push(findOnTapPicks({ ...input, eventsTomorrow: tomorrow }))
   }
   const onTapPicks = mergeOnTapPicks(onTapSlices)
   const dogOfTheDay = findDogOfTheDayAcrossSports(inputs)

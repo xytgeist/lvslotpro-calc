@@ -777,6 +777,9 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-05: **Scott NCAAB Coffee & Covers slate filter:** `loungeBotNcaabCoffeeFilter.ts` — AP Top 25 → power conf → spread move → rivalry/high total; max **40** games in morning board. Redeploy **`lounge-odds-poll`**.
+- 2026-07-05: **Scott NCAAB venue expansion (complete):** Pac-12 (12), WCC (12), MWC (12), American (13), A-10 (14), MVC (11) — added Seattle U, Grand Canyon; dropped departed Missouri State/UMass; **153** NCAAB rows in **`loungeSportsVenues.ts`**. Redeploy **`lounge-odds-poll`**.
+- 2026-07-05: **Scott Rest + Travel NCAAF/NCAAB venues:** **`scripts/lib/college-sports-venues-seed.mjs`** (80 FBS + initial NCAAB) merged into **`loungeSportsVenues.ts`**; **`scripts/geocode-sports-venues.mjs`** imports seed for one-time coord refresh. Redeploy **`lounge-odds-poll`**.
 - 2026-07-05: **Scott Rest + Travel Phase 2:** full NHL/WNBA venue seed, Rundown `venue_location` city lookup, `isHome` fix for travel coords, `scripts/geocode-sports-venues.mjs`. Redeploy **`lounge-odds-poll`**.
 - 2026-07-05: **Scott Rest + Travel Advantage:** **`loungeBotRestTravel.ts`** + **`loungeSportsVenues.ts`** — 7-day Rundown schedule, venue lat/lng seed, NFL short-week/bye, +EV on rested team, optional cross-TZ/800mi line. Redeploy **`lounge-odds-poll`**.
 - 2026-07-05: **Scott context alert post kinds:** migration **`20260705010000`** — **`loungeBotContextAlerts.ts`** publishes factual Starter Spotlight, Confirmed Starters, Injury Impact, Rest + Travel on **`poll_edges`** when Rundown + +EV qualify; **Fade the Public** off until public % feed exists. Example pack **17** posts. Portal audience rows for five kinds (default **Subs**). Redeploy **`lounge-odds-poll`**; apply SQL on test.
