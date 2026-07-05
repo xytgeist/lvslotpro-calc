@@ -1,6 +1,6 @@
 # Lounge bot — sports odds / +EV plays
 
-**Status:** **Shipped on test (code, Jul 2026)** — migrations through **`20260704220000`**, Edge fns **`lounge-odds-ingest`** + **`lounge-odds-poll`**, admin portal **`/?tab=bots`**. **Ryan smoke pending** on **`kcosfvmreeiosdjdzycb`**. **Prod:** **`20260704220000`** RPC verified on **`jtjgtucumuoswnbauxry`** (**2026-07-04**, manual SQL editor apply).
+**Status:** **Shipped on test (code, Jul 2026)** — migrations through **`20260704230000`**, Edge fns **`lounge-odds-ingest`** + **`lounge-odds-poll`**, admin portal **`/?tab=bots`**. **Ryan smoke pending** on **`kcosfvmreeiosdjdzycb`** (apply cron migration + Vault). **Prod:** **`20260704220000`** RPC verified on **`jtjgtucumuoswnbauxry`** (**2026-07-04**, manual SQL editor apply).
 
 **Live bot (test):** **Scott Share** — `@sharpesignal`, pipeline **`odds_api`**, category pill **`sports`**.
 
@@ -75,7 +75,7 @@ Germany -110 (FanDuel), Portugal +105 (DraftKings)
 
 Long posts may still truncate with `+N more games today.` at the **2000-char** caption cap (subscriber/bot tier). **+EV alerts and morning posts** only consider games **kicking off today (PT)** that have not started yet.
 
-**Morning automation:** cron calls **`lounge-odds-poll`** with **`daily_slates`** every 15 min between **7-10am PT**; each bot fires once per day at a random minute in that window. See **`lounge-odds-poll/README.md`**.
+**Morning automation:** pg_cron calls **`invoke_lounge_odds_poll('daily_slates')`** every **5 min** between **7-10am PT**; each bot fires once per day at a random minute in that window. Edge scan: **`poll_edges`** every **30 min**, **8am-8pm PT**. Migration **`20260704230000`** + Vault secrets — see **`lounge-odds-poll/README.md`**.
 
 **`review_mode`:** `automatic`. Target volume: **~2 posts/day** + optional edge alerts when lines misprice (caps below).
 
@@ -207,6 +207,7 @@ Captions prefix category label from calendar row (e.g. `Wimbledon: ...`).
 | **`20260704200000`** | **`coffee_covers`** post kind + **`coffee_covers_enabled`** |
 | **`20260704210000`** | Bot profile interest tribes on **`admin_lounge_bot_save_settings`** |
 | **`20260704220000`** | Bot portal reply on any visible post (**`admin_lounge_bot_post_comment`**) |
+| **`20260704230000`** | pg_cron **`daily_slates`** + **`poll_edges`** → **`lounge-odds-poll`** (Vault secrets) |
 
 ---
 
@@ -229,7 +230,7 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 | Phase | Scope | Status |
 | --- | --- | --- |
 | **1** | Manual fetch + devig +EV + Coffee & Covers + portal | **Code shipped** |
-| **2** | **`lounge-odds-poll`** cron (30-min edge scan, morning Coffee & Covers) | **Fn shipped; cron not wired** |
+| **2** | **`lounge-odds-poll`** cron (30-min edge scan, morning Coffee & Covers) | **Migration `20260704230000` — apply + Vault on test/prod** |
 | **3** | Line movement vs snapshot ("moved from -2.5 to -3.5") | Not started |
 | **4** | Props, rich cards | Not started |
 
@@ -253,7 +254,7 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 
 ## Open questions
 
-- [ ] Supabase cron schedule for **`poll_edges`** / **`daily_slates`**
+- [x] Supabase cron schedule for **`poll_edges`** / **`daily_slates`** — **`20260704230000`** (Vault + apply per project)
 - [ ] Feed UI badge for +EV posts (caption prefix only today)
 - [ ] Affiliate / sportsbook deep links allowed?
 - [ ] Responsible gaming disclaimer on every post vs profile-only?

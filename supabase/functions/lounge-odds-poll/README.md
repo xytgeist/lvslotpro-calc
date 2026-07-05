@@ -15,13 +15,31 @@ Background odds poller for sports bots.
 
 Each post opens with **☕ Coffee & Covers 💵**. If no spread clears **+4%** EV, Scott opens with *"No strong covers today - sitting on hands until we see better value."* Then **- Best ML Spots Right Now -**, **- Biggest Dogs -**, **- 🍺 On Tap Tomorrow -**, and **`Best lines 👇`**. Today's lines live in **thread parts** (one per calendar sport with games).
 
-**Cron:** invoke every **15 minutes** from **7:00-9:59am PT** with service role:
+**Cron (pg_cron):** migration **`20260704230000_lounge_odds_poll_pg_cron.sql`**
 
-```json
-{ "slug": "sharpesignal", "action": "daily_slates" }
+| Job | Schedule (PDT / UTC-7) | `action` |
+| --- | --- | --- |
+| `lounge_odds_poll_daily_slates` | Every **5 min**, **7:00-9:59am PT** (`*/5 14-16 * * *`) | `daily_slates` |
+| `lounge_odds_poll_edges_pt_day` | Every **30 min**, **8am-4pm PT** (`0,30 15-23 * * *`) | `poll_edges` |
+| `lounge_odds_poll_edges_pt_evening` | Every **30 min**, **5pm-8pm PT** (`0,30 0-3 * * *`) | `poll_edges` |
+
+Invokes **each** `odds_api` bot with `run_state = running` via **`invoke_lounge_odds_poll(action)`**.
+
+**Vault (once per project):**
+
+```sql
+select vault.create_secret('https://YOUR_PROJECT_REF.supabase.co', 'lounge_odds_poll_project_url');
+select vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'lounge_odds_poll_service_role_key');
 ```
 
-First tick after the bot's scheduled minute posts **one** combined thread (deduped via `coffee:daily:{ptDay}`).
+**Verify:**
+
+```sql
+select * from cron.job where jobname like 'lounge_odds_poll_%';
+select public.invoke_lounge_odds_poll('daily_slates');  -- manual smoke
+```
+
+First morning tick after the bot's scheduled random minute posts **one** combined thread (deduped via `coffee:daily:{ptDay}`).
 
 **Portal:** **Post Coffee & Covers** sends `force: true` to bypass the time gate for manual smoke.
 
@@ -31,4 +49,4 @@ First tick after the bot's scheduled minute posts **one** combined thread (dedup
 supabase functions deploy lounge-odds-poll --project-ref YOUR_PROJECT_REF
 ```
 
-Requires **`THE_ODDS_API_KEY`** and migrations through **`20260704200000`**.
+Requires **`THE_ODDS_API_KEY`**, migrations through **`20260704230000`**, and Vault secrets above.

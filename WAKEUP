@@ -82,7 +82,7 @@ Share link UUID = last path segment of **`https://edgetilt.com/lounge/p/{uuid}`*
 
 **Apply on test (in order, skip any already applied):**
 
-`20260704120000` → `20260704130000` → `20260704140000` → `20260704150000` → `20260704160000` → `20260704170000` → `20260704180000` → `20260704190000` → `20260704200000` → `20260704210000` → **`20260704220000`**
+`20260704120000` → `20260704130000` → `20260704140000` → `20260704150000` → `20260704160000` → `20260704170000` → `20260704180000` → `20260704190000` → `20260704200000` → `20260704210000` → `20260704220000` → **`20260704230000`** (cron + Vault)
 
 **Deploy on test:**
 
@@ -95,7 +95,7 @@ Plus frontend deploy for portal UI.
 
 **Ryan smoke checklist:** see **`docs/test-buildout-backlog.md`** → **Planned → Lounge bots → Sports odds smoke**.
 
-**Not built yet:** Supabase cron for 30-min **`poll_edges`** (README only); line-movement captions; spreads/totals +EV; feed UI +EV badge; portal calendar editor (SQL/table only).
+**Not built yet:** line-movement captions; spreads/totals +EV; feed UI +EV badge; portal calendar editor (SQL/table only). **Cron:** migration **`20260704230000`** (apply + Vault on test/prod).
 
 ### Shipped on production (`edgetilt.com`) — still true
 
