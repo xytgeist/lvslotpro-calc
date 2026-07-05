@@ -923,7 +923,9 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
               Optional ticker boost (comma or space separated)
             </div>
             <div className="text-zinc-600 text-[10px] mt-0.5 mb-1">
-              Market Edge publishes on topic tiers (macro, earnings, geopolitics, commodities, regs, M&A). Tickers here are optional — extra company feeds + small score nudge only.
+              {bot.config?.news_profile === 'crypto' || bot.slug === 'crypto-edge'
+                ? 'Crypto Edge publishes on crypto topic tiers (regs, hacks, majors, DeFi). Tickers here are optional — extra company feeds + small score nudge only.'
+                : 'Market Edge publishes on topic tiers (macro, earnings, geopolitics, commodities, regs, M&A). Tickers here are optional — extra company feeds + small score nudge only.'}
             </div>
             <textarea
               value={draft.watchlistText}

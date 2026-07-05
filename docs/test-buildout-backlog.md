@@ -53,8 +53,9 @@ Work proceeds **in roadmap phase order (A → B → C → …)** with each phase
 ### Self-contained (parallel)
 
 - [x] **Apply migrations `20260705020000`–`20260705040000` on test + prod** (manual `supabase db query -f`; `db push` blocked by test history drift)
-- [ ] **Apply migration `20260703140000` on test** (if `lounge_news_sources` missing — skipped when base schema already present)
+- [ ] **Apply migration `20260705050000` on test + prod** (Crypto Edge tier 1+2 sources + profile-aware seed)
 - [ ] **Create Market Edge bot** (`market-edge` / `@marketedge`) via **`/?tab=bots`** wizard or **`supabase/seed/lounge_market_edge_bot.sql`** + **`lounge_bot_seed_market_news_sources()`**
+- [ ] **Create Crypto Edge bot** (`crypto-edge` / `@cryptoedge`) via **`/?tab=bots`** wizard (**Crypto Edge** preset) or **`supabase/seed/lounge_crypto_edge_bot.sql`** + **`lounge_bot_seed_crypto_news_sources()`**
 - [x] **Deploy `lounge-news-poll` + `lounge-bot-admin` on test + prod** (requires **`FINNHUB_API_KEY`**)
 - [x] **Market news bot v1 (code):** Finnhub general + M&A + watchlist company feeds → score → auto-publish; migration + Edge fn + Bot Portal. **`docs/lounge-bot-market-news.md`**
 - [x] **Market Edge persona + cron (code):** migration **`20260705020000`** (`invoke_lounge_news_poll`, pg_cron every 3 min, watchlist seed); wizard defaults **Market Edge** / `@marketedge`.
@@ -817,6 +818,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 - 2026-07-04: **Odds caption voice:** edge + slate posts use plain sentences (short names, fair as American odds, `vs` matchups, compact PT kickoff) — **`loungeBotOddsCaption.ts`**. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.
 - 2026-07-04: **Continuity docs refresh:** **`WAKEUP`**, **`docs/lounge-bot-sports-odds.md`** (shipped v1 spec), **`docs/frontend-architecture.md`** **`bots/`** row, backlog sports-odds smoke checklist expanded.
 - 2026-07-04: **Odds min +EV portal field:** **`/?tab=bots`** Settings shows **Min +EV %** for **`odds_api`** bots (0.5–15); **`admin_lounge_bot_save_settings`** patch **`min_edge_pct`** → **`lounge_bot_odds_config`**. Migration **`20260704170000`**. Apply on test.
+- 2026-07-05: **Crypto Edge tier 1+2 (code):** migration **`20260705050000`** — Finnhub crypto + CoinDesk/Block/Decrypt + SEC/CFTC/Fed + Bitcoin Magazine/CryptoSlate/CoinTelegraph; `config.news_profile: crypto`; **`loungeBotCryptoNewsScore.ts`**; Bot Portal **Crypto Edge** wizard preset; **`docs/lounge-bot-crypto-news.md`**. Apply migration + redeploy **`lounge-news-poll`** + **`lounge-bot-admin`**; smoke on test only.
 - 2026-07-05: **Market Edge shipped to test + prod:** commit **`fa651c5c`** — migrations **`20260705020000`–`20260705040000`** applied (SQL editor/CLI); **`lounge-news-poll`** + **`lounge-bot-admin`** redeployed on **`kcosfvmreeiosdjdzycb`** + **`jtjgtucumuoswnbauxry`**. Bot create + dry-run smoke still open; keep **Stopped** on prod until test sign-off.
 - 2026-07-05: **Market Edge EDGAR + RSS allowlist:** migration **`20260705040000`** — SEC EDGAR 8-K/10-Q/10-K Atom, SEC/Fed/Treasury/CFTC/EIA RSS, BBC + NPR Business; `loungeBotEdgarFetch.ts` + `loungeBotRssFetch.ts`; optional **`SEC_EDGAR_USER_AGENT`** Edge secret.
 - 2026-07-05: **Market Edge topic scoring:** replaced ticker-blend watchlist with **topic-tier** keywords (macro, Fed, earnings, geopolitics, regs, commodities, crypto, M&A); Finnhub **forex + crypto** category sources; optional portal tickers only. Migration **`20260705030000`**. **`docs/lounge-bot-market-news.md`** concept section.

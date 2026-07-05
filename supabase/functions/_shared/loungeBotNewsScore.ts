@@ -1,3 +1,6 @@
+import { scoreCryptoNewsCandidateDetailed } from './loungeBotCryptoNewsScore.ts'
+import type { NewsProfile } from './loungeBotNewsProfile.ts'
+
 /**
  * Topic-tier scoring for Market Edge (0–100).
  * Prioritizes market-moving world news — not a fixed ticker watchlist.
@@ -292,17 +295,23 @@ function matchTopicTiers(blob: string): { matchedTiers: string[]; tierBonus: num
   return { matchedTiers, tierBonus }
 }
 
-export function scoreNewsCandidate(
-  item: NewsCandidate,
-  opts: { watchlistTickers?: string[]; minTitleLength?: number } = {},
-): number {
+export type NewsScoreOpts = {
+  watchlistTickers?: string[]
+  minTitleLength?: number
+  newsProfile?: NewsProfile
+}
+
+export function scoreNewsCandidate(item: NewsCandidate, opts: NewsScoreOpts = {}): number {
   return scoreNewsCandidateDetailed(item, opts).score
 }
 
 export function scoreNewsCandidateDetailed(
   item: NewsCandidate,
-  opts: { watchlistTickers?: string[]; minTitleLength?: number } = {},
+  opts: NewsScoreOpts = {},
 ): TopicScoreResult {
+  if (opts.newsProfile === 'crypto') {
+    return scoreCryptoNewsCandidateDetailed(item, opts)
+  }
   const title = String(item.title || '').trim()
   const summary = String(item.summary || '').trim()
   const blob = `${title} ${summary}`.toLowerCase()

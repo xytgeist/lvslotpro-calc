@@ -2,18 +2,33 @@ import { useMemo, useState } from 'react'
 import { createBotAccount } from './botPortalApi.js'
 import { LOUNGE_POST_CATEGORY_PILL_SLUGS, loungePostCategoryPillLabel } from '../../utils/loungePostCategoryPills.js'
 
-const DEFAULT_MARKET_EDGE_WATCHLIST_TEXT = ''
+const DEFAULT_WATCHLIST_TEXT = ''
 
 const PIPELINE_OPTIONS = [
   {
     id: 'market_news',
+    pipelineId: 'market_news',
+    newsProfile: 'market',
     label: 'Market Edge (financial wire)',
-    hint: 'Self-contained · Finnhub allowlist · auto-publish',
+    hint: 'Self-contained · Finnhub + EDGAR + gov RSS · auto-publish',
     defaultSlug: 'market-edge',
     defaultHandle: 'marketedge',
     defaultDisplayName: 'Market Edge',
     defaultBio: '24/7 Breaking News headlines for professional day traders.',
     defaultPills: ['stocks', 'trading'],
+    maxDay: 12,
+  },
+  {
+    id: 'market_news_crypto',
+    pipelineId: 'market_news',
+    newsProfile: 'crypto',
+    label: 'Crypto Edge (crypto wire)',
+    hint: 'Self-contained · CoinDesk + Block + Finnhub crypto · auto-publish',
+    defaultSlug: 'crypto-edge',
+    defaultHandle: 'cryptoedge',
+    defaultDisplayName: 'Crypto Edge',
+    defaultBio: '24/7 crypto headlines for traders who still read the wire.',
+    defaultPills: ['crypto', 'trading'],
     maxDay: 12,
   },
   {
@@ -46,11 +61,15 @@ function handleFromSlug(slug) {
   return String(slug || '').replace(/-/g, '_').slice(0, 30)
 }
 
+function isMarketNewsWire(meta) {
+  return meta?.pipelineId === 'market_news'
+}
+
 export default function BotCreateWizard({ supabaseClient, open, onClose, onCreated }) {
   const [step, setStep] = useState(0)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [pipeline, setPipeline] = useState('market_news')
+  const [pipelineChoice, setPipelineChoice] = useState('market_news')
   const [slug, setSlug] = useState('market-edge')
   const [handle, setHandle] = useState('marketedge')
   const [displayName, setDisplayName] = useState('Market Edge')
@@ -60,18 +79,19 @@ export default function BotCreateWizard({ supabaseClient, open, onClose, onCreat
   const [scoreMin, setScoreMin] = useState(55)
   const [pills, setPills] = useState(['stocks', 'trading'])
   const [xHandles, setXHandles] = useState('')
-  const [watchlist, setWatchlist] = useState(DEFAULT_MARKET_EDGE_WATCHLIST_TEXT)
+  const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST_TEXT)
 
   const pipelineMeta = useMemo(
-    () => PIPELINE_OPTIONS.find((p) => p.id === pipeline) || PIPELINE_OPTIONS[0],
-    [pipeline],
+    () => PIPELINE_OPTIONS.find((p) => p.id === pipelineChoice) || PIPELINE_OPTIONS[0],
+    [pipelineChoice],
   )
+  const pipeline = pipelineMeta.pipelineId || pipelineMeta.id
 
   if (!open) return null
 
   const pickPipeline = (id) => {
     const meta = PIPELINE_OPTIONS.find((p) => p.id === id) || PIPELINE_OPTIONS[0]
-    setPipeline(id)
+    setPipelineChoice(id)
     setSlug(meta.defaultSlug)
     setHandle(meta.defaultHandle || handleFromSlug(meta.defaultSlug))
     setDisplayName(meta.defaultDisplayName || '')
@@ -79,7 +99,7 @@ export default function BotCreateWizard({ supabaseClient, open, onClose, onCreat
     setPills([...meta.defaultPills])
     setMaxDay(meta.maxDay)
     setMaxHour(id === 'odds_api' ? 1 : 4)
-    if (id === 'market_news') setWatchlist(DEFAULT_MARKET_EDGE_WATCHLIST_TEXT)
+    if (isMarketNewsWire(meta)) setWatchlist(DEFAULT_WATCHLIST_TEXT)
   }
 
   const submit = async () => {
@@ -101,8 +121,9 @@ export default function BotCreateWizard({ supabaseClient, open, onClose, onCreat
       category_pills_default: pills,
       run_state: 'stopped',
       x_handles: xList,
-      config: pipeline === 'market_news'
+      config: isMarketNewsWire(pipelineMeta)
         ? {
+            news_profile: pipelineMeta.newsProfile || 'market',
             watchlist_tickers: watchlist.split(/[,\s]+/).map((t) => t.replace(/^\$/, '').toUpperCase()).filter(Boolean),
           }
         : {},
@@ -147,7 +168,7 @@ export default function BotCreateWizard({ supabaseClient, open, onClose, onCreat
                 type="button"
                 onClick={() => pickPipeline(opt.id)}
                 className={`w-full text-left rounded-xl border px-3 py-3 ${
-                  pipeline === opt.id
+                  pipelineChoice === opt.id
                     ? 'border-cyan-500/40 bg-cyan-950/30'
                     : 'border-zinc-700 bg-zinc-950/40 hover:border-zinc-600'
                 }`}
@@ -253,17 +274,19 @@ export default function BotCreateWizard({ supabaseClient, open, onClose, onCreat
                 />
               </label>
             ) : null}
-            {pipeline === 'market_news' ? (
+            {isMarketNewsWire(pipelineMeta) ? (
               <label className="block">
                 <div className="text-[11px] font-semibold uppercase text-zinc-500">Optional ticker boost</div>
                 <div className="text-zinc-600 text-[10px] mt-0.5 mb-1">
-                  Leave blank for topic-only mode (macro, earnings, geopolitics, commodities, etc.). Add tickers only if you want extra company feeds and a small score nudge.
+                  {pipelineMeta.newsProfile === 'crypto'
+                    ? 'Leave blank for topic-only mode (regs, hacks, majors, DeFi). Add tickers only for extra feeds and a small score nudge.'
+                    : 'Leave blank for topic-only mode (macro, earnings, geopolitics, commodities, etc.). Add tickers only if you want extra company feeds and a small score nudge.'}
                 </div>
                 <textarea
                   value={watchlist}
                   rows={2}
                   onChange={(e) => setWatchlist(e.target.value)}
-                  placeholder="Optional — e.g. NVDA, BTC"
+                  placeholder={pipelineMeta.newsProfile === 'crypto' ? 'Optional — e.g. BTC, ETH, COIN' : 'Optional — e.g. NVDA, BTC'}
                   className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-white text-sm font-mono"
                 />
               </label>

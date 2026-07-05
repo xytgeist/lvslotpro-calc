@@ -17,6 +17,10 @@ import {
   scoreNewsCandidate,
 } from '../_shared/loungeBotNewsScore.ts'
 import { DEFAULT_MARKET_EDGE_SLUG } from '../_shared/loungeBotMarketNewsDefaults.ts'
+import {
+  defaultNewsSourcesForProfile,
+  newsProfileFromAccount,
+} from '../_shared/loungeBotNewsProfile.ts'
 import { fetchEdgarCurrentFilings, secEdgarUserAgent } from '../_shared/loungeBotEdgarFetch.ts'
 import { fetchAllowlistedFeed, type NormalizedNewsItem } from '../_shared/loungeBotRssFetch.ts'
 import { publishLoungeBotPost } from '../_shared/loungeBotPublish.ts'
@@ -73,6 +77,28 @@ function watchlistFromConfig(config: Record<string, unknown> | null): string[] {
   const raw = config?.watchlist_tickers
   if (!Array.isArray(raw)) return []
   return raw.map((t) => String(t || '').trim().toUpperCase()).filter(Boolean)
+}
+
+async function ensureDefaultNewsSources(
+  admin: SupabaseClient,
+  botUserId: string,
+  profile: ReturnType<typeof newsProfileFromAccount>,
+  existingSources: NewsSource[],
+): Promise<void> {
+  const existingNames = new Set(existingSources.map((s) => s.name))
+  for (const seed of defaultNewsSourcesForProfile(profile)) {
+    if (existingNames.has(seed.name)) continue
+    await admin.from('lounge_news_sources').insert({
+      bot_user_id: botUserId,
+      name: seed.name,
+      kind: seed.kind,
+      poll_url: seed.poll_url ?? null,
+      api_config: seed.api_config ?? {},
+      poll_interval_sec: seed.poll_interval_sec,
+      enabled: true,
+    })
+    existingNames.add(seed.name)
+  }
 }
 
 async function ensureWatchlistCompanySources(
@@ -280,6 +306,7 @@ Deno.serve(async (req) => {
     }
 
     const account = bot as BotAccount
+    const newsProfile = newsProfileFromAccount(account.config, account.slug)
     const watchlist = watchlistFromConfig(account.config)
     const threshold = Number(account.publish_score_threshold) || 55
 
@@ -302,11 +329,15 @@ Deno.serve(async (req) => {
 
     if (allSrcErr) return adminOpsJson(500, { error: allSrcErr.message })
 
+    const sourceRows = (allSources || []) as NewsSource[]
+
+    await ensureDefaultNewsSources(admin, account.user_id, newsProfile, sourceRows)
+
     await ensureWatchlistCompanySources(
       admin,
       account.user_id,
       watchlist,
-      (allSources || []) as NewsSource[],
+      sourceRows,
     )
 
     const { data: sources, error: srcErr } = await admin
@@ -343,7 +374,7 @@ Deno.serve(async (req) => {
             .maybeSingle()
           if (existing?.id) continue
 
-          const score = scoreNewsCandidate(item, { watchlistTickers: watchlist })
+          const score = scoreNewsCandidate(item, { watchlistTickers: watchlist, newsProfile })
           if (dryRun) {
             if (score >= threshold) candidates.push({ item, score, sourceId: source.id })
             continue
@@ -406,7 +437,9 @@ Deno.serve(async (req) => {
         const caption = buildFinancialWireCaption(cand.item)
         const pills = account.category_pills_default?.length
           ? account.category_pills_default
-          : ['stocks', 'trading']
+          : newsProfile === 'crypto'
+            ? ['crypto', 'trading']
+            : ['stocks', 'trading']
 
         const { data: rawMatch } = await admin
           .from('lounge_news_raw_items')

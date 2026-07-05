@@ -5,7 +5,7 @@
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
-import { DEFAULT_MARKET_NEWS_SOURCES } from '../_shared/loungeBotMarketNewsDefaults.ts'
+import { defaultNewsSourcesForProfile, newsProfileFromAccount } from '../_shared/loungeBotNewsProfile.ts'
 
 type CreateBotBody = {
   action: 'create_bot'
@@ -53,9 +53,11 @@ async function seedPipelineExtras(
   pipeline: string,
   xHandles: string[],
   config: Record<string, unknown> | null,
+  slug?: string,
 ) {
   if (pipeline === 'market_news') {
-    for (const s of DEFAULT_MARKET_NEWS_SOURCES) {
+    const profile = newsProfileFromAccount(config, slug)
+    for (const s of defaultNewsSourcesForProfile(profile)) {
       const { data: exists } = await admin
         .from('lounge_news_sources')
         .select('id')
@@ -206,7 +208,7 @@ Deno.serve(async (req) => {
       return adminOpsJson(500, { error: botErr.message })
     }
 
-    await seedPipelineExtras(admin, userId, pipeline, body.x_handles || [], body.config || null)
+    await seedPipelineExtras(admin, userId, pipeline, body.x_handles || [], body.config || null, slug)
 
     return adminOpsJson(200, {
       ok: true,
