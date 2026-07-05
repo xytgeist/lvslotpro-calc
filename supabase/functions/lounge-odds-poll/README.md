@@ -35,7 +35,13 @@ Invokes **each** `odds_api` bot with `run_state = running` via **`invoke_lounge_
 ```sql
 select vault.create_secret('https://YOUR_PROJECT_REF.supabase.co', 'lounge_odds_poll_project_url');
 select vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'lounge_odds_poll_service_role_key');
+-- Random string (same value on Edge as LOUNGE_ODDS_POLL_CRON_SECRET) — migration 20260705090000
+select vault.create_secret('YOUR_LONG_RANDOM_SECRET', 'lounge_odds_poll_cron_secret');
 ```
+
+Set Edge secret **`LOUNGE_ODDS_POLL_CRON_SECRET`** on **`lounge-odds-poll`** and **`lounge-bot-publish-due`** to the same random string. pg_net sends header **`x-lounge-odds-poll-cron-secret`** (avoids service-role JWT format mismatches).
+
+**Portal manual runs** use your **admin session JWT** (sync Edge invoke), not pg_net.
 
 **Verify:**
 

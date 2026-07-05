@@ -1,8 +1,11 @@
 import { createClient, type SupabaseClient, type User } from 'npm:@supabase/supabase-js@2'
 
+export const LOUNGE_ODDS_POLL_CRON_HEADER = 'x-lounge-odds-poll-cron-secret'
+
 export const adminOpsCorsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-lounge-odds-poll-cron-secret',
 }
 
 export function adminOpsJson(status: number, body: Record<string, unknown>) {
@@ -66,9 +69,19 @@ export function isKnownServiceRoleBearer(
 
 /** pg_net often sends service role on apikey only (sb_secret must not use Authorization Bearer). */
 export function serviceRoleCredentialFromRequest(req: Request): string {
+  const apikey = (req.headers.get('apikey') || '').trim()
   const authBearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
+  if (apikey && (!authBearer || authBearer === apikey)) return apikey
   if (authBearer) return authBearer
-  return (req.headers.get('apikey') || '').trim()
+  return apikey
+}
+
+/** Shared secret for pg_net → lounge-odds-poll / lounge-bot-publish-due (Vault + Edge env). */
+export function isOddsPollCronSecret(req: Request): boolean {
+  const expected = Deno.env.get('LOUNGE_ODDS_POLL_CRON_SECRET')?.trim()
+  if (!expected) return false
+  const got = req.headers.get(LOUNGE_ODDS_POLL_CRON_HEADER)?.trim()
+  return Boolean(got && got === expected)
 }
 
 /** Service role (cron) or admin user JWT (portal). */
@@ -77,6 +90,10 @@ export async function authorizeServiceRoleOrAdmin(req: Request): Promise<Supabas
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
   if (!supabaseUrl || !serviceRoleKey) {
     throw adminOpsJson(503, { error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.' })
+  }
+
+  if (isOddsPollCronSecret(req)) {
+    return createClient(supabaseUrl, serviceRoleKey)
   }
 
   const credential = serviceRoleCredentialFromRequest(req)

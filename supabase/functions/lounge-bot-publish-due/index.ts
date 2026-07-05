@@ -7,6 +7,7 @@ import {
   adminOpsCorsHeaders,
   adminOpsJson,
   isKnownServiceRoleBearer,
+  isOddsPollCronSecret,
   requireAdminUser,
   serviceRoleCredentialFromRequest,
 } from '../_shared/adminAuth.ts'
@@ -17,6 +18,10 @@ async function authorize(req: Request): Promise<{ admin: SupabaseClient; reviewe
   const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim()
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
   if (!supabaseUrl || !serviceRoleKey) throw adminOpsJson(503, { error: 'Missing env.' })
+
+  if (isOddsPollCronSecret(req)) {
+    return { admin: createClient(supabaseUrl, serviceRoleKey), reviewerId: null }
+  }
 
   const credential = serviceRoleCredentialFromRequest(req)
   if (isKnownServiceRoleBearer(credential, serviceRoleKey, supabaseUrl)) {
