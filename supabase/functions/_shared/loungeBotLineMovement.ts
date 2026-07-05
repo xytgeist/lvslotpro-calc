@@ -398,13 +398,6 @@ export function buildLineMovementCaption(
     ? alert.leadingBooks.join(', ')
     : 'multiple books'
 
-  const ts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  }).format(new Date())
-
   const header = ALERT_HEADERS[alert.kind]
   const contextLines = formatScottSportContextLines(
     alert.awayTeam,
@@ -422,8 +415,6 @@ export function buildLineMovementCaption(
     `Books: ${books}`,
     '',
     alert.meaning,
-    '',
-    `Updated ${ts}`,
   ].join('\n')
 }
 

@@ -268,7 +268,7 @@ Example:
 
 Example period report:
 ```text
-📊 Halftime Report - NFL - Chiefs 14-10 Bills
+📊 Halftime Report - Chiefs 14-10 Bills
 
 Best bets for 2nd half:
 • Chiefs -2.5 (-108) @ DraftKings (+4.5% EV)
@@ -295,9 +295,7 @@ France vs Paraguay · Sat 2PM PT
 France spread -3 (-110) → -4 (-108)
 Books: FanDuel, DraftKings
 
-Significant move (1 pt) — sharp action shifting the France spread.
-
-Updated 6:45 PM PT
+Significant move (1 pt) ... sharp action shifting the France spread.
 ```
 
 Example steam:
@@ -310,9 +308,7 @@ Chiefs vs Raiders · Sun 1:25 PM PT
 Chiefs spread -3 (-110) → -4 (-108)
 Books: FanDuel, DraftKings
 
-Fast multi-book steam — number syncing toward Chiefs right now.
-
-Updated 6:45 PM PT
+Fast multi-book steam ... number syncing toward Chiefs right now.
 ```
 
 ---

@@ -281,10 +281,7 @@ export function buildPeriodReportCaption(
   const away = shortName(String(event.away_team || 'Away'))
   const home = shortName(String(event.home_team || 'Home'))
   const matchup = opts.scoreLine || `${away} vs ${home}`
-  const sport = String(opts.categoryLabel || '').trim()
-  const header = sport
-    ? `📊 ${opts.periodLabel} - ${sport} - ${matchup}`
-    : `📊 ${opts.periodLabel} - ${matchup}`
+  const header = `📊 ${opts.periodLabel} - ${matchup}`
 
   const lines = [
     header,

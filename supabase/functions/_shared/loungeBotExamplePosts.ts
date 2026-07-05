@@ -145,8 +145,6 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       'Books: FanDuel, DraftKings',
       '',
       'Significant move (1 pt) ... sharp action shifting the France spread.',
-      '',
-      'Updated 6:45 PM PT',
     ].join('\n'),
   },
   {
@@ -162,8 +160,6 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       'Books: FanDuel, DraftKings',
       '',
       'Fast multi-book steam ... number syncing toward Chiefs right now.',
-      '',
-      'Updated 6:45 PM PT',
     ].join('\n'),
   },
   {
@@ -179,8 +175,6 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       'Books: DraftKings, FanDuel',
       '',
       'Public side and sharp money diverging ... spread moved one way while ML moved the other.',
-      '',
-      'Updated 6:45 PM PT',
     ].join('\n'),
   },
   {
@@ -200,7 +194,7 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
     postKind: 'period_report',
     label: 'Period / Halftime Report',
     caption: [
-      '📊 Halftime Report - NFL - Chiefs 14-10 Bills',
+      '📊 Halftime Report - Chiefs 14-10 Bills',
       '',
       'Best bets for 2nd half:',
       '• Chiefs -2.5 (-108) @ DraftKings (+4.5% EV)',
