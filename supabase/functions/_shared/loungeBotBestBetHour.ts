@@ -36,6 +36,7 @@ import {
   coverageRankForSport,
   type CalendarCoverageInput,
 } from './loungeBotCoverageScope.ts'
+import { effectiveMinEvPct } from './loungeBotSportAnalysis.ts'
 
 const HOURLY_MARKETS: Array<'h2h' | 'spreads' | 'totals'> = ['h2h', 'spreads', 'totals']
 const CAPTION_MAX = 2000
@@ -277,7 +278,8 @@ export async function runBestBetHourPoll(
   }
 
   const best = pickBestBetAcrossSports(candidates)
-  if (!best || best.edgePct < minEv) {
+  const minEvForBest = best ? effectiveMinEvPct(best.sportKey, minEv) : minEv
+  if (!best || best.edgePct < minEvForBest) {
     return {
       ok: true,
       slug,

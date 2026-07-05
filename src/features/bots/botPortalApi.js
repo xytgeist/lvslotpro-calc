@@ -134,11 +134,24 @@ export async function invokeLoungeOddsIngest(supabaseClient, opts = {}) {
       sportKey: opts.sportKey || undefined,
       calendarSlug: opts.calendarSlug || undefined,
       postMode: opts.postMode || 'auto',
+      action: opts.action || undefined,
     },
   })
   if (error) return { data: null, error: new Error(error.message || 'lounge-odds-ingest failed') }
   if (data?.error) return { data: null, error: new Error(String(data.error)) }
   return { data, error: null }
+}
+
+/**
+ * Publish one example Lounge post per Scott alert type (portal smoke pack).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ slug?: string }} [opts]
+ */
+export async function invokeLoungeOddsPublishExamples(supabaseClient, opts = {}) {
+  return invokeLoungeOddsIngest(supabaseClient, {
+    slug: opts.slug,
+    action: 'publish_examples',
+  })
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   type OddsEvent,
   type OddsPick,
 } from './loungeBotOddsCaption.ts'
+import { effectiveMinEvPct } from './loungeBotSportAnalysis.ts'
 
 /** Min +EV % on $1 for ML spots in the morning post. */
 export const COFFEE_ML_EV_THRESHOLD_PCT = 3
@@ -607,7 +608,8 @@ export function findPlusEvSpreadOpportunities(
   } = {},
 ): SpreadPick[] {
   const minBooks = opts.minBooks ?? DEFAULT_MIN_BOOKS
-  const minEvPct = opts.minEvPct ?? COFFEE_SPREAD_EV_THRESHOLD_PCT
+  const rawMinEv = opts.minEvPct ?? COFFEE_SPREAD_EV_THRESHOLD_PCT
+  const minEvPct = effectiveMinEvPct(sportKey, rawMinEv)
   const maxEvPct = opts.maxEvPct ?? DEFAULT_MAX_EV_PCT
   const opportunities: SpreadPick[] = []
 

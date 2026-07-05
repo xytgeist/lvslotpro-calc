@@ -17,6 +17,7 @@ import {
   type OddsPick,
   type OddsEvent,
 } from './loungeBotOddsCaption.ts'
+import { effectiveMinEvPct } from './loungeBotSportAnalysis.ts'
 import {
   coffeeDailyDedupeKey,
   generateCoffeeAndCovers,
@@ -396,8 +397,9 @@ export async function tryPublishEdgeAlert(
     maxEvPct: DEFAULT_MAX_EV_PCT,
   })
 
-  if (!pick || pick.edgePct < minEdge) {
-    return { published: false, pick: pick && pick.edgePct < minEdge ? pick : null }
+  const minEvForSport = effectiveMinEvPct(ctx.sportKey, minEdge)
+  if (!pick || pick.edgePct < minEvForSport) {
+    return { published: false, pick: pick && pick.edgePct < minEvForSport ? pick : null }
   }
 
   const dedupeKey = edgeAlertDedupeKey(pick, ptTodayDate())

@@ -12,12 +12,12 @@
 
 ```text
 Calendar sport pick (portal)  →  lounge-odds-ingest (manual) or lounge-odds-poll (cron)
-  →  +EV engine (h2h devig)  →  ⚡ edge alert OR Coffee & Covers morning post  →  feed
+  →  +EV engine (h2h / spreads / totals devig)  →  ⚡ edge alert OR Coffee & Covers morning post  →  feed
 ```
 
 | **Post kind** | When | Example tone |
 | --- | --- | --- |
-| **Edge** | Best h2h line clears **`min_edge_pct`** | See example below |
+| **Edge** | Best +EV line (ML / spread / total) clears **`min_edge_pct`** | See example below |
 | **Coffee & Covers** | No edge on manual fetch, or **`daily_slates`** morning poll | See example below |
 | **Best Bet of the Hour** | Hourly cron **`best_bet_hour`** (or portal button) | See example below |
 | **Arb Watch** | **`poll_edges`** finds **≥ 3%** guaranteed cross-book arb | See example below |
@@ -102,6 +102,7 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 | **Scan all · edge** | All calendar sports today → edge alerts only |
 | **Post Coffee & Covers** | One morning post/day (dedupe) with thread parts per sport |
 | **Best bet · hour** | Manual smoke for hourly strongest +EV post (same logic as cron) |
+| **Post all examples** | One 🧪 Example feed post per alert type (**13** total, incl. Coffee & Covers thread part) |
 | **Min +EV %** | Settings field **0.5–15** → **`lounge_bot_odds_config.min_edge_pct`** |
 | **Alert audience** | Per alert type: **All** (public feed) or **Subs** (subscriber-only post). Matrix in Settings → **`lounge_bot_odds_config.alert_audience`**. Defaults: Coffee & Covers **All**; edge, line movement, in-game, period reports, Best Bet of the Hour, Arb Watch, **Sharp Report** **Subs**. **Arb Watch** and **Sharp Report** only post when quality signal exists. |
 
@@ -117,16 +118,16 @@ Each publish path sets **`subscriber_only`** from **`alert_audience`** (see port
 
 ## +EV engine
 
-Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`** (h2h alerts) and **`loungeBotCoffeeAndCovers.ts`** (morning covers + ML spots).
+Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`**, **`loungeBotSportAnalysis.ts`** (sport-weighted ranking), and **`loungeBotCoffeeAndCovers.ts`** (morning covers + ML spots).
 
-### Edge alerts (h2h)
+### Edge alerts (multi-market)
 
 1. Filter events: **today (PT)** kickoffs not yet started (after optional **48h** API pre-filter), **3+ books**, in-season sport keys from The Odds API **`active`**
-2. **h2h only** for ⚡ alerts
-3. Per book: devig both sides → fair implied prob per outcome
+2. Scan **`h2h`**, **`spreads`**, and **`totals`** (sport-weighted tie-break when EV is close; see **Sport-specific analysis** below)
+3. Per book: devig outcomes → fair implied prob per side
 4. **Consensus:** average fair probs across books
 5. **EV on $1** at best available American price vs consensus
-6. Publish if **`evPct >= min_edge_pct`** and **`evPct <= 15`** (stale-data filter)
+6. Publish if **`evPct >= min_edge_pct`** (WNBA **+0.5%** bump) and **`evPct <= 15`** (stale-data filter)
 
 ### Coffee & Covers (morning)
 
@@ -400,6 +401,92 @@ Canonical logic: **`supabase/functions/_shared/loungeBotCoverageScope.ts`**.
 
 ---
 
+## Sport-specific analysis (pick ranking + voice)
+
+Canonical logic: **`supabase/functions/_shared/loungeBotSportAnalysis.ts`**.
+
+### Engine behavior (Odds API only today)
+
+| Sport | Market priority when EV is close | Min EV notes |
+| --- | --- | --- |
+| **NFL / NCAAF / NBA / NCAAB / WNBA / NHL** | **Spread-heavy** ... spreads > totals > ML | WNBA adds **+0.5%** to every configured min EV bar |
+| **MLB / MMA / tennis / boxing** | **ML-heavy** ... ML > spread > total; slight underdog ML boost | Underdog ML tie-break |
+| **Soccer** | Balanced 1X2 / handicap / totals; **draw ML** tie-break | `h2h` is 3-way home/draw/away |
+
+**Where it applies:**
+
+- **`findPlusEvOpportunities`** / **`pickBestOddsCandidate`** ... sport-weighted sort when raw EV gap **< 2%**
+- **+EV edge alerts** (`poll_edges`) ... same **3-market** scan as Best Bet / Value Radar (no longer ML-only)
+- **Best Bet of the Hour**, **Value Bet Radar**, **live in-game edge** ... inherit WNBA bump via `effectiveMinEvPct`
+- **Coffee & Covers** spread covers + Dog of the Day ... WNBA bump on spread thresholds too
+
+**Still deferred until a stats feed (e.g. SportsDataIO):** player props, fight method, starting pitcher / injury narrative in captions. Sharp Report injury copy today is template-only when we lack a feed.
+
+### Target voice per sport (caption examples)
+
+Use these as editorial north stars; post kinds may differ but tone should match.
+
+**NFL & college football** ... spreads + totals, 0.5pt moves matter, covers in Coffee & Covers.
+
+```text
+📊 Sharp Move – Chiefs -3 moved to -3.5 across 6 books (+4.2% EV on Chiefs -3.5)
+```
+
+**NBA** ... spreads + totals; live halftime / in-game edges.
+
+```text
+🔥 Best Bet of the Hour – Lakers -4.5 @ +105 (+5.8% EV) vs Warriors
+```
+
+**MLB** ... ML + run line (`spreads`); underdog value.
+
+```text
+📡 Value Bet Radar – Padres ML +219 (+7.8% EV) vs Dodgers
+```
+
+**Soccer** ... 1X2 (`h2h`), handicap (`spreads`), totals; draw can be high value.
+
+```text
+☕ Coffee & Covers – Draw ML +718 (+9.6% EV) in France vs Paraguay
+```
+
+**NHL** ... ML, puck line, totals; period milestone posts for live.
+
+```text
+📈 Line Movement – Oilers -1.5 Puck Line moved from -110 to +105
+```
+
+**Tennis (Grand Slams)** ... match ML underdogs.
+
+```text
+🔥 Giron ML +900 (+4.2% EV) vs Zverev – Wimbledon
+```
+
+**WNBA** ... NBA-like markets, slightly higher EV bar (+0.5%).
+
+```text
+📡 Value Bet Radar – Valkyries ML +155 (+3.7% EV) vs Dream
+```
+
+**UFC / MMA** ... ML; Dog of the Day hunts big +EV dogs.
+
+```text
+Dog of the Day – Underdog +450 (+6.1% EV)
+```
+
+### Future: SportsDataIO (or similar)
+
+Planned enrichment layer **after** API access:
+
+- MLB starting pitchers + bullpen context in Coffee & Covers / Sharp Report
+- NBA/WNBA injury availability for live edge captions
+- UFC fight method / weight-class metadata for prop expansion
+- Soccer lineups / suspension flags for draw / total reasoning
+
+Until then, Scott stays **odds-consensus + line-movement** only ... no fabricated injury or matchup copy.
+
+---
+
 ## Migrations (apply order on test)
 
 | Migration | What |
@@ -427,6 +514,8 @@ Canonical logic: **`supabase/functions/_shared/loungeBotCoverageScope.ts`**.
 | **`20260704310000`** | **Human-paced publish queue** (`lounge_bot_scheduled_posts`, minute drain cron) |
 | **`20260704320000`** | **Sports calendar portal** (list + save RPCs, Scott bot calendar UI) |
 | **`20260704330000`** | **Scott coverage tiers** (`coverage_tier` on calendar, expanded 2026 seed incl. UFC 329) |
+
+**Edge code (no migration):** **`loungeBotSportAnalysis.ts`** — sport market weights, WNBA +0.5% min EV, multi-market edge alerts. Redeploy **`lounge-odds-poll`** after pull.
 
 ---
 
@@ -464,6 +553,9 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 | Spec (this file) | **`docs/lounge-bot-sports-odds.md`** |
 | Portal UI | **`src/features/bots/BotManagementPortal.jsx`**, **`botPortalApi.js`** |
 | +EV math | **`supabase/functions/_shared/loungeBotOddsCaption.ts`** |
+| Sport pick ranking | **`supabase/functions/_shared/loungeBotSportAnalysis.ts`** |
+| Example post pack | **`supabase/functions/_shared/loungeBotExamplePosts.ts`** |
+| Coverage tiers | **`supabase/functions/_shared/loungeBotCoverageScope.ts`** |
 | Coffee & Covers | **`supabase/functions/_shared/loungeBotCoffeeAndCovers.ts`** |
 | Best Bet of the Hour | **`supabase/functions/_shared/loungeBotBestBetHour.ts`** |
 | Arb Watch | **`supabase/functions/_shared/loungeBotArbWatch.ts`** |
@@ -480,6 +572,10 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 - [ ] Feed UI badge for +EV posts (caption prefix only today)
 - [ ] Affiliate / sportsbook deep links allowed?
 - [ ] Responsible gaming disclaimer on every post vs profile-only?
+
+---
+
+_Updated 2026-07-04: Sport-specific analysis (`loungeBotSportAnalysis.ts`) — market weights, WNBA +0.5% min EV, multi-market edge alerts; SportsDataIO enrichment deferred._
 
 ---
 

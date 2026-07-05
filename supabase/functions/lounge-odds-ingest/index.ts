@@ -1,9 +1,11 @@
 /**
  * Sports odds bot — manual fetch for one sport (edge alert or morning post).
  * Body: { slug, sportKey, calendarSlug?, dryRun?, postMode?: 'auto'|'edge_only'|'slate_only' }
+ * Body: { slug, action: 'publish_examples' } — portal example post pack (no sportKey).
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import { publishScottExamplePosts } from '../_shared/loungeBotExamplePosts.ts'
 import {
   buildOddsEdgeAlertCaption,
   buildOddsSlateCaption,
@@ -44,14 +46,11 @@ Deno.serve(async (req) => {
     const admin = await authorize(req)
     const body = await req.json().catch(() => ({}))
     const slug = String(body?.slug || 'sports-odds').trim()
+    const action = String(body?.action || '').trim()
     const dryRun = body?.dryRun === true
     const sportKey = String(body?.sportKey || '').trim()
     const calendarSlug = String(body?.calendarSlug || '').trim()
     const postMode = String(body?.postMode || 'auto').trim() as 'auto' | 'edge_only' | 'slate_only'
-
-    if (!sportKey) {
-      return adminOpsJson(400, { error: 'sportKey required. Pick today\'s sport in the bot portal.' })
-    }
 
     const { data: bot, error: botErr } = await admin
       .from('lounge_bot_accounts')
@@ -62,6 +61,35 @@ Deno.serve(async (req) => {
     if (botErr) return adminOpsJson(500, { error: botErr.message })
     if (!bot?.user_id) return adminOpsJson(404, { error: 'Odds bot not configured.' })
     if (bot.pipeline !== 'odds_api') return adminOpsJson(400, { error: 'Not an odds_api bot.' })
+
+    if (action === 'publish_examples') {
+      const { data: oddsCfgRaw } = await admin
+        .from('lounge_bot_odds_config')
+        .select('alert_audience')
+        .eq('bot_user_id', bot.user_id)
+        .maybeSingle()
+
+      const result = await publishScottExamplePosts(
+        admin,
+        bot,
+        (oddsCfgRaw?.alert_audience as Record<string, unknown> | null) ?? null,
+      )
+
+      return adminOpsJson(200, {
+        ok: true,
+        slug,
+        action: 'publish_examples',
+        published: result.published,
+        failed: result.failed,
+        postIds: result.postIds,
+        details: result.details,
+      })
+    }
+
+    if (!sportKey) {
+      return adminOpsJson(400, { error: 'sportKey required. Pick today\'s sport in the bot portal.' })
+    }
+
     if (!dryRun && bot.run_state !== 'running') {
       return adminOpsJson(200, { ok: true, skipped: bot.run_state, slug })
     }

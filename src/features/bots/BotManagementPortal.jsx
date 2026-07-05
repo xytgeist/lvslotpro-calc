@@ -23,11 +23,13 @@ import {
   invokeLoungeNewsPoll,
   invokeLoungeOddsIngest,
   invokeLoungeOddsPoll,
+  invokeLoungeOddsPublishExamples,
   invokeLoungeXIngest,
   saveBotSettings,
   toggleBotNewsSource,
   updateBotPostCaption,
 } from './botPortalApi.js'
+import { SCOTT_EXAMPLE_POST_COUNT } from './scottExamplePosts.js'
 import { LOUNGE_CAPTION_MAX, LOUNGE_CAPTION_SUBSCRIBER_MAX } from '../../utils/loungeCommentLimits.js'
 import {
   LOUNGE_POST_CATEGORY_PILL_SLUGS,
@@ -477,6 +479,30 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     void onReload()
   }
 
+  const publishAllExamplePosts = async () => {
+    const ok = window.confirm(
+      `Post ${SCOTT_EXAMPLE_POST_COUNT} example captions to the Lounge feed as @${bot.handle || bot.slug}? Each post is prefixed with 🧪 Example and uses your Alert audience (All | Subs) settings.`,
+    )
+    if (!ok) return
+
+    setBusy('examples')
+    const result = await invokeLoungeOddsPublishExamples(supabaseClient, { slug: bot.slug })
+    setBusy('')
+    if (result.error) {
+      setToast(result.error.message || 'Example post pack failed.')
+      return
+    }
+    const d = result.data || {}
+    if (d.failed > 0 && d.published > 0) {
+      setToast(`Posted ${d.published}/${SCOTT_EXAMPLE_POST_COUNT} examples · ${d.failed} failed. Check feed.`)
+    } else if (d.failed > 0) {
+      setToast(`Example pack failed (${d.failed} errors).`)
+    } else {
+      setToast(`Posted ${d.published ?? SCOTT_EXAMPLE_POST_COUNT} example posts · check Lounge feed.`)
+    }
+    void onReload()
+  }
+
   const togglePill = (slug) => {
     setDraft((d) => {
       const cur = d.categoryPills || []
@@ -658,6 +684,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         ) : null}
 
         {isAutomatic ? (
+          <>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -712,6 +739,26 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
               </>
             ) : null}
           </div>
+          {bot.pipeline === 'odds_api' ? (
+            <div className="mt-3 rounded-xl border border-violet-500/25 bg-violet-950/20 px-3 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-200/90">
+                Example post pack
+              </div>
+              <div className="text-zinc-500 text-[10px] mt-1 mb-2">
+                One 🧪 Example feed post per alert type ({SCOTT_EXAMPLE_POST_COUNT} total), including Coffee & Covers thread part.
+                Respects Alert audience All | Subs. Works while paused.
+              </div>
+              <button
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => void publishAllExamplePosts()}
+                className="min-h-8 rounded-lg bg-violet-800 px-3 text-violet-50 text-[11px] font-bold disabled:opacity-50"
+              >
+                {busy === 'examples' ? 'Publishing…' : 'Post all examples'}
+              </button>
+            </div>
+          ) : null}
+          </>
         ) : (
           <div className="mt-3 flex flex-wrap gap-2">
             <button

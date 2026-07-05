@@ -1,7 +1,11 @@
 /**
  * Sports odds +EV analysis (The Odds API JSON).
- * h2h only: per-book devig → consensus fair prob → EV on best available price.
+ * Per-book devig → consensus fair prob → EV on best available line (h2h / spreads / totals).
  */
+import {
+  compareSportPicks,
+  resolvePlusEvPickOptions,
+} from './loungeBotSportAnalysis.ts'
 
 const CAPTION_MAX = 2000
 
@@ -56,7 +60,7 @@ export type PlusEvPickOptions = {
   minBooks?: number
   minEvPct?: number
   maxEvPct?: number
-  /** Defaults to h2h only; pass spreads/totals for live multi-market scans. */
+  /** Defaults to sport profile markets (usually h2h + spreads + totals). */
   marketKeys?: Array<'h2h' | 'spreads' | 'totals'>
 }
 
@@ -309,17 +313,18 @@ function shortDisplayName(name: string): string {
 
 /**
  * Find +EV opportunities: devig per book, consensus fair prob, EV on best line.
- * Default market is h2h; pass marketKeys for live spread/total scans.
+ * Default markets are sport-weighted (h2h / spreads / totals); close EV ties prefer spread- vs ML-heavy sports.
  */
 export function findPlusEvOpportunities(
   events: OddsEvent[],
   sportKey: string,
   opts: PlusEvPickOptions = {},
 ): OddsPick[] {
+  const resolved = resolvePlusEvPickOptions(sportKey, opts)
   const minBooks = opts.minBooks ?? DEFAULT_MIN_BOOKS
-  const minEvPct = opts.minEvPct ?? DEFAULT_MIN_EV_PCT
+  const minEvPct = resolved.minEvPct ?? opts.minEvPct ?? DEFAULT_MIN_EV_PCT
   const maxEvPct = opts.maxEvPct ?? DEFAULT_MAX_EV_PCT
-  const marketKeys = opts.marketKeys?.length ? opts.marketKeys : ['h2h']
+  const marketKeys = opts.marketKeys?.length ? opts.marketKeys : resolved.marketKeys ?? ['h2h']
   const opportunities: OddsPick[] = []
 
   for (const ev of events) {
@@ -409,17 +414,18 @@ export function findPlusEvOpportunities(
     }
   }
 
-  opportunities.sort((a, b) => b.edgePct - a.edgePct)
+  opportunities.sort((a, b) => compareSportPicks(a, b, sportKey))
   return opportunities
 }
 
-/** Best single h2h +EV pick across events (or null). */
+/** Best +EV pick for sport (multi-market by default, sport-weighted tie-break). */
 export function pickBestOddsCandidate(
   events: OddsEvent[],
   sportKey: string,
   opts: PlusEvPickOptions = {},
 ): OddsPick | null {
-  const list = findPlusEvOpportunities(events, sportKey, opts)
+  const resolved = resolvePlusEvPickOptions(sportKey, opts)
+  const list = findPlusEvOpportunities(events, sportKey, resolved)
   return list[0] ?? null
 }
 
