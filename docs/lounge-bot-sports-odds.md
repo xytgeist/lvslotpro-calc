@@ -373,7 +373,7 @@ RPC **`admin_lounge_sports_betting_calendar_today()`** → portal dropdown.
 
 Captions prefix category label from calendar row (e.g. `Wimbledon: ...`).
 
-**No portal calendar editor yet** — extend rows via SQL.
+**Portal calendar editor:** Scott bot **`/?tab=bots`** → **View calendar** → list all rows, filter **Active today** / **Upcoming**, **Add event** / **Edit** (migration **`20260704320000`**).
 
 ---
 
@@ -402,6 +402,7 @@ Captions prefix category label from calendar row (e.g. `Wimbledon: ...`).
 | **`20260704290000`** | **Sharp Report Card** (`sharp_report` narrative on meaningful line moves) |
 | **`20260704300000`** | **Value Bet Radar** (`value_bet_radar` — 2–3 top +EV plays, ~30 min peak cron) |
 | **`20260704310000`** | **Human-paced publish queue** (`lounge_bot_scheduled_posts`, minute drain cron) |
+| **`20260704320000`** | **Sports calendar portal** (list + save RPCs, Scott bot calendar UI) |
 
 ---
 

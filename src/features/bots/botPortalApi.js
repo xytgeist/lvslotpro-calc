@@ -104,6 +104,26 @@ export async function fetchSportsBettingCalendarToday(supabaseClient) {
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ */
+export async function fetchSportsBettingCalendarAll(supabaseClient) {
+  const { data, error } = await supabaseClient.rpc('admin_lounge_sports_betting_calendar_list')
+  const rows = Array.isArray(data) ? data : []
+  return { data: rows, error }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {Record<string, unknown>} row
+ */
+export async function saveSportsBettingCalendarRow(supabaseClient, row) {
+  const { data, error } = await supabaseClient.rpc('admin_lounge_sports_betting_calendar_save', {
+    p_row: row,
+  })
+  return { data, error }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {{ slug?: string, dryRun?: boolean, sportKey?: string, calendarSlug?: string, postMode?: string }} [opts]
  */
 export async function invokeLoungeOddsIngest(supabaseClient, opts = {}) {

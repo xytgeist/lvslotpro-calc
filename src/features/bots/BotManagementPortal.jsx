@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import BotCreateWizard from './BotCreateWizard.jsx'
 import BotEditorialInbox from './BotEditorialInbox.jsx'
 import BotPostRepliesPanel from './BotPostRepliesPanel.jsx'
 import BotReplyOnPostPanel from './BotReplyOnPostPanel.jsx'
 import BotProfileEditor from './BotProfileEditor.jsx'
+import BotSportsCalendarPanel from './BotSportsCalendarPanel.jsx'
 import {
   BOT_PIPELINE_LABELS,
   BOT_REVIEW_MODE_LABELS,
@@ -185,6 +186,14 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       localStorage.setItem(`bot-odds-calendar-${bot.user_id}`, slug)
     }
   }
+
+  const refreshCalendarToday = useCallback(() => {
+    if (bot?.pipeline !== 'odds_api') return
+    void fetchSportsBettingCalendarToday(supabaseClient).then(({ data, error }) => {
+      if (error) return
+      setCalendarToday(Array.isArray(data) ? data : [])
+    })
+  }, [bot?.pipeline, supabaseClient])
 
   useEffect(() => {
     if (!bot) {
@@ -638,6 +647,13 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                 </div>
               )}
             </label>
+            <BotSportsCalendarPanel
+              supabaseClient={supabaseClient}
+              setToast={setToast}
+              busy={busy}
+              setBusy={setBusy}
+              onCalendarUpdated={refreshCalendarToday}
+            />
           </div>
         ) : null}
 
@@ -1208,8 +1224,8 @@ export default function BotManagementPortal({
         <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-amber-100 text-sm">
           {error}
           <div className="text-amber-200/70 text-xs mt-1">
-            Apply migrations <span className="font-mono">20260703140000</span> through{' '}
-            <span className="font-mono">20260703160000</span>.
+            Apply migrations <span className="font-mono">20260704270000</span> through{' '}
+            <span className="font-mono">20260704310000</span> (in order, skip any already applied).
           </div>
         </div>
       ) : null}
