@@ -373,13 +373,19 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
   }
 
   const runOddsPoll = async (action, dryRun = false) => {
-    const busyKey = action === 'daily_slates' ? 'slates' : action === 'best_bet_hour' ? 'best-hour' : 'poll-all'
+    const busyKey = action === 'daily_slates'
+      ? 'slates'
+      : action === 'best_bet_hour'
+        ? 'best-hour'
+        : action === 'value_bet_radar'
+          ? 'value-radar'
+          : 'poll-all'
     setBusy(dryRun ? 'poll-dry' : busyKey)
     const result = await invokeLoungeOddsPoll(supabaseClient, {
       slug: bot.slug,
       action,
       dryRun,
-      force: action === 'daily_slates' && !dryRun,
+      force: (action === 'daily_slates' || action === 'value_bet_radar') && !dryRun,
     })
     setBusy('')
     if (result.error) {
@@ -411,6 +417,27 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         setToast(`Dry run · would post Best Bet${ev ? ` (+${ev} EV)` : ''}: ${d.captionPreview.slice(0, 120)}…`)
       } else {
         setToast(d.skipped ? `Best Bet skipped (${d.skipped})` : 'Best Bet hour poll finished.')
+      }
+    } else if (action === 'value_bet_radar') {
+      const topEv = d.picks?.[0]?.edgePct != null ? `${Math.round(d.picks[0].edgePct * 10) / 10}%` : null
+      if (d.skipped === 'already_posted_this_window') {
+        setToast('Value Bet Radar already posted this PT half-hour.')
+      } else if (d.skipped === 'value_bet_radar_disabled') {
+        setToast('Value Bet Radar is disabled in odds config.')
+      } else if (d.skipped === 'outside_peak_window') {
+        setToast('Value Bet Radar only runs 8am–10pm PT (use manual run with force).')
+      } else if (d.skipped === 'no_qualifying_edges') {
+        setToast(
+          dryRun
+            ? `Dry run · fewer than 2 plays cleared +${d.minEv ?? 3.5}% EV (${d.candidatesFound ?? 0} candidates)`
+            : `No Radar posted · need 2+ plays at +${d.minEv ?? 3.5}% EV (${d.candidatesFound ?? 0} candidates)`,
+        )
+      } else if (d.published) {
+        setToast(`📡 Value Bet Radar posted · ${d.pickCount ?? 0} plays${topEv ? ` (top +${topEv})` : ''}`)
+      } else if (dryRun && d.captionPreview) {
+        setToast(`Dry run · would post Radar (${d.pickCount ?? 0} plays): ${d.captionPreview.slice(0, 120)}…`)
+      } else {
+        setToast(d.skipped ? `Value Bet Radar skipped (${d.skipped})` : 'Value Bet Radar poll finished.')
       }
     } else if (action === 'daily_slates') {
       const combined = (d.details || []).find((row) => row?.combinedCoffee)
@@ -653,6 +680,14 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                   className="min-h-8 rounded-lg bg-rose-900/70 px-3 text-rose-100 text-[11px] font-semibold disabled:opacity-50"
                 >
                   {busy === 'best-hour' ? '…' : 'Best bet · hour'}
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(busy) || bot.run_state !== 'running'}
+                  onClick={() => void runOddsPoll('value_bet_radar', false)}
+                  className="min-h-8 rounded-lg bg-cyan-900/70 px-3 text-cyan-100 text-[11px] font-semibold disabled:opacity-50"
+                >
+                  {busy === 'value-radar' ? '…' : 'Value radar'}
                 </button>
               </>
             ) : null}

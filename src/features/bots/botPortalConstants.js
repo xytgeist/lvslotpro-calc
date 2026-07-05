@@ -48,6 +48,8 @@ export const ODDS_ALERT_AUDIENCE_ROWS = Object.freeze([
   { key: 'period_report', label: 'Period / Halftime Report' },
   { key: 'best_bet_hour', label: 'Best Bet of the Hour' },
   { key: 'arb_watch', label: 'Arb Watch' },
+  { key: 'sharp_report', label: "Sharpe's Sharp Report" },
+  { key: 'value_bet_radar', label: 'Value Bet Radar' },
 ])
 
 export const DEFAULT_ODDS_ALERT_AUDIENCE = Object.freeze({
@@ -58,6 +60,8 @@ export const DEFAULT_ODDS_ALERT_AUDIENCE = Object.freeze({
   period_report: 'subscribers',
   best_bet_hour: 'subscribers',
   arb_watch: 'subscribers',
+  sharp_report: 'subscribers',
+  value_bet_radar: 'all',
 })
 
 /** @param {string} tone */

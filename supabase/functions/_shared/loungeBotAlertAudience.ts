@@ -12,6 +12,8 @@ export type OddsAlertAudienceKey =
   | 'period_report'
   | 'best_bet_hour'
   | 'arb_watch'
+  | 'sharp_report'
+  | 'value_bet_radar'
 
 export const ODDS_ALERT_AUDIENCE_KEYS: OddsAlertAudienceKey[] = [
   'coffee_covers',
@@ -21,6 +23,8 @@ export const ODDS_ALERT_AUDIENCE_KEYS: OddsAlertAudienceKey[] = [
   'period_report',
   'best_bet_hour',
   'arb_watch',
+  'sharp_report',
+  'value_bet_radar',
 ]
 
 export const DEFAULT_ALERT_AUDIENCE: Record<OddsAlertAudienceKey, AlertAudience> = {
@@ -31,6 +35,8 @@ export const DEFAULT_ALERT_AUDIENCE: Record<OddsAlertAudienceKey, AlertAudience>
   period_report: 'subscribers',
   best_bet_hour: 'subscribers',
   arb_watch: 'subscribers',
+  sharp_report: 'subscribers',
+  value_bet_radar: 'all',
 }
 
 export const ALERT_AUDIENCE_LABELS: Record<OddsAlertAudienceKey, string> = {
@@ -41,6 +47,8 @@ export const ALERT_AUDIENCE_LABELS: Record<OddsAlertAudienceKey, string> = {
   period_report: 'Period / Halftime Report',
   best_bet_hour: 'Best Bet of the Hour',
   arb_watch: 'Arb Watch',
+  sharp_report: "Sharpe's Sharp Report",
+  value_bet_radar: 'Value Bet Radar',
 }
 
 const LINE_KINDS = new Set(['line_movement', 'sharp_move', 'steam', 'rlm'])
@@ -53,6 +61,8 @@ export function audienceKeyForPostKind(postKind: string): OddsAlertAudienceKey {
   if (postKind === 'period_report') return 'period_report'
   if (postKind === 'best_bet_hour') return 'best_bet_hour'
   if (postKind === 'arb_watch') return 'arb_watch'
+  if (postKind === 'sharp_report') return 'sharp_report'
+  if (postKind === 'value_bet_radar') return 'value_bet_radar'
   return 'edge'
 }
 

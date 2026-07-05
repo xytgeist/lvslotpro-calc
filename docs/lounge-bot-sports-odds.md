@@ -21,6 +21,8 @@ Calendar sport pick (portal)  →  lounge-odds-ingest (manual) or lounge-odds-po
 | **Coffee & Covers** | No edge on manual fetch, or **`daily_slates`** morning poll | See example below |
 | **Best Bet of the Hour** | Hourly cron **`best_bet_hour`** (or portal button) | See example below |
 | **Arb Watch** | **`poll_edges`** finds **≥ 3%** guaranteed cross-book arb | See example below |
+| **Sharp Report Card** | **`poll_edges`** when meaningful sharp/steam/RLM move (10–60 min snapshot) | See example below |
+| **Value Bet Radar** | **`value_bet_radar`** cron every ~30 min during peak hours (or portal button) | See example below |
 | **Slate** (legacy) | When **`coffee_covers_enabled = false`** | See legacy example below |
 
 **Caption style:** factual labels only (no opinion phrases). Line breaks between sections. Plain keyboard punctuation only (colons, commas, hyphens in odds ... no middle dots or em/en dashes). Sportsbook names use brand labels (FanDuel, MyBookie) ... not bare domains (avoids auto-linkify in feed).
@@ -101,7 +103,7 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 | **Post Coffee & Covers** | One morning post/day (dedupe) with thread parts per sport |
 | **Best bet · hour** | Manual smoke for hourly strongest +EV post (same logic as cron) |
 | **Min +EV %** | Settings field **0.5–15** → **`lounge_bot_odds_config.min_edge_pct`** |
-| **Alert audience** | Per alert type: **All** (public feed) or **Subs** (subscriber-only post). Matrix in Settings → **`lounge_bot_odds_config.alert_audience`**. Defaults: Coffee & Covers **All**; edge, line movement, in-game, period reports, Best Bet of the Hour, **Arb Watch** **Subs**. **Arb Watch** fires automatically on **Scan all · edge** / cron when a **≥ 3%** arb exists (no post otherwise). |
+| **Alert audience** | Per alert type: **All** (public feed) or **Subs** (subscriber-only post). Matrix in Settings → **`lounge_bot_odds_config.alert_audience`**. Defaults: Coffee & Covers **All**; edge, line movement, in-game, period reports, Best Bet of the Hour, Arb Watch, **Sharp Report** **Subs**. **Arb Watch** and **Sharp Report** only post when quality signal exists. |
 
 ---
 
@@ -195,6 +197,16 @@ Guaranteed +3.4% profit no matter the result.
 Stake $51 on France and $49 on Draw ($100 total) for $3.40 profit.
 ```
 
+**Sharp Report Card example:**
+```text
+📊 Sharp Report Card
+
+Chiefs -4 moved from -3 to -4 at multiple sharp books.
+
+Sharp money appears to be coming in on Kansas City as the number shortens across books. Line has steamed over the last ~15 minutes.
+NFL: Chiefs vs Raiders (Sun 1:25 PM PT). This is one to watch closely.
+```
+
 ### Best Bet of the Hour (hourly)
 
 **`loungeBotBestBetHour.ts`** — dedicated **`best_bet_hour`** poll action (pg_cron **minute 5 every hour**):
@@ -208,15 +220,43 @@ Stake $51 on France and $49 on Draw ($100 total) for $3.40 profit.
 
 Disable via **`best_bet_hour_enabled = false`**. Audience key **`best_bet_hour`** in portal matrix.
 
-Example in-game:
+### Sharpe's Sharp Report (poll_edges)
+
+**`loungeBotSharpReport.ts`** — one narrative **Sharp Report Card** per poll when meaningful movement is found:
+
+1. Compare current lines to stored snapshot (**10–60 min** age; wider than tick-level line alerts)
+2. Reuse **`detectLineMovements`**; keep **steam**, **sharp_move**, **RLM**, or spread **≥ 0.5** / ML **≥ 20** pt moves
+3. Pick **one** best game slate-wide (movement score → NFL/NBA/MLB popularity)
+4. Short analytical caption with cautious language (`appears to be`, `leaning`, etc.) ... **no fabricated injury/news context**
+5. Dedupe **`sharp_report:{ptDay}:{eventId}:...`**; cap **`max_sharp_reports_per_day`** (default **4**)
+
+Disable via **`sharp_report_enabled = false`**.
+
+### Value Bet Radar (peak hours, ~30 min)
+
+**`loungeBotValueBetRadar.ts`** — dedicated **`value_bet_radar`** poll action (pg_cron **minutes 5 and 35 every hour**; Edge gates **8am–10pm PT**):
+
+1. Scan every calendar sport today via fresh Odds API fetch (**`h2h`**, **`spreads`**, **`totals`**)
+2. Include **today's unplayed** kickoffs plus **live** in-progress games (same window as Best Bet)
+3. **`findPlusEvOpportunities`** slate-wide; keep **2–3** highest **+EV** plays (min **3.5%** default)
+4. **Variety:** prefer one pick per sport first, then fill remaining slots; one play per game
+5. Dedupe **`value_bet_radar:{PT half-hour bucket}`** — one post per bot per 30-min window; cap **`max_value_bet_radar_posts_per_day`** (default **20**)
+
+Disable via **`value_bet_radar_enabled = false`**. Default audience **`all`** (snackable feed content).
+
+Example:
 ```text
-🔴 LIVE In-Game Edge · ~12m left in 2nd half
+📡 Value Bet Radar
+Here are the strongest edges right now:
 
-NBA: Celtics 52 - 48 Lakers
+Padres ML +219 @ lowvig (+7.8% EV)
+vs Dodgers – Sat 7:11 PM PT
+Canada ML +490 @ BetUS (+3.1% EV)
+World Cup – Sat 10AM PT
+Giron ML +900 @ DraftKings (+4.2% EV)
+Wimbledon – Sat 6:30 AM PT
 
-Celtics -3.5 (-110) at FanDuel
-Fair -5 (-108) (7 books)
-+4.2% EV on spread
+Quick hits. Bet responsibly.
 ```
 
 Example period report:
@@ -248,10 +288,10 @@ Updated 6:45 PM PT
 | Function | Role |
 | --- | --- |
 | **`lounge-odds-ingest`** | Manual single-sport fetch (`sportKey`, `calendarSlug`, `postMode`) |
-| **`lounge-odds-poll`** | Background: **`poll_edges`** \| **`daily_slates`** \| **`best_bet_hour`** |
+| **`lounge-odds-poll`** | Background: **`poll_edges`** \| **`daily_slates`** \| **`best_bet_hour`** \| **`value_bet_radar`** |
 | **`lounge-bot-admin`** | Create bot + seed **`lounge_bot_odds_config`** |
 
-Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**, **`loungeBotCoffeeAndCovers.ts`**, **`loungeBotLineMovement.ts`**, **`loungeBotBestBetHour.ts`**
+Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**, **`loungeBotCoffeeAndCovers.ts`**, **`loungeBotLineMovement.ts`**, **`loungeBotBestBetHour.ts`**, **`loungeBotValueBetRadar.ts`**
 
 Deploy:
 
@@ -302,8 +342,13 @@ Current fetch: **`h2h` + `spreads`**, region **`us`** → **~2 credits/call**.
 | `arb_watch_enabled` | Default **true** — arb scan on poll_edges (post only when arb found) |
 | `min_arb_profit_pct` | Default **3** — min guaranteed arb profit % |
 | `max_arb_alerts_per_day` | Default **6** |
+| `sharp_report_enabled` | Default **true** — narrative sharp report on poll_edges |
+| `max_sharp_reports_per_day` | Default **4** |
+| `value_bet_radar_enabled` | Default **true** — 2–3 strongest +EV plays during peak hours |
+| `min_value_bet_radar_ev_pct` | Default **3.5** — min +EV % per Radar pick |
+| `max_value_bet_radar_posts_per_day` | Default **20** |
 
-Publish log: **`post_kind`** (`edge` \| `slate` \| `coffee_covers` \| `best_bet_hour` \| `arb_watch`), **`dedupe_key`** — migrations **`20260704150000`**, **`20260704200000`**, **`20260704270000`**, **`20260704280000`**.
+Publish log: **`post_kind`** (… `sharp_report` \| `value_bet_radar`), **`dedupe_key`** — through **`20260704300000`**.
 
 ---
 
@@ -341,6 +386,8 @@ Captions prefix category label from calendar row (e.g. `Wimbledon: ...`).
 | **`20260704260000`** | **`subscriber_only`** feed + **`alert_audience`** + live in-game / period reports |
 | **`20260704270000`** | **Best Bet of the Hour** (`best_bet_hour` post kind, hourly cron, portal audience row) |
 | **`20260704280000`** | **Arb Watch** (`arb_watch` on `poll_edges`, min 3% guaranteed profit) |
+| **`20260704290000`** | **Sharp Report Card** (`sharp_report` narrative on meaningful line moves) |
+| **`20260704300000`** | **Value Bet Radar** (`value_bet_radar` — 2–3 top +EV plays, ~30 min peak cron) |
 
 ---
 
@@ -381,6 +428,7 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 | Coffee & Covers | **`supabase/functions/_shared/loungeBotCoffeeAndCovers.ts`** |
 | Best Bet of the Hour | **`supabase/functions/_shared/loungeBotBestBetHour.ts`** |
 | Arb Watch | **`supabase/functions/_shared/loungeBotArbWatch.ts`** |
+| Sharp Report | **`supabase/functions/_shared/loungeBotSharpReport.ts`** |
 | Ingest / poll | **`lounge-odds-ingest/`**, **`lounge-odds-poll/`** |
 | Poll README | **`supabase/functions/lounge-odds-poll/README.md`** |
 | Backlog smoke | **`docs/test-buildout-backlog.md`** → Planned (Lounge bots) |
@@ -396,4 +444,4 @@ Works for Scott Share and all other bots. Does not bypass day/hour caps on autom
 
 ---
 
-_Updated 2026-07-04: Arb Watch on poll_edges (post only when ≥ 3% cross-book arb found)._
+_Updated 2026-07-04: Sharpe's Sharp Report Card (poll_edges narrative on 10–60 min line moves; posts only on quality steam/RLM/sharp moves)._

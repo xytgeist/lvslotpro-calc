@@ -776,6 +776,8 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-04: **Value Bet Radar:** migration **`20260704300000`** — cron **`value_bet_radar`** every ~30 min (8am–10pm PT) posts 2–3 strongest +EV plays (ML/spreads/totals, min **3.5%** EV, sport variety). Portal: **Value radar** button + **All | Subs** row (default **All**). Redeploy **`lounge-odds-poll`**; apply SQL on test/prod.
+- 2026-07-04: **Sharpe's Sharp Report Card:** migration **`20260704290000`** — one narrative post per poll when meaningful sharp/steam/RLM line move detected (10–60 min snapshot, NFL/NBA priority). Redeploy **`lounge-odds-poll`**.
 - 2026-07-04: **Arb Watch:** cross-book arb detection on **`poll_edges`** — posts **only** when guaranteed profit clears **3%** (ML/spreads/totals); migration **`20260704280000`**. No extra Odds API credits (reuses poll fetch). Redeploy **`lounge-odds-poll`**.
 - 2026-07-04: **Best Bet of the Hour:** migration **`20260704270000`** — hourly cron **`best_bet_hour`** posts single strongest +EV play (ML/spreads/totals, min **4%** EV, NFL > NBA > MLB tie-break). Portal: **Best bet · hour** button + **All | Subs** row. Redeploy **`lounge-odds-poll`**; apply SQL on test/prod.
 - 2026-07-04: **Coffee & Covers Dog of the Day:** replaces **Biggest Dogs** with one slate-wide **+EV underdog** (ML plus money or spread +points), odds, EV %, and short consensus reason. Redeploy **`lounge-odds-ingest`** + **`lounge-odds-poll`**.

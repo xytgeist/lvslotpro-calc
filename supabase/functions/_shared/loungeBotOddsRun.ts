@@ -78,6 +78,11 @@ export type OddsCfgRow = {
   arb_watch_enabled?: boolean | null
   min_arb_profit_pct?: number | null
   max_arb_alerts_per_day?: number | null
+  sharp_report_enabled?: boolean | null
+  max_sharp_reports_per_day?: number | null
+  value_bet_radar_enabled?: boolean | null
+  min_value_bet_radar_ev_pct?: number | null
+  max_value_bet_radar_posts_per_day?: number | null
 }
 
 export function oddsApiKey(): string {
