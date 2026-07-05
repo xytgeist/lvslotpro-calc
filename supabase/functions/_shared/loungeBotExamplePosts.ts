@@ -203,6 +203,71 @@ export const SCOTT_EXAMPLE_POST_SPECS: ScottExamplePostSpec[] = [
       '• Chiefs -2.5 (-108) @ DraftKings (+4.5% EV)',
     ].join('\n'),
   },
+  {
+    postKind: 'starter_spotlight',
+    label: 'Starter Spotlight',
+    caption: [
+      '🔦 Starter Spotlight',
+      '',
+      'Padres vs Dodgers (Sat 7:11 PM PT)',
+      '',
+      'Confirmed Starters:',
+      '• Padres: Dylan Cease',
+      '• Dodgers: TBD',
+      '',
+      'Padres ML +219 @ lowvig (+7.8% EV)',
+    ].join('\n'),
+  },
+  {
+    postKind: 'injury_impact',
+    label: 'Injury Impact',
+    caption: [
+      '⚠️ Injury Impact',
+      '',
+      'Chiefs vs Raiders (Sun 1:25 PM PT)',
+      '',
+      'Rashee Rice listed as OUT.',
+      '',
+      '→ Chiefs -4 now available at -110 (+4.1% EV)',
+    ].join('\n'),
+  },
+  {
+    postKind: 'rest_travel_edge',
+    label: 'Rest Advantage',
+    caption: [
+      '🛫 Rest Advantage',
+      '',
+      'Lakers vs Warriors (Sat 7:30 PM PT)',
+      '',
+      'Lakers on back-to-back (2nd game in 2 nights)',
+      'Warriors had full day of rest',
+      '',
+      '→ Warriors -4.5 showing +3.9% EV',
+    ].join('\n'),
+  },
+  {
+    postKind: 'confirmed_starters',
+    label: 'Confirmed Starters',
+    caption: [
+      '✅ Confirmed Starters - MLB',
+      '',
+      '• Padres: Dylan Cease',
+      '• Dodgers: TBD',
+      '',
+      'Padres ML +219 @ lowvig (+7.8% EV)',
+    ].join('\n'),
+  },
+  {
+    postKind: 'fade_the_public',
+    label: 'Fade the Public',
+    caption: [
+      '🚫 Fade the Public',
+      '',
+      'Chiefs vs Raiders',
+      '',
+      'Line moved toward Chiefs -4 while public betting is heavy on Raiders +4.',
+    ].join('\n'),
+  },
 ]
 
 export type PublishExamplePostsResult = {

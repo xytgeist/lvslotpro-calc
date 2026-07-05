@@ -96,6 +96,12 @@ export type OddsCfgRow = {
   min_value_bet_radar_ev_pct?: number | null
   max_value_bet_radar_posts_per_day?: number | null
   min_post_gap_minutes?: number | null
+  starter_spotlight_enabled?: boolean | null
+  confirmed_starters_enabled?: boolean | null
+  injury_impact_enabled?: boolean | null
+  rest_travel_edge_enabled?: boolean | null
+  fade_the_public_enabled?: boolean | null
+  max_context_alerts_per_day?: number | null
 }
 
 export function oddsApiKey(): string {

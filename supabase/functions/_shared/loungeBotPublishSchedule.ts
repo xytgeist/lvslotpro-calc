@@ -30,7 +30,9 @@ export type SubmitBotAlertPostResult = {
 
 export function priorityForPostKind(postKind: string): BotPostPriority {
   if (postKind === 'arb_watch') return 'urgent'
-  if (['edge', 'in_game_edge', 'best_bet_hour', 'value_bet_radar'].includes(postKind)) return 'normal'
+  if (['edge', 'in_game_edge', 'best_bet_hour', 'value_bet_radar', 'injury_impact', 'starter_spotlight'].includes(postKind)) {
+    return 'normal'
+  }
   return 'low'
 }
 

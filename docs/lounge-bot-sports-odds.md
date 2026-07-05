@@ -102,7 +102,7 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 | **Scan all · edge** | All calendar sports today → edge alerts only |
 | **Post Coffee & Covers** | One morning post/day (dedupe) with thread parts per sport |
 | **Best bet · hour** | Manual smoke for hourly strongest +EV post (same logic as cron) |
-| **Post all examples** | One feed post per alert type (**12** total, incl. Coffee & Covers thread part); captions match live format |
+| **Post all examples** | One feed post per alert type (**17** total, incl. Coffee & Covers thread part); captions match live format |
 | **Min +EV %** | Settings field **0.5–15** → **`lounge_bot_odds_config.min_edge_pct`** |
 | **Alert audience** | Per alert type: **All** (public feed) or **Subs** (subscriber-only post). Matrix in Settings → **`lounge_bot_odds_config.alert_audience`**. Defaults: Coffee & Covers **All**; edge, line movement, in-game, period reports, Best Bet of the Hour, Arb Watch, **Sharp Report** **Subs**. **Arb Watch** and **Sharp Report** only post when quality signal exists. |
 
@@ -240,8 +240,8 @@ Odds alerts no longer burst-post when several qualify in one **`poll_edges`** ti
 | Priority | Alert kinds | Typical delay after spacing gate |
 | --- | --- | --- |
 | **Urgent** | Arb Watch | ~15s–2min after min gap |
-| **Normal** | +EV edge, Best Bet, Value Radar, in-game edge | ~2–10min after min gap |
-| **Low** | Line movement, Sharp Report, period reports | ~6–20min after min gap |
+| **Normal** | +EV edge, Best Bet, Value Radar, in-game edge, Starter Spotlight, Injury Impact | ~2–10min after min gap |
+| **Low** | Line movement, Sharp Report, period reports, Confirmed Starters, Rest Advantage | ~6–20min after min gap |
 
 **`min_post_gap_minutes`** (default **8**) enforces minimum spacing between any Scott posts. **`lounge_bot_scheduled_posts`** is drained every minute by pg_cron **`lounge_bot_publish_scheduled_odds`** → **`lounge-bot-publish-due`** (`publishScheduledOdds: true`). Stale pending rows (**> 3h**) cancel automatically. **Coffee & Covers** still posts immediately (threaded morning post).
 
@@ -256,6 +256,44 @@ Odds alerts no longer burst-post when several qualify in one **`poll_edges`** ti
 5. Dedupe **`value_bet_radar:{PT half-hour bucket}`** — one post per bot per 30-min window; cap **`max_value_bet_radar_posts_per_day`** (default **20**)
 
 Disable via **`value_bet_radar_enabled = false`**. Default audience **`all`** (snackable feed content).
+
+### Context alerts (factual Rundown + odds, `poll_edges`)
+
+**`loungeBotContextAlerts.ts`** — up to **one** context post per sport per **`poll_edges`** tick when data qualifies. Captions are **data-only** (no interpretive commentary). Requires **`THERUNDOWN_API_KEY`** for starters, injuries, and rest/B2B; each kind also needs a qualifying **+EV** pick on the same game (**`min_edge_pct`**).
+
+| `post_kind` | Header | Data source |
+| --- | --- | --- |
+| **`starter_spotlight`** | 🔦 Starter Spotlight | Confirmed starters (pitchers, QBs, etc. when Rundown has data) + best +EV pick |
+| **`confirmed_starters`** | ✅ Confirmed Starters | Compact starter list + pick (skipped if Starter Spotlight already posted/scheduled that day for same game) |
+| **`injury_impact`** | ⚠️ Injury Impact | Hard injury status (OUT, IR, etc.) + pick |
+| **`rest_travel_edge`** | 🛫 Rest Advantage | B2B vs rested team (any Rundown-scheduled sport) + pick |
+| **`fade_the_public`** | 🚫 Fade the Public | **Off by default** — needs public betting % feed (not in Rundown OpenAPI) |
+
+Priority when multiple qualify: injury → starter spotlight → rest → confirmed starters. Daily cap **`max_context_alerts_per_day`** (default **8**). Toggle per kind via **`starter_spotlight_enabled`**, **`confirmed_starters_enabled`**, **`injury_impact_enabled`**, **`rest_travel_edge_enabled`**, **`fade_the_public_enabled`**. Default audience **Subs**.
+
+Example Starter Spotlight:
+```text
+🔦 Starter Spotlight
+
+Padres vs Dodgers (Sat 7:11 PM PT)
+
+Confirmed Starters:
+• Padres: Dylan Cease
+• Dodgers: TBD
+
+Padres ML +219 @ lowvig (+7.8% EV)
+```
+
+Example Injury Impact:
+```text
+⚠️ Injury Impact
+
+Chiefs vs Raiders (Sun 1:25 PM PT)
+
+Rashee Rice listed as OUT.
+
+→ Chiefs -4 @ DraftKings (+4.1% EV)
+```
 
 Example:
 ```text
@@ -321,7 +359,7 @@ Fast multi-book steam ... number syncing toward Chiefs right now.
 | **`lounge-odds-poll`** | Background: **`poll_edges`** \| **`daily_slates`** \| **`best_bet_hour`** \| **`value_bet_radar`** |
 | **`lounge-bot-admin`** | Create bot + seed **`lounge_bot_odds_config`** |
 
-Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**, **`loungeBotCoffeeAndCovers.ts`**, **`loungeBotLineMovement.ts`**, **`loungeBotBestBetHour.ts`**, **`loungeBotValueBetRadar.ts`**
+Shared run/publish: **`supabase/functions/_shared/loungeBotOddsRun.ts`**, **`loungeBotCoffeeAndCovers.ts`**, **`loungeBotLineMovement.ts`**, **`loungeBotBestBetHour.ts`**, **`loungeBotValueBetRadar.ts`**, **`loungeBotContextAlerts.ts`**, **`loungeBotRundownContext.ts`**
 
 Deploy:
 
@@ -379,9 +417,15 @@ Current fetch: **`h2h` + `spreads`**, region **`us`** → **~2 credits/call**.
 | `value_bet_radar_enabled` | Default **true** — 2–3 strongest +EV plays during peak hours |
 | `min_value_bet_radar_ev_pct` | Default **3.5** — min +EV % per Radar pick |
 | `max_value_bet_radar_posts_per_day` | Default **20** |
+| `starter_spotlight_enabled` | Default **true** — starter spotlight on **`poll_edges`** when Rundown confirms starters |
+| `confirmed_starters_enabled` | Default **true** — compact confirmed-starters list |
+| `injury_impact_enabled` | Default **true** — hard injury status + pick |
+| `rest_travel_edge_enabled` | Default **true** — B2B vs rest (Rundown schedule, all mapped sports) |
+| `fade_the_public_enabled` | Default **false** — needs public betting % feed |
+| `max_context_alerts_per_day` | Default **8** — cap across all context kinds |
 | `min_post_gap_minutes` | Default **8** — min minutes between Scott feed posts (queue spacing) |
 
-Publish log: **`post_kind`** (… `value_bet_radar`), **`dedupe_key`** — through **`20260704310000`**. Pending queue: **`lounge_bot_scheduled_posts`**.
+Publish log: **`post_kind`** (… `value_bet_radar`, `starter_spotlight`, `injury_impact`, …), **`dedupe_key`** — through **`20260705010000`**. Pending queue: **`lounge_bot_scheduled_posts`**.
 
 ---
 
@@ -554,6 +598,7 @@ Player props and deep injury narratives may still need a dedicated injuries feed
 | **`20260704310000`** | **Human-paced publish queue** (`lounge_bot_scheduled_posts`, minute drain cron) |
 | **`20260704320000`** | **Sports calendar portal** (list + save RPCs, Scott bot calendar UI) |
 | **`20260704330000`** | **Scott coverage tiers** (`coverage_tier` on calendar, expanded 2026 seed incl. UFC 329) |
+| **`20260705010000`** | **Context alerts** (`starter_spotlight`, `confirmed_starters`, `injury_impact`, `rest_travel_edge`, `fade_the_public` off by default) |
 
 **Edge code (no migration):** **`loungeBotSportAnalysis.ts`** — sport market weights, WNBA +0.5% min EV, multi-market edge alerts. Redeploy **`lounge-odds-poll`** after pull.
 

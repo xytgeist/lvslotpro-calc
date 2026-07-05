@@ -319,7 +319,7 @@ async function loadLiveFoulNotes(eventId: string, sportId: number): Promise<stri
   return notes.slice(0, 2)
 }
 
-async function resolveRundownEvent(input: RundownMatchInput): Promise<ResolvedRundownEvent | null> {
+export async function resolveRundownEvent(input: RundownMatchInput): Promise<ResolvedRundownEvent | null> {
   const sportId = oddsSportKeyToRundownSportId(input.sportKey)
   if (!sportId || !isRundownEnabled()) return null
 
@@ -536,4 +536,126 @@ export async function fetchRundownContextNotesForPicks(
 export function lineMovementMovedTeam(alert: LineMovementAlert): string {
   if (alert.marketKey === 'totals') return ''
   return String(alert.outcomeName || '').trim()
+}
+
+/** PT calendar date for yesterday (America/Los_Angeles). */
+export function ptYesterdayDate(now = new Date()): string {
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  return ptDateFromIso(yesterday.toISOString())
+}
+
+/** Team IDs with a game on the given PT date (Rundown schedule). */
+export async function rundownTeamIdsPlayedOnDate(
+  sportKey: string,
+  ptDate: string,
+): Promise<Set<number>> {
+  const sportId = oddsSportKeyToRundownSportId(sportKey)
+  if (!sportId || !isRundownEnabled()) return new Set()
+
+  const events = await loadDayEvents(sportId, ptDate)
+  const ids = new Set<number>()
+  for (const ev of events) {
+    for (const team of ev.teams || []) {
+      if (Number.isFinite(team.team_id)) ids.add(Number(team.team_id))
+    }
+  }
+  return ids
+}
+
+export function injuryImpactPlayers(
+  ctx: ResolvedRundownEvent,
+): Array<{ name: string; status: string; teamId: number }> {
+  return ctx.inactivePlayers.filter((p) => isInjuryImpactStatus(p.status))
+}
+
+function isInjuryImpactStatus(status: string): boolean {
+  const s = String(status || '').trim()
+  return /^(out|inactive|suspended|ir|pup)$/i.test(s)
+    || /^out$/i.test(s)
+    || /injured reserve/i.test(s)
+}
+
+export type ConfirmedStarters = {
+  away: string
+  home: string
+}
+
+/** Short sport label for context alert headers (e.g. NFL, MLB). */
+export function sportContextLabelFromKey(sportKey: string): string {
+  const sk = String(sportKey || '').trim().toLowerCase()
+  if (!sk) return ''
+  if (sk === 'americanfootball_nfl') return 'NFL'
+  if (sk === 'americanfootball_nfl_preseason') return 'NFL Preseason'
+  if (sk === 'americanfootball_ncaaf') return 'NCAAF'
+  if (sk.startsWith('baseball')) return 'MLB'
+  if (sk === 'basketball_nba') return 'NBA'
+  if (sk === 'basketball_ncaab') return 'NCAAB'
+  if (sk === 'basketball_wnba') return 'WNBA'
+  if (sk.startsWith('icehockey')) return 'NHL'
+  if (sk.startsWith('mma')) return 'UFC'
+  if (sk.startsWith('soccer')) return 'Soccer'
+  if (sk.startsWith('tennis')) return 'Tennis'
+  if (sk.startsWith('golf')) return 'Golf'
+  if (sk.startsWith('boxing')) return 'Boxing'
+  return ''
+}
+
+export function supportsRundownSchedule(sportKey: string): boolean {
+  return oddsSportKeyToRundownSportId(sportKey) != null
+}
+
+function cleanStarterName(raw: string): string {
+  return String(raw || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[.]+$/g, '')
+    .trim()
+}
+
+function parseStarterHeadline(headline: string | undefined): ConfirmedStarters | null {
+  const h = String(headline || '').trim()
+  if (!h) return null
+
+  const dual = h.match(
+    /(?:probable\s+)?(?:pitchers?|starters?|quarterbacks?|qbs?)\s*:?\s*(.+?)\s+vs\.?\s+(.+?)(?:[.!]|$)/i,
+  )
+  if (dual) {
+    const away = cleanStarterName(dual[1])
+    const home = cleanStarterName(dual[2])
+    if (away && home) return { away, home }
+  }
+
+  const single = h.match(
+    /([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*)\s+(?:to start|will start|confirmed (?:as )?starter)/i,
+  )
+  if (single) {
+    const name = cleanStarterName(single[1])
+    if (name) return { away: name, home: 'TBD' }
+  }
+
+  return null
+}
+
+/** Confirmed starters when Rundown has structured or headline data (any sport). */
+export function confirmedStartersFromRundown(
+  ctx: ResolvedRundownEvent,
+  _sportKey?: string,
+): ConfirmedStarters | null {
+  const awayPitcher = String(ctx.pitcherAway || '').trim()
+  const homePitcher = String(ctx.pitcherHome || '').trim()
+  if (awayPitcher || homePitcher) {
+    return {
+      away: awayPitcher || 'TBD',
+      home: homePitcher || 'TBD',
+    }
+  }
+  return parseStarterHeadline(ctx.headline)
+}
+
+export function hasConfirmedStarterInfo(
+  ctx: ResolvedRundownEvent,
+  sportKey?: string,
+): boolean {
+  const starters = confirmedStartersFromRundown(ctx, sportKey)
+  if (!starters) return false
+  return starters.away !== 'TBD' || starters.home !== 'TBD'
 }

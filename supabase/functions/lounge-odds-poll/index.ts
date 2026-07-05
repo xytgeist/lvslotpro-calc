@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
 import { tryPublishArbWatchAlerts } from '../_shared/loungeBotArbWatch.ts'
 import { runBestBetHourPoll } from '../_shared/loungeBotBestBetHour.ts'
+import { tryPublishContextAlert } from '../_shared/loungeBotContextAlerts.ts'
 import { runValueBetRadarPoll } from '../_shared/loungeBotValueBetRadar.ts'
 import { tryPublishLiveGameContent } from '../_shared/loungeBotLiveContent.ts'
 import {
@@ -142,6 +143,7 @@ Deno.serve(async (req) => {
     let publishedPeriodReports = 0
     let publishedArbWatch = 0
     let publishedSharpReport = 0
+    let publishedContextAlerts = 0
     let publishedCoffeeCovers = 0
     let publishedSlates = 0
     let requestsRemaining: string | null = null
@@ -249,6 +251,19 @@ Deno.serve(async (req) => {
             publishedPeriodReports += liveResult.publishedPeriodReports
           }
 
+          const contextResult = await tryPublishContextAlert(
+            admin,
+            bot,
+            ctx.upcoming,
+            sportKey,
+            oddsCfg,
+            dayStart,
+            dryRun,
+          )
+          if (contextResult.published || contextResult.scheduled) {
+            publishedContextAlerts += contextResult.scheduled ? 0 : 1
+          }
+
           details.push({
             calendarSlug: row.slug,
             sportKey,
@@ -266,6 +281,10 @@ Deno.serve(async (req) => {
             publishedPeriodReports: liveResult.publishedPeriodReports,
             liveSkipped: liveResult.skipped,
             liveGames: ctx.inProgress.length,
+            publishedContextAlert: contextResult.published || contextResult.scheduled,
+            contextAlertKind: contextResult.kind ?? null,
+            contextAlertSkipped: contextResult.skipped ?? null,
+            contextAlertPreview: contextResult.captionPreview ?? null,
           })
         } else if (morningEnabled) {
           if (coffeeCoversEnabled) {
@@ -373,7 +392,7 @@ Deno.serve(async (req) => {
 
     if (!dryRun && (publishedEdges > 0 || publishedLineMoves > 0 || publishedArbWatch > 0
       || publishedSharpReport > 0 || publishedLiveEdges > 0
-      || publishedPeriodReports > 0 || publishedMorning > 0)) {
+      || publishedPeriodReports > 0 || publishedContextAlerts > 0 || publishedMorning > 0)) {
       await admin.from('lounge_bot_accounts').update({
         last_poll_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -398,6 +417,7 @@ Deno.serve(async (req) => {
       publishedSharpReport,
       publishedLiveEdges,
       publishedPeriodReports,
+      publishedContextAlerts,
       publishedCoffeeCovers,
       publishedSlates,
       publishedMorning,
