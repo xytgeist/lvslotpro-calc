@@ -404,6 +404,19 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
     const d = result.data || {}
+    if (d.asyncQueued) {
+      const label =
+        action === 'daily_slates'
+          ? 'Coffee & Covers'
+          : action === 'best_bet_hour'
+            ? 'Best Bet of the Hour'
+            : action === 'value_bet_radar'
+              ? 'Value Bet Radar'
+              : 'Edge scan'
+      setToast(`${label} queued… Scott runs in the background. Check the Lounge feed in ~1 min.`)
+      window.setTimeout(() => void onReload(), 45000)
+      return
+    }
     if (d.skipped === 'no_calendar_today') {
       setToast('No major events on the betting calendar today.')
     } else if (d.skipped === 'before_scheduled_time') {

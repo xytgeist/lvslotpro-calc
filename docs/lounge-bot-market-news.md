@@ -188,8 +188,8 @@ Always **rewrite** ... do not paste licensed wire text verbatim unless API contr
 | Schema | `supabase/migrations/20260703140000_lounge_bot_financial_wire.sql` |
 | Poll fn | `supabase/functions/lounge-news-poll/` |
 | Scoring | `supabase/functions/_shared/loungeBotNewsScore.ts` |
-| Captions | `supabase/functions/_shared/loungeBotNewsCaption.ts` |
-| Publish | `supabase/functions/_shared/loungeBotPublish.ts` |
+| Captions | `supabase/functions/_shared/loungeBotNewsCaption.ts` — wire voice; **`shouldAttachNewsSourceLink`** (~5% source link + preview) |
+| Publish | `supabase/functions/_shared/loungeBotPublish.ts` — **`requirePreviewToAttachLink`** skips naked/broken URLs for news bots |
 | Admin UI | `src/features/ops/EdgeMonitorBotOpsPanel.jsx` |
 | Finnhub (existing) | `supabase/functions/_shared/finnhubMarket.ts` |
 

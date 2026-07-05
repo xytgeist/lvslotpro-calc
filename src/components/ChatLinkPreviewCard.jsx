@@ -30,6 +30,7 @@ import YouTubeChatEmbed from './YouTubeChatEmbed.jsx'
  */
 export default function ChatLinkPreviewCard({ preview, className = '', isMine = false, embedded = false, onPreviewOpen }) {
   const [sampledAccent, setSampledAccent] = useState(null)
+  const [richImageFailed, setRichImageFailed] = useState(false)
 
   const resolvedAccent = useMemo(() => (preview?.url ? resolvePreviewAccent(preview) : null), [preview])
   const accentBg = useMemo(() => {
@@ -51,6 +52,10 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
     }
   }, [preview?.favicon_url, preview?.url, resolvedAccent])
 
+  useEffect(() => {
+    setRichImageFailed(false)
+  }, [preview?.url, preview?.image_url])
+
   if (!preview?.url) return null
 
   if (isYouTubeLinkPreview(preview)) {
@@ -71,7 +76,7 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
     /* */
   }
   const title = String(preview.title || hostname || 'Link').trim()
-  const isRich = preview.layout === 'rich' && preview.image_url
+  const isRich = preview.layout === 'rich' && preview.image_url && !richImageFailed
 
   const branded = Boolean(accentBg)
   const cardStyle = accentBg ? { backgroundColor: accentBg } : undefined
@@ -151,6 +156,7 @@ export default function ChatLinkPreviewCard({ preview, className = '', isMine = 
           alt=""
           className="aspect-[1.91/1] w-full object-cover"
           loading="lazy"
+          onError={() => setRichImageFailed(true)}
         />
         <div className={footerClass} style={footerBg}>
           <div className={`line-clamp-2 text-[14px] font-semibold leading-snug ${titleClass}`} style={titleStyle}>

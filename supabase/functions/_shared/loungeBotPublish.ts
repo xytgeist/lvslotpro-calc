@@ -3,13 +3,15 @@
  */
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { attachLinkPreviewToEntity } from './linkUnfurl.ts'
+import { attachLinkPreviewToEntity, unfurlUrl, type LinkPreviewPayload } from './linkUnfurl.ts'
 
 export type BotPublishInput = {
   botUserId: string
   caption: string
   categoryPills?: string[]
   sourceUrl?: string | null
+  /** When true, skip URL + preview unless unfurl succeeds (news bots). Default false. */
+  requirePreviewToAttachLink?: boolean
   /** When true, post is hidden from anon / non-subscribers on the lounge feed. */
   subscriberOnly?: boolean
 }
@@ -47,9 +49,28 @@ export async function publishLoungeBotPost(
 
   let finalCaption = caption
   const url = String(input.sourceUrl || '').trim()
-  if (url && !finalCaption.includes(url)) {
-    const withUrl = `${finalCaption} ${url}`.trim()
-    finalCaption = withUrl.length <= 2000 ? withUrl : caption
+  const requirePreview = input.requirePreviewToAttachLink === true
+  let preparedPreview: LinkPreviewPayload | null = null
+
+  if (url) {
+    preparedPreview = await unfurlUrl(admin, url)
+    const previewOk = Boolean(
+      preparedPreview &&
+        (preparedPreview.layout === 'compact' ||
+          (preparedPreview.layout === 'rich' && preparedPreview.image_url)),
+    )
+
+    if (previewOk) {
+      if (!finalCaption.includes(url)) {
+        const withUrl = `${finalCaption} ${url}`.trim()
+        finalCaption = withUrl.length <= 2000 ? withUrl : caption
+      }
+    } else if (requirePreview) {
+      preparedPreview = null
+    } else if (!finalCaption.includes(url)) {
+      const withUrl = `${finalCaption} ${url}`.trim()
+      finalCaption = withUrl.length <= 2000 ? withUrl : caption
+    }
   }
 
   const row: Record<string, unknown> = {
@@ -72,7 +93,14 @@ export async function publishLoungeBotPost(
   }
 
   try {
-    await attachLinkPreviewToEntity(admin, 'feed_post', data.id, finalCaption, input.botUserId)
+    if (preparedPreview) {
+      await admin
+        .from('community_feed_posts')
+        .update({ link_preview: preparedPreview })
+        .eq('id', data.id)
+    } else if (url && !requirePreview) {
+      await attachLinkPreviewToEntity(admin, 'feed_post', data.id, finalCaption, input.botUserId)
+    }
   } catch {
     // Link preview is best-effort for bot posts.
   }

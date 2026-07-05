@@ -24,6 +24,16 @@ verify_jwt = true
 [functions.lounge-send-activity-push]
 verify_jwt = false
 
+# pg_cron → pg_net with Vault legacy service_role JWT; auth checked in function (see adminAuth.ts).
+[functions.lounge-news-poll]
+verify_jwt = false
+
+[functions.lounge-odds-poll]
+verify_jwt = false
+
+[functions.lounge-bot-publish-due]
+verify_jwt = false
+
 # Stripe billing webhook (signed by Stripe, not Supabase JWT).
 [functions.stripe-webhook]
 verify_jwt = false

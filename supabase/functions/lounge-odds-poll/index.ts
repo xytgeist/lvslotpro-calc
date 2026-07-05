@@ -3,7 +3,7 @@
  * Body: { slug, action: 'poll_edges' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar', dryRun?: boolean, force?: boolean }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import { adminOpsCorsHeaders, adminOpsJson, authorizeServiceRoleOrAdmin } from '../_shared/adminAuth.ts'
 import { tryPublishArbWatchAlerts } from '../_shared/loungeBotArbWatch.ts'
 import { runBestBetHourPoll } from '../_shared/loungeBotBestBetHour.ts'
 import { tryPublishContextAlert } from '../_shared/loungeBotContextAlerts.ts'
@@ -34,16 +34,7 @@ import { DEFAULT_MIN_EV_PCT } from '../_shared/loungeBotOddsCaption.ts'
 import { countScheduledKindToday } from '../_shared/loungeBotPublishSchedule.ts'
 
 async function authorize(req: Request): Promise<SupabaseClient> {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim()
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
-  if (!supabaseUrl || !serviceRoleKey) throw adminOpsJson(503, { error: 'Missing env.' })
-
-  const authHeader = req.headers.get('Authorization') || ''
-  if (authHeader.replace(/^Bearer\s+/i, '').trim() === serviceRoleKey) {
-    return createClient(supabaseUrl, serviceRoleKey)
-  }
-  await requireAdminUser(req)
-  return createClient(supabaseUrl, serviceRoleKey)
+  return authorizeServiceRoleOrAdmin(req)
 }
 
 Deno.serve(async (req) => {
@@ -128,6 +119,134 @@ Deno.serve(async (req) => {
     const morningGate = action === 'daily_slates'
       ? morningSlateShouldRunNow(bot.user_id, { force: false })
       : null
+
+    if (action === 'daily_slates' && morningEnabled && coffeeCoversEnabled) {
+      const dayStart = ptDayStartIso()
+      let morningCount = await countPublishedKindToday(admin, bot.user_id, 'coffee_covers', dayStart)
+      const activeSports = await fetchActiveSportKeys()
+      const coffeeMarkets = ['h2h', 'spreads']
+      const details: Record<string, unknown>[] = []
+      let requestsRemaining: string | null = null
+
+      const rowResults = await Promise.all(
+        calendarRows.map(async (row) => {
+          const sportKey = row.odds_sport_keys?.[0]
+          if (!sportKey) {
+            return { calendarSlug: row.slug, sportKey: null, skipped: 'no_sport_key' as const }
+          }
+          if (!activeSports.has(sportKey)) {
+            return { calendarSlug: row.slug, sportKey, skipped: 'sport_not_active' as const }
+          }
+          try {
+            const ctx = await loadSportOddsContext(
+              admin,
+              bot.user_id,
+              sportKey,
+              {
+                calendarSlug: row.slug,
+                categoryLabel: String(row.caption_prefix || row.label_short || '').trim(),
+              },
+              regions,
+              coffeeMarkets,
+              dryRun,
+            )
+            return {
+              calendarSlug: row.slug,
+              sportKey,
+              ctx,
+              gamesToday: ctx.eventsInWindow,
+              requestsRemaining: ctx.requestsRemaining,
+            }
+          } catch (err) {
+            return {
+              calendarSlug: row.slug,
+              sportKey,
+              error: err instanceof Error ? err.message : 'fetch failed',
+            }
+          }
+        }),
+      )
+
+      const coffeeSportContexts: SportOddsContext[] = []
+      for (const row of rowResults) {
+        if ('ctx' in row && row.ctx) {
+          coffeeSportContexts.push(row.ctx)
+          requestsRemaining = row.requestsRemaining ?? requestsRemaining
+          details.push({
+            calendarSlug: row.calendarSlug,
+            sportKey: row.sportKey,
+            gamesToday: row.gamesToday,
+            queuedForCombinedCoffee: row.gamesToday > 0,
+          })
+        } else {
+          details.push(row)
+        }
+      }
+
+      let publishedCoffeeCovers = 0
+      if (coffeeSportContexts.length > 0) {
+        if (morningCount >= maxMorningPosts) {
+          details.push({ combinedCoffee: true, skipped: 'morning_cap' })
+        } else {
+          const coffeeResult = await tryPublishCombinedCoffeeAndCovers(
+            admin,
+            bot,
+            coffeeSportContexts,
+            dayStart,
+            dryRun,
+            oddsCfg.alert_audience,
+          )
+          if (coffeeResult.published) {
+            publishedCoffeeCovers = 1
+            morningCount += 1
+          }
+          details.push({
+            combinedCoffee: true,
+            publishedCoffeeCovers: coffeeResult.published,
+            gamesToday: coffeeResult.gamesToday ?? null,
+            coverCount: coffeeResult.coverCount ?? null,
+            mlCount: coffeeResult.mlCount ?? null,
+            onTapCount: coffeeResult.onTapCount ?? null,
+            hasCovers: coffeeResult.hasCovers ?? null,
+            threadPartCount: coffeeResult.threadPartCount ?? null,
+            sportsIncluded: coffeeResult.sportsIncluded ?? null,
+            skipped: coffeeResult.skipped,
+          })
+        }
+      }
+
+      if (!dryRun) {
+        await admin.from('lounge_bot_accounts').update({
+          last_poll_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('user_id', bot.user_id)
+      }
+
+      return adminOpsJson(200, {
+        ok: true,
+        slug,
+        action,
+        dryRun,
+        coffeeCoversEnabled,
+        sportsChecked: details.length,
+        publishedEdges: 0,
+        publishedLineMoves: 0,
+        publishedArbWatch: 0,
+        publishedSharpReport: 0,
+        publishedLiveEdges: 0,
+        publishedPeriodReports: 0,
+        publishedContextAlerts: 0,
+        publishedCoffeeCovers,
+        publishedSlates: 0,
+        publishedMorning: publishedCoffeeCovers,
+        requestsRemaining,
+        scheduledPt: morningGate?.scheduledMinute != null
+          ? formatPtMinuteAsClock(morningGate.scheduledMinute)
+          : null,
+        wouldRunMorningSlates: morningGate?.shouldRun ?? null,
+        details,
+      })
+    }
 
     const dayStart = ptDayStartIso()
     const minPostGap = Number(oddsCfg.min_post_gap_minutes) || 8

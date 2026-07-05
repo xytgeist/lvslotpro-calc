@@ -3,7 +3,12 @@
  * Body: { "queueId": "uuid" } | { "publishDue": true } | { "publishScheduledOdds": true }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import {
+  adminOpsCorsHeaders,
+  adminOpsJson,
+  isKnownServiceRoleBearer,
+  requireAdminUser,
+} from '../_shared/adminAuth.ts'
 import { publishDueQueueRows, publishQueueRow } from '../_shared/loungeBotQueuePublish.ts'
 import { drainDueScheduledBotPosts } from '../_shared/loungeBotPublishSchedule.ts'
 
@@ -13,9 +18,10 @@ async function authorize(req: Request): Promise<{ admin: SupabaseClient; reviewe
   if (!supabaseUrl || !serviceRoleKey) throw adminOpsJson(503, { error: 'Missing env.' })
 
   const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
-  if (bearer === serviceRoleKey) {
-    return { admin: createClient(supabaseUrl, serviceRoleKey), reviewerId: null }
+  if (isKnownServiceRoleBearer(bearer, serviceRoleKey, supabaseUrl)) {
+    return { admin: createClient(supabaseUrl, bearer || serviceRoleKey), reviewerId: null }
   }
+
   const { admin, user } = await requireAdminUser(req)
   return { admin, reviewerId: user.id }
 }

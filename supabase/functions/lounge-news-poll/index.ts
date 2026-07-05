@@ -9,9 +9,9 @@
  *   { "slug": "market-edge", "dryRun": false, "force": false }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import { adminOpsCorsHeaders, adminOpsJson, authorizeServiceRoleOrAdmin } from '../_shared/adminAuth.ts'
 import { decodeHtmlEntities } from '../_shared/decodeHtmlEntities.ts'
-import { buildFinancialWireCaption } from '../_shared/loungeBotNewsCaption.ts'
+import { buildFinancialWireCaption, shouldAttachNewsSourceLink } from '../_shared/loungeBotNewsCaption.ts'
 import {
   extractTickers,
   normalizeTitleHash,
@@ -58,20 +58,7 @@ function finnhubToken(): string {
 }
 
 async function authorize(req: Request): Promise<SupabaseClient> {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim()
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw adminOpsJson(503, { error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.' })
-  }
-
-  const authHeader = req.headers.get('Authorization') || ''
-  const bearer = authHeader.replace(/^Bearer\s+/i, '').trim()
-  if (bearer && bearer === serviceRoleKey) {
-    return createClient(supabaseUrl, serviceRoleKey)
-  }
-
-  await requireAdminUser(req)
-  return createClient(supabaseUrl, serviceRoleKey)
+  return authorizeServiceRoleOrAdmin(req)
 }
 
 function watchlistFromConfig(config: Record<string, unknown> | null): string[] {
@@ -450,11 +437,14 @@ Deno.serve(async (req) => {
           .eq('external_id', cand.item.externalId)
           .maybeSingle()
 
+        const attachSourceLink = shouldAttachNewsSourceLink(account.user_id, cand.item.externalId)
+
         const result = await publishLoungeBotPost(admin, {
           botUserId: account.user_id,
           caption,
           categoryPills: pills,
-          sourceUrl: cand.item.url,
+          sourceUrl: attachSourceLink ? cand.item.url : null,
+          requirePreviewToAttachLink: true,
         })
 
         if (result.postId) {

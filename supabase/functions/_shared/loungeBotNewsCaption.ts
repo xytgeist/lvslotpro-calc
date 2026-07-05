@@ -57,3 +57,17 @@ export function buildFinancialWireCaption(item: NewsCandidate): string {
 
 /** @deprecated alias */
 export const buildMarketEdgeCaption = buildFinancialWireCaption
+
+/** ~5% of news posts include a source link + preview card (Market Edge + Crypto Edge). */
+export const NEWS_SOURCE_LINK_RATE = 0.05
+
+/** Stable per-item bucket — same raw item always gets the same link/no-link decision. */
+export function shouldAttachNewsSourceLink(botUserId: string, externalId: string): boolean {
+  const key = `${botUserId}:${externalId}`
+  let h = 2166136261
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return (h >>> 0) % 10_000 < Math.round(NEWS_SOURCE_LINK_RATE * 10_000)
+}

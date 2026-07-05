@@ -292,6 +292,37 @@ async function fetchLoungePostPreview(
   }
 }
 
+/** HEAD/GET probe so rich cards never store og:image URLs that 403 or return HTML. */
+async function imageUrlIsReachable(imageUrl: string): Promise<boolean> {
+  if (!/^https?:\/\//i.test(imageUrl)) return false
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 6000)
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (compatible; LVSlotProLinkPreview/1.0)',
+    Accept: 'image/*,*/*',
+  }
+  try {
+    let res = await fetch(imageUrl, { method: 'HEAD', signal: ctrl.signal, redirect: 'follow', headers })
+    if (res.ok) {
+      const ct = (res.headers.get('content-type') || '').toLowerCase()
+      if (ct.startsWith('image/')) return true
+    }
+    res = await fetch(imageUrl, {
+      method: 'GET',
+      signal: ctrl.signal,
+      redirect: 'follow',
+      headers: { ...headers, Range: 'bytes=0-8191' },
+    })
+    if (!res.ok) return false
+    const ct = (res.headers.get('content-type') || '').toLowerCase()
+    return ct.startsWith('image/')
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function fetchHtmlSafe(url: string): Promise<string> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS)
@@ -383,7 +414,9 @@ export async function unfurlUrl(
     metaContent(html, 'og:image') ||
     metaContent(html, 'twitter:image', 'name') ||
     metaContent(html, 'twitter:image:src', 'name')
-  const image_url = resolveMaybeRelative(parsed.href, imageRaw) || null
+  const imageCandidate = resolveMaybeRelative(parsed.href, imageRaw) || null
+  const image_url =
+    imageCandidate && (await imageUrlIsReachable(imageCandidate)) ? imageCandidate : null
   const site_name = decodeHtmlEntities(
     metaContent(html, 'og:site_name') || parsed.hostname.replace(/^www\./i, ''),
   )
