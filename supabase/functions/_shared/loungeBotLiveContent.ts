@@ -7,7 +7,6 @@ import {
   DEFAULT_MAX_EV_PCT,
   DEFAULT_MIN_BOOKS,
   findPlusEvOpportunities,
-  formatAmericanOdds,
   formatOddsPickLine,
   marketLabel,
   type OddsEvent,
@@ -142,9 +141,29 @@ export function formatLiveScoreLine(
   }
 
   if (homeScore != null && awayScore != null) {
-    return `${shortName(away)} ${awayScore} - ${homeScore} ${shortName(home)}`
+    return formatCompactScoreLine(home, away, homeScore, awayScore)
   }
   return `${shortName(away)} @ ${shortName(home)}`
+}
+
+/** e.g. "Lakers 88-82 Warriors" — higher-scoring team listed first. */
+export function formatCompactScoreLine(
+  homeTeam: string,
+  awayTeam: string,
+  homeScore: string | number,
+  awayScore: string | number,
+): string {
+  const home = shortName(homeTeam)
+  const away = shortName(awayTeam)
+  const h = Number(homeScore)
+  const a = Number(awayScore)
+  if (Number.isFinite(h) && Number.isFinite(a) && a > h) {
+    return `${away} ${awayScore}-${homeScore} ${home}`
+  }
+  if (Number.isFinite(h) && Number.isFinite(a) && h > a) {
+    return `${home} ${homeScore}-${awayScore} ${away}`
+  }
+  return `${away} ${awayScore}-${homeScore} ${home}`
 }
 
 function elapsedMinutesSinceCommence(commenceIso: string, now = Date.now()): number {
@@ -166,6 +185,34 @@ export function detectPeriodMilestone(
     if (elapsed >= milestone.minMinutes) current = milestone
   }
   return current
+}
+
+/** Period label for live edge headers (e.g. "3rd Quarter"). */
+export function formatLivePeriodLabel(sportKey: string, commenceIso: string, now = Date.now()): string {
+  const elapsed = elapsedMinutesSinceCommence(commenceIso, now)
+  if (sportKey.startsWith('basketball')) {
+    if (elapsed < 12) return '1st Quarter'
+    if (elapsed < 24) return '2nd Quarter'
+    if (elapsed < 36) return '3rd Quarter'
+    if (elapsed < 48) return '4th Quarter'
+    return 'Late Game'
+  }
+  if (sportKey.startsWith('americanfootball')) {
+    if (elapsed < 45) return '1st Half'
+    if (elapsed < 90) return '2nd Half'
+    return 'Late Game'
+  }
+  if (sportKey.startsWith('icehockey')) {
+    if (elapsed < 20) return '1st Period'
+    if (elapsed < 40) return '2nd Period'
+    return '3rd Period'
+  }
+  if (sportKey.startsWith('baseball')) {
+    if (elapsed < 90) return 'Early Innings'
+    if (elapsed < 135) return 'Mid Game'
+    return 'Late Innings'
+  }
+  return 'Live'
 }
 
 export function formatLiveClockHint(sportKey: string, commenceIso: string, now = Date.now()): string {
@@ -194,26 +241,32 @@ export function formatLiveClockHint(sportKey: string, commenceIso: string, now =
 
 export function buildInGameEdgeCaption(
   pick: OddsPick,
-  opts: { categoryLabel?: string; scoreLine?: string; clockHint?: string },
+  opts: { categoryLabel?: string; scoreLine?: string; periodLabel?: string },
 ): string {
-  const away = shortName(pick.awayTeam)
-  const home = shortName(pick.homeTeam)
-  const event = opts.categoryLabel?.trim()
-  const matchup = opts.scoreLine || `${away} @ ${home}`
-  const head = event ? `${event}: ${matchup}` : matchup
+  const matchup = opts.scoreLine || `${shortName(pick.awayTeam)} vs ${shortName(pick.homeTeam)}`
   const pickLine = formatOddsPickLine(pick)
-  const fair = formatAmericanOdds(pick.consensusPrice)
-  const clock = opts.clockHint ? ` · ${opts.clockHint}` : ''
+  const period = opts.periodLabel?.trim()
+  const header = period ? `🔴 LIVE In-Game Edge • ${period}` : '🔴 LIVE In-Game Edge'
+  const ev = Math.round(pick.edgePct * 10) / 10
+  const sport = String(opts.categoryLabel || '').trim()
+  const contextLines = sport ? [sport, matchup] : [matchup]
 
   return [
-    `🔴 LIVE In-Game Edge${clock}`,
+    header,
     '',
-    head,
+    ...contextLines,
     '',
-    `${pickLine} at ${pick.bookTitle}`,
-    `Fair ${fair} (${pick.bookCount} books)`,
-    `+${pick.edgePct}% EV on ${marketLabel(pick.marketKey)}`,
+    `${pickLine} @ ${pick.bookTitle}`,
+    `+${ev}% EV on the ${marketLabel(pick.marketKey)}`,
   ].join('\n').trim()
+}
+
+function periodReportPicksHeading(periodLabel: string): string {
+  const label = periodLabel.toLowerCase()
+  if (label.includes('halftime')) return 'Best bets for 2nd half:'
+  if (label.includes('1st period')) return 'Best bets for the rest of the game:'
+  if (label.includes('2nd period')) return 'Best bets for the 3rd period:'
+  return 'Best bets for the rest of the game:'
 }
 
 export function buildPeriodReportCaption(
@@ -227,23 +280,24 @@ export function buildPeriodReportCaption(
 ): string {
   const away = shortName(String(event.away_team || 'Away'))
   const home = shortName(String(event.home_team || 'Home'))
-  const matchup = opts.scoreLine || `${away} @ ${home}`
-  const eventLabel = opts.categoryLabel?.trim()
-  const head = eventLabel ? `${eventLabel}: ${matchup}` : matchup
+  const matchup = opts.scoreLine || `${away} vs ${home}`
+  const sport = String(opts.categoryLabel || '').trim()
+  const header = sport
+    ? `📊 ${opts.periodLabel} - ${sport} - ${matchup}`
+    : `📊 ${opts.periodLabel} - ${matchup}`
 
   const lines = [
-    `📊 ${opts.periodLabel}`,
+    header,
     '',
-    head,
-    '',
-    'Best bets for the rest of the game:',
+    periodReportPicksHeading(opts.periodLabel),
   ]
 
   if (!picks.length) {
     lines.push('No +EV live lines clearing the threshold right now.')
   } else {
     for (const pick of picks.slice(0, 2)) {
-      lines.push(`• ${formatOddsPickLine(pick)} at ${pick.bookTitle} (+${pick.edgePct}% EV)`)
+      const ev = Math.round(pick.edgePct * 10) / 10
+      lines.push(`• ${formatOddsPickLine(pick)} @ ${pick.bookTitle} (+${ev}% EV)`)
     }
   }
 
@@ -415,8 +469,8 @@ export async function tryPublishLiveGameContent(
 
       const scoreRow = scoreById.get(pick.eventId)
       const scoreLine = formatLiveScoreLine(pick.homeTeam, pick.awayTeam, scoreRow?.scores)
-      const clockHint = formatLiveClockHint(sportKey, pick.commenceTime)
-      const caption = buildInGameEdgeCaption(pick, { categoryLabel, scoreLine, clockHint })
+      const periodLabel = formatLivePeriodLabel(sportKey, pick.commenceTime)
+      const caption = buildInGameEdgeCaption(pick, { categoryLabel, scoreLine, periodLabel })
 
       if (dryRun) {
         if (!topLivePick) topLivePick = pick

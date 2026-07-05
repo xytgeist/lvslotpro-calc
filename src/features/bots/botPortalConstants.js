@@ -43,7 +43,7 @@ export function formatBotPortalWhen(iso) {
 export const ODDS_ALERT_AUDIENCE_ROWS = Object.freeze([
   { key: 'coffee_covers', label: 'Coffee & Covers' },
   { key: 'edge', label: '+EV Edge Alerts' },
-  { key: 'line_movement', label: 'Line Movement' },
+  { key: 'line_movement', label: 'Line Movement (sharp / steam / RLM)' },
   { key: 'in_game_edge', label: 'In-Game Edge' },
   { key: 'period_report', label: 'Period / Halftime Report' },
   { key: 'best_bet_hour', label: 'Best Bet of the Hour' },

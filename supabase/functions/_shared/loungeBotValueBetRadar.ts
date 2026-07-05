@@ -13,8 +13,8 @@ import {
   DEFAULT_MAX_EV_PCT,
   DEFAULT_MIN_BOOKS,
   findPlusEvOpportunities,
-  formatOddsCommenceTimeShort,
   formatOddsPickLine,
+  formatScottPickContextSuffix,
   type OddsEvent,
   type OddsPick,
 } from './loungeBotOddsCaption.ts'
@@ -47,12 +47,6 @@ export type RadarPick = OddsPick & {
   calendarPriority: number
   /** @deprecated use coverageRank */
   popularityRank: number
-}
-
-function shortName(name: string): string {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
-  if (parts.length <= 1) return parts[0] || ''
-  return parts[parts.length - 1]!
 }
 
 function joinCaptionLines(lines: string[]): string {
@@ -160,49 +154,22 @@ export function selectValueBetRadarPicks(
   return picked.slice(0, maxPicks)
 }
 
-function usesCategorySubline(pick: RadarPick): boolean {
-  const label = pick.categoryLabel?.trim()
-  if (!label) return false
-  const home = shortName(pick.homeTeam).toLowerCase()
-  const away = shortName(pick.awayTeam).toLowerCase()
-  const ll = label.toLowerCase()
-  return ll !== home && ll !== away && !ll.includes(' vs ')
-}
-
-function formatRadarSubline(pick: RadarPick): string {
-  const when = formatOddsCommenceTimeShort(pick.commenceTime)
-  if (usesCategorySubline(pick)) {
-    return `${pick.categoryLabel.trim()} – ${when}`
-  }
-  if (pick.marketKey === 'totals') {
-    return `${shortName(pick.awayTeam)} vs ${shortName(pick.homeTeam)} – ${when}`
-  }
-  const pn = String(pick.pickName || '').trim().toLowerCase()
-  const home = String(pick.homeTeam || '').trim()
-  const away = String(pick.awayTeam || '').trim()
-  let opp = shortName(away)
-  if (pn === home.toLowerCase() || shortName(home).toLowerCase() === pn) opp = shortName(away)
-  else if (pn === away.toLowerCase() || shortName(away).toLowerCase() === pn) opp = shortName(home)
-  return `vs ${opp} – ${when}`
-}
-
-export function formatRadarPickLines(pick: RadarPick): string[] {
+function formatRadarPickLine(pick: RadarPick): string {
   const ev = Math.round(pick.edgePct * 10) / 10
-  return [
-    `${formatOddsPickLine(pick)} @ ${pick.bookTitle} (+${ev}% EV)`,
-    formatRadarSubline(pick),
-  ]
+  const ctx = formatScottPickContextSuffix({
+    awayTeam: pick.awayTeam,
+    homeTeam: pick.homeTeam,
+    commenceTime: pick.commenceTime,
+    categoryLabel: pick.categoryLabel,
+  })
+  return `• ${formatOddsPickLine(pick)} @ ${pick.bookTitle} (+${ev}% EV)${ctx}`
 }
 
 export function buildValueBetRadarCaption(picks: RadarPick[]): string {
-  const blocks = picks.flatMap((pick) => formatRadarPickLines(pick))
   return joinCaptionLines([
     '📡 Value Bet Radar',
-    'Here are the strongest edges right now:',
     '',
-    ...blocks,
-    '',
-    'Quick hits. Bet responsibly.',
+    ...picks.map(formatRadarPickLine),
   ])
 }
 

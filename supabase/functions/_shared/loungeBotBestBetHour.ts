@@ -11,8 +11,8 @@ import {
   filterOddsEventsForPtCalendarDay,
   findPlusEvOpportunities,
   formatAmericanOdds,
-  formatOddsCommenceTimeShort,
   formatOddsPickLine,
+  formatScottSportContextLines,
   marketLabel,
   ptTodayDate,
   type OddsEvent,
@@ -173,17 +173,22 @@ export function buildBestBetHourCaption(
   pick: HourlyBestPick,
   _opts?: { displayName?: string },
 ): string {
-  const away = shortName(pick.awayTeam)
-  const home = shortName(pick.homeTeam)
-  const when = formatOddsCommenceTimeShort(pick.commenceTime)
   const pickLine = formatOddsPickLine(pick)
   const ev = Math.round(pick.edgePct * 10) / 10
 
   return joinCaptionLines([
-    `🔥 Best Bet of the Hour`,
+    '🔥 Best Bet of the Hour',
+    '',
+    ...formatScottSportContextLines(
+      pick.awayTeam,
+      pick.homeTeam,
+      pick.commenceTime,
+      pick.categoryLabel,
+    ),
+    '',
     `${pickLine} @ ${pick.bookTitle}`,
-    `${away} vs ${home} (${when})`,
     `+${ev}% EV`,
+    '',
     buildBestBetHourReason(pick),
   ])
 }

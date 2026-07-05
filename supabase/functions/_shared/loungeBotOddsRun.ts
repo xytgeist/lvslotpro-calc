@@ -28,6 +28,7 @@ import {
   buildLineMovementCaption,
   detectLineMovements,
   extractEventLines,
+  LINE_MOVEMENT_PUBLISH_KINDS,
   lineMovementDedupeKey,
   loadStoredEventLines,
   SNAPSHOT_COMPARE_MAX_MS,
@@ -779,6 +780,7 @@ export async function tryPublishLineMovementAlerts(
 
   for (const alert of movements) {
     if (publishedToday >= maxPerDay) break
+    if (!LINE_MOVEMENT_PUBLISH_KINDS.has(alert.kind)) continue
 
     const dedupeKey = lineMovementDedupeKey(alert)
     if (await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) continue

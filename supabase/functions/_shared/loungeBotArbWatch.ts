@@ -8,7 +8,7 @@ import {
   americanToImplied,
   formatAmericanOdds,
   formatBookDisplayName,
-  formatOddsCommenceTimeShort,
+  formatScottSportContextLines,
   ptTodayDate,
   type OddsEvent,
 } from './loungeBotOddsCaption.ts'
@@ -404,26 +404,20 @@ function formatStakeSummary(arb: ArbOpportunity): string {
 
 export function buildArbWatchCaption(
   arb: ArbOpportunity,
-  _opts?: { displayName?: string; categoryLabel?: string },
+  opts?: { displayName?: string; categoryLabel?: string },
 ): string {
-  const away = shortName(arb.awayTeam)
-  const home = shortName(arb.homeTeam)
-  const when = formatOddsCommenceTimeShort(arb.commenceTime)
   const legsWithMarket = arb.legs.map((leg) => ({ ...leg, marketKey: arb.marketKey })) as ArbLegWithMarket[]
 
   const lines = [
-    `🔒 Arb Watch`,
-    'Risk-Free Opportunity',
+    '🔒 Arb Watch',
+    '',
+    ...formatScottSportContextLines(arb.awayTeam, arb.homeTeam, arb.commenceTime, opts?.categoryLabel),
     '',
     ...legsWithMarket.map(formatLegCaptionLine),
     '',
     `Guaranteed +${arb.profitPct}% profit no matter the result.`,
     formatStakeSummary(arb),
   ]
-
-  if (when) {
-    lines.splice(3, 0, `${away} vs ${home} (${when})`, '')
-  }
 
   return joinCaptionLines(lines)
 }

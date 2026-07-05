@@ -5,11 +5,14 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import {
   formatAmericanOdds,
   formatBookDisplayName,
-  formatOddsCommenceTimeShort,
+  formatScottSportContextLines,
   type OddsEvent,
 } from './loungeBotOddsCaption.ts'
 
 export type LineMovementKind = 'sharp_move' | 'steam' | 'line_movement' | 'rlm'
+
+/** Feed posts only for meaningful moves — minor `line_movement` stays internal (Sharp Report input). */
+export const LINE_MOVEMENT_PUBLISH_KINDS = new Set<LineMovementKind>(['sharp_move', 'steam', 'rlm'])
 
 function ptTodayDate(): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -66,10 +69,10 @@ export type LineMovementConfig = {
 }
 
 const ALERT_HEADERS: Record<LineMovementKind, string> = {
-  sharp_move: '🔥 Sharp Move Alert',
-  steam: '🔥 Steam Coming In',
+  sharp_move: '🔥 Sharp Money Move',
+  steam: '💨 Steam Coming In',
   rlm: '📈 Reverse Line Movement',
-  line_movement: '📈 Line Movement',
+  line_movement: '📈 Line Watch',
 }
 
 function median(nums: number[]): number | null {
@@ -243,25 +246,42 @@ function classifyMovement(
   return 'line_movement'
 }
 
-function movementMeaning(kind: LineMovementKind, marketKey: string, outcomeName: string, priceDelta: number): string {
+function movementMeaning(kind: LineMovementKind, marketKey: string, outcomeName: string, priceDelta: number, pointDelta: number): string {
   const label = shortName(outcomeName)
   if (kind === 'rlm') {
-    return `Line moved toward ${label} while moneyline odds moved the other way ... classic reverse line movement (sharp money signal).`
+    return `Public side and sharp money diverging ... spread moved one way while ML moved the other.`
   }
-  if (kind === 'sharp_move' || kind === 'steam') {
+  if (kind === 'sharp_move') {
+    const size = formatMoveSizeLabel(marketKey, pointDelta, priceDelta)
     if (marketKey === 'spreads') {
       return priceDelta < 0
-        ? `Steam shortening juice on ${label} ... books adjusting fast.`
-        : `Sharp action shifting the ${label} spread.`
+        ? `Significant move (${size}) — sharp books shortening juice on ${label}.`
+        : `Significant move (${size}) — sharp action shifting the ${label} spread.`
     }
     if (marketKey === 'totals') {
-      return `Steam moving the ${label.toLowerCase()} total.`
+      return `Significant move (${size}) — sharp action on the ${label.toLowerCase()} total.`
     }
     return priceDelta > 0
-      ? `${label} odds lengthening ... value opening on the dog side.`
-      : `${label} ML shortening ... money coming in.`
+      ? `Significant ML move (${size}) — ${label} odds lengthening, potential dog value.`
+      : `Significant ML move (${size}) — ${label} shortening, sharp money in.`
   }
-  return `Notable line shift on ${label} across books.`
+  if (kind === 'steam') {
+    if (marketKey === 'spreads') {
+      return `Fast multi-book steam — number syncing toward ${label} right now.`
+    }
+    if (marketKey === 'totals') {
+      return `Fast multi-book steam on the ${label.toLowerCase()} total.`
+    }
+    return `Fast multi-book steam — ${label} ML adjusting across books.`
+  }
+  return `Minor line shift on ${label} — tracking only (no standalone alert).`
+}
+
+function formatMoveSizeLabel(marketKey: string, pointDelta: number, priceDelta: number): string {
+  if (marketKey === 'spreads' || marketKey === 'totals') {
+    return `${Math.abs(pointDelta)} pt`
+  }
+  return `${Math.abs(priceDelta)} ML pts`
 }
 
 export function detectLineMovements(
@@ -342,7 +362,7 @@ export function detectLineMovements(
       pointDelta,
       priceDelta,
       leadingBooks,
-      meaning: movementMeaning(kind, row.marketKey, row.outcomeName, priceDelta),
+      meaning: movementMeaning(kind, row.marketKey, row.outcomeName, priceDelta, pointDelta),
     })
   }
 
@@ -366,14 +386,6 @@ export function buildLineMovementCaption(
   alert: LineMovementAlert,
   opts?: { categoryLabel?: string },
 ): string {
-  const away = shortName(alert.awayTeam)
-  const home = shortName(alert.homeTeam)
-  const when = formatOddsCommenceTimeShort(alert.commenceTime)
-  const event = opts?.categoryLabel?.trim()
-  const head = event
-    ? `${event}: ${away} vs ${home} (${when})`
-    : `${away} vs ${home} (${when})`
-
   const moveLine = formatMarketMoveLabel(
     alert.marketKey,
     alert.outcomeName,
@@ -394,13 +406,21 @@ export function buildLineMovementCaption(
   }).format(new Date())
 
   const header = ALERT_HEADERS[alert.kind]
+  const contextLines = formatScottSportContextLines(
+    alert.awayTeam,
+    alert.homeTeam,
+    alert.commenceTime,
+    opts?.categoryLabel,
+  )
 
   return [
     header,
-    head,
+    '',
+    ...contextLines,
     '',
     moveLine,
-    `Books leading move: ${books}`,
+    `Books: ${books}`,
+    '',
     alert.meaning,
     '',
     `Updated ${ts}`,

@@ -470,21 +470,50 @@ function formatEventMatchupLine(
   return event ? `${event}: ${body}` : body
 }
 
-export function buildOddsEdgeAlertCaption(pick: OddsPick, opts?: { categoryLabel?: string }): string {
-  const pickLabel = shortDisplayName(pick.pickName)
+/** Standard sport + matchup + kickoff lines for Scott captions. */
+export function formatScottSportContextLines(
+  awayTeam: string,
+  homeTeam: string,
+  commenceTime: string,
+  categoryLabel?: string,
+): string[] {
+  const away = shortDisplayName(awayTeam)
+  const home = shortDisplayName(homeTeam)
+  const when = formatOddsCommenceTimeShort(commenceTime)
+  const sport = String(categoryLabel || '').trim()
+  const lines: string[] = []
+  if (sport) lines.push(sport)
+  lines.push(when ? `${away} vs ${home} · ${when}` : `${away} vs ${home}`)
+  return lines
+}
+
+/** Compact sport · time suffix for snackable list lines (e.g. Value Radar). */
+export function formatScottPickContextSuffix(
+  pick: { awayTeam: string; homeTeam: string; commenceTime: string; categoryLabel?: string },
+): string {
+  const sport = String(pick.categoryLabel || '').trim()
+  const when = formatOddsCommenceTimeShort(pick.commenceTime)
   const away = shortDisplayName(pick.awayTeam)
   const home = shortDisplayName(pick.homeTeam)
+  const parts: string[] = []
+  if (sport) parts.push(sport)
+  if (when) parts.push(when)
+  return parts.length ? ` · ${parts.join(' · ')}` : ` · ${away} vs ${home}`
+}
+
+export function buildOddsEdgeAlertCaption(pick: OddsPick, opts?: { categoryLabel?: string }): string {
+  const pickLabel = shortDisplayName(pick.pickName)
   const odds = formatAmericanOdds(pick.pickPrice)
   const fair = formatAmericanOdds(pick.consensusPrice)
-  const when = formatOddsCommenceTimeShort(pick.commenceTime)
-  const event = opts?.categoryLabel?.trim()
+  const ev = Math.round(pick.edgePct * 10) / 10
 
   return joinCaptionLines([
-    `⚡ ${formatEventMatchupLine(event, away, home, when)}`,
+    '⚡ +EV Edge',
     '',
-    `${pickLabel} ML ${odds} at ${pick.bookTitle}`,
-    `Fair ${fair} (${pick.bookCount} books)`,
-    `+${pick.edgePct}% edge on ML`,
+    ...formatScottSportContextLines(pick.awayTeam, pick.homeTeam, pick.commenceTime, opts?.categoryLabel),
+    '',
+    `${pickLabel} ML ${odds} @ ${pick.bookTitle}`,
+    `+${ev}% EV on ML · fair ${fair} (${pick.bookCount} books)`,
   ])
 }
 

@@ -11,7 +11,7 @@ import {
   type LineMovementAlert,
   type LineMovementConfig,
 } from './loungeBotLineMovement.ts'
-import { formatAmericanOdds, formatOddsCommenceTimeShort, ptTodayDate, type OddsEvent } from './loungeBotOddsCaption.ts'
+import { formatAmericanOdds, formatScottSportContextLines, ptTodayDate, type OddsEvent } from './loungeBotOddsCaption.ts'
 import { hasDedupePublishedToday, type OddsBotRow, type OddsCfgRow } from './loungeBotOddsRun.ts'
 import {
   countScheduledKindToday,
@@ -150,12 +150,6 @@ export function buildSharpReportAnalysis(
 
 export function buildSharpReportCaption(candidate: SharpReportCandidate): string {
   const { alert, snapshotAgeMs, categoryLabel } = candidate
-  const away = shortName(alert.awayTeam)
-  const home = shortName(alert.homeTeam)
-  const when = formatOddsCommenceTimeShort(alert.commenceTime)
-  const eventLabel = categoryLabel?.trim()
-    ? `${categoryLabel}: ${away} vs ${home}`
-    : `${away} vs ${home}`
 
   return joinCaptionLines([
     '📊 Sharp Report Card',
@@ -163,7 +157,8 @@ export function buildSharpReportCaption(candidate: SharpReportCandidate): string
     buildSharpReportMovementLine(alert),
     '',
     buildSharpReportAnalysis(alert, snapshotAgeMs),
-    when ? `${eventLabel} (${when}). This is one to watch closely.` : 'This is one to watch closely.',
+    '',
+    ...formatScottSportContextLines(alert.awayTeam, alert.homeTeam, alert.commenceTime, categoryLabel),
   ])
 }
 

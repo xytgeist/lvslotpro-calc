@@ -102,7 +102,7 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 | **Scan all · edge** | All calendar sports today → edge alerts only |
 | **Post Coffee & Covers** | One morning post/day (dedupe) with thread parts per sport |
 | **Best bet · hour** | Manual smoke for hourly strongest +EV post (same logic as cron) |
-| **Post all examples** | One 🧪 Example feed post per alert type (**13** total, incl. Coffee & Covers thread part) |
+| **Post all examples** | One 🧪 Example feed post per alert type (**12** total, incl. Coffee & Covers thread part) |
 | **Min +EV %** | Settings field **0.5–15** → **`lounge_bot_odds_config.min_edge_pct`** |
 | **Alert audience** | Per alert type: **All** (public feed) or **Subs** (subscriber-only post). Matrix in Settings → **`lounge_bot_odds_config.alert_audience`**. Defaults: Coffee & Covers **All**; edge, line movement, in-game, period reports, Best Bet of the Hour, Arb Watch, **Sharp Report** **Subs**. **Arb Watch** and **Sharp Report** only post when quality signal exists. |
 
@@ -158,8 +158,8 @@ Set **`coffee_covers_enabled = false`** on **`lounge_bot_odds_config`** to fall 
    - Spread moves **≥ 0.5** pts (config **`min_spread_move_pts`**)
    - Total moves **≥ 0.5** pts (**`min_total_move_pts`**)
    - ML moves **≥ 20** American pts in the interval (e.g. +150 → +130, -140 → -160; config **`min_ml_move_pts`**, default **20**)
-4. Classify: **`sharp_move`** (≥ 1 pt or large ML), **`steam`**, **`rlm`** (spread vs ML diverge), **`line_movement`**
-5. Post feed alert with sport, matchup, kickoff, what moved, leading books, meaning, timestamp
+4. Classify: **`sharp_move`** (≥ 1 pt or large ML), **`steam`** (fast multi-book sync), **`rlm`** (spread vs ML diverge), **`line_movement`** (minor — internal only, no feed post)
+5. Post feed alert for **`sharp_move`**, **`steam`**, and **`rlm`** only (minor **`line_movement`** feeds **Sharp Report Card** but not standalone alerts)
 6. Upsert new snapshot (first poll = baseline only, no alerts)
 
 Dedupe: one alert per movement direction per game/market/outcome per PT day. Cap: **`max_line_alerts_per_day`** (default **12**). Disable via **`line_movement_enabled = false`**.
@@ -171,7 +171,7 @@ Dedupe: one alert per movement direction per game/market/outcome per PT day. Cap
 | Post kind | Trigger | Threshold |
 | --- | --- | --- |
 | **`in_game_edge`** | Live game (commenced, not completed per scores API) | **+EV ≥ `min_live_edge_pct`** (default **4%**) on **ML, spreads, or totals** |
-| **`period_report`** | Sport-specific period milestone (halftime, NHL period end, MLB 5th-inning heuristic) | Best **+EV** lines for remainder of game; header is milestone label only (e.g. **Halftime Report**) |
+| **`period_report`** | Sport-specific period milestone (halftime, NHL period end, MLB 5th-inning heuristic) | Best **+EV** lines for remainder of game; header merges milestone + score (e.g. **Halftime Report - Chiefs 14-10 Bills**) |
 
 Period milestones use elapsed-time heuristics per sport (not play-by-play). State in **`lounge_odds_game_period_state`** — one report per game per milestone. Caps: **`max_live_alerts_per_day`** (default **8**), **`max_period_reports_per_day`** (default **6**). Toggle via **`live_edge_enabled`** / **`period_report_enabled`**.
 
@@ -260,36 +260,57 @@ Disable via **`value_bet_radar_enabled = false`**. Default audience **`all`** (s
 Example:
 ```text
 📡 Value Bet Radar
-Here are the strongest edges right now:
 
-Padres ML +219 @ lowvig (+7.8% EV)
-vs Dodgers – Sat 7:11 PM PT
-Canada ML +490 @ BetUS (+3.1% EV)
-World Cup – Sat 10AM PT
-Giron ML +900 @ DraftKings (+4.2% EV)
-Wimbledon – Sat 6:30 AM PT
-
-Quick hits. Bet responsibly.
+• Padres ML +219 @ lowvig (+7.8% EV) · MLB · Sat 7:11 PM PT
+• Canada ML +490 @ BetUS (+3.1% EV) · World Cup · Sat 10AM PT
+• Giron ML +900 @ DraftKings (+4.2% EV)
 ```
 
 Example period report:
 ```text
-📊 Halftime Report
+📊 Halftime Report - NFL - Chiefs 14-10 Bills
 
-NFL: Chiefs 14 - 10 Bills
-
-Best bets for the rest of the game:
-• Chiefs -2.5 (-108) at DraftKings (+4.5% EV)
+Best bets for 2nd half:
+• Chiefs -2.5 (-108) @ DraftKings (+4.5% EV)
 ```
 
-Example:
+Example live edge:
 ```text
-🔥 Sharp Move Alert
-World Cup: France vs Paraguay (Sat 2PM PT)
+🔴 LIVE In-Game Edge • 3rd Quarter
+
+NBA
+Lakers 88-82 Warriors
+
+Lakers -4.5 (+105) @ DraftKings
++5.2% EV on the spread
+```
+
+Example line movement (sharp money):
+```text
+🔥 Sharp Money Move
+
+World Cup
+France vs Paraguay · Sat 2PM PT
 
 France spread -3 (-110) → -4 (-108)
-Books leading move: FanDuel, DraftKings
-Sharp action shifting the France spread.
+Books: FanDuel, DraftKings
+
+Significant move (1 pt) — sharp action shifting the France spread.
+
+Updated 6:45 PM PT
+```
+
+Example steam:
+```text
+💨 Steam Coming In
+
+NFL
+Chiefs vs Raiders · Sun 1:25 PM PT
+
+Chiefs spread -3 (-110) → -4 (-108)
+Books: FanDuel, DraftKings
+
+Fast multi-book steam — number syncing toward Chiefs right now.
 
 Updated 6:45 PM PT
 ```
