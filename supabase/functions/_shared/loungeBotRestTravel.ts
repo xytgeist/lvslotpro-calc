@@ -247,6 +247,7 @@ export function evaluateRestTravelMatchup(
   homeTeam: string,
   awayProfile: TeamRestProfile,
   homeProfile: TeamRestProfile,
+  tonightVenueLocation?: string,
 ): RestTravelMatchup | null {
   const pairs = [
     { fatigued: awayProfile, rested: homeProfile, fatiguedName: awayTeam, restedName: homeTeam },
@@ -264,8 +265,9 @@ export function evaluateRestTravelMatchup(
     const currentVenue = resolveGameVenueCoords(
       sportId,
       pair.fatiguedName,
-      !pair.fatigued.isHomeTonight,
+      pair.fatigued.isHomeTonight,
       pair.fatigued.isHomeTonight ? pair.restedName : pair.fatiguedName,
+      tonightVenueLocation,
     )
     const travel = detectTravelFatigue(pair.fatigued.lastVenue ?? null, currentVenue)
 

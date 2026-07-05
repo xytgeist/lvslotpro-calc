@@ -410,6 +410,7 @@ async function collectContextCandidates(
         homeTeam,
         awayProfile,
         homeProfile,
+        rundown.venueLocation,
       )
       if (matchup) {
         const restedPick = bestPickForRestedTeam(

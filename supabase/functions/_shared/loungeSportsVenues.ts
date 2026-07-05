@@ -122,12 +122,54 @@ export const SPORTS_VENUES: SportsVenueRow[] = [
   { sportIds: [2, 25], keys: ['tampa bay buccaneers', 'buccaneers'], venueName: 'Raymond James Stadium', city: 'Tampa', lat: 27.976, lng: -82.503, tz: 'ET' },
   { sportIds: [2, 25], keys: ['tennessee titans', 'titans'], venueName: 'Nissan Stadium', city: 'Nashville', lat: 36.166, lng: -86.771, tz: 'CT' },
   { sportIds: [2, 25], keys: ['washington commanders', 'commanders'], venueName: 'Northwest Stadium', city: 'Landover', lat: 38.908, lng: -76.864, tz: 'ET' },
-  // WNBA (reuse NBA arenas where applicable)
+  // WNBA
+  { sportIds: [8], keys: ['atlanta dream', 'dream'], venueName: 'State Farm Arena', city: 'Atlanta', lat: 33.757, lng: -84.396, tz: 'ET' },
+  { sportIds: [8], keys: ['chicago sky', 'sky'], venueName: 'Wintrust Arena', city: 'Chicago', lat: 41.853, lng: -87.621, tz: 'CT' },
+  { sportIds: [8], keys: ['connecticut sun', 'sun'], venueName: 'Mohegan Sun Arena', city: 'Uncasville', lat: 41.491, lng: -72.088, tz: 'ET' },
+  { sportIds: [8], keys: ['dallas wings', 'wings'], venueName: 'College Park Center', city: 'Arlington', lat: 32.730, lng: -97.108, tz: 'CT' },
+  { sportIds: [8], keys: ['golden state valkyries', 'valkyries'], venueName: 'Chase Center', city: 'San Francisco', lat: 37.768, lng: -122.387, tz: 'PT' },
+  { sportIds: [8], keys: ['indiana fever', 'fever'], venueName: 'Gainbridge Fieldhouse', city: 'Indianapolis', lat: 39.764, lng: -86.155, tz: 'ET' },
   { sportIds: [8], keys: ['las vegas aces', 'aces'], venueName: 'Michelob Ultra Arena', city: 'Las Vegas', lat: 36.091, lng: -115.184, tz: 'PT' },
+  { sportIds: [8], keys: ['los angeles sparks', 'sparks'], venueName: 'Crypto.com Arena', city: 'Los Angeles', lat: 34.043, lng: -118.267, tz: 'PT' },
+  { sportIds: [8], keys: ['minnesota lynx', 'lynx'], venueName: 'Target Center', city: 'Minneapolis', lat: 44.979, lng: -93.276, tz: 'CT' },
   { sportIds: [8], keys: ['new york liberty', 'liberty'], venueName: 'Barclays Center', city: 'Brooklyn', lat: 40.683, lng: -73.975, tz: 'ET' },
-  // NHL (subset — same buildings as NBA in many markets)
-  { sportIds: [6], keys: ['vegas golden knights', 'golden knights'], venueName: 'T-Mobile Arena', city: 'Las Vegas', lat: 36.103, lng: -115.178, tz: 'PT' },
+  { sportIds: [8], keys: ['phoenix mercury', 'mercury'], venueName: 'Footprint Center', city: 'Phoenix', lat: 33.446, lng: -112.071, tz: 'MT' },
+  { sportIds: [8], keys: ['seattle storm', 'storm'], venueName: 'Climate Pledge Arena', city: 'Seattle', lat: 47.622, lng: -122.354, tz: 'PT' },
+  { sportIds: [8], keys: ['washington mystics', 'mystics'], venueName: 'Entertainment and Sports Arena', city: 'Washington', lat: 38.868, lng: -76.978, tz: 'ET' },
+  // NHL (32 franchises — shared buildings with NBA/MLB where applicable)
+  { sportIds: [6], keys: ['anaheim ducks', 'ducks'], venueName: 'Honda Center', city: 'Anaheim', lat: 33.808, lng: -117.877, tz: 'PT' },
+  { sportIds: [6], keys: ['arizona coyotes', 'coyotes'], venueName: 'Mullett Arena', city: 'Tempe', lat: 33.427, lng: -111.931, tz: 'MT' },
   { sportIds: [6], keys: ['boston bruins', 'bruins'], venueName: 'TD Garden', city: 'Boston', lat: 42.366, lng: -71.062, tz: 'ET' },
+  { sportIds: [6], keys: ['buffalo sabres', 'sabres'], venueName: 'KeyBank Center', city: 'Buffalo', lat: 42.875, lng: -78.876, tz: 'ET' },
+  { sportIds: [6], keys: ['calgary flames', 'flames'], venueName: 'Scotiabank Saddledome', city: 'Calgary', lat: 51.037, lng: -114.052, tz: 'MT' },
+  { sportIds: [6], keys: ['carolina hurricanes', 'hurricanes'], venueName: 'Lenovo Center', city: 'Raleigh', lat: 35.803, lng: -78.722, tz: 'ET' },
+  { sportIds: [6], keys: ['chicago blackhawks', 'blackhawks'], venueName: 'United Center', city: 'Chicago', lat: 41.881, lng: -87.674, tz: 'CT' },
+  { sportIds: [6], keys: ['colorado avalanche', 'avalanche'], venueName: 'Ball Arena', city: 'Denver', lat: 39.748, lng: -105.007, tz: 'MT' },
+  { sportIds: [6], keys: ['columbus blue jackets', 'blue jackets'], venueName: 'Nationwide Arena', city: 'Columbus', lat: 39.969, lng: -83.006, tz: 'ET' },
+  { sportIds: [6], keys: ['dallas stars', 'stars'], venueName: 'American Airlines Center', city: 'Dallas', lat: 32.790, lng: -96.810, tz: 'CT' },
+  { sportIds: [6], keys: ['detroit red wings', 'red wings'], venueName: 'Little Caesars Arena', city: 'Detroit', lat: 42.341, lng: -83.055, tz: 'ET' },
+  { sportIds: [6], keys: ['edmonton oilers', 'oilers'], venueName: 'Rogers Place', city: 'Edmonton', lat: 53.547, lng: -113.498, tz: 'MT' },
+  { sportIds: [6], keys: ['florida panthers', 'panthers nhl'], venueName: 'Amerant Bank Arena', city: 'Sunrise', lat: 26.158, lng: -80.326, tz: 'ET' },
+  { sportIds: [6], keys: ['los angeles kings', 'kings nhl'], venueName: 'Crypto.com Arena', city: 'Los Angeles', lat: 34.043, lng: -118.267, tz: 'PT' },
+  { sportIds: [6], keys: ['minnesota wild', 'wild'], venueName: 'Xcel Energy Center', city: 'St. Paul', lat: 44.945, lng: -93.101, tz: 'CT' },
+  { sportIds: [6], keys: ['montreal canadiens', 'canadiens'], venueName: 'Bell Centre', city: 'Montreal', lat: 45.496, lng: -73.569, tz: 'ET' },
+  { sportIds: [6], keys: ['nashville predators', 'predators'], venueName: 'Bridgestone Arena', city: 'Nashville', lat: 36.159, lng: -86.778, tz: 'CT' },
+  { sportIds: [6], keys: ['new jersey devils', 'devils'], venueName: 'Prudential Center', city: 'Newark', lat: 40.734, lng: -74.171, tz: 'ET' },
+  { sportIds: [6], keys: ['new york islanders', 'islanders'], venueName: 'UBS Arena', city: 'Elmont', lat: 40.711, lng: -73.726, tz: 'ET' },
+  { sportIds: [6], keys: ['new york rangers', 'rangers'], venueName: 'Madison Square Garden', city: 'New York', lat: 40.750, lng: -73.993, tz: 'ET' },
+  { sportIds: [6], keys: ['ottawa senators', 'senators'], venueName: 'Canadian Tire Centre', city: 'Ottawa', lat: 45.297, lng: -75.927, tz: 'ET' },
+  { sportIds: [6], keys: ['philadelphia flyers', 'flyers'], venueName: 'Wells Fargo Center', city: 'Philadelphia', lat: 39.901, lng: -75.172, tz: 'ET' },
+  { sportIds: [6], keys: ['pittsburgh penguins', 'penguins'], venueName: 'PPG Paints Arena', city: 'Pittsburgh', lat: 40.439, lng: -79.984, tz: 'ET' },
+  { sportIds: [6], keys: ['san jose sharks', 'sharks'], venueName: 'SAP Center', city: 'San Jose', lat: 37.332, lng: -121.901, tz: 'PT' },
+  { sportIds: [6], keys: ['seattle kraken', 'kraken'], venueName: 'Climate Pledge Arena', city: 'Seattle', lat: 47.622, lng: -122.354, tz: 'PT' },
+  { sportIds: [6], keys: ['st louis blues', 'blues'], venueName: 'Enterprise Center', city: 'St. Louis', lat: 38.627, lng: -90.203, tz: 'CT' },
+  { sportIds: [6], keys: ['tampa bay lightning', 'lightning'], venueName: 'Amalie Arena', city: 'Tampa', lat: 27.943, lng: -82.452, tz: 'ET' },
+  { sportIds: [6], keys: ['toronto maple leafs', 'maple leafs'], venueName: 'Scotiabank Arena', city: 'Toronto', lat: 43.643, lng: -79.379, tz: 'ET' },
+  { sportIds: [6], keys: ['utah hockey club', 'utah mammoth'], venueName: 'Delta Center', city: 'Salt Lake City', lat: 40.768, lng: -111.901, tz: 'MT' },
+  { sportIds: [6], keys: ['vancouver canucks', 'canucks'], venueName: 'Rogers Arena', city: 'Vancouver', lat: 49.277, lng: -123.109, tz: 'PT' },
+  { sportIds: [6], keys: ['vegas golden knights', 'golden knights'], venueName: 'T-Mobile Arena', city: 'Las Vegas', lat: 36.103, lng: -115.178, tz: 'PT' },
+  { sportIds: [6], keys: ['washington capitals', 'capitals'], venueName: 'Capital One Arena', city: 'Washington', lat: 38.898, lng: -77.021, tz: 'ET' },
+  { sportIds: [6], keys: ['winnipeg jets', 'jets nhl'], venueName: 'Canada Life Centre', city: 'Winnipeg', lat: 49.893, lng: -97.143, tz: 'CT' },
 ]
 
 export function haversineMiles(
@@ -169,12 +211,44 @@ export function lookupSportsVenue(sportId: number, teamName: string): SportsVenu
   return null
 }
 
+/** Match Rundown `venue_location` (e.g. "Los Angeles, CA") to a seeded row. */
+export function lookupVenueByLocation(sportId: number, location: string): SportsVenueRow | null {
+  const loc = norm(location)
+  if (!loc) return null
+  const cityToken = loc.split(',')[0]?.trim() || loc
+
+  const sportMatch = (row: SportsVenueRow) => {
+    if (!row.sportIds.includes(sportId)) return false
+    const city = norm(row.city)
+    return cityToken === city || loc.includes(city) || city.includes(cityToken)
+  }
+
+  for (const row of SPORTS_VENUES) {
+    if (sportMatch(row)) return row
+  }
+  for (const row of SPORTS_VENUES) {
+    const city = norm(row.city)
+    if (cityToken === city || loc.includes(city) || city.includes(cityToken)) return row
+  }
+  return null
+}
+
 export type GameVenueCoords = {
   lat: number
   lng: number
   tz: UsTzBucket
   city: string
   venueName: string
+}
+
+function venueRowToCoords(row: SportsVenueRow): GameVenueCoords {
+  return {
+    lat: row.lat,
+    lng: row.lng,
+    tz: row.tz,
+    city: row.city,
+    venueName: row.venueName,
+  }
 }
 
 /** Where a team plays for a given game (home arena or opponent home when away). */
@@ -185,16 +259,15 @@ export function resolveGameVenueCoords(
   opponentName: string,
   venueLocation?: string,
 ): GameVenueCoords | null {
+  const venueStr = String(venueLocation || '').trim()
+  if (venueStr) {
+    const byLoc = lookupVenueByLocation(sportId, venueStr)
+    if (byLoc) return venueRowToCoords(byLoc)
+  }
   const homeTeamName = isHome ? teamName : opponentName
   const row = lookupSportsVenue(sportId, homeTeamName)
   if (!row) return null
-  return {
-    lat: row.lat,
-    lng: row.lng,
-    tz: row.tz,
-    city: row.city,
-    venueName: row.venueName,
-  }
+  return venueRowToCoords(row)
 }
 
 export const TRAVEL_MILES_THRESHOLD = 800

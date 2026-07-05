@@ -277,8 +277,10 @@ Priority when multiple qualify: injury → starter spotlight → rest → confir
 2. Per team: days since last game, B2B (`days === 1`), NFL short week (`days < 6`), bye (no game in window).
 3. Qualify when fatigued side is B2B or NFL short week and rested side has **≥1 day** more rest (or bye vs short week).
 4. **+EV pick must be on the rested team** (h2h/spreads only).
-5. Travel line only when Haversine **≥800 mi** or home-market TZ bucket changes (`loungeSportsVenues.ts` seed). Pre-game: falls back to home-team arena coords when Rundown `venue_location` is blank.
+5. Travel line only when Haversine **≥800 mi** or home-market TZ bucket changes (`loungeSportsVenues.ts` seed). Resolve order: Rundown **`venue_location`** when present → home-team arena → opponent home arena. Unknown team → rest-only caption (no travel line).
 6. Copy stays **team schedule** only (never pitcher workload).
+
+**Venue seed (Phase 2):** `loungeSportsVenues.ts` — NBA (30), MLB (30), NFL (32), WNBA (13), NHL (32). Expand via **`scripts/geocode-sports-venues.mjs`** (one-time Google geocode, no runtime Maps calls).
 
 Example:
 ```text

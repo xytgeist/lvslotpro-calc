@@ -72,6 +72,7 @@ export type ResolvedRundownEvent = {
   pitcherAway?: string
   pitcherHome?: string
   headline?: string
+  venueLocation?: string
   inactivePlayers: Array<{ name: string; status: string; teamId: number }>
   liveNotes: string[]
 }
@@ -362,6 +363,7 @@ export async function resolveRundownEvent(input: RundownMatchInput): Promise<Res
     pitcherAway: String(matched.pitcher_away?.name || '').trim() || undefined,
     pitcherHome: String(matched.pitcher_home?.name || '').trim() || undefined,
     headline: String(matched.schedule?.event_headline || '').trim() || undefined,
+    venueLocation: String(matched.score?.venue_location || '').trim() || undefined,
     inactivePlayers,
     liveNotes,
   }
