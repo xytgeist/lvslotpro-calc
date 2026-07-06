@@ -93,11 +93,35 @@ function wireHeadline(item: NewsCandidate): string {
   return rewriteFirstPersonHeadline(item.title || '', sourceLabel(item))
 }
 
-function buildHeadlineLine(item: NewsCandidate): string {
+const CRYPTO_ASSET_LEADS: Array<{ re: RegExp; sym: string }> = [
+  { re: /\bbitcoin\b|\bbtc\b/i, sym: 'BTC' },
+  { re: /\bethereum\b|\beth\b/i, sym: 'ETH' },
+  { re: /\bsolana\b/i, sym: 'SOL' },
+  { re: /\bxrp\b|\bripple\b/i, sym: 'XRP' },
+  { re: /\bdogecoin\b|\bdoge\b/i, sym: 'DOGE' },
+]
+
+function cryptoLeadSymbols(text: string, existing: string[]): string[] {
+  const out: string[] = []
+  const seen = new Set(existing.map((t) => t.toUpperCase()))
+  for (const { re, sym } of CRYPTO_ASSET_LEADS) {
+    if (re.test(text) && !seen.has(sym)) {
+      seen.add(sym)
+      out.push(sym)
+    }
+  }
+  return out.slice(0, 3)
+}
+
+function buildHeadlineLine(item: NewsCandidate, opts: { newsProfile?: NewsProfile } = {}): string {
   const title = wireHeadline(item)
-  const tickers = item.tickers?.length
+  let tickers = item.tickers?.length
     ? item.tickers.map((t) => t.toUpperCase())
     : extractTickers(`${item.title} ${item.summary || ''}`)
+
+  if (opts.newsProfile === 'crypto') {
+    tickers = [...new Set([...cryptoLeadSymbols(`${item.title} ${item.summary || ''}`, tickers), ...tickers])].slice(0, 3)
+  }
 
   const lead = tickers.length > 0
     ? tickers.slice(0, 3).map((t) => `$${t}`).join(' ')
@@ -120,7 +144,7 @@ export async function buildFinancialWirePostAsync(
   item: NewsCandidate,
   opts: { newsProfile?: NewsProfile } = {},
 ): Promise<WirePostComposeResult> {
-  const headlineLine = buildHeadlineLine(item)
+  const headlineLine = buildHeadlineLine(item, opts)
   const composed = await composeWirePost({
     headline: headlineLine,
     originalTitle: item.title,

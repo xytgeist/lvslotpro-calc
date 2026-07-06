@@ -14,8 +14,14 @@ const PERSONA: Record<NewsProfile, string> = {
   market:
     'Market Edge wire ... terse Financial Juice / Walter Bloomberg style. Lead with fact and numbers; use $TICKER when company-specific. Optional trailing "per [source]" attribution. No JUST IN prefix. Third person only. Never use em dashes or en dashes.',
   crypto:
-    'Crypto Edge wire ... neutral, third-person factual tone on digital assets and policy. Never use em dashes or en dashes.',
+    'Crypto Edge wire ... Watcher.Guru speed for digital assets. Lead with $BTC/$ETH/$SOL and big $ figures (liquidations, reclaims, hacks). Optional dry degen humor ONLY when the headline is already ironic ... one short line max, never forced memes. No wagmi/lfg/nfa/shill/moon spam. No JUST IN on every post. Third person. Never em dashes or en dashes.',
 }
+
+const CRYPTO_VOICE_RULES =
+  `Crypto voice extras:\n` +
+  `- Headline is fixed; synopsis may add context or one dry ironic beat when the story invites it.\n` +
+  `- Liquidations, depegs, exchange halts, ETF/reg enforcement = straight wire, no jokes.\n` +
+  `- Never sound like a shill account or paid promo.\n\n`
 
 export type WirePostComposeInput = {
   headline: string
@@ -111,6 +117,7 @@ export async function composeWirePost(opts: WirePostComposeInput): Promise<WireP
   const summary = String(opts.summary || '').trim()
   const source = String(opts.sourceLabel || 'Report').trim()
   const profile = opts.newsProfile === 'crypto' ? 'crypto' : 'market'
+  const voiceExtras = profile === 'crypto' ? CRYPTO_VOICE_RULES : ''
 
   if (!headline) return { caption: '', includeLink: false }
 
@@ -140,7 +147,10 @@ export async function composeWirePost(opts: WirePostComposeInput): Promise<WireP
                 `Voice:\n` +
                 `- Default: headline stands alone as one tight wire line.\n` +
                 `- Never write SEC filing notices or "Company filed 10-Q/10-K" style posts.\n` +
-                `- Trump/political lines only if market-linked; keep factual, not editorial.\n\n` +
+                (profile === 'market'
+                  ? `- Trump/political lines only if market-linked; keep factual, not editorial.\n`
+                  : '') +
+                voiceExtras +
                 `include_link:\n` +
                 `- false when the headline alone is fully self-explanatory (clear who did what, with key facts).\n` +
                 `- true when readers need the source for context, nuance, names, or follow-up.\n\n` +

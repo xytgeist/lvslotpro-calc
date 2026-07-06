@@ -20,7 +20,9 @@ Cron **`invoke_lounge_news_poll()`** already loops **every** running `market_new
 
 ## Default allowlist (tier 1 + tier 2)
 
-Migration **`20260705050000`**. Headline + **OpenAI compose** (0-2 sentence synopsis when needed; link only when headline needs source context; feed excerpt fallback) + optional source link; rich preview only when og:image loads.
+**Voice brief:** `docs/crypto-edge-voice-brief.md` (Watcher.Guru speed + dry degen humor when ironic; Ryan sign-off 2026-07-06).
+
+Migration **`20260705050000`**. Headline + **OpenAI compose** (0-2 sentence synopsis when needed; link only when headline needs source context; feed excerpt fallback) + optional source link; rich preview only when og:image loads. **`$BTC`/`$ETH` lead** on major-asset headlines.
 
 ### Tier 1
 
@@ -64,8 +66,10 @@ Topic tiers (first match per tier):
 | Mining / halving | 10 | hashrate, halving |
 | Macro (crypto lens) | 10 | Fed, rates, liquidity |
 | Funding / market | 8 | raises, token sale |
+| **Liquidations** | 14 | margin cascade, $ liquidated |
+| **Prediction markets** | 12 | Polymarket, Kalshi |
 
-Default publish threshold: **55** (same as Market Edge). Drops list filters giveaways, price predictions, sponsored fluff.
+Default publish threshold: **55** (same as Market Edge). Drops list filters giveaways, price predictions, shill/moon spam, sponsored fluff, SEC filings.
 
 ---
 

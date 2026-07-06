@@ -27,7 +27,7 @@ const PIPELINE_OPTIONS = [
     defaultSlug: 'crypto-edge',
     defaultHandle: 'cryptoedge',
     defaultDisplayName: 'Crypto Edge',
-    defaultBio: '24/7 crypto headlines for traders who still read the wire.',
+    defaultBio: '24/7 crypto wire ... regs, hacks, liquidations, and the occasional dry degen take.',
     defaultPills: ['crypto', 'trading'],
     maxDay: 12,
   },

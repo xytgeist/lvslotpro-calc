@@ -5,6 +5,7 @@
 
 import {
   extractTickers,
+  isBlockedNewsItem,
   normalizeTitleHash,
   type NewsCandidate,
   type TopicScoreResult,
@@ -110,6 +111,32 @@ const CRYPTO_TOPIC_TIERS: Array<{ id: string; weight: number; keywords: string[]
     ],
   },
   {
+    id: 'liquidations',
+    weight: 14,
+    keywords: [
+      'liquidated',
+      'liquidation',
+      'liquidations',
+      'margin call',
+      'cascade',
+      'longs wiped',
+      'shorts wiped',
+      'funding rate',
+      'open interest',
+    ],
+  },
+  {
+    id: 'prediction_markets',
+    weight: 12,
+    keywords: [
+      'polymarket',
+      'kalshi',
+      'prediction market',
+      'prediction markets',
+      'betting odds',
+    ],
+  },
+  {
     id: 'defi_protocol',
     weight: 12,
     keywords: [
@@ -121,9 +148,6 @@ const CRYPTO_TOPIC_TIERS: Array<{ id: string; weight: number; keywords: string[]
       'curve',
       'compound',
       'makerdao',
-      'liquidation',
-      'funding rate',
-      'open interest',
       'perpetual',
       'dex ',
       'lending protocol',
@@ -202,6 +226,17 @@ const CRYPTO_DROP_KEYWORDS = [
   'advertisement',
   'horoscope',
   'celebrity',
+  'watch live',
+  'to the moon',
+  '100x',
+  'wagmi',
+  ' lfg ',
+  'not financial advice',
+  'nfa ',
+  'shill',
+  '10-q filing',
+  '10-k filing',
+  '8-k filing',
 ]
 
 function matchCryptoTopicTiers(blob: string): { matchedTiers: string[]; tierBonus: number } {
@@ -220,6 +255,9 @@ export function scoreCryptoNewsCandidateDetailed(
   item: NewsCandidate,
   opts: { watchlistTickers?: string[]; minTitleLength?: number } = {},
 ): TopicScoreResult {
+  if (isBlockedNewsItem(item)) {
+    return { score: 0, matchedTiers: [] }
+  }
   const title = String(item.title || '').trim()
   const summary = String(item.summary || '').trim()
   const blob = ` ${title} ${summary} `.toLowerCase()
