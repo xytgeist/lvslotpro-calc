@@ -7,7 +7,7 @@
 import { decodeHtmlEntities } from './decodeHtmlEntities.ts'
 import { extractTickers, type NewsCandidate } from './loungeBotNewsScore.ts'
 import type { NewsProfile } from './loungeBotNewsProfile.ts'
-import { generateWireSynopsis } from './loungeBotNewsSynopsis.ts'
+import { composeWirePost, type WirePostComposeResult } from './loungeBotNewsSynopsis.ts'
 
 const CAPTION_MAX = 1200
 
@@ -109,13 +109,13 @@ export function buildFinancialWireCaption(item: NewsCandidate): string {
   return shorten(buildHeadlineLine(item), CAPTION_MAX)
 }
 
-/** Headline + OpenAI synopsis (1-2 sentences) for published wire posts. */
-export async function buildFinancialWireCaptionAsync(
+/** Headline + OpenAI compose (synopsis length + link decision) for published wire posts. */
+export async function buildFinancialWirePostAsync(
   item: NewsCandidate,
   opts: { newsProfile?: NewsProfile } = {},
-): Promise<string> {
+): Promise<WirePostComposeResult> {
   const headlineLine = buildHeadlineLine(item)
-  const synopsis = await generateWireSynopsis({
+  const composed = await composeWirePost({
     headline: headlineLine,
     originalTitle: item.title,
     summary: item.summary,
@@ -123,10 +123,19 @@ export async function buildFinancialWireCaptionAsync(
     newsProfile: opts.newsProfile,
   })
 
-  if (synopsis) {
-    return shorten(`${headlineLine}\n\n${synopsis}`, CAPTION_MAX)
+  return {
+    caption: shorten(composed.caption || headlineLine, CAPTION_MAX),
+    includeLink: composed.includeLink && Boolean(item.url),
   }
-  return shorten(headlineLine, CAPTION_MAX)
+}
+
+/** @deprecated use buildFinancialWirePostAsync */
+export async function buildFinancialWireCaptionAsync(
+  item: NewsCandidate,
+  opts: { newsProfile?: NewsProfile } = {},
+): Promise<string> {
+  const { caption } = await buildFinancialWirePostAsync(item, opts)
+  return caption
 }
 
 /** @deprecated alias */

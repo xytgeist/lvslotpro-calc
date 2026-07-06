@@ -35,6 +35,13 @@ const TOPIC_TIERS: Array<{ id: string; weight: number; keywords: string[] }> = [
       'trade balance',
       'import prices',
       'export prices',
+      'bill auction',
+      'treasury auction',
+      'bid-to-cover',
+      'auction high',
+      '3-month bill',
+      '10-year note',
+      'strategic petroleum reserve',
     ],
   },
   {
@@ -150,11 +157,19 @@ const TOPIC_TIERS: Array<{ id: string; weight: number; keywords: string[] }> = [
       'delisting',
       'downgrade',
       'upgrade',
-      '8-k',
-      '10-q',
-      '10-k',
-      'sec filing',
-      'edgar',
+    ],
+  },
+  {
+    id: 'prediction_markets',
+    weight: 13,
+    keywords: [
+      'polymarket',
+      'kalshi',
+      'prediction market',
+      'prediction markets',
+      'betting odds',
+      'chance of advancing',
+      'odds of advancing',
     ],
   },
   {
@@ -240,18 +255,119 @@ const DROP_KEYWORDS = [
   'celebrity',
   'horoscope',
   'recipe',
+  'watch live',
+  'must step aside',
+  'among ipo underwriters',
+  'ipo underwriter',
+  'rose garden club',
+  '10-q filing',
+  '10-k filing',
+  '8-k filing',
+  'sec edgar',
 ]
 
-/** Routine EDGAR 8-K filings — not Lounge-worthy wire posts. */
+/** SEC EDGAR filing notices — not Lounge-worthy wire posts. */
 export function isBlockedNewsItem(item: NewsCandidate & { raw?: Record<string, unknown> }): boolean {
   const title = String(item.title || '').trim().toLowerCase()
   const source = String(item.sourceName || '').trim().toLowerCase()
   const filingType = String(item.raw?.filingType || item.raw?.filing_type || '').trim().toUpperCase()
 
-  if (filingType === '8-K') return true
-  if (source.includes('edgar 8-k') || source === 'sec edgar 8-k') return true
-  if (/^8-k\b/i.test(title) || /\b8-k filing:/i.test(title)) return true
+  if (item.raw?.edgar === true) return true
+  if (filingType === '8-K' || filingType === '10-Q' || filingType === '10-K') return true
+  if (source.includes('sec edgar') || (source.includes('edgar') && source.includes('sec'))) return true
+  if (/^(8-k|10-q|10-k)\b/i.test(title) || /\b(8-k|10-q|10-k) filing:/i.test(title)) return true
   return false
+}
+
+const TRUMP_RE = /\b(trump|donald trump|president trump)\b/i
+
+const TRUMP_MARKET_CONTEXT = [
+  'tariff',
+  'tariffs',
+  'stock',
+  'stocks',
+  'market',
+  'fed',
+  'trade',
+  'dollar',
+  'bond',
+  'yield',
+  'inflation',
+  'oil',
+  'crypto',
+  'bitcoin',
+  'semiconductor',
+  'invest',
+  'economy',
+  'gdp',
+  'treasury',
+  'earnings',
+  'rate',
+  'sanction',
+  'china',
+  'iran',
+  'tax',
+  'import',
+  'export',
+  'wall street',
+  'nasdaq',
+  'dow',
+  's&p',
+  'circuit',
+  'ipo',
+  'merger',
+  'antitrust',
+  'sec ',
+  'account',
+  'computer',
+  'chip',
+  'ai ',
+  'bubble',
+  'jpmorgan',
+  'nvidia',
+  'dell',
+  'polymarket',
+  'kalshi',
+]
+
+const MAJOR_CRYPTO_SIGNALS = [
+  'etf',
+  'sec ',
+  'regulat',
+  'hack',
+  'billion',
+  'trillion',
+  'liquidat',
+  'all-time',
+  'record high',
+  'circuit',
+  'blackrock',
+  'fidelity',
+  'stablecoin',
+  'reclaims',
+  'falls below',
+  'surpass',
+  'custody',
+  'sberbank',
+  'binance',
+  'coinbase',
+  'microstrategy',
+  'saylor',
+  'mica',
+  'exchange',
+]
+
+function isNonMarketTrumpStory(blob: string): boolean {
+  if (!TRUMP_RE.test(blob)) return false
+  return !TRUMP_MARKET_CONTEXT.some((kw) => blob.includes(kw))
+}
+
+function isMinorCryptoOnlyStory(blob: string, matchedTiers: string[]): boolean {
+  if (!matchedTiers.includes('crypto_risk')) return false
+  if (matchedTiers.some((t) => t !== 'crypto_risk')) return false
+  if (MAJOR_CRYPTO_SIGNALS.some((kw) => blob.includes(kw))) return false
+  if (/\$\d{2,}[,\d]*|\d+\s*(billion|million)\b|\d+\s*m liquidat/i.test(blob)) return false
+  return true
 }
 
 const CASHTAG_RE = /\$([A-Za-z][A-Za-z0-9.-]{0,14})\b/g
@@ -338,7 +454,15 @@ export function scoreNewsCandidateDetailed(
     if (blob.includes(bad)) return { score: 0, matchedTiers: [] }
   }
 
+  if (isNonMarketTrumpStory(blob)) {
+    return { score: 0, matchedTiers: [] }
+  }
+
   const { matchedTiers, tierBonus } = matchTopicTiers(blob)
+
+  if (isMinorCryptoOnlyStory(blob, matchedTiers)) {
+    return { score: Math.min(44, 28 + tierBonus), matchedTiers }
+  }
 
   // Off-topic general news stays below default publish threshold (55).
   if (!matchedTiers.length) {
@@ -354,7 +478,7 @@ export function scoreNewsCandidateDetailed(
   if (tickers.length > 2) score += 3
 
   const source = String(item.sourceName || '').toLowerCase()
-  if (source.includes('sec edgar') || source.includes('sec press')) score += 8
+  if (source.includes('sec press')) score += 8
   if (source.includes('federal reserve') || source.includes('treasury') || source.includes('cftc')) score += 6
   if (source.includes('eia')) score += 5
 

@@ -57,9 +57,7 @@ Migration **`20260705040000`**. Headline rewrite + source link only ... no full-
 | Finnhub general | `finnhub_general` | 3 min | Broad market headlines |
 | Finnhub M&A | `finnhub_category` | 5 min | Deals, takeovers |
 | Finnhub forex | `finnhub_category` | 5 min | Macro / FX |
-| Finnhub crypto | `finnhub_category` | 5 min | Digital assets, crypto regs |
-| **SEC EDGAR 10-Q** | `edgar` | 10 min | Quarterly filings |
-| **SEC EDGAR 10-K** | `edgar` | 15 min | Annual filings |
+| Finnhub crypto | `finnhub_category` | 5 min | Major crypto headlines only (scoring gate) |
 | **SEC press releases** | `rss` | 5 min | Enforcement, rule proposals |
 | **Federal Reserve press** | `rss` | 5 min | FOMC, Fed speakers, policy |
 | **US Treasury press** | `rss` | 7 min | Fiscal, debt ceiling, sanctions |
@@ -68,7 +66,9 @@ Migration **`20260705040000`**. Headline rewrite + source link only ... no full-
 | **BBC Business** | `rss` | 5 min | Geopolitical / global business *(link out)* |
 | **NPR Business** | `rss` | 7 min | US business / economy *(link out)* |
 
-**SEC requirement:** set Edge secret **`SEC_EDGAR_USER_AGENT`** (e.g. `EdgeTilt MarketEdge/1.0 (support@edgetilt.com)`). Defaults if unset.
+**Voice brief:** `docs/market-edge-voice-brief.md` (Ryan sign-off 2026-07-06).
+
+**SEC requirement:** set Edge secret **`SEC_EDGAR_USER_AGENT`** only if an `edgar` source is re-enabled later. Defaults if unset.
 
 **Also required:** **`FINNHUB_API_KEY`** (same key as Lounge market charts).
 
@@ -80,9 +80,9 @@ Toggle any source off in **`/?tab=bots`** without removing the row.
 
 | Source | Shipped? | Notes |
 | --- | --- | --- |
-| **Finnhub** categories | Yes | general, merger, forex, crypto |
-| **SEC EDGAR** Atom | Yes | 10-Q, 10-K current filings (8-K disabled Jul 2026 — routine noise) |
-| **Gov/reg RSS** | Yes | SEC, Fed, Treasury, CFTC, EIA |
+| **Finnhub** categories | Yes | general, merger, forex, crypto (major-only gate on Market Edge) |
+| **SEC EDGAR** Atom | **Off** | All filing feeds disabled Jul 2026 — not this bot's job |
+| **Gov/reg RSS** | Yes | SEC press, Fed, Treasury, CFTC, EIA |
 | **Publisher RSS** | Yes | BBC Business, NPR Business (headline + link) |
 | **Benzinga API** | No | Requires license |
 | **Options flow** | No | Phase 2 vendor |
@@ -187,8 +187,8 @@ Always **rewrite** ... do not paste licensed wire text verbatim unless API contr
 | Schema | `supabase/migrations/20260703140000_lounge_bot_financial_wire.sql` |
 | Poll fn | `supabase/functions/lounge-news-poll/` |
 | Scoring | `supabase/functions/_shared/loungeBotNewsScore.ts` |
-| Captions | `supabase/functions/_shared/loungeBotNewsCaption.ts` — headline + OpenAI synopsis (`loungeBotNewsSynopsis.ts`); first-person headlines reframed |
-| Publish | `supabase/functions/_shared/loungeBotPublish.ts` — source link + preview on every post; rich card only when og:image loads |
+| Captions | `supabase/functions/_shared/loungeBotNewsCaption.ts` — headline + OpenAI compose (`loungeBotNewsSynopsis.ts`: link yes/no + 0-2 sentence synopsis); first-person headlines reframed |
+| Publish | `supabase/functions/_shared/loungeBotPublish.ts` — source link + preview when compose says include; rich card only when og:image loads |
 | Admin UI | `src/features/ops/EdgeMonitorBotOpsPanel.jsx` |
 | Finnhub (existing) | `supabase/functions/_shared/finnhubMarket.ts` |
 

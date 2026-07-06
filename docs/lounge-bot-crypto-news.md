@@ -20,7 +20,7 @@ Cron **`invoke_lounge_news_poll()`** already loops **every** running `market_new
 
 ## Default allowlist (tier 1 + tier 2)
 
-Migration **`20260705050000`**. Headline + **OpenAI 1-2 sentence synopsis** (feed excerpt fallback) + source link on every publish; rich preview only when og:image loads.
+Migration **`20260705050000`**. Headline + **OpenAI compose** (0-2 sentence synopsis when needed; link only when headline needs source context; feed excerpt fallback) + optional source link; rich preview only when og:image loads.
 
 ### Tier 1
 

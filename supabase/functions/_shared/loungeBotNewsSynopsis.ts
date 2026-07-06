@@ -1,6 +1,6 @@
 /**
- * OpenAI synopsis for wire bot posts (Market Edge + Crypto Edge).
- * Falls back to clipped RSS/Finnhub summary when API unavailable.
+ * OpenAI compose step for wire bot posts (Market Edge + Crypto Edge).
+ * Decides link + synopsis length in one call; RSS excerpt fallback when API unavailable.
  */
 
 import { decodeHtmlEntities } from './decodeHtmlEntities.ts'
@@ -10,11 +10,27 @@ const SYNOPSIS_MAX = 380
 const OPENAI_TIMEOUT_MS = 12000
 
 const PERSONA: Record<NewsProfile, string> = {
-  market: 'Market Edge financial wire — neutral, fast, third-person factual tone.',
+  market:
+    'Market Edge wire — terse Financial Juice / Walter Bloomberg style. Lead with fact and numbers; use $TICKER when company-specific. Optional trailing "per [source]" attribution. No JUST IN prefix. Third person only.',
   crypto: 'Crypto Edge wire — neutral, third-person factual tone on digital assets and policy.',
 }
 
-function clipFeedSummary(summary: string, maxSentences = 2): string {
+export type WirePostComposeInput = {
+  headline: string
+  originalTitle?: string
+  summary?: string
+  sourceLabel: string
+  newsProfile?: NewsProfile
+}
+
+export type WirePostComposeResult = {
+  /** Caption body without URL (headline, optional blank line + synopsis). */
+  caption: string
+  /** Attach source URL + link preview card when true. */
+  includeLink: boolean
+}
+
+function clipFeedSummary(summary: string, maxSentences: 1 | 2): string {
   let t = decodeHtmlEntities(String(summary || ''))
     .replace(/\s+/g, ' ')
     .trim()
@@ -32,20 +48,67 @@ function clipFeedSummary(summary: string, maxSentences = 2): string {
   return t.slice(0, SYNOPSIS_MAX)
 }
 
-export async function generateWireSynopsis(opts: {
-  headline: string
-  originalTitle?: string
-  summary?: string
-  sourceLabel: string
-  newsProfile?: NewsProfile
-}): Promise<string> {
+function headlineLooksSelfContained(headline: string): boolean {
+  const h = String(headline || '').trim()
+  if (h.length < 72) return false
+  const hasActor =
+    /\b(SEC|Fed|CPI|GDP|FOMC|Treasury|CFTC|Apple|Microsoft|Nvidia|Tesla|Sberbank|Bitcoin|Ethereum)\b/i.test(h)
+    || /\$[A-Z]{1,5}\b/.test(h)
+  const hasFact = /\d|%|\b(billion|million|bps|basis points|rate cut|rate hike)\b/i.test(h)
+  return hasActor && hasFact && h.length >= 85
+}
+
+function fallbackCompose(input: WirePostComposeInput): WirePostComposeResult {
+  const headline = String(input.headline || '').trim()
+  const summary = String(input.summary || '').trim()
+  const selfContained = headlineLooksSelfContained(headline)
+
+  if (selfContained && summary.length < 80) {
+    return { caption: headline, includeLink: false }
+  }
+
+  const synopsis = clipFeedSummary(summary, selfContained ? 1 : 2)
+  if (!synopsis) {
+    return { caption: headline, includeLink: !selfContained && Boolean(summary || input.originalTitle) }
+  }
+
+  return {
+    caption: `${headline}\n\n${synopsis}`,
+    includeLink: !selfContained,
+  }
+}
+
+function parseComposeJson(raw: string): { includeLink: boolean; synopsis: string } | null {
+  try {
+    const parsed = JSON.parse(raw) as { include_link?: unknown; synopsis?: unknown }
+    const includeLink = parsed.include_link === true
+    const synopsis = String(parsed.synopsis || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, SYNOPSIS_MAX)
+    return { includeLink, synopsis }
+  } catch {
+    return null
+  }
+}
+
+/** @deprecated use composeWirePost */
+export async function generateWireSynopsis(opts: WirePostComposeInput): Promise<string> {
+  const result = await composeWirePost(opts)
+  const parts = result.caption.split('\n\n')
+  return parts.length > 1 ? parts.slice(1).join('\n\n') : ''
+}
+
+export async function composeWirePost(opts: WirePostComposeInput): Promise<WirePostComposeResult> {
   const headline = String(opts.headline || '').trim()
   const summary = String(opts.summary || '').trim()
   const source = String(opts.sourceLabel || 'Report').trim()
   const profile = opts.newsProfile === 'crypto' ? 'crypto' : 'market'
 
+  if (!headline) return { caption: '', includeLink: false }
+
   const key = Deno.env.get('OPENAI_API_KEY')?.trim()
-  if (key && headline) {
+  if (key) {
     try {
       const ctrl = new AbortController()
       const timer = setTimeout(() => ctrl.abort(), OPENAI_TIMEOUT_MS)
@@ -58,18 +121,28 @@ export async function generateWireSynopsis(opts: {
         },
         body: JSON.stringify({
           model: Deno.env.get('OPENAI_CHAT_MODEL') || 'gpt-4o-mini',
-          temperature: 0.35,
-          max_tokens: 160,
+          temperature: 0.3,
+          max_tokens: 220,
+          response_format: { type: 'json_object' },
           messages: [
             {
               role: 'system',
               content:
-                `Write exactly 1-2 sentences as a post synopsis under a headline. ` +
-                `${PERSONA[profile]} ` +
-                `Third person only — never use we, our, us, I, or the publisher's editorial voice. ` +
-                `Do not repeat the headline verbatim. No investment advice. No em dashes. ` +
-                `Output ONLY the synopsis (no headline, URL, source label, or quotes). ` +
-                `Max ${SYNOPSIS_MAX} characters.`,
+                `Compose a Lounge wire post under a fixed headline. ${PERSONA[profile]} ` +
+                `Return JSON only: {"include_link":boolean,"synopsis":string}\n\n` +
+                `Voice:\n` +
+                `- Default: headline stands alone as one tight wire line.\n` +
+                `- Never write SEC filing notices or "Company filed 10-Q/10-K" style posts.\n` +
+                `- Trump/political lines only if market-linked; keep factual, not editorial.\n\n` +
+                `include_link:\n` +
+                `- false when the headline alone is fully self-explanatory (clear who did what, with key facts).\n` +
+                `- true when readers need the source for context, nuance, names, or follow-up.\n\n` +
+                `synopsis:\n` +
+                `- "" (empty) when no extra context is needed under the headline.\n` +
+                `- ONE short sentence when a little context helps.\n` +
+                `- TWO sentences when the story needs more setup (use the minimum that works).\n` +
+                `- Never repeat the headline. Third person only — no we/our/us/I. No investment advice. No em dashes.\n` +
+                `- Max ${SYNOPSIS_MAX} characters in synopsis.`,
             },
             {
               role: 'user',
@@ -87,16 +160,18 @@ export async function generateWireSynopsis(opts: {
       clearTimeout(timer)
       if (res.ok) {
         const json = await res.json()
-        const text = String(json?.choices?.[0]?.message?.content || '')
-          .replace(/^["']|["']$/g, '')
-          .replace(/\s+/g, ' ')
-          .trim()
-        if (text.length >= 40) return text.slice(0, SYNOPSIS_MAX)
+        const parsed = parseComposeJson(String(json?.choices?.[0]?.message?.content || ''))
+        if (parsed) {
+          const caption = parsed.synopsis
+            ? `${headline}\n\n${parsed.synopsis}`
+            : headline
+          return { caption, includeLink: parsed.includeLink }
+        }
       }
     } catch {
       /* fallback */
     }
   }
 
-  return clipFeedSummary(summary)
+  return fallbackCompose(opts)
 }
