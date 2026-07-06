@@ -36,6 +36,22 @@ import {
   loungePostCategoryPillLabel,
 } from '../../utils/loungePostCategoryPills.js'
 
+const SCOTT_ASYNC_TOAST =
+  'Queued … Scott is working in the background (up to ~3 min). Refresh this panel for Last poll and new Lounge posts.'
+
+const SCOTT_POLL_ACTION_LABELS = {
+  daily_slates: 'Coffee & Covers',
+  poll_edges: 'Scan all · edge',
+  best_bet_hour: 'Best bet · hour',
+  value_bet_radar: 'Value radar',
+}
+
+function scheduleBotReload(onReload, delayMs = 120_000) {
+  window.setTimeout(() => {
+    void onReload()
+  }, delayMs)
+}
+
 function RunStateBadge({ runState }) {
   const meta = BOT_RUN_STATES.find((s) => s.id === runState) || BOT_RUN_STATES[2]
   return (
@@ -338,6 +354,11 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
     const d = result.data || {}
+    if (d.asyncQueued) {
+      setToast(SCOTT_ASYNC_TOAST)
+      scheduleBotReload(onReload)
+      return
+    }
     if (bot.pipeline === 'odds_api') {
       const skipMsg =
         d.skipped === 'no_calendar_today'
@@ -398,6 +419,11 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
     const d = result.data || {}
+    if (d.asyncQueued) {
+      setToast(`${SCOTT_POLL_ACTION_LABELS[action] || action} · ${SCOTT_ASYNC_TOAST}`)
+      scheduleBotReload(onReload)
+      return
+    }
     if (d.skipped === 'no_calendar_today') {
       setToast('No major events on the betting calendar today.')
     } else if (d.skipped === 'before_scheduled_time') {
@@ -487,6 +513,11 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
     const d = result.data || {}
+    if (d.asyncQueued) {
+      setToast(`Example pack · ${SCOTT_ASYNC_TOAST}`)
+      scheduleBotReload(onReload)
+      return
+    }
     if (d.failed > 0 && d.published > 0) {
       setToast(`Posted ${d.published}/${SCOTT_EXAMPLE_POST_COUNT} examples · ${d.failed} failed. Check feed.`)
     } else if (d.failed > 0) {

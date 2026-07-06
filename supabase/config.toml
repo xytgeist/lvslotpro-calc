@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.lounge-odds-poll]
 verify_jwt = false
 
+[functions.lounge-odds-ingest]
+verify_jwt = false
+
 [functions.lounge-bot-publish-due]
 verify_jwt = false
 

@@ -124,17 +124,33 @@ export async function saveSportsBettingCalendarRow(supabaseClient, row) {
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
- * @param {{ slug?: string, dryRun?: boolean, sportKey?: string, calendarSlug?: string, postMode?: string }} [opts]
+ * @param {{ slug?: string, dryRun?: boolean, sportKey?: string, calendarSlug?: string, postMode?: string, action?: string }} [opts]
  */
 export async function invokeLoungeOddsIngest(supabaseClient, opts = {}) {
+  const dryRun = opts.dryRun === true
+  const slug = opts.slug || 'sports-odds'
+  const action = opts.action || undefined
+
+  if (!dryRun) {
+    const { data, error } = await supabaseClient.rpc('admin_lounge_bot_queue_odds_ingest', {
+      p_slug: slug,
+      p_sport_key: action === 'publish_examples' ? null : (opts.sportKey || null),
+      p_calendar_slug: opts.calendarSlug || null,
+      p_post_mode: opts.postMode || 'edge_only',
+      p_action: action === 'publish_examples' ? 'publish_examples' : null,
+    })
+    if (error) return { data: null, error: new Error(error.message || 'Scott ingest queue failed') }
+    return { data: { ...(data || {}), asyncQueued: true }, error: null }
+  }
+
   const { data, error } = await supabaseClient.functions.invoke('lounge-odds-ingest', {
     body: {
-      slug: opts.slug,
-      dryRun: opts.dryRun === true,
+      slug,
+      dryRun: true,
       sportKey: opts.sportKey || undefined,
       calendarSlug: opts.calendarSlug || undefined,
       postMode: opts.postMode || 'auto',
-      action: opts.action || undefined,
+      action: action || undefined,
     },
   })
   if (error) return { data: null, error: new Error(error.message || 'lounge-odds-ingest failed') }
@@ -160,13 +176,23 @@ export async function invokeLoungeOddsPublishExamples(supabaseClient, opts = {})
  */
 export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
   const action = opts.action || 'poll_edges'
+  const dryRun = opts.dryRun === true
+  const slug = opts.slug || 'sports-odds'
+  const force = opts.force === true
+
+  if (!dryRun) {
+    const { data, error } = await supabaseClient.rpc('admin_lounge_bot_queue_odds_poll', {
+      p_slug: slug,
+      p_action: action,
+      p_dry_run: false,
+      p_force: force,
+    })
+    if (error) return { data: null, error: new Error(error.message || 'Scott poll queue failed') }
+    return { data: { ...(data || {}), asyncQueued: true }, error: null }
+  }
+
   const { data, error } = await supabaseClient.functions.invoke('lounge-odds-poll', {
-    body: {
-      slug: opts.slug,
-      action,
-      dryRun: opts.dryRun === true,
-      force: opts.force === true,
-    },
+    body: { slug, action, dryRun: true, force },
   })
   if (error) return { data: null, error: new Error(error.message || 'lounge-odds-poll failed') }
   if (data?.error) return { data: null, error: new Error(String(data.error)) }
