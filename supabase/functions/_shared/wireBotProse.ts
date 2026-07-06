@@ -3,8 +3,7 @@
  * Prefer ellipses for breaks; hyphen without spaces for numeric ranges only.
  */
 
-/** Strip em dash, en dash (prose), and double-hyphen dash substitutes. */
-export function sanitizeWireProse(text: string): string {
+function sanitizeWireProseLine(text: string): string {
   let s = String(text || '')
 
   // Numeric ranges: 2024–2026, $955–968 → hyphen without spaces
@@ -16,6 +15,18 @@ export function sanitizeWireProse(text: string): string {
 
   return s
     .replace(/(?: \.\.\.){2,}/g, ' ... ')
-    .replace(/\s+/g, ' ')
+    .replace(/[ \t]+/g, ' ')
     .trim()
+}
+
+/** Sanitize one line or multi-paragraph caption (preserves blank lines between headline + synopsis). */
+export function sanitizeWireProse(text: string): string {
+  const raw = String(text || '')
+  if (!raw.includes('\n')) return sanitizeWireProseLine(raw)
+
+  return raw
+    .split(/\n\n+/)
+    .map((para) => sanitizeWireProseLine(para))
+    .filter(Boolean)
+    .join('\n\n')
 }

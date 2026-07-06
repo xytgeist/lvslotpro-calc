@@ -56,6 +56,59 @@ function sourceLabel(item: NewsCandidate): string {
   }
 }
 
+/** CoinDesk, not coindesk.com — for `Source: headline` credit lines. */
+function sourceDisplayName(item: NewsCandidate): string {
+  const fromName = String(item.sourceName || '').trim()
+  if (fromName) return fromName.replace(/\s+rss$/i, '').trim()
+
+  const host = sourceLabel(item)
+  if (host === 'Report') return 'Report'
+
+  const base = host.replace(/\.(com|org|net|io|co|uk)$/i, '')
+  if (!base.includes('.')) {
+    if (base === 'coindesk') return 'CoinDesk'
+    if (base === 'bbc') return 'BBC'
+    if (base === 'npr') return 'NPR'
+    return `${base.charAt(0).toUpperCase()}${base.slice(1)}`
+  }
+  return host
+}
+
+function normalizeHeadlineCompare(text: string): string {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\w\s$']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\.$/, '')
+}
+
+function headlinesAreDuplicate(wireTitle: string, originalTitle: string): boolean {
+  const a = normalizeHeadlineCompare(wireTitle)
+  const b = normalizeHeadlineCompare(originalTitle)
+  if (!a || !b) return false
+  return a === b
+}
+
+/** 1:1 feed headline → `CoinDesk: …` credit (optional $TICKER lead stays first). */
+function creditSourceIfDuplicateHeadline(
+  headlineLine: string,
+  item: NewsCandidate,
+  wireTitle: string,
+): string {
+  const label = sourceDisplayName(item)
+  if (label === 'Report') return headlineLine
+  if (!headlinesAreDuplicate(wireTitle, String(item.title || ''))) return headlineLine
+  if (new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`, 'i').test(headlineLine)) {
+    return headlineLine
+  }
+
+  const tickerLead = headlineLine.match(/^((?:\$[A-Z][A-Za-z0-9.-]{0,14}\s+)+)/)?.[1]?.trim() || ''
+  const body = tickerLead ? headlineLine.slice(tickerLead.length).trim() : headlineLine
+  const credited = `${label}: ${body}`
+  return tickerLead ? `${tickerLead} ${credited}` : credited
+}
+
 function headlineUsesFirstPerson(title: string): boolean {
   return FIRST_PERSON_RE.test(String(title || ''))
 }
@@ -114,7 +167,7 @@ function cryptoLeadSymbols(text: string, existing: string[]): string[] {
 }
 
 function buildHeadlineLine(item: NewsCandidate, opts: { newsProfile?: NewsProfile } = {}): string {
-  const title = wireHeadline(item)
+  const wireTitle = wireHeadline(item)
   let tickers = item.tickers?.length
     ? item.tickers.map((t) => t.toUpperCase())
     : extractTickers(`${item.title} ${item.summary || ''}`)
@@ -127,9 +180,9 @@ function buildHeadlineLine(item: NewsCandidate, opts: { newsProfile?: NewsProfil
     ? tickers.slice(0, 3).map((t) => `$${t}`).join(' ')
     : ''
 
-  let body = bodyWithoutTickerDup(title, tickers)
+  let body = bodyWithoutTickerDup(wireTitle, tickers)
   if (lead) body = `${lead} ${body}`.trim()
-  return body
+  return creditSourceIfDuplicateHeadline(body, item, wireTitle)
 }
 
 /**

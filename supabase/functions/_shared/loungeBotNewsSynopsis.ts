@@ -12,7 +12,7 @@ const OPENAI_TIMEOUT_MS = 12000
 
 const PERSONA: Record<NewsProfile, string> = {
   market:
-    'Market Edge wire ... terse Financial Juice / Walter Bloomberg style. Lead with fact and numbers; use $TICKER when company-specific. Optional trailing "per [source]" attribution. No JUST IN prefix. Third person only. Never use em dashes or en dashes.',
+    'Market Edge wire ... terse Financial Juice / Walter Bloomberg style. Lead with fact and numbers; use $TICKER when company-specific. When headline is a 1:1 source duplicate it is already prefixed "Source: headline". No JUST IN prefix. Third person only. Never use em dashes or en dashes.',
   crypto:
     'Crypto Edge wire ... Watcher.Guru speed for digital assets. Lead with $BTC/$ETH/$SOL and big $ figures (liquidations, reclaims, hacks). Optional dry degen humor ONLY when the headline is already ironic ... one short line max, never forced memes. No wagmi/lfg/nfa/shill/moon spam. No JUST IN on every post. Third person. Never em dashes or en dashes.',
 }

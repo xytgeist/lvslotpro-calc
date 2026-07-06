@@ -18,7 +18,7 @@
 | Extra context | DeItaone-style: headline + 0-2 sentences only when needed (compose step decides). |
 | Tickers | `$AAPL`, `$MU` when company-specific. |
 | Numbers | Lead with `$`, `%`, PMI, bps, auction yields when present. |
-| Attribution | Optional trailing `per Bloomberg` / `per Reuters` when paraphrasing. |
+| Attribution | **`CoinDesk: headline`** when post repeats the feed headline 1:1; `, per Source.` only when reframing publisher voice |
 | Tone | Third person. No publisher "we/our". No investment advice. **Never em dashes or en dashes** ... commas or ` ... ` only. |
 
 ---

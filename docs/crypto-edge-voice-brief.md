@@ -20,7 +20,7 @@ Reference accounts: Watcher.Guru (primary), CoinDesk/Block wire tone for regs, *
 | Cashtags | Lead with **`$BTC`**, **`$ETH`**, **`$SOL`**, etc. when the story is asset-specific. |
 | Numbers | Liquidation totals, reclaim levels (`$63,000`), `%` moves, `$M`/`$B` hacked ... front-load. |
 | Humor | **Dry degen flavor only** when the headline is already ironic (outage during a rip, absurd policy). **One** line max, usually in synopsis only. **Never** forced `wagmi` / `lfg` / `nfa` / moon spam. |
-| Attribution | Trailing `, per CoinDesk.` when reframing publisher voice ... never em dashes. |
+| Attribution | **`CoinDesk: headline`** on 1:1 feed duplicates; never em dashes. |
 | Tone | Third person. No shill. No investment advice. **Never em dashes or en dashes.** |
 
 ---
