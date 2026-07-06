@@ -20,7 +20,7 @@ Cron **`invoke_lounge_news_poll()`** already loops **every** running `market_new
 
 ## Default allowlist (tier 1 + tier 2)
 
-Migration **`20260705050000`**. Headline rewrite + source link on every publish; rich preview only when og:image loads; first-person publisher headlines reframed (e.g. CNBC "we're watching" → attributed third person).
+Migration **`20260705050000`**. Headline + **OpenAI 1-2 sentence synopsis** (feed excerpt fallback) + source link on every publish; rich preview only when og:image loads.
 
 ### Tier 1
 
@@ -44,7 +44,7 @@ Migration **`20260705050000`**. Headline rewrite + source link on every publish;
 
 **Not included:** Market Edge EDGAR, BBC/NPR, Treasury, EIA ... crypto bot stays crypto-specific.
 
-**Secrets:** **`FINNHUB_API_KEY`** (required). SEC RSS uses same User-Agent as EDGAR when hitting `sec.gov` URLs.
+**Secrets:** **`FINNHUB_API_KEY`** (required). **`OPENAI_API_KEY`** (synopsis). SEC RSS uses same User-Agent as EDGAR when hitting `sec.gov` URLs.
 
 ---
 

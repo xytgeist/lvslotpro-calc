@@ -11,7 +11,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, authorizeServiceRoleOrAdmin } from '../_shared/adminAuth.ts'
 import { decodeHtmlEntities } from '../_shared/decodeHtmlEntities.ts'
-import { buildFinancialWireCaption } from '../_shared/loungeBotNewsCaption.ts'
+import { buildFinancialWireCaption, buildFinancialWireCaptionAsync } from '../_shared/loungeBotNewsCaption.ts'
 import {
   extractTickers,
   isBlockedNewsItem,
@@ -429,7 +429,7 @@ Deno.serve(async (req) => {
 
     if (!dryRun && publishBudget > 0) {
       for (const cand of candidates.slice(0, publishBudget)) {
-        const caption = buildFinancialWireCaption(cand.item)
+        const caption = await buildFinancialWireCaptionAsync(cand.item, { newsProfile })
         const pills = account.category_pills_default?.length
           ? account.category_pills_default
           : newsProfile === 'crypto'

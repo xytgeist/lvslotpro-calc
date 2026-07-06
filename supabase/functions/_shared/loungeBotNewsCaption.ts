@@ -6,8 +6,10 @@
 
 import { decodeHtmlEntities } from './decodeHtmlEntities.ts'
 import { extractTickers, type NewsCandidate } from './loungeBotNewsScore.ts'
+import type { NewsProfile } from './loungeBotNewsProfile.ts'
+import { generateWireSynopsis } from './loungeBotNewsSynopsis.ts'
 
-const CAPTION_MAX = 500
+const CAPTION_MAX = 1200
 
 const FLUFF_PREFIX_RE = /^(breaking|just in|update|alert|exclusive)[:\s-]+/i
 
@@ -85,11 +87,7 @@ function wireHeadline(item: NewsCandidate): string {
   return rewriteFirstPersonHeadline(item.title || '', sourceLabel(item))
 }
 
-/**
- * Build Lounge caption from a news candidate.
- * Voice: factual wire rewrite; sparing dry humor only if source headline is already punchy.
- */
-export function buildFinancialWireCaption(item: NewsCandidate): string {
+function buildHeadlineLine(item: NewsCandidate): string {
   const title = wireHeadline(item)
   const tickers = item.tickers?.length
     ? item.tickers.map((t) => t.toUpperCase())
@@ -101,8 +99,34 @@ export function buildFinancialWireCaption(item: NewsCandidate): string {
 
   let body = bodyWithoutTickerDup(title, tickers)
   if (lead) body = `${lead} ${body}`.trim()
+  return body
+}
 
-  return shorten(body, CAPTION_MAX)
+/**
+ * Build Lounge caption from a news candidate (headline only — skip logs / dry fallback).
+ */
+export function buildFinancialWireCaption(item: NewsCandidate): string {
+  return shorten(buildHeadlineLine(item), CAPTION_MAX)
+}
+
+/** Headline + OpenAI synopsis (1-2 sentences) for published wire posts. */
+export async function buildFinancialWireCaptionAsync(
+  item: NewsCandidate,
+  opts: { newsProfile?: NewsProfile } = {},
+): Promise<string> {
+  const headlineLine = buildHeadlineLine(item)
+  const synopsis = await generateWireSynopsis({
+    headline: headlineLine,
+    originalTitle: item.title,
+    summary: item.summary,
+    sourceLabel: sourceLabel(item),
+    newsProfile: opts.newsProfile,
+  })
+
+  if (synopsis) {
+    return shorten(`${headlineLine}\n\n${synopsis}`, CAPTION_MAX)
+  }
+  return shorten(headlineLine, CAPTION_MAX)
 }
 
 /** @deprecated alias */

@@ -14,6 +14,8 @@ Uses `config.news_profile` (`market` | `crypto`) to pick source allowlist and sc
 | Secret | Required | Purpose |
 | --- | --- | --- |
 | `FINNHUB_API_KEY` | Yes | Finnhub news categories |
+| `OPENAI_API_KEY` | Yes | 1-2 sentence post synopsis (falls back to feed excerpt if unset) |
+| `OPENAI_CHAT_MODEL` | Optional | Default `gpt-4o-mini` |
 | `SEC_EDGAR_USER_AGENT` | Recommended | SEC fair-access policy (defaults to `EdgeTilt MarketEdge/1.0 (support@edgetilt.com)`) |
 
 ## Setup (test, then prod schema)

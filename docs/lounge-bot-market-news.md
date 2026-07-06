@@ -187,7 +187,7 @@ Always **rewrite** ... do not paste licensed wire text verbatim unless API contr
 | Schema | `supabase/migrations/20260703140000_lounge_bot_financial_wire.sql` |
 | Poll fn | `supabase/functions/lounge-news-poll/` |
 | Scoring | `supabase/functions/_shared/loungeBotNewsScore.ts` |
-| Captions | `supabase/functions/_shared/loungeBotNewsCaption.ts` — wire voice; first-person headlines reframed with source attribution |
+| Captions | `supabase/functions/_shared/loungeBotNewsCaption.ts` — headline + OpenAI synopsis (`loungeBotNewsSynopsis.ts`); first-person headlines reframed |
 | Publish | `supabase/functions/_shared/loungeBotPublish.ts` — source link + preview on every post; rich card only when og:image loads |
 | Admin UI | `src/features/ops/EdgeMonitorBotOpsPanel.jsx` |
 | Finnhub (existing) | `supabase/functions/_shared/finnhubMarket.ts` |
