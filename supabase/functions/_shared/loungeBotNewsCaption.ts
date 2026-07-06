@@ -5,6 +5,7 @@
  */
 
 import { decodeHtmlEntities } from './decodeHtmlEntities.ts'
+import { sanitizeWireProse } from './wireBotProse.ts'
 import { extractTickers, type NewsCandidate } from './loungeBotNewsScore.ts'
 import type { NewsProfile } from './loungeBotNewsProfile.ts'
 import { composeWirePost, type WirePostComposeResult } from './loungeBotNewsSynopsis.ts'
@@ -18,9 +19,11 @@ const FIRST_PERSON_RE =
   /\b(here are|here'?s|what we'?re|we'?re|we'?ve|we'?ll|\bwe\b|\bour\b|\bus\b|\bi'?m|\bi'?ve|\bmy\b|\bi\b)\b/i
 
 function cleanHeadline(raw: string): string {
-  let s = decodeHtmlEntities(String(raw || ''))
-    .replace(/\s+/g, ' ')
-    .trim()
+  let s = sanitizeWireProse(
+    decodeHtmlEntities(String(raw || ''))
+      .replace(/\s+/g, ' ')
+      .trim(),
+  )
   s = s.replace(FLUFF_PREFIX_RE, '')
   s = s.replace(/\.\.\.$/, '.')
   if (s && !/[.!?]$/.test(s)) s += '.'
@@ -77,8 +80,11 @@ function rewriteFirstPersonHeadline(title: string, label: string): string {
 
   if (t && !/[.!?]$/.test(t)) t += '.'
 
-  const lead = label && label !== 'Report' ? `${label} — ` : 'Report — '
-  return `${lead}${t.charAt(0).toUpperCase()}${t.slice(1)}`
+  const body = `${t.charAt(0).toUpperCase()}${t.slice(1)}`
+  if (label && label !== 'Report') {
+    return sanitizeWireProse(`${body.replace(/[.!?]+$/, '')}, per ${label}.`)
+  }
+  return sanitizeWireProse(body)
 }
 
 function wireHeadline(item: NewsCandidate): string {
@@ -106,7 +112,7 @@ function buildHeadlineLine(item: NewsCandidate): string {
  * Build Lounge caption from a news candidate (headline only — skip logs / dry fallback).
  */
 export function buildFinancialWireCaption(item: NewsCandidate): string {
-  return shorten(buildHeadlineLine(item), CAPTION_MAX)
+  return shorten(sanitizeWireProse(buildHeadlineLine(item)), CAPTION_MAX)
 }
 
 /** Headline + OpenAI compose (synopsis length + link decision) for published wire posts. */
@@ -124,7 +130,7 @@ export async function buildFinancialWirePostAsync(
   })
 
   return {
-    caption: shorten(composed.caption || headlineLine, CAPTION_MAX),
+    caption: shorten(sanitizeWireProse(composed.caption || headlineLine), CAPTION_MAX),
     includeLink: composed.includeLink && Boolean(item.url),
   }
 }

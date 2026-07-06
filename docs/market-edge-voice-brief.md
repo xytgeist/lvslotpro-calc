@@ -19,7 +19,7 @@
 | Tickers | `$AAPL`, `$MU` when company-specific. |
 | Numbers | Lead with `$`, `%`, PMI, bps, auction yields when present. |
 | Attribution | Optional trailing `per Bloomberg` / `per Reuters` when paraphrasing. |
-| Tone | Third person. No publisher "we/our". No investment advice. |
+| Tone | Third person. No publisher "we/our". No investment advice. **Never em dashes or en dashes** ... commas or ` ... ` only. |
 
 ---
 

@@ -4,6 +4,7 @@
  */
 
 import { decodeHtmlEntities } from './decodeHtmlEntities.ts'
+import { sanitizeWireProse } from './wireBotProse.ts'
 import type { NewsProfile } from './loungeBotNewsProfile.ts'
 
 const SYNOPSIS_MAX = 380
@@ -11,8 +12,9 @@ const OPENAI_TIMEOUT_MS = 12000
 
 const PERSONA: Record<NewsProfile, string> = {
   market:
-    'Market Edge wire — terse Financial Juice / Walter Bloomberg style. Lead with fact and numbers; use $TICKER when company-specific. Optional trailing "per [source]" attribution. No JUST IN prefix. Third person only.',
-  crypto: 'Crypto Edge wire — neutral, third-person factual tone on digital assets and policy.',
+    'Market Edge wire ... terse Financial Juice / Walter Bloomberg style. Lead with fact and numbers; use $TICKER when company-specific. Optional trailing "per [source]" attribution. No JUST IN prefix. Third person only. Never use em dashes or en dashes.',
+  crypto:
+    'Crypto Edge wire ... neutral, third-person factual tone on digital assets and policy. Never use em dashes or en dashes.',
 }
 
 export type WirePostComposeInput = {
@@ -36,6 +38,8 @@ function clipFeedSummary(summary: string, maxSentences: 1 | 2): string {
     .trim()
   if (!t || t.length < 48) return ''
   if (/^(read more|click here|view article)/i.test(t)) return ''
+
+  t = sanitizeWireProse(t)
 
   const parts = t.match(/[^.!?]+[.!?]+(?:\s|$)/g)
   if (parts?.length) {
@@ -64,16 +68,19 @@ function fallbackCompose(input: WirePostComposeInput): WirePostComposeResult {
   const selfContained = headlineLooksSelfContained(headline)
 
   if (selfContained && summary.length < 80) {
-    return { caption: headline, includeLink: false }
+    return { caption: sanitizeWireProse(headline), includeLink: false }
   }
 
   const synopsis = clipFeedSummary(summary, selfContained ? 1 : 2)
   if (!synopsis) {
-    return { caption: headline, includeLink: !selfContained && Boolean(summary || input.originalTitle) }
+    return {
+      caption: sanitizeWireProse(headline),
+      includeLink: !selfContained && Boolean(summary || input.originalTitle),
+    }
   }
 
   return {
-    caption: `${headline}\n\n${synopsis}`,
+    caption: sanitizeWireProse(`${headline}\n\n${synopsis}`),
     includeLink: !selfContained,
   }
 }
@@ -86,7 +93,7 @@ function parseComposeJson(raw: string): { includeLink: boolean; synopsis: string
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, SYNOPSIS_MAX)
-    return { includeLink, synopsis }
+    return { includeLink, synopsis: sanitizeWireProse(synopsis) }
   } catch {
     return null
   }
@@ -141,7 +148,8 @@ export async function composeWirePost(opts: WirePostComposeInput): Promise<WireP
                 `- "" (empty) when no extra context is needed under the headline.\n` +
                 `- ONE short sentence when a little context helps.\n` +
                 `- TWO sentences when the story needs more setup (use the minimum that works).\n` +
-                `- Never repeat the headline. Third person only — no we/our/us/I. No investment advice. No em dashes.\n` +
+                `- Never repeat the headline. Third person only ... no we/our/us/I. No investment advice.\n` +
+                `- NEVER use em dashes or en dashes. Use commas or " ... " for breaks.\n` +
                 `- Max ${SYNOPSIS_MAX} characters in synopsis.`,
             },
             {
@@ -162,9 +170,10 @@ export async function composeWirePost(opts: WirePostComposeInput): Promise<WireP
         const json = await res.json()
         const parsed = parseComposeJson(String(json?.choices?.[0]?.message?.content || ''))
         if (parsed) {
-          const caption = parsed.synopsis
-            ? `${headline}\n\n${parsed.synopsis}`
-            : headline
+          const synopsis = sanitizeWireProse(parsed.synopsis)
+          const caption = synopsis
+            ? sanitizeWireProse(`${headline}\n\n${synopsis}`)
+            : sanitizeWireProse(headline)
           return { caption, includeLink: parsed.includeLink }
         }
       }
@@ -173,5 +182,5 @@ export async function composeWirePost(opts: WirePostComposeInput): Promise<WireP
     }
   }
 
-  return fallbackCompose(opts)
+  return fallbackCompose({ ...opts, headline: sanitizeWireProse(headline) })
 }
