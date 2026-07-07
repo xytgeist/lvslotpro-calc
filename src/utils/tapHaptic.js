@@ -1,4 +1,4 @@
-import { isIosDevice } from './pwaNotificationPrompt.js'
+import { isAndroidDevice, isIosDevice } from './pwaNotificationPrompt.js'
 
 const TAP_TARGET_SELECTOR = [
   'button:not(:disabled)',
@@ -34,39 +34,66 @@ const TEXT_INPUT_TYPES = new Set([
   'hidden',
 ])
 
-function prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
-}
+const IOS_SWITCH_INPUT_ID = 'edge-tap-haptic-switch'
 
-function hasCoarsePointer() {
-  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches === true
-}
+let iosHapticLabel = null
+let iosHapticInput = null
 
 function hasVibrationApi() {
   return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
 }
 
-/** True when this device can fire tap haptics (touch-first environments). */
+/** Touch-first phone/tablet ... UA + touch surface, not `(pointer: coarse)` alone. */
+function isMobileTapEnvironment() {
+  if (typeof window === 'undefined') return false
+  if (isIosDevice() || isAndroidDevice()) return true
+  return (
+    typeof navigator !== 'undefined' &&
+    navigator.maxTouchPoints > 0 &&
+    window.matchMedia?.('(hover: none)')?.matches === true
+  )
+}
+
+/** True when this device can fire tap haptics. */
 export function isTapHapticSupported() {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return false
-  if (!hasCoarsePointer()) return false
+  if (typeof document === 'undefined') return false
+  if (!isMobileTapEnvironment()) return false
   return hasVibrationApi() || isIosDevice()
 }
 
+function ensureIosHapticSwitch() {
+  if (iosHapticLabel || typeof document === 'undefined' || !document.body) return
+
+  const input = document.createElement('input')
+  input.type = 'checkbox'
+  input.id = IOS_SWITCH_INPUT_ID
+  input.setAttribute('switch', '')
+  input.style.display = 'none'
+  document.body.appendChild(input)
+  iosHapticInput = input
+
+  const label = document.createElement('label')
+  label.htmlFor = IOS_SWITCH_INPUT_ID
+  label.setAttribute('aria-hidden', 'true')
+  label.style.display = 'none'
+  document.body.appendChild(label)
+  iosHapticLabel = label
+}
+
 function fireIosSwitchHaptic() {
-  if (typeof document === 'undefined' || !document.body) return
+  ensureIosHapticSwitch()
+  if (!iosHapticLabel || !iosHapticInput) return
   try {
-    const label = document.createElement('label')
-    label.setAttribute('aria-hidden', 'true')
-    label.style.cssText =
-      'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;'
-    const input = document.createElement('input')
-    input.type = 'checkbox'
-    input.setAttribute('switch', '')
-    label.appendChild(input)
-    document.body.appendChild(label)
-    label.click()
-    document.body.removeChild(label)
+    iosHapticLabel.click()
+  } catch {
+    // no-op
+  }
+}
+
+function fireAndroidVibrate() {
+  if (!hasVibrationApi()) return
+  try {
+    navigator.vibrate(40)
   } catch {
     // no-op
   }
@@ -74,21 +101,14 @@ function fireIosSwitchHaptic() {
 
 /** Light impact for standard button taps (X.com-style). Must run inside the user gesture. */
 export function triggerTapHapticLight() {
-  if (!isTapHapticSupported() || prefersReducedMotion()) return
-
-  if (hasVibrationApi()) {
-    try {
-      const ms = /Android/i.test(navigator.userAgent || '') ? 15 : 10
-      navigator.vibrate(ms)
-      return
-    } catch {
-      // fall through to iOS switch fallback
-    }
-  }
+  if (!isTapHapticSupported()) return
 
   if (isIosDevice()) {
     fireIosSwitchHaptic()
+    return
   }
+
+  fireAndroidVibrate()
 }
 
 function isTextEntryElement(el) {
@@ -113,26 +133,32 @@ function findTapHapticTarget(node) {
   return el
 }
 
-function shouldHapticForPointerEvent(event) {
-  if (!event.isPrimary || event.button !== 0) return false
-  if (prefersReducedMotion() || !isTapHapticSupported()) return false
-  if (event.pointerType === 'touch') return true
-  return hasCoarsePointer()
+function shouldHapticForTapEvent(event) {
+  if (!isMobileTapEnvironment() || !isTapHapticSupported()) return false
+  // Ignore synthetic keyboard activations; touch/pointer taps have detail >= 1.
+  if (event.detail === 0) return false
+  return true
 }
 
 /**
  * Document-level tap haptics for buttons and other touch targets.
+ * Uses trusted click (iOS switch trick needs user activation).
  * Returns a cleanup function (for tests or future teardown).
  */
 export function installGlobalTapHaptic() {
-  if (typeof document === 'undefined' || !isTapHapticSupported()) return () => {}
+  if (typeof document === 'undefined' || !isMobileTapEnvironment()) return () => {}
 
-  const onPointerDown = (event) => {
-    if (!shouldHapticForPointerEvent(event)) return
+  ensureIosHapticSwitch()
+
+  const onTap = (event) => {
+    if (!shouldHapticForTapEvent(event)) return
     if (!findTapHapticTarget(event.target)) return
     triggerTapHapticLight()
   }
 
-  document.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true })
-  return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  document.addEventListener('click', onTap, { capture: true, passive: true })
+
+  return () => {
+    document.removeEventListener('click', onTap, true)
+  }
 }
