@@ -3,51 +3,86 @@
  */
 
 /**
- * Surface `{ error }` from Edge Function JSON when invoke returns non-2xx.
- * @param {unknown} error
- * @param {Response | undefined} response
- * @param {{ functionName?: string, defaultMessage?: string }} [opts]
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} functionName
+ * @param {Record<string, unknown>} body
  */
-async function messageFromEdgeInvokeError(error, response, opts = {}) {
-  const functionName = opts.functionName || 'edge function'
-  const defaultMessage = opts.defaultMessage || 'Request failed.'
-  const fallback = String(
-    (error && typeof error === 'object' && 'message' in error && error.message) || defaultMessage,
-  ).trim()
-
-  const ctx = error && typeof error === 'object' ? /** @type {{ context?: Response }} */ (error).context : null
-  const res =
-    ctx && typeof ctx.status === 'number'
-      ? ctx
-      : response && typeof response.status === 'number'
-        ? response
-        : null
-
-  if (res) {
-    try {
-      const raw = await res.clone().text()
-      if (raw) {
-        try {
-          const body = JSON.parse(raw)
-          if (body?.error != null) return String(body.error).trim() || fallback
-          if (body?.message != null) return String(body.message).trim() || fallback
-        } catch {
-          return raw.slice(0, 400) || fallback
-        }
-      }
-    } catch {
-      // ignore
-    }
-    if (res.status === 503) {
-      return `Server misconfigured (check Edge secrets for ${functionName}, e.g. X_API_BEARER_TOKEN).`
-    }
-    if (res.status === 401) return 'Sign in again, then retry (session expired).'
-    if (res.status === 403) return 'Admin access required.'
-    if (res.status === 404) return `Not found (${functionName} or requested resource).`
-    return fallback || `Service returned HTTP ${res.status}.`
+async function invokeAdminEdgeFunction(supabaseClient, functionName, body) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
+  if (!supabaseUrl || !anonKey) {
+    return { data: null, error: new Error('Supabase env not configured.') }
   }
 
-  return fallback || defaultMessage
+  let {
+    data: { session },
+  } = await supabaseClient.auth.getSession()
+  if (!session?.access_token) {
+    return { data: null, error: new Error('Sign in again, then retry.') }
+  }
+
+  const nowSecs = Math.floor(Date.now() / 1000)
+  if (!session.expires_at || session.expires_at - nowSecs < 60) {
+    const { data: refreshed } = await supabaseClient.auth.refreshSession()
+    if (refreshed?.session?.access_token) session = refreshed.session
+  }
+
+  let res
+  try {
+    res = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Network error'
+    return { data: null, error: new Error(msg) }
+  }
+
+  const text = await res.text().catch(() => '')
+  let data = null
+  if (text) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      if (!res.ok) {
+        return {
+          data: null,
+          error: new Error(text.slice(0, 400) || `${functionName} failed (HTTP ${res.status}).`),
+        }
+      }
+    }
+  }
+
+  if (!res.ok) {
+    const fromBody = data?.error != null ? String(data.error).trim() : ''
+    if (fromBody) return { data: null, error: new Error(fromBody) }
+    if (res.status === 503) {
+      return {
+        data: null,
+        error: new Error(
+          `Server misconfigured (check Edge secrets for ${functionName}, e.g. X_API_BEARER_TOKEN).`,
+        ),
+      }
+    }
+    if (res.status === 401) {
+      return { data: null, error: new Error('Sign in again, then retry (session expired).') }
+    }
+    if (res.status === 403) {
+      return { data: null, error: new Error('Admin access required.') }
+    }
+    return {
+      data: null,
+      error: new Error(text.slice(0, 400) || `${functionName} failed (HTTP ${res.status}).`),
+    }
+  }
+
+  if (data?.error) return { data: null, error: new Error(String(data.error)) }
+  return { data, error: null }
 }
 
 /**
@@ -286,22 +321,11 @@ export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
  * @param {{ slug?: string, dryRun?: boolean }} [opts]
  */
 export async function invokeLoungeXIngest(supabaseClient, opts = {}) {
-  const { data, error, response } = await supabaseClient.functions.invoke('lounge-x-ingest', {
-    body: {
-      slug: opts.slug,
-      dryRun: opts.dryRun === true,
-      tweetUrl: opts.tweetUrl ? String(opts.tweetUrl).trim() : undefined,
-    },
+  return invokeAdminEdgeFunction(supabaseClient, 'lounge-x-ingest', {
+    slug: opts.slug,
+    dryRun: opts.dryRun === true,
+    tweetUrl: opts.tweetUrl ? String(opts.tweetUrl).trim() : undefined,
   })
-  if (error) {
-    const msg = await messageFromEdgeInvokeError(error, response, {
-      functionName: 'lounge-x-ingest',
-      defaultMessage: 'lounge-x-ingest failed.',
-    })
-    return { data: null, error: new Error(msg) }
-  }
-  if (data?.error) return { data: null, error: new Error(String(data.error)) }
-  return { data, error: null }
 }
 
 /**
