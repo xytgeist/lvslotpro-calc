@@ -18,6 +18,7 @@ import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitl
 import SlotsToolPageHeader from '../../components/SlotsToolPageHeader.jsx'
 import useOffersCalendarState from './hooks/useOffersCalendarState'
 import useOffersCalendarMutations from './hooks/useOffersCalendarMutations'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 import useWebPushNotifications from './hooks/useWebPushNotifications'
 import {
   OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX,
@@ -951,6 +952,7 @@ export default function OffersCalendar({
   const handleAddEvent = () => {
     setViewMenuOpen(false)
     const dayKey = selectedDays.length === 1 ? selectedDays[0] : null
+    triggerTapHapticLight()
     openForm(dayKey)
   }
 

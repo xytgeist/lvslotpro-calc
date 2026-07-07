@@ -12,6 +12,7 @@ import BankrollChartsTab from './BankrollChartsTab.jsx'
 import BankrollLocationsTab from './BankrollLocationsTab.jsx'
 import BankrollImportSheet from './BankrollImportSheet.jsx'
 import { fetchNearbyCasinos } from '../../utils/nearbyCasinos.js'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -297,6 +298,7 @@ export default function BankrollTracker({
       if (err) throw err
       setSessions(prev => [data, ...prev])
       setSheet(null); setStartCasino(''); setStartAmount(''); setStartGameType('slots')
+      triggerTapHapticLight()
       onBankrollSessionCreated?.()
     } catch (e) {
       setError(e.message || 'Could not start session.')
@@ -330,6 +332,7 @@ export default function BankrollTracker({
       setSessions(prev => prev.map(s => s.id === activeSession.id ? updatedSession : s))
       setProfile(updatedProfile)
       setSheet(null); setEndAmount(''); setSessionNotes('')
+      triggerTapHapticLight()
     } catch (e) {
       setError(e.message || 'Could not end session.')
     } finally {

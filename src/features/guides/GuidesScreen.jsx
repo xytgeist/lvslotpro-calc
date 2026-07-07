@@ -4,6 +4,7 @@ import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { format, parseISO } from 'date-fns'
 import { stashPlayLogPrefill } from '../../utils/playLogPrefill.js'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 import {
   BUFFALO_LINK_DEMO_SLUG,
   buffaloLinkGuideMarkdown,
@@ -2178,6 +2179,7 @@ export default function GuidesScreen({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
+                            triggerTapHapticLight()
                             setAskFor(row)
                           }}
                           className="flex-1 min-h-11 rounded-2xl bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-bold touch-manipulation"

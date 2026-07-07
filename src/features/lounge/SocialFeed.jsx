@@ -37,6 +37,7 @@ import {
   normalizeFeedCaption,
   quoteRepostOriginalUnavailable,
 } from '../../utils/communityFeedPost'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 import {
   feedPostCategoryPills,
   displayPostCategoryPills,
@@ -11699,6 +11700,7 @@ export default function SocialFeed({
       preserveComposerVideoPrep: preserveVideoPrep,
       pendingSnapshot: snapshot,
     })
+    triggerTapHapticLight()
     enqueueAndRunLoungeSubmitRef.current('post', snapshot)
   }, [
     clearComposerForPostAttempt,
@@ -11857,6 +11859,7 @@ export default function SocialFeed({
       preserveComposerVideoPrep: preserveVideoPrep,
       pendingSnapshot: snapshot,
     })
+    triggerTapHapticLight()
     enqueueAndRunLoungeSubmitRef.current('post', snapshot)
   }, [
     loungeComposerVideoPostBlocked,
@@ -12502,11 +12505,13 @@ export default function SocialFeed({
       if (openProfileGateIfNeeded()) return
       if (profileModalOpen || profileOverlayStack.length > 0) {
         pushProfileOverlay(entity)
+        triggerTapHapticLight()
         return
       }
       if (!opts?.skipNavCapture && !opts?.fromPublicLink) {
         pushLoungeNavReturnContext()
       }
+      triggerTapHapticLight()
       void openProfileModal(
         {
           user_id: stub.user_id,

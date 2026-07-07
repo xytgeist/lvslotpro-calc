@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal, flushSync } from 'react-dom'
 import { uploadLoungeFeedPostImage } from '../../utils/communityFeedPost.js'
 import { prepareLoungeFeedImageForUpload } from '../../utils/compressImageForUpload.js'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 import {
   focusLoungeComposerCaption,
   scheduleLoungeComposerTextareaFocus,
@@ -855,6 +856,7 @@ export default function ChatComposer({
               onClick={(e) => {
                 e.stopPropagation()
                 if (!canSend) return
+                triggerTapHapticLight()
                 void handleSend()
               }}
               aria-label="Send"

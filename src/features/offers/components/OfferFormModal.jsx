@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { triggerTapHapticLight } from '../../../utils/tapHaptic.js'
 import DatePicker from 'react-datepicker'
 import Picker from 'react-mobile-picker'
 import {
@@ -468,7 +469,10 @@ export default function OfferFormModal({
             <div className="relative flex shrink-0 items-center justify-between">
               <button
                 type="button"
-                onClick={requestClose}
+                onClick={() => {
+                  triggerTapHapticLight()
+                  requestClose()
+                }}
                 aria-label="Close event form"
                 className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full border border-zinc-600 bg-zinc-800/90 text-2xl leading-none text-zinc-300 touch-manipulation"
               >
@@ -479,7 +483,10 @@ export default function OfferFormModal({
               </div>
               <button
                 type="button"
-                onClick={saveEvent}
+                onClick={() => {
+                  triggerTapHapticLight()
+                  saveEvent()
+                }}
                 disabled={!canSave || saving}
                 aria-label={editingId ? 'Update event' : 'Save event'}
                 className={`pointer-events-auto grid h-12 w-12 place-items-center rounded-full border text-2xl leading-none touch-manipulation transition-colors ${

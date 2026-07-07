@@ -14,6 +14,7 @@ import {
 } from '../../utils/loungeFeedScope'
 import { LOUNGE_FEED_SORT, readLoungeFeedSort } from '../../utils/loungeFeedSortPref'
 import { readLoungeFeedCategoryFilter } from '../../utils/loungeFeedCategoryFilterPref.js'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 import { renderRichCaption } from '../lounge/loungeCaption'
 import {
   OFFERS_ALERT_DEFAULT_PRESET_KEY_PREFIX,
@@ -1075,9 +1076,11 @@ export default function AppShell({
             if (item.id === 'slots') {
               setActiveCalculator(null)
               setTab('slots')
+              triggerTapHapticLight()
             } else {
               setActiveCalculator(null)
               setTab(item.id)
+              if (item.id === 'chat') triggerTapHapticLight()
             }
             setMenuOpen(false)
           }}

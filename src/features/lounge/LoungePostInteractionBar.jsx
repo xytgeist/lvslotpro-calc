@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 import LoungeFlameIcon from './LoungeFlameIcon.jsx'
 import { LoungeInteractionGlyphRail } from './LoungeInteractionGlyphRail.jsx'
 import {
@@ -239,6 +240,7 @@ export default function LoungePostInteractionBar({
               onClick={(e) => {
                 e.stopPropagation()
                 setRepostMenuOpen(false)
+                triggerTapHapticLight()
                 onUndoPlainRepost?.(post)
               }}
             >
@@ -261,6 +263,7 @@ export default function LoungePostInteractionBar({
               onClick={(e) => {
                 e.stopPropagation()
                 setRepostMenuOpen(false)
+                triggerTapHapticLight()
                 onPlainRepost(post)
               }}
             >
@@ -284,6 +287,7 @@ export default function LoungePostInteractionBar({
               onClick={(e) => {
                 e.stopPropagation()
                 setRepostMenuOpen(false)
+                triggerTapHapticLight()
                 onRemoveQuoteRepost?.(post)
               }}
             >
@@ -307,6 +311,7 @@ export default function LoungePostInteractionBar({
               onClick={(e) => {
                 e.stopPropagation()
                 setRepostMenuOpen(false)
+                triggerTapHapticLight()
                 onQuoteRepost(post)
               }}
             >
@@ -341,6 +346,7 @@ export default function LoungePostInteractionBar({
               onClick={(e) => {
                 e.stopPropagation()
                 setRepostMenuOpen(false)
+                triggerTapHapticLight()
                 onPlainRepost(post)
               }}
             >
@@ -362,6 +368,7 @@ export default function LoungePostInteractionBar({
               onClick={(e) => {
                 e.stopPropagation()
                 setRepostMenuOpen(false)
+                triggerTapHapticLight()
                 onQuoteRepost(post)
               }}
             >
@@ -396,6 +403,7 @@ export default function LoungePostInteractionBar({
                 onClick={(e) => {
                   e.stopPropagation()
                   setRepostMenuOpen(false)
+                  triggerTapHapticLight()
                   onUndoPlainRepost?.(post)
                 }}
               >
@@ -419,6 +427,7 @@ export default function LoungePostInteractionBar({
                 onClick={(e) => {
                   e.stopPropagation()
                   setRepostMenuOpen(false)
+                  triggerTapHapticLight()
                   onPlainRepost?.(post)
                 }}
               >
@@ -443,6 +452,7 @@ export default function LoungePostInteractionBar({
                 onClick={(e) => {
                   e.stopPropagation()
                   setRepostMenuOpen(false)
+                  triggerTapHapticLight()
                   onRemoveQuoteRepost?.(post)
                 }}
               >
@@ -491,6 +501,7 @@ export default function LoungePostInteractionBar({
               onClick={(e) => {
                 e.stopPropagation()
                 setRepostMenuOpen(false)
+                triggerTapHapticLight()
                 onPlainRepost?.(post)
               }}
             >
@@ -514,6 +525,7 @@ export default function LoungePostInteractionBar({
                 onClick={(e) => {
                   e.stopPropagation()
                   setRepostMenuOpen(false)
+                  triggerTapHapticLight()
                   onQuoteRepost(post)
                 }}
               >
@@ -585,6 +597,7 @@ export default function LoungePostInteractionBar({
             return
           }
           if (onPlainRepost && !onQuoteRepost) {
+            triggerTapHapticLight()
             onPlainRepost(post)
             return
           }
@@ -593,9 +606,11 @@ export default function LoungePostInteractionBar({
             return
           }
           if (onQuoteRepost) {
+            triggerTapHapticLight()
             onQuoteRepost(post)
             return
           }
+          triggerTapHapticLight()
           void toggleInteraction(post.id, 'reposted')
         }}
         statClass={statMidCls}
@@ -622,9 +637,10 @@ export default function LoungePostInteractionBar({
         readOnly={ro}
         title={ro ? 'Sign in to like' : undefined}
         onReadOnlyClick={requireLoungeAuth}
-        onClick={() =>
+        onClick={() => {
+          triggerTapHapticLight()
           typeof onToggleLike === 'function' ? void onToggleLike(post.id) : void toggleInteraction(post.id, 'liked')
-        }
+        }}
         statClass={statMidCls}
         pillOverlay={pillOverlay}
         glyph={<LoungeFlameIcon className={`shrink-0 ${iconSz} ${likeClass}`} liked={ui.liked} readOnly={ro} />}
@@ -664,11 +680,12 @@ export default function LoungePostInteractionBar({
         ) : (
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              triggerTapHapticLight()
               typeof onToggleBookmark === 'function'
                 ? void onToggleBookmark(post.id)
                 : void toggleBookmark(post.id)
-            }
+            }}
             className={`${statBookmarkCls} box-border flex shrink-0 items-center justify-center`}
             title={isBookmarked ? 'Remove bookmark' : 'Save post'}
           >

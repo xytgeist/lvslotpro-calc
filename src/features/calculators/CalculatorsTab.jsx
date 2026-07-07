@@ -11,6 +11,7 @@ import {
   canOpenCalculator,
   showCalculatorLock,
 } from './calculatorAccess.js'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 
 const PhoenixLink = lazyRoute(() => import('./games/PhoenixLink.jsx'))
 const BuffaloLink = lazyRoute(() => import('./games/BuffaloLink.jsx'))
@@ -62,6 +63,7 @@ function CalculatorsHome({
       return
     }
     onSelectCalculator(key)
+    triggerTapHapticLight()
   }
 
   const handleAdminLockToggle = async (key, locked) => {

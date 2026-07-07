@@ -1,38 +1,7 @@
 import { isAndroidDevice, isIosDevice } from './pwaNotificationPrompt.js'
 
-const TAP_TARGET_SELECTOR = [
-  'button:not(:disabled)',
-  'a[href]',
-  '[role="button"]:not([aria-disabled="true"])',
-  'input[type="button"]:not(:disabled)',
-  'input[type="submit"]:not(:disabled)',
-  'input[type="reset"]:not(:disabled)',
-  'input[type="checkbox"]:not(:disabled)',
-  'input[type="radio"]:not(:disabled)',
-  'select:not(:disabled)',
-  'summary',
-  'label[for]',
-  '[data-tap-haptic]',
-  '.touch-manipulation',
-].join(',')
-
-const TEXT_INPUT_TYPES = new Set([
-  'text',
-  'email',
-  'password',
-  'search',
-  'tel',
-  'url',
-  'number',
-  'date',
-  'datetime-local',
-  'month',
-  'week',
-  'time',
-  'color',
-  'file',
-  'hidden',
-])
+/** Opt-in only — global listener does not haptic every button. */
+const TAP_TARGET_SELECTOR = '[data-tap-haptic]'
 
 const IOS_SWITCH_INPUT_ID = 'edge-tap-haptic-switch'
 
@@ -111,24 +80,12 @@ export function triggerTapHapticLight() {
   fireAndroidVibrate()
 }
 
-function isTextEntryElement(el) {
-  if (!(el instanceof HTMLElement)) return false
-  const tag = el.tagName
-  if (tag === 'TEXTAREA') return true
-  if (el.isContentEditable) return true
-  if (tag !== 'INPUT') return false
-  const type = (el.getAttribute('type') || 'text').toLowerCase()
-  if (type === 'range') return true
-  return TEXT_INPUT_TYPES.has(type)
-}
-
 function findTapHapticTarget(node) {
   if (!(node instanceof Element)) return null
   if (node.closest('[data-no-tap-haptic]')) return null
 
   const el = node.closest(TAP_TARGET_SELECTOR)
   if (!el || !(el instanceof HTMLElement)) return null
-  if (isTextEntryElement(el)) return null
   if (el.matches('button:disabled, input:disabled, select:disabled, [aria-disabled="true"]')) return null
   return el
 }

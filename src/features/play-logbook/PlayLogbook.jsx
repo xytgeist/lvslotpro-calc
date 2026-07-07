@@ -12,6 +12,7 @@ import LogPlayGamePicker from './LogPlayGamePicker.jsx'
 import { APP_MODAL_OVERLAY_CLASS, APP_MODAL_SHEET_PANEL_CLASS, Z_APP_ALERT } from '../../constants/appZIndex.js'
 import { resolveDefaultCaptureCasino } from '../../utils/nearbyCasinos.js'
 import { consumePlayLogPrefill } from '../../utils/playLogPrefill.js'
+import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 import { playLogCalcSnapshotNotes } from '../../utils/playLogCalcSnapshot.js'
 import {
   formatMetricValue,
@@ -454,6 +455,7 @@ export default function PlayLogbook({
       setGpsLoading(false)
       setSheet('logPlay')
       setError('')
+      triggerTapHapticLight()
       if (!opts.casinoName && !opts.skipCasinoPopulate) populateCaptureCasino()
     },
     [templates, templateById, populateCaptureCasino, userId, viewerProfile, canCreatePlayLog, onRequireSubscribeForPlayLog],
@@ -718,6 +720,7 @@ export default function PlayLogbook({
         if (e) throw e
       }
       closeSheet()
+      triggerTapHapticLight()
       await loadAll()
       if (!editingEntryId && !sharedOnEdit) onPlayLogCreated?.()
     } catch (e) {
