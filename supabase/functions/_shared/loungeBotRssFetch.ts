@@ -12,6 +12,9 @@ export type NormalizedNewsItem = NewsCandidate & {
   raw: Record<string, unknown>
 }
 
+const DEFAULT_RSS_USER_AGENT =
+  'Mozilla/5.0 (compatible; EdgeTilt/1.0; +https://edgetilt.com)'
+
 function decodeXmlText(raw: string): string {
   return decodeHtmlEntities(
     String(raw || '')
@@ -124,6 +127,7 @@ export async function fetchAllowlistedFeed(
   const res = await fetch(url, {
     headers: {
       Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+      'User-Agent': DEFAULT_RSS_USER_AGENT,
       ...headers,
     },
   })

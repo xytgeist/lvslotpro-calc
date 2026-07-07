@@ -69,6 +69,27 @@ export const DEFAULT_MARKET_NEWS_SOURCES: MarketNewsSourceSeed[] = [
     api_config: { source_label: 'NPR Business' },
     poll_interval_sec: 420,
   },
+  {
+    name: 'Yahoo Finance',
+    kind: 'rss',
+    poll_url: 'https://finance.yahoo.com/news/rssindex',
+    api_config: { source_label: 'Yahoo Finance' },
+    poll_interval_sec: 240,
+  },
+  {
+    name: 'MarketWatch Top Stories',
+    kind: 'rss',
+    poll_url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',
+    api_config: { source_label: 'MarketWatch' },
+    poll_interval_sec: 300,
+  },
+  {
+    name: 'MarketWatch Real-Time',
+    kind: 'rss',
+    poll_url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines',
+    api_config: { source_label: 'MarketWatch' },
+    poll_interval_sec: 240,
+  },
 ]
 
 /**

@@ -65,6 +65,9 @@ Migration **`20260705040000`**. Headline rewrite + source link only ... no full-
 | **EIA Today in Energy** | `rss` | 10 min | Oil, gas, energy macro |
 | **BBC Business** | `rss` | 5 min | Geopolitical / global business *(link out)* |
 | **NPR Business** | `rss` | 7 min | US business / economy *(link out)* |
+| **Yahoo Finance** | `rss` | 4 min | Broad US markets headline firehose *(link out)* |
+| **MarketWatch Top Stories** | `rss` | 5 min | Markets / stocks top stories *(link out)* |
+| **MarketWatch Real-Time** | `rss` | 4 min | Faster headline tick *(link out)* |
 
 **Voice brief:** `docs/market-edge-voice-brief.md` (Ryan sign-off 2026-07-06).
 
@@ -83,7 +86,7 @@ Toggle any source off in **`/?tab=bots`** without removing the row.
 | **Finnhub** categories | Yes | general, merger, forex, crypto (major-only gate on Market Edge) |
 | **SEC EDGAR** Atom | **Off** | All filing feeds disabled Jul 2026 — not this bot's job |
 | **Gov/reg RSS** | Yes | SEC press, Fed, Treasury, CFTC, EIA |
-| **Publisher RSS** | Yes | BBC Business, NPR Business (headline + link) |
+| **Publisher RSS** | Yes | BBC Business, NPR Business, Yahoo Finance, MarketWatch (headline + link) |
 | **Benzinga API** | No | Requires license |
 | **Options flow** | No | Phase 2 vendor |
 
