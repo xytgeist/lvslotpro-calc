@@ -200,6 +200,15 @@ npm run lint
 npm run build
 ```
 
+**Supabase SQL (test default, prod when explicit):** use **`npm run db:query:test`** / **`db:query:production`** (`scripts/supabase-db-query.mjs`) — **not** raw parallel `supabase db query --linked`. The wrapper serializes queries, retries pooler auth failures, and uses **`SUPABASE_DB_PASSWORD`** from **`.env.supabase.{test,production}`** (see **`.env.supabase.example`**) to hit postgres via **`--db-url`** instead of flaky **`cli_login_postgres`** temp role. **Never** fan out multiple `--linked` probes at once (circuit breaker).
+
+```bash
+npm run db:query:test -- "select 1"
+npm run db:query:production -f supabase/migrations/foo.sql
+```
+
+`AGENT_RULE_SUPABASE_DB_QUERY` — searchability token.
+
 Manual smoke steps live under **Test smoke and release readiness** in `docs/test-buildout-backlog.md`.
 
 ---

@@ -279,6 +279,7 @@ export async function countPublishedKindToday(
     .eq('status', 'published')
     .eq('post_kind', postKind)
     .gte('created_at', dayStart)
+    .not('post_id', 'is', null)
   return count || 0
 }
 
@@ -318,6 +319,8 @@ export async function hasDedupePublishedToday(
     .eq('status', 'published')
     .eq('dedupe_key', dedupeKey)
     .gte('created_at', dayStart)
+    .not('post_id', 'is', null)
+    .limit(1)
     .maybeSingle()
   return Boolean(data?.id)
 }
@@ -585,6 +588,7 @@ export async function tryPublishCombinedCoffeeAndCovers(
   dayStart: string,
   dryRun: boolean,
   alertAudience?: Record<string, unknown> | null,
+  force = false,
 ): Promise<{
   published: boolean
   skipped?: string
@@ -610,7 +614,7 @@ export async function tryPublishCombinedCoffeeAndCovers(
   }
 
   const dedupeKey = coffeeDailyDedupeKey(ptTodayDate())
-  if (!dryRun && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) {
+  if (!dryRun && !force && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) {
     return {
       published: false,
       skipped: 'coffee_already_posted',

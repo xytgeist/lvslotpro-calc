@@ -43,6 +43,8 @@
     "ap-guide:backfill-accents": "node scripts/ap-guide-backfill-card-accent-colors.mjs --target=test",
     "ap-guide:backfill-accents:dry": "node scripts/ap-guide-backfill-card-accent-colors.mjs --target=test --dry-run",
     "ap-guide:restore": "node scripts/ap-guide-restore-test-guides.mjs --latest",
+    "db:query:test": "node scripts/supabase-db-query.mjs --target=test",
+    "db:query:production": "node scripts/supabase-db-query.mjs --target=production",
     "ap-guide:voice-audit": "node scripts/ap-guide-voice-audit-payloads.mjs",
     "ap-guide:voice-audit:strict": "node scripts/ap-guide-voice-audit-payloads.mjs --strict",
     "play-log:sync-templates": "node scripts/sync-play-log-guide-templates.mjs --target=test",

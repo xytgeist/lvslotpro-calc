@@ -3,6 +3,40 @@
  */
 
 /**
+ * Poll pg_net response for async Scott queue (admin_lounge_bot_queue_odds_* request_id).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {number | string} requestId
+ */
+export async function fetchPgNetRequestResult(supabaseClient, requestId) {
+  const { data, error } = await supabaseClient.rpc('admin_lounge_bot_pg_net_result', {
+    p_request_id: Number(requestId),
+  })
+  return { data, error }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {number | string} requestId
+ * @param {{ maxMs?: number, intervalMs?: number }} [opts]
+ */
+export async function waitForPgNetRequestResult(supabaseClient, requestId, opts = {}) {
+  const maxMs = opts.maxMs ?? 185_000
+  const intervalMs = opts.intervalMs ?? 2_000
+  const started = Date.now()
+
+  while (Date.now() - started < maxMs) {
+    const { data, error } = await fetchPgNetRequestResult(supabaseClient, requestId)
+    if (error) return { ready: false, error }
+    if (data?.ready) return { ready: true, result: data }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, intervalMs)
+    })
+  }
+
+  return { ready: false, timedOut: true }
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  */
 export async function fetchBotPortalSnapshot(supabaseClient) {

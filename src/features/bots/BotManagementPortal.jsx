@@ -28,6 +28,7 @@ import {
   saveBotSettings,
   toggleBotNewsSource,
   updateBotPostCaption,
+  waitForPgNetRequestResult,
 } from './botPortalApi.js'
 import { SCOTT_EXAMPLE_POST_COUNT } from './scottExamplePosts.js'
 import { LOUNGE_CAPTION_MAX, LOUNGE_CAPTION_SUBSCRIBER_MAX } from '../../utils/loungeCommentLimits.js'
@@ -37,7 +38,9 @@ import {
 } from '../../utils/loungePostCategoryPills.js'
 
 const SCOTT_ASYNC_TOAST =
-  'Queued … Scott is working in the background (up to ~3 min). Refresh this panel for Last poll and new Lounge posts.'
+  'Still running in the background (up to ~3 min). Refresh this panel for Last poll and new Lounge posts.'
+
+const SCOTT_ASYNC_WORKING_TOAST = 'Scott is working…'
 
 const SCOTT_POLL_ACTION_LABELS = {
   daily_slates: 'Coffee & Covers',
@@ -46,10 +49,37 @@ const SCOTT_POLL_ACTION_LABELS = {
   value_bet_radar: 'Value radar',
 }
 
-function scheduleBotReload(onReload, delayMs = 120_000) {
+function scheduleBotReload(onReload, delayMs = 45_000) {
   window.setTimeout(() => {
     void onReload()
   }, delayMs)
+}
+
+/** Wait for pg_net Edge response after async queue RPC; returns merged outcome or original queued payload. */
+async function awaitScottQueueOutcome(supabaseClient, data, setToastMsg) {
+  if (!data?.asyncQueued || data.request_id == null) return data
+  setToastMsg(SCOTT_ASYNC_WORKING_TOAST)
+  const waited = await waitForPgNetRequestResult(supabaseClient, data.request_id)
+  if (waited.error) {
+    return { ...data, _pollError: waited.error.message }
+  }
+  if (!waited.ready) {
+    return data
+  }
+  const envelope = waited.result || {}
+  const body = envelope.body && typeof envelope.body === 'object' ? envelope.body : {}
+  if (envelope.status_code >= 400 || body.error || body.code === 'BOOT_ERROR') {
+    const bootMsg = body.code === 'BOOT_ERROR'
+      ? 'Scott poll worker failed to start on Edge (BOOT_ERROR). Redeploy lounge-odds-poll or check function logs.'
+      : null
+    return {
+      asyncQueued: false,
+      _httpError: String(
+        bootMsg || body.error || body.message || envelope.error_msg || `HTTP ${envelope.status_code}`,
+      ),
+    }
+  }
+  return { ...body, asyncQueued: false, request_id: data.request_id }
 }
 
 function RunStateBadge({ runState }) {
@@ -328,7 +358,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         setBusy('')
         setToast(
           calendarToday.length
-            ? 'Pick today\'s major sport from the dropdown first.'
+            ? 'Pick a sporting event from the dropdown first.'
             : 'No major events on the betting calendar today.',
         )
         return
@@ -348,12 +378,26 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
 
-    setBusy('')
     if (result.error) {
+      setBusy('')
       setToast(result.error.message || 'Pipeline run failed.')
       return
     }
-    const d = result.data || {}
+    let d = result.data || {}
+    if (d.asyncQueued) {
+      d = await awaitScottQueueOutcome(supabaseClient, d, setToast)
+    }
+    setBusy('')
+    if (d._pollError) {
+      setToast(`${SCOTT_ASYNC_TOAST} (${d._pollError})`)
+      scheduleBotReload(onReload)
+      return
+    }
+    if (d._httpError) {
+      setToast(d._httpError)
+      void onReload()
+      return
+    }
     if (d.asyncQueued) {
       setToast(SCOTT_ASYNC_TOAST)
       scheduleBotReload(onReload)
@@ -413,12 +457,26 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       dryRun,
       force: (action === 'daily_slates' || action === 'value_bet_radar') && !dryRun,
     })
-    setBusy('')
     if (result.error) {
+      setBusy('')
       setToast(result.error.message || 'Odds poll failed.')
       return
     }
-    const d = result.data || {}
+    let d = result.data || {}
+    if (d.asyncQueued) {
+      d = await awaitScottQueueOutcome(supabaseClient, d, setToast)
+    }
+    setBusy('')
+    if (d._pollError) {
+      setToast(`${SCOTT_POLL_ACTION_LABELS[action] || action} · ${SCOTT_ASYNC_TOAST} (${d._pollError})`)
+      scheduleBotReload(onReload)
+      return
+    }
+    if (d._httpError) {
+      setToast(d._httpError)
+      void onReload()
+      return
+    }
     if (d.asyncQueued) {
       setToast(`${SCOTT_POLL_ACTION_LABELS[action] || action} · ${SCOTT_ASYNC_TOAST}`)
       scheduleBotReload(onReload)
@@ -507,12 +565,26 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
 
     setBusy('examples')
     const result = await invokeLoungeOddsPublishExamples(supabaseClient, { slug: bot.slug })
-    setBusy('')
     if (result.error) {
+      setBusy('')
       setToast(result.error.message || 'Example post pack failed.')
       return
     }
-    const d = result.data || {}
+    let d = result.data || {}
+    if (d.asyncQueued) {
+      d = await awaitScottQueueOutcome(supabaseClient, d, setToast)
+    }
+    setBusy('')
+    if (d._pollError) {
+      setToast(`Example pack · ${SCOTT_ASYNC_TOAST} (${d._pollError})`)
+      scheduleBotReload(onReload)
+      return
+    }
+    if (d._httpError) {
+      setToast(d._httpError)
+      void onReload()
+      return
+    }
     if (d.asyncQueued) {
       setToast(`Example pack · ${SCOTT_ASYNC_TOAST}`)
       scheduleBotReload(onReload)
@@ -670,7 +742,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
           <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-3 py-3">
             <label className="block min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-300/90">
-                Today&apos;s major sport
+                Today&apos;s major sporting events
               </div>
               {calendarToday.length ? (
                 <>
@@ -687,7 +759,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                     ))}
                   </select>
                   <div className="text-zinc-500 text-[10px] mt-1.5">
-                    Fetch odds posts a ⚡ +EV alert for the selected sport when one clears the bar. Coffee & Covers is only via its own button or the 6–8am PT cron.{' '}
+                    Calendar rows active today (date window). Fetch odds posts a ⚡ +EV alert for the selected sport only. Coffee &amp; Covers scans every row here but only includes sports with unplayed games on today&apos;s PT slate (Odds API).{' '}
                     <span className="font-mono text-zinc-400">{selectedSportKey || '…'}</span>
                   </div>
                 </>

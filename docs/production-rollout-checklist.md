@@ -26,9 +26,11 @@ Apply in the **Supabase Dashboard → SQL Editor** for **production**, or via CL
 
 ```bash
 supabase link --project-ref jtjgtucumuoswnbauxry --yes
-supabase db query --linked -f supabase/community_feed_posts.sql
-supabase db query --linked -f supabase/feed_phase_a_profiles_public_read.sql
+npm run db:query:production -f supabase/community_feed_posts.sql
+npm run db:query:production -f supabase/feed_phase_a_profiles_public_read.sql
 ```
+
+Set **`SUPABASE_DB_PASSWORD`** in **`.env.supabase.production`** (copy **`.env.supabase.example`**) so CLI SQL avoids pooler **`cli_login_postgres`** auth failures.
 
 Track **everything else** already used on test that production must also have applied (reconcile against test SQL history / migrations folder). Common project shapes include (verify test actually has these before copying blindly):
 

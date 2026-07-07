@@ -45,6 +45,13 @@ export const COFFEE_ML_SPOTS_MAX_TOTAL = 8
 export const COFFEE_ON_TAP_MAX_PICKS = 3
 /** Include tomorrow picks within this many % of the spread/ML bar. */
 export const COFFEE_ON_TAP_NEAR_THRESHOLD_PCT = 1
+/** Min +EV % for below-bar Coffee fallback (still +EV only, never negative). */
+export const COFFEE_FALLBACK_MIN_EV_PCT = 0
+
+export const COFFEE_THIN_COVER_LINE =
+  'Nothing at the +4% cover bar ... top +EV spreads on the board:'
+export const COFFEE_THIN_ML_LINE =
+  'Nothing at the +3% ML bar ... best +EV moneylines on the board:'
 
 const CAPTION_MAX = 2000
 
@@ -142,8 +149,7 @@ export type CoffeeThreadPart = {
   body: string
 }
 
-export type DogOfTheDay = {
-  kind: 'ml' | 'spread'
+export type BiggestDog = {
   categoryLabel: string
   pickName: string
   awayTeam: string
@@ -151,15 +157,11 @@ export type DogOfTheDay = {
   commenceTime: string
   pickPrice: number
   bookTitle: string
-  edgePct: number
-  /** Spread line when kind === 'spread'. */
-  linePoint?: number
-  consensusPrice?: number
-  bookCount?: number
+  sportKey?: string
 }
 
-/** @deprecated use DogOfTheDay */
-export type BiggestDog = DogOfTheDay
+/** @deprecated use BiggestDog */
+export type DogOfTheDay = BiggestDog
 
 export type OnTapPick =
   | { kind: 'spread'; categoryLabel: string; pick: SpreadPick; edgePct: number }
@@ -171,9 +173,9 @@ export type CoffeeAndCoversResult = {
   threadParts: CoffeeThreadPart[]
   coverPicks: SpreadPick[]
   mlPicks: OddsPick[]
-  dogOfTheDay: DogOfTheDay | null
-  /** @deprecated use dogOfTheDay */
-  biggestDogs: DogOfTheDay[]
+  biggestDogs: BiggestDog[]
+  /** @deprecated use biggestDogs */
+  dogOfTheDay: BiggestDog | null
   onTapPicks: OnTapPick[]
   gameCount: number
   hasCovers: boolean
@@ -261,6 +263,14 @@ function formatEvSuffix(edgePct: number): string {
   return `(+${ev}% EV)`
 }
 
+function strictlyPlusEvSpreads(picks: SpreadPick[]): SpreadPick[] {
+  return picks.filter((p) => p.edgePct > 0)
+}
+
+function strictlyPlusEvMl(picks: OddsPick[]): OddsPick[] {
+  return picks.filter((p) => p.edgePct > 0)
+}
+
 function formatMatchupTeams(awayTeam: string, homeTeam: string): string {
   return `${shortDisplayName(awayTeam)} vs ${shortDisplayName(homeTeam)}`
 }
@@ -306,145 +316,133 @@ function formatMlSpotBulletLines(
   return lines
 }
 
-/** Min +EV to qualify as Dog of the Day (underdog ML or spread). */
-export const COFFEE_DOG_MIN_EV_PCT = 0.5
-
-function isMlUnderdogPick(pick: OddsPick): boolean {
-  if (pick.pickPrice <= 0) return false
-  const name = String(pick.pickName || '').trim()
-  return !/^draw$|^tie$/i.test(name)
-}
-
-function isSpreadUnderdogPick(pick: SpreadPick): boolean {
-  return Number.isFinite(pick.pickPoint) && pick.pickPoint > 0
-}
-
-function buildDogOfTheDayReason(dog: DogOfTheDay): string {
-  const fair = dog.consensusPrice != null ? formatAmericanOdds(dog.consensusPrice) : ''
-  const books = dog.bookCount && dog.bookCount > 0 ? `${dog.bookCount} books` : 'consensus'
-  if (dog.kind === 'spread' && dog.linePoint != null) {
-    const pts = formatSpreadPoint(dog.linePoint)
-    return fair
-      ? `Getting ${pts} with edge vs fair ${fair} (${books}).`
-      : `Getting ${pts} ... top spread underdog +EV on the slate.`
-  }
-  return fair
-    ? `Plus money ahead of fair ${fair} (${books}).`
-    : `Top moneyline underdog +EV on the slate.`
-}
-
-function formatDogOfTheDayLines(dog: DogOfTheDay, contextNote?: string): string[] {
+function formatBiggestDogBulletLines(dog: BiggestDog, contextNote?: string): string[] {
   const when = formatOddsCommenceTimeShort(dog.commenceTime)
   const pickLabel = formatPickNameLabel(dog.pickName)
   const odds = formatAmericanOdds(dog.pickPrice)
-  const ev = formatEvSuffix(dog.edgePct)
-  const head = `• ${dog.categoryLabel} - ${formatMatchupTeams(dog.awayTeam, dog.homeTeam)} (${when})`
-  const pickLine = dog.kind === 'spread' && dog.linePoint != null
-    ? `${pickLabel} ${formatSpreadPoint(dog.linePoint)} (${odds}) @ ${dog.bookTitle} ${ev}`
-    : `${pickLabel} ML ${odds} @ ${dog.bookTitle} ${ev}`
-  const lines = [head, pickLine, buildDogOfTheDayReason(dog)]
+  const lines = [
+    `• ${dog.categoryLabel} - ${formatMatchupTeams(dog.awayTeam, dog.homeTeam)} (${when})`,
+    `${pickLabel} ML ${odds} @ ${dog.bookTitle}`,
+  ]
   if (contextNote?.trim()) lines.push(contextNote.trim())
   return lines
 }
 
+function isPlusMoneyUnderdogOutcome(name: string, price: number): boolean {
+  if (!Number.isFinite(price) || price <= 0) return false
+  return !/^draw$|^tie$/i.test(String(name || '').trim())
+}
+
 /**
- * Best single +EV underdog today (ML plus money or spread getting points).
+ * Longest plus-money ML on today's board for one calendar sport (biggest underdog).
  */
-export function findDogOfTheDay(
-  categoryLabel: string,
-  sportKey: string,
-  events: OddsEvent[],
-  opts: {
-    minBooks?: number
-    minEvPct?: number
-    maxEvPct?: number
-  } = {},
-): DogOfTheDay | null {
-  const label = String(categoryLabel || '').trim()
-  const sk = String(sportKey || '').trim()
-  if (!label || !sk || !events.length) return null
-
-  const minBooks = opts.minBooks ?? DEFAULT_MIN_BOOKS
-  const minEvPct = opts.minEvPct ?? COFFEE_DOG_MIN_EV_PCT
-  const maxEvPct = opts.maxEvPct ?? DEFAULT_MAX_EV_PCT
-
-  const mlCandidates = findPlusEvOpportunities(events, sk, {
-    minBooks,
-    minEvPct,
-    maxEvPct,
-    marketKeys: ['h2h'],
-  }).filter(isMlUnderdogPick)
-
-  const spreadCandidates = findPlusEvSpreadOpportunities(events, sk, {
-    minBooks,
-    minEvPct,
-    maxEvPct,
-  }).filter(isSpreadUnderdogPick)
-
-  type Candidate = { edgePct: number; dog: DogOfTheDay }
-  const merged: Candidate[] = [
-    ...mlCandidates.map((pick) => ({
-      edgePct: pick.edgePct,
-      dog: {
-        kind: 'ml' as const,
-        categoryLabel: label,
-        pickName: pick.pickName,
-        awayTeam: pick.awayTeam,
-        homeTeam: pick.homeTeam,
-        commenceTime: pick.commenceTime,
-        pickPrice: pick.pickPrice,
-        bookTitle: pick.bookTitle,
-        edgePct: pick.edgePct,
-        consensusPrice: pick.consensusPrice,
-        bookCount: pick.bookCount,
-      },
-    })),
-    ...spreadCandidates.map((pick) => ({
-      edgePct: pick.edgePct,
-      dog: {
-        kind: 'spread' as const,
-        categoryLabel: label,
-        pickName: pick.pickName,
-        awayTeam: pick.awayTeam,
-        homeTeam: pick.homeTeam,
-        commenceTime: pick.commenceTime,
-        pickPrice: pick.pickPrice,
-        bookTitle: pick.bookTitle,
-        edgePct: pick.edgePct,
-        linePoint: pick.pickPoint,
-        consensusPrice: pick.consensusPrice,
-        bookCount: pick.bookCount,
-      },
-    })),
-  ]
-
-  merged.sort((a, b) => b.edgePct - a.edgePct)
-  return merged[0]?.dog ?? null
-}
-
-/** Pick the single best Dog of the Day across multiple calendar sports. */
-export function findDogOfTheDayAcrossSports(inputs: CoffeeAndCoversOptions[]): DogOfTheDay | null {
-  let best: DogOfTheDay | null = null
-  for (const input of inputs) {
-    const { events } = coffeeEventsForInput(input)
-    if (!events.length) continue
-    const dog = findDogOfTheDay(input.categoryLabel, input.sportKey, events, {
-      minBooks: input.minBooks,
-      maxEvPct: input.maxEvPct,
-    })
-    if (!dog) continue
-    if (!best || dog.edgePct > best.edgePct) best = dog
-  }
-  return best
-}
-
-/** @deprecated use findDogOfTheDay */
 export function findBiggestDog(
   categoryLabel: string,
   events: OddsEvent[],
   sportKey = '',
-): DogOfTheDay | null {
-  return findDogOfTheDay(categoryLabel, sportKey, events)
+): BiggestDog | null {
+  const label = String(categoryLabel || '').trim()
+  if (!label) return null
+
+  let best: BiggestDog | null = null
+
+  for (const ev of events) {
+    const home = String(ev.home_team || 'Home').trim()
+    const away = String(ev.away_team || 'Away').trim()
+    const commenceTime = String(ev.commence_time || '').trim()
+    if (!home || !away || !commenceTime) continue
+
+    for (const book of ev.bookmakers || []) {
+      const market = (book.markets || []).find((m) => m.key === 'h2h')
+      if (!market) continue
+      const bookLabel = formatBookDisplayName(String(book.title || ''), book.key)
+
+      for (const out of market.outcomes || []) {
+        const name = String(out.name || '').trim()
+        const price = Number(out.price)
+        if (!isPlusMoneyUnderdogOutcome(name, price)) continue
+        if (!best || price > best.pickPrice) {
+          best = {
+            categoryLabel: label,
+            pickName: name,
+            awayTeam: away,
+            homeTeam: home,
+            commenceTime,
+            pickPrice: price,
+            bookTitle: bookLabel,
+            sportKey: sportKey || undefined,
+          }
+        }
+      }
+    }
+  }
+
+  return best
+}
+
+/** @deprecated use findBiggestDog */
+export function findDogOfTheDay(
+  categoryLabel: string,
+  sportKey: string,
+  events: OddsEvent[],
+): BiggestDog | null {
+  return findBiggestDog(categoryLabel, events, sportKey)
+}
+
+function pickTopSpreadCovers(
+  events: OddsEvent[],
+  sportKey: string,
+  opts: {
+    minBooks?: number
+    maxEvPct?: number
+    thresholdPct: number
+    limit: number
+  },
+): { picks: SpreadPick[]; metBar: boolean } {
+  const base = {
+    minBooks: opts.minBooks,
+    maxEvPct: opts.maxEvPct,
+  }
+  const qualified = findPlusEvSpreadOpportunities(events, sportKey, {
+    ...base,
+    minEvPct: opts.thresholdPct,
+  })
+  if (qualified.length) {
+    return { picks: qualified.slice(0, opts.limit), metBar: true }
+  }
+  const fallback = strictlyPlusEvSpreads(findPlusEvSpreadOpportunities(events, sportKey, {
+    ...base,
+    minEvPct: COFFEE_FALLBACK_MIN_EV_PCT,
+  }))
+  return { picks: fallback.slice(0, opts.limit), metBar: false }
+}
+
+function pickTopMlSpots(
+  events: OddsEvent[],
+  sportKey: string,
+  opts: {
+    minBooks?: number
+    maxEvPct?: number
+    thresholdPct: number
+    limit: number
+  },
+): { picks: OddsPick[]; metBar: boolean } {
+  const base = {
+    minBooks: opts.minBooks,
+    maxEvPct: opts.maxEvPct,
+  }
+  const qualified = findPlusEvOpportunities(events, sportKey, {
+    ...base,
+    minEvPct: opts.thresholdPct,
+  })
+  if (qualified.length) {
+    return { picks: qualified.slice(0, opts.limit), metBar: true }
+  }
+  const fallback = strictlyPlusEvMl(findPlusEvOpportunities(events, sportKey, {
+    ...base,
+    minEvPct: COFFEE_FALLBACK_MIN_EV_PCT,
+  }))
+  return { picks: fallback.slice(0, opts.limit), metBar: false }
 }
 
 function formatOnTapBulletLine(entry: OnTapPick): string {
@@ -458,11 +456,11 @@ function formatOnTapBulletLine(entry: OnTapPick): string {
     const team = formatPickNameLabel(entry.pick.pickName)
     const spread = formatSpreadPoint(entry.pick.pickPoint)
     const juice = formatAmericanOdds(entry.pick.pickPrice)
-    return `• ${label} - ${matchup}: ${team} ${spread} (${juice}) ${ev}`
+    return `• ${label} - ${matchup}: ${team} ${spread} (${juice}) @ ${entry.pick.bookTitle} ${ev}`
   }
   const team = formatPickNameLabel(entry.pick.pickName)
   const odds = formatAmericanOdds(entry.pick.pickPrice)
-  return `• ${label} - ${matchup}: ${team} ${odds} ${ev}`
+  return `• ${label} - ${matchup}: ${team} ML ${odds} @ ${entry.pick.bookTitle} ${ev}`
 }
 
 /** Tomorrow spread/ML spots at or near the Coffee & Covers bars. */
@@ -585,15 +583,19 @@ function coffeeEventsForInput(input: CoffeeAndCoversOptions): {
 function buildMainCaption(
   coverPicks: SpreadPick[],
   mlPicks: OddsPick[],
-  dogOfTheDay: DogOfTheDay | null,
+  biggestDogs: BiggestDog[],
   onTapPicks: OnTapPick[],
   sportLabelByPick?: (pick: SpreadPick | OddsPick) => string | undefined,
   contextByEventKey?: Map<string, string>,
+  barFlags: { coversMetBar?: boolean; mlMetBar?: boolean } = {},
 ): string {
   const lines: string[] = [COFFEE_COVERS_HEADER, '']
 
   const coverSorted = [...coverPicks].sort((a, b) => b.edgePct - a.edgePct).slice(0, 3)
   if (coverSorted.length) {
+    if (barFlags.coversMetBar === false) {
+      lines.push(COFFEE_THIN_COVER_LINE)
+    }
     for (const pick of coverSorted) {
       const label = sportLabelByPick?.(pick) ?? ''
       const note = contextByEventKey?.get(rundownEventKey(pick))
@@ -607,26 +609,32 @@ function buildMainCaption(
   const mlSorted = [...mlPicks].sort((a, b) => b.edgePct - a.edgePct)
     .slice(0, COFFEE_ML_SPOTS_MAX_TOTAL)
   if (mlSorted.length) {
+    if (barFlags.mlMetBar === false) {
+      lines.push(COFFEE_THIN_ML_LINE)
+    }
     for (const pick of mlSorted) {
       const label = sportLabelByPick?.(pick) ?? ''
       const note = contextByEventKey?.get(rundownEventKey(pick))
       lines.push(...formatMlSpotBulletLines(pick, label, note))
     }
   } else {
-    lines.push('Nothing clearing the ML bar right now.')
+    lines.push('Nothing clearing +EV on ML right now.')
   }
 
   lines.push('', COFFEE_DOG_SECTION)
-  if (dogOfTheDay) {
-    const dogKey = rundownEventKey({
-      homeTeam: dogOfTheDay.homeTeam,
-      awayTeam: dogOfTheDay.awayTeam,
-      commenceTime: dogOfTheDay.commenceTime,
-    })
-    const dogNote = contextByEventKey?.get(dogKey)
-    lines.push(...formatDogOfTheDayLines(dogOfTheDay, dogNote))
+  const dogsSorted = [...biggestDogs].sort((a, b) => b.pickPrice - a.pickPrice)
+  if (dogsSorted.length) {
+    for (const dog of dogsSorted) {
+      const dogKey = rundownEventKey({
+        homeTeam: dog.homeTeam,
+        awayTeam: dog.awayTeam,
+        commenceTime: dog.commenceTime,
+      })
+      const dogNote = contextByEventKey?.get(dogKey)
+      lines.push(...formatBiggestDogBulletLines(dog, dogNote))
+    }
   } else {
-    lines.push('No underdog clearing +EV on today\'s slate.')
+    lines.push('No big dogs on today\'s slate.')
   }
 
   lines.push('', COFFEE_ON_TAP_SECTION)
@@ -740,23 +748,22 @@ export function generateCoffeeAndCovers(input: CoffeeAndCoversOptions): CoffeeAn
   const maxPicks = input.maxPicksPerSport ?? COFFEE_MAX_PICKS_PER_SPORT
   const maxEvPct = input.maxEvPct ?? DEFAULT_MAX_EV_PCT
 
-  const coverPicks = findPlusEvSpreadOpportunities(events, sportKey, {
+  const coverResult = pickTopSpreadCovers(events, sportKey, {
     minBooks,
-    minEvPct: spreadThreshold,
     maxEvPct,
-  }).slice(0, maxPicks)
-
-  const mlPicks = findPlusEvOpportunities(events, sportKey, {
+    thresholdPct: spreadThreshold,
+    limit: maxPicks,
+  })
+  const mlResult = pickTopMlSpots(events, sportKey, {
     minBooks,
-    minEvPct: mlThreshold,
     maxEvPct,
-  }).slice(0, maxPicks)
+    thresholdPct: mlThreshold,
+    limit: maxPicks,
+  })
 
   const games = extractSlateGameBestLines(events)
-  const dogOfTheDay = findDogOfTheDay(categoryLabel, sportKey, events, {
-    minBooks,
-    maxEvPct,
-  })
+  const biggestDog = findBiggestDog(categoryLabel, events, sportKey)
+  const biggestDogs = biggestDog ? [biggestDog] : []
   const onTapPicks = findOnTapPicks(input).slice(0, input.onTapMaxPicks ?? COFFEE_ON_TAP_MAX_PICKS)
   const threadBody = buildSportLinesThreadBody(categoryLabel, events, sportKey, totalBefore)
   const threadParts: CoffeeThreadPart[] = threadBody
@@ -764,15 +771,26 @@ export function generateCoffeeAndCovers(input: CoffeeAndCoversOptions): CoffeeAn
     : []
 
   return {
-    caption: buildMainCaption(coverPicks, mlPicks, dogOfTheDay, onTapPicks, () => categoryLabel),
+    caption: buildMainCaption(
+      coverResult.picks,
+      mlResult.picks,
+      biggestDogs,
+      onTapPicks,
+      () => categoryLabel,
+      undefined,
+      {
+        coversMetBar: coverResult.metBar,
+        mlMetBar: mlResult.metBar,
+      },
+    ),
     threadParts,
-    coverPicks,
-    mlPicks,
-    dogOfTheDay,
-    biggestDogs: dogOfTheDay ? [dogOfTheDay] : [],
+    coverPicks: coverResult.picks,
+    mlPicks: mlResult.picks,
+    biggestDogs,
+    dogOfTheDay: biggestDog,
     onTapPicks,
     gameCount: games.length,
-    hasCovers: coverPicks.length > 0,
+    hasCovers: coverResult.metBar && coverResult.picks.length > 0,
   }
 }
 
@@ -784,6 +802,8 @@ type SportCoffeeSlice = {
   mlPicks: OddsPick[]
   gameCount: number
   totalBefore: number
+  coversMetBar: boolean
+  mlMetBar: boolean
 }
 
 function buildSportSlice(input: CoffeeAndCoversOptions): SportCoffeeSlice {
@@ -796,26 +816,29 @@ function buildSportSlice(input: CoffeeAndCoversOptions): SportCoffeeSlice {
   const maxPicks = input.maxPicksPerSport ?? COFFEE_MAX_PICKS_PER_SPORT
   const maxEvPct = input.maxEvPct ?? DEFAULT_MAX_EV_PCT
 
-  const coverPicks = findPlusEvSpreadOpportunities(events, sportKey, {
+  const coverResult = pickTopSpreadCovers(events, sportKey, {
     minBooks,
-    minEvPct: spreadThreshold,
     maxEvPct,
-  }).slice(0, maxPicks)
-
-  const mlPicks = findPlusEvOpportunities(events, sportKey, {
+    thresholdPct: spreadThreshold,
+    limit: maxPicks,
+  })
+  const mlResult = pickTopMlSpots(events, sportKey, {
     minBooks,
-    minEvPct: mlThreshold,
     maxEvPct,
-  }).slice(0, maxPicks)
+    thresholdPct: mlThreshold,
+    limit: maxPicks,
+  })
 
   return {
     categoryLabel,
     sportKey,
     events,
-    coverPicks,
-    mlPicks,
+    coverPicks: coverResult.picks,
+    mlPicks: mlResult.picks,
     gameCount: extractSlateGameBestLines(events).length,
     totalBefore,
+    coversMetBar: coverResult.metBar,
+    mlMetBar: mlResult.metBar,
   }
 }
 
@@ -835,6 +858,7 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
     slices.find((s) => s.sportKey === pick.sportKey)?.categoryLabel
 
   const threadParts: CoffeeThreadPart[] = []
+  const biggestDogs: BiggestDog[] = []
   const onTapSlices: OnTapPick[][] = []
   for (const slice of slices) {
     if (slice.gameCount <= 0 || !slice.categoryLabel) continue
@@ -845,6 +869,8 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
       slice.totalBefore,
     )
     if (body) threadParts.push({ categoryLabel: slice.categoryLabel, body })
+    const dog = findBiggestDog(slice.categoryLabel, slice.events, slice.sportKey)
+    if (dog) biggestDogs.push(dog)
   }
   for (const input of inputs) {
     const tomorrow = coffeeEventsForInput({
@@ -855,21 +881,25 @@ export function generateCombinedCoffeeAndCovers(inputs: CoffeeAndCoversOptions[]
     onTapSlices.push(findOnTapPicks({ ...input, eventsTomorrow: tomorrow }))
   }
   const onTapPicks = mergeOnTapPicks(onTapSlices)
-  const dogOfTheDay = findDogOfTheDayAcrossSports(inputs)
+  const coversMetBar = slices.some((s) => s.coversMetBar && s.coverPicks.length > 0)
+  const mlMetBar = slices.some((s) => s.mlMetBar && s.mlPicks.length > 0)
 
   return {
-    caption: buildMainCaption(coverPicks, mlPicks, dogOfTheDay, onTapPicks, (pick) => {
+    caption: buildMainCaption(coverPicks, mlPicks, biggestDogs, onTapPicks, (pick) => {
       if ('pickPoint' in pick) return sportLabelForSpread(pick as SpreadPick)
       return sportLabelForMl(pick as OddsPick)
+    }, undefined, {
+      coversMetBar,
+      mlMetBar,
     }),
     threadParts,
     coverPicks,
     mlPicks,
-    dogOfTheDay,
-    biggestDogs: dogOfTheDay ? [dogOfTheDay] : [],
+    biggestDogs,
+    dogOfTheDay: biggestDogs[0] ?? null,
     onTapPicks,
     gameCount,
-    hasCovers: coverPicks.length > 0,
+    hasCovers: slices.some((s) => s.coversMetBar && s.coverPicks.length > 0),
   }
 }
 
@@ -923,11 +953,11 @@ function coffeePicksForContext(
     })
   }
 
-  if (generated.dogOfTheDay) {
-    const dog = generated.dogOfTheDay
-    const dogSportKey = generated.coverPicks.find((p) =>
-      p.homeTeam === dog.homeTeam && p.awayTeam === dog.awayTeam
-    )?.sportKey
+  for (const dog of generated.biggestDogs) {
+    const dogSportKey = dog.sportKey
+      ?? generated.coverPicks.find((p) =>
+        p.homeTeam === dog.homeTeam && p.awayTeam === dog.awayTeam
+      )?.sportKey
       ?? generated.mlPicks.find((p) => p.homeTeam === dog.homeTeam && p.awayTeam === dog.awayTeam)?.sportKey
       ?? sportKeyFallback
     out.push({
@@ -965,7 +995,7 @@ export async function enrichCoffeeAndCoversCaption(
   return buildMainCaption(
     generated.coverPicks,
     generated.mlPicks,
-    generated.dogOfTheDay,
+    generated.biggestDogs,
     generated.onTapPicks,
     sportLabelByPick,
     contextByEventKey,

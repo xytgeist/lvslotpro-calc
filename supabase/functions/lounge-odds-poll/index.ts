@@ -1,19 +1,11 @@
 /**
  * Background odds poller — edge alerts + morning Coffee & Covers batch + hourly best bet.
  * Body: { slug, action: 'poll_edges' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar', dryRun?: boolean, force?: boolean }
+ *
+ * Heavy poll_edges modules are dynamic-imported so daily_slates / best_bet_hour cold starts stay small.
  */
-import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
+import { type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, authorizeServiceRoleOrAdmin } from '../_shared/adminAuth.ts'
-import { tryPublishArbWatchAlerts } from '../_shared/loungeBotArbWatch.ts'
-import { runBestBetHourPoll } from '../_shared/loungeBotBestBetHour.ts'
-import { tryPublishContextAlert } from '../_shared/loungeBotContextAlerts.ts'
-import { runValueBetRadarPoll } from '../_shared/loungeBotValueBetRadar.ts'
-import { tryPublishLiveGameContent } from '../_shared/loungeBotLiveContent.ts'
-import {
-  findSharpReportCandidateForSport,
-  tryPublishSharpReport,
-  type SharpReportCandidate,
-} from '../_shared/loungeBotSharpReport.ts'
 import {
   countPublishedKindToday,
   fetchActiveSportKeys,
@@ -31,10 +23,35 @@ import {
   type SportOddsContext,
 } from '../_shared/loungeBotOddsRun.ts'
 import { DEFAULT_MIN_EV_PCT } from '../_shared/loungeBotOddsCaption.ts'
-import { countScheduledKindToday } from '../_shared/loungeBotPublishSchedule.ts'
+import type { SharpReportCandidate } from '../_shared/loungeBotSharpReport.ts'
 
 async function authorize(req: Request): Promise<SupabaseClient> {
   return authorizeServiceRoleOrAdmin(req)
+}
+
+async function loadPollEdgesModules() {
+  const [
+    arbWatch,
+    contextAlerts,
+    liveContent,
+    sharpReport,
+    publishSchedule,
+  ] = await Promise.all([
+    import('../_shared/loungeBotArbWatch.ts'),
+    import('../_shared/loungeBotContextAlerts.ts'),
+    import('../_shared/loungeBotLiveContent.ts'),
+    import('../_shared/loungeBotSharpReport.ts'),
+    import('../_shared/loungeBotPublishSchedule.ts'),
+  ])
+
+  return {
+    tryPublishArbWatchAlerts: arbWatch.tryPublishArbWatchAlerts,
+    tryPublishContextAlert: contextAlerts.tryPublishContextAlert,
+    tryPublishLiveGameContent: liveContent.tryPublishLiveGameContent,
+    findSharpReportCandidateForSport: sharpReport.findSharpReportCandidateForSport,
+    tryPublishSharpReport: sharpReport.tryPublishSharpReport,
+    countScheduledKindToday: publishSchedule.countScheduledKindToday,
+  }
 }
 
 Deno.serve(async (req) => {
@@ -77,11 +94,13 @@ Deno.serve(async (req) => {
     const oddsCfg = (oddsCfgRaw || {}) as OddsCfgRow
 
     if (action === 'best_bet_hour') {
+      const { runBestBetHourPoll } = await import('../_shared/loungeBotBestBetHour.ts')
       const result = await runBestBetHourPoll(admin, bot, oddsCfg, dryRun)
       return adminOpsJson(200, result)
     }
 
     if (action === 'value_bet_radar') {
+      const { runValueBetRadarPoll } = await import('../_shared/loungeBotValueBetRadar.ts')
       const result = await runValueBetRadarPoll(admin, bot, oddsCfg, dryRun, { force })
       return adminOpsJson(200, result)
     }
@@ -195,6 +214,7 @@ Deno.serve(async (req) => {
             dayStart,
             dryRun,
             oddsCfg.alert_audience,
+            force,
           )
           if (coffeeResult.published) {
             publishedCoffeeCovers = 1
@@ -248,10 +268,16 @@ Deno.serve(async (req) => {
       })
     }
 
+    const pollEdgesModules = action === 'poll_edges'
+      ? await loadPollEdgesModules()
+      : null
+
     const dayStart = ptDayStartIso()
     const minPostGap = Number(oddsCfg.min_post_gap_minutes) || 8
     let edgeCount = await countPublishedKindToday(admin, bot.user_id, 'edge', dayStart)
-    edgeCount += await countScheduledKindToday(admin, bot.user_id, 'edge', dayStart)
+    if (pollEdgesModules) {
+      edgeCount += await pollEdgesModules.countScheduledKindToday(admin, bot.user_id, 'edge', dayStart)
+    }
     const morningPostKind = coffeeCoversEnabled ? 'coffee_covers' : 'slate'
     let morningCount = await countPublishedKindToday(admin, bot.user_id, morningPostKind, dayStart)
 
@@ -300,7 +326,7 @@ Deno.serve(async (req) => {
         )
         requestsRemaining = ctx.requestsRemaining
 
-        if (action === 'poll_edges') {
+        if (action === 'poll_edges' && pollEdgesModules) {
           if (edgeCount >= maxEdgeAlerts) {
             details.push({ calendarSlug: row.slug, skipped: 'edge_cap' })
             continue
@@ -320,7 +346,7 @@ Deno.serve(async (req) => {
             edgeCount += 1
           }
 
-          const sharpCandidate = await findSharpReportCandidateForSport(
+          const sharpCandidate = await pollEdgesModules.findSharpReportCandidateForSport(
             admin,
             bot.user_id,
             ctx.upcoming,
@@ -343,7 +369,7 @@ Deno.serve(async (req) => {
             publishedLineMoves += lineResult.published
           }
 
-          const arbResult = await tryPublishArbWatchAlerts(
+          const arbResult = await pollEdgesModules.tryPublishArbWatchAlerts(
             admin,
             bot,
             ctx.upcoming,
@@ -355,7 +381,7 @@ Deno.serve(async (req) => {
           )
           if (arbResult.published > 0) publishedArbWatch += arbResult.published
 
-          const liveResult = await tryPublishLiveGameContent(
+          const liveResult = await pollEdgesModules.tryPublishLiveGameContent(
             admin,
             bot,
             sportKey,
@@ -370,7 +396,7 @@ Deno.serve(async (req) => {
             publishedPeriodReports += liveResult.publishedPeriodReports
           }
 
-          const contextResult = await tryPublishContextAlert(
+          const contextResult = await pollEdgesModules.tryPublishContextAlert(
             admin,
             bot,
             ctx.upcoming,
@@ -466,6 +492,7 @@ Deno.serve(async (req) => {
           dayStart,
           dryRun,
           oddsCfg.alert_audience,
+          force,
         )
         if (coffeeResult.published) {
           publishedCoffeeCovers = 1
@@ -486,9 +513,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    let sharpReportResult: Awaited<ReturnType<typeof tryPublishSharpReport>> | null = null
-    if (action === 'poll_edges') {
-      sharpReportResult = await tryPublishSharpReport(
+    if (action === 'poll_edges' && pollEdgesModules) {
+      const sharpReportResult = await pollEdgesModules.tryPublishSharpReport(
         admin,
         bot,
         sharpReportCandidates,
@@ -509,14 +535,7 @@ Deno.serve(async (req) => {
 
     const publishedMorning = publishedCoffeeCovers + publishedSlates
 
-    if (!dryRun && (publishedEdges > 0 || publishedLineMoves > 0 || publishedArbWatch > 0
-      || publishedSharpReport > 0 || publishedLiveEdges > 0
-      || publishedPeriodReports > 0 || publishedContextAlerts > 0 || publishedMorning > 0)) {
-      await admin.from('lounge_bot_accounts').update({
-        last_poll_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).eq('user_id', bot.user_id)
-    } else if (!dryRun) {
+    if (!dryRun) {
       await admin.from('lounge_bot_accounts').update({
         last_poll_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

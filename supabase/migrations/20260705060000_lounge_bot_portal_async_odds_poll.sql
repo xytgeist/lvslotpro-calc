@@ -16,9 +16,9 @@ declare
   service_key text;
   base_url text;
   req_id bigint;
-  action text;
+  v_action text;
   body jsonb;
-  slug text;
+  v_slug text;
 begin
   if auth.uid() is null then
     raise exception 'authentication required';
@@ -27,24 +27,24 @@ begin
     raise exception 'admin only';
   end if;
 
-  slug := btrim(coalesce(p_slug, ''));
-  if slug = '' then
+  v_slug := btrim(coalesce(p_slug, ''));
+  if v_slug = '' then
     raise exception 'slug required';
   end if;
 
-  action := lower(btrim(coalesce(p_action, '')));
-  if action not in ('poll_edges', 'daily_slates', 'best_bet_hour', 'value_bet_radar') then
+  v_action := lower(btrim(coalesce(p_action, '')));
+  if v_action not in ('poll_edges', 'daily_slates', 'best_bet_hour', 'value_bet_radar') then
     raise exception 'invalid action: %', p_action;
   end if;
 
   if not exists (
     select 1
     from public.lounge_bot_accounts a
-    where a.slug = slug
+    where a.slug = v_slug
       and a.pipeline = 'odds_api'
       and a.enabled = true
   ) then
-    raise exception 'odds bot not found: %', slug;
+    raise exception 'odds bot not found: %', v_slug;
   end if;
 
   select btrim(ds.decrypted_secret)
@@ -74,8 +74,8 @@ begin
   base_url := rtrim(btrim(base_url), '/');
 
   body := jsonb_build_object(
-    'slug', slug,
-    'action', action,
+    'slug', v_slug,
+    'action', v_action,
     'dryRun', coalesce(p_dry_run, false),
     'force', coalesce(p_force, false)
   );
@@ -98,8 +98,8 @@ begin
     'queued', true,
     'asyncQueued', true,
     'request_id', req_id,
-    'slug', slug,
-    'action', action
+    'slug', v_slug,
+    'action', v_action
   );
 exception
   when others then

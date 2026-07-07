@@ -47,11 +47,10 @@ Draw ML +718 @ MyBookie (+9.6% EV)
 Canada ML +490 @ BetUS (+3.1% EV)
 - Dog of the Day -
 • World Cup - France vs Paraguay (Sat 2PM PT)
-Paraguay ML +718 @ MyBookie (+9.6% EV)
-Plus money ahead of fair +652 (9 books).
+Paraguay ML +718 @ MyBookie
 - 🍺 On Tap Tomorrow -
-• Wimbledon - Mochizuki vs Sinner: Mochizuki +1600 (+8.1% EV)
-• World Cup - Norway vs Brazil: Norway +367 (+2.8% EV)
+• Wimbledon - Mochizuki vs Sinner: Mochizuki ML +1600 @ DraftKings (+8.1% EV)
+• World Cup - Norway vs Brazil: Norway ML +367 @ FanDuel (+2.8% EV)
 Best lines 👇
 ```
 
@@ -63,7 +62,7 @@ Yankees vs Red Sox (Sat 1PM PT)
 Yankees -110 (FanDuel), Red Sox +105 (DraftKings)
 ```
 
-When no spread clears **+4%** EV, the root post opens with: *No strong covers today - sitting on hands until we see better value.*
+When no spread clears **+4%** EV, the root post still lists the **best +EV spread lines** on the board (below bar, not called a cover pick). Same for ML (**+3%** bar). **Never negative EV.** **Dog of the Day** is the biggest plus-money underdog per sport (not +EV gated).
 
 **Best Bet of the Hour example:**
 ```text
@@ -97,7 +96,7 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 
 | Control | Behavior |
 | --- | --- |
-| **Today's major sport** | Dropdown from **`lounge_sports_betting_calendar`** (PT day) |
+| **Today's major sporting events** | Dropdown from **`lounge_sports_betting_calendar`** (PT day — date window, not “has games today”) |
 | **Fetch odds** | One sport: ⚡ +EV only (`postMode: edge_only`) — use **Post Coffee & Covers** or morning cron for Coffee |
 | **Scan all · edge** | All calendar sports today → edge alerts only |
 | **Post Coffee & Covers** | One morning post/day (dedupe) with thread parts per sport |
@@ -135,9 +134,9 @@ Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`**, **`loung
 
 | Section | Threshold | Max per sport |
 | --- | --- | --- |
-| **Covers** (spread/handicap) | **+4%** EV on $1 | **3** per sport (merged in root) |
-| **ML spots** | **+3%** EV on $1 | **3** per sport (merged in root) |
-| **Dog of the Day** | Highest **+EV underdog** (ML plus money or spread **+points**) across the full slate | **One** pick with odds, +EV %, and short reason vs consensus |
+| **Covers** (spread/handicap) | **+4%** EV on $1 (else best **+EV** on board, not a cover pick) | **3** per sport (merged in root) |
+| **ML spots** | **+3%** EV on $1 (else best **+EV** ML on board) | **3** per sport (merged in root) |
+| **Dog of the Day** | Biggest **plus-money ML underdog** per sport on today's slate | **One per sport** (longest ML on board; not +EV gated) |
 | **On Tap (tomorrow)** | Tomorrow spread/ML at or within **1%** of bar | **Max 3** across all sports |
 | **Best Lines 👇** | Best ML + book per outcome | One **thread part** per calendar sport (header: sport emoji + label, e.g. `🎾 Wimbledon`) |
 
@@ -150,7 +149,7 @@ Shared logic: **`supabase/functions/_shared/loungeBotOddsCaption.ts`**, **`loung
 
 Thread footer shows `+N more games today` against the full unfiltered slate count.
 
-Spread devig mirrors h2h: per-book no-vig fair probs on each spread side, consensus average, EV at best juice. Dedupe key: **`coffee:daily:{ptDay}`** (one post per bot per PT day). Log **`post_kind: coffee_covers`**. Root post ends with **`Best Lines 👇`**; lines board lives in author thread parts (`feed_comments.is_thread_part`).
+Spread devig mirrors h2h: per-book no-vig fair probs on each spread side, consensus average, EV at best juice. Dedupe key: **`coffee:daily:{ptDay}`** (one live post per bot per PT day; deleting the feed post clears dedupe via **`lounge_bot_publish_log.post_id`** `ON DELETE SET NULL`). Log **`post_kind: coffee_covers`**. Root post ends with **`Best Lines 👇`**; lines board lives in author thread parts (`feed_comments.is_thread_part`).
 
 Set **`coffee_covers_enabled = false`** on **`lounge_bot_odds_config`** to fall back to legacy slate check-ins.
 
@@ -563,10 +562,10 @@ Use these as editorial north stars; post kinds may differ but tone should match.
 📡 Value Bet Radar – Valkyries ML +155 (+3.7% EV) vs Dream
 ```
 
-**UFC / MMA** ... ML; Dog of the Day hunts big +EV dogs.
+**UFC / MMA** ... ML; Dog of the Day is the longest plus-money ML on the slate.
 
 ```text
-Dog of the Day – Underdog +450 (+6.1% EV)
+Dog of the Day – Underdog +450 @ MyBookie
 ```
 
 ### TheRundown context layer
