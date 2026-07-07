@@ -780,7 +780,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
-- 2026-07-06: **Market Edge Yahoo + MarketWatch RSS:** migration **`20260706180000`** adds **`Yahoo Finance`**, **`MarketWatch Top Stories`**, **`MarketWatch Real-Time`** to Market Edge allowlist; default **`User-Agent`** on RSS fetch. Applied test; redeploy **`lounge-news-poll`** on test. Apply SQL + redeploy on prod when promoting.
+- 2026-07-06: **Market Edge Yahoo + MarketWatch RSS:** migration **`20260706180000`** adds **`Yahoo Finance`**, **`MarketWatch Top Stories`**, **`MarketWatch Real-Time`** to Market Edge allowlist; default **`User-Agent`** on RSS fetch. Applied test + prod; **`lounge-news-poll`** redeployed test + prod. Commit **`9795a21f`**.
 - 2026-07-06: **Coffee & Covers dedupe after delete:** `hasDedupePublishedToday` / `countPublishedKindToday` ignore publish-log rows whose **`post_id`** was cleared (feed post deleted). Portal delete → repost same PT day works. Redeploy **`lounge-odds-poll`** + **`lounge-odds-ingest`**.
 - 2026-07-06: **Coffee & Covers On Tap:** tomorrow lines now include **`@ book`** (best price book already on pick). Redeploy **`lounge-odds-poll`** + **`lounge-odds-ingest`**.
 - 2026-07-06: **Scott `lounge-odds-poll` BOOT_ERROR fix:** Coffee & Covers / poll actions queued OK but Edge returned **503 BOOT_ERROR** (function failed cold start — bundle too heavy). Slimmed **`lounge-odds-poll/index.ts`** with dynamic imports for poll_edges-only modules; redeployed test + prod. Prod smoke: live **`daily_slates` + `force`** → **`publishedCoffeeCovers: 1`** (MLB+WNBA thread). Portal outcome polling (**`20260706160000`**) still needs frontend deploy.
