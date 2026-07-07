@@ -1,6 +1,6 @@
 /**
  * Background odds poller — edge alerts + morning Coffee & Covers batch + hourly best bet.
- * Body: { slug, action: 'poll_edges' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar', dryRun?: boolean, force?: boolean }
+ * Body: { slug, action: 'poll_edges' | 'poll_live' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar', dryRun?: boolean, force?: boolean }
  *
  * Heavy poll_edges modules are dynamic-imported so daily_slates / best_bet_hour cold starts stay small.
  */
@@ -33,13 +33,11 @@ async function loadPollEdgesModules() {
   const [
     arbWatch,
     contextAlerts,
-    liveContent,
     sharpReport,
     publishSchedule,
   ] = await Promise.all([
     import('../_shared/loungeBotArbWatch.ts'),
     import('../_shared/loungeBotContextAlerts.ts'),
-    import('../_shared/loungeBotLiveContent.ts'),
     import('../_shared/loungeBotSharpReport.ts'),
     import('../_shared/loungeBotPublishSchedule.ts'),
   ])
@@ -47,7 +45,6 @@ async function loadPollEdgesModules() {
   return {
     tryPublishArbWatchAlerts: arbWatch.tryPublishArbWatchAlerts,
     tryPublishContextAlert: contextAlerts.tryPublishContextAlert,
-    tryPublishLiveGameContent: liveContent.tryPublishLiveGameContent,
     findSharpReportCandidateForSport: sharpReport.findSharpReportCandidateForSport,
     tryPublishSharpReport: sharpReport.tryPublishSharpReport,
     countScheduledKindToday: publishSchedule.countScheduledKindToday,
@@ -66,9 +63,9 @@ Deno.serve(async (req) => {
     const dryRun = body?.dryRun === true
     const force = body?.force === true
 
-    if (!['poll_edges', 'daily_slates', 'best_bet_hour', 'value_bet_radar'].includes(action)) {
+    if (!['poll_edges', 'poll_live', 'daily_slates', 'best_bet_hour', 'value_bet_radar'].includes(action)) {
       return adminOpsJson(400, {
-        error: 'action must be poll_edges, daily_slates, best_bet_hour, or value_bet_radar.',
+        error: 'action must be poll_edges, poll_live, daily_slates, best_bet_hour, or value_bet_radar.',
       })
     }
 
@@ -102,6 +99,12 @@ Deno.serve(async (req) => {
     if (action === 'value_bet_radar') {
       const { runValueBetRadarPoll } = await import('../_shared/loungeBotValueBetRadar.ts')
       const result = await runValueBetRadarPoll(admin, bot, oddsCfg, dryRun, { force })
+      return adminOpsJson(200, result)
+    }
+
+    if (action === 'poll_live') {
+      const { runPollLive } = await import('../_shared/loungeBotPollLive.ts')
+      const result = await runPollLive(admin, bot, oddsCfg, dryRun, { force })
       return adminOpsJson(200, result)
     }
 
@@ -284,8 +287,6 @@ Deno.serve(async (req) => {
     const activeSports = await fetchActiveSportKeys()
     let publishedEdges = 0
     let publishedLineMoves = 0
-    let publishedLiveEdges = 0
-    let publishedPeriodReports = 0
     let publishedArbWatch = 0
     let publishedSharpReport = 0
     let publishedContextAlerts = 0
@@ -381,21 +382,6 @@ Deno.serve(async (req) => {
           )
           if (arbResult.published > 0) publishedArbWatch += arbResult.published
 
-          const liveResult = await pollEdgesModules.tryPublishLiveGameContent(
-            admin,
-            bot,
-            sportKey,
-            ctx.inProgress,
-            oddsCfg,
-            calendarPick.categoryLabel,
-            dayStart,
-            dryRun,
-          )
-          if (liveResult.publishedLiveEdges > 0) publishedLiveEdges += liveResult.publishedLiveEdges
-          if (liveResult.publishedPeriodReports > 0) {
-            publishedPeriodReports += liveResult.publishedPeriodReports
-          }
-
           const contextResult = await pollEdgesModules.tryPublishContextAlert(
             admin,
             bot,
@@ -422,9 +408,6 @@ Deno.serve(async (req) => {
             arbsDetected: arbResult.detected,
             arbSkipped: arbResult.skipped,
             arbBestProfitPct: arbResult.best?.profitPct ?? null,
-            publishedLiveEdges: liveResult.publishedLiveEdges,
-            publishedPeriodReports: liveResult.publishedPeriodReports,
-            liveSkipped: liveResult.skipped,
             liveGames: ctx.inProgress.length,
             publishedContextAlert: contextResult.published || contextResult.scheduled,
             contextAlertKind: contextResult.kind ?? null,
@@ -553,8 +536,6 @@ Deno.serve(async (req) => {
       publishedLineMoves,
       publishedArbWatch,
       publishedSharpReport,
-      publishedLiveEdges,
-      publishedPeriodReports,
       publishedContextAlerts,
       publishedCoffeeCovers,
       publishedSlates,

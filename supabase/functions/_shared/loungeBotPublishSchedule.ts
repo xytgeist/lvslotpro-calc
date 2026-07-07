@@ -3,6 +3,7 @@
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { publishLoungeBotPost, type BotPublishInput } from './loungeBotPublish.ts'
+import { validateLiveScheduledPost } from './loungeBotLiveGuards.ts'
 
 export type BotPostPriority = 'urgent' | 'normal' | 'low'
 
@@ -30,7 +31,8 @@ export type SubmitBotAlertPostResult = {
 
 export function priorityForPostKind(postKind: string): BotPostPriority {
   if (postKind === 'arb_watch') return 'urgent'
-  if (['edge', 'in_game_edge', 'best_bet_hour', 'value_bet_radar', 'injury_impact', 'starter_spotlight'].includes(postKind)) {
+  if (postKind === 'period_report' || postKind === 'in_game_edge') return 'urgent'
+  if (['edge', 'best_bet_hour', 'value_bet_radar', 'injury_impact', 'starter_spotlight'].includes(postKind)) {
     return 'normal'
   }
   return 'low'
@@ -238,7 +240,7 @@ export async function drainDueScheduledBotPosts(
   admin: SupabaseClient,
   opts: { limit?: number } = {},
 ): Promise<{ published: number; failed: number; cancelled: number }> {
-  const cancelled = await cancelStalePending(admin)
+  const cancelledStale = await cancelStalePending(admin)
   const nowIso = new Date().toISOString()
   const limit = Math.max(1, opts.limit ?? 10)
 
@@ -250,7 +252,7 @@ export async function drainDueScheduledBotPosts(
     .order('publish_at', { ascending: true })
     .limit(limit * 3)
 
-  if (error || !dueRows?.length) return { published: 0, failed: 0, cancelled }
+  if (error || !dueRows?.length) return { published: 0, failed: 0, cancelled: cancelledStale }
 
   const seenBots = new Set<string>()
   const toPublish: ScheduledRow[] = []
@@ -263,8 +265,28 @@ export async function drainDueScheduledBotPosts(
 
   let published = 0
   let failed = 0
+  let cancelledLive = 0
+  const scoreCache = new Map<string, import('./loungeBotLiveGuards.ts').LiveScoreRow[]>()
 
   for (const row of toPublish) {
+    const liveCheck = await validateLiveScheduledPost(
+      row.post_kind,
+      row.dedupe_key,
+      row.created_at,
+      scoreCache,
+    )
+    if (!liveCheck.valid) {
+      await admin
+        .from('lounge_bot_scheduled_posts')
+        .update({
+          status: 'cancelled',
+          error_message: liveCheck.reason || 'live_game_over',
+        })
+        .eq('id', row.id)
+      cancelledLive += 1
+      continue
+    }
+
     const result = await publishLoungeBotPost(admin, {
       botUserId: row.bot_user_id,
       caption: row.caption,
@@ -320,5 +342,5 @@ export async function drainDueScheduledBotPosts(
     }
   }
 
-  return { published, failed, cancelled }
+  return { published, failed, cancelled: cancelledStale + cancelledLive }
 }

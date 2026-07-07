@@ -44,22 +44,77 @@ function bodyWithoutTickerDup(body: string, tickers: string[]): string {
   return stripped.length > 24 ? stripped : body
 }
 
+const GENERIC_SOURCE_LABELS = new Set(['rss', 'feed', 'xml', 'atom'])
+
+/** Known publisher display names (hostname or config label → brand). */
+const SOURCE_BRAND_BY_HOST: Record<string, string> = {
+  'finance.yahoo.com': 'Yahoo! Finance',
+  'yahoo.com': 'Yahoo! Finance',
+  'marketwatch.com': 'MarketWatch',
+  'www.marketwatch.com': 'MarketWatch',
+}
+
+const SOURCE_BRAND_BY_LABEL: Record<string, string> = {
+  'yahoo finance': 'Yahoo! Finance',
+  marketwatch: 'MarketWatch',
+}
+
+function isGenericSourceLabel(name: string): boolean {
+  return GENERIC_SOURCE_LABELS.has(String(name || '').trim().toLowerCase())
+}
+
+function brandFromHostname(host: string): string | null {
+  const h = String(host || '').trim().toLowerCase().replace(/^www\./, '')
+  if (!h) return null
+  return SOURCE_BRAND_BY_HOST[h] || SOURCE_BRAND_BY_HOST[`www.${h}`] || null
+}
+
+function brandFromConfigLabel(label: string): string | null {
+  const key = String(label || '').trim().toLowerCase()
+  return SOURCE_BRAND_BY_LABEL[key] || null
+}
+
 function sourceLabel(item: NewsCandidate): string {
   const fromName = String(item.sourceName || '').trim()
-  if (fromName) return fromName.replace(/\s+rss$/i, '').trim()
-  const url = String(item.url || '').trim()
-  if (!url) return 'Report'
-  try {
-    return new URL(url).hostname.replace(/^www\./i, '')
-  } catch {
-    return 'Report'
+  if (fromName && !isGenericSourceLabel(fromName)) {
+    return fromName.replace(/\s+rss$/i, '').trim()
   }
+  const url = String(item.url || '').trim()
+  if (url) {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./i, '')
+      const brand = brandFromHostname(host)
+      if (brand) return brand
+      return host
+    } catch {
+      /* fall through */
+    }
+  }
+  if (fromName) {
+    const brand = brandFromConfigLabel(fromName)
+    if (brand) return brand
+  }
+  return 'Report'
 }
 
 /** CoinDesk, not coindesk.com — for `Source: headline` credit lines. */
 function sourceDisplayName(item: NewsCandidate): string {
   const fromName = String(item.sourceName || '').trim()
-  if (fromName) return fromName.replace(/\s+rss$/i, '').trim()
+  if (fromName && !isGenericSourceLabel(fromName)) {
+    const cleaned = fromName.replace(/\s+rss$/i, '').trim()
+    return brandFromConfigLabel(cleaned) || cleaned
+  }
+
+  const url = String(item.url || '').trim()
+  if (url) {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./i, '')
+      const brand = brandFromHostname(host)
+      if (brand) return brand
+    } catch {
+      /* fall through */
+    }
+  }
 
   const host = sourceLabel(item)
   if (host === 'Report') return 'Report'

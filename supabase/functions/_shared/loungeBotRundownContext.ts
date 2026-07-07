@@ -7,6 +7,7 @@ import type { LineMovementAlert } from './loungeBotLineMovement.ts'
 const RUNDOWN_BASE = 'https://therundown.io/api/v2'
 const PT_OFFSET_MIN = 420
 const CACHE_MS = 45 * 60 * 1000
+export const RUNDOWN_LIVE_CACHE_MS = 3 * 60 * 1000
 const COMMENCE_MATCH_MS = 6 * 60 * 60 * 1000
 
 export type RundownContextPostKind =
@@ -49,6 +50,21 @@ type RundownPlayer = {
   status?: string
   active?: boolean
 }
+export type RundownScore = {
+  event_status?: string
+  score_away?: number
+  score_home?: number
+  score_away_by_period?: number[]
+  score_home_by_period?: number[]
+  game_clock?: number
+  display_clock?: string
+  game_period?: number
+  event_status_detail?: string
+  venue_name?: string
+  venue_location?: string
+  updated_at?: string
+}
+
 type RundownEvent = {
   event_id?: string
   event_date?: string
@@ -57,11 +73,7 @@ type RundownEvent = {
   pitcher_away?: RundownPitcher
   pitcher_home?: RundownPitcher
   schedule?: { event_headline?: string }
-  score?: {
-    event_status?: string
-    venue_name?: string
-    venue_location?: string
-  }
+  score?: RundownScore
 }
 
 export type ResolvedRundownEvent = {
@@ -221,10 +233,14 @@ async function rundownFetch<T>(path: string): Promise<T | null> {
   }
 }
 
-async function loadDayEvents(sportId: number, ptDate: string): Promise<RundownEvent[]> {
+async function loadDayEvents(
+  sportId: number,
+  ptDate: string,
+  maxCacheMs = CACHE_MS,
+): Promise<RundownEvent[]> {
   const cacheKey = `${sportId}|${ptDate}`
   const cached = dayEventsCache.get(cacheKey)
-  if (cached && Date.now() - cached.at < CACHE_MS) return cached.events
+  if (cached && Date.now() - cached.at < maxCacheMs) return cached.events
 
   const data = await rundownFetch<{ events?: RundownEvent[] }>(
     `/sports/${sportId}/events/${ptDate}?offset=${PT_OFFSET_MIN}`,
@@ -322,6 +338,19 @@ async function loadLiveFoulNotes(eventId: string, sportId: number): Promise<stri
     }
   }
   return notes.slice(0, 2)
+}
+
+export async function findRundownEventForMatch(
+  input: RundownMatchInput,
+  opts: { maxCacheMs?: number } = {},
+): Promise<RundownEvent | null> {
+  const sportId = oddsSportKeyToRundownSportId(input.sportKey)
+  if (!sportId || !isRundownEnabled()) return null
+  const ptDate = ptDateFromIso(input.commenceTime)
+  const dayEvents = await loadDayEvents(sportId, ptDate, opts.maxCacheMs ?? CACHE_MS)
+  return dayEvents.find((ev) =>
+    eventsMatchTeamsAndTime(ev, input.awayTeam, input.homeTeam, input.commenceTime)
+  ) ?? null
 }
 
 export async function resolveRundownEvent(input: RundownMatchInput): Promise<ResolvedRundownEvent | null> {

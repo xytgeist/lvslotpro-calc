@@ -73,7 +73,7 @@ export const DEFAULT_MARKET_NEWS_SOURCES: MarketNewsSourceSeed[] = [
     name: 'Yahoo Finance',
     kind: 'rss',
     poll_url: 'https://finance.yahoo.com/news/rssindex',
-    api_config: { source_label: 'Yahoo Finance' },
+    api_config: { source_label: 'Yahoo! Finance' },
     poll_interval_sec: 240,
   },
   {

@@ -6,7 +6,8 @@ Background odds poller for sports bots.
 
 | `action` | Behavior |
 | --- | --- |
-| `poll_edges` | Fetch each calendar-active sport today; publish **⚡ +EV** alerts when EV clears `min_edge_pct` (devig h2h). Also **line movement**, **Arb Watch** (only when a **≥ 3%** cross-book arb exists), **Sharp Report Card** (meaningful sharp/steam/RLM move), **live in-game edge**, and **period/halftime reports** when enabled. |
+| `poll_edges` | Fetch each calendar-active sport today; publish **⚡ +EV** alerts when EV clears `min_edge_pct` (devig h2h). Also **line movement**, **Arb Watch** (only when a **≥ 3%** cross-book arb exists), **Sharp Report Card** (meaningful sharp/steam/RLM move), and context alerts. |
+| `poll_live` | Lightweight **5 min** live tick: **in-game edge** + **period/halftime reports** using **TheRundown** game state (`game_period`, `STATUS_HALFTIME`, etc.) with elapsed-time fallback. Pre-checks scores; only fetches odds for sports with live games. |
 | `daily_slates` | Post **one Coffee & Covers thread** per bot/day (covers in root, best lines in thread parts per sport). Legacy slate check-ins when `coffee_covers_enabled = false`. |
 | `best_bet_hour` | Post **one Best Bet of the Hour** per bot per PT hour — strongest +EV across ML, spreads, and totals (min **4%** default). Tie-break NFL > NBA > MLB. |
 | `value_bet_radar` | Post **2–3 strongest +EV plays** per PT half-hour during **8am–10pm PT** (min **3.5%** default). Sport variety when possible. Silent if fewer than 2 qualify. |
@@ -23,10 +24,11 @@ Each post opens with **☕ Coffee & Covers 💵**. If no spread clears **+4%** E
 | --- | --- | --- |
 | `lounge_odds_poll_daily_slates` | Every **5 min**, **6:00-7:59am PT** (`*/5 13-14 * * *`) | `daily_slates` |
 | `lounge_odds_poll_edges` | Every **15 min**, **24/7** (`*/15 * * * *`) | `poll_edges` |
+| `lounge_odds_poll_live` | Every **5 min**, **10am-2am PT** (`*/5 17-23,0-8 * * *` PDT) | `poll_live` |
 | `lounge_odds_poll_best_bet_hour` | **Minute 5** of every hour (`5 * * * *`) | `best_bet_hour` |
 | `lounge_odds_poll_value_bet_radar` | **Minutes 5 and 35** every hour (`5,35 * * * *`) | `value_bet_radar` (Edge gates **8am–10pm PT**) |
 
-**+EV posts:** no time-of-day gate ... only games **on today's PT calendar** that **have not started**. **Live posts** use in-progress games (scores API) with **+4%** default on ML/spreads/totals. **Best Bet of the Hour** includes unplayed + live games. Cron runs 24/7; Edge filters events.
+**+EV posts:** no time-of-day gate ... only games **on today's PT calendar** that **have not started**. **Live posts** (`poll_live`) use in-progress games with **TheRundown** period/halftime detection when **`THERUNDOWN_API_KEY`** is set; **+4%** default on ML/spreads/totals. **Best Bet of the Hour** includes unplayed + live games. Cron runs 24/7 for `poll_edges`; `poll_live` gates **10am-2am PT**.
 
 Invokes **each** `odds_api` bot with `run_state = running` via **`invoke_lounge_odds_poll(action)`**.
 
@@ -57,6 +59,6 @@ supabase functions deploy lounge-odds-poll --project-ref YOUR_PROJECT_REF
 supabase functions deploy lounge-odds-ingest --project-ref YOUR_PROJECT_REF
 ```
 
-Requires **`THE_ODDS_API_KEY`**, optional **`THERUNDOWN_API_KEY`** for contextual captions, migrations through **`20260704310000`**, and Vault secrets above.
+Requires **`THE_ODDS_API_KEY`**, **`THERUNDOWN_API_KEY`** recommended for live period/halftime milestones, migrations through **`20260706190000`**, and Vault secrets above.
 
 **Scheduled odds posts:** pg_cron **`lounge_bot_publish_scheduled_odds`** every minute drains **`lounge_bot_scheduled_posts`** via **`lounge-bot-publish-due`** (`publishScheduledOdds: true`).

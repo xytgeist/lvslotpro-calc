@@ -16,10 +16,17 @@ import { ptTodayDate } from './loungeBotOddsRun.ts'
 import { publishLoungeBotPost } from './loungeBotPublish.ts'
 import {
   countScheduledKindToday,
-  DEFAULT_MIN_POST_GAP_MINUTES,
   hasPendingScheduleDedupe,
   submitLoungeBotAlertPost,
 } from './loungeBotPublishSchedule.ts'
+import {
+  elapsedMinutesSinceCommence,
+  isEventStillLive,
+} from './loungeBotLiveGuards.ts'
+import {
+  resolveRundownLivePeriodLabel,
+  resolveRundownPeriodMilestone,
+} from './loungeBotRundownLiveState.ts'
 import { fetchRundownContextNote } from './loungeBotRundownContext.ts'
 
 const ODDS_BASE = 'https://api.the-odds-api.com/v4'
@@ -58,30 +65,32 @@ type PeriodMilestone = {
   key: string
   label: string
   minMinutes: number
+  /** Only fire inside [minMinutes, maxMinutes). Defaults to min + 45. */
+  maxMinutes?: number
 }
 
 const PERIOD_RULES: Record<string, PeriodMilestone[]> = {
   basketball_nba: [
-    { key: 'halftime', label: 'Halftime Report', minMinutes: 50 },
+    { key: 'halftime', label: 'Halftime Report', minMinutes: 50, maxMinutes: 70 },
   ],
   basketball_ncaab: [
-    { key: 'halftime', label: 'Halftime Report', minMinutes: 50 },
+    { key: 'halftime', label: 'Halftime Report', minMinutes: 50, maxMinutes: 70 },
   ],
   basketball_wnba: [
-    { key: 'halftime', label: 'Halftime Report', minMinutes: 50 },
+    { key: 'halftime', label: 'Halftime Report', minMinutes: 50, maxMinutes: 70 },
   ],
   americanfootball_nfl: [
-    { key: 'halftime', label: 'Halftime Report', minMinutes: 70 },
+    { key: 'halftime', label: 'Halftime Report', minMinutes: 70, maxMinutes: 95 },
   ],
   americanfootball_ncaaf: [
-    { key: 'halftime', label: 'Halftime Report', minMinutes: 70 },
+    { key: 'halftime', label: 'Halftime Report', minMinutes: 70, maxMinutes: 95 },
   ],
   icehockey_nhl: [
-    { key: 'p1_end', label: 'End of 1st Period', minMinutes: 20 },
-    { key: 'p2_end', label: 'End of 2nd Period', minMinutes: 40 },
+    { key: 'p1_end', label: 'End of 1st Period', minMinutes: 20, maxMinutes: 38 },
+    { key: 'p2_end', label: 'End of 2nd Period', minMinutes: 40, maxMinutes: 58 },
   ],
   baseball_mlb: [
-    { key: 'inning_5', label: 'Mid-Game Update (5th Inning)', minMinutes: 135 },
+    { key: 'inning_5', label: 'Mid-Game Update (5th Inning)', minMinutes: 135, maxMinutes: 195 },
   ],
 }
 
@@ -167,12 +176,6 @@ export function formatCompactScoreLine(
   return `${away} ${awayScore}-${homeScore} ${home}`
 }
 
-function elapsedMinutesSinceCommence(commenceIso: string, now = Date.now()): number {
-  const t = Date.parse(String(commenceIso || ''))
-  if (!Number.isFinite(t)) return 0
-  return Math.max(0, Math.floor((now - t) / 60_000))
-}
-
 export function detectPeriodMilestone(
   sportKey: string,
   commenceIso: string,
@@ -183,9 +186,31 @@ export function detectPeriodMilestone(
   const elapsed = elapsedMinutesSinceCommence(commenceIso, now)
   let current: PeriodMilestone | null = null
   for (const milestone of rules) {
-    if (elapsed >= milestone.minMinutes) current = milestone
+    const max = milestone.maxMinutes ?? milestone.minMinutes + 45
+    if (elapsed >= milestone.minMinutes && elapsed < max) {
+      current = milestone
+    }
   }
   return current
+}
+
+async function resolvePeriodMilestone(
+  sportKey: string,
+  commenceIso: string,
+  homeTeam: string,
+  awayTeam: string,
+  now = Date.now(),
+): Promise<PeriodMilestone | null> {
+  const fromRundown = await resolveRundownPeriodMilestone({
+    sportKey,
+    homeTeam,
+    awayTeam,
+    commenceTime: commenceIso,
+  })
+  if (fromRundown) {
+    return { key: fromRundown.key, label: fromRundown.label, minMinutes: 0 }
+  }
+  return detectPeriodMilestone(sportKey, commenceIso, now)
 }
 
 /** Period label for live edge headers (e.g. "3rd Quarter"). */
@@ -451,7 +476,11 @@ export async function tryPublishLiveGameContent(
   const completedIds = new Set(
     scores.filter((row) => row.completed === true).map((row) => String(row.id || '').trim()).filter(Boolean),
   )
-  const activeEvents = filterInProgressOddsEvents(inProgressEvents, completedIds)
+  const activeEvents = filterInProgressOddsEvents(inProgressEvents, completedIds).filter((ev) => {
+    const eventId = String(ev.id || '').trim()
+    const commence = String(ev.commence_time || '')
+    return isEventStillLive(sportKey, commence, scoreById.get(eventId))
+  })
   if (!activeEvents.length) {
     return { publishedLiveEdges: 0, publishedPeriodReports: 0, skipped: 'no_live_games' }
   }
@@ -472,13 +501,21 @@ export async function tryPublishLiveGameContent(
   if (liveEnabled && liveCount < maxLive) {
     for (const pick of livePicks) {
       if (liveCount >= maxLive) break
+      if (!isEventStillLive(sportKey, pick.commenceTime, scoreById.get(pick.eventId))) continue
       const dedupeKey = inGameEdgeDedupeKey(pick, ptDay)
       if (!dryRun && await hasDedupePublishedToday(admin, bot.user_id, dedupeKey, dayStart)) continue
       if (!dryRun && await hasPendingScheduleDedupe(admin, bot.user_id, dedupeKey)) continue
 
       const scoreRow = scoreById.get(pick.eventId)
       const scoreLine = formatLiveScoreLine(pick.homeTeam, pick.awayTeam, scoreRow?.scores)
-      const periodLabel = formatLivePeriodLabel(sportKey, pick.commenceTime)
+      const rundownPeriod = await resolveRundownLivePeriodLabel({
+        sportKey: pick.sportKey,
+        homeTeam: pick.homeTeam,
+        awayTeam: pick.awayTeam,
+        commenceTime: pick.commenceTime,
+        live: true,
+      })
+      const periodLabel = rundownPeriod || formatLivePeriodLabel(sportKey, pick.commenceTime)
       const contextNote = dryRun
         ? null
         : await fetchRundownContextNote('in_game_edge', {
@@ -502,7 +539,6 @@ export async function tryPublishLiveGameContent(
       }
 
       const subscriberOnly = resolveAlertSubscriberOnly('in_game_edge', oddsCfg.alert_audience)
-      const minGap = Number(oddsCfg.min_post_gap_minutes) || DEFAULT_MIN_POST_GAP_MINUTES
       const result = await submitLoungeBotAlertPost(admin, {
         botUserId: bot.user_id,
         caption,
@@ -511,7 +547,7 @@ export async function tryPublishLiveGameContent(
         postKind: 'in_game_edge',
         dedupeKey,
         score: pick.edgePct,
-        minGapMinutes: minGap,
+        minGapMinutes: 1,
       })
 
       if (result.accepted) {
@@ -540,15 +576,17 @@ export async function tryPublishLiveGameContent(
       const commence = String(ev.commence_time || '')
       if (!eventId || !commence) continue
 
-      const milestone = detectPeriodMilestone(sportKey, commence)
+      const scoreRow = scoreById.get(eventId)
+      if (!isEventStillLive(sportKey, commence, scoreRow)) continue
+
+      const home = String(ev.home_team || '')
+      const away = String(ev.away_team || '')
+      const milestone = await resolvePeriodMilestone(sportKey, commence, home, away)
       if (!milestone) continue
 
       const prior = dryRun ? null : await loadPeriodState(admin, bot.user_id, eventId)
       if (prior?.last_period_key === milestone.key) continue
 
-      const scoreRow = scoreById.get(eventId)
-      const home = String(ev.home_team || '')
-      const away = String(ev.away_team || '')
       const scoreLine = formatLiveScoreLine(home, away, scoreRow?.scores)
 
       const eventPicks = livePicks.filter((p) => p.eventId === eventId)
@@ -602,7 +640,6 @@ export async function tryPublishLiveGameContent(
       }
 
       const subscriberOnly = resolveAlertSubscriberOnly('period_report', oddsCfg.alert_audience)
-      const minGap = Number(oddsCfg.min_post_gap_minutes) || DEFAULT_MIN_POST_GAP_MINUTES
       const result = await submitLoungeBotAlertPost(admin, {
         botUserId: bot.user_id,
         caption,
@@ -611,7 +648,7 @@ export async function tryPublishLiveGameContent(
         postKind: 'period_report',
         dedupeKey,
         score: eventPicks[0]?.edgePct ?? null,
-        minGapMinutes: minGap,
+        minGapMinutes: 1,
       })
 
       const topScore = eventPicks[0]?.edgePct ?? null

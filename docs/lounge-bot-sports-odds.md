@@ -172,16 +172,20 @@ Set **`coffee_covers_enabled = false`** on **`lounge_bot_odds_config`** to fall 
 
 Dedupe: one alert per movement direction per game/market/outcome per PT day. Cap: **`max_line_alerts_per_day`** (default **12**). Disable via **`line_movement_enabled = false`**.
 
-### Live in-game edge + period reports (poll_edges)
+### Live in-game edge + period reports (`poll_live`)
 
-**`loungeBotLiveContent.ts`** — same **15 min** cron as edge + line movement:
+**`loungeBotPollLive.ts`** + **`loungeBotRundownLiveState.ts`** — dedicated **5 min** cron (`poll_live`), separate from **`poll_edges`**:
 
 | Post kind | Trigger | Threshold |
 | --- | --- | --- |
 | **`in_game_edge`** | Live game (commenced, not completed per scores API) | **+EV ≥ `min_live_edge_pct`** (default **4%**) on **ML, spreads, or totals** |
-| **`period_report`** | Sport-specific period milestone (halftime, NHL period end, MLB 5th-inning heuristic) | Best **+EV** lines for remainder of game; header merges milestone + score (e.g. **Halftime Report - Chiefs 14-10 Bills**) |
+| **`period_report`** | **TheRundown** `event_status` / `game_period` when key set; else elapsed-time fallback | Best **+EV** lines for remainder of game |
 
-Period milestones use elapsed-time heuristics per sport (not play-by-play). State in **`lounge_odds_game_period_state`** — one report per game per milestone. Caps: **`max_live_alerts_per_day`** (default **8**), **`max_period_reports_per_day`** (default **6**). Toggle via **`live_edge_enabled`** / **`period_report_enabled`**.
+**Rundown milestones (preferred):** `STATUS_HALFTIME` (basketball/football), `STATUS_END_PERIOD` + `game_period` (NHL), `game_period >= 5` (MLB). In-game headers use `event_status_detail` when present.
+
+**Credits:** `poll_live` pre-checks Odds API **scores** (skip sport if no live games), then fetches **odds** only for sports in play ... much cheaper than 5 min full `poll_edges`.
+
+**Guards:** **`loungeBotLiveGuards.ts`** + publish-due re-validation (cancel if game final). State in **`lounge_odds_game_period_state`**. Caps: **`max_live_alerts_per_day`** (default **8**), **`max_period_reports_per_day`** (default **6**).
 
 ### Arb Watch (poll_edges)
 

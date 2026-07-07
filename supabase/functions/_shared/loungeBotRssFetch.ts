@@ -25,7 +25,7 @@ function decodeXmlText(raw: string): string {
     .trim()
 }
 
-function parseRssItemBlocks(xml: string): NormalizedNewsItem[] {
+function parseRssItemBlocks(xml: string, sourceName: string): NormalizedNewsItem[] {
   const items: NormalizedNewsItem[] = []
   const blocks = xml.match(/<item[\s\S]*?<\/item>/gi) || []
   for (const block of blocks.slice(0, 40)) {
@@ -38,7 +38,14 @@ function parseRssItemBlocks(xml: string): NormalizedNewsItem[] {
     const pubRaw = decodeXmlText(block.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i)?.[1] || '')
     const desc = decodeXmlText(block.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] || '')
     const publishedAtIso = pubRaw ? safeIso(pubRaw) : null
-    items.push(normalizeItem({ title, summary: desc, url: link, publishedAtIso, guid, sourceName: 'RSS' }))
+    items.push(normalizeItem({
+      title,
+      summary: desc,
+      url: link,
+      publishedAtIso,
+      guid,
+      sourceName,
+    }))
   }
   return items
 }
@@ -116,7 +123,7 @@ export function parseFeedXml(xml: string, sourceName: string): NormalizedNewsIte
   if (/<feed[\s>]/i.test(trimmed) || /<entry[\s>]/i.test(trimmed)) {
     return parseAtomEntries(trimmed, sourceName)
   }
-  return parseRssItemBlocks(trimmed)
+  return parseRssItemBlocks(trimmed, sourceName)
 }
 
 export async function fetchAllowlistedFeed(
