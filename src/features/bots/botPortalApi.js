@@ -239,7 +239,11 @@ export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
  */
 export async function invokeLoungeXIngest(supabaseClient, opts = {}) {
   const { data, error } = await supabaseClient.functions.invoke('lounge-x-ingest', {
-    body: { slug: opts.slug, dryRun: opts.dryRun === true },
+    body: {
+      slug: opts.slug,
+      dryRun: opts.dryRun === true,
+      tweetUrl: opts.tweetUrl ? String(opts.tweetUrl).trim() : undefined,
+    },
   })
   if (error) return { data: null, error: new Error(error.message || 'lounge-x-ingest failed') }
   if (data?.error) return { data: null, error: new Error(String(data.error)) }

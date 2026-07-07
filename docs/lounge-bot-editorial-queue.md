@@ -83,6 +83,7 @@ X ingest + draft  →  Review / edit / skip    →   Publish due rows
 ```
 
 1. **`lounge-x-ingest`** (cron): poll configured timelines → filter on-topic → LLM draft in persona voice → `pending_review` with **`bot_user_id` set**.
+   - **Single post:** `{ "slug": "…", "tweetUrl": "https://x.com/…/status/…" }` fetches that tweet (any age), LLM rewrite, editorial queue.
 2. **Editorial UI** (admin): inbox filterable by X bot; edit caption, pills, schedule.
 3. **`lounge-bot-publish-due`** (every ~5 min): due `scheduled` rows → post as that **`user_id`**.
 

@@ -1,11 +1,13 @@
 /**
  * X-tracker ingest → editorial queue (pending_review).
- * Body: { "slug": "x-crypto", "dryRun": false, "force": false }
+ * Body: { "slug": "x-crypto", "dryRun": false }
+ * Body (single post): { "slug": "x-crypto", "tweetUrl": "https://x.com/handle/status/123" }
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
 import { rewriteTweetForBot } from '../_shared/loungeBotXRewrite.ts'
 import { resolveXBotVoicePrompt } from '../_shared/loungeBotXVoice.ts'
+import { canonicalXTweetUrl, parseXTweetUrl } from '../_shared/loungeBotXTweetUrl.ts'
 
 const X_API = 'https://api.x.com/2'
 
@@ -69,6 +71,156 @@ async function fetchTweets(
   return res.json()
 }
 
+type FetchedTweet = {
+  id: string
+  text: string
+  created_at?: string
+  authorHandle: string
+  payload: Record<string, unknown>
+}
+
+async function fetchTweetById(tweetId: string, token: string): Promise<FetchedTweet | null> {
+  const params = new URLSearchParams({
+    'tweet.fields': 'created_at,entities,referenced_tweets,author_id',
+    expansions: 'author_id',
+    'user.fields': 'username',
+  })
+  const res = await fetch(`${X_API}/tweets/${encodeURIComponent(tweetId)}?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`X API ${res.status}: ${text.slice(0, 200)}`)
+  }
+  const json = await res.json()
+  const tw = json?.data
+  if (!tw?.id) return null
+
+  const users = Array.isArray(json?.includes?.users) ? json.includes.users : []
+  const authorId = String(tw.author_id || '')
+  const author = users.find((u: { id?: string }) => String(u?.id || '') === authorId)
+  const authorHandle = String(author?.username || '').trim().toLowerCase()
+
+  return {
+    id: String(tw.id),
+    text: String(tw.text || '').trim(),
+    created_at: tw.created_at,
+    authorHandle,
+    payload: tw,
+  }
+}
+
+async function ingestTweetUrl(
+  admin: SupabaseClient,
+  opts: { slug: string; tweetUrl: string; dryRun: boolean; token: string },
+) {
+  const parsed = parseXTweetUrl(opts.tweetUrl)
+  if (!parsed?.tweetId) {
+    return adminOpsJson(400, { error: 'Invalid X post URL. Paste a link like https://x.com/handle/status/123' })
+  }
+
+  const { data: bot, error: botErr } = await admin
+    .from('lounge_bot_accounts')
+    .select('user_id, slug, pipeline, display_name, category_pills_default, config')
+    .eq('pipeline', 'x')
+    .eq('slug', opts.slug)
+    .maybeSingle()
+
+  if (botErr) return adminOpsJson(500, { error: botErr.message })
+  if (!bot?.user_id) return adminOpsJson(404, { error: `X bot not found: ${opts.slug}` })
+
+  const fetched = await fetchTweetById(parsed.tweetId, opts.token)
+  if (!fetched?.text) {
+    return adminOpsJson(404, { error: 'Tweet not found or not accessible via X API.' })
+  }
+
+  const xHandle = parsed.handle || fetched.authorHandle || 'unknown'
+  const sourceUrl = canonicalXTweetUrl(xHandle, fetched.id, opts.tweetUrl)
+
+  const { data: existing } = await admin
+    .from('lounge_bot_queue')
+    .select('id, status')
+    .eq('bot_user_id', bot.user_id)
+    .eq('external_key', fetched.id)
+    .maybeSingle()
+
+  if (existing?.id && !opts.dryRun) {
+    return adminOpsJson(200, {
+      ok: true,
+      mode: 'tweet_url',
+      slug: opts.slug,
+      alreadyQueued: true,
+      queueId: existing.id,
+      status: existing.status,
+    })
+  }
+
+  const botConfig = (bot.config && typeof bot.config === 'object' ? bot.config : {}) as Record<string, unknown>
+  const voicePrompt = resolveXBotVoicePrompt({
+    config: botConfig,
+    displayName: String(bot.display_name || ''),
+  })
+
+  const draft = await rewriteTweetForBot({
+    sourceText: fetched.text,
+    xHandle,
+    voicePrompt,
+  })
+
+  if (opts.dryRun) {
+    return adminOpsJson(200, {
+      ok: true,
+      mode: 'tweet_url',
+      slug: opts.slug,
+      dryRun: true,
+      tweetId: fetched.id,
+      xHandle,
+      sourceText: fetched.text,
+      draftCaption: draft,
+    })
+  }
+
+  const { data: sources } = await admin
+    .from('lounge_bot_x_sources')
+    .select('id, x_handle')
+    .eq('bot_user_id', bot.user_id)
+
+  const matchedSource = (sources || []).find(
+    (s) => String(s.x_handle || '').toLowerCase() === xHandle.toLowerCase(),
+  )
+
+  const { data: inserted, error: insErr } = await admin
+    .from('lounge_bot_queue')
+    .insert({
+      source_type: 'x',
+      source_id: matchedSource?.id ?? null,
+      external_key: fetched.id,
+      bot_user_id: bot.user_id,
+      source_text: fetched.text,
+      source_url: sourceUrl,
+      source_posted_at: fetched.created_at || null,
+      draft_caption: draft,
+      category_pills: bot.category_pills_default || [],
+      attach_source_link: true,
+      status: 'pending_review',
+      source_payload: fetched.payload,
+    })
+    .select('id')
+    .single()
+
+  if (insErr) return adminOpsJson(500, { error: insErr.message })
+
+  return adminOpsJson(200, {
+    ok: true,
+    mode: 'tweet_url',
+    slug: opts.slug,
+    ingested: 1,
+    queueId: inserted?.id,
+    tweetId: fetched.id,
+    xHandle,
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: adminOpsCorsHeaders })
   if (req.method !== 'POST') return adminOpsJson(405, { error: 'POST required.' })
@@ -78,9 +230,17 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const slug = String(body?.slug || '').trim()
     const dryRun = body?.dryRun === true
+    const tweetUrl = String(body?.tweetUrl || body?.tweet_url || '').trim()
 
     const token = xToken()
     if (!token) return adminOpsJson(503, { error: 'X_API_BEARER_TOKEN not set on Edge.' })
+
+    if (tweetUrl) {
+      if (!slug) {
+        return adminOpsJson(400, { error: 'slug required when ingesting a specific X post URL.' })
+      }
+      return await ingestTweetUrl(admin, { slug, tweetUrl, dryRun, token })
+    }
 
     let botQuery = admin
       .from('lounge_bot_accounts')

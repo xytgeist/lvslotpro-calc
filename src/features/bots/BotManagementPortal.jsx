@@ -190,6 +190,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
   const [editPost, setEditPost] = useState(null)
   const [draft, setDraft] = useState(null)
   const [newXHandle, setNewXHandle] = useState('')
+  const [ingestTweetUrl, setIngestTweetUrl] = useState('')
   const [calendarToday, setCalendarToday] = useState([])
   const [selectedCalendarSlug, setSelectedCalendarSlug] = useState('')
   const [composeCaption, setComposeCaption] = useState('')
@@ -697,6 +698,28 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     void onReload()
   }
 
+  const transformTweetUrl = async () => {
+    const url = ingestTweetUrl.trim()
+    if (!url) return
+    setBusy('tweet-url')
+    const { data, error } = await invokeLoungeXIngest(supabaseClient, {
+      slug: bot.slug,
+      tweetUrl: url,
+    })
+    setBusy('')
+    if (error) {
+      setToast(error.message || 'Could not transform post.')
+      return
+    }
+    if (data?.alreadyQueued) {
+      setToast('That post is already in the editorial queue.')
+    } else {
+      setToast('Draft added to editorial inbox.')
+      setIngestTweetUrl('')
+    }
+    void onReload()
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
@@ -1146,6 +1169,33 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
               className="shrink-0 min-h-9 rounded-xl bg-violet-800 px-4 text-white text-xs font-bold disabled:opacity-50"
             >
               Add
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {bot.pipeline === 'x' ? (
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+          <div className="text-white font-bold text-sm mb-1">Transform a post</div>
+          <div className="text-zinc-500 text-[11px] mb-3">
+            Paste an x.com link to an older tweet. Fetches the post, runs your LLM voice instructions,
+            and adds a draft to the editorial inbox.
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="url"
+              value={ingestTweetUrl}
+              placeholder="https://x.com/handle/status/1234567890"
+              onChange={(e) => setIngestTweetUrl(e.target.value)}
+              className="flex-1 min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-white text-sm"
+            />
+            <button
+              type="button"
+              disabled={busy === 'tweet-url' || !ingestTweetUrl.trim()}
+              onClick={() => void transformTweetUrl()}
+              className="shrink-0 min-h-9 rounded-xl bg-cyan-800 px-4 text-white text-xs font-bold disabled:opacity-50"
+            >
+              {busy === 'tweet-url' ? 'Transforming…' : 'Transform → inbox'}
             </button>
           </div>
         </div>

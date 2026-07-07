@@ -20,8 +20,10 @@ export default function BotEditorialInbox({ supabaseClient, bots, onReload, setT
   const [busy, setBusy] = useState('')
   const [editId, setEditId] = useState('')
   const [editCaption, setEditCaption] = useState('')
+  const [ingestTweetUrl, setIngestTweetUrl] = useState('')
 
   const xBots = (bots || []).filter((b) => b.pipeline === 'x' || b.review_mode === 'editorial')
+  const filteredBot = botFilter ? bots.find((b) => b.user_id === botFilter) : null
 
   const load = useCallback(async () => {
     if (!supabaseClient) return
@@ -114,6 +116,28 @@ export default function BotEditorialInbox({ supabaseClient, bots, onReload, setT
     void load()
   }
 
+  const transformTweetUrl = async () => {
+    const slug = filteredBot?.slug
+    const url = ingestTweetUrl.trim()
+    if (!slug || !url) return
+    setBusy('tweet-url')
+    const { data, error } = await invokeLoungeXIngest(supabaseClient, { slug, tweetUrl: url })
+    setBusy('')
+    if (error) {
+      setToast?.(error.message || 'Could not transform post.')
+      return
+    }
+    if (data?.alreadyQueued) {
+      setToast?.('That post is already in the editorial queue.')
+    } else {
+      setToast?.('Draft added to inbox.')
+      setIngestTweetUrl('')
+    }
+    setStatus('pending_review')
+    void load()
+    void onReload?.()
+  }
+
   const publishAllDue = async () => {
     setBusy('due')
     const { data, error } = await invokeLoungeBotPublishDue(supabaseClient, { publishDue: true })
@@ -195,6 +219,26 @@ export default function BotEditorialInbox({ supabaseClient, bots, onReload, setT
           </select>
         </div>
 
+        {filteredBot?.pipeline === 'x' ? (
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            <input
+              type="url"
+              value={ingestTweetUrl}
+              placeholder={`https://x.com/handle/status/… (${filteredBot.display_name || filteredBot.slug})`}
+              onChange={(e) => setIngestTweetUrl(e.target.value)}
+              className="flex-1 min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-white text-sm"
+            />
+            <button
+              type="button"
+              disabled={busy === 'tweet-url' || !ingestTweetUrl.trim()}
+              onClick={() => void transformTweetUrl()}
+              className="shrink-0 min-h-9 rounded-xl bg-cyan-800 px-4 text-white text-[11px] font-bold disabled:opacity-50"
+            >
+              {busy === 'tweet-url' ? '…' : 'Transform post'}
+            </button>
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="edge-monitor-shimmer h-20 rounded-xl bg-zinc-800/60" />
         ) : rows.length === 0 ? (
@@ -266,6 +310,19 @@ export default function BotEditorialInbox({ supabaseClient, bots, onReload, setT
                 {row.source_text ? (
                   <div className="text-zinc-500 text-[11px] mb-2 line-clamp-3 border-l-2 border-zinc-700 pl-2">
                     Source: {row.source_text}
+                    {row.source_url ? (
+                      <>
+                        {' '}
+                        <a
+                          href={row.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-500/90 hover:underline"
+                        >
+                          View on X
+                        </a>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
 
