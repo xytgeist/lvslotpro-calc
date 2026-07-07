@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import BotComposeImagePicker from './BotComposeImagePicker.jsx'
 import BotCreateWizard from './BotCreateWizard.jsx'
 import BotEditorialInbox from './BotEditorialInbox.jsx'
 import BotPostRepliesPanel from './BotPostRepliesPanel.jsx'
@@ -30,7 +31,10 @@ import {
   updateBotPostCaption,
   waitForPgNetRequestResult,
 } from './botPortalApi.js'
+import { revokeBotComposeImagePreviews } from './botComposeImages.js'
 import { SCOTT_EXAMPLE_POST_COUNT } from './scottExamplePosts.js'
+import { prepareLoungeFeedImageForUpload } from '../../utils/compressImageForUpload'
+import { uploadLoungeFeedPostImage } from '../../utils/communityFeedPost'
 import { LOUNGE_CAPTION_MAX, LOUNGE_CAPTION_SUBSCRIBER_MAX } from '../../utils/loungeCommentLimits.js'
 import {
   LOUNGE_POST_CATEGORY_PILL_SLUGS,
@@ -195,6 +199,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
   const [calendarToday, setCalendarToday] = useState([])
   const [selectedCalendarSlug, setSelectedCalendarSlug] = useState('')
   const [composeCaption, setComposeCaption] = useState('')
+  const [composeImageItems, setComposeImageItems] = useState([])
   const [composePills, setComposePills] = useState([])
 
   useEffect(() => {
@@ -273,6 +278,10 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     })
     setComposeCaption('')
     setComposePills(Array.isArray(bot.category_pills_default) ? [...bot.category_pills_default] : [])
+    setComposeImageItems((prev) => {
+      revokeBotComposeImagePreviews(prev)
+      return []
+    })
   }, [
     bot?.user_id,
     bot?.max_posts_per_day,
@@ -630,12 +639,33 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
 
   const handlePublishPost = async () => {
     const caption = composeCaption.trim()
-    if (!caption) return
+    if (!caption && composeImageItems.length === 0) return
     setBusy('compose-post')
+    const imageUrls = []
+    for (const item of composeImageItems) {
+      const { file: prepared, error: prepErr } = await prepareLoungeFeedImageForUpload(item.file)
+      if (prepErr || !prepared) {
+        setBusy('')
+        setToast(prepErr?.message || 'Could not prepare image.')
+        return
+      }
+      const { data: upUrl, error: upErr } = await uploadLoungeFeedPostImage({
+        supabaseClient,
+        user: { id: bot.user_id },
+        file: prepared,
+      })
+      if (upErr || !upUrl) {
+        setBusy('')
+        setToast(upErr?.message || 'Could not upload image.')
+        return
+      }
+      imageUrls.push(upUrl)
+    }
     const { error } = await publishBotPost(supabaseClient, {
       botUserId: bot.user_id,
       caption,
       categoryPills: composePills,
+      imageUrls,
     })
     setBusy('')
     if (error) {
@@ -643,6 +673,10 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
     setComposeCaption('')
+    setComposeImageItems((prev) => {
+      revokeBotComposeImagePreviews(prev)
+      return []
+    })
     setToast(`Posted as @${bot.handle || bot.slug}.`)
     void onReload()
   }
@@ -1229,6 +1263,12 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         <div className="text-zinc-500 text-[10px] mt-1 tabular-nums">
           {composeCaption.length}/{LOUNGE_CAPTION_SUBSCRIBER_MAX}
         </div>
+        <BotComposeImagePicker
+          items={composeImageItems}
+          disabled={busy === 'compose-post'}
+          onChange={setComposeImageItems}
+          onLimitMessage={setToast}
+        />
         <div className="mt-3">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
             Category pills (max 3)
@@ -1255,7 +1295,9 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         </div>
         <button
           type="button"
-          disabled={busy === 'compose-post' || !composeCaption.trim()}
+          disabled={
+            busy === 'compose-post' || (!composeCaption.trim() && composeImageItems.length === 0)
+          }
           onClick={() => void handlePublishPost()}
           className="mt-4 min-h-10 rounded-xl bg-cyan-700 px-5 text-white text-sm font-bold hover:bg-cyan-600 disabled:opacity-50"
         >

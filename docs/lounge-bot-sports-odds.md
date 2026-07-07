@@ -645,7 +645,7 @@ On **`/?tab=bots`**, any bot card includes:
 
 | Control | RPC / behavior |
 | --- | --- |
-| **Post as @handle** | **`admin_lounge_bot_publish_post`** — inserts feed post as bot; logs **`post_kind: other`** |
+| **Post as @handle** | **`admin_lounge_bot_publish_post`** — inserts feed post as bot (caption and/or up to 6 **`image_urls`**); logs **`post_kind: other`** |
 | **Reply on any post** | Paste Lounge **`?post=`** link or UUID → **Load post** → thread + **Reply as bot** on any visible post (**`20260704220000`**) |
 | **Replies** on each recent bot post | Same reply UI on Scott's own posts in **Feed posts** |
 
