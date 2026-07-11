@@ -184,6 +184,8 @@ Secrets (secrets / env vault in Supabase) for push + web-push must exist on prod
 
 **Deploy update banner 20s (2026-07-04):** client-only **`843c5f32`** — **`appDeployVersion.js`**; refocus deploy detect auto-reloads after **20s** (was 3s). No migration or Edge redeploy.
 
+**Deploy update banner close+reopen (2026-07-11):** client-only — banner copy asks full close + reopen (no Refresh / auto soft-reload). No migration or Edge redeploy.
+
 **Advanced chart Add to post confirm (2026-07-04):** client-only **`014b3d4d`** — **`LoungeMarketChartModal`** confirm before inserting Advanced snapshot into composer. No migration or Edge redeploy.
 
 **Bot portal reply on any post (2026-07-04):** client **`48d739db`** + SQL **`20260704220000`**. **Ryan sign-off:** prod RPC verified **2026-07-04** on **`jtjgtucumuoswnbauxry`** (manual SQL editor; function comment + no bot-owner guard). Not recorded in **`schema_migrations`**. Residual portal errors → wrong env / UUID / stale tab.

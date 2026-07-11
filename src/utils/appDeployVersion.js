@@ -7,7 +7,7 @@ export const APP_UPDATE_AVAILABLE_EVENT = 'edge-app-update-available'
 const APP_UPDATE_DISMISS_KEY = 'lvsp_app_update_dismissed_token'
 const DEPLOY_POLL_MS = 5 * 60 * 1000
 const BUILD_SHA_META = 'edge-build-sha'
-/** Refocus path: show banner, then silent reload (time to tap Refresh or Not now). */
+/** @deprecated Soft reload does not reliably apply deploys (esp. PWA). Banner asks for full close + reopen. */
 export const APP_UPDATE_VISIBILITY_RELOAD_MS = 20_000
 
 /** @type {number | null} */
@@ -122,8 +122,9 @@ export function isStandalonePwa() {
 
 /**
  * Poll live deploy while the tab is open.
- * - Refocus: banner + silent reload after ~20s (cancelable via Not now).
- * - Interval (foreground): immediate silent reload (chunk safety if they never backgrounded).
+ * Shows **Update available** on refocus + periodic foreground checks.
+ * Does **not** soft-reload ... PWA/browser caches often keep the old build until a full close + reopen.
+ * (Chunk MIME failures still use `lazyImportWithChunkReload` / `installStaleChunkReloadListener`.)
  */
 export function installDeployVersionWatch() {
   if (typeof window === 'undefined') return undefined
@@ -134,17 +135,11 @@ export function installDeployVersionWatch() {
     if (!result.updateAvailable || !result.remoteToken) return
     if (isAppUpdateDismissed(result.remoteToken)) return
 
-    if (source === 'visibility') {
-      dispatchAppUpdateAvailable({
-        ...result,
-        source,
-        autoReloadMs: APP_UPDATE_VISIBILITY_RELOAD_MS,
-      })
-      scheduleSilentAppUpdateReload(APP_UPDATE_VISIBILITY_RELOAD_MS)
-      return
-    }
-
-    scheduleSilentAppUpdateReload(0)
+    cancelScheduledAppUpdateReload()
+    dispatchAppUpdateAvailable({
+      ...result,
+      source,
+    })
   }
 
   const intervalId = window.setInterval(() => void runCheck('interval'), DEPLOY_POLL_MS)
