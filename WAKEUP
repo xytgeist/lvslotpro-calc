@@ -38,7 +38,7 @@ The agent should treat the following as **standing instructions for this session
 | **Production** | **`jtjgtucumuoswnbauxry`** | **`edgetilt.com`** |
 | **Test sandbox** | **`kcosfvmreeiosdjdzycb`** | **`lvslotpro.com`** |
 
-**Goal:** _Confirm Odds API 5M plan live on prod key; Scott posting again after Jul 10 credit outage._
+**Goal:** _Scott portal **Run alert now** (per-type invoke) + Best Bet same-game skip live on test/prod Edge._
 
 **Start by reading:** `AGENTS.md`, then **`docs/test-buildout-backlog.md`** Update log tail (**2026-07-10**). Scott: **`docs/lounge-bot-sports-odds.md`**. Bot portal: **`/?tab=bots`**.
 

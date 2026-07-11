@@ -1,6 +1,12 @@
 /**
  * Background odds poller — edge alerts + morning Coffee & Covers batch + hourly best bet.
- * Body: { slug, action: 'poll_edges' | 'poll_live' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar', dryRun?: boolean, force?: boolean }
+ * Body: {
+ *   slug,
+ *   action: 'poll_edges' | 'poll_live' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar',
+ *   dryRun?: boolean,
+ *   force?: boolean,
+ *   alertKind?: string  // optional: run only one subsystem (portal per-alert invoke)
+ * }
  *
  * Heavy poll_edges modules are dynamic-imported so daily_slates / best_bet_hour cold starts stay small.
  */
@@ -25,6 +31,18 @@ import {
 } from '../_shared/loungeBotOddsRun.ts'
 import { DEFAULT_MIN_EV_PCT } from '../_shared/loungeBotOddsCaption.ts'
 import type { SharpReportCandidate } from '../_shared/loungeBotSharpReport.ts'
+
+const CONTEXT_ALERT_KINDS = new Set([
+  'starter_spotlight',
+  'confirmed_starters',
+  'injury_impact',
+  'rest_travel_edge',
+  'fade_the_public',
+])
+
+function wantsAlertKind(alertKind: string | null, kind: string): boolean {
+  return !alertKind || alertKind === kind
+}
 
 async function authorize(req: Request): Promise<SupabaseClient> {
   return authorizeServiceRoleOrAdmin(req)
@@ -63,11 +81,35 @@ Deno.serve(async (req) => {
     const action = String(body?.action || 'poll_edges').trim()
     const dryRun = body?.dryRun === true
     const force = body?.force === true
+    const alertKindRaw = String(body?.alertKind || '').trim().toLowerCase()
+    const alertKind = alertKindRaw || null
 
     if (!['poll_edges', 'poll_live', 'daily_slates', 'best_bet_hour', 'value_bet_radar'].includes(action)) {
       return adminOpsJson(400, {
         error: 'action must be poll_edges, poll_live, daily_slates, best_bet_hour, or value_bet_radar.',
       })
+    }
+
+    if (alertKind && action === 'poll_edges') {
+      const allowed = new Set([
+        'edge',
+        'line_movement',
+        'arb_watch',
+        'sharp_report',
+        ...CONTEXT_ALERT_KINDS,
+      ])
+      if (!allowed.has(alertKind)) {
+        return adminOpsJson(400, {
+          error: `alertKind "${alertKind}" is not valid for poll_edges.`,
+        })
+      }
+    }
+    if (alertKind && action === 'poll_live') {
+      if (alertKind !== 'in_game_edge' && alertKind !== 'period_report') {
+        return adminOpsJson(400, {
+          error: `alertKind "${alertKind}" is not valid for poll_live.`,
+        })
+      }
     }
 
     const { data: bot, error: botErr } = await admin
@@ -93,7 +135,7 @@ Deno.serve(async (req) => {
 
     if (action === 'best_bet_hour') {
       const { runBestBetHourPoll } = await import('../_shared/loungeBotBestBetHour.ts')
-      const result = await runBestBetHourPoll(admin, bot, oddsCfg, dryRun)
+      const result = await runBestBetHourPoll(admin, bot, oddsCfg, dryRun, { force })
       return adminOpsJson(200, result)
     }
 
@@ -105,7 +147,7 @@ Deno.serve(async (req) => {
 
     if (action === 'poll_live') {
       const { runPollLive } = await import('../_shared/loungeBotPollLive.ts')
-      const result = await runPollLive(admin, bot, oddsCfg, dryRun, { force })
+      const result = await runPollLive(admin, bot, oddsCfg, dryRun, { force, alertKind })
       return adminOpsJson(200, result)
     }
 
@@ -329,76 +371,123 @@ Deno.serve(async (req) => {
         requestsRemaining = ctx.requestsRemaining
 
         if (action === 'poll_edges' && pollEdgesModules) {
-          if (edgeCount >= maxEdgeAlerts) {
+          const runEdge = wantsAlertKind(alertKind, 'edge')
+          const runLine = wantsAlertKind(alertKind, 'line_movement')
+          const runArb = wantsAlertKind(alertKind, 'arb_watch')
+          const runSharp = wantsAlertKind(alertKind, 'sharp_report')
+          const runContext = !alertKind || CONTEXT_ALERT_KINDS.has(alertKind)
+          const contextOnlyKind = alertKind && CONTEXT_ALERT_KINDS.has(alertKind)
+            ? alertKind
+            : null
+
+          if (runEdge && edgeCount >= maxEdgeAlerts) {
             details.push({ calendarSlug: row.slug, skipped: 'edge_cap' })
-            continue
-          }
-          const edgeResult = await tryPublishEdgeAlert(
-            admin,
-            bot,
-            ctx,
-            minEdge,
-            dayStart,
-            dryRun,
-            oddsCfg.alert_audience,
-            minPostGap,
-          )
-          if (edgeResult.published || edgeResult.scheduled) {
-            publishedEdges += edgeResult.scheduled ? 0 : 1
-            edgeCount += 1
+            if (!runLine && !runArb && !runSharp && !runContext) continue
           }
 
-          const sharpCandidate = await pollEdgesModules.findSharpReportCandidateForSport(
-            admin,
-            bot.user_id,
-            ctx.upcoming,
-            sportKey,
-            calendarPick.categoryLabel,
-            lineMovementCfg,
-            row,
-          )
-          if (sharpCandidate) sharpReportCandidates.push(sharpCandidate)
-
-          const lineResult = await tryPublishLineMovementAlerts(
-            admin,
-            bot,
-            ctx,
-            oddsCfg,
-            dayStart,
-            dryRun,
-          )
-          if (lineResult.published > 0) {
-            publishedLineMoves += lineResult.published
+          let edgeResult: Awaited<ReturnType<typeof tryPublishEdgeAlert>> = {
+            published: false,
+            pick: null,
+            skipped: runEdge ? undefined : 'alert_kind_filtered',
+          }
+          if (runEdge && edgeCount < maxEdgeAlerts) {
+            edgeResult = await tryPublishEdgeAlert(
+              admin,
+              bot,
+              ctx,
+              minEdge,
+              dayStart,
+              dryRun,
+              oddsCfg.alert_audience,
+              minPostGap,
+            )
+            if (edgeResult.published || edgeResult.scheduled) {
+              publishedEdges += edgeResult.scheduled ? 0 : 1
+              edgeCount += 1
+            }
           }
 
-          const arbResult = await pollEdgesModules.tryPublishArbWatchAlerts(
-            admin,
-            bot,
-            ctx.upcoming,
-            sportKey,
-            calendarPick.categoryLabel,
-            oddsCfg,
-            dayStart,
-            dryRun,
-          )
-          if (arbResult.published > 0) publishedArbWatch += arbResult.published
+          if (runSharp) {
+            const sharpCandidate = await pollEdgesModules.findSharpReportCandidateForSport(
+              admin,
+              bot.user_id,
+              ctx.upcoming,
+              sportKey,
+              calendarPick.categoryLabel,
+              lineMovementCfg,
+              row,
+            )
+            if (sharpCandidate) sharpReportCandidates.push(sharpCandidate)
+          }
 
-          const contextResult = await pollEdgesModules.tryPublishContextAlert(
-            admin,
-            bot,
-            ctx.upcoming,
-            sportKey,
-            oddsCfg,
-            dayStart,
-            dryRun,
-          )
-          if (contextResult.published || contextResult.scheduled) {
-            publishedContextAlerts += contextResult.scheduled ? 0 : 1
+          let lineResult: Awaited<ReturnType<typeof tryPublishLineMovementAlerts>> = {
+            published: 0,
+            detected: 0,
+            skipped: runLine ? undefined : 'alert_kind_filtered',
+          }
+          if (runLine) {
+            lineResult = await tryPublishLineMovementAlerts(
+              admin,
+              bot,
+              ctx,
+              oddsCfg,
+              dayStart,
+              dryRun,
+            )
+            if (lineResult.published > 0) {
+              publishedLineMoves += lineResult.published
+            }
+          }
+
+          let arbResult: Awaited<ReturnType<typeof pollEdgesModules.tryPublishArbWatchAlerts>> = {
+            published: 0,
+            detected: 0,
+            skipped: runArb ? undefined : 'alert_kind_filtered',
+          }
+          if (runArb) {
+            arbResult = await pollEdgesModules.tryPublishArbWatchAlerts(
+              admin,
+              bot,
+              ctx.upcoming,
+              sportKey,
+              calendarPick.categoryLabel,
+              oddsCfg,
+              dayStart,
+              dryRun,
+            )
+            if (arbResult.published > 0) publishedArbWatch += arbResult.published
+          }
+
+          let contextResult: Awaited<ReturnType<typeof pollEdgesModules.tryPublishContextAlert>> = {
+            published: false,
+            skipped: runContext ? undefined : 'alert_kind_filtered',
+          }
+          if (runContext) {
+            contextResult = await pollEdgesModules.tryPublishContextAlert(
+              admin,
+              bot,
+              ctx.upcoming,
+              sportKey,
+              oddsCfg,
+              dayStart,
+              dryRun,
+              { onlyKind: contextOnlyKind as
+                | 'starter_spotlight'
+                | 'confirmed_starters'
+                | 'injury_impact'
+                | 'rest_travel_edge'
+                | 'fade_the_public'
+                | null },
+            )
+            if (contextResult.published || contextResult.scheduled) {
+              publishedContextAlerts += contextResult.scheduled ? 0 : 1
+            }
           }
 
           details.push({
             calendarSlug: row.slug,
             sportKey,
+            alertKind: alertKind || null,
             publishedEdge: edgeResult.published,
             edge: edgeResult.pick?.edgePct ?? null,
             skipped: edgeResult.skipped,
@@ -497,7 +586,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (action === 'poll_edges' && pollEdgesModules) {
+    if (action === 'poll_edges' && pollEdgesModules && wantsAlertKind(alertKind, 'sharp_report')) {
       const sharpReportResult = await pollEdgesModules.tryPublishSharpReport(
         admin,
         bot,

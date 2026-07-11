@@ -12,6 +12,7 @@ import {
   BOT_RUN_STATES,
   DEFAULT_ODDS_ALERT_AUDIENCE,
   ODDS_ALERT_AUDIENCE_ROWS,
+  ODDS_ALERT_INVOKE_ROWS,
   botPollActionLabel,
   botRunStateBadgeClass,
   formatBotPortalWhen,
@@ -52,6 +53,7 @@ const SCOTT_ASYNC_WORKING_TOAST = 'Scott is working…'
 const SCOTT_POLL_ACTION_LABELS = {
   daily_slates: 'Coffee & Covers',
   poll_edges: 'Scan all · edge',
+  poll_live: 'Live alerts',
   best_bet_hour: 'Best bet · hour',
   value_bet_radar: 'Value radar',
 }
@@ -462,20 +464,31 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     void onReload()
   }
 
-  const runOddsPoll = async (action, dryRun = false) => {
-    const busyKey = action === 'daily_slates'
-      ? 'slates'
-      : action === 'best_bet_hour'
-        ? 'best-hour'
-        : action === 'value_bet_radar'
-          ? 'value-radar'
-          : 'poll-all'
+  const runOddsPoll = async (action, dryRun = false, opts = {}) => {
+    const alertKind = opts.alertKind ? String(opts.alertKind).trim() : null
+    const force = opts.force === true
+    const busyKey = alertKind
+      ? `alert-${alertKind}`
+      : action === 'daily_slates'
+        ? 'slates'
+        : action === 'best_bet_hour'
+          ? 'best-hour'
+          : action === 'value_bet_radar'
+            ? 'value-radar'
+            : action === 'poll_live'
+              ? 'poll-live'
+              : 'poll-all'
+    const label = alertKind
+      ? (ODDS_ALERT_INVOKE_ROWS.find((r) => r.alertKind === alertKind || r.key === alertKind)?.label
+        || alertKind)
+      : (SCOTT_POLL_ACTION_LABELS[action] || action)
     setBusy(dryRun ? 'poll-dry' : busyKey)
     const result = await invokeLoungeOddsPoll(supabaseClient, {
       slug: bot.slug,
       action,
       dryRun,
-      force: (action === 'daily_slates' || action === 'value_bet_radar') && !dryRun,
+      force: force || ((action === 'daily_slates' || action === 'value_bet_radar') && !dryRun),
+      alertKind,
     })
     if (result.error) {
       setBusy('')
@@ -488,7 +501,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     }
     setBusy('')
     if (d._pollError) {
-      setToast(`${SCOTT_POLL_ACTION_LABELS[action] || action} · ${SCOTT_ASYNC_TOAST} (${d._pollError})`)
+      setToast(`${label} · ${SCOTT_ASYNC_TOAST} (${d._pollError})`)
       scheduleBotReload(onReload)
       return
     }
@@ -498,7 +511,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       return
     }
     if (d.asyncQueued) {
-      setToast(`${SCOTT_POLL_ACTION_LABELS[action] || action} · ${SCOTT_ASYNC_TOAST}`)
+      setToast(`${label} · ${SCOTT_ASYNC_TOAST}`)
       scheduleBotReload(onReload)
       return
     }
@@ -512,6 +525,8 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
       const ev = d.pick?.edgePct != null ? `${Math.round(d.pick.edgePct * 10) / 10}%` : null
       if (d.skipped === 'already_posted_this_hour') {
         setToast('Best Bet of the Hour already posted this PT hour.')
+      } else if (d.skipped === 'same_game_as_last_best_bet') {
+        setToast('Best Bet skipped · same game as the last Best Bet (need a different game).')
       } else if (d.skipped === 'best_bet_hour_disabled') {
         setToast('Best Bet of the Hour is disabled in odds config.')
       } else if (d.skipped === 'no_qualifying_edge') {
@@ -568,11 +583,22 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
               : `No Coffee & Covers posted (${combined?.skipped || 'no games'}) · ${sportsIncluded} sport${sportsIncluded === 1 ? '' : 's'} checked`,
       )
     } else {
-      setToast(
-        dryRun
-          ? `Dry run · scanned ${d.sportsChecked ?? 0} sports for edge alerts`
-          : `⚡ ${d.publishedEdges ?? 0} +EV alert${d.publishedEdges === 1 ? '' : 's'} posted (${d.sportsChecked ?? 0} sports scanned)`,
-      )
+      const kindHint = alertKind ? ` · ${label}` : ''
+      if (action === 'poll_live') {
+        setToast(
+          dryRun
+            ? `Dry run · live scan${kindHint}`
+            : `Live${kindHint} · ${d.publishedLiveEdges ?? 0} in-game · ${d.publishedPeriodReports ?? 0} period${d.skipped ? ` (${d.skipped})` : ''}`,
+        )
+      } else {
+        setToast(
+          dryRun
+            ? `Dry run · scanned ${d.sportsChecked ?? 0} sports${kindHint}`
+            : alertKind
+              ? `${label} · done (${d.sportsChecked ?? 0} sports)${d.skipped ? ` · ${d.skipped}` : ''}`
+              : `⚡ ${d.publishedEdges ?? 0} +EV · ${d.publishedLineMoves ?? 0} line · ${d.publishedArbWatch ?? 0} arb · ${d.publishedSharpReport ?? 0} sharp · ${d.publishedContextAlerts ?? 0} context (${d.sportsChecked ?? 0} sports)`,
+        )
+      }
     }
     void onReload()
   }
@@ -896,33 +922,48 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
                 >
                   {busy === 'poll-all' ? '…' : 'Scan all · edge'}
                 </button>
-                <button
-                  type="button"
-                  disabled={Boolean(busy) || bot.run_state !== 'running'}
-                  onClick={() => void runOddsPoll('daily_slates', false)}
-                  className="min-h-8 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold disabled:opacity-50"
-                >
-                  {busy === 'slates' ? '…' : 'Post Coffee & Covers'}
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(busy) || bot.run_state !== 'running'}
-                  onClick={() => void runOddsPoll('best_bet_hour', false)}
-                  className="min-h-8 rounded-lg bg-rose-900/70 px-3 text-rose-100 text-[11px] font-semibold disabled:opacity-50"
-                >
-                  {busy === 'best-hour' ? '…' : 'Best bet · hour'}
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(busy) || bot.run_state !== 'running'}
-                  onClick={() => void runOddsPoll('value_bet_radar', false)}
-                  className="min-h-8 rounded-lg bg-cyan-900/70 px-3 text-cyan-100 text-[11px] font-semibold disabled:opacity-50"
-                >
-                  {busy === 'value-radar' ? '…' : 'Value radar'}
-                </button>
               </>
             ) : null}
           </div>
+          {bot.pipeline === 'odds_api' ? (
+            <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-950/15 px-3 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200/90">
+                Run alert now
+              </div>
+              <div className="text-zinc-500 text-[10px] mt-1 mb-2">
+                Invoke any single alert type immediately (bypasses time windows). Best Bet still skips if the top play is the same game as the last Best Bet.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ODDS_ALERT_INVOKE_ROWS.map((row) => {
+                  const busyKey = row.alertKind ? `alert-${row.alertKind}` : (
+                    row.action === 'daily_slates'
+                      ? 'slates'
+                      : row.action === 'best_bet_hour'
+                        ? 'best-hour'
+                        : row.action === 'value_bet_radar'
+                          ? 'value-radar'
+                          : row.action === 'poll_live'
+                            ? 'poll-live'
+                            : `alert-${row.key}`
+                  )
+                  return (
+                    <button
+                      key={row.key}
+                      type="button"
+                      disabled={Boolean(busy) || bot.run_state !== 'running'}
+                      onClick={() => void runOddsPoll(row.action, false, {
+                        alertKind: row.alertKind,
+                        force: row.force,
+                      })}
+                      className="min-h-8 rounded-lg bg-zinc-800 px-2.5 text-zinc-200 text-[10px] font-semibold disabled:opacity-50 hover:bg-zinc-700"
+                    >
+                      {busy === busyKey ? '…' : row.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
           {bot.pipeline === 'odds_api' ? (
             <div className="mt-3 rounded-xl border border-violet-500/25 bg-violet-950/20 px-3 py-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-200/90">

@@ -47,15 +47,21 @@ export async function runPollLive(
   bot: PollLiveBotRow,
   oddsCfg: OddsCfgRow,
   dryRun: boolean,
-  opts: { force?: boolean } = {},
+  opts: { force?: boolean; alertKind?: string | null } = {},
 ): Promise<Record<string, unknown>> {
+  const alertKind = String(opts.alertKind || '').trim() || null
+  const onlyLiveKind =
+    alertKind === 'in_game_edge' || alertKind === 'period_report'
+      ? alertKind
+      : null
+
   const gate = livePollShouldRunNow(new Date(), opts)
   if (!gate.shouldRun) {
     return { ok: true, skipped: gate.reason, slug: bot.slug, action: 'poll_live', nowMinute: gate.nowMinute }
   }
 
-  const liveEnabled = oddsCfg.live_edge_enabled !== false
-  const periodEnabled = oddsCfg.period_report_enabled !== false
+  const liveEnabled = (oddsCfg.live_edge_enabled !== false) && (!onlyLiveKind || onlyLiveKind === 'in_game_edge')
+  const periodEnabled = (oddsCfg.period_report_enabled !== false) && (!onlyLiveKind || onlyLiveKind === 'period_report')
   if (!liveEnabled && !periodEnabled) {
     return { ok: true, skipped: 'live_content_disabled', slug: bot.slug, action: 'poll_live' }
   }
@@ -135,6 +141,7 @@ export async function runPollLive(
         categoryLabel,
         dayStart,
         dryRun,
+        { onlyKind: onlyLiveKind },
       )
 
       if (liveResult.publishedLiveEdges > 0) publishedLiveEdges += liveResult.publishedLiveEdges

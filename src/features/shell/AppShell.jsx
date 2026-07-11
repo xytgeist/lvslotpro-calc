@@ -38,6 +38,7 @@ import {
 } from '../../utils/appConsoleLogHudPref.js'
 import LoungeAppSplash from '../../components/LoungeAppSplash.jsx'
 import { useLoungeColdBootSplash } from '../lounge/useLoungeColdBootSplash.js'
+import { LOUNGE_COLD_BOOT_RESUME_EVENT } from '../../utils/loungeColdBootSplash.js'
 import { shouldShowLoungeColdBootSplash } from '../../utils/loungeColdBootSplash.js'
 import { Z_APP_ALERT } from '../../constants/appZIndex.js'
 import LoungeActivityInAppToast from '../lounge/LoungeActivityInAppToast.jsx'
@@ -897,6 +898,16 @@ export default function AppShell({
   useEffect(() => {
     if (tab === 'home') void loadCommunityFeedRef.current()
   }, [tab])
+
+  /** Resume Lottie (≥1h background): refresh feed under the splash so the reveal isn't stale. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onResumeSplash = () => {
+      void loadCommunityFeedRef.current({ silent: true })
+    }
+    window.addEventListener(LOUNGE_COLD_BOOT_RESUME_EVENT, onResumeSplash)
+    return () => window.removeEventListener(LOUNGE_COLD_BOOT_RESUME_EVENT, onResumeSplash)
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator?.serviceWorker) return

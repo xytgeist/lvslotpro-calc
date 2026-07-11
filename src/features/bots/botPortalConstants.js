@@ -57,6 +57,27 @@ export const ODDS_ALERT_AUDIENCE_ROWS = Object.freeze([
   { key: 'fade_the_public', label: 'Fade the Public' },
 ])
 
+/**
+ * Portal "Run now" buttons — one invoke per alert type.
+ * @type {ReadonlyArray<{ key: string, label: string, action: string, alertKind: string | null, force: boolean }>}
+ */
+export const ODDS_ALERT_INVOKE_ROWS = Object.freeze([
+  { key: 'coffee_covers', label: 'Coffee & Covers', action: 'daily_slates', alertKind: null, force: true },
+  { key: 'edge', label: '+EV Edge', action: 'poll_edges', alertKind: 'edge', force: true },
+  { key: 'line_movement', label: 'Line Movement', action: 'poll_edges', alertKind: 'line_movement', force: true },
+  { key: 'arb_watch', label: 'Arb Watch', action: 'poll_edges', alertKind: 'arb_watch', force: true },
+  { key: 'sharp_report', label: 'Sharp Report', action: 'poll_edges', alertKind: 'sharp_report', force: true },
+  { key: 'in_game_edge', label: 'In-Game Edge', action: 'poll_live', alertKind: 'in_game_edge', force: true },
+  { key: 'period_report', label: 'Period Report', action: 'poll_live', alertKind: 'period_report', force: true },
+  { key: 'best_bet_hour', label: 'Best Bet · Hour', action: 'best_bet_hour', alertKind: null, force: true },
+  { key: 'value_bet_radar', label: 'Value Radar', action: 'value_bet_radar', alertKind: null, force: true },
+  { key: 'starter_spotlight', label: 'Starter Spotlight', action: 'poll_edges', alertKind: 'starter_spotlight', force: true },
+  { key: 'confirmed_starters', label: 'Confirmed Starters', action: 'poll_edges', alertKind: 'confirmed_starters', force: true },
+  { key: 'injury_impact', label: 'Injury Impact', action: 'poll_edges', alertKind: 'injury_impact', force: true },
+  { key: 'rest_travel_edge', label: 'Rest + Travel', action: 'poll_edges', alertKind: 'rest_travel_edge', force: true },
+  { key: 'fade_the_public', label: 'Fade the Public', action: 'poll_edges', alertKind: 'fade_the_public', force: true },
+])
+
 export const DEFAULT_ODDS_ALERT_AUDIENCE = Object.freeze({
   coffee_covers: 'all',
   edge: 'subscribers',

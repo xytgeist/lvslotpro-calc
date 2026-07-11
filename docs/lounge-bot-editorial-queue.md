@@ -203,7 +203,7 @@ RLS: **admin-only** read/write.
 ## Transform pipeline (per tweet)
 
 1. **Filter:** drop replies, RTs, promo, off-topic (optional classifier).
-2. **Rewrite:** LLM with **per-persona system prompt** (`scripts/lib/loungeBotPersonas.mjs`).
+2. **Rewrite:** LLM with **per-persona system prompt** (`config.voice_prompt`). Expand `t.co` via **`entities.urls`** and **keep those http(s) links** in the draft caption (appended if the model drops them).
 3. **Queue:** insert `pending_review` ... never write `community_feed_posts` here.
 
 Do **not** copy-paste tweets verbatim (ToS + reads bot).

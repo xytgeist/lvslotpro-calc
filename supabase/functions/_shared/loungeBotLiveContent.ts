@@ -440,14 +440,16 @@ export async function tryPublishLiveGameContent(
   categoryLabel: string,
   dayStart: string,
   dryRun: boolean,
+  opts: { onlyKind?: 'in_game_edge' | 'period_report' | null } = {},
 ): Promise<{
   publishedLiveEdges: number
   publishedPeriodReports: number
   skipped?: string
   livePick?: OddsPick | null
 }> {
-  const liveEnabled = oddsCfg.live_edge_enabled !== false
-  const periodEnabled = oddsCfg.period_report_enabled !== false
+  const onlyKind = opts.onlyKind ?? null
+  const liveEnabled = (oddsCfg.live_edge_enabled !== false) && (!onlyKind || onlyKind === 'in_game_edge')
+  const periodEnabled = (oddsCfg.period_report_enabled !== false) && (!onlyKind || onlyKind === 'period_report')
   if (!liveEnabled && !periodEnabled) {
     return { publishedLiveEdges: 0, publishedPeriodReports: 0, skipped: 'live_content_disabled' }
   }

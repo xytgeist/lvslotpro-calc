@@ -9,7 +9,7 @@ import { rewriteTweetForBot } from '../_shared/loungeBotXRewrite.ts'
 import { resolveXBotVoicePrompt } from '../_shared/loungeBotXVoice.ts'
 import { canonicalXTweetUrl, parseXTweetUrl } from '../_shared/loungeBotXTweetUrl.ts'
 import { readXApiError } from '../_shared/loungeBotXApi.ts'
-import { resolveTweetForManualIngest } from '../_shared/loungeBotXTweetFetch.ts'
+import { resolveTweetForManualIngest, expandTweetTextUrls } from '../_shared/loungeBotXTweetFetch.ts'
 
 const X_API = 'https://api.x.com/2'
 
@@ -272,8 +272,8 @@ Deno.serve(async (req) => {
 
           for (const tw of tweets) {
             if (!isTopLevelTweet(tw)) continue
-            const text = String(tw.text || '').trim()
             const tweetId = String(tw.id || '')
+            const text = expandTweetTextUrls(String(tw.text || '').trim(), tw.entities)
             if (!text || !tweetId) continue
 
             const { data: existing } = await admin

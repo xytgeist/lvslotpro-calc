@@ -4,6 +4,7 @@ import {
   LOUNGE_COLD_BOOT_ANON_MIN_MS,
   LOUNGE_COLD_BOOT_MEMBER_MAX_MS,
   LOUNGE_COLD_BOOT_MEMBER_MIN_MS,
+  dispatchLoungeColdBootResumeRefresh,
   markLoungeColdBootBackgroundAt,
   markLoungeColdBootSplashCycleDone,
   shouldShowLoungeColdBootResumeSplash,
@@ -119,7 +120,7 @@ export function useLoungeColdBootSplash({ tab, browseMode }) {
     }
   }, [tab, pendingWork, beginSplash])
 
-  /** Long background resume (>10 min) on Home without pending work. */
+  /** Long background resume (≥1h) on Home without pending work. */
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
     const onVisibility = () => {
@@ -135,6 +136,8 @@ export function useLoungeColdBootSplash({ tab, browseMode }) {
         })
       ) {
         cycleDoneRef.current = false
+        // Refresh feed/unread under the Lottie so the reveal isn't stale.
+        dispatchLoungeColdBootResumeRefresh()
         beginSplash()
       }
     }

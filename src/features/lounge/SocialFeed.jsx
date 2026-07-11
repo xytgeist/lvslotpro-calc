@@ -147,6 +147,7 @@ import {
 import { markLoungeColdBootFeedMounted } from '../../utils/loungeColdBootFeedMounted.js'
 import { loungeFeedPostRowPerfStyle } from '../../utils/loungeFeedPostRowPerfStyle.js'
 import { setLoungeColdBootPendingWork } from '../../utils/loungeColdBootPendingWork.js'
+import { LOUNGE_COLD_BOOT_RESUME_EVENT } from '../../utils/loungeColdBootSplash.js'
 import {
   executeLoungeCommunityPostSubmission,
   executeLoungeCommunityPostUpdate,
@@ -7084,6 +7085,17 @@ export default function SocialFeed({
     const id = window.setInterval(() => void refreshChatUnreadRoomCount(), 60_000)
     return () => window.clearInterval(id)
   }, [composerUserId, loungeFeedBrowseMode, refreshChatUnreadRoomCount])
+
+  /** Resume Lottie: refresh unread badges under the splash (feed refresh is in AppShell). */
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onResumeSplash = () => {
+      void refreshLoungeNotificationsUnread()
+      void refreshChatUnreadRoomCount()
+    }
+    window.addEventListener(LOUNGE_COLD_BOOT_RESUME_EVENT, onResumeSplash)
+    return () => window.removeEventListener(LOUNGE_COLD_BOOT_RESUME_EVENT, onResumeSplash)
+  }, [refreshLoungeNotificationsUnread, refreshChatUnreadRoomCount])
 
   const {
     pushActive: loungePushActive,

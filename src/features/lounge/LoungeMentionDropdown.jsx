@@ -28,6 +28,7 @@ export default function LoungeMentionDropdown({
   zIndex = 9999,
 }) {
   const ref = useRef(null)
+  const listRef = useRef(null)
   const [pos, setPos] = useState(null) // { top, left, width } fixed coords
 
   useLayoutEffect(() => {
@@ -62,11 +63,67 @@ export default function LoungeMentionDropdown({
     }
   }, [suggestions.length, loading, activeIndex, anchorRef, caretFieldRef])
 
-  // Scroll the active row into view
+  // Keep highlighted row inside the list without scrolling the Lounge feed.
   useEffect(() => {
-    const el = ref.current?.querySelector(`[data-mention-idx="${activeIndex}"]`)
-    el?.scrollIntoView({ block: 'nearest' })
+    const list = listRef.current
+    const el = list?.querySelector(`[data-mention-idx="${activeIndex}"]`)
+    if (!list || !el) return
+    const listRect = list.getBoundingClientRect()
+    const rowRect = el.getBoundingClientRect()
+    if (rowRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - rowRect.top
+    } else if (rowRect.bottom > listRect.bottom) {
+      list.scrollTop += rowRect.bottom - listRect.bottom
+    }
   }, [activeIndex])
+
+  // Trap wheel/touch so gestures never chain to the Lounge feed under the fixed portal.
+  useEffect(() => {
+    const list = listRef.current
+    if (!list) return undefined
+
+    const onWheel = (e) => {
+      e.stopPropagation()
+      const canScroll = list.scrollHeight > list.clientHeight + 1
+      if (!canScroll) {
+        e.preventDefault()
+        return
+      }
+      const { scrollTop, scrollHeight, clientHeight } = list
+      const delta = e.deltaY
+      const atTop = scrollTop <= 0 && delta < 0
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && delta > 0
+      if (atTop || atBottom) e.preventDefault()
+    }
+
+    let touchStartY = 0
+    const onTouchStart = (e) => {
+      touchStartY = e.touches[0]?.clientY ?? 0
+    }
+    const onTouchMove = (e) => {
+      e.stopPropagation()
+      const canScroll = list.scrollHeight > list.clientHeight + 1
+      if (!canScroll) {
+        e.preventDefault()
+        return
+      }
+      const y = e.touches[0]?.clientY ?? touchStartY
+      const delta = touchStartY - y
+      const { scrollTop, scrollHeight, clientHeight } = list
+      const atTop = scrollTop <= 0 && delta < 0
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && delta > 0
+      if (atTop || atBottom) e.preventDefault()
+    }
+
+    list.addEventListener('wheel', onWheel, { passive: false })
+    list.addEventListener('touchstart', onTouchStart, { passive: true })
+    list.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => {
+      list.removeEventListener('wheel', onWheel)
+      list.removeEventListener('touchstart', onTouchStart)
+      list.removeEventListener('touchmove', onTouchMove)
+    }
+  }, [suggestions.length, loading])
 
   if (!loading && suggestions.length === 0) return null
 
@@ -85,57 +142,67 @@ export default function LoungeMentionDropdown({
         visibility: pos ? 'visible' : 'hidden',
       }}
       className="overflow-hidden rounded-xl border border-zinc-700/80 bg-zinc-900/98 shadow-2xl backdrop-blur-sm"
+      onTouchMove={(e) => {
+        // Portal is outside the feed tree; still stop bubbling to window listeners.
+        e.stopPropagation()
+      }}
     >
       {loading && suggestions.length === 0 ? (
         <div className="px-3 py-2.5 text-[13px] text-zinc-500">Searching…</div>
       ) : (
-        suggestions.map((profile, i) => {
-          const isActive = i === activeIndex
-          const initials = profileAvatarInitials(profile.display_name || '', profile.handle || '')
-          const toneClass = profileAvatarToneClass(profile.user_id || profile.handle || '')
-          return (
-            <button
-              key={profile.user_id || profile.handle}
-              data-mention-idx={i}
-              type="button"
-              role="option"
-              aria-selected={isActive}
-              onMouseDown={(e) => {
-                e.preventDefault() // prevent textarea blur before onSelect fires
-                onSelect?.(profile)
-              }}
-              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] ${
-                isActive ? 'bg-zinc-800' : 'hover:bg-zinc-800/60'
-              }`}
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-800 text-[12px] font-bold text-zinc-200">
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="eager"
-                    decoding="async"
-                  />
-                ) : (
-                  <span className={`flex h-full w-full items-center justify-center font-bold text-white ${toneClass}`}>
-                    {initials}
-                  </span>
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                {profile.display_name ? (
-                  <span className="block truncate text-[13px] font-semibold leading-tight text-zinc-100">
-                    {profile.display_name}
-                  </span>
-                ) : null}
-                <span className="block truncate text-[12px] leading-tight text-orange-400">
-                  @{profile.handle}
+        <div
+          ref={listRef}
+          className="max-h-[min(40vh,14rem)] overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]"
+          style={{ overscrollBehavior: 'contain' }}
+        >
+          {suggestions.map((profile, i) => {
+            const isActive = i === activeIndex
+            const initials = profileAvatarInitials(profile.display_name || '', profile.handle || '')
+            const toneClass = profileAvatarToneClass(profile.user_id || profile.handle || '')
+            return (
+              <button
+                key={profile.user_id || profile.handle}
+                data-mention-idx={i}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                onMouseDown={(e) => {
+                  e.preventDefault() // prevent textarea blur before onSelect fires
+                  onSelect?.(profile)
+                }}
+                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] ${
+                  isActive ? 'bg-zinc-800' : 'hover:bg-zinc-800/60'
+                }`}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-800 text-[12px] font-bold text-zinc-200">
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="eager"
+                      decoding="async"
+                    />
+                  ) : (
+                    <span className={`flex h-full w-full items-center justify-center font-bold text-white ${toneClass}`}>
+                      {initials}
+                    </span>
+                  )}
                 </span>
-              </span>
-            </button>
-          )
-        })
+                <span className="min-w-0 flex-1">
+                  {profile.display_name ? (
+                    <span className="block truncate text-[13px] font-semibold leading-tight text-zinc-100">
+                      {profile.display_name}
+                    </span>
+                  ) : null}
+                  <span className="block truncate text-[12px] leading-tight text-orange-400">
+                    @{profile.handle}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
       )}
     </div>
   )

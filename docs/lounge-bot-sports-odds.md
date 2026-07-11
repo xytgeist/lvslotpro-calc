@@ -229,9 +229,12 @@ NFL: Chiefs vs Raiders (Sun 1:25 PM PT). This is one to watch closely.
 3. **`findPlusEvOpportunities`** across all three markets; keep highest **+EV** play slate-wide
 4. Minimum **`min_best_bet_hour_ev_pct`** (default **4%**); stale cap **15%**
 5. Tie-break: higher **+EV** → sport popularity (**NFL > NBA > MLB**, etc.) → calendar **`priority`** → more books
-6. Dedupe **`best_bet_hour:{PT hour bucket}`** — one post per bot per PT hour
+6. Dedupe **`best_bet_hour:{PT hour bucket}:{eventId}`** — one post per bot per PT hour
+7. **Same-game skip:** if the top pick's **`eventId`** matches the last published/queued Best Bet, skip (`same_game_as_last_best_bet`) ... need a different game
 
 Disable via **`best_bet_hour_enabled = false`**. Audience key **`best_bet_hour`** in portal matrix.
+
+**Portal Run alert now:** one button per alert type → **`admin_lounge_bot_queue_odds_poll`** with **`p_alert_kind`** + **`p_force`**. Edge **`lounge-odds-poll`** accepts **`alertKind`** on **`poll_edges`** / **`poll_live`** to run a single subsystem. Migration **`20260710160000`**.
 
 ### Sharpe's Sharp Report (poll_edges)
 

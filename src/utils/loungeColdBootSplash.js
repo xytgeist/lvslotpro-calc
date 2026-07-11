@@ -6,7 +6,10 @@ export const LOUNGE_COLD_BOOT_SPLASH_CYCLE_KEY = 'loungeColdBootSplashCycle:v1'
 /** Timestamp when the tab last went to background (`visibilitychange` → hidden). */
 export const LOUNGE_COLD_BOOT_BG_AT_KEY = 'loungeColdBootBgAt:v1'
 
-export const LOUNGE_COLD_BOOT_RESUME_AFTER_MS = 10 * 60 * 1000
+export const LOUNGE_COLD_BOOT_RESUME_AFTER_MS = 60 * 60 * 1000
+
+/** Dispatched when a long-background resume splash starts (PWA Home). Listeners refresh feed under the Lottie. */
+export const LOUNGE_COLD_BOOT_RESUME_EVENT = 'lounge:cold-boot-resume'
 
 /** Member + anonymous: min covers draw phase; dismiss when Lottie completes (fly-through is the transition). */
 export const LOUNGE_COLD_BOOT_MEMBER_MIN_MS = 3000
@@ -74,7 +77,7 @@ export function markLoungeColdBootBackgroundAt() {
 }
 
 /**
- * After a long background, allow one more splash this session.
+ * After a long background (≥ LOUNGE_COLD_BOOT_RESUME_AFTER_MS), allow one more splash this session.
  * @returns {boolean} true when resume splash should run
  */
 export function consumeLoungeColdBootLongBackgroundResume() {
@@ -90,6 +93,16 @@ export function consumeLoungeColdBootLongBackgroundResume() {
     return true
   } catch {
     return false
+  }
+}
+
+/** Notify the shell/feed to refresh under a resume splash. */
+export function dispatchLoungeColdBootResumeRefresh() {
+  if (typeof window === 'undefined') return
+  try {
+    window.dispatchEvent(new CustomEvent(LOUNGE_COLD_BOOT_RESUME_EVENT))
+  } catch {
+    // ignore
   }
 }
 

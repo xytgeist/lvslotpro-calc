@@ -292,13 +292,20 @@ export async function invokeLoungeOddsPublishExamples(supabaseClient, opts = {})
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
- * @param {{ slug?: string, action?: 'poll_edges' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar', dryRun?: boolean, force?: boolean }} [opts]
+ * @param {{
+ *   slug?: string,
+ *   action?: 'poll_edges' | 'poll_live' | 'daily_slates' | 'best_bet_hour' | 'value_bet_radar',
+ *   dryRun?: boolean,
+ *   force?: boolean,
+ *   alertKind?: string | null,
+ * }} [opts]
  */
 export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
   const action = opts.action || 'poll_edges'
   const dryRun = opts.dryRun === true
   const slug = opts.slug || 'sports-odds'
   const force = opts.force === true
+  const alertKind = opts.alertKind ? String(opts.alertKind).trim() : null
 
   if (!dryRun) {
     const { data, error } = await supabaseClient.rpc('admin_lounge_bot_queue_odds_poll', {
@@ -306,13 +313,20 @@ export async function invokeLoungeOddsPoll(supabaseClient, opts = {}) {
       p_action: action,
       p_dry_run: false,
       p_force: force,
+      p_alert_kind: alertKind || null,
     })
     if (error) return { data: null, error: new Error(error.message || 'Scott poll queue failed') }
     return { data: { ...(data || {}), asyncQueued: true }, error: null }
   }
 
   const { data, error } = await supabaseClient.functions.invoke('lounge-odds-poll', {
-    body: { slug, action, dryRun: true, force },
+    body: {
+      slug,
+      action,
+      dryRun: true,
+      force,
+      ...(alertKind ? { alertKind } : {}),
+    },
   })
   if (error) return { data: null, error: new Error(error.message || 'lounge-odds-poll failed') }
   if (data?.error) return { data: null, error: new Error(String(data.error)) }

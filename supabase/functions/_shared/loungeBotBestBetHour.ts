@@ -69,8 +69,17 @@ export function ptHourBucket(now = new Date()): string {
   return `${y}-${m}-${d}T${h}`
 }
 
-export function bestBetHourDedupeKey(hourBucket = ptHourBucket()): string {
-  return `best_bet_hour:${hourBucket}`
+export function bestBetHourDedupeKey(hourBucket = ptHourBucket(), eventId?: string | null): string {
+  const id = String(eventId || '').trim()
+  return id ? `best_bet_hour:${hourBucket}:${id}` : `best_bet_hour:${hourBucket}`
+}
+
+/** Extract event id from `best_bet_hour:YYYY-MM-DDTHH:eventId` (null for legacy hour-only keys). */
+export function parseBestBetEventIdFromDedupeKey(dedupeKey: string): string | null {
+  const key = String(dedupeKey || '').trim()
+  const m = key.match(/^best_bet_hour:\d{4}-\d{2}-\d{2}T\d{2}:(.+)$/)
+  const id = m?.[1]?.trim()
+  return id || null
 }
 
 function shortName(name: string): string {
@@ -213,6 +222,69 @@ async function hasDedupePublished(
   return Boolean(data?.id)
 }
 
+async function hasBestBetPostedThisHour(
+  admin: SupabaseClient,
+  botUserId: string,
+  hourBucket: string,
+): Promise<boolean> {
+  const hourStart = new Date()
+  hourStart.setMinutes(0, 0, 0)
+  const prefix = `best_bet_hour:${hourBucket}`
+  const { data } = await admin
+    .from('lounge_bot_publish_log')
+    .select('id')
+    .eq('bot_user_id', botUserId)
+    .eq('status', 'published')
+    .eq('post_kind', 'best_bet_hour')
+    .like('dedupe_key', `${prefix}%`)
+    .gte('created_at', hourStart.toISOString())
+    .limit(1)
+  if (data?.length) return true
+
+  const { data: pending } = await admin
+    .from('lounge_bot_scheduled_posts')
+    .select('id')
+    .eq('bot_user_id', botUserId)
+    .eq('status', 'pending')
+    .eq('post_kind', 'best_bet_hour')
+    .like('dedupe_key', `${prefix}%`)
+    .limit(1)
+  return Boolean(pending?.length)
+}
+
+/** Most recent Best Bet event id (published or still pending in the queue). */
+async function lastBestBetEventId(
+  admin: SupabaseClient,
+  botUserId: string,
+): Promise<string | null> {
+  const { data: published } = await admin
+    .from('lounge_bot_publish_log')
+    .select('dedupe_key, created_at')
+    .eq('bot_user_id', botUserId)
+    .eq('status', 'published')
+    .eq('post_kind', 'best_bet_hour')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data: pending } = await admin
+    .from('lounge_bot_scheduled_posts')
+    .select('dedupe_key, created_at')
+    .eq('bot_user_id', botUserId)
+    .eq('status', 'pending')
+    .eq('post_kind', 'best_bet_hour')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const pubAt = published?.created_at ? Date.parse(String(published.created_at)) : 0
+  const pendAt = pending?.created_at ? Date.parse(String(pending.created_at)) : 0
+  const newestKey = pendAt > pubAt
+    ? String(pending?.dedupe_key || '')
+    : String(published?.dedupe_key || '')
+  return parseBestBetEventIdFromDedupeKey(newestKey)
+}
+
 export type BestBetHourPollResult = {
   ok: boolean
   slug: string
@@ -220,6 +292,7 @@ export type BestBetHourPollResult = {
   dryRun: boolean
   skipped?: string
   published?: boolean
+  scheduled?: boolean
   hourBucket?: string
   pick?: {
     edgePct: number
@@ -227,6 +300,7 @@ export type BestBetHourPollResult = {
     categoryLabel: string
     marketKey: string
     pickName: string
+    eventId?: string
   } | null
   captionPreview?: string
   sportsScanned?: number
@@ -239,6 +313,7 @@ export async function runBestBetHourPoll(
   bot: OddsBotRow & { display_name?: string | null },
   oddsCfg: OddsCfgRow,
   dryRun: boolean,
+  opts: { force?: boolean } = {},
 ): Promise<BestBetHourPollResult> {
   const slug = bot.slug
   if (oddsCfg.best_bet_hour_enabled === false) {
@@ -255,13 +330,10 @@ export async function runBestBetHourPoll(
   const markets = [...new Set([...(oddsCfg.markets || ['h2h', 'spreads']), 'totals'])]
   const activeSports = await fetchActiveSportKeys()
   const hourBucket = ptHourBucket()
-  const dedupeKey = bestBetHourDedupeKey(hourBucket)
+  const force = opts.force === true
 
-  if (!dryRun && await hasDedupePublished(admin, bot.user_id, dedupeKey)) {
+  if (!dryRun && !force && await hasBestBetPostedThisHour(admin, bot.user_id, hourBucket)) {
     return { ok: true, slug, action: 'best_bet_hour', dryRun, skipped: 'already_posted_this_hour', hourBucket }
-  }
-  if (!dryRun && await hasPendingScheduleDedupe(admin, bot.user_id, dedupeKey)) {
-    return { ok: true, slug, action: 'best_bet_hour', dryRun, skipped: 'already_scheduled_this_hour', hourBucket }
   }
 
   const candidates: HourlyBestPick[] = []
@@ -300,6 +372,38 @@ export async function runBestBetHourPoll(
     }
   }
 
+  const lastEventId = dryRun ? null : await lastBestBetEventId(admin, bot.user_id)
+  if (!dryRun && lastEventId && String(best.eventId || '').trim() === lastEventId) {
+    return {
+      ok: true,
+      slug,
+      action: 'best_bet_hour',
+      dryRun,
+      skipped: 'same_game_as_last_best_bet',
+      hourBucket,
+      pick: {
+        edgePct: best.edgePct,
+        sportKey: best.sportKey,
+        categoryLabel: best.categoryLabel,
+        marketKey: best.marketKey,
+        pickName: best.pickName,
+        eventId: best.eventId,
+      },
+      sportsScanned: calendarRows.length,
+      candidatesFound: candidates.length,
+      requestsRemaining,
+    }
+  }
+
+  const dedupeKey = bestBetHourDedupeKey(hourBucket, best.eventId)
+
+  if (!dryRun && await hasDedupePublished(admin, bot.user_id, dedupeKey)) {
+    return { ok: true, slug, action: 'best_bet_hour', dryRun, skipped: 'already_posted_this_hour', hourBucket }
+  }
+  if (!dryRun && await hasPendingScheduleDedupe(admin, bot.user_id, dedupeKey)) {
+    return { ok: true, slug, action: 'best_bet_hour', dryRun, skipped: 'already_scheduled_this_hour', hourBucket }
+  }
+
   const contextNote = await fetchRundownContextNote('best_bet_hour', {
     sportKey: best.sportKey,
     homeTeam: best.homeTeam,
@@ -326,6 +430,7 @@ export async function runBestBetHourPoll(
         categoryLabel: best.categoryLabel,
         marketKey: best.marketKey,
         pickName: best.pickName,
+        eventId: best.eventId,
       },
       captionPreview: caption.slice(0, 400),
       sportsScanned: calendarRows.length,
@@ -368,6 +473,7 @@ export async function runBestBetHourPoll(
         categoryLabel: best.categoryLabel,
         marketKey: best.marketKey,
         pickName: best.pickName,
+        eventId: best.eventId,
       },
       sportsScanned: calendarRows.length,
       candidatesFound: candidates.length,

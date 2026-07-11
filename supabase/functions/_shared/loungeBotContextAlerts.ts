@@ -445,6 +445,7 @@ async function collectContextCandidates(
 function pickBestCandidate(
   candidates: ContextAlertCandidate[],
   oddsCfg: OddsCfgRow,
+  onlyKind?: ContextAlertKind | null,
 ): ContextAlertCandidate | null {
   const priority: ContextAlertKind[] = [
     'injury_impact',
@@ -454,7 +455,8 @@ function pickBestCandidate(
     'fade_the_public',
   ]
 
-  const enabled = candidates.filter((c) => contextKindEnabled(c.kind, oddsCfg))
+  let enabled = candidates.filter((c) => contextKindEnabled(c.kind, oddsCfg))
+  if (onlyKind) enabled = enabled.filter((c) => c.kind === onlyKind)
   if (!enabled.length) return null
 
   for (const kind of priority) {
@@ -474,6 +476,7 @@ export async function tryPublishContextAlert(
   oddsCfg: OddsCfgRow,
   dayStart: string,
   dryRun: boolean,
+  opts: { onlyKind?: ContextAlertKind | null } = {},
 ): Promise<{
   published: boolean
   scheduled?: boolean
@@ -493,7 +496,7 @@ export async function tryPublishContextAlert(
     : null
 
   const candidates = await collectContextCandidates(events, sportKey, minEv, schedulePack)
-  const best = pickBestCandidate(candidates, oddsCfg)
+  const best = pickBestCandidate(candidates, oddsCfg, opts.onlyKind ?? null)
   if (!best) return { published: false, skipped: 'no_qualifying_context' }
 
   if (best.kind === 'confirmed_starters') {

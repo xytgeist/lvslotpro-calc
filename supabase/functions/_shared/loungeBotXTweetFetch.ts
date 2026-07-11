@@ -12,6 +12,73 @@ export type ResolvedTweet = {
   payload?: Record<string, unknown>
 }
 
+export type XUrlEntity = {
+  url?: string
+  expanded_url?: string
+  display_url?: string
+}
+
+/** Replace t.co short links with expanded_url from X entities.urls. */
+export function expandTweetTextUrls(
+  text: string,
+  entities?: { urls?: XUrlEntity[] | null } | null,
+): string {
+  let out = String(text || '')
+  const urls = Array.isArray(entities?.urls) ? entities.urls : []
+  const sorted = [...urls].sort(
+    (a, b) => String(b.url || '').length - String(a.url || '').length,
+  )
+  for (const u of sorted) {
+    const short = String(u.url || '').trim()
+    const expanded = String(u.expanded_url || '').trim()
+    if (!short || !expanded || short === expanded) continue
+    if (!out.includes(short)) continue
+    out = out.split(short).join(expanded)
+  }
+  return out
+}
+
+/** Unique http(s) URLs in text (trailing punctuation stripped). */
+export function extractHttpUrls(text: string): string[] {
+  const matches = String(text || '').match(/https?:\/\/[^\s<>"']+/g) || []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of matches) {
+    const cleaned = raw.replace(/[),.;!?]+$/g, '').trim()
+    if (!cleaned || seen.has(cleaned)) continue
+    if (/^https?:\/\/(pic\.twitter\.com|pbs\.twimg\.com)\b/i.test(cleaned)) continue
+    seen.add(cleaned)
+    out.push(cleaned)
+  }
+  return out
+}
+
+/**
+ * Ensure source URLs survive rewrite. Prefer keeping links even if caption must shrink.
+ */
+export function ensureCaptionKeepsUrls(caption: string, urls: string[], maxChars: number): string {
+  const unique = [...new Set(urls.map((u) => String(u || '').trim()).filter(Boolean))]
+  if (!unique.length) return String(caption || '').trim().slice(0, maxChars)
+
+  let body = String(caption || '').trim()
+  for (const url of unique) {
+    if (!body.includes(url)) body = `${body}\n${url}`.trim()
+  }
+  if (body.length <= maxChars) return body
+
+  const urlBlock = unique.join('\n')
+  const room = maxChars - urlBlock.length - 1
+  if (room < 24) return urlBlock.slice(0, maxChars)
+
+  const stripped = body
+    .replace(/https?:\/\/[^\s<>"']+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, room)
+    .trim()
+  return `${stripped}\n${urlBlock}`.slice(0, maxChars)
+}
+
 function decodeHtmlEntities(raw: string): string {
   return String(raw || '')
     .replace(/&amp;/g, '&')
@@ -114,10 +181,11 @@ async function fetchTweetViaXApi(tweetId: string, token: string): Promise<Resolv
   const authorId = String(tw.author_id || '')
   const author = users.find((u: { id?: string }) => String(u?.id || '') === authorId)
   const authorHandle = String(author?.username || '').trim().toLowerCase()
+  const text = expandTweetTextUrls(String(tw.text || '').trim(), tw.entities)
 
   return {
     id: String(tw.id),
-    text: String(tw.text || '').trim(),
+    text,
     created_at: tw.created_at,
     authorHandle,
     source: 'x_api',
