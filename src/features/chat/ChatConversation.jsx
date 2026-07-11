@@ -242,8 +242,8 @@ export default function ChatConversation({
   const tailPinFollowUntilRef = useRef(0)
   const kbOverlapPrevRef = useRef(0)
   const kbClosingRef = useRef(false)
-  /** Bottom inset for the scroll list - matches floating transparent composer height. */
-  const [composerInsetPx, setComposerInsetPx] = useState(72)
+  /** Bottom inset for the scroll list - matches floating transparent composer height (DOM-owned). */
+  const composerInsetPxRef = useRef(72)
   const openScrollPendingRef = useRef(true)
   /** When set, open/tail pin handlers must not scroll to the latest message. */
   const pendingJumpMessageIdRef = useRef(/** @type {string | null} */ (null))
@@ -798,6 +798,38 @@ export default function ChatConversation({
     if (composerFocusedRef.current) return true
     if (chatComposerFieldFocused(composerBarRef.current)) return true
     return kbTargetRef.current > iosSafeBottomRef.current + 2
+  }, [])
+
+  /**
+   * Keep list paddingBottom + composer marginTop in lockstep with composer height.
+   * Apply in the same layout turn as multiline grow so the list does not shrink then
+   * snap back (the classic iOS newline message hop). scrollTop += Δ keeps the tail glued.
+   * Styles are written to the DOM here (not only via React) so a stale render cannot undo them.
+   */
+  const syncComposerInsetFromDom = useCallback(() => {
+    const composer = composerBarRef.current
+    const list = listRef.current
+    if (!composer) return
+    const next = composer.offsetHeight + COMPOSER_SCROLL_GAP_PX
+    const prev = composerInsetPxRef.current
+    const delta = next - prev
+
+    composer.style.marginTop = `-${next}px`
+    if (list) list.style.paddingBottom = `${next}px`
+
+    if (Math.abs(delta) < 0.5) return
+
+    composerInsetPxRef.current = next
+    if (list) {
+      const stick =
+        atBottomRef.current ||
+        chatComposerFieldFocused(composer) ||
+        composerFocusedRef.current
+      if (stick) {
+        list.scrollTop += delta
+        atBottomRef.current = true
+      }
+    }
   }, [])
 
   /** iOS: pin each animation frame while keyboard slides; Android: one snap. */
@@ -1760,27 +1792,28 @@ export default function ChatConversation({
     return undefined
   }, [iosSafeBottomPx, kbOverlapPx, runTailPinFollow, pinListToTail])
 
+  useLayoutEffect(() => {
+    syncComposerInsetFromDom()
+  }, [syncComposerInsetFromDom])
+
   useEffect(() => {
     const composer = composerBarRef.current
     if (!composer) return undefined
-    const syncInset = () => {
-      setComposerInsetPx(composer.offsetHeight + COMPOSER_SCROLL_GAP_PX)
-    }
-    syncInset()
+    syncComposerInsetFromDom()
     const ro = new ResizeObserver(() => {
-      syncInset()
-      if (!chatComposerFieldFocused(composer) && !composerFocusedRef.current) return
-      if (IS_IOS) pinIosKeyboardFrame()
-      else pinListToTail({ force: true })
+      // Height-only: delta scroll via syncComposerInsetFromDom. Do not hard-pin here —
+      // pin-before-React-margin was the newline hop.
+      syncComposerInsetFromDom()
     })
     ro.observe(composer)
     return () => ro.disconnect()
-  }, [pinListToTail, pinIosKeyboardFrame])
+  }, [syncComposerInsetFromDom])
 
-  // iOS: tail rides the smoothed overlap lerp - one pin per displayed px (open + close).
+  // iOS: tail rides the smoothed overlap lerp - one pin per displayed kb px (open + close).
+  // Intentionally omit composerInsetPx: multiline grow uses scrollTop += Δ instead of pin.
   useLayoutEffect(() => {
     pinIosKeyboardFrame()
-  }, [kbOverlapPx, kbOverlapTargetPx, composerFocused, composerInsetPx, pinIosKeyboardFrame])
+  }, [kbOverlapPx, kbOverlapTargetPx, composerFocused, pinIosKeyboardFrame])
 
   // resizes-content: when the keyboard opens/closes the list height changes - pin tail.
   useEffect(() => {
@@ -1797,6 +1830,11 @@ export default function ChatConversation({
 
       if (growing && preservedGap != null) {
         container.scrollTop = container.scrollHeight - container.clientHeight - preservedGap
+      } else if (IS_IOS && inputFocused && (growing || shrinking)) {
+        // Multiline composer can transiently change list height before margin sync.
+        // Hard pin fights scrollTop += Δ and hops the message stack.
+        prevH = h
+        return
       } else if (shrinking && (atBottomRef.current || inputFocused)) {
         if (IS_IOS) pinIosKeyboardFrame()
         else pinListToTail({ force: true })
@@ -2246,7 +2284,7 @@ export default function ChatConversation({
           onTouchEnd={handleSwipeTouchEnd}
           onTouchCancel={handleSwipeTouchEnd}
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-3 pb-2"
-          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop, paddingBottom: composerInsetPx }}
+          style={{ touchAction: 'pan-y', paddingTop: listPaddingTop }}
         >
           {loadingMore && (
             <div className="py-2 text-center text-[12px] text-zinc-600">Loading older messages…</div>
@@ -2383,7 +2421,6 @@ export default function ChatConversation({
         className="relative z-20 shrink-0 px-3 pt-2.5 pb-0"
         style={{
           paddingBottom: composerPadBottom,
-          marginTop: -composerInsetPx,
           background: 'transparent',
         }}
       >
@@ -2411,6 +2448,7 @@ export default function ChatConversation({
             onTyping={(name) => typingRef.current?.(name)}
             viewerDisplayName={viewerDisplayName}
             footerHost
+            onComposerChromeLayout={syncComposerInsetFromDom}
           />
         </div>
       </div>

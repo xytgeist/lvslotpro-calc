@@ -45,8 +45,10 @@ const COMPOSER_EXPANDED_RADIUS_PX = 20
  *   viewerDisplayName?: string,
  *   disabled?: boolean,
  *   footerHost?: boolean,
+ *   onComposerChromeLayout?: (() => void) | null,
  * }} props
  * @param props.footerHost Parent footer host already applies padding + keyboard overlap.
+ * @param props.onComposerChromeLayout Parent syncs list inset after auto-grow (iOS multiline).
  */
 export default function ChatComposer({
   supabaseClient,
@@ -59,6 +61,7 @@ export default function ChatComposer({
   viewerDisplayName = '',
   disabled = false,
   footerHost = false,
+  onComposerChromeLayout = null,
 }) {
   const [body, setBody]           = useState('')
   /**
@@ -169,7 +172,11 @@ export default function ChatComposer({
         wrap.style.borderRadius = '9999px'
       }
     }
-  }, [body, composerActive, footerHost])
+
+    // Same layout turn as height change: parent overlays list inset so messages
+    // scroll up by Δ instead of hopping (list shrink → margin catch-up → hard pin).
+    onComposerChromeLayout?.()
+  }, [body, composerActive, footerHost, imageSlots.length, replyTarget, onComposerChromeLayout])
 
   const handleBodyInput = (e) => {
     const el = e.currentTarget
