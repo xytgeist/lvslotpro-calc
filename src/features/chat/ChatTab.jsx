@@ -1051,6 +1051,17 @@ function getSwipeIconRevealProgress(absOffset) {
   return Math.min(1, absOffset / ROOM_SWIPE_ICON_FULL_PX)
 }
 
+/** Nearest scrollable ancestor (inbox list). Used when touch-action is none on the row. */
+function getChatRoomSwipeScrollParent(el) {
+  let node = el?.parentElement || null
+  while (node && node !== document.body) {
+    const { overflowY } = window.getComputedStyle(node)
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') return node
+    node = node.parentElement
+  }
+  return null
+}
+
 function ChatSwipeTrashIcon({ className = 'h-6 w-6' }) {
   return (
     <svg
@@ -1129,20 +1140,27 @@ function ChatRoomListRow({
   const timerRef = useRef(null)
   const suppressClickRef = useRef(false)
   const rowRef = useRef(null)
+  const foregroundRef = useRef(null)
   const rowWidthRef = useRef(320)
   const offsetRef = useRef(0)
+  const swipeDraggingRef = useRef(false)
   const gestureRef = useRef({
     startX: 0,
     startY: 0,
+    lastY: 0,
     axis: null,
     pointerId: null,
+    scrollParent: null,
   })
   const [offsetX, setOffsetX] = useState(0)
   const [swipeDragging, setSwipeDragging] = useState(false)
 
-  const setOffset = useCallback((next) => {
+  const setOffset = useCallback((next, { syncDom = false } = {}) => {
     offsetRef.current = next
     setOffsetX(next)
+    if (syncDom && foregroundRef.current) {
+      foregroundRef.current.style.transform = `translate3d(${next}px, 0, 0)`
+    }
   }, [])
 
   useEffect(() => {
@@ -1158,6 +1176,8 @@ function ChatRoomListRow({
   }, [])
 
   useEffect(() => {
+    // Don't yank the row closed while this row is actively dragging.
+    if (swipeDraggingRef.current) return
     if (openSwipeRoomId !== room.id) setOffset(0)
   }, [openSwipeRoomId, room.id, setOffset])
 
@@ -1181,8 +1201,10 @@ function ChatRoomListRow({
     gestureRef.current = {
       startX: e.clientX,
       startY: e.clientY,
+      lastY: e.clientY,
       axis: null,
       pointerId: e.pointerId,
+      scrollParent: null,
     }
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
@@ -1205,21 +1227,37 @@ function ChatRoomListRow({
       if (Math.abs(dx) > ROOM_SWIPE_AXIS_LOCK_PX && Math.abs(dx) > Math.abs(dy)) {
         g.axis = 'x'
         clearTimer()
+        swipeDraggingRef.current = true
         setSwipeDragging(true)
         onSwipeOpen?.(room.id)
+        if (foregroundRef.current) foregroundRef.current.style.transition = 'none'
       } else if (Math.abs(dy) > ROOM_LONG_PRESS_MOVE_PX && Math.abs(dy) > Math.abs(dx)) {
         g.axis = 'y'
         clearTimer()
-        return
+        g.scrollParent = getChatRoomSwipeScrollParent(rowRef.current)
       } else {
         return
       }
+    }
+    if (g.axis === 'y') {
+      e.preventDefault()
+      const scroller = g.scrollParent || getChatRoomSwipeScrollParent(rowRef.current)
+      g.scrollParent = scroller
+      if (scroller) {
+        const deltaY = e.clientY - g.lastY
+        scroller.scrollTop -= deltaY
+      }
+      g.lastY = e.clientY
+      return
     }
     if (g.axis !== 'x') return
     e.preventDefault()
     const width = rowWidthRef.current || window.innerWidth
     const clamped = Math.max(-width, Math.min(width, dx))
-    setOffset(clamped)
+    // Drive transform via DOM during the gesture so parent re-renders (openSwipeRoomId)
+    // cannot flash a CSS transition snap mid-swipe.
+    setOffset(clamped, { syncDom: true })
+    g.lastY = e.clientY
   }, [clearTimer, onSwipeOpen, room.id, setOffset])
 
   const finishGesture = useCallback(() => {
@@ -1231,6 +1269,7 @@ function ChatRoomListRow({
       const commitAt = getRoomSwipeCommitThreshold(width)
 
       const runActionAfterSnap = (targetOffset, action) => {
+        swipeDraggingRef.current = false
         setSwipeDragging(false)
         setOffset(targetOffset)
         onSwipeOpen?.(null)
@@ -1247,13 +1286,18 @@ function ChatRoomListRow({
       } else if (offset >= commitAt) {
         runActionAfterSnap(width, () => onDelete?.(room))
       } else {
+        swipeDraggingRef.current = false
         setSwipeDragging(false)
         setOffset(0)
         onSwipeOpen?.(null)
       }
+    } else {
+      swipeDraggingRef.current = false
+      setSwipeDragging(false)
     }
     g.axis = null
     g.pointerId = null
+    g.scrollParent = null
   }, [clearTimer, listMode, onArchive, onUnarchive, onDelete, onSwipeOpen, room, setOffset])
 
   const onPointerUp = useCallback(
@@ -1272,6 +1316,8 @@ function ChatRoomListRow({
   const onPointerCancel = useCallback(
     (e) => {
       if (gestureRef.current.pointerId !== e.pointerId) return
+      // touch-action:pan-y used to cancel horizontal swipes mid-drag on WebKit.
+      // With touch-action:none we still finish cleanly if the OS cancels.
       finishGesture()
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
@@ -1346,12 +1392,15 @@ function ChatRoomListRow({
 
       <button
         type="button"
+        ref={foregroundRef}
         onClick={handleClick}
         className={`chat-room-swipe-foreground-shell relative z-[1] flex w-full select-none items-center gap-3 px-4 py-3.5 text-left touch-manipulation hover:bg-zinc-900/60 active:bg-zinc-900 [-webkit-tap-highlight-color:transparent] ${foregroundInnerClass}`}
         style={{
           transform: `translate3d(${offsetX}px, 0, 0)`,
           transition: rowTransition,
-          touchAction: 'pan-y',
+          // pan-y cancels horizontal pointer gestures on WebKit (snap-back).
+          // none + manual vertical scroll keep swipe + inbox scroll working.
+          touchAction: 'none',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',
           willChange: swipeDragging ? 'transform' : 'auto',
