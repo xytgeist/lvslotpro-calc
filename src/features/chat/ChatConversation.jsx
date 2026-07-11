@@ -39,7 +39,6 @@ import { uploadChatVideoToR2, uploadChatPosterToR2 } from '../../utils/chatVideo
 import { subscribeToTyping } from './chatTypingBroadcast.js'
 import { notifyLoungeDockSuppress } from '../lounge/loungeDockSuppressRegistry.js'
 import { useLoungeKeyboardOverlapPx, LOUNGE_IOS_KEYBOARD_SMOOTH_MS, loungeComposerFooterPaddingBottom, useLoungeIosSafeBottomPx } from '../lounge/useLoungeKeyboardOverlapPx.js'
-import { applyTemporaryIosStatusBarStyle } from '../../utils/iosStatusBarStyle.js'
 
 // Glass styles are defined in index.css as .chat-header-glass / .chat-menu-glass
 // with html.light overrides - do not use inline styles for these.
@@ -527,17 +526,6 @@ export default function ChatConversation({
   useEffect(() => {
     notifyLoungeDockSuppress(true)
     return () => notifyLoungeDockSuppress(false)
-  }, [])
-
-  // Chat-only: translucent iOS status bar while this conversation is open (not app-wide).
-  // Restores on back. Installed PWAs may ignore runtime flips; Safari tab is the check.
-  useEffect(() => {
-    if (!IS_IOS) return undefined
-    const isLight =
-      typeof document !== 'undefined' && document.documentElement.classList.contains('light')
-    return applyTemporaryIosStatusBarStyle('black-translucent', {
-      themeColor: isLight ? '#fafafa' : '#09090b',
-    })
   }, [])
 
   // Lock the entire document body against text selection while chat is mounted.
