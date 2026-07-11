@@ -4255,6 +4255,34 @@ html.light .chat-room-swipe-unread-dot {
   border-color: #ffffff;
 }
 
+/* Bankroll session history — swipe-right delete (same gesture as chat inbox) */
+.bankroll-session-swipe-row {
+  --bankroll-session-swipe-radius: 1rem; /* matches rounded-2xl cards */
+  isolation: isolate;
+}
+.bankroll-session-swipe-underlay-clip {
+  overflow: hidden;
+  border-radius: var(--bankroll-session-swipe-radius);
+}
+.bankroll-session-swipe-delete {
+  background: #d93025;
+}
+.bankroll-session-swipe-icon {
+  display: inline-flex;
+  color: #ffffff;
+}
+.bankroll-session-swipe-foreground {
+  position: relative;
+  border-radius: var(--bankroll-session-swipe-radius);
+  overflow: hidden;
+}
+.bankroll-session-swipe-foreground-active {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+html.light .bankroll-session-swipe-foreground-active {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* iOS-style vibrancy input field - dark */
 .chat-input-glass {
   background: rgba(44, 44, 46, 0.55);

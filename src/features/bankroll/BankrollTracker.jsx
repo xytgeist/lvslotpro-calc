@@ -11,6 +11,7 @@ import BankrollTrendTab from './BankrollTrendTab.jsx'
 import BankrollChartsTab from './BankrollChartsTab.jsx'
 import BankrollLocationsTab from './BankrollLocationsTab.jsx'
 import BankrollImportSheet from './BankrollImportSheet.jsx'
+import BankrollSessionHistoryRow from './BankrollSessionHistoryRow.jsx'
 import { fetchNearbyCasinos } from '../../utils/nearbyCasinos.js'
 import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
 
@@ -156,6 +157,7 @@ export default function BankrollTracker({
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const deleteConfirmTimerRef = useRef(null)
+  const [openSwipeSessionId, setOpenSwipeSessionId] = useState(null)
 
   // Session history filter state
   const [historyFilterOpen, setHistoryFilterOpen] = useState(false)
@@ -577,6 +579,7 @@ export default function BankrollTracker({
     setSelectMode(true)
     setSelectedIds(new Set())
     setDeleteConfirm(false)
+    setOpenSwipeSessionId(null)
   }
 
   function exitSelectMode() {
@@ -1009,25 +1012,25 @@ export default function BankrollTracker({
                 {filteredHistory.length} of {completedSessions.length} sessions
               </div>
             )}
-            <div className="space-y-2">
-              {filteredHistory.length === 0 && (
-                <div className="text-center text-zinc-600 text-sm py-8">No sessions match the current filters.</div>
-              )}
+            {filteredHistory.length === 0 ? (
+              <div className="text-center text-zinc-600 text-sm py-8">No sessions match the current filters.</div>
+            ) : (
+            <ul className="space-y-2">
               {filteredHistory.map(session => {
                 const wl = sessionWinLoss(session)
                 const hr = hourlyRate(session)
                 const durSecs = Math.round(sessionDurationHours(session) * 3600)
                 const isSelected = selectedIds.has(session.id)
                 return (
-                  <button
+                  <BankrollSessionHistoryRow
                     key={session.id}
-                    onClick={() => selectMode ? toggleSelectSession(session.id) : openEditSession(session)}
-                    data-session-row
-                    className={`w-full text-left rounded-2xl border p-4 touch-manipulation transition-colors ${
-                      isSelected
-                        ? 'bg-cyan-950/40 border-cyan-700/60 active:bg-cyan-950/60'
-                        : 'bg-zinc-900 border-zinc-800/60 active:bg-zinc-800'
-                    }`}
+                    sessionId={session.id}
+                    selectMode={selectMode}
+                    isSelected={isSelected}
+                    openSwipeId={openSwipeSessionId}
+                    onSwipeOpen={setOpenSwipeSessionId}
+                    onActivate={() => (selectMode ? toggleSelectSession(session.id) : openEditSession(session))}
+                    onDelete={() => void deleteSession(session.id)}
                   >
                     <div className="flex items-center gap-3">
                       {selectMode && (
@@ -1070,10 +1073,11 @@ export default function BankrollTracker({
                         )}
                       </div>
                     </div>
-                  </button>
+                  </BankrollSessionHistoryRow>
                 )
               })}
-            </div>
+            </ul>
+            )}
           </div>
         )}
 
