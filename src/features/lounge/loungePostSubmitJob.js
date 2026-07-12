@@ -116,39 +116,23 @@ async function resolveThreadPartStreamVideoForInsert({
   }
 
   if (preUid) {
+    // Composer / thread prep already waited for HLS before exposing the uid.
     streamVideoUid = preUid
-    report(0.2, label, 'Checking playback')
-    await waitForCfStreamManifestReady(preUid, {
-      signal,
-      onUploadDiagnostic,
-      onPoll: ({ elapsed }) => {
-        const cap = 120_000
-        const t = Math.min(1, elapsed / cap)
-        report(0.2 + t * 0.5, label, `${Math.round(elapsed / 1000)}s`)
-      },
-    })
+    report(0.7, label, 'Using upload from composer')
   } else {
     report(0.05, label, 'Preparing video')
     const out = await resolveLoungeSubmissionVideoPrep({
       snapshot: prepSnap,
       supabaseClient,
       signal,
-      onProgress: (info) => report(0.05 + (info.progress ?? 0) * 0.55, info.status, info.detail),
+      onProgress: (info) => report(0.05 + (info.progress ?? 0) * 0.65, info.status, info.detail),
       onUploadDiagnostic,
     })
     streamVideoUid = String(out.streamVideoUid || '').trim()
     pendingCfUploadUid = streamVideoUid || null
     if (!streamVideoUid) throw new Error('Could not upload thread video.')
-    report(0.65, label, 'Checking playback')
-    await waitForCfStreamManifestReady(streamVideoUid, {
-      signal,
-      onUploadDiagnostic,
-      onPoll: ({ elapsed }) => {
-        const cap = 120_000
-        const t = Math.min(1, elapsed / cap)
-        report(0.65 + t * 0.25, label, `${Math.round(elapsed / 1000)}s`)
-      },
-    })
+    // resolveLoungeSubmissionVideoPrep already waited for HLS playback.
+    report(0.75, label, 'Video ready')
   }
 
   let streamPosterPublicUrl = ''
@@ -945,16 +929,8 @@ export async function executeLoungeCommunityPostSubmission({
       streamVideoUid = preUid
       pendingCfUploadUid = preUid
       throwIfAborted()
+      // Composer prep already waited for HLS before exposing the uid.
       report(0.55, 'Video ready', 'Using upload from composer')
-      await waitForCfStreamManifestReady(preUid, {
-        signal,
-        onUploadDiagnostic,
-        onPoll: ({ elapsed }) => {
-          const cap = 120_000
-          const t = Math.min(1, elapsed / cap)
-          report(0.55 + t * 0.3, 'Checking playback', `${Math.round(elapsed / 1000)}s`)
-        },
-      })
     } else if (hasVideo && videoFile) {
       const vf = videoFile
       if (vf.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
@@ -978,7 +954,7 @@ export async function executeLoungeCommunityPostSubmission({
       })
       pendingCfUploadUid = uid
       throwIfAborted()
-      report(0.64, 'Waiting for Ether encoding', 'Polling HLS manifest…')
+      report(0.64, 'Waiting for Ether encoding', 'Polling HLS…')
       await waitForCfStreamManifestReady(uid, {
         signal,
         onUploadDiagnostic,
@@ -988,7 +964,7 @@ export async function executeLoungeCommunityPostSubmission({
           report(
             0.64 + t * 0.24,
             'Waiting for Ether encoding',
-            `${Math.round(elapsed / 1000)}s elapsed (manifest must return 200)`,
+            `${Math.round(elapsed / 1000)}s elapsed`,
           )
         },
       })
@@ -1402,16 +1378,8 @@ export async function executeLoungeCommunityPostUpdate({
       streamVideoUid = preUid
       pendingCfUploadUid = preUid
       throwIfAborted()
+      // Composer prep already waited for HLS before exposing the uid.
       report(0.55, 'Video ready', 'Using upload from composer')
-      await waitForCfStreamManifestReady(preUid, {
-        signal,
-        onUploadDiagnostic,
-        onPoll: ({ elapsed }) => {
-          const cap = 120_000
-          const t = Math.min(1, elapsed / cap)
-          report(0.55 + t * 0.3, 'Checking playback', `${Math.round(elapsed / 1000)}s`)
-        },
-      })
     } else if (hasVideo && videoFile) {
       const vf = videoFile
       if (vf.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
@@ -1435,7 +1403,7 @@ export async function executeLoungeCommunityPostUpdate({
       })
       pendingCfUploadUid = uid
       throwIfAborted()
-      report(0.64, 'Waiting for Ether encoding', 'Polling HLS manifest…')
+      report(0.64, 'Waiting for Ether encoding', 'Polling HLS…')
       await waitForCfStreamManifestReady(uid, {
         signal,
         onUploadDiagnostic,
@@ -1445,7 +1413,7 @@ export async function executeLoungeCommunityPostUpdate({
           report(
             0.64 + t * 0.24,
             'Waiting for Ether encoding',
-            `${Math.round(elapsed / 1000)}s elapsed (manifest must return 200)`,
+            `${Math.round(elapsed / 1000)}s elapsed`,
           )
         },
       })

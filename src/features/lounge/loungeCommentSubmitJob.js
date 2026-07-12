@@ -97,16 +97,8 @@ export async function executeLoungeCommentSubmission({
       streamVideoUid = preUid
       pendingCfUploadUid = preUid
       throwIfAborted()
+      // Composer prep already waited for HLS before exposing the uid.
       report(0.55, 'Video ready', 'Using upload from composer')
-      await waitForCfStreamManifestReady(preUid, {
-        signal,
-        onUploadDiagnostic,
-        onPoll: ({ elapsed }) => {
-          const cap = 120_000
-          const t = Math.min(1, elapsed / cap)
-          report(0.55 + t * 0.3, 'Checking playback', `${Math.round(elapsed / 1000)}s`)
-        },
-      })
     } else if (hasVideo && videoFile) {
       const vf = videoFile
       if (vf.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
@@ -346,16 +338,8 @@ export async function executeLoungeCommentUpdate({
       streamVideoUid = preUid
       pendingCfUploadUid = preUid
       throwIfAborted()
+      // Composer prep already waited for HLS before exposing the uid.
       report(0.55, 'Video ready', 'Using upload from composer')
-      await waitForCfStreamManifestReady(preUid, {
-        signal,
-        onUploadDiagnostic,
-        onPoll: ({ elapsed }) => {
-          const cap = 120_000
-          const t = Math.min(1, elapsed / cap)
-          report(0.55 + t * 0.3, 'Checking playback', `${Math.round(elapsed / 1000)}s`)
-        },
-      })
     } else if (hasVideo && videoFile) {
       const vf = videoFile
       if (vf.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {

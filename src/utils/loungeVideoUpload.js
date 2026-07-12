@@ -1279,44 +1279,116 @@ function sleepWithAbort(ms, signal) {
   })
 }
 
+/** Per-attempt budget for one HLS readiness probe (native or hls.js). */
+const CF_STREAM_HLS_PROBE_TIMEOUT_MS = 5_000
+
+/** Shared hls.js default import (one network fetch for the chunk across poll loops). */
+let hlsJsDefaultPromise = null
+
+function loadHlsJsDefault() {
+  if (!hlsJsDefaultPromise) {
+    hlsJsDefaultPromise = import('hls.js').then((m) => m.default)
+  }
+  return hlsJsDefaultPromise
+}
+
 /**
- * Probe Cloudflare Stream readiness via thumbnail load (no CORS - safe on localhost dev).
+ * Probe real Stream HLS readiness (same path feed playback uses).
+ * Thumbnail `Image` load alone is not enough: CF often serves `thumbnail.jpg` before
+ * `manifest/video.m3u8` is playable, which yields poster-only tiles that never start.
  * @param {string} uid
  * @param {AbortSignal} [signal]
  * @returns {Promise<boolean>}
  */
-function probeCfStreamThumbnailReady(uid, signal) {
-  const poster = cfStreamPosterUrl(uid, 360)
-  if (!poster || typeof Image === 'undefined') return Promise.resolve(false)
+function probeCfStreamHlsReady(uid, signal) {
+  const id = String(uid || '').trim()
+  if (!id || typeof document === 'undefined') return Promise.resolve(false)
+  const manifest = `${cfStreamManifestUrl(id)}?poll=${Date.now()}`
+  if (!manifest) return Promise.resolve(false)
+
   return new Promise((resolve) => {
     if (signal?.aborted) {
       resolve(false)
       return
     }
-    const img = new Image()
+
+    const video = document.createElement('video')
+    video.muted = true
+    video.playsInline = true
+    video.setAttribute('playsinline', '')
+    video.preload = 'metadata'
+
     let settled = false
+    /** @type {{ destroy: () => void } | null} */
+    let hlsInstance = null
+    let tid = 0
+
     const finish = (ok) => {
       if (settled) return
       settled = true
-      img.onload = null
-      img.onerror = null
+      if (tid) clearTimeout(tid)
       signal?.removeEventListener('abort', onAbort)
+      try {
+        if (hlsInstance) {
+          hlsInstance.destroy()
+          hlsInstance = null
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        video.removeAttribute('src')
+        video.load()
+      } catch {
+        // ignore
+      }
       resolve(ok)
     }
+
     const onAbort = () => finish(false)
     signal?.addEventListener('abort', onAbort)
-    img.onload = () => {
-      finish(img.naturalWidth > 0 && img.naturalHeight > 0)
+    tid = setTimeout(() => finish(false), CF_STREAM_HLS_PROBE_TIMEOUT_MS)
+
+    const canNativeHls = Boolean(video.canPlayType('application/vnd.apple.mpegurl'))
+    if (canNativeHls) {
+      video.onloadedmetadata = () => finish(true)
+      video.oncanplay = () => finish(true)
+      video.onerror = () => finish(false)
+      video.src = manifest
+      return
     }
-    img.onerror = () => finish(false)
-    img.decoding = 'async'
-    img.src = `${poster}&time=0s&poll=${Date.now()}`
+
+    loadHlsJsDefault()
+      .then((Hls) => {
+        if (settled || signal?.aborted) {
+          finish(false)
+          return
+        }
+        if (!Hls.isSupported()) {
+          finish(false)
+          return
+        }
+        const hls = new Hls({
+          maxBufferLength: 1,
+          maxMaxBufferLength: 2,
+          enableWorker: false,
+          startLevel: 0,
+        })
+        hlsInstance = hls
+        hls.on(Hls.Events.MANIFEST_PARSED, () => finish(true))
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data?.fatal) finish(false)
+        })
+        hls.loadSource(manifest)
+        hls.attachMedia(video)
+      })
+      .catch(() => finish(false))
   })
 }
 
 /**
- * Poll until Stream playback assets are ready (encoding finished).
- * Uses thumbnail `Image` load - not HLS `fetch` - so localhost dev is not blocked by videodelivery.net CORS.
+ * Poll until Stream HLS playback is ready (encoding finished).
+ * Gates on real manifest parse / native HLS metadata — not thumbnail alone.
  * @param {string} uid
  * @param {{ timeoutMs?: number, intervalMs?: number, signal?: AbortSignal, onPoll?: (args: { elapsed: number }) => void, onUploadDiagnostic?: (detail: string) => void }} [options]
  */
@@ -1351,7 +1423,7 @@ export async function waitForCfStreamManifestReady(uid, options = {}) {
     }
     options.onPoll?.({ elapsed })
     try {
-      if (await probeCfStreamThumbnailReady(id, signal)) return true
+      if (await probeCfStreamHlsReady(id, signal)) return true
       lastPollError = ''
     } catch (e) {
       if (e && typeof e === 'object' && 'name' in e && /** @type {{ name?: string }} */ (e).name === 'AbortError') {
