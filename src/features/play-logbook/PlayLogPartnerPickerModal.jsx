@@ -127,10 +127,16 @@ export default function PlayLogPartnerPickerModal({
     return () => window.clearTimeout(t)
   }, [open, load])
 
+  const clearSearchForNextPartner = () => {
+    setSearch('')
+    window.setTimeout(() => searchRef.current?.focus(), 0)
+  }
+
   const addProfileToStaged = profile => {
     const uid = String(profile?.user_id || '').trim()
     if (!uid || usedUserIds.has(uid) || stagedUserIds.has(uid)) return
     setStagedProfiles(prev => [...prev, profile])
+    clearSearchForNextPartner()
   }
 
   const removeStagedProfile = uid => {
@@ -161,7 +167,7 @@ export default function PlayLogPartnerPickerModal({
     setStagedGuests(prev => [...prev, trimmed])
     addSavedGuestLabel(userId, trimmed)
     void refreshSavedGuests()
-    if (trimmed === searchTrimmed) setSearch('')
+    clearSearchForNextPartner()
   }
 
   const removeSavedGuestFromList = label => {
