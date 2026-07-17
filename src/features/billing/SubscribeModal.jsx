@@ -196,9 +196,9 @@ function PlanPromoBadge({ affiliate = null }) {
     const initials = profileAvatarInitials(affiliate.displayName, affiliate.handle || affiliate.code)
     const tone = profileAvatarToneClass(affiliate.handle || affiliate.code || promoLabel || 'creator')
     return (
-      <div className="subscribe-plan-founding-badge subscribe-plan-affiliate-badge pointer-events-none absolute left-1/2 top-0 z-30 -translate-x-1/2 -translate-y-1/2">
+      <div className="subscribe-plan-founding-badge subscribe-plan-affiliate-badge pointer-events-none absolute left-1/2 top-0 z-30 w-max max-w-[90%] -translate-x-1/2 -translate-y-1/2">
         <div
-          className="subscribe-plan-affiliate-badge-inner flex items-center gap-2.5 rounded-full border border-cyan-400/40 bg-zinc-900 py-1 pl-1 pr-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-cyan-400/25"
+          className="subscribe-plan-affiliate-badge-inner flex min-w-0 max-w-full items-center gap-2.5 rounded-full border border-cyan-400/40 bg-zinc-900 py-1 pl-1 pr-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-cyan-400/25"
           aria-label={
             promoLabel
               ? `${promoLabel} · ${affiliate.buyerDiscountPct}% off`
@@ -223,7 +223,7 @@ function PlanPromoBadge({ affiliate = null }) {
           )}
           {promoLabel ? (
             <>
-              <span className="subscribe-plan-affiliate-badge-label shrink-0 text-[11px] font-semibold tracking-wide text-cyan-50">
+              <span className="subscribe-plan-affiliate-badge-label min-w-0 truncate text-[11px] font-semibold tracking-wide text-cyan-50">
                 {promoLabel}
               </span>
               <span className="subscribe-plan-affiliate-badge-divider h-3 w-px shrink-0 bg-cyan-400/35" aria-hidden />
