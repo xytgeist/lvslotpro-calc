@@ -410,7 +410,7 @@ export default function LoungePostArticle({
                 ) : null}
                 {post.profile_pinned_at ? (
                   <span className="inline-flex shrink-0 rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide text-sky-200">
-                    Pinned to profile
+                    Pinned
                   </span>
                 ) : null}
               </div>
