@@ -268,6 +268,7 @@ create policy affiliate_tax_profiles_self_select on public.affiliate_tax_profile
   );
 
 drop policy if exists affiliate_tax_profiles_self_upsert on public.affiliate_tax_profiles;
+drop policy if exists affiliate_tax_profiles_self_insert on public.affiliate_tax_profiles;
 create policy affiliate_tax_profiles_self_insert on public.affiliate_tax_profiles
   for insert to authenticated
   with check (
