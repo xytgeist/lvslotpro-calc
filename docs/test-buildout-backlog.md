@@ -786,6 +786,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-17: **Chat inbox preview for R2 video:** migration **`20260717120000`** … `chat_message_preview_text` treats `video_url` as `[video]` (was Stream-uid only); backfill blank room previews. Fixes list **"No messages yet"** after video-only sends.
 - 2026-07-17: **Subscribe modal affiliate promo badge → prod:** migration **`20260711170000`** on **`jtjgtucumuoswnbauxry`**; `main` fast-forwarded to **`148819b8`**. Pill = avatar + promo code + %; caption `via @handle`. Josh resolve returns **25%** + avatar.
 - 2026-07-17: **Subscribe modal affiliate promo badge:** migration **`20260711170000`** (`affiliates.buyer_discount_pct`); `resolve_affiliate_ref` returns avatar/handle/%; stamp + **`SubscribeModal`** swap Founding Member pill for creator avatar + % when `?ref=` present. Admin form: buyer discount %. Apply SQL on test (+ prod when promoting).
 - 2026-07-17: **Creator affiliates → production:** SQL **`20260711140000`–`160000`** on **`jtjgtucumuoswnbauxry`**; Edge **`stripe-create-checkout-session`**, **`stripe-webhook`**, **`affiliate-connect`**, **`affiliate-tax-email`** redeployed; **`main`** fast-forwarded from **`test`**. Remaining live ops: Connect + promo ids + prod **`RESEND_API_KEY`**.
