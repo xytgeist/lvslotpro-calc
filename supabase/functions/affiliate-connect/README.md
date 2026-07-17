@@ -18,3 +18,4 @@ Reuses **`STRIPE_SECRET_KEY`**. Optional **`PUBLIC_APP_URL`** / **`APP_ORIGIN`**
 
 - Platform must have Connect enabled in the Stripe Dashboard (test + live separately).
 - Manual **Mark paid** in the admin UI remains the fallback when Connect is incomplete.
+- Express account create/update prefills `business_profile` (app origin URL + creator-affiliate product description) so Stripe’s website / product-description step is less confusing for affiliates.

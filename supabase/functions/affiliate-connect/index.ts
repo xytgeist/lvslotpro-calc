@@ -83,6 +83,13 @@ Deno.serve(async (req) => {
             transfers: { requested: true },
           },
           business_type: 'individual',
+          business_profile: {
+            // Prefill Stripe's "website / product description" onboarding step for creators.
+            url: origin,
+            product_description:
+              'Creator affiliate promoting EdgeTilt subscriptions via referral link and promo code.',
+            mcc: '7399', // Business services (not elsewhere classified)
+          },
           metadata: {
             affiliate_id: affiliate.id,
             affiliate_code: affiliate.code,
@@ -99,6 +106,24 @@ Deno.serve(async (req) => {
           })
           .eq('id', affiliate.id)
         if (upErr) throw new Error(upErr.message)
+      } else {
+        // Best-effort prefill for accounts created before we set business_profile.
+        try {
+          await stripe.accounts.update(accountId, {
+            business_profile: {
+              url: origin,
+              product_description:
+                'Creator affiliate promoting EdgeTilt subscriptions via referral link and promo code.',
+              mcc: '7399',
+            },
+          })
+        } catch (e) {
+          console.warn(
+            'affiliate-connect: business_profile prefill skipped',
+            accountId,
+            e instanceof Error ? e.message : String(e),
+          )
+        }
       }
 
       if (action === 'refresh') {
