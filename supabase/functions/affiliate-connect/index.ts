@@ -145,11 +145,15 @@ Deno.serve(async (req) => {
         })
       }
 
+      const account = await stripe.accounts.retrieve(accountId)
+      const onboarded = Boolean(
+        account.details_submitted && account.charges_enabled && account.payouts_enabled,
+      )
       const link = await stripe.accountLinks.create({
         account: accountId,
         refresh_url: `${origin}/?tab=creator&connect=refresh`,
         return_url: `${origin}/?tab=creator&connect=return`,
-        type: 'account_onboarding',
+        type: onboarded ? 'account_update' : 'account_onboarding',
       })
 
       return jsonResponse({ url: link.url, account_id: accountId })

@@ -389,7 +389,11 @@ export default function CreatorAffiliatePortal({
             onClick={() => void startConnect()}
             className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50"
           >
-            {affiliate.stripe_connect_account_id ? 'Continue Connect setup' : 'Set up Connect'}
+            {affiliate.connect_onboarding_complete
+              ? 'Update payout details'
+              : affiliate.stripe_connect_account_id
+                ? 'Continue Connect setup'
+                : 'Set up Connect'}
           </button>
           <button
             type="button"
