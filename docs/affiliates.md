@@ -111,6 +111,7 @@ W-9/W-8 fields + optional `document_path` under Storage.
 
 ### Admin
 - `/?tab=affiliates` … CRUD-lite, Mark paid, CSV, Pay via Connect
+- Link creators by **profile handle** (resolved to `user_id` in `admin_affiliate_upsert`); UUID optional/legacy
 
 ### Creator
 - `/?tab=creator` … link, promo, totals, tax form, Connect onboarding

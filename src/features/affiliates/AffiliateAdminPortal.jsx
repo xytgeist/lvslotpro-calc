@@ -16,7 +16,7 @@ const emptyForm = {
   package_slug: 'creator',
   display_name: '',
   contact_email: '',
-  user_id: '',
+  linked_handle: '',
   status: 'invited',
   payout_notes: '',
 }
@@ -75,7 +75,7 @@ export default function AffiliateAdminPortal({
       package_slug: a.package_slug || 'creator',
       display_name: a.display_name || '',
       contact_email: a.contact_email || '',
-      user_id: a.user_id || '',
+      linked_handle: a.linked_handle || '',
       status: a.status || 'invited',
       payout_notes: a.payout_notes || '',
     })
@@ -97,7 +97,7 @@ export default function AffiliateAdminPortal({
         package_slug: form.package_slug,
         display_name: form.display_name.trim() || form.code.trim(),
         contact_email: form.contact_email.trim() || null,
-        user_id: form.user_id.trim() || null,
+        linked_handle: form.linked_handle.trim().replace(/^@+/, '') || null,
         status: form.status,
         payout_notes: form.payout_notes.trim() || null,
       }
@@ -285,12 +285,12 @@ export default function AffiliateAdminPortal({
             />
           </label>
           <label className="block text-xs text-zinc-400">
-            Linked user_id
+            Linked handle
             <input
               className="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2 text-sm text-white"
-              value={form.user_id}
-              onChange={(e) => setField('user_id', e.target.value)}
-              placeholder="uuid"
+              value={form.linked_handle}
+              onChange={(e) => setField('linked_handle', e.target.value)}
+              placeholder="edgelord"
             />
           </label>
           <label className="block text-xs text-zinc-400">
@@ -368,6 +368,7 @@ export default function AffiliateAdminPortal({
                 </div>
                 <div className="mt-1 text-xs text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
                   <span>{a.package_slug}</span>
+                  {a.linked_handle ? <span>@{a.linked_handle}</span> : <span>no linked handle</span>}
                   <span>tax: {a.tax_status}</span>
                   <span>pending {formatCents(a.pending_cents)}</span>
                   <span>payable {formatCents(a.payable_cents)}</span>
