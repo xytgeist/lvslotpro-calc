@@ -75,9 +75,12 @@ function runSupabaseCli(args, { env = process.env } = {}) {
 export function ensureLinked(target) {
   const ref = PROJECT_REFS[target];
   const currentRef = readProjectRefFromDisk();
+  const poolerUrl = readPoolerUrlFromDisk();
   const password = process.env.SUPABASE_DB_PASSWORD?.trim() || "";
+  const poolerMatchesRef =
+    Boolean(poolerUrl) && poolerUrl.includes(`postgres.${ref}@`);
 
-  if (currentRef === ref && readPoolerUrlFromDisk()) {
+  if (currentRef === ref && poolerMatchesRef) {
     return ref;
   }
 
@@ -91,7 +94,37 @@ export function ensureLinked(target) {
     env.SUPABASE_DB_PASSWORD = password;
   }
 
-  runSupabaseCli(linkArgs, { env });
+  try {
+    runSupabaseCli(linkArgs, { env });
+  } catch (err) {
+    // Windows/OneDrive can fail `supabase link` with AlreadyExists on .temp.
+    // Fall back to writing the link metadata ourselves so --target cannot drift.
+    fs.mkdirSync(path.dirname(PROJECT_REF_PATH), { recursive: true });
+    fs.writeFileSync(PROJECT_REF_PATH, ref, "utf8");
+    const regionGuess =
+      poolerUrl?.match(/@(aws-\d+-[a-z0-9-]+)\.pooler\.supabase\.com/)?.[1] ||
+      "aws-1-us-east-1";
+    fs.writeFileSync(
+      POOLER_URL_PATH,
+      `postgresql://postgres.${ref}@${regionGuess}.pooler.supabase.com:5432/postgres`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(path.dirname(PROJECT_REF_PATH), "linked-project.json"),
+      JSON.stringify({ ref, name: `linked-${target}`, organization_id: "", organization_slug: "" }),
+      "utf8",
+    );
+    process.stderr.write(
+      `[supabase-db-query] supabase link failed (${err?.message || err}); wrote project-ref=${ref} manually.\n`,
+    );
+  }
+
+  const afterRef = readProjectRefFromDisk();
+  if (afterRef !== ref) {
+    throw new Error(
+      `Failed to link Supabase CLI to ${ref} (still "${afterRef || "unset"}").`,
+    );
+  }
   return ref;
 }
 
@@ -173,7 +206,20 @@ export async function runSupabaseDbQuery(opts) {
   await acquireLock();
 
   try {
+    // Always re-link before --linked so --target=test cannot silently hit a stale
+    // project-ref (e.g. production). Prefer --db-url when SUPABASE_DB_PASSWORD is set.
+    ensureLinked(target);
     const dbUrl = resolveDbUrl(target);
+    const linkedRef = readProjectRefFromDisk();
+    const expectedRef = PROJECT_REFS[target];
+    if (!dbUrl && linkedRef && linkedRef !== expectedRef) {
+      throw new Error(
+        `Refusing --linked query for target=${target}: supabase/.temp/project-ref is "${linkedRef}" but expected "${expectedRef}". Re-run supabase link --project-ref ${expectedRef}, or set SUPABASE_DB_PASSWORD in .env.supabase.${target}.`,
+      );
+    }
+    process.stderr.write(
+      `[supabase-db-query] target=${target} project=${expectedRef} via=${dbUrl ? "db-url" : "linked"}\n`,
+    );
     let lastErr;
 
     for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
@@ -186,7 +232,7 @@ export async function runSupabaseDbQuery(opts) {
       }
 
       try {
-        if (!dbUrl && attempt > 0) {
+        if (!dbUrl) {
           ensureLinked(target);
         }
 
