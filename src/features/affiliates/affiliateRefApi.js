@@ -2,8 +2,42 @@ const STORAGE_KEY = 'edge_affiliate_ref_v1'
 const ATTRIBUTION_MS = 30 * 24 * 60 * 60 * 1000
 
 /**
- * @typedef {{ code: string, affiliateId: string, promoCode?: string | null, exp: number }} AffiliateStamp
+ * @typedef {{
+ *   code: string,
+ *   affiliateId: string,
+ *   promoCode?: string | null,
+ *   displayName?: string | null,
+ *   handle?: string | null,
+ *   avatarUrl?: string | null,
+ *   buyerDiscountPct?: number | null,
+ *   exp: number,
+ * }} AffiliateStamp
  */
+
+/** @param {unknown} value @returns {number | null} */
+function normalizePercent(value) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0 || n > 100) return null
+  return Math.round(n * 100) / 100
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} data
+ * @returns {AffiliateStamp | null}
+ */
+function stampFromResolvePayload(data) {
+  if (!data?.affiliate_id || !data?.code) return null
+  return {
+    code: String(data.code),
+    affiliateId: String(data.affiliate_id),
+    promoCode: data.promo_code ? String(data.promo_code) : null,
+    displayName: data.display_name ? String(data.display_name) : null,
+    handle: data.handle ? String(data.handle) : null,
+    avatarUrl: data.avatar_url ? String(data.avatar_url) : null,
+    buyerDiscountPct: normalizePercent(data.buyer_discount_pct),
+    exp: Date.now() + ATTRIBUTION_MS,
+  }
+}
 
 /** @returns {AffiliateStamp | null} */
 export function readAffiliateStamp() {
@@ -21,6 +55,10 @@ export function readAffiliateStamp() {
       code: String(parsed.code),
       affiliateId: String(parsed.affiliateId),
       promoCode: parsed.promoCode ? String(parsed.promoCode) : null,
+      displayName: parsed.displayName ? String(parsed.displayName) : null,
+      handle: parsed.handle ? String(parsed.handle) : null,
+      avatarUrl: parsed.avatarUrl ? String(parsed.avatarUrl) : null,
+      buyerDiscountPct: normalizePercent(parsed.buyerDiscountPct),
       exp: Number(parsed.exp),
     }
   } catch {
@@ -37,6 +75,10 @@ export function writeAffiliateStamp(stamp) {
       code: stamp.code,
       affiliateId: stamp.affiliateId,
       promoCode: stamp.promoCode || null,
+      displayName: stamp.displayName || null,
+      handle: stamp.handle || null,
+      avatarUrl: stamp.avatarUrl || null,
+      buyerDiscountPct: stamp.buyerDiscountPct ?? null,
       exp: stamp.exp,
     }),
   )
@@ -78,17 +120,13 @@ export async function captureAffiliateRefFromUrl(supabaseClient) {
     stripRefQueryParam()
     return readAffiliateStamp()
   }
-  if (!data?.affiliate_id || !data?.code) {
+
+  const stamp = stampFromResolvePayload(data)
+  if (!stamp) {
     stripRefQueryParam()
     return readAffiliateStamp()
   }
 
-  const stamp = {
-    code: String(data.code),
-    affiliateId: String(data.affiliate_id),
-    promoCode: data.promo_code ? String(data.promo_code) : null,
-    exp: Date.now() + ATTRIBUTION_MS,
-  }
   writeAffiliateStamp(stamp)
   stripRefQueryParam()
   return stamp
@@ -97,6 +135,38 @@ export async function captureAffiliateRefFromUrl(supabaseClient) {
 /** @returns {string | null} */
 export function getAffiliateCodeForCheckout() {
   return readAffiliateStamp()?.code || null
+}
+
+/**
+ * Active stamp with a usable buyer discount for subscribe UI.
+ * @returns {AffiliateStamp | null}
+ */
+export function getAffiliateStampForSubscribeUi() {
+  const stamp = readAffiliateStamp()
+  if (!stamp?.code || !stamp.buyerDiscountPct) return null
+  return stamp
+}
+
+/**
+ * Re-resolve an existing stamp so avatar / % stay current (and migrate old stamps).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @returns {Promise<AffiliateStamp | null>}
+ */
+export async function refreshAffiliateStamp(supabaseClient) {
+  const existing = readAffiliateStamp()
+  if (!existing?.code || !supabaseClient) return existing
+
+  const { data, error } = await supabaseClient.rpc('resolve_affiliate_ref', {
+    p_code: existing.code,
+  })
+  if (error || !data?.affiliate_id) return existing
+
+  const next = stampFromResolvePayload(data)
+  if (!next) return existing
+  // Keep original attribution window unless already expired (read cleared it).
+  next.exp = existing.exp
+  writeAffiliateStamp(next)
+  return next
 }
 
 /**
@@ -133,14 +203,11 @@ export async function ensureAffiliateStampFromUserMetadata(supabaseClient, user)
   if (!code) return null
 
   const { data, error } = await supabaseClient.rpc('resolve_affiliate_ref', { p_code: code })
-  if (error || !data?.affiliate_id || !data?.code) return null
+  if (error) return null
 
-  const stamp = {
-    code: String(data.code),
-    affiliateId: String(data.affiliate_id),
-    promoCode: data.promo_code ? String(data.promo_code) : null,
-    exp: Date.now() + ATTRIBUTION_MS,
-  }
+  const stamp = stampFromResolvePayload(data)
+  if (!stamp) return null
+
   writeAffiliateStamp(stamp)
   return stamp
 }

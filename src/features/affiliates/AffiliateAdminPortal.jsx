@@ -19,6 +19,7 @@ const emptyForm = {
   linked_handle: '',
   status: 'invited',
   payout_notes: '',
+  buyer_discount_pct: '10',
 }
 
 function StatusPill({ status }) {
@@ -78,6 +79,10 @@ export default function AffiliateAdminPortal({
       linked_handle: a.linked_handle || '',
       status: a.status || 'invited',
       payout_notes: a.payout_notes || '',
+      buyer_discount_pct:
+        a.buyer_discount_pct != null && a.buyer_discount_pct !== ''
+          ? String(a.buyer_discount_pct)
+          : '10',
     })
     setNotice('')
     setLocalError('')
@@ -100,6 +105,7 @@ export default function AffiliateAdminPortal({
         linked_handle: form.linked_handle.trim().replace(/^@+/, '') || null,
         status: form.status,
         payout_notes: form.payout_notes.trim() || null,
+        buyer_discount_pct: Number(form.buyer_discount_pct) || 10,
       }
       await upsertAffiliate(supabaseClient, payload)
       setNotice(form.id ? 'Affiliate updated.' : 'Affiliate created.')
@@ -267,6 +273,18 @@ export default function AffiliateAdminPortal({
             </select>
           </label>
           <label className="block text-xs text-zinc-400">
+            Buyer discount %
+            <select
+              className="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2 text-sm text-white"
+              value={form.buyer_discount_pct}
+              onChange={(e) => setField('buyer_discount_pct', e.target.value)}
+            >
+              <option value="10">10% off first payment</option>
+              <option value="20">20% off first payment</option>
+              <option value="25">25% off first payment</option>
+            </select>
+          </label>
+          <label className="block text-xs text-zinc-400">
             Stripe promotion_code id
             <input
               className="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2 text-sm text-white"
@@ -368,6 +386,7 @@ export default function AffiliateAdminPortal({
                 </div>
                 <div className="mt-1 text-xs text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
                   <span>{a.package_slug}</span>
+                  {a.buyer_discount_pct != null ? <span>{a.buyer_discount_pct}% buyer off</span> : null}
                   {a.linked_handle ? <span>@{a.linked_handle}</span> : <span>no linked handle</span>}
                   <span>tax: {a.tax_status}</span>
                   <span>pending {formatCents(a.pending_cents)}</span>

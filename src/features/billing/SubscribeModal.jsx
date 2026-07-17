@@ -8,19 +8,24 @@ import {
   resolvedEntitlementBillingInterval,
 } from './edgeProducts.js'
 import {
-  SLOTS_EDGE_FOUNDING,
   SLOTS_EDGE_FOUNDING_PERCENT_OFF,
   SLOTS_EDGE_FULL_ANNUAL_USD,
   SLOTS_EDGE_FULL_MONTHLY_USD,
   SLOTS_EDGE_LIFETIME_USD,
   SLOTS_EDGE_STARTER_MONTHLY_USD,
   SLOTS_EDGE_STARTER_ANNUAL_USD,
+  applyPercentOff,
   formatUsdAnnual,
   formatUsdMonthly,
   formatUsdOneTime,
 } from './edgePricing.js'
 import { startEdgeCheckout } from './stripeBillingApi.js'
-import { getAffiliateCodeForCheckout } from '../affiliates/affiliateRefApi.js'
+import {
+  getAffiliateCodeForCheckout,
+  getAffiliateStampForSubscribeUi,
+  refreshAffiliateStamp,
+} from '../affiliates/affiliateRefApi.js'
+import { profileAvatarInitials, profileAvatarToneClass } from '../profiles/profileGate.js'
 
 const PLAN_SLUGS = [PRODUCT_SLOTS_EDGE_STARTER, PRODUCT_SLOTS_EDGE, PRODUCT_SLOTS_EDGE_LIFETIME]
 const PLAN_LABELS = {
@@ -161,13 +166,65 @@ function planCardClass(selected, extra = '') {
     .join(' ')
 }
 
-function FoundingMemberBadge() {
+/**
+ * @param {{
+ *   affiliate?: {
+ *     displayName?: string | null,
+ *     handle?: string | null,
+ *     avatarUrl?: string | null,
+ *     buyerDiscountPct?: number | null,
+ *     code?: string,
+ *   } | null,
+ * }} props
+ */
+function PlanPromoBadge({ affiliate = null }) {
+  if (affiliate?.buyerDiscountPct) {
+    const label =
+      (affiliate.handle ? `@${String(affiliate.handle).replace(/^@+/, '')}` : null) ||
+      affiliate.displayName ||
+      affiliate.code ||
+      'Creator'
+    const initials = profileAvatarInitials(affiliate.displayName, affiliate.handle || affiliate.code)
+    const tone = profileAvatarToneClass(affiliate.handle || affiliate.code || label)
+    return (
+      <div className="subscribe-plan-founding-badge subscribe-plan-affiliate-badge pointer-events-none absolute left-1/2 top-0 z-30 -translate-x-1/2 -translate-y-1/2">
+        <div className="subscribe-plan-affiliate-badge-inner flex max-w-[min(100%,18rem)] items-center gap-2 rounded-full border border-cyan-400/40 bg-zinc-900 py-1 pl-1 pr-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-cyan-400/25">
+          {affiliate.avatarUrl ? (
+            <img
+              src={affiliate.avatarUrl}
+              alt=""
+              className="subscribe-plan-affiliate-avatar h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/15"
+            />
+          ) : (
+            <span
+              className={`subscribe-plan-affiliate-avatar flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ring-1 ring-white/15 ${tone}`}
+              aria-hidden
+            >
+              {initials}
+            </span>
+          )}
+          <span className="subscribe-plan-affiliate-badge-label min-w-0 truncate text-[11px] font-semibold text-cyan-50">
+            {label}
+          </span>
+          <span className="subscribe-plan-affiliate-badge-divider h-3 w-px shrink-0 bg-cyan-400/35" aria-hidden />
+          <span className="subscribe-plan-affiliate-badge-value shrink-0 text-[11px] font-semibold text-cyan-50">
+            {affiliate.buyerDiscountPct}% off
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="subscribe-plan-founding-badge pointer-events-none absolute left-1/2 top-0 z-30 -translate-x-1/2 -translate-y-1/2">
       <div className="subscribe-plan-founding-badge-inner flex items-center gap-2.5 rounded-full border border-yellow-400/45 bg-zinc-900 px-4 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-yellow-400/30">
-        <span className="subscribe-plan-founding-badge-label text-[10px] font-bold uppercase tracking-[0.12em] text-yellow-100">Founding member</span>
+        <span className="subscribe-plan-founding-badge-label text-[10px] font-bold uppercase tracking-[0.12em] text-yellow-100">
+          Founding member
+        </span>
         <span className="subscribe-plan-founding-badge-divider h-3 w-px shrink-0 bg-yellow-400/40" aria-hidden />
-        <span className="subscribe-plan-founding-badge-value text-[11px] font-semibold text-yellow-50">{SLOTS_EDGE_FOUNDING_PERCENT_OFF}% off</span>
+        <span className="subscribe-plan-founding-badge-value text-[11px] font-semibold text-yellow-50">
+          {SLOTS_EDGE_FOUNDING_PERCENT_OFF}% off
+        </span>
       </div>
     </div>
   )
@@ -215,6 +272,7 @@ export default function SubscribeModal({
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [affiliatePromo, setAffiliatePromo] = useState(() => getAffiliateStampForSubscribeUi())
   const [selectedPlan, setSelectedPlan] = useState(defaultPlan)
   const [fullInterval, setFullInterval] = useState(/** @type {'monthly' | 'annual'} */ ('monthly'))
   const [starterInterval, setStarterInterval] = useState(/** @type {'monthly' | 'annual'} */ ('monthly'))
@@ -247,6 +305,7 @@ export default function SubscribeModal({
       starterCurrentInterval ? billingSwitchTargetInterval(starterCurrentInterval) : 'monthly',
     )
     setFullInterval(fullCurrentInterval ? billingSwitchTargetInterval(fullCurrentInterval) : 'monthly')
+    setAffiliatePromo(getAffiliateStampForSubscribeUi())
     setError('')
     setBusy(false)
     setInstantSlideIndexes(new Set())
@@ -256,7 +315,19 @@ export default function SubscribeModal({
     isDraggingRef.current = false
     const idx = Math.max(0, PLAN_SLUGS.indexOf(defaultPlan))
     setActiveSlide(idx >= 0 ? idx : 1)
-  }, [open, defaultPlan, fullCurrentInterval, starterCurrentInterval])
+
+    let cancelled = false
+    void (async () => {
+      const refreshed = await refreshAffiliateStamp(supabaseClient)
+      if (cancelled) return
+      setAffiliatePromo(
+        refreshed?.buyerDiscountPct ? refreshed : getAffiliateStampForSubscribeUi(),
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, defaultPlan, fullCurrentInterval, starterCurrentInterval, supabaseClient])
 
   useEffect(() => {
     return () => {
@@ -426,20 +497,31 @@ export default function SubscribeModal({
 
   if (!open || typeof document === 'undefined') return null
 
+  const promoPercentOff = affiliatePromo?.buyerDiscountPct || SLOTS_EDGE_FOUNDING_PERCENT_OFF
+  const isAffiliatePromo = Boolean(affiliatePromo?.buyerDiscountPct)
+  const discounted = {
+    starterMonthlyUsd: applyPercentOff(SLOTS_EDGE_STARTER_MONTHLY_USD, promoPercentOff),
+    starterAnnualUsd: applyPercentOff(SLOTS_EDGE_STARTER_ANNUAL_USD, promoPercentOff),
+    fullMonthlyUsd: applyPercentOff(SLOTS_EDGE_FULL_MONTHLY_USD, promoPercentOff),
+    fullAnnualUsd: applyPercentOff(SLOTS_EDGE_FULL_ANNUAL_USD, promoPercentOff),
+    lifetimeUsd: applyPercentOff(SLOTS_EDGE_LIFETIME_USD, promoPercentOff),
+  }
+  const rateCaption = isAffiliatePromo ? 'partner rate' : 'founding rate'
+
   const starterList = formatUsdMonthly(SLOTS_EDGE_STARTER_MONTHLY_USD)
-  const starterEarly = formatUsdMonthly(SLOTS_EDGE_FOUNDING.starterMonthlyUsd)
+  const starterEarly = formatUsdMonthly(discounted.starterMonthlyUsd)
   const starterAnnualList = formatUsdAnnual(SLOTS_EDGE_STARTER_ANNUAL_USD)
-  const starterAnnualEarly = formatUsdAnnual(SLOTS_EDGE_FOUNDING.starterAnnualUsd)
+  const starterAnnualEarly = formatUsdAnnual(discounted.starterAnnualUsd)
   const starterAnnualEffective = formatUsdMonthly(
-    Math.round((SLOTS_EDGE_FOUNDING.starterAnnualUsd / 12) * 100) / 100,
+    Math.round((discounted.starterAnnualUsd / 12) * 100) / 100,
   )
   const fullMonthlyList = formatUsdMonthly(SLOTS_EDGE_FULL_MONTHLY_USD)
-  const fullMonthlyEarly = formatUsdMonthly(SLOTS_EDGE_FOUNDING.fullMonthlyUsd)
+  const fullMonthlyEarly = formatUsdMonthly(discounted.fullMonthlyUsd)
   const fullAnnualList = formatUsdAnnual(SLOTS_EDGE_FULL_ANNUAL_USD)
-  const fullAnnualEarly = formatUsdAnnual(SLOTS_EDGE_FOUNDING.fullAnnualUsd)
-  const fullAnnualEffective = formatUsdMonthly(Math.round((SLOTS_EDGE_FOUNDING.fullAnnualUsd / 12) * 100) / 100)
+  const fullAnnualEarly = formatUsdAnnual(discounted.fullAnnualUsd)
+  const fullAnnualEffective = formatUsdMonthly(Math.round((discounted.fullAnnualUsd / 12) * 100) / 100)
   const lifetimeList = formatUsdOneTime(SLOTS_EDGE_LIFETIME_USD)
-  const lifetimeEarly = formatUsdOneTime(SLOTS_EDGE_FOUNDING.lifetimeUsd)
+  const lifetimeEarly = formatUsdOneTime(discounted.lifetimeUsd)
 
   const lifetimeSelected = selectedPlan === PRODUCT_SLOTS_EDGE_LIFETIME
   const starterSelected = selectedPlan === PRODUCT_SLOTS_EDGE_STARTER
@@ -633,7 +715,7 @@ export default function SubscribeModal({
                       }}
                       className={planCardClass(starterSelected, busy ? 'cursor-default' : 'cursor-pointer')}
                     >
-                      <FoundingMemberBadge />
+                      <PlanPromoBadge affiliate={affiliatePromo} />
                       {hasSlotsEdgeStarter ? (
                         <span className="absolute right-3 top-10 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-emerald-500/30">
                           Current
@@ -702,8 +784,10 @@ export default function SubscribeModal({
                       </div>
                       <p className="mt-0.5 text-[11px] text-zinc-500">
                         {starterInterval === 'annual'
-                          ? `${starterAnnualEffective} effective · founding rate`
-                          : 'Founding rate on monthly checkout'}
+                          ? `${starterAnnualEffective} effective · ${rateCaption}`
+                          : isAffiliatePromo
+                            ? `${promoPercentOff}% off on monthly checkout`
+                            : 'Founding rate on monthly checkout'}
                       </p>
                       <ul className="mt-3 flex-1 space-y-1.5">
                         {STARTER_FEATURES.map((line) => (
@@ -744,7 +828,7 @@ export default function SubscribeModal({
                         busy ? 'cursor-default' : 'cursor-pointer',
                       ].join(' ')}
                     >
-                      <FoundingMemberBadge />
+                      <PlanPromoBadge affiliate={affiliatePromo} />
                       {fullSubscriber ? (
                         <span className="absolute right-3 top-10 rounded-full bg-cyan-500/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-cyan-200 ring-1 ring-cyan-500/30">
                           Current
@@ -817,8 +901,10 @@ export default function SubscribeModal({
                       </div>
                       <p className="mt-0.5 text-[11px] text-zinc-500">
                         {fullInterval === 'annual'
-                          ? `${fullAnnualEffective} effective · one month free`
-                          : 'Founding rate on monthly checkout'}
+                          ? `${fullAnnualEffective} effective · ${isAffiliatePromo ? rateCaption : 'one month free'}`
+                          : isAffiliatePromo
+                            ? `${promoPercentOff}% off on monthly checkout`
+                            : 'Founding rate on monthly checkout'}
                       </p>
                       <ul className="mt-3 flex-1 space-y-1.5">
                         {FULL_FEATURES.map((line) => (
@@ -859,9 +945,9 @@ export default function SubscribeModal({
                         busy ? 'cursor-default' : 'cursor-pointer',
                       ].join(' ')}
                     >
-                      <FoundingMemberBadge />
+                      <PlanPromoBadge affiliate={affiliatePromo} />
                       <span className="inline-flex w-fit rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200 ring-1 ring-amber-500/30">
-                        Founding lifetime pass
+                        {isAffiliatePromo ? 'Partner lifetime pass' : 'Founding lifetime pass'}
                       </span>
                       <div className="mt-1.5 text-lg font-bold text-white">{productDisplayName(PRODUCT_SLOTS_EDGE_LIFETIME)}</div>
                       <p className="mt-0.5 text-xs text-zinc-400">Pay once. Never worry about renewals or new-tool add-ons.</p>
@@ -869,7 +955,11 @@ export default function SubscribeModal({
                         <span className="text-xl font-bold tracking-tight text-white">{lifetimeEarly}</span>
                         <span className="pb-0.5 text-xs text-zinc-500 line-through">{lifetimeList}</span>
                       </div>
-                      <p className="mt-0.5 text-[11px] text-zinc-500">Founding rate · one-time checkout</p>
+                      <p className="mt-0.5 text-[11px] text-zinc-500">
+                        {isAffiliatePromo
+                          ? `${promoPercentOff}% off · one-time checkout`
+                          : 'Founding rate · one-time checkout'}
+                      </p>
                       <ul className="mt-3 flex-1 space-y-1.5">
                         {LIFETIME_FEATURES.map((line) => (
                           <PlanFeature key={line}>{line}</PlanFeature>

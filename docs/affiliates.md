@@ -23,9 +23,10 @@ Goal: curated X/creator affiliates with tiered commissions, unique links + disco
 
 ### Buyer discount (creator promo)
 
-- Real Stripe coupon / promotion code per creator.
-- **10% off the first payment only** (configure coupon as once / first invoice in Stripe Dashboard).
+- Real Stripe coupon / promotion code per creator (typically **10% / 20% / 25%** off first payment ... configure once / first invoice in Stripe Dashboard).
+- Store matching **`affiliates.buyer_discount_pct`** in admin (drives subscribe modal preview). Checkout still applies `stripe_promotion_code_id`.
 - Founding / sitewide promos: **mutually exclusive** with creator codes (Checkout skips founding when `affiliate_code` is present).
+- Subscribe UI: with a valid `?ref=` stamp, plan cards show creator **avatar + % off** (not Founding Member) and prices use that %.
 
 ### Attribution
 
@@ -75,7 +76,9 @@ Rewardful / Tolt / FirstPromoter / Tapfiliate … wrong economics for a few crea
 Seeded: `creator` 20%, `mid` 25%, `elite` 30%.
 
 ### `affiliates`
-`code`, `promo_code`, `stripe_coupon_id`, `stripe_promotion_code_id`, `package_id`, `display_name`, `contact_email`, `user_id`, `status`, `payout_notes`, `stripe_connect_account_id`, `connect_onboarding_complete`.
+`code`, `promo_code`, `stripe_coupon_id`, `stripe_promotion_code_id`, `package_id`, `display_name`, `contact_email`, `user_id`, `status`, `payout_notes`, `buyer_discount_pct`, `stripe_connect_account_id`, `connect_onboarding_complete`.
+
+Public RPC **`resolve_affiliate_ref`** returns `display_name`, `handle`, `avatar_url`, `buyer_discount_pct` for the client stamp (`edge_affiliate_ref_v1`).
 
 ### `affiliate_attributions`
 Per checkout stamp when Checkout runs with affiliate.
@@ -112,6 +115,7 @@ W-9/W-8 fields + `tin_last4` + `ftin_not_legally_required` + `signature_name` + 
 ### Admin
 - `/?tab=affiliates` … CRUD-lite, Mark paid, CSV, Pay via Connect
 - Link creators by **profile handle** (resolved to `user_id` in `admin_affiliate_upsert`); UUID optional/legacy
+- Set **buyer discount %** (10/20/25) to match the Stripe coupon so Subscribe preview stays honest
 
 ### Creator
 - `/?tab=creator` … link, promo, totals, tax form, Connect onboarding

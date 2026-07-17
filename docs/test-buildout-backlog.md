@@ -786,6 +786,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-17: **Subscribe modal affiliate promo badge:** migration **`20260711170000`** (`affiliates.buyer_discount_pct`); `resolve_affiliate_ref` returns avatar/handle/%; stamp + **`SubscribeModal`** swap Founding Member pill for creator avatar + % when `?ref=` present. Admin form: buyer discount %. Apply SQL on test (+ prod when promoting).
 - 2026-07-17: **Creator affiliates → production:** SQL **`20260711140000`–`160000`** on **`jtjgtucumuoswnbauxry`**; Edge **`stripe-create-checkout-session`**, **`stripe-webhook`**, **`affiliate-connect`**, **`affiliate-tax-email`** redeployed; **`main`** fast-forwarded from **`test`**. Remaining live ops: Connect + promo ids + prod **`RESEND_API_KEY`**.
 - 2026-07-17: **Creator affiliates tax email copy:** migration **`20260711160000`** (`tax_email`); Edge **`affiliate-tax-email`** (Resend attachment from `affiliate-tax-docs`). Set **`RESEND_API_KEY`** on test. Spec: **`docs/affiliates.md`**.
 - 2026-07-16: **Creator affiliates tax PDF:** migration **`20260711150000`** (`ftin_not_legally_required`, `signature_name`); creator portal generates substitute W-9/W-8 PDF (`pdf-lib`) with typed signature; TIN last 4 label + FTIN Not Legally Required. Applied on **test** via Management API. Spec: **`docs/affiliates.md`**.
