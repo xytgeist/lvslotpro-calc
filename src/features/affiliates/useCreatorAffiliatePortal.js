@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchMyAffiliatePortal } from './affiliatePortalApi.js'
+import { affiliateErrorMessage, fetchMyAffiliatePortal } from './affiliatePortalApi.js'
 
 export function useCreatorAffiliatePortal(supabaseClient) {
   const [portal, setPortal] = useState(null)

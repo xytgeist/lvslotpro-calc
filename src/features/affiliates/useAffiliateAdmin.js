@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchAdminAffiliateSnapshot } from './affiliatePortalApi.js'
+import { affiliateErrorMessage, fetchAdminAffiliateSnapshot } from './affiliatePortalApi.js'
 
 export function useAffiliateAdmin(supabaseClient) {
   const [snapshot, setSnapshot] = useState(null)

@@ -2,9 +2,34 @@
  * Admin + creator portal API for affiliates.
  */
 
+/** @param {unknown} err */
+export function affiliateErrorMessage(err, fallback = 'Request failed.') {
+  if (err == null) return fallback
+  if (typeof err === 'string' && err.trim()) return err.trim()
+  if (err instanceof Error && err.message) return err.message
+  if (typeof err === 'object') {
+    const o = /** @type {{ message?: unknown, error?: unknown, details?: unknown, hint?: unknown, code?: unknown }} */ (
+      err
+    )
+    const parts = [o.message, o.error, o.details, o.hint, o.code]
+      .map((v) => (v == null ? '' : String(v).trim()))
+      .filter(Boolean)
+    if (parts.length) return parts.join(' · ')
+  }
+  try {
+    return JSON.stringify(err)
+  } catch {
+    return fallback
+  }
+}
+
+function throwRpcError(error) {
+  throw new Error(affiliateErrorMessage(error))
+}
+
 export async function fetchAdminAffiliateSnapshot(supabaseClient) {
   const { data, error } = await supabaseClient.rpc('admin_affiliate_portal_snapshot')
-  if (error) throw error
+  if (error) throwRpcError(error)
   return data && typeof data === 'object'
     ? data
     : { packages: [], affiliates: [], commissions: [], hold_days: 45 }
@@ -14,7 +39,7 @@ export async function upsertAffiliate(supabaseClient, payload) {
   const { data, error } = await supabaseClient.rpc('admin_affiliate_upsert', {
     p_payload: payload,
   })
-  if (error) throw error
+  if (error) throwRpcError(error)
   return data
 }
 
@@ -23,13 +48,13 @@ export async function markCommissionsPaid(supabaseClient, commissionIds, payoutR
     p_commission_ids: commissionIds,
     p_payout_ref: payoutRef,
   })
-  if (error) throw error
+  if (error) throwRpcError(error)
   return Number(data) || 0
 }
 
 export async function fetchMyAffiliatePortal(supabaseClient) {
   const { data, error } = await supabaseClient.rpc('get_my_affiliate_portal')
-  if (error) throw error
+  if (error) throwRpcError(error)
   return data || null
 }
 
@@ -39,7 +64,7 @@ export async function checkIAmActiveAffiliate(supabaseClient) {
     if (error.code === 'PGRST202' || /i_am_active_affiliate/i.test(error.message || '')) {
       return false
     }
-    throw error
+    throwRpcError(error)
   }
   return Boolean(data)
 }
@@ -48,7 +73,7 @@ export async function upsertMyTaxProfile(supabaseClient, payload) {
   const { data, error } = await supabaseClient.rpc('upsert_my_affiliate_tax_profile', {
     p_payload: payload,
   })
-  if (error) throw error
+  if (error) throwRpcError(error)
   return data
 }
 
