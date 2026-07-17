@@ -177,18 +177,29 @@ function planCardClass(selected, extra = '') {
  *   } | null,
  * }} props
  */
+function affiliateHandleLabel(affiliate) {
+  if (!affiliate) return null
+  if (affiliate.handle) return `@${String(affiliate.handle).replace(/^@+/, '')}`
+  if (affiliate.displayName) return String(affiliate.displayName)
+  if (affiliate.code) return String(affiliate.code)
+  return null
+}
+
 function PlanPromoBadge({ affiliate = null }) {
   if (affiliate?.buyerDiscountPct) {
-    const label =
-      (affiliate.handle ? `@${String(affiliate.handle).replace(/^@+/, '')}` : null) ||
-      affiliate.displayName ||
-      affiliate.code ||
-      'Creator'
+    const handleLabel = affiliateHandleLabel(affiliate)
     const initials = profileAvatarInitials(affiliate.displayName, affiliate.handle || affiliate.code)
-    const tone = profileAvatarToneClass(affiliate.handle || affiliate.code || label)
+    const tone = profileAvatarToneClass(affiliate.handle || affiliate.code || handleLabel || 'creator')
     return (
       <div className="subscribe-plan-founding-badge subscribe-plan-affiliate-badge pointer-events-none absolute left-1/2 top-0 z-30 -translate-x-1/2 -translate-y-1/2">
-        <div className="subscribe-plan-affiliate-badge-inner flex max-w-[min(100%,18rem)] items-center gap-2 rounded-full border border-cyan-400/40 bg-zinc-900 py-1 pl-1 pr-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-cyan-400/25">
+        <div
+          className="subscribe-plan-affiliate-badge-inner flex items-center gap-2 rounded-full border border-cyan-400/40 bg-zinc-900 py-1 pl-1 pr-3 shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-cyan-400/25"
+          aria-label={
+            handleLabel
+              ? `${handleLabel} · ${affiliate.buyerDiscountPct}% off`
+              : `${affiliate.buyerDiscountPct}% off`
+          }
+        >
           {affiliate.avatarUrl ? (
             <img
               src={affiliate.avatarUrl}
@@ -203,10 +214,6 @@ function PlanPromoBadge({ affiliate = null }) {
               {initials}
             </span>
           )}
-          <span className="subscribe-plan-affiliate-badge-label min-w-0 truncate text-[11px] font-semibold text-cyan-50">
-            {label}
-          </span>
-          <span className="subscribe-plan-affiliate-badge-divider h-3 w-px shrink-0 bg-cyan-400/35" aria-hidden />
           <span className="subscribe-plan-affiliate-badge-value shrink-0 text-[11px] font-semibold text-cyan-50">
             {affiliate.buyerDiscountPct}% off
           </span>
@@ -499,6 +506,7 @@ export default function SubscribeModal({
 
   const promoPercentOff = affiliatePromo?.buyerDiscountPct || SLOTS_EDGE_FOUNDING_PERCENT_OFF
   const isAffiliatePromo = Boolean(affiliatePromo?.buyerDiscountPct)
+  const affiliateVia = affiliateHandleLabel(affiliatePromo)
   const discounted = {
     starterMonthlyUsd: applyPercentOff(SLOTS_EDGE_STARTER_MONTHLY_USD, promoPercentOff),
     starterAnnualUsd: applyPercentOff(SLOTS_EDGE_STARTER_ANNUAL_USD, promoPercentOff),
@@ -506,7 +514,9 @@ export default function SubscribeModal({
     fullAnnualUsd: applyPercentOff(SLOTS_EDGE_FULL_ANNUAL_USD, promoPercentOff),
     lifetimeUsd: applyPercentOff(SLOTS_EDGE_LIFETIME_USD, promoPercentOff),
   }
-  const rateCaption = isAffiliatePromo ? 'partner rate' : 'founding rate'
+  const affiliateRateCaption = affiliateVia
+    ? `${promoPercentOff}% off via ${affiliateVia}`
+    : `${promoPercentOff}% off`
 
   const starterList = formatUsdMonthly(SLOTS_EDGE_STARTER_MONTHLY_USD)
   const starterEarly = formatUsdMonthly(discounted.starterMonthlyUsd)
@@ -784,9 +794,11 @@ export default function SubscribeModal({
                       </div>
                       <p className="mt-0.5 text-[11px] text-zinc-500">
                         {starterInterval === 'annual'
-                          ? `${starterAnnualEffective} effective · ${rateCaption}`
+                          ? isAffiliatePromo
+                            ? `${starterAnnualEffective} effective · ${affiliateRateCaption}`
+                            : `${starterAnnualEffective} effective · founding rate`
                           : isAffiliatePromo
-                            ? `${promoPercentOff}% off on monthly checkout`
+                            ? affiliateRateCaption
                             : 'Founding rate on monthly checkout'}
                       </p>
                       <ul className="mt-3 flex-1 space-y-1.5">
@@ -901,9 +913,11 @@ export default function SubscribeModal({
                       </div>
                       <p className="mt-0.5 text-[11px] text-zinc-500">
                         {fullInterval === 'annual'
-                          ? `${fullAnnualEffective} effective · ${isAffiliatePromo ? rateCaption : 'one month free'}`
+                          ? isAffiliatePromo
+                            ? `${fullAnnualEffective} effective · ${affiliateRateCaption}`
+                            : `${fullAnnualEffective} effective · one month free`
                           : isAffiliatePromo
-                            ? `${promoPercentOff}% off on monthly checkout`
+                            ? affiliateRateCaption
                             : 'Founding rate on monthly checkout'}
                       </p>
                       <ul className="mt-3 flex-1 space-y-1.5">
@@ -957,7 +971,7 @@ export default function SubscribeModal({
                       </div>
                       <p className="mt-0.5 text-[11px] text-zinc-500">
                         {isAffiliatePromo
-                          ? `${promoPercentOff}% off · one-time checkout`
+                          ? `${affiliateRateCaption} · one-time`
                           : 'Founding rate · one-time checkout'}
                       </p>
                       <ul className="mt-3 flex-1 space-y-1.5">
