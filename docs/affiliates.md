@@ -97,7 +97,8 @@ W-9/W-8 fields + optional `document_path` under Storage.
 
 ### Checkout (`stripe-create-checkout-session`)
 - Resolve active affiliate; reject self-ref; require `stripe_promotion_code_id`
-- `discounts: [{ promotion_code }]` **or** founding coupon (not both)
+- `discounts: [{ promotion_code }]` **or** founding coupon (not both) when the creator promo applies
+- If the Stripe customer has **prior transactions** (or promo redeem fails as ineligible), **skip the creator promo** and still open Checkout (founding may apply). Affiliate metadata stays for attribution. Never hard-block signup on promo eligibility.
 - Metadata: `affiliate_id`, `affiliate_code` on session + subscription
 
 ### Webhook (`stripe-webhook`)
