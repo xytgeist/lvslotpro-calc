@@ -289,7 +289,7 @@ export default function CreatorAffiliatePortal({
             </select>
           </label>
           <label className="block text-xs text-zinc-400">
-            Legal name
+            Legal name (person or entity name on your tax return)
             <input
               className="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2 text-sm text-white"
               value={form.legal_name}
