@@ -786,6 +786,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-17: **Profile Posts pin (own post):** migration **`20260717130000`** (`profile_pinned_at` + RPC **`lounge_set_profile_pin`**); one pin per author on profile Posts tab; menu **Pin to profile** (separate from staff Lounge pin).
 - 2026-07-17: **Lounge video upload resume on background → prod:** `main` fast-forwarded to **`d2499095`** (Ryan smoke OK on test). Fingerprint resume + visibility soft-pause.
 - 2026-07-17: **Lounge video upload resume on background:** `uploadVideoToCfStreamResumableTus` now calls **`findPreviousUploads` / `resumeFromPreviousUpload`**, soft-pauses on `visibilitychange` → hidden, resumes on visible; prep retries wait while foregrounded. Upload bar: "Waiting until you are back".
 - 2026-07-17: **Chat inbox preview for R2 video:** migration **`20260717120000`** … `chat_message_preview_text` treats `video_url` as `[video]` (was Stream-uid only); backfill blank room previews. Fixes list **"No messages yet"** after video-only sends.

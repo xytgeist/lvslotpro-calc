@@ -234,10 +234,12 @@ import {
   pushLoungeNavReturnFrame,
 } from './loungeNavReturnStack.js'
 import {
+  applyLoungeProfilePinToPosts,
   fetchLoungeProfilePosts,
   fetchLoungeProfileRow,
   loadLoungeProfileScreenPostsRemainder,
   LOUNGE_PROFILE_POST_INITIAL_LIMIT,
+  mergeLoungeProfilePosts,
 } from './loungeProfileScreenLoad.js'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import LoungeFeedAuthorMetaBadges from './LoungeFeedAuthorMetaBadges.jsx'
@@ -756,6 +758,7 @@ export default function SocialFeed({
   /** Non-empty while showing the “too many images” alert (composer + quote repost uploads). */
   const [loungeImageLimitDialog, setLoungeImageLimitDialog] = useState('')
   const [loungePinBusy, setLoungePinBusy] = useState(false)
+  const [loungeProfilePinBusy, setLoungeProfilePinBusy] = useState(false)
   const [profileGateOpen, setProfileGateOpen] = useState(false)
   const [loungeWelcomeOpen, setLoungeWelcomeOpen] = useState(false)
   const loungeWelcomeScheduleRef = useRef(false)
@@ -7940,6 +7943,58 @@ export default function SocialFeed({
     [loungeViewerIsStaff, loadCommunityFeed, setCommunityPosts, supabaseClient]
   )
 
+  const setLoungeProfilePostPinned = useCallback(
+    async (postId, nextPinned) => {
+      const id = String(postId || '').trim()
+      if (!id || !composerUserId) return { ok: false, error: 'Sign in required.' }
+      setLoungeManageErr('')
+      setLoungeProfilePinBusy(true)
+      try {
+        const { data, error } = await supabaseClient.rpc('lounge_set_profile_pin', {
+          p_post_id: id,
+          p_pinned: Boolean(nextPinned),
+        })
+        if (error) {
+          const msg = error.message || 'Could not update profile pin.'
+          setLoungeManageErr(msg)
+          setLoungeShareFlash(msg)
+          return { ok: false, error: msg }
+        }
+        const pinnedAt = data?.profile_pinned_at ? String(data.profile_pinned_at) : null
+        // Home feed order must stay feed-scoped; only patch the field here.
+        setCommunityPosts((prev) =>
+          prev.map((p) => {
+            if (String(p?.id) === id) return { ...p, profile_pinned_at: pinnedAt }
+            if (pinnedAt && p?.profile_pinned_at && p?.user_id === composerUserId) {
+              return { ...p, profile_pinned_at: null }
+            }
+            return p
+          }),
+        )
+        setProfileModalPosts((prev) => applyLoungeProfilePinToPosts(prev, id, pinnedAt))
+        setProfileOverlayStack((prev) =>
+          prev.map((layer) => ({
+            ...layer,
+            posts: applyLoungeProfilePinToPosts(layer.posts, id, pinnedAt),
+          })),
+        )
+        setLoungePostDetail((prev) => {
+          if (!prev) return prev
+          if (String(prev.id) === id) return { ...prev, profile_pinned_at: pinnedAt }
+          if (pinnedAt && prev.profile_pinned_at && prev.user_id === composerUserId) {
+            return { ...prev, profile_pinned_at: null }
+          }
+          return prev
+        })
+        setLoungeShareFlash(pinnedAt ? 'Pinned to your profile.' : 'Unpinned from your profile.')
+        return { ok: true, profile_pinned_at: pinnedAt }
+      } finally {
+        setLoungeProfilePinBusy(false)
+      }
+    },
+    [composerUserId, setCommunityPosts, supabaseClient],
+  )
+
   const performLoungePostDeleteFromDetail = useCallback(async () => {
     if (!loungePostDetail?.id || loungePostDetail.user_id !== composerUserId) return
     if (loungePostDeleteInflightRef.current) return
@@ -12236,15 +12291,7 @@ export default function SocialFeed({
           if (morePosts.length === 0) return
           setProfileModalPosts((prev) => {
             if (loadGen !== profileModalLoadGenRef.current) return prev
-            const seen = new Set(prev.map((p) => p.id))
-            const merged = [...prev]
-            for (const row of morePosts) {
-              if (row?.id && !seen.has(row.id)) {
-                seen.add(row.id)
-                merged.push(row)
-              }
-            }
-            return merged
+            return mergeLoungeProfilePosts(prev, morePosts)
           })
         })()
       } catch (e) {
@@ -12352,15 +12399,7 @@ export default function SocialFeed({
             setProfileOverlayStack((prev) =>
               prev.map((layer) => {
                 if (layer.userId !== userId) return layer
-                const seen = new Set((layer.posts || []).map((p) => p.id))
-                const merged = [...(layer.posts || [])]
-                for (const row of morePosts) {
-                  if (row?.id && !seen.has(row.id)) {
-                    seen.add(row.id)
-                    merged.push(row)
-                  }
-                }
-                return { ...layer, posts: merged }
+                return { ...layer, posts: mergeLoungeProfilePosts(layer.posts, morePosts) }
               }),
             )
           })()
@@ -13036,6 +13075,8 @@ export default function SocialFeed({
       loungeViewerIsStaff,
       setLoungePostPinned,
       loungePinBusy,
+      setLoungeProfilePostPinned,
+      loungeProfilePinBusy,
       displayNameFor,
       handleFor,
       postAgeLabel,
@@ -13117,6 +13158,8 @@ export default function SocialFeed({
       loungeViewerIsStaff,
       setLoungePostPinned,
       loungePinBusy,
+      setLoungeProfilePostPinned,
+      loungeProfilePinBusy,
       displayNameFor,
       handleFor,
       postAgeLabel,
@@ -14088,6 +14131,8 @@ export default function SocialFeed({
                   loungeViewerIsStaff={loungeViewerIsStaff}
                   setLoungePostPinned={setLoungePostPinned}
                   loungePinBusy={loungePinBusy}
+                  setLoungeProfilePostPinned={setLoungeProfilePostPinned}
+                  loungeProfilePinBusy={loungeProfilePinBusy}
                   displayNameFor={displayNameFor}
                   handleFor={handleFor}
                   postAgeLabel={postAgeLabel}

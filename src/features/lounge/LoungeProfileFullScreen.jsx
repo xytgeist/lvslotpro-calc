@@ -54,10 +54,12 @@ import LoungeOgBadge from './LoungeOgBadge'
 import ProfileAvatarCropModal from './ProfileAvatarCropModal'
 import LoungeProfileFollowList from './LoungeProfileFollowList.jsx'
 import {
+  applyLoungeProfilePinToPosts,
   fetchLoungeProfilePosts,
   fetchLoungeProfileRow,
   loadLoungeProfileScreenPostsRemainder,
   LOUNGE_PROFILE_POST_INITIAL_LIMIT,
+  mergeLoungeProfilePosts,
 } from './loungeProfileScreenLoad.js'
 import { formatCompactStatCount, fullStatCountTitle } from '../../utils/formatCompactStatCount.js'
 import { LOUNGE_DOCK_FAB_SIZE_PX } from '../../utils/loungeDockFabPosition.js'
@@ -709,6 +711,22 @@ export default function LoungeProfileFullScreen({
             base.onCommentUndoPlainRepost(p)
           }
         : base.onCommentUndoPlainRepost
+    const wrapProfilePin =
+      typeof base.setLoungeProfilePostPinned === 'function'
+        ? async (postId, nextPinned) => {
+            const result = await base.setLoungeProfilePostPinned(postId, nextPinned)
+            if (result?.ok) {
+              const pinnedAt = result.profile_pinned_at || null
+              setNestedProfileStack((prev) =>
+                prev.map((layer) => ({
+                  ...layer,
+                  posts: applyLoungeProfilePinToPosts(layer.posts, postId, pinnedAt),
+                })),
+              )
+            }
+            return result
+          }
+        : base.setLoungeProfilePostPinned
     return {
       ...base,
       toggleBookmark: wrapBm,
@@ -717,6 +735,7 @@ export default function LoungeProfileFullScreen({
       onToggleCommentBookmark: wrapCommentBookmark,
       onCommentPlainRepost: wrapCommentPlainRepost,
       onCommentUndoPlainRepost: wrapCommentUndoRepost,
+      setLoungeProfilePostPinned: wrapProfilePin,
     }
   }, [postCardProps, tab])
 
@@ -1704,15 +1723,7 @@ export default function LoungeProfileFullScreen({
             setNestedProfileStack((prev) =>
               prev.map((layer) => {
                 if (layer.userId !== uid) return layer
-                const seen = new Set((layer.posts || []).map((p) => p.id))
-                const merged = [...(layer.posts || [])]
-                for (const row of morePosts) {
-                  if (row?.id && !seen.has(row.id)) {
-                    seen.add(row.id)
-                    merged.push(row)
-                  }
-                }
-                return { ...layer, posts: merged }
+                return { ...layer, posts: mergeLoungeProfilePosts(layer.posts, morePosts) }
               }),
             )
           })()
@@ -2472,7 +2483,7 @@ export default function LoungeProfileFullScreen({
               isOwnProfile={Boolean(viewerUserId && layer.userId === viewerUserId)}
               onClose={popNestedProfile}
               onAfterTransitionOut={popNestedProfile}
-              postCardProps={postCardProps}
+              postCardProps={postCardPropsForLists}
               onProfileUpdated={onProfileUpdated}
               hydratePosts={hydratePosts}
               onNavigateToProfile={(entity) => {

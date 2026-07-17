@@ -60,6 +60,8 @@ export default function LoungePostArticle({
   loungeViewerIsStaff,
   setLoungePostPinned,
   loungePinBusy,
+  setLoungeProfilePostPinned,
+  loungeProfilePinBusy,
   displayNameFor,
   handleFor,
   postAgeLabel,
@@ -167,9 +169,17 @@ export default function LoungePostArticle({
   )
   const showStaffPin =
     Boolean(loungeViewerIsStaff && !ro && !isPlainPostRepost && !isCommentRepost && typeof setLoungePostPinned === 'function')
+  const showProfilePin = Boolean(
+    menuIsOwn &&
+      !ro &&
+      !isPlainPostRepost &&
+      !isCommentRepost &&
+      typeof setLoungeProfilePostPinned === 'function',
+  )
   const showPostRowMenu = Boolean(
     (!ro && !isPlainPostRepost && !isCommentRepost && typeof onSharePost === 'function') ||
       showStaffPin ||
+      showProfilePin ||
       (!ro &&
         viewerUserId &&
         ((!isPlainPostRepost && !isCommentRepost && (onPostMenuEdit || onPostMenuBlock || onPostMenuReport)) ||
@@ -390,12 +400,19 @@ export default function LoungePostArticle({
                 </span>
               </span>
             </div>
-            {/* Pinned pill - only on non-repost cards */}
-            {!isPlainPostRepost && !isCommentRepost && post.pinned ? (
-              <div className="mt-1">
-                <span className="inline-flex shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
-                  Pinned
-                </span>
+            {/* Pinned pills - lounge staff vs profile (own Posts tab) */}
+            {!isPlainPostRepost && !isCommentRepost && (post.pinned || post.profile_pinned_at) ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {post.pinned ? (
+                  <span className="inline-flex shrink-0 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide text-fuchsia-200">
+                    Pinned
+                  </span>
+                ) : null}
+                {post.profile_pinned_at ? (
+                  <span className="inline-flex shrink-0 rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide text-sky-200">
+                    Pinned to profile
+                  </span>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -417,6 +434,10 @@ export default function LoungePostArticle({
                 pinned={Boolean(post?.pinned)}
                 pinBusy={loungePinBusy}
                 onPinToggle={() => void setLoungePostPinned(post.id, !post.pinned)}
+                showProfilePin={showProfilePin}
+                profilePinned={Boolean(post?.profile_pinned_at)}
+                profilePinBusy={loungeProfilePinBusy}
+                onProfilePinToggle={() => void setLoungeProfilePostPinned(post.id, !post.profile_pinned_at)}
                 positionScrollRootRef={repostMenuScrollRootRef}
               />
             </div>

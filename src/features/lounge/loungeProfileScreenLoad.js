@@ -11,17 +11,56 @@ const PROFILE_SELECT_CORE =
   'user_id,handle,display_name,avatar_url,bio,created_at,role,handle_changed_at,is_og'
 
 const PROFILE_POST_SELECT =
+  'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,profile_pinned_at,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url'
+
+const PROFILE_POST_SELECT_LEGACY =
   'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url'
 
-function profilePostsQuery(supabaseClient, userId) {
-  return supabaseClient
+/** Profile Posts tab: profile pin first, then newest. */
+export function sortLoungeProfilePosts(posts) {
+  return [...(Array.isArray(posts) ? posts : [])].sort((a, b) => {
+    const ap = a?.profile_pinned_at ? Date.parse(a.profile_pinned_at) : 0
+    const bp = b?.profile_pinned_at ? Date.parse(b.profile_pinned_at) : 0
+    const aPin = Number.isFinite(ap) && ap > 0 ? ap : 0
+    const bPin = Number.isFinite(bp) && bp > 0 ? bp : 0
+    if (aPin !== bPin) return bPin - aPin
+    const ac = a?.created_at ? Date.parse(a.created_at) : 0
+    const bc = b?.created_at ? Date.parse(b.created_at) : 0
+    if (ac !== bc) return bc - ac
+    return String(b?.id || '').localeCompare(String(a?.id || ''))
+  })
+}
+
+/**
+ * Apply a profile-pin toggle locally (clears other pins for the author when pinning).
+ * @param {object[]} posts
+ * @param {string} postId
+ * @param {string | null} profilePinnedAt
+ */
+export function applyLoungeProfilePinToPosts(posts, postId, profilePinnedAt) {
+  const id = String(postId || '').trim()
+  if (!id) return sortLoungeProfilePosts(posts)
+  const pinnedAt = profilePinnedAt ? String(profilePinnedAt) : null
+  const next = (Array.isArray(posts) ? posts : []).map((p) => {
+    if (!p?.id) return p
+    if (String(p.id) === id) return { ...p, profile_pinned_at: pinnedAt }
+    if (pinnedAt && p.profile_pinned_at) return { ...p, profile_pinned_at: null }
+    return p
+  })
+  return sortLoungeProfilePosts(next)
+}
+
+function profilePostsQuery(supabaseClient, userId, select = PROFILE_POST_SELECT) {
+  let q = supabaseClient
     .from('community_feed_posts')
-    .select(PROFILE_POST_SELECT)
+    .select(select)
     .eq('user_id', userId)
     .is('hidden_at', null)
     .is('thread_root_id', null)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
+  if (select.includes('profile_pinned_at')) {
+    q = q.order('profile_pinned_at', { ascending: false, nullsFirst: false })
+  }
+  return q.order('created_at', { ascending: false }).order('id', { ascending: false })
 }
 
 /**
@@ -79,13 +118,20 @@ export async function fetchLoungeProfilePosts(
   const from = Math.max(0, offset)
   const to = from + safeLimit - 1
 
-  const { data: postRows, error: postsErr } = await profilePostsQuery(supabaseClient, uid).range(from, to)
+  let { data: postRows, error: postsErr } = await profilePostsQuery(supabaseClient, uid).range(from, to)
+  if (postsErr && /profile_pinned_at/i.test(String(postsErr.message || ''))) {
+    ;({ data: postRows, error: postsErr } = await profilePostsQuery(
+      supabaseClient,
+      uid,
+      PROFILE_POST_SELECT_LEGACY,
+    ).range(from, to))
+  }
 
   const hydrated =
     typeof hydratePosts === 'function' ? await hydratePosts(postRows || []) : postRows || []
 
   return {
-    posts: hydrated,
+    posts: sortLoungeProfilePosts(hydrated),
     postsErr: postsErr?.message || '',
   }
 }
@@ -111,6 +157,18 @@ export async function loadLoungeProfileScreenPostsRemainder(
     limit: remaining,
     offset: loaded,
   })
+}
+
+/** Merge extra profile posts without losing pin-first order. */
+export function mergeLoungeProfilePosts(existing, more) {
+  const seen = new Set()
+  const merged = []
+  for (const row of [...(existing || []), ...(more || [])]) {
+    if (!row?.id || seen.has(row.id)) continue
+    seen.add(row.id)
+    merged.push(row)
+  }
+  return sortLoungeProfilePosts(merged)
 }
 
 /**
