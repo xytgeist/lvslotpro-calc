@@ -516,9 +516,9 @@ export default function SubscribeModal({
         aria-modal="true"
         aria-labelledby="subscribe-modal-title"
         data-subscribe-modal
-        className="subscribe-modal-shell relative z-10 flex h-[92dvh] max-h-[92dvh] min-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-zinc-700/70 bg-zinc-950 shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:h-[90dvh] sm:max-h-[90dvh] sm:min-h-[90dvh] sm:max-w-2xl sm:rounded-[1.75rem]"
+        className="subscribe-modal-shell relative z-10 flex h-[96dvh] max-h-[96dvh] min-h-[96dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-zinc-700/70 bg-zinc-950 shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:h-[94dvh] sm:max-h-[94dvh] sm:min-h-[94dvh] sm:max-w-2xl sm:rounded-[1.75rem]"
       >
-        <div className="subscribe-modal-hero relative z-30 shrink-0 bg-zinc-950 px-6 pb-4 pt-5 sm:px-7 sm:pb-7 sm:pt-7">
+        <div className="subscribe-modal-hero relative z-20 shrink-0 bg-zinc-950 px-6 pb-3 pt-5 sm:px-7 sm:pb-5 sm:pt-7">
           <div
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(6,182,212,0.2),transparent_60%)]"
             aria-hidden
@@ -570,7 +570,7 @@ export default function SubscribeModal({
             </div>
           ) : (
             <>
-              <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-visible px-1 pb-1 pt-3 sm:items-center sm:py-2">
+              <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-visible px-1 pb-1 pt-8 sm:items-center sm:pt-10 sm:pb-2">
                 <button
                   type="button"
                   aria-label="Previous plan"
