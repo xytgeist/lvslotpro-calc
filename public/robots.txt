@@ -1,0 +1,5 @@
+# https://edgetilt.com
+User-agent: *
+Allow: /
+
+Sitemap: https://edgetilt.com/sitemap.xml

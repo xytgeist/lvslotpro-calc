@@ -786,6 +786,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-17: **Homepage SEO pack:** `index.html` title/description/canonical + OG/Twitter; **`public/robots.txt`** + **`sitemap.xml`** (static files served ahead of SPA rewrite).
 - 2026-07-17: **GA4 site analytics:** `VITE_GA_MEASUREMENT_ID` (Vercel Production) → **`initGoogleAnalytics`** in **`main.jsx`**; privacy policy + **`LEGAL_POLICY_VERSION`** bumped to **2026-07-17** (re-acceptance).
 - 2026-07-17: **Editorial inbox Discard:** migration **`20260717140000`** RPC **`admin_lounge_bot_queue_delete`**; portal **Discard** removes queue row so Transform can retry the same tweet (Skip alone left dedupe locked).
 - 2026-07-17: **Profile Posts pin (own post):** migration **`20260717130000`** (`profile_pinned_at` + RPC **`lounge_set_profile_pin`**); one pin per author on profile Posts tab; menu **Pin to profile** (separate from staff Lounge pin).
