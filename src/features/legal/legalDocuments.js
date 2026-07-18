@@ -153,13 +153,13 @@ export const LEGAL_DOCUMENTS = {
         id: 'cookies',
         heading: '2. Cookies and similar technologies',
         paragraphs: [
-          'We use cookies, local storage, and similar browser technologies ("cookies" in this section) to run the Service. We do not use third-party advertising or cross-site tracking cookies today.',
+          'We use cookies, local storage, and similar browser technologies ("cookies" in this section) to run the Service and understand how it is used.',
           'Strictly necessary: Supabase authentication stores session tokens so you stay signed in. Stripe may set cookies when you complete checkout or manage billing. These are required for login and payments.',
           'Preferences and app state: we store settings on your device with local storage (for example, light/dark theme, Lounge feed preferences, quick-link shortcuts, composer drafts, and similar UI state). This keeps the app working the way you left it.',
+          'Analytics: we use Google Analytics 4 to measure site visits, pages viewed, devices, approximate location, and campaign/referral information (including UTM parameters on links we share). Google may set cookies or use similar identifiers for this purpose. We configure analytics to reduce precision where available (for example, IP anonymization). We do not use Google Analytics for third-party advertising networks or cross-site ad targeting.',
           'Push notifications: if you enable alerts, your browser or installed app may store a push subscription identifier tied to this device.',
           'Fonts and media: we load fonts from Google Fonts. Embedded YouTube videos in chat use YouTube\'s privacy-enhanced (nocookie) embed where configured. Cloudflare and other infrastructure providers may process technical data when you load images or video.',
-          'Your choices: you can clear site data or cookies in your browser settings, which may sign you out and reset local preferences. Most browsers also let you block third-party cookies; blocking all cookies may prevent login or checkout from working.',
-          'If we add optional analytics or marketing cookies in the future, we will update this Policy and, where required by law, ask for your consent before using them.',
+          'Your choices: you can clear site data or cookies in your browser settings, which may sign you out and reset local preferences. Most browsers also let you block third-party cookies; blocking all cookies may prevent login or checkout from working. You can also use browser or Google tools that limit Analytics measurement where available.',
         ],
       },
       {
@@ -189,7 +189,7 @@ export const LEGAL_DOCUMENTS = {
         heading: '5. How we share information',
         paragraphs: [
           'Public profile and Lounge content: information you choose to make public (such as posts, handle, and public profile fields) is visible to other users according to product settings and RLS policies.',
-          'Service providers: we use vendors such as Supabase (database and auth), Vercel (hosting), Cloudflare (media and video), Stripe (payments), and push notification infrastructure. They process data on our behalf under contractual safeguards.',
+          'Service providers: we use vendors such as Supabase (database and auth), Vercel (hosting), Cloudflare (media and video), Stripe (payments), Google (Analytics and fonts), and push notification infrastructure. They process data on our behalf under contractual safeguards.',
           'Legal and safety: we may disclose information if required by law, to protect rights and safety, or to investigate fraud or abuse.',
           'Business transfers: if we merge, sell assets, or reorganize, user information may transfer as part of that transaction, subject to this Policy.',
           'We do not sell your personal information for cross-context behavioral advertising.',
