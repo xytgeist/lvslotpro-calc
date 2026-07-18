@@ -2,6 +2,9 @@
  * Google Analytics 4 (gtag) for EdgeTilt production.
  * Loads only when `VITE_GA_MEASUREMENT_ID` is set (Vercel Production).
  * Sends an initial page_view, then SPA navigations via history patches.
+ *
+ * Important: the gtag stub must use `arguments` (not rest+array push).
+ * Rest-args stubs load gtag.js but never emit collect hits.
  */
 
 const MEASUREMENT_ID = String(import.meta.env.VITE_GA_MEASUREMENT_ID || '').trim()
@@ -43,8 +46,10 @@ export function initGoogleAnalytics() {
   window.__edgeGaInitialized = true
 
   window.dataLayer = window.dataLayer || []
-  window.gtag = function gtag(...args) {
-    window.dataLayer.push(args)
+  // Must match Google's snippet: push `arguments`, not a rest-array.
+  window.gtag = function gtag() {
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer.push(arguments)
   }
 
   window.gtag('js', new Date())
