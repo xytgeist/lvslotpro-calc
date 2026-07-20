@@ -2732,6 +2732,35 @@ html.light [data-settings-account] .hover\:bg-zinc-800\/80:hover {
   background-color: #e4e4e7 !important;
 }
 
+/* Settings → Help & support - light mode */
+html.light [data-settings-support] .text-zinc-100 {
+  color: #18181b !important;
+}
+html.light [data-settings-support] .text-zinc-500 {
+  color: #71717a !important;
+}
+html.light [data-settings-support] a.text-orange-400 {
+  color: #ea580c !important;
+}
+html.light [data-settings-support] a.hover\:text-orange-300:hover {
+  color: #c2410c !important;
+}
+html.light [data-settings-support] .text-cyan-200\/90 {
+  color: #1d4ed8 !important;
+}
+html.light [data-settings-support] .text-zinc-200 {
+  color: #3f3f46 !important;
+}
+html.light [data-settings-support] .bg-zinc-900\/80 {
+  background-color: #f4f4f5 !important;
+}
+html.light [data-settings-support] .border-zinc-700\/90 {
+  border-color: #d4d4d8 !important;
+}
+html.light [data-settings-support] .hover\:bg-zinc-800:hover {
+  background-color: #e4e4e7 !important;
+}
+
 /* Manage membership modal - light mode */
 html.light [data-billing-manage-modal] {
   background-color: #ffffff !important;
