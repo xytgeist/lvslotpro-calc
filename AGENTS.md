@@ -122,10 +122,11 @@ Future sessions have **no memory** of this chat. Treat the repo as the **source 
 | 4 | `docs/test-buildout-backlog.md` | Test-first work, phase checkboxes, **smoke list**, sign-offs, SQL/RLS notes tied to test |
 | 5 | `docs/production-rollout-checklist.md` | Promoting test work to production (SQL, functions, smoke) |
 | 6 | `docs/edgetilt-production-cutover.md` | **One-time** prod/test Supabase + domain cutover (`edgetilt.com` / `lvslotpro.com`) |
-| 6 | `docs/access-tiers.md` | **Freemium spec:** no account vs free vs paid — per-surface read/write matrix; update when product rules change |
-| 7 | `docs/affiliates.md` | **Creator affiliates:** in-house v1 (packages, `?ref=` + promo, ledger, admin/creator portals, Connect) |
-| 8 | `docs/test-user-roles.md` | **`profiles.role`** + **`has_active_subscription`** — tier testing SQL recipes |
-| 9 | `supabase/*.sql` | Schema, RLS, triggers; read headers/comments when touching the DB |
+| 6 | `docs/access-tiers.md` | **Freemium spec (shipped):** no account vs free vs **Slots Edge** / staff — per-surface read/write matrix |
+| 7 | `docs/entitlements-matrix.md` | **Multi-product paywalls (planned + partial):** Edge Pro, creator fan subs, add-ons, stacking, **`get_my_entitlements()`** target, rollout phases |
+| 8 | `docs/affiliates.md` | **Creator affiliates:** in-house v1 (packages, `?ref=` + promo, ledger, admin/creator portals, Connect) |
+| 9 | `docs/test-user-roles.md` | **`profiles.role`** + **`has_active_subscription`** — tier testing SQL recipes |
+| 10 | `supabase/*.sql` | Schema, RLS, triggers; read headers/comments when touching the DB |
 
 Feature-specific notes may also live next to code (e.g. `src/features/offers/README.md`).
 
@@ -142,7 +143,7 @@ Do this **in the same change or PR** as the code (or immediately after), not “
 | **DB capability** (e.g. moderator `UPDATE` including `pinned`) **without** matching UI | `docs/test-buildout-backlog.md`: open checkbox + how to test (seed SQL, SQL editor, future UI). Do not assume the next agent reads chat exports. |
 | Edge Function added/removed/renamed on test | `docs/test-buildout-backlog.md` Edge Functions section + prod checklist §4 if needed |
 | Stakeholder **decision** that affects implementation | Distill into the single best canonical file above; **one sentence in Update log** if it closes or opens a tracked item |
-| **Freemium / subscriptions / entitlements** (tiers, paywalls, Stripe) | **`docs/access-tiers.md`** (matrix) + `docs/social-feed-roadmap.md` (Freemium section) + backlog + `docs/frontend-architecture.md` when client gating changes |
+| **Freemium / subscriptions / entitlements** (tiers, paywalls, Stripe) | **`docs/access-tiers.md`** (shipped tiers) + **`docs/entitlements-matrix.md`** (multi-product catalog + capability matrix) + `docs/social-feed-roadmap.md` (Freemium section) + backlog + `docs/frontend-architecture.md` when client gating changes |
 | **Creator affiliates** (in-house ledger, packages, ref/promo) | **`docs/affiliates.md`** |
 | Only internal refactor, **zero** API/UX/contract change | Docs optional unless you moved paths (then `frontend-architecture.md`) |
 
@@ -176,7 +177,8 @@ Do **not** duplicate long implementation notes here (they drift). Read these whe
 | Chat (DM, groups, video prep, link previews, glass CSS blast radius) | **`docs/frontend-architecture.md`** → **`chat/`** row; backlog **Chat** section |
 | Play Logbook, calculators, bankroll, offers, guides | Matching **`docs/frontend-architecture.md`** feature rows; backlog sections |
 | **Lounge bots (Scott Share / odds, wire, X editorial)** | **`docs/lounge-bot-sports-odds.md`**, **`docs/lounge-bot-market-news.md`**, **`docs/lounge-bot-crypto-news.md`**, **`docs/lounge-bot-editorial-queue.md`**; portal **`/?tab=bots`** (**`BotReplyOnPostPanel`**, **`BotProfileEditor`**, **`BotComposeImagePicker`**, X **Transform a post**); Edge **`lounge-odds-ingest`**, **`lounge-odds-poll`**, **`lounge-news-poll`**, **`lounge-x-ingest`**; migrations through **`20260707000000`** on test + prod (**`schema_migrations`** tracked Jul 7); X manual transform works without bearer |
-| Freemium product rules | **`docs/access-tiers.md`** |
+| Freemium product rules (shipped) | **`docs/access-tiers.md`** |
+| Multi-product entitlements (planned) | **`docs/entitlements-matrix.md`** |
 | Creator affiliates | **`docs/affiliates.md`** |
 | Tier testing SQL (`profiles.role`, `has_active_subscription`) | **`docs/test-user-roles.md`** |
 | **Test:** SQL apply order, Edge deploy list, smoke sign-offs, shipped facts | **`docs/test-buildout-backlog.md`** (sections + **Update log** tail) |

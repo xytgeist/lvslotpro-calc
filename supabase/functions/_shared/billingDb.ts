@@ -75,6 +75,25 @@ export async function upsertUserSubscriptionFromStripe(
     updated_at: new Date().toISOString(),
   }
 
+  const { data: existingBySubId, error: subLookupErr } = await admin
+    .from('user_subscriptions')
+    .select('id, status')
+    .eq('stripe_subscription_id', subscription.id)
+    .maybeSingle()
+  if (subLookupErr) throw new Error(`user_subscriptions lookup (${subscription.id}): ${subLookupErr.message}`)
+
+  // Stripe does not guarantee webhook order. subscription.created (incomplete) can arrive after
+  // checkout.session.completed or subscription.updated (active) and would clobber entitlements.
+  const protectedStatuses = new Set(['active', 'trialing'])
+  const staleIncomingStatuses = new Set(['incomplete', 'incomplete_expired'])
+  if (
+    existingBySubId?.id &&
+    protectedStatuses.has(String(existingBySubId.status)) &&
+    staleIncomingStatuses.has(subscription.status)
+  ) {
+    return
+  }
+
   // Starter → Pro reuses one Stripe subscription id but changes product_slug. Clear conflicting
   // rows before write so we do not hit user_subscriptions_stripe_subscription_id_key or
   // user_subscriptions_user_product_key (e.g. stale test pro row + active starter row).
@@ -82,13 +101,6 @@ export async function upsertUserSubscriptionFromStripe(
     await clearStarterSubscriptionRow(admin, userId)
     await clearStaleFullSubscriptionRows(admin, userId, subscription.id)
   }
-
-  const { data: existingBySubId, error: subLookupErr } = await admin
-    .from('user_subscriptions')
-    .select('id')
-    .eq('stripe_subscription_id', subscription.id)
-    .maybeSingle()
-  if (subLookupErr) throw new Error(`user_subscriptions lookup (${subscription.id}): ${subLookupErr.message}`)
 
   if (existingBySubId?.id) {
     const { error } = await admin.from('user_subscriptions').update(row).eq('id', existingBySubId.id)

@@ -2,7 +2,7 @@
 
 **Purpose:** Define **no account**, **free (verified) account**, **paid subscriber**, and **staff** behavior before entitlements, RLS, and UI gates are implemented.
 
-**Related:** `docs/social-feed-roadmap.md` (Freemium & subscriptions), `docs/frontend-architecture.md` (Access model), `AGENTS.md`.
+**Related:** `docs/entitlements-matrix.md` (**multi-product** paywalls: Edge Pro, creator fan subs, add-ons ... planned), `docs/social-feed-roadmap.md` (Freemium & subscriptions), `docs/frontend-architecture.md` (Access model), `AGENTS.md`.
 
 ---
 
@@ -232,3 +232,4 @@ Copy for modals: distinguish **create account** (anon) vs **subscribe** (free us
 | 2026-07-01 | **Starter weekly drop rules locked:** per-user uniform random from **remaining** published **2020+** slugs (excludes free list + prior grants). Migration **`20260701130000_starter_weekly_guide_unlocks.sql`**, pool helpers **`starterWeeklyDropPool.js`**, client **`useStarterWeeklyDropGuideSlugs`**. |
 | 2026-07-01 | **Public tier names:** **Slots Edge** (`slots-edge-starter`), **Slots Edge Pro** (`slots-edge`), **Slots Edge Lifetime** (`slots-edge-lifetime`). Migration **`20260701150000_subscription_product_tier_display_names.sql`**. Subscribe modal + **`edgeProducts.js`** display names. |
 | 2026-07-02 | **Buffalo Diamond → Pro only:** **`SLOTS_EDGE_PRO_ONLY_GUIDE_SLUGS`** + **`SLOTS_EDGE_PRO_ONLY_CALCULATOR_KEYS`** in **`guideAccess.js`** / **`calculatorAccess.js`**. Starter keeps WoF 4D CE guide + calc when guide is unlocked. |
+| 2026-07-18 | **Multi-product entitlements (planned):** creator fan subs, Edge Pro platform tier, add-ons ... capability matrix and stacking rules in **`docs/entitlements-matrix.md`**. This file remains source of truth for **shipped** anon / free / Slots Edge / staff behavior. |

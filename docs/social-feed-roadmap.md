@@ -63,23 +63,27 @@ There is **no** separate “reply detail” or “reply-to-reply detail” scree
 
 ---
 
-## Freemium & subscriptions (cross-cutting — planned)
+## Freemium & subscriptions (cross-cutting ... planned)
 
-Product direction (not fully implemented yet; today’s **anonymous shell + open auth** is the stepping stone):
+**Specs (read both):**
 
-1. **Anonymous** — See **`docs/access-tiers.md`**: Lounge **read-only** (no artificial post cap; normal pagination/RLS), no search/filter/post open; **create account** modal on any attempt to leave Lounge / use other disallowed UI.
-2. **Free account** — **Verified user** badge; **full Lounge**; other tabs reachable; **subscribe** gates on bankroll, offer alerts + OCR, locked calculators/guides (see access tiers).
-3. **Paid — Starter or Full Edge** — Verified + **subscriber** badges; **guide cards are the hero product** (Starter: fixed pack + weekly random premium drop; Full: instant library). **Full Edge** unlocks all tools; **optional add-on paywalls** for new game packs offered **only to Full subscribers**. Pricing locked in **`docs/access-tiers.md` §5.1** ($14 Starter, $42/mo / $420/yr Full, 10% off first year for early subs). Billing: **Stripe** + webhooks → Supabase.
+- **`docs/access-tiers.md`** ... **shipped today:** anonymous / free / **Slots Edge** (Starter, Pro, Lifetime) / staff; per-surface gates (bankroll, logbook, calcs, guides, calendar OCR).
+- **`docs/entitlements-matrix.md`** ... **planned multi-product:** **Edge Pro** (platform social tier: ads off, feed filters, author reply controls), **creator fan subs** (70/30 Connect, fan-only posts + fan room), **add-ons**, stacking rules, target **`get_my_entitlements()`** shape, phased rollout **§6**.
+
+Product direction (partially implemented; **anonymous shell + open auth** + **Slots Edge billing on test** are the stepping stones):
+
+1. **Anonymous** ... Lounge **read-only** (no artificial post cap; normal pagination/RLS), no search/filter/post open; **create account** modal on forbidden actions (see access tiers).
+2. **Free account** ... **Verified user** badge; **full Lounge**; other tabs reachable; **subscribe** gates on bankroll/logbook limits, offer alerts + OCR, locked calculators/guides.
+3. **Paid ... Slots Edge** ... Verified + **subscriber** badges; guide cards are the hero product (Starter: fixed pack + weekly drop; Pro/Lifetime: full library + all tools). Pricing: **`docs/access-tiers.md` §5.1**. Billing: **Stripe** + webhooks → Supabase (**shipped on test**).
+4. **Planned ... Edge Pro + creator fan subs + add-ons** ... separate products that **stack independently**; never one ambiguous **Subscribe** button. Fan subs: preset monthly tiers, Connect onboarding, fan-only posts + searchable fan room (not E2EE v1). Detail: **`docs/entitlements-matrix.md`**.
 
 **Engineering rules when this ships:**
 
 - **Server truth:** RLS + Edge checks must enforce tier limits; the client only hides/shows UX and must not be the only gate.
-- **Single entitlement read path:** e.g. `get_entitlements(user_id)` RPC or JWT claims refreshed post-webhook so `AppShell` / features can branch without duplicating business rules everywhere.
-- **Lounge:** view for everyone with `SELECT`; **writes** gated on `authenticated` + profile/tier policies (already directionally aligned with Phase A3).
+- **Single entitlement read path:** **`get_my_entitlements()`** (or equivalent) refreshed post-webhook; clients branch on **specific grants** (`edge-pro`, `slots-edge`, `creator-fan:{id}`, add-ons) without duplicating business rules.
+- **Lounge:** public read for everyone with `SELECT`; **writes** gated on `authenticated` + profile/tier policies; **fan-only** and **Edge Pro reply** gates use the matrix capability rows.
 
-Order vs phases **A–L** is TBD; likely after **Phase C** (profiles + identity) and stable read paths, introduce schema + webhooks, then gate tab-by-tab. Track concrete tasks in `docs/test-buildout-backlog.md` when implementation starts.
-
-**Your tier definitions:** fill in **`docs/access-tiers.md`** (per-surface read/write matrix + global rules). That file becomes the spec implementation should follow.
+Order vs phases **A–L** is TBD; **Slots Edge** gates can land tab-by-tab after **Phase C**; **creator fan subs** and **Edge Pro** follow **`docs/entitlements-matrix.md` §6** (Phase 1 RPC refactor first). Track concrete tasks in **`docs/test-buildout-backlog.md`**.
 
 ---
 
