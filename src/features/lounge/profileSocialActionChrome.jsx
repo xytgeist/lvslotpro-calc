@@ -14,7 +14,7 @@ const PROFILE_SOCIAL_NEUTRAL_BTN =
  */
 export function profileSocialActionButtonClass(variant) {
   if (variant === 'followInvite') {
-    return `${PROFILE_SOCIAL_ACTION_BTN_BASE} border-zinc-600/85 bg-zinc-950 text-zinc-50 shadow-none hover:bg-zinc-900 hover:border-zinc-500`
+    return `${PROFILE_SOCIAL_ACTION_BTN_BASE} border-zinc-600/85 bg-white text-zinc-950 shadow-none hover:bg-zinc-100 hover:border-zinc-500`
   }
   if (variant === 'followActive') {
     return `${PROFILE_SOCIAL_ACTION_BTN_BASE} border-cyan-500/55 bg-cyan-950/35 text-cyan-100 shadow-[inset_0_1px_0_rgba(34,211,238,0.12)] hover:border-cyan-400/65`
