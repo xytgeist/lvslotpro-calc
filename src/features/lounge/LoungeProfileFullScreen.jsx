@@ -68,6 +68,11 @@ import {
   profileCategoryPills,
 } from '../../utils/loungePostCategoryPills.js'
 import { chatBlockUser, chatGetBlockStatus, chatUnblockUser } from '../chat/chatApi.js'
+import {
+  fetchCreatorFanOffer,
+  startCreatorFanCheckout,
+} from '../creatorFanSubs/creatorFanSubsApi.js'
+import { formatFanTierLabel } from '../creatorFanSubs/fanSubTiers.js'
 
 const PROFILE_TAB_IDS = ['posts', 'replies', 'likes', 'bookmarks']
 
@@ -517,6 +522,9 @@ export default function LoungeProfileFullScreen({
   const [theyBlockMe, setTheyBlockMe] = useState(false)
   const [blockBusy, setBlockBusy] = useState(false)
   const [socialBusy, setSocialBusy] = useState(false)
+  const [creatorFanOffer, setCreatorFanOffer] = useState(null)
+  const [hasCreatorFanSub, setHasCreatorFanSub] = useState(false)
+  const [fanCheckoutBusy, setFanCheckoutBusy] = useState(false)
   const [aboutDraft, setAboutDraft] = useState('')
   const [locationDraft, setLocationDraft] = useState('')
   const [categoryPillsDraft, setCategoryPillsDraft] = useState([])
@@ -1248,6 +1256,38 @@ export default function LoungeProfileFullScreen({
   }, [open, panelVisible, refreshSocial])
 
   useEffect(() => {
+    if (!open || !panelVisible || !profileUserId || isOwnProfile) {
+      setCreatorFanOffer(null)
+      setHasCreatorFanSub(false)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const offer = await fetchCreatorFanOffer(supabaseClient, profileUserId)
+        if (cancelled) return
+        setCreatorFanOffer(offer)
+        if (!viewerUserId || !offer) {
+          setHasCreatorFanSub(false)
+          return
+        }
+        const { data, error } = await supabaseClient.rpc('get_my_creator_fan_entitlements')
+        if (cancelled || error) return
+        const key = `creator-fan:${profileUserId}`
+        setHasCreatorFanSub(Boolean(data?.[key]?.active))
+      } catch {
+        if (!cancelled) {
+          setCreatorFanOffer(null)
+          setHasCreatorFanSub(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, panelVisible, profileUserId, isOwnProfile, viewerUserId, supabaseClient])
+
+  useEffect(() => {
     if (!open || !panelVisible) return
     profileDockRevealRef.current = 1
     setProfileDockReveal(1)
@@ -1366,6 +1406,18 @@ export default function LoungeProfileFullScreen({
       setIsSubscribed((v) => !v)
     } finally {
       setSocialBusy(false)
+    }
+  }
+
+  const supportCreatorFan = async () => {
+    if (!viewerUserId || !profileUserId || isOwnProfile || fanCheckoutBusy || hasCreatorFanSub) return
+    if (!creatorFanOffer) return
+    setFanCheckoutBusy(true)
+    try {
+      await startCreatorFanCheckout(supabaseClient, profileUserId)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Checkout could not start.')
+      setFanCheckoutBusy(false)
     }
   }
 
@@ -2018,6 +2070,27 @@ export default function LoungeProfileFullScreen({
                   >
                     {isFollowing ? 'Following' : 'Follow'}
                   </button>
+                  {creatorFanOffer ? (
+                    <button
+                      type="button"
+                      disabled={fanCheckoutBusy || hasCreatorFanSub}
+                      onClick={() => void supportCreatorFan()}
+                      title={
+                        hasCreatorFanSub
+                          ? 'You support this creator'
+                          : `Paid fan subscription · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
+                      }
+                      className={`min-h-9 max-w-full rounded-full px-3 text-[13px] font-bold touch-manipulation disabled:opacity-60 sm:px-4 sm:text-[14px] ${
+                        hasCreatorFanSub
+                          ? 'border border-orange-500/50 bg-orange-950/30 text-orange-200'
+                          : 'bg-orange-500 text-zinc-950 hover:bg-orange-400'
+                      }`}
+                    >
+                      {hasCreatorFanSub
+                        ? 'Supporting'
+                        : `Support ${handle} · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`}
+                    </button>
+                  ) : null}
                   {onOpenChatWithUser && profileUserId ? (
                     <button
                       type="button"
