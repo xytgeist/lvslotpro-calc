@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { formatFanTierLabel } from './fanSubTiers.js'
 import { creatorFanOfferHeadline } from './fanSubOffer.js'
 import { startCreatorFanCheckout } from './creatorFanSubsApi.js'
+import CreatorFanSubscribeRubberButton from './CreatorFanSubscribeRubberButton.jsx'
 import {
   profileAvatarInitials,
   profileAvatarToneClass,
@@ -16,6 +17,8 @@ import { Z_APP_MODAL } from '../../constants/appZIndex.js'
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
  *   offer: Record<string, unknown> | null,
  *   alreadySubscribed?: boolean,
+ *   postAlertsEnabled?: boolean,
+ *   onEnablePostAlerts?: () => void | Promise<void>,
  * }} props
  */
 export default function CreatorFanSubscribeModal({
@@ -24,6 +27,8 @@ export default function CreatorFanSubscribeModal({
   supabaseClient,
   offer,
   alreadySubscribed = false,
+  postAlertsEnabled = false,
+  onEnablePostAlerts,
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -54,6 +59,24 @@ export default function CreatorFanSubscribeModal({
       await startCreatorFanCheckout(supabaseClient, creatorUserId)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Checkout could not start.')
+      setBusy(false)
+    }
+  }
+
+  const onAlertsOnly = async () => {
+    if (busy || postAlertsEnabled) {
+      onClose()
+      return
+    }
+    if (!onEnablePostAlerts) return
+    setBusy(true)
+    setError('')
+    try {
+      await onEnablePostAlerts()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not turn on alerts.')
+    } finally {
       setBusy(false)
     }
   }
@@ -129,32 +152,43 @@ export default function CreatorFanSubscribeModal({
             ) : null}
 
             <p className="mt-4 text-[12px] leading-snug text-zinc-600">
-              Billed monthly through Stripe. Cancel anytime … access stays through the paid period.
+              Paid fan access is billed monthly through Stripe. Alerts only is free post notifications.
             </p>
           </>
         )}
 
         {error ? <p className="mt-3 text-[13px] text-red-300/95">{error}</p> : null}
 
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-            className="min-h-11 rounded-xl border border-zinc-700/90 px-4 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-50"
-          >
-            {alreadySubscribed ? 'Close' : 'Cancel'}
-          </button>
-          {!alreadySubscribed ? (
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+          {alreadySubscribed ? (
             <button
               type="button"
               disabled={busy}
-              onClick={() => void onSubscribe()}
-              className="min-h-11 rounded-xl bg-orange-500 px-5 text-[14px] font-bold text-zinc-950 hover:bg-orange-400 disabled:opacity-50"
+              onClick={onClose}
+              className="min-h-11 rounded-xl border border-zinc-700/90 px-4 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-50"
             >
-              {busy ? 'Starting checkout…' : `Subscribe · ${tierLabel}`}
+              Close
             </button>
-          ) : null}
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={busy || postAlertsEnabled}
+                onClick={() => void onAlertsOnly()}
+                data-creator-fan-rubber-secondary
+                className="creator-fan-rubber-secondary touch-manipulation"
+              >
+                {postAlertsEnabled ? 'Alerts on' : 'Alerts only'}
+              </button>
+              <CreatorFanSubscribeRubberButton
+                label={busy ? '…' : 'Subscribe'}
+                disabled={busy}
+                onClick={() => void onSubscribe()}
+                title={`Paid fan subscription · ${tierLabel}`}
+                bellAlertsActive={postAlertsEnabled}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

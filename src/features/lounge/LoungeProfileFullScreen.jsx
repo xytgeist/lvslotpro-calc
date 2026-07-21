@@ -71,8 +71,8 @@ import { chatBlockUser, chatGetBlockStatus, chatUnblockUser } from '../chat/chat
 import {
   fetchCreatorFanOffer,
 } from '../creatorFanSubs/creatorFanSubsApi.js'
-import { formatFanTierLabel } from '../creatorFanSubs/fanSubTiers.js'
 import CreatorFanSubscribeModal from '../creatorFanSubs/CreatorFanSubscribeModal.jsx'
+import CreatorFanSubscribeRubberButton from '../creatorFanSubs/CreatorFanSubscribeRubberButton.jsx'
 
 const PROFILE_TAB_IDS = ['posts', 'replies', 'likes', 'bookmarks']
 
@@ -1409,8 +1409,23 @@ export default function LoungeProfileFullScreen({
     }
   }
 
+  const enableProfilePostAlertsOnly = async () => {
+    if (!viewerUserId || !profileUserId || isOwnProfile || socialBusy) return
+    if (isSubscribed) return
+    setSocialBusy(true)
+    try {
+      await supabaseClient.from('profile_post_subscriptions').insert({
+        subscriber_id: viewerUserId,
+        publisher_id: profileUserId,
+      })
+      setIsSubscribed(true)
+    } finally {
+      setSocialBusy(false)
+    }
+  }
+
   const supportCreatorFan = () => {
-    if (!viewerUserId || !profileUserId || isOwnProfile || hasCreatorFanSub) return
+    if (!viewerUserId || !profileUserId || isOwnProfile) return
     if (!creatorFanOffer) return
     setFanSubscribeModalOpen(true)
   }
@@ -2010,7 +2025,7 @@ export default function LoungeProfileFullScreen({
           <div className="relative px-4">
             <div
               className={`pointer-events-none relative z-20 -mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14${
-                !isOwnProfile && viewerUserId && creatorFanOffer ? ' pb-11' : ''
+                !isOwnProfile && viewerUserId && creatorFanOffer ? ' pb-10' : ''
               }`}
             >
               <div className="relative shrink-0 pointer-events-auto">
@@ -2104,6 +2119,7 @@ export default function LoungeProfileFullScreen({
                       </svg>
                     </button>
                   ) : null}
+                  {!creatorFanOffer ? (
                   <button
                     type="button"
                     disabled={socialBusy}
@@ -2126,6 +2142,7 @@ export default function LoungeProfileFullScreen({
                       <path d="M7.5 14.5h5a2 2 0 01-4 0z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
                     </svg>
                   </button>
+                  ) : null}
                   {/* Block / Unblock */}
                   <button
                     type="button"
@@ -2147,25 +2164,18 @@ export default function LoungeProfileFullScreen({
                   </button>
                   </div>
                   {creatorFanOffer ? (
-                    <button
-                      type="button"
-                      disabled={hasCreatorFanSub}
+                    <CreatorFanSubscribeRubberButton
+                      label={hasCreatorFanSub ? 'Supporting' : 'Subscribe'}
+                      disabled={false}
                       onClick={() => supportCreatorFan()}
                       title={
                         hasCreatorFanSub
-                          ? 'You support this creator'
-                          : `Paid fan subscription · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
+                          ? 'View your fan subscription'
+                          : 'Subscribe or turn on post alerts'
                       }
-                      className={`absolute right-0 top-full z-10 mt-2 min-h-9 shrink-0 whitespace-nowrap rounded-full px-3 text-[13px] font-bold touch-manipulation disabled:opacity-60 sm:px-4 sm:text-[14px] ${
-                        hasCreatorFanSub
-                          ? 'border border-orange-500/50 bg-orange-950/30 text-orange-200'
-                          : 'bg-orange-500 text-zinc-950 hover:bg-orange-400'
-                      }`}
-                    >
-                      {hasCreatorFanSub
-                        ? 'Supporting'
-                        : `Support · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`}
-                    </button>
+                      bellAlertsActive={isSubscribed}
+                      className="absolute right-0 top-full z-10 mt-2"
+                    />
                   ) : null}
                 </div>
               ) : null}
@@ -2681,6 +2691,8 @@ export default function LoungeProfileFullScreen({
         supabaseClient={supabaseClient}
         offer={creatorFanOffer}
         alreadySubscribed={hasCreatorFanSub}
+        postAlertsEnabled={isSubscribed}
+        onEnablePostAlerts={enableProfilePostAlertsOnly}
       />
     </div>
   )
