@@ -1533,6 +1533,12 @@ html.light [data-lounge-profile-block-btn][data-block-active='true']:hover {
 [data-lounge-profile-fan-sub-btn][data-fan-sub-subscribed='true'] .profile-fan-sub-bell-glyph {
   color: #18181b;
 }
+[data-lounge-profile-fan-sub-btn][data-fan-sub-cap='custom'] .profile-fan-sub-pill-label {
+  font-size: 0.625rem;
+  letter-spacing: 0.03em;
+  padding-left: 0.55rem;
+  padding-right: calc(1.125rem + 0.3rem);
+}
 [data-lounge-profile-fan-sub-btn] .profile-fan-sub-bell-glyph {
   color: inherit;
 }

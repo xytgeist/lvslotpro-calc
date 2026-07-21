@@ -2130,7 +2130,17 @@ export default function LoungeProfileFullScreen({
                   </>
                 ) : null}
               </div>
-              {!isOwnProfile && viewerUserId ? (
+              {isOwnProfile &&
+              !showOwnEditControls &&
+              typeof onOpenFanSubscriptionSettings === 'function' &&
+              supabaseClient ? (
+                <div className="pointer-events-auto mb-1 shrink-0">
+                  <OwnProfileFanMonetizationCta
+                    supabaseClient={supabaseClient}
+                    onOpenFanSubscriptionSettings={onOpenFanSubscriptionSettings}
+                  />
+                </div>
+              ) : !isOwnProfile && viewerUserId ? (
                 <div className="pointer-events-auto mb-1 shrink-0">
                   <div className="flex flex-wrap items-center justify-end gap-2">
                   {isFollowing ? (
@@ -2372,17 +2382,6 @@ export default function LoungeProfileFullScreen({
                 </p>
               )}
             </div>
-
-            {isOwnProfile &&
-            !showOwnEditControls &&
-            typeof onOpenFanSubscriptionSettings === 'function' &&
-            supabaseClient ? (
-              <OwnProfileFanMonetizationCta
-                supabaseClient={supabaseClient}
-                profileHandle={profile?.handle}
-                onOpenFanSubscriptionSettings={onOpenFanSubscriptionSettings}
-              />
-            ) : null}
           </div>
 
           {!showOwnEditControls ? (

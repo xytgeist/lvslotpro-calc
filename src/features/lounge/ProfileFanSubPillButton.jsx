@@ -12,6 +12,7 @@ import { PROFILE_SOCIAL_ACTION_ICON_CLASS } from './profileSocialActionChrome.js
  *   'aria-label'?: string,
  *   postAlertsOn?: boolean,
  *   subscribed?: boolean,
+ *   capLabel?: string,
  * }} props
  */
 export default function ProfileFanSubPillButton({
@@ -21,7 +22,10 @@ export default function ProfileFanSubPillButton({
   'aria-label': ariaLabel,
   postAlertsOn = false,
   subscribed = false,
+  capLabel,
 }) {
+  const labelText = subscribed ? 'SUBSCRIBED' : capLabel?.trim() || 'SUB'
+
   return (
     <button
       type="button"
@@ -32,9 +36,10 @@ export default function ProfileFanSubPillButton({
       data-lounge-profile-fan-sub-btn
       data-fan-sub-post-alerts={!subscribed && postAlertsOn ? 'true' : 'false'}
       data-fan-sub-subscribed={subscribed ? 'true' : 'false'}
+      data-fan-sub-cap={capLabel && !subscribed ? 'custom' : 'default'}
       className="profile-fan-sub-pill touch-manipulation outline-none ring-0 [-webkit-tap-highlight-color:transparent] disabled:cursor-not-allowed disabled:opacity-55 disabled:saturate-50"
     >
-      <span className="profile-fan-sub-pill-label">{subscribed ? 'SUBSCRIBED' : 'SUB'}</span>
+      <span className="profile-fan-sub-pill-label">{labelText}</span>
       <span className="profile-fan-sub-pill-knob" aria-hidden>
         {subscribed || postAlertsOn ? (
           <Bell

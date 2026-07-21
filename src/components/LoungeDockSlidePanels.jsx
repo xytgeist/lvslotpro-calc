@@ -1395,73 +1395,6 @@ export default function LoungeDockSlidePanels({
               </div>
             </div>
 
-            {showAccountSection ? (
-              <div ref={settingsMembershipSectionRef} className="mt-6 border-t border-zinc-800 pt-5">
-                <span className="block text-[15px] font-semibold text-zinc-100">Memberships</span>
-                <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
-                  Edge tools and platform access you subscribe to.
-                </span>
-                <SettingsMembershipPanel
-                  membershipLabel={settingsMembershipLabel}
-                  viewerIsStaff={settingsViewerIsStaff}
-                  hasPaidMembership={settingsHasPaidMembership}
-                  hasActiveSubscription={settingsHasActiveSubscription}
-                  onOpenBillingManage={settingsOnOpenBillingManage}
-                />
-              </div>
-            ) : null}
-
-            {settingsSupabaseClient ? (
-              <div ref={settingsSubscriptionsSectionRef} className="mt-6 border-t border-zinc-800 pt-5">
-                <span className="block text-[15px] font-semibold text-zinc-100">Subscriptions</span>
-                <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
-                  Creators you support and fan monetization if you publish.
-                </span>
-                <div
-                  data-settings-subscriptions
-                  className="mt-3 rounded-xl border border-zinc-800/90 bg-zinc-950/40 divide-y divide-zinc-800/90"
-                >
-                  <CreatorFanSupportedCreatorsPanel supabaseClient={settingsSupabaseClient} />
-                  <div>
-                    <button
-                      type="button"
-                      aria-expanded={fanMonetizationSettingsOpen}
-                      onClick={() => setFanMonetizationSettingsOpen((open) => !open)}
-                      className="flex min-h-12 w-full items-start justify-between gap-3 px-3.5 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/50"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-[15px] font-semibold text-zinc-100">
-                          Enable fan subscriptions
-                        </span>
-                        <span className="mt-0.5 block text-[12px] font-normal leading-snug text-zinc-500">
-                          Preset monthly tiers, fan-only posts, and a private fan group chat.
-                        </span>
-                      </span>
-                      <span
-                        aria-hidden
-                        className={`mt-0.5 shrink-0 text-zinc-400 transition-transform duration-200 ${
-                          fanMonetizationSettingsOpen ? 'rotate-180' : 'rotate-0'
-                        }`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                          <path
-                            d="M6 9l6 6 6-6"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </span>
-                    </button>
-                    {fanMonetizationSettingsOpen ? (
-                      <CreatorFanMonetizationPanel supabaseClient={settingsSupabaseClient} embedded />
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
             <div className="mt-6 border-t border-zinc-800 pt-5" data-settings-support>
               <span className="block text-[15px] font-semibold text-zinc-100">Help &amp; support</span>
               <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
@@ -1984,6 +1917,73 @@ export default function LoungeDockSlidePanels({
                     </div>
                   </div>
                 ) : null}
+              </div>
+            ) : null}
+
+            {showAccountSection ? (
+              <div ref={settingsMembershipSectionRef} className="mt-6 border-t border-zinc-800 pt-5">
+                <span className="block text-[15px] font-semibold text-zinc-100">Memberships</span>
+                <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
+                  Edge tools and platform access you subscribe to.
+                </span>
+                <SettingsMembershipPanel
+                  membershipLabel={settingsMembershipLabel}
+                  viewerIsStaff={settingsViewerIsStaff}
+                  hasPaidMembership={settingsHasPaidMembership}
+                  hasActiveSubscription={settingsHasActiveSubscription}
+                  onOpenBillingManage={settingsOnOpenBillingManage}
+                />
+              </div>
+            ) : null}
+
+            {settingsSupabaseClient ? (
+              <div ref={settingsSubscriptionsSectionRef} className="mt-6 border-t border-zinc-800 pt-5">
+                <span className="block text-[15px] font-semibold text-zinc-100">Subscriptions</span>
+                <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
+                  Creators you support and fan monetization if you publish.
+                </span>
+                <div
+                  data-settings-subscriptions
+                  className="mt-3 rounded-xl border border-zinc-800/90 bg-zinc-950/40 divide-y divide-zinc-800/90"
+                >
+                  <CreatorFanSupportedCreatorsPanel supabaseClient={settingsSupabaseClient} />
+                  <div>
+                    <button
+                      type="button"
+                      aria-expanded={fanMonetizationSettingsOpen}
+                      onClick={() => setFanMonetizationSettingsOpen((open) => !open)}
+                      className="flex min-h-12 w-full items-start justify-between gap-3 px-3.5 py-3 text-left touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-[15px] font-semibold text-zinc-100">
+                          Enable fan subscriptions
+                        </span>
+                        <span className="mt-0.5 block text-[12px] font-normal leading-snug text-zinc-500">
+                          Preset monthly tiers, fan-only posts, and a private fan group chat.
+                        </span>
+                      </span>
+                      <span
+                        aria-hidden
+                        className={`mt-0.5 shrink-0 text-zinc-400 transition-transform duration-200 ${
+                          fanMonetizationSettingsOpen ? 'rotate-180' : 'rotate-0'
+                        }`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                          <path
+                            d="M6 9l6 6 6-6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    </button>
+                    {fanMonetizationSettingsOpen ? (
+                      <CreatorFanMonetizationPanel supabaseClient={settingsSupabaseClient} embedded />
+                    ) : null}
+                  </div>
+                </div>
               </div>
             ) : null}
 

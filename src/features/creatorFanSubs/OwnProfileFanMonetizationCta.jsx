@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
+import ProfileFanSubPillButton from '../lounge/ProfileFanSubPillButton.jsx'
 import { fetchMyCreatorFanMonetization } from './creatorFanSubsApi.js'
 import { isCreatorFanOfferComplete } from './fanSubOffer.js'
 
 /**
+ * Own-profile fan monetization entry — same pill chrome as viewer SUB / alerts control.
+ *
  * @param {{
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
- *   profileHandle?: string | null,
  *   onOpenFanSubscriptionSettings: () => void,
  * }} props
  */
 export default function OwnProfileFanMonetizationCta({
   supabaseClient,
-  profileHandle,
   onOpenFanSubscriptionSettings,
 }) {
   const [loading, setLoading] = useState(true)
@@ -54,25 +55,19 @@ export default function OwnProfileFanMonetizationCta({
 
   if (loading) return null
 
-  const handle = String(profileHandle || '').trim()
   const live = enabled && connectComplete && offerComplete
-  const label = live ? 'Manage fan subscriptions' : 'Enable fan subscriptions'
-  const hint = !handle
-    ? 'Set a handle first, then finish setup in Settings.'
-    : live
-      ? 'Fan posts and private fan chat are live for your subscribers.'
-      : 'Offer paid fan access … preset monthly tiers and a private fan chat.'
 
   return (
-    <div className="mt-4" data-own-profile-fan-monetization-cta>
-      <button
-        type="button"
-        onClick={onOpenFanSubscriptionSettings}
-        className="min-h-11 w-full rounded-xl border border-orange-500/40 bg-orange-950/25 px-4 text-[14px] font-semibold text-orange-100 touch-manipulation hover:bg-orange-950/40 [-webkit-tap-highlight-color:transparent]"
-      >
-        {label}
-      </button>
-      <p className="mt-2 text-[12px] leading-snug text-zinc-500">{hint}</p>
-    </div>
+    <ProfileFanSubPillButton
+      capLabel="Enable Subs"
+      subscribed={live}
+      onClick={onOpenFanSubscriptionSettings}
+      title={
+        live
+          ? 'Fan subscriptions are live … manage in Settings'
+          : 'Set up fan subscriptions in Settings'
+      }
+      aria-label={live ? 'Manage fan subscriptions' : 'Enable fan subscriptions'}
+    />
   )
 }
