@@ -448,7 +448,59 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 - [ ] **Freemium / subscriptions (Slots Edge, shipped on test):** **`slots-edge-starter`**, **`slots-edge`**, **`slots-edge-lifetime`** ... migration **`20260526120000_edge_subscriptions.sql`**, Stripe Edge functions (**`stripe-create-checkout-session`**, **`stripe-webhook`**, **`stripe-create-portal-session`**), **`get_my_entitlements()`**, Subscribe modal + hamburger/OCR gates on **test**; **apply migration + deploy Edge + Stripe secrets** before smoke; RLS hardening + per-calc/guide locks still open. Spec: **`docs/access-tiers.md`**; setup: **`supabase/functions/stripe-create-checkout-session/README.md`**.
 - [ ] **Entitlements Phase 1 (planned):** refactor **`get_my_entitlements()`** to **`docs/entitlements-matrix.md` §4** shape; Stripe webhook routing by **`product_slug`** / metadata; stub **`edge-pro`** grant ok. Spec: **`docs/entitlements-matrix.md` §6 Phase 1**.
 - [ ] **Creator fan sub MVP (planned):** Connect onboarding, **five** preset monthly tiers (**$4.99 / $9.99 / $19.99 / $49.99 / $99.99**; keys `fan-tier-499` … `fan-tier-9999`), **70/30** split, fan-only Lounge posts + auto fan room, search discover metadata + subscribe CTA gate, owner-assigned moderators. **Not v1:** E2EE. Spec: **`docs/entitlements-matrix.md` §2.3–§5**.
+- [x] **Creator fan subs — foundation (test, partial):** **`20260720180000`** + **`20260720190000`**; Connect/checkout/webhook; Settings monetization + offer form; profile **SUB / SUBSCRIBED** + full-screen subscribe sheet; **`profile_feed_mutes`**; cancel via Stripe portal (`creator_user_id` flow). Code: **`src/features/creatorFanSubs/`**, **`LoungeProfileFullScreen`**. **Remaining work:** checklist **§ Creator fan subs — product backlog** below.
 - [ ] **Edge Pro platform tier (planned):** ads off in Lounge, filter non–Edge-Pro authors, author setting to restrict replies to Edge Pro subscribers. Spec: **`docs/entitlements-matrix.md` §2.1–§2.2**.
+
+---
+
+## Creator fan subs — product backlog (Ryan 2026-07-21)
+
+Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **2026-07-20**). Track the six product tracks below before calling Phase 2 complete. Spec anchors: **`docs/entitlements-matrix.md` §2.2–§2.3, §5**; chat schema notes in **`docs/frontend-architecture.md`** (`chat/`).
+
+### 1. Settings — “Creators I support”
+
+- [ ] **Settings screen section** listing every active (and optionally pending-cancel) **creator fan sub** for the signed-in user (creator avatar, `@handle`, tier label, renew / access-through date).
+- [ ] **Cancel subscription** per row → reuse **`openCreatorFanBillingPortal(creator_user_id)`** / Stripe portal (same as profile sheet).
+- [ ] Data: **`get_my_creator_fan_entitlements()`** (+ join **`profiles`** for display); handle **`cancel_at_period_end`** copy (“Access until …”).
+- [ ] Light/dark scoped UI (Settings account pattern); empty state when no fan subs.
+
+### 2. Lounge composer — audience: All vs Subs
+
+- [ ] **Composer control** for creators with fan monetization enabled: post audience **`All`** | **`Subs`** (maps to **`community_feed_posts.creator_fan_only`**).
+- [ ] Default **All**; persist last choice per session optional.
+- [ ] RLS + insert path unchanged for subs-only body; author must have completed offer + Connect.
+
+### 3. Fan-only posts in main feed — teaser + subscribe CTA
+
+- [ ] **Feed policy change:** fan-only posts **appear in the main Lounge timeline for everyone** (not hidden by current fan-only RLS read path for anon/free viewers).
+- [ ] **Non-subscribers** see **partial first line** (teaser) + blurred/truncated body; **Subscribe** CTA on card (opens fan subscribe flow for that creator).
+- [ ] **Subscribers** (and staff) see full post (existing **`has_creator_fan_sub`** / entitlements).
+- [ ] **Subscribe from feed CTA:** on successful checkout (or alerts-only path if product allows), **auto-follow** creator if viewer is **not** already following (**`profile_follows`** insert).
+- [ ] RPC/hydrate: extend feed load or post payload with **`teaser` / `locked`** flags; avoid leaking full **`content_markdown`** to client for non-subs (server-side trim or dedicated column).
+- [ ] Smoke: sub sees full text; non-sub sees teaser + CTA; follow row created after sub.
+
+### 4. Subscriber chat — “Subs” tab + fan rooms
+
+- [ ] **Chat screen tab:** **Subs** next to **Inbox** / **Topics** listing **creator fan rooms** the user can enter (**`chat_rooms.kind = creator_fan`**, membership via **`creator_fan_sub_sync_chat_member`** / webhook).
+- [ ] **Creator enablement:** create/configure **private fan room** when monetization on ( **`creator_fan_ensure_room`** exists; UI + naming/avatar copy).
+- [ ] **Enter gate:** non-subscribers see subscribe CTA (entitlements matrix §2.3 copy).
+- [ ] Search/discover metadata for fan rooms (later tie-in to Phase G search) — optional follow-on.
+
+### 5. Fan room moderation (creator + delegated mods)
+
+- [ ] **Creator (room owner):** mute, block, **cancel subscriber’s fan sub** (portal or admin action TBD), remove from room.
+- [ ] **Assign moderator** role to other **subscribers** in that room (**`chat_room_members.role`** / planned **`moderator`**).
+- [ ] Mod capabilities: delete messages, kick, mute (align **`docs/entitlements-matrix.md` §2.3**); audit log TBD.
+- [ ] RLS + Edge/RPC for owner-only cancel-sub and role assignment; never expose Stripe secrets client-side.
+
+### 6. Audio “hang out” (Spaces-style) — later track
+
+- [ ] **Product spec:** creator-started **live audio room** for subscribers (X Spaces–like): who can speak, listener cap, recording policy, abuse/reporting.
+- [ ] **Tech spike:** WebRTC vs third-party (Daily, LiveKit, etc.), cost, mobile/PWA constraints.
+- [ ] **Depends on:** fan room membership (§4) + moderation tooling (§5) at minimum.
+- [ ] **Not blocking** §1–§5; track as **Phase 2b** or separate roadmap row once §4 ships.
+
+**Suggested build order:** **1** (settings/manage) → **2** (compose) → **3** (feed teaser) → **4** (Subs tab) → **5** (mod tools) → **6** (audio spike).
 
 ---
 
@@ -789,6 +841,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Update log
 
+- 2026-07-21: **Creator fan subs — product backlog (six tracks):** Settings “creators I support” + cancel; composer **All | Subs**; fan-only posts in main feed with **teaser + subscribe CTA** (auto-follow on sub); Chat **Subs** tab + fan rooms; fan room **mod** tools (mute/block/cancel sub/delegate mods); **audio hang out** (Spaces-like) deferred spike. Checklist: **`docs/test-buildout-backlog.md` § Creator fan subs — product backlog**.
 - 2026-07-20: **Profile feed mutes + overflow menu icons (test):** migration **`20260720195000`** applied on **`kcosfvmreeiosdjdzycb`** (`profile_feed_mutes` … hide muted authors on home feed client-side in **`AppShell`**); full-screen profile **⋯** menu **Share** / **Mute posts** / **Block** with Lucide icons; **Block** removed from profile social action row (menu only).
 - 2026-07-20: **Creator fan sub tiers (spec):** five preset monthly MSRPs **$4.99 / $9.99 / $19.99 / $49.99 / $99.99** + `fan-tier-*` keys ... **`docs/entitlements-matrix.md` §5** (Ryan; implementation not started).
 - 2026-07-20: **Creator fan subs (foundation, test):** migration **`20260720180000`** applied on **`kcosfvmreeiosdjdzycb`**; five **`STRIPE_PRICE_FAN_TIER_*`** test secrets + Edge **`creator-fan-connect`**, **`creator-fan-checkout`**, **`stripe-webhook`** deployed on test. Settings **Fan subscriptions** panel + **`20260720190000`** creator **offer form** (save/edit) + subscriber **preview modal** before checkout. **Still open:** compose fan-only posts, search gate, moderators.

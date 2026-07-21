@@ -160,7 +160,7 @@ get_my_entitlements(user_id) → {
 | **4** | Add-on SKUs + Lifetime/Pro bundle rules | Slots vertical |
 | **5** | Fan room E2EE (optional) | Phase 2 traction + crypto design |
 
-Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts.
+Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts. **Detailed task breakdown (2026-07-21):** **`docs/test-buildout-backlog.md` § Creator fan subs — product backlog** (Settings manage subs, composer audience, feed teaser, Chat Subs tab, room mod tools, audio hang out).
 
 ---
 
@@ -170,3 +170,4 @@ Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts
 | --- | --- |
 | 2026-07-18 | Initial matrix: multi-product catalog, capability table, creator fan sub v1, Edge Pro platform tier, stacking rules, engineering target, rollout phases (Ryan spec). |
 | 2026-07-20 | Creator fan sub preset tiers locked to **five** monthly MSRPs: $4.99 / $9.99 / $19.99 / $49.99 / $99.99 + tier keys `fan-tier-*`. |
+| 2026-07-21 | Feed teaser model for fan-only posts (visible in main feed, partial line + subscribe CTA, auto-follow on sub) added to product backlog; supersedes “hide fan-only from non-subs” for **timeline** only — full post detail policy TBD in backlog §3. |
