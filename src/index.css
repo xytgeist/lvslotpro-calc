@@ -1515,7 +1515,7 @@ html.light [data-lounge-profile-block-btn][data-block-active='true']:hover {
   margin-left: -1px;
   border: 1px solid rgba(234, 88, 12, 0.72);
   border-radius: 9999px;
-  background: rgba(9, 9, 11, 0.75);
+  background: #09090b;
   color: #18181b;
   box-shadow: none;
 }
