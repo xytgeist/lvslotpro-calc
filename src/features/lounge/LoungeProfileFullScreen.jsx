@@ -2144,12 +2144,22 @@ export default function LoungeProfileFullScreen({
                       <ProfileSocialMessageIcon />
                     </button>
                   ) : null}
-                  {creatorFanOffer && !isSubscribed && !hasCreatorFanSub ? (
+                  {creatorFanOffer && !hasCreatorFanSub ? (
                     <ProfileFanSubPillButton
                       disabled={socialBusy}
-                      onClick={() => supportCreatorFan()}
-                      title={`Subscribe or post alerts · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`}
-                      aria-label="Subscribe or turn on post alerts"
+                      postAlertsOn={isSubscribed}
+                      onClick={() => {
+                        if (isSubscribed) void toggleSubscribe()
+                        else supportCreatorFan()
+                      }}
+                      title={
+                        isSubscribed
+                          ? 'Turn off post alerts'
+                          : `Subscribe or post alerts · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
+                      }
+                      aria-label={
+                        isSubscribed ? 'Turn off post alerts' : 'Subscribe or turn on post alerts'
+                      }
                     />
                   ) : (
                   <button
@@ -2176,22 +2186,26 @@ export default function LoungeProfileFullScreen({
                     }
                     data-lounge-profile-alerts-btn
                     data-profile-alerts-colored={
-                      creatorFanOffer
-                        ? isSubscribed || hasCreatorFanSub
-                          ? 'fanActive'
-                          : 'false'
-                        : isSubscribed
-                          ? 'active'
-                          : 'false'
+                      creatorFanOffer && hasCreatorFanSub
+                        ? 'fanSubscribed'
+                        : creatorFanOffer
+                          ? isSubscribed || hasCreatorFanSub
+                            ? 'fanActive'
+                            : 'false'
+                          : isSubscribed
+                            ? 'active'
+                            : 'false'
                     }
                     className={profileSocialActionButtonClass(
-                      creatorFanOffer
-                        ? isSubscribed || hasCreatorFanSub
-                          ? 'alertsFanActive'
-                          : 'neutral'
-                        : isSubscribed
-                          ? 'alertsActive'
-                          : 'neutral',
+                      creatorFanOffer && hasCreatorFanSub
+                        ? 'alertsFan'
+                        : creatorFanOffer
+                          ? isSubscribed || hasCreatorFanSub
+                            ? 'alertsFanActive'
+                            : 'neutral'
+                          : isSubscribed
+                            ? 'alertsActive'
+                            : 'neutral',
                     )}
                     aria-label={
                       creatorFanOffer
@@ -2207,7 +2221,7 @@ export default function LoungeProfileFullScreen({
                   >
                     <ProfileSocialAlertsIcon
                       active={isSubscribed || hasCreatorFanSub}
-                      fanOffer={false}
+                      filled={Boolean(creatorFanOffer && hasCreatorFanSub)}
                     />
                   </button>
                   )}

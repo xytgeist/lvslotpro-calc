@@ -20,7 +20,7 @@ export function profileSocialActionButtonClass(variant) {
     return `${PROFILE_SOCIAL_ACTION_BTN_BASE} border-orange-500/50 bg-orange-950/35 text-orange-100 shadow-[inset_0_1px_0_rgba(251,146,60,0.12)] hover:border-orange-400/55`
   }
   if (variant === 'alertsFan') {
-    return `${PROFILE_SOCIAL_ACTION_BTN_BASE} border-orange-500/65 bg-orange-500 text-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] hover:bg-orange-400`
+    return `${PROFILE_SOCIAL_ACTION_BTN_BASE} border-orange-500/65 bg-orange-500 text-zinc-950 shadow-none hover:bg-orange-400`
   }
   if (variant === 'alertsFanActive') {
     return `${PROFILE_SOCIAL_ACTION_BTN_BASE} border-orange-500/50 bg-orange-950/35 text-orange-100 shadow-[inset_0_1px_0_rgba(251,146,60,0.1)] hover:border-orange-400/55`
@@ -49,8 +49,11 @@ export function ProfileSocialMessageIcon() {
   return <MessageCircle {...lucideProps} />
 }
 
-/** @param {{ active?: boolean }} props */
-export function ProfileSocialAlertsIcon({ active = false }) {
+/** @param {{ active?: boolean, filled?: boolean }} props */
+export function ProfileSocialAlertsIcon({ active = false, filled = false }) {
+  if (filled) {
+    return <Bell {...lucideProps} fill="currentColor" />
+  }
   if (active) {
     return <BellRing {...lucideProps} />
   }
