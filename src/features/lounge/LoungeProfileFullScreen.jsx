@@ -73,6 +73,13 @@ import {
 } from '../creatorFanSubs/creatorFanSubsApi.js'
 import CreatorFanSubscribeModal from '../creatorFanSubs/CreatorFanSubscribeModal.jsx'
 import { formatFanTierLabel } from '../creatorFanSubs/fanSubTiers.js'
+import {
+  profileSocialActionButtonClass,
+  ProfileSocialAlertsIcon,
+  ProfileSocialBlockIcon,
+  ProfileSocialFollowIcon,
+  ProfileSocialMessageIcon,
+} from './profileSocialActionChrome.jsx'
 
 const PROFILE_TAB_IDS = ['posts', 'replies', 'likes', 'bookmarks']
 
@@ -2072,13 +2079,11 @@ export default function LoungeProfileFullScreen({
                     type="button"
                     disabled={socialBusy}
                     onClick={() => void toggleFollow()}
-                    className={`min-h-9 rounded-full px-4 text-[14px] font-bold touch-manipulation disabled:opacity-50 ${
-                      isFollowing
-                        ? 'border border-zinc-600 bg-zinc-900 text-zinc-100'
-                        : 'bg-white text-zinc-950 hover:bg-zinc-200'
-                    }`}
+                    title={isFollowing ? 'Following' : 'Follow'}
+                    aria-label={isFollowing ? 'Following' : 'Follow'}
+                    className={profileSocialActionButtonClass(isFollowing ? 'followActive' : 'neutral')}
                   >
-                    {isFollowing ? 'Following' : 'Follow'}
+                    <ProfileSocialFollowIcon following={isFollowing} />
                   </button>
                   {onOpenChatWithUser && profileUserId ? (
                     <button
@@ -2103,16 +2108,9 @@ export default function LoungeProfileFullScreen({
                               ? 'Message'
                               : 'Complete your profile to message'
                       }
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-600 bg-zinc-900 text-zinc-200 touch-manipulation hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      className={profileSocialActionButtonClass('neutral')}
                     >
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden>
-                        <path
-                          d="M4 5.5h12a1.5 1.5 0 011.5 1.5v6A1.5 1.5 0 0116 14.5H8.5l-3.2 2.4a.6.6 0 01-.95-.48V14.5H4A1.5 1.5 0 012.5 13V7A1.5 1.5 0 014 5.5z"
-                          stroke="currentColor"
-                          strokeWidth="1.35"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                      <ProfileSocialMessageIcon />
                     </button>
                   ) : null}
                   <button
@@ -2129,15 +2127,15 @@ export default function LoungeProfileFullScreen({
                           : `Subscribe or post alerts · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
                         : 'Notify me about their posts'
                     }
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border touch-manipulation disabled:opacity-50 ${
+                    className={profileSocialActionButtonClass(
                       creatorFanOffer
                         ? isSubscribed || hasCreatorFanSub
-                          ? 'border-orange-500/50 bg-orange-950/30 text-orange-200'
-                          : 'border-orange-500/70 bg-orange-500 text-zinc-950 hover:bg-orange-400'
+                          ? 'alertsFanActive'
+                          : 'alertsFan'
                         : isSubscribed
-                          ? 'border-cyan-500/60 bg-cyan-950/40 text-cyan-200'
-                          : 'border-zinc-600 bg-zinc-900 text-zinc-300 hover:border-zinc-500'
-                    }`}
+                          ? 'alertsActive'
+                          : 'neutral',
+                    )}
                     aria-label={
                       creatorFanOffer
                         ? hasCreatorFanSub
@@ -2148,34 +2146,20 @@ export default function LoungeProfileFullScreen({
                           : 'Subscribe to notifications'
                     }
                   >
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden>
-                      <path
-                        d="M10 2.5a5 5 0 015 5v2.5l1.5 2v.5H3.5V10L5 7.5V7.5a5 5 0 015-5z"
-                        stroke="currentColor"
-                        strokeWidth="1.35"
-                        strokeLinejoin="round"
-                      />
-                      <path d="M7.5 14.5h5a2 2 0 01-4 0z" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-                    </svg>
+                    <ProfileSocialAlertsIcon
+                      active={isSubscribed || hasCreatorFanSub}
+                      fanOffer={Boolean(creatorFanOffer) && !isSubscribed && !hasCreatorFanSub}
+                    />
                   </button>
-                  {/* Block / Unblock */}
                   <button
                     type="button"
                     disabled={blockBusy}
                     onClick={() => void toggleBlock()}
                     title={iBlockingThem ? 'Unblock member' : 'Block member'}
                     aria-label={iBlockingThem ? 'Unblock member' : 'Block member'}
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border touch-manipulation disabled:opacity-50 ${
-                      iBlockingThem
-                        ? 'border-red-700/60 bg-red-950/40 text-red-300'
-                        : 'border-zinc-600 bg-zinc-900 text-zinc-400 hover:border-red-700/50 hover:text-red-400'
-                    }`}
+                    className={profileSocialActionButtonClass(iBlockingThem ? 'blockActive' : 'block')}
                   >
-                    {/* Ban / no-entry circle icon */}
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden>
-                      <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.35" />
-                      <line x1="4.5" y1="15.5" x2="15.5" y2="4.5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-                    </svg>
+                    <ProfileSocialBlockIcon />
                   </button>
                   </div>
                 </div>
