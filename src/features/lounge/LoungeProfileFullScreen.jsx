@@ -2008,7 +2008,11 @@ export default function LoungeProfileFullScreen({
           </div>
 
           <div className="relative px-4">
-            <div className="pointer-events-none relative z-20 -mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14">
+            <div
+              className={`pointer-events-none relative z-20 -mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14${
+                !isOwnProfile && viewerUserId && creatorFanOffer ? ' pb-11' : ''
+              }`}
+            >
               <div className="relative shrink-0 pointer-events-auto">
                 <div className="flex h-24 w-24 overflow-hidden rounded-full bg-zinc-900 text-[28px] font-bold text-zinc-200 shadow-lg sm:h-[5.5rem] sm:w-[5.5rem] sm:text-[32px]">
                   {profile?.avatar_url ? (
@@ -2051,7 +2055,7 @@ export default function LoungeProfileFullScreen({
                 ) : null}
               </div>
               {!isOwnProfile && viewerUserId ? (
-                <div className="pointer-events-auto mb-1 flex min-w-0 flex-1 flex-col items-end gap-2">
+                <div className="pointer-events-auto relative mb-1 shrink-0">
                   <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
                     type="button"
@@ -2152,7 +2156,7 @@ export default function LoungeProfileFullScreen({
                           ? 'You support this creator'
                           : `Paid fan subscription · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
                       }
-                      className={`min-h-9 shrink-0 rounded-full px-3 text-[13px] font-bold touch-manipulation disabled:opacity-60 sm:px-4 sm:text-[14px] ${
+                      className={`absolute right-0 top-full z-10 mt-2 min-h-9 shrink-0 whitespace-nowrap rounded-full px-3 text-[13px] font-bold touch-manipulation disabled:opacity-60 sm:px-4 sm:text-[14px] ${
                         hasCreatorFanSub
                           ? 'border border-orange-500/50 bg-orange-950/30 text-orange-200'
                           : 'bg-orange-500 text-zinc-950 hover:bg-orange-400'
