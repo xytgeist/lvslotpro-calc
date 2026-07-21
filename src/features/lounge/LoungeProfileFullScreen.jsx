@@ -70,9 +70,9 @@ import {
 import { chatBlockUser, chatGetBlockStatus, chatUnblockUser } from '../chat/chatApi.js'
 import {
   fetchCreatorFanOffer,
-  startCreatorFanCheckout,
 } from '../creatorFanSubs/creatorFanSubsApi.js'
 import { formatFanTierLabel } from '../creatorFanSubs/fanSubTiers.js'
+import CreatorFanSubscribeModal from '../creatorFanSubs/CreatorFanSubscribeModal.jsx'
 
 const PROFILE_TAB_IDS = ['posts', 'replies', 'likes', 'bookmarks']
 
@@ -524,7 +524,7 @@ export default function LoungeProfileFullScreen({
   const [socialBusy, setSocialBusy] = useState(false)
   const [creatorFanOffer, setCreatorFanOffer] = useState(null)
   const [hasCreatorFanSub, setHasCreatorFanSub] = useState(false)
-  const [fanCheckoutBusy, setFanCheckoutBusy] = useState(false)
+  const [fanSubscribeModalOpen, setFanSubscribeModalOpen] = useState(false)
   const [aboutDraft, setAboutDraft] = useState('')
   const [locationDraft, setLocationDraft] = useState('')
   const [categoryPillsDraft, setCategoryPillsDraft] = useState([])
@@ -1409,16 +1409,10 @@ export default function LoungeProfileFullScreen({
     }
   }
 
-  const supportCreatorFan = async () => {
-    if (!viewerUserId || !profileUserId || isOwnProfile || fanCheckoutBusy || hasCreatorFanSub) return
+  const supportCreatorFan = () => {
+    if (!viewerUserId || !profileUserId || isOwnProfile || hasCreatorFanSub) return
     if (!creatorFanOffer) return
-    setFanCheckoutBusy(true)
-    try {
-      await startCreatorFanCheckout(supabaseClient, profileUserId)
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Checkout could not start.')
-      setFanCheckoutBusy(false)
-    }
+    setFanSubscribeModalOpen(true)
   }
 
   const toggleBlock = async () => {
@@ -2073,8 +2067,8 @@ export default function LoungeProfileFullScreen({
                   {creatorFanOffer ? (
                     <button
                       type="button"
-                      disabled={fanCheckoutBusy || hasCreatorFanSub}
-                      onClick={() => void supportCreatorFan()}
+                      disabled={hasCreatorFanSub}
+                      onClick={() => supportCreatorFan()}
                       title={
                         hasCreatorFanSub
                           ? 'You support this creator'
@@ -2674,6 +2668,14 @@ export default function LoungeProfileFullScreen({
             document.body,
           )
         : null}
+
+      <CreatorFanSubscribeModal
+        open={fanSubscribeModalOpen}
+        onClose={() => setFanSubscribeModalOpen(false)}
+        supabaseClient={supabaseClient}
+        offer={creatorFanOffer}
+        alreadySubscribed={hasCreatorFanSub}
+      />
     </div>
   )
 }

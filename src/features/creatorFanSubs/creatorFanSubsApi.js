@@ -40,6 +40,21 @@ export async function saveCreatorFanMonetization(supabaseClient, fanTierKey, ena
   return data
 }
 
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ offerHeadline?: string, offerIntro?: string, offerPrivatePosts?: string, offerFanChat?: string }} fields
+ */
+export async function saveCreatorFanOffer(supabaseClient, fields) {
+  const { data, error } = await supabaseClient.rpc('creator_fan_save_offer', {
+    p_offer_headline: fields.offerHeadline ?? '',
+    p_offer_intro: fields.offerIntro ?? '',
+    p_offer_private_posts: fields.offerPrivatePosts ?? '',
+    p_offer_fan_chat: fields.offerFanChat ?? '',
+  })
+  if (error) throw new Error(error.message || 'Could not save your offer.')
+  return data
+}
+
 /** @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient */
 export async function startCreatorFanConnectOnboarding(supabaseClient) {
   const { data, error, response } = await supabaseClient.functions.invoke('creator-fan-connect', {
@@ -92,5 +107,6 @@ export async function fetchCreatorFanOffer(supabaseClient, creatorUserId) {
   if (error) throw error
   if (!data || typeof data !== 'object') return null
   if (data.enabled !== true) return null
+  if (data.offer_complete !== true) return null
   return data
 }
