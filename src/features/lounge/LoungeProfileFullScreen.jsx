@@ -2051,7 +2051,8 @@ export default function LoungeProfileFullScreen({
                 ) : null}
               </div>
               {!isOwnProfile && viewerUserId ? (
-                <div className="pointer-events-auto mb-1 flex flex-wrap items-center justify-end gap-2">
+                <div className="pointer-events-auto mb-1 flex min-w-0 flex-1 flex-col items-end gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
                     type="button"
                     disabled={socialBusy}
@@ -2064,27 +2065,6 @@ export default function LoungeProfileFullScreen({
                   >
                     {isFollowing ? 'Following' : 'Follow'}
                   </button>
-                  {creatorFanOffer ? (
-                    <button
-                      type="button"
-                      disabled={hasCreatorFanSub}
-                      onClick={() => supportCreatorFan()}
-                      title={
-                        hasCreatorFanSub
-                          ? 'You support this creator'
-                          : `Paid fan subscription · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
-                      }
-                      className={`min-h-9 max-w-full rounded-full px-3 text-[13px] font-bold touch-manipulation disabled:opacity-60 sm:px-4 sm:text-[14px] ${
-                        hasCreatorFanSub
-                          ? 'border border-orange-500/50 bg-orange-950/30 text-orange-200'
-                          : 'bg-orange-500 text-zinc-950 hover:bg-orange-400'
-                      }`}
-                    >
-                      {hasCreatorFanSub
-                        ? 'Supporting'
-                        : `Support · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`}
-                    </button>
-                  ) : null}
                   {onOpenChatWithUser && profileUserId ? (
                     <button
                       type="button"
@@ -2161,6 +2141,28 @@ export default function LoungeProfileFullScreen({
                       <line x1="4.5" y1="15.5" x2="15.5" y2="4.5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
                     </svg>
                   </button>
+                  </div>
+                  {creatorFanOffer ? (
+                    <button
+                      type="button"
+                      disabled={hasCreatorFanSub}
+                      onClick={() => supportCreatorFan()}
+                      title={
+                        hasCreatorFanSub
+                          ? 'You support this creator'
+                          : `Paid fan subscription · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
+                      }
+                      className={`min-h-9 shrink-0 rounded-full px-3 text-[13px] font-bold touch-manipulation disabled:opacity-60 sm:px-4 sm:text-[14px] ${
+                        hasCreatorFanSub
+                          ? 'border border-orange-500/50 bg-orange-950/30 text-orange-200'
+                          : 'bg-orange-500 text-zinc-950 hover:bg-orange-400'
+                      }`}
+                    >
+                      {hasCreatorFanSub
+                        ? 'Supporting'
+                        : `Support · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
