@@ -1,7 +1,9 @@
-import { Bell } from 'lucide-react'
+import { BellPlus } from 'lucide-react'
+
+import { PROFILE_SOCIAL_ACTION_ICON_CLASS } from './profileSocialActionChrome.jsx'
 
 /**
- * Neumorphic fan-sub CTA on profile (SUB + red bell knob). Scoped via data-lounge-profile-fan-sub-btn.
+ * Fan-sub CTA: SUB capsule + round orange bell+ knob (profile header). Scoped via data-lounge-profile-fan-sub-btn.
  *
  * @param {{
  *   disabled?: boolean,
@@ -24,11 +26,11 @@ export default function ProfileFanSubPillButton({
       title={title}
       aria-label={ariaLabel}
       data-lounge-profile-fan-sub-btn
-      className="profile-fan-sub-pill touch-manipulation disabled:opacity-55 disabled:saturate-50"
+      className="profile-fan-sub-pill touch-manipulation outline-none ring-0 [-webkit-tap-highlight-color:transparent] disabled:cursor-not-allowed disabled:opacity-55 disabled:saturate-50"
     >
-      <span className="profile-fan-sub-pill-label">sub</span>
-      <span className="profile-fan-sub-pill-bell" aria-hidden>
-        <Bell className="h-3.5 w-3.5 text-zinc-950" strokeWidth={2.25} fill="currentColor" />
+      <span className="profile-fan-sub-pill-label">SUB</span>
+      <span className="profile-fan-sub-pill-knob" aria-hidden>
+        <BellPlus className={PROFILE_SOCIAL_ACTION_ICON_CLASS} strokeWidth={1.75} />
       </span>
     </button>
   )

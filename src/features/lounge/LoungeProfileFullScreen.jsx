@@ -2128,15 +2128,23 @@ export default function LoungeProfileFullScreen({
                     type="button"
                     disabled={socialBusy}
                     onClick={() => {
-                      if (creatorFanOffer) supportCreatorFan()
-                      else void toggleSubscribe()
+                      if (creatorFanOffer) {
+                        if (isSubscribed) void toggleSubscribe()
+                        else supportCreatorFan()
+                      } else {
+                        void toggleSubscribe()
+                      }
                     }}
                     title={
                       creatorFanOffer
-                        ? hasCreatorFanSub
-                          ? 'View your fan subscription'
-                          : `Subscribe or post alerts · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
-                        : 'Notify me about their posts'
+                        ? isSubscribed
+                          ? 'Turn off post alerts'
+                          : hasCreatorFanSub
+                            ? 'View your fan subscription'
+                            : `Subscribe or post alerts · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
+                        : isSubscribed
+                          ? 'Turn off post alerts'
+                          : 'Notify me about their posts'
                     }
                     data-lounge-profile-alerts-btn
                     data-profile-alerts-colored={
@@ -2159,11 +2167,13 @@ export default function LoungeProfileFullScreen({
                     )}
                     aria-label={
                       creatorFanOffer
-                        ? hasCreatorFanSub
-                          ? 'Fan subscription and post alerts'
-                          : 'Subscribe or turn on post alerts'
+                        ? isSubscribed
+                          ? 'Turn off post alerts'
+                          : hasCreatorFanSub
+                            ? 'Fan subscription and post alerts'
+                            : 'Subscribe or turn on post alerts'
                         : isSubscribed
-                          ? 'Subscribed to notifications'
+                          ? 'Turn off post alerts'
                           : 'Subscribe to notifications'
                     }
                   >
@@ -2702,6 +2712,7 @@ export default function LoungeProfileFullScreen({
         alreadySubscribed={hasCreatorFanSub}
         postAlertsEnabled={isSubscribed}
         onEnablePostAlerts={enableProfilePostAlertsOnly}
+        onDisablePostAlerts={toggleSubscribe}
       />
     </div>
   )

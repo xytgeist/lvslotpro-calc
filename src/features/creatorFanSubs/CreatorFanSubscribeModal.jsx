@@ -18,6 +18,7 @@ import { Z_APP_MODAL } from '../../constants/appZIndex.js'
  *   alreadySubscribed?: boolean,
  *   postAlertsEnabled?: boolean,
  *   onEnablePostAlerts?: () => void | Promise<void>,
+ *   onDisablePostAlerts?: () => void | Promise<void>,
  * }} props
  */
 export default function CreatorFanSubscribeModal({
@@ -28,6 +29,7 @@ export default function CreatorFanSubscribeModal({
   alreadySubscribed = false,
   postAlertsEnabled = false,
   onEnablePostAlerts,
+  onDisablePostAlerts,
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -63,8 +65,19 @@ export default function CreatorFanSubscribeModal({
   }
 
   const onAlertsOnly = async () => {
-    if (busy || postAlertsEnabled) {
-      onClose()
+    if (busy) return
+    if (postAlertsEnabled) {
+      if (!onDisablePostAlerts) return
+      setBusy(true)
+      setError('')
+      try {
+        await onDisablePostAlerts()
+        onClose()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not turn off alerts.')
+      } finally {
+        setBusy(false)
+      }
       return
     }
     if (!onEnablePostAlerts) return
@@ -172,11 +185,11 @@ export default function CreatorFanSubscribeModal({
             <>
               <button
                 type="button"
-                disabled={busy || postAlertsEnabled}
+                disabled={busy}
                 onClick={() => void onAlertsOnly()}
                 className="min-h-11 rounded-xl border border-zinc-700/90 px-4 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-50 touch-manipulation"
               >
-                {postAlertsEnabled ? 'Alerts on' : 'Alerts only'}
+                {postAlertsEnabled ? 'Turn off alerts' : 'Alerts only'}
               </button>
               <button
                 type="button"
