@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { createChart, LineSeries } from 'lightweight-charts'
 import {
   formatMarketChangePct,
-  formatMarketEmbedWindowLabel,
   formatMarketPrice,
   marketEmbedCacheKey,
   pickRollingMarketPayload,
@@ -19,6 +18,8 @@ import { marketChartLocalizationBase } from './loungeMarketChartLocale.js'
  * }} props
  */
 const MINI_CHART_TAP_MOVE_PX = 12
+const MINI_SPARKLINE_WIDTH_PX = 116
+const MINI_SPARKLINE_HEIGHT_PX = 52
 
 export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpen, className = '' }) {
   const hostRef = useRef(null)
@@ -29,17 +30,18 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
   const rollingPayload = isRolling ? pickRollingMarketPayload(embed, rollingLive) : null
   const quote = isRolling ? rollingPayload?.quote : embed?.quote
   const bars = isRolling ? rollingPayload?.bars : embed?.bars
-  const windowLabel = formatMarketEmbedWindowLabel(embed, isRolling ? rollingPayload : null)
   const changePct = Number(quote?.change_pct)
   const up = Number.isFinite(changePct) ? changePct >= 0 : true
   const theme = loungeMarketChartTheme()
+  const displaySymbol = String(embed?.display_symbol || '').trim().toUpperCase()
+  const displayName = String(embed?.name || displaySymbol).trim() || displaySymbol
 
   useEffect(() => {
     const el = hostRef.current
     if (!el) return undefined
     const chart = createChart(el, {
-      width: el.clientWidth || 148,
-      height: 52,
+      width: el.clientWidth || MINI_SPARKLINE_WIDTH_PX,
+      height: MINI_SPARKLINE_HEIGHT_PX,
       layout: theme.layout,
       grid: theme.grid,
       localization: marketChartLocalizationBase(),
@@ -87,7 +89,6 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
     const dy = e.clientY - start.y
     const distSq = dx * dx + dy * dy
     if (distSq > MINI_CHART_TAP_MOVE_PX * MINI_CHART_TAP_MOVE_PX) return
-    // Horizontal swipe on the strip - scroll, don't open modal.
     if (Math.abs(dx) > Math.abs(dy)) return
     e.stopPropagation()
     onOpen?.()
@@ -110,32 +111,45 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
         e.stopPropagation()
         onOpen?.()
       }}
-      className={`relative flex w-[148px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border ${theme.cardBorder} ${theme.cardBg} p-2 text-left [touch-action:pan-x_pan-y] cursor-pointer active:opacity-90 [-webkit-tap-highlight-color:transparent] ${className}`}
+      className={`relative flex h-[4.25rem] min-h-[4.25rem] shrink-0 snap-start items-center gap-2.5 overflow-hidden rounded-2xl border ${theme.cardBorder} bg-gradient-to-br from-zinc-900/95 via-zinc-950 to-zinc-900/90 px-3 py-2 text-left [touch-action:pan-x_pan-y] cursor-pointer active:opacity-90 [-webkit-tap-highlight-color:transparent] ${className}`}
       data-lounge-market-chart-mini
-      aria-label={`Open ${embed.display_symbol} chart`}
+      aria-label={`Open ${displaySymbol} chart`}
     >
-      <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0">
-          <div className={`truncate text-[13px] font-bold ${theme.priceText}`}>
-            ${embed.display_symbol}
-          </div>
-          <div className={`truncate text-[10px] ${theme.mutedText}`}>{windowLabel}</div>
-        </div>
-        {embed.logo_url ? (
-          <img src={embed.logo_url} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
-        ) : null}
-      </div>
-      <div className="mt-0.5 flex items-baseline gap-1.5">
-        <span className={`text-[12px] font-semibold tabular-nums ${theme.priceText}`}>
-          {formatMarketPrice(quote?.price)}
-        </span>
-        <span
-          className={`text-[11px] font-semibold tabular-nums ${up ? 'text-lv-green' : 'text-lv-red'}`}
+      {embed.logo_url ? (
+        <img
+          src={embed.logo_url}
+          alt=""
+          className="h-10 w-10 shrink-0 rounded-full border border-zinc-700/50 object-cover"
+        />
+      ) : (
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700/50 bg-zinc-800/90 text-[11px] font-bold text-zinc-300"
+          aria-hidden
         >
-          {formatMarketChangePct(changePct)}
-        </span>
+          {displaySymbol.slice(0, 2)}
+        </div>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+        <div className={`truncate text-[15px] font-bold leading-tight ${theme.priceText}`}>{displayName}</div>
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
+          <span className={`shrink-0 text-[13px] font-semibold tracking-wide ${theme.mutedText}`}>
+            {displaySymbol}
+          </span>
+          <span className={`text-[13px] font-semibold tabular-nums ${theme.priceText}`}>
+            {formatMarketPrice(quote?.price)}
+          </span>
+          <span
+            className={`text-[13px] font-semibold tabular-nums ${up ? 'text-lv-green' : 'text-lv-red'}`}
+          >
+            {formatMarketChangePct(changePct)}
+          </span>
+        </div>
       </div>
-      <div ref={hostRef} className="pointer-events-none mt-1 h-[52px] w-full" aria-hidden />
+      <div
+        ref={hostRef}
+        className="pointer-events-none h-[52px] w-[7.25rem] shrink-0 sm:w-[8rem]"
+        aria-hidden
+      />
     </div>
   )
 }

@@ -14,15 +14,17 @@ export default function LoungeMarketChartStrip({ post, onOpenChart, className = 
     <div
       className={`mt-2 -mx-1 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
-      <div className="flex snap-x snap-mandatory gap-2 px-1 pb-0.5">
+      <div className="flex snap-x snap-mandatory gap-2.5 px-1 pb-0.5">
         {embeds.map((embed) => {
           const key = marketEmbedCacheKey(embed)
+          const wide = embeds.length === 1
           return (
             <LoungeMarketChartMini
               key={`${embed.symbol}-${embed.window_key}-${embed.kind}`}
               embed={embed}
               rollingLive={embed.kind === 'rolling' ? quotes[key] : null}
               onOpen={() => onOpenChart?.(embed, embeds)}
+              className={wide ? 'w-full max-w-none' : 'w-[min(92vw,22rem)]'}
             />
           )
         })}

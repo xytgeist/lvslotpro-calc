@@ -2256,6 +2256,10 @@ html.light [data-lounge-market-chart-modal] .text-lv-green,
 html.light [data-lounge-market-chart-mini] .text-lv-green {
   color: #16a34a;
 }
+html.light [data-lounge-market-chart-mini] {
+  background: linear-gradient(to bottom right, #fafafa, #f4f4f5, #fafafa) !important;
+  border-color: #e4e4e7 !important;
+}
 
 /* Lounge feed caption Show more expand control (dark: cyan, light: blue) */
 .lounge-caption-more {

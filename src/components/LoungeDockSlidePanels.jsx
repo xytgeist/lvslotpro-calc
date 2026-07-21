@@ -1395,31 +1395,6 @@ export default function LoungeDockSlidePanels({
               </div>
             </div>
 
-            <div className="mt-6 border-t border-zinc-800 pt-5" data-settings-support>
-              <span className="block text-[15px] font-semibold text-zinc-100">Help &amp; support</span>
-              <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
-                Billing, access, bugs, and account help.
-              </span>
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <a
-                  href={supportMailtoHref()}
-                  className="inline-flex min-h-10 items-center py-1 text-[14px] font-semibold text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                >
-                  Email support
-                </a>
-                <button
-                  type="button"
-                  onClick={() => void onCopySupportEmail()}
-                  className="min-h-10 rounded-lg border border-zinc-700/90 bg-zinc-900/80 px-3 text-[13px] font-semibold text-zinc-200 touch-manipulation transition-colors hover:bg-zinc-800 [-webkit-tap-highlight-color:transparent]"
-                >
-                  Copy email
-                </button>
-              </div>
-              {supportEmailCopyMessage ? (
-                <p className="mt-2 text-[12px] leading-snug text-cyan-200/90">{supportEmailCopyMessage}</p>
-              ) : null}
-            </div>
-
             <div className="mt-6 border-t border-zinc-800 pt-5">
               <button
                 type="button"
@@ -1779,6 +1754,31 @@ export default function LoungeDockSlidePanels({
                   />
                 </span>
               </button>
+            </div>
+
+            <div className="mt-6 border-t border-zinc-800 pt-5" data-settings-support>
+              <span className="block text-[15px] font-semibold text-zinc-100">Help &amp; support</span>
+              <span className="mt-1 block text-[13px] leading-relaxed text-zinc-500">
+                Billing, access, bugs, and account help.
+              </span>
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <a
+                  href={supportMailtoHref()}
+                  className="inline-flex min-h-10 items-center py-1 text-[14px] font-semibold text-orange-400 underline underline-offset-2 hover:text-orange-300 touch-manipulation [-webkit-tap-highlight-color:transparent]"
+                >
+                  Email support
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void onCopySupportEmail()}
+                  className="min-h-10 rounded-lg border border-zinc-700/90 bg-zinc-900/80 px-3 text-[13px] font-semibold text-zinc-200 touch-manipulation transition-colors hover:bg-zinc-800 [-webkit-tap-highlight-color:transparent]"
+                >
+                  Copy email
+                </button>
+              </div>
+              {supportEmailCopyMessage ? (
+                <p className="mt-2 text-[12px] leading-snug text-cyan-200/90">{supportEmailCopyMessage}</p>
+              ) : null}
             </div>
 
             {settingsViewerIsStaff ? (
