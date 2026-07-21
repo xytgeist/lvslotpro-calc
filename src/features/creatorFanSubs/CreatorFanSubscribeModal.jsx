@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import { formatFanTierLabel } from './fanSubTiers.js'
 import { creatorFanOfferHeadline } from './fanSubOffer.js'
 import { startCreatorFanCheckout } from './creatorFanSubsApi.js'
@@ -40,6 +41,24 @@ export default function CreatorFanSubscribeModal({
     setError('')
   }, [open])
 
+  useEffect(() => {
+    if (!open) return
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
+
   if (!open || !offer) return null
 
   const handle = String(offer.handle || '').trim()
@@ -64,7 +83,7 @@ export default function CreatorFanSubscribeModal({
     }
   }
 
-  const onAlertsOnly = async () => {
+  const onAlertsAction = async () => {
     if (busy) return
     if (postAlertsEnabled) {
       if (!onDisablePostAlerts) return
@@ -95,28 +114,39 @@ export default function CreatorFanSubscribeModal({
 
   const body = (
     <div
-      className={`fixed inset-0 z-[${Z_APP_MODAL}] flex items-end justify-center sm:items-center sm:p-4`}
+      data-creator-fan-subscribe-modal
+      className={`fixed inset-0 z-[${Z_APP_MODAL}] flex flex-col bg-orange-600 text-white`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="creator-fan-subscribe-title"
     >
-      <button
-        type="button"
-        aria-label="Close"
-        className="absolute inset-0 bg-black/70"
-        onClick={onClose}
-      />
-      <div
-        data-creator-fan-subscribe-modal
-        className="relative z-10 max-h-[min(92vh,720px)] w-full max-w-md overflow-y-auto rounded-t-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl sm:rounded-2xl"
+      <header
+        data-creator-fan-subscribe-header
+        className="shrink-0 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]"
       >
-        <div className="flex items-start gap-3">
-          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-zinc-800">
+        <div className="grid h-11 grid-cols-[2.75rem_1fr_2.75rem] items-center">
+          <button
+            type="button"
+            aria-label="Close"
+            disabled={busy}
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-white/95 touch-manipulation hover:bg-white/10 disabled:opacity-50"
+          >
+            <X className="h-6 w-6" strokeWidth={2} aria-hidden />
+          </button>
+          <h2 id="creator-fan-subscribe-title" className="text-center text-[17px] font-bold leading-tight">
+            Subscribe
+          </h2>
+          <span className="h-11 w-11" aria-hidden />
+        </div>
+
+        <div className="flex flex-col items-center px-4 pb-6 pt-3 text-center">
+          <div className="h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-full border-[3px] border-white/90 bg-zinc-800 shadow-md">
             {offer.avatar_url ? (
               <img src={String(offer.avatar_url)} alt="" className="h-full w-full object-cover" />
             ) : (
               <span
-                className={`grid h-full w-full place-items-center text-[15px] font-bold text-white ${profileAvatarToneClass(
+                className={`grid h-full w-full place-items-center text-[22px] font-bold text-white ${profileAvatarToneClass(
                   offer.creator_user_id || handle,
                 )}`}
               >
@@ -124,81 +154,94 @@ export default function CreatorFanSubscribeModal({
               </span>
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 id="creator-fan-subscribe-title" className="text-[17px] font-bold text-zinc-100">
-              {headline}
-            </h2>
-            <p className="mt-0.5 text-[13px] text-zinc-500">
-              {displayName} · {handleAt}
+          <p className="mt-3 text-[20px] font-bold leading-tight">{displayName}</p>
+          <p className="mt-1 text-[15px] font-medium text-white/85">{handleAt}</p>
+        </div>
+      </header>
+
+      <div
+        data-creator-fan-subscribe-sheet
+        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[1.35rem] border-t border-white/10 bg-zinc-950 text-zinc-100"
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 pb-4 pt-5">
+          {alreadySubscribed ? (
+            <p className="text-[15px] leading-relaxed text-emerald-300/95">
+              You are already supporting this creator. Thanks for being here.
             </p>
-            <p className="mt-1 text-[14px] font-semibold text-orange-400">{tierLabel}</p>
-          </div>
+          ) : (
+            <>
+              <p className="text-[17px] font-bold text-zinc-100">{headline}</p>
+              <p className="mt-1 text-[14px] font-semibold text-orange-400">{tierLabel}</p>
+
+              {intro ? (
+                <p className="mt-4 text-[15px] leading-relaxed text-zinc-300 whitespace-pre-wrap">{intro}</p>
+              ) : null}
+
+              {posts ? (
+                <section className="mt-5">
+                  <h3 className="text-[13px] font-bold text-zinc-100">Subscription perks</h3>
+                  <p className="mt-2 flex items-start gap-2 text-[15px] leading-relaxed text-zinc-300">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full border border-zinc-500" aria-hidden />
+                    <span className="whitespace-pre-wrap">{posts}</span>
+                  </p>
+                </section>
+              ) : null}
+
+              {chat ? (
+                <section className="mt-5">
+                  <h3 className="text-[13px] font-bold text-zinc-100">Fan group chat</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-zinc-300 whitespace-pre-wrap">{chat}</p>
+                </section>
+              ) : null}
+
+              <p className="mt-6 text-[12px] leading-snug text-zinc-600">
+                Paid fan access is billed monthly through Stripe. Alerts only is free post notifications.
+              </p>
+            </>
+          )}
+
+          {error ? <p className="mt-4 text-[13px] text-red-300/95">{error}</p> : null}
         </div>
 
-        {alreadySubscribed ? (
-          <p className="mt-4 text-[14px] leading-relaxed text-emerald-300/95">
-            You are already supporting this creator. Thanks for being here.
-          </p>
-        ) : (
-          <>
-            {intro ? (
-              <p className="mt-4 text-[14px] leading-relaxed text-zinc-300 whitespace-pre-wrap">{intro}</p>
-            ) : null}
-
-            {posts ? (
-              <section className="mt-4">
-                <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-500">
-                  Private posts
-                </h3>
-                <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-300 whitespace-pre-wrap">{posts}</p>
-              </section>
-            ) : null}
-
-            {chat ? (
-              <section className="mt-4">
-                <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-500">
-                  Fan group chat
-                </h3>
-                <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-300 whitespace-pre-wrap">{chat}</p>
-              </section>
-            ) : null}
-
-            <p className="mt-4 text-[12px] leading-snug text-zinc-600">
-              Paid fan access is billed monthly through Stripe. Alerts only is free post notifications.
-            </p>
-          </>
-        )}
-
-        {error ? <p className="mt-3 text-[13px] text-red-300/95">{error}</p> : null}
-
-        <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
-          {alreadySubscribed ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onClose}
-              className="min-h-11 rounded-xl border border-zinc-700/90 px-4 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-50"
-            >
-              Close
-            </button>
-          ) : (
+        <div className="shrink-0 border-t border-zinc-800/90 bg-zinc-950 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+          {!alreadySubscribed ? (
             <>
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void onAlertsOnly()}
-                className="min-h-11 rounded-xl border border-zinc-700/90 px-4 text-[14px] font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-50 touch-manipulation"
+                onClick={() => void onSubscribe()}
+                className="flex min-h-[3.25rem] w-full items-center justify-center rounded-full bg-orange-500 px-5 text-[16px] font-bold text-zinc-950 touch-manipulation hover:bg-orange-400 disabled:opacity-50"
               >
-                {postAlertsEnabled ? 'Turn off alerts' : 'Alerts only'}
+                {busy ? '…' : `Subscribe · ${tierLabel}`}
               </button>
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void onSubscribe()}
-                title={`Paid fan subscription · ${tierLabel}`}
-                className="min-h-11 rounded-xl bg-orange-500 px-5 text-[14px] font-bold text-zinc-950 hover:bg-orange-400 disabled:opacity-50 touch-manipulation"
+                onClick={() => void onAlertsAction()}
+                className="mt-3 flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-700/90 px-4 text-[15px] font-semibold text-zinc-200 touch-manipulation hover:bg-zinc-900/80 disabled:opacity-50"
               >
-                {busy ? '…' : 'Subscribe'}
+                {postAlertsEnabled ? 'Turn off alerts' : 'Alerts only'}
+              </button>
+            </>
+          ) : (
+            <>
+              {postAlertsEnabled && onDisablePostAlerts ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onAlertsAction()}
+                  className="mb-3 flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-700/90 px-4 text-[15px] font-semibold text-zinc-200 touch-manipulation hover:bg-zinc-900/80 disabled:opacity-50"
+                >
+                  Turn off alerts
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onClose}
+                className="flex min-h-[3.25rem] w-full items-center justify-center rounded-full bg-orange-500 px-5 text-[16px] font-bold text-zinc-950 touch-manipulation hover:bg-orange-400 disabled:opacity-50"
+              >
+                Close
               </button>
             </>
           )}

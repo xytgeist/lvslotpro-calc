@@ -2950,36 +2950,44 @@ html.light [data-creator-fan-offer-form] .text-zinc-600 {
   color: #71717a !important;
 }
 
-html.light [data-creator-fan-subscribe-modal] {
+html.light [data-creator-fan-subscribe-sheet] {
   background-color: #ffffff !important;
   border-color: #e4e4e7 !important;
 }
-html.light [data-creator-fan-subscribe-modal] .text-zinc-100 {
+html.light [data-creator-fan-subscribe-sheet] .text-zinc-100 {
   color: #18181b !important;
 }
-html.light [data-creator-fan-subscribe-modal] .text-zinc-300 {
+html.light [data-creator-fan-subscribe-sheet] .text-zinc-300 {
   color: #3f3f46 !important;
 }
-html.light [data-creator-fan-subscribe-modal] .text-zinc-500 {
+html.light [data-creator-fan-subscribe-sheet] .text-zinc-500 {
   color: #71717a !important;
 }
-html.light [data-creator-fan-subscribe-modal] .text-zinc-600 {
+html.light [data-creator-fan-subscribe-sheet] .text-zinc-600 {
   color: #71717a !important;
 }
-html.light [data-creator-fan-subscribe-modal] .text-zinc-200 {
+html.light [data-creator-fan-subscribe-sheet] .text-zinc-200 {
   color: #3f3f46 !important;
 }
-html.light [data-creator-fan-subscribe-modal] .bg-zinc-950 {
+html.light [data-creator-fan-subscribe-sheet] .bg-zinc-950 {
   background-color: #ffffff !important;
 }
-html.light [data-creator-fan-subscribe-modal] .border-zinc-800 {
+html.light [data-creator-fan-subscribe-sheet] .border-zinc-800 {
   border-color: #e4e4e7 !important;
 }
-html.light [data-creator-fan-subscribe-modal] .border-zinc-700\/90 {
+html.light [data-creator-fan-subscribe-sheet] .border-zinc-800\/90 {
+  border-color: #e4e4e7 !important;
+}
+html.light [data-creator-fan-subscribe-sheet] .border-zinc-700\/90 {
   border-color: #d4d4d8 !important;
 }
-html.light [data-creator-fan-subscribe-modal] .bg-zinc-800 {
+html.light [data-creator-fan-subscribe-sheet] .bg-zinc-800 {
   background-color: #f4f4f5 !important;
+}
+
+/* Legacy hook: full-screen modal root (header stays orange in light mode) */
+html.light [data-creator-fan-subscribe-modal] {
+  background-color: #ea580c !important;
 }
 
 /* Manage membership modal - light mode */

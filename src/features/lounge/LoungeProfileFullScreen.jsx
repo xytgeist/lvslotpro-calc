@@ -2148,17 +2148,14 @@ export default function LoungeProfileFullScreen({
                     <ProfileFanSubPillButton
                       disabled={socialBusy}
                       postAlertsOn={isSubscribed}
-                      onClick={() => {
-                        if (isSubscribed) void toggleSubscribe()
-                        else supportCreatorFan()
-                      }}
+                      onClick={() => supportCreatorFan()}
                       title={
                         isSubscribed
-                          ? 'Turn off post alerts'
+                          ? 'Manage post alerts or subscribe'
                           : `Subscribe or post alerts · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
                       }
                       aria-label={
-                        isSubscribed ? 'Turn off post alerts' : 'Subscribe or turn on post alerts'
+                        isSubscribed ? 'Manage post alerts or subscribe' : 'Subscribe or turn on post alerts'
                       }
                     />
                   ) : (
@@ -2167,8 +2164,7 @@ export default function LoungeProfileFullScreen({
                     disabled={socialBusy}
                     onClick={() => {
                       if (creatorFanOffer) {
-                        if (isSubscribed) void toggleSubscribe()
-                        else supportCreatorFan()
+                        supportCreatorFan()
                       } else {
                         void toggleSubscribe()
                       }
@@ -2176,7 +2172,7 @@ export default function LoungeProfileFullScreen({
                     title={
                       creatorFanOffer
                         ? isSubscribed
-                          ? 'Turn off post alerts'
+                          ? 'Manage post alerts or subscribe'
                           : hasCreatorFanSub
                             ? 'View your fan subscription'
                             : `Subscribe or post alerts · ${formatFanTierLabel(creatorFanOffer.fan_tier_key)}`
