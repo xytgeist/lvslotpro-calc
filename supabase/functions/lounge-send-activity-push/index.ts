@@ -114,6 +114,7 @@ function prefAllows(prefs: NotificationPrefs | null, eventType: string): boolean
     case 'mention_in_comment':
       return prefs.push_mentions
     case 'follow':
+    case 'creator_fan_sub':
       return prefs.push_follows
     case 'repost':
     case 'quote_repost':
@@ -151,6 +152,8 @@ function actionPhrase(eventType: string, commentId: string | null, isReply = fal
       return 'mentioned you in a comment'
     case 'follow':
       return 'followed you'
+    case 'creator_fan_sub':
+      return 'subscribed to your fan tier'
     case 'repost':
       return commentId ? 'reposted your comment' : 'reposted your post'
     case 'quote_repost':
@@ -211,7 +214,7 @@ function buildTargetUrl(
   ) {
     params.set('tab', 'logbook')
     params.set('playLogEntry', event.play_log_entry_id)
-  } else if (event.event_type === 'follow') {
+  } else if (event.event_type === 'follow' || event.event_type === 'creator_fan_sub') {
     const handle = String(actor?.handle || '').trim().replace(/^@/, '').toLowerCase()
     if (handle) {
       params.set('u', handle)

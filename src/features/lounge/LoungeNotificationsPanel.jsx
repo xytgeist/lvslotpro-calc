@@ -415,7 +415,10 @@ export default function LoungeNotificationsPanel({
         return
       }
 
-      if (event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW) {
+      if (
+        event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW ||
+        event.event_type === LOUNGE_ACTIVITY_EVENT_TYPES.CREATOR_FAN_SUB
+      ) {
         onOpenProfile?.({
           user_id: event.actor_user_id,
           author_profile: {

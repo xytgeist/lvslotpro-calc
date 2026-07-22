@@ -72,6 +72,7 @@ import {
   fetchCreatorFanOffer,
 } from '../creatorFanSubs/creatorFanSubsApi.js'
 import CreatorFanSubscribeModal from '../creatorFanSubs/CreatorFanSubscribeModal.jsx'
+import CreatorFanPortalModal from '../creatorFanSubs/CreatorFanPortalModal.jsx'
 import OwnProfileFanMonetizationCta from '../creatorFanSubs/OwnProfileFanMonetizationCta.jsx'
 import { formatFanTierLabel } from '../creatorFanSubs/fanSubTiers.js'
 import LoungeProfileOverflowMenu from './LoungeProfileOverflowMenu.jsx'
@@ -516,6 +517,8 @@ export default function LoungeProfileFullScreen({
   onNavRestoreApplied = null,
   /** Open Settings → Subscriptions → Enable fan subscriptions (own profile CTA). */
   onOpenFanSubscriptionSettings = null,
+  /** One-shot: open Fan hub modal when own profile is visible (e.g. `?fanPortal=1`). */
+  requestOpenFanPortal = false,
 }) {
   const [tab, setTab] = useState('posts')
   const [adminRoleBusy, setAdminRoleBusy] = useState(false)
@@ -542,6 +545,7 @@ export default function LoungeProfileFullScreen({
   const [fanSubCancelAtPeriodEnd, setFanSubCancelAtPeriodEnd] = useState(false)
   const [fanSubPeriodEnd, setFanSubPeriodEnd] = useState(/** @type {string | null} */ (null))
   const [fanSubscribeModalOpen, setFanSubscribeModalOpen] = useState(false)
+  const [fanPortalOpen, setFanPortalOpen] = useState(false)
   const [aboutDraft, setAboutDraft] = useState('')
   const [locationDraft, setLocationDraft] = useState('')
   const [categoryPillsDraft, setCategoryPillsDraft] = useState([])
@@ -803,6 +807,11 @@ export default function LoungeProfileFullScreen({
     setAboutErr('')
     setOwnProfileEditing(true)
   }, [open, isOwnProfile, requestOwnProfileEditing, profileUserId])
+
+  useEffect(() => {
+    if (!open || !isOwnProfile || !requestOpenFanPortal) return
+    setFanPortalOpen(true)
+  }, [open, isOwnProfile, requestOpenFanPortal, profileUserId])
 
   useEffect(() => {
     if (!ownProfileEditing || !isOwnProfile || profile?.user_id == null) return
@@ -2138,6 +2147,7 @@ export default function LoungeProfileFullScreen({
                   <OwnProfileFanMonetizationCta
                     supabaseClient={supabaseClient}
                     onOpenFanSubscriptionSettings={onOpenFanSubscriptionSettings}
+                    onOpenCreatorFanPortal={() => setFanPortalOpen(true)}
                   />
                 </div>
               ) : !isOwnProfile && viewerUserId ? (
@@ -2746,6 +2756,20 @@ export default function LoungeProfileFullScreen({
         onEnablePostAlerts={enableProfilePostAlertsOnly}
         onDisablePostAlerts={toggleSubscribe}
       />
+
+      {isOwnProfile && supabaseClient ? (
+        <CreatorFanPortalModal
+          open={fanPortalOpen}
+          onClose={() => setFanPortalOpen(false)}
+          supabaseClient={supabaseClient}
+          onOpenMonetizationSettings={onOpenFanSubscriptionSettings || undefined}
+          onViewSubscriber={
+            typeof onNavigateToProfile === 'function'
+              ? (userId) => onNavigateToProfile({ userId })
+              : undefined
+          }
+        />
+      ) : null}
     </div>
   )
 }

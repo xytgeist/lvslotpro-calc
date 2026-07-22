@@ -16,6 +16,7 @@ export const LOUNGE_ACTIVITY_EVENT_TYPES = {
   PLAY_LOG_PARTNER_PAID: 'play_log_partner_paid',
   PLAY_LOG_PARTNER_UNPAID: 'play_log_partner_unpaid',
   STARTER_WEEKLY_GUIDE_DROP: 'starter_weekly_guide_drop',
+  CREATOR_FAN_SUB: 'creator_fan_sub',
 }
 
 /** Maps `activity_events.event_type` → notification avatar badge kind (null = no badge). */
@@ -29,6 +30,7 @@ export function loungeActivityNotificationBadgeKind(eventType) {
     case LOUNGE_ACTIVITY_EVENT_TYPES.MENTION_IN_COMMENT:
       return 'mention'
     case LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW:
+    case LOUNGE_ACTIVITY_EVENT_TYPES.CREATOR_FAN_SUB:
       return 'follow'
     case LOUNGE_ACTIVITY_EVENT_TYPES.LIKE:
       return 'like'
@@ -184,6 +186,8 @@ export function loungeActivityActionPhrase(event) {
       return 'mentioned you in a comment'
     case LOUNGE_ACTIVITY_EVENT_TYPES.FOLLOW:
       return 'followed you'
+    case LOUNGE_ACTIVITY_EVENT_TYPES.CREATOR_FAN_SUB:
+      return 'subscribed to your fan tier'
     case LOUNGE_ACTIVITY_EVENT_TYPES.REPOST:
       return event?.comment_id ? 'reposted your comment' : 'reposted your post'
     case LOUNGE_ACTIVITY_EVENT_TYPES.QUOTE_REPOST:

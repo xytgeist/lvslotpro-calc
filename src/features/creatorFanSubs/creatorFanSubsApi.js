@@ -241,3 +241,61 @@ export async function fetchCreatorFanOffer(supabaseClient, creatorUserId) {
   if (data.offer_complete !== true) return null
   return data
 }
+
+/** @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient */
+export async function fetchMyCreatorFanSubscriberStats(supabaseClient) {
+  const { data, error } = await supabaseClient.rpc('get_my_creator_fan_subscriber_stats')
+  if (error) {
+    if (error.code === 'PGRST202') return null
+    throw error
+  }
+  return data && typeof data === 'object' ? data : null
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ search?: string, limit?: number, offset?: number }} [opts]
+ */
+export async function listMyCreatorFanSubscribers(supabaseClient, opts = {}) {
+  const { data, error } = await supabaseClient.rpc('list_my_creator_fan_subscribers', {
+    p_search: opts.search ?? '',
+    p_limit: opts.limit ?? 100,
+    p_offset: opts.offset ?? 0,
+  })
+  if (error) {
+    if (error.code === 'PGRST202') return []
+    throw error
+  }
+  if (Array.isArray(data)) return data
+  if (data && typeof data === 'object') {
+    try {
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+/** @param {Array<Record<string, unknown>>} rows */
+export function creatorFanSubscribersToCsv(rows) {
+  const esc = (v) => {
+    const s = String(v ?? '')
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+    return s
+  }
+  const header = 'handle,display_name,tier_key,status,cancel_at_period_end,period_end,subscribed_at'
+  const lines = rows.map((r) =>
+    [
+      esc(r.handle),
+      esc(r.display_name),
+      esc(r.fan_tier_key),
+      esc(r.status),
+      r.cancel_at_period_end ? 'yes' : 'no',
+      esc(r.current_period_end),
+      esc(r.subscribed_at),
+    ].join(','),
+  )
+  return `${header}\n${lines.join('\n')}\n`
+}

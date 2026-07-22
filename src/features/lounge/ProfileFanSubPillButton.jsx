@@ -13,6 +13,7 @@ import { PROFILE_SOCIAL_ACTION_ICON_CLASS } from './profileSocialActionChrome.js
  *   postAlertsOn?: boolean,
  *   subscribed?: boolean,
  *   capLabel?: string,
+ *   pillLabel?: string,
  * }} props
  */
 export default function ProfileFanSubPillButton({
@@ -23,8 +24,13 @@ export default function ProfileFanSubPillButton({
   postAlertsOn = false,
   subscribed = false,
   capLabel,
+  pillLabel,
 }) {
-  const labelText = subscribed ? 'SUBSCRIBED' : capLabel?.trim() || 'SUB'
+  const labelText = pillLabel?.trim()
+    ? pillLabel.trim()
+    : subscribed
+      ? 'SUBSCRIBED'
+      : capLabel?.trim() || 'SUB'
 
   return (
     <button

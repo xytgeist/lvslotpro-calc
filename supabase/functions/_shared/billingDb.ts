@@ -280,6 +280,19 @@ export async function upsertCreatorFanSubscriptionFromStripe(
     p_grant_access: grantAccess,
   })
   if (syncErr) throw new Error(`creator_fan_sub_sync_chat_member: ${syncErr.message}`)
+
+  const wasActive =
+    existingBySubId?.id != null && protectedStatuses.has(String(existingBySubId.status))
+  const nowActive = subscription.status === 'active' || subscription.status === 'trialing'
+  if (nowActive && !wasActive) {
+    const { error: notifyErr } = await admin.rpc('creator_fan_notify_new_subscriber', {
+      p_creator_user_id: creatorUserId,
+      p_subscriber_user_id: subscriberUserId,
+    })
+    if (notifyErr) {
+      console.warn('creator_fan_notify_new_subscriber:', notifyErr.message)
+    }
+  }
 }
 
 export async function deleteCreatorFanSubscriptionByStripeId(

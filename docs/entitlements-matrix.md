@@ -160,7 +160,7 @@ get_my_entitlements(user_id) → {
 | **4** | Add-on SKUs + Lifetime/Pro bundle rules | Slots vertical |
 | **5** | Fan room E2EE (optional) | Phase 2 traction + crypto design |
 
-Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts. **Detailed task breakdown (2026-07-21):** **`docs/test-buildout-backlog.md` § Creator fan subs — product backlog** (Settings manage subs, composer audience, feed teaser, Chat Subs tab, room mod tools, audio hang out).
+Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts. **Detailed task breakdown (2026-07-21):** **`docs/test-buildout-backlog.md` § Creator fan subs — product backlog** (Settings manage subs, composer audience, feed teaser, Chat Subs tab, room mod tools, **creator new-sub awareness §7**, audio hang out).
 
 ---
 

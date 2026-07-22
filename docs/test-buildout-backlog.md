@@ -455,7 +455,7 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 ## Creator fan subs — product backlog (Ryan 2026-07-21)
 
-Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **2026-07-20**). Track the six product tracks below before calling Phase 2 complete. Spec anchors: **`docs/entitlements-matrix.md` §2.2–§2.3, §5**; chat schema notes in **`docs/frontend-architecture.md`** (`chat/`).
+Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **2026-07-20**). Track the product tracks below before calling Phase 2 complete. Spec anchors: **`docs/entitlements-matrix.md` §2.2–§2.3, §5**; chat schema notes in **`docs/frontend-architecture.md`** (`chat/`).
 
 ### 1. Settings — “Creators I support”
 
@@ -500,7 +500,18 @@ Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **
 - [ ] **Depends on:** fan room membership (§4) + moderation tooling (§5) at minimum.
 - [ ] **Not blocking** §1–§5; track as **Phase 2b** or separate roadmap row once §4 ships.
 
-**Suggested build order:** **1** (settings/manage) → **2** (compose) → **3** (feed teaser) → **4** (Subs tab) → **5** (mod tools) → **6** (audio spike).
+### 7. Creator experience — new subscriber awareness (Ryan 2026-07-21)
+
+Creators need to know when someone subscribes. **Shipped v1 (2026-07-21):** **`creator_fan_sub`** activity + push (respects **Follows** push pref), **`CreatorFanPortalModal`** (**Fan hub** on own profile when live), subscriber list/search/CSV, stats RPCs migration **`20260721210000`**, webhook **`creator_fan_notify_new_subscriber`**. Deep link **`?fanPortal=1`** opens own profile + hub.
+
+- [ ] **Research:** How does **X** (and similar) surface new subs to creators (push, email, monetization dashboard, DMs, payout summaries)? Capture screenshots / flows in a short note (link from this section or **`docs/entitlements-matrix.md` §5**).
+- [x] **Creator POV audit:** Connect → go live → fan checkout documented; **Fan hub** + Alerts on new sub (test after migration + **`stripe-webhook`** redeploy).
+- [x] **Product decision:** v1 = in-app notification + **Fan hub** modal (not a separate app tab).
+- [x] **Implement** v1 — migration **`20260721210000`**, **`CreatorFanPortalModal.jsx`**, **`OwnProfileFanMonetizationCta`** hub pill, **`billingDb`** notify RPC, **`lounge-send-activity-push`** **`creator_fan_sub`**.
+
+**Test:** apply **`20260721210000`** on test; redeploy **`stripe-webhook`** + **`lounge-send-activity-push`**; new fan sub → creator Alerts row + push; own profile **Fan hub** lists subscriber; **`/?fanPortal=1`** smoke.
+
+**Suggested timing:** **§2–§6** still open; **§7** v1 shipped — email digest / MRR charts deferred.
 
 ---
 
@@ -842,6 +853,8 @@ Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **
 ## Update log
 
 - 2026-07-21: **Creator fan sub tiers $149 / $249:** migration **`20260721180000`** on test + prod; client + Edge tier catalog **`fan-tier-14999`**, **`fan-tier-24999`**; live Stripe **`STRIPE_PRICE_FAN_TIER_14999`**, **`STRIPE_PRICE_FAN_TIER_24999`** on prod.
+- 2026-07-21: **Creator fan portal + new-sub alerts (§7 v1):** migration **`20260721210000`** (`get_my_creator_fan_subscriber_stats`, `list_my_creator_fan_subscribers`, **`creator_fan_sub`** activity + **`creator_fan_notify_new_subscriber`**); **`CreatorFanPortalModal`** + own-profile **Fan hub** pill; webhook notify in **`billingDb.ts`**; push/activity copy in client + **`lounge-send-activity-push`**; **`?fanPortal=1`** deep link. Apply migration on test; redeploy **`stripe-webhook`** + **`lounge-send-activity-push`** before smoke.
+- 2026-07-21: **Creator fan subs — creator new-sub awareness (backlog §7):** Ryan — creators must be informed when someone subscribes; research X/subscription UX, full creator POV audit, then decide notifications vs subscriber list vs creator portal before build.
 - 2026-07-21: **Creator fan subscribe modal — resume:** pending cancel-at-period-end shows **Resume subscription** (Edge **`creator-fan-resume-subscription`**, deploy to test before smoke); **`stripe-create-portal-session`** still used for cancel. **Creators I support** rows open creator profile (not inline cancel).
 - 2026-07-21: **Settings IA (test):** **Memberships** (Edge AP Slots + staff access) and **Subscriptions** (Creators I support + collapsed **Enable fan subscriptions**); Account slimmed to identity/legal. Own profile **Enable fan subscriptions** CTA → Settings **`subscriptions-fan`**; Stripe Connect return **`?settings=fan`** opens same.
 - 2026-07-21: **Creator fan subs Settings — Creators I support (test):** Account accordion lists active fan subs (`get_my_creator_fan_entitlements` + **`profiles`**), tier + renew/access-through copy, **Cancel subscription** → **`openCreatorFanBillingPortal(creator_user_id)`**; refetch on portal return. **`CreatorFanSupportedCreatorsPanel`** in **`LoungeDockSlidePanels`**.

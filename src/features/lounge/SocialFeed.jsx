@@ -810,6 +810,7 @@ export default function SocialFeed({
   const [profileModalData, setProfileModalData] = useState(null)
   const [profileModalPosts, setProfileModalPosts] = useState([])
   const [profileModalStartEditing, setProfileModalStartEditing] = useState(false)
+  const [profileModalOpenFanPortal, setProfileModalOpenFanPortal] = useState(false)
   const [profileModalFollowListTab, setProfileModalFollowListTab] = useState(null)
   const [profileModalHighlightFollowerIds, setProfileModalHighlightFollowerIds] = useState([])
   /** Profiles opened from feed/detail/profile without replacing the root sheet (back pops one layer). */
@@ -12147,12 +12148,14 @@ export default function SocialFeed({
       setProfileModalStartEditing(false)
       setProfileModalFollowListTab(null)
       setProfileModalHighlightFollowerIds([])
+      setProfileModalOpenFanPortal(false)
       return
     }
     if (loungeNavSearchReturnPendingRef.current) {
       setProfileModalStartEditing(false)
       setProfileModalFollowListTab(null)
       setProfileModalHighlightFollowerIds([])
+      setProfileModalOpenFanPortal(false)
       return
     }
     const navFrame = popLoungeNavReturnFrame(loungeNavReturnStackRef.current)
@@ -12170,6 +12173,7 @@ export default function SocialFeed({
     setProfileModalStartEditing(false)
     setProfileModalFollowListTab(null)
     setProfileModalHighlightFollowerIds([])
+    setProfileModalOpenFanPortal(false)
   }, [])
 
   const closeProfileModal = useCallback(() => {
@@ -12254,6 +12258,7 @@ export default function SocialFeed({
       if (!userId) return
       profileReturnDockPanelRef.current = opts?.returnDockPanel ?? null
       setProfileModalStartEditing(opts?.startEditing === true)
+      setProfileModalOpenFanPortal(opts?.openFanPortal === true)
       setProfileModalFollowListTab(
         opts?.openFollowListTab === 'following' || opts?.openFollowListTab === 'followers'
           ? opts.openFollowListTab
@@ -12342,6 +12347,19 @@ export default function SocialFeed({
       supabaseClient,
     ]
   )
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !composerUserId || !composerAuthResolved || loungeReadOnly) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('fanPortal') !== '1') return
+    params.delete('fanPortal')
+    const qs = params.toString()
+    const nextPath = qs ? `/?${qs}` : '/'
+    if (window.location.pathname + window.location.search !== nextPath) {
+      window.history.replaceState({}, '', nextPath)
+    }
+    void openProfileModal({ user_id: composerUserId }, { openFanPortal: true })
+  }, [composerAuthResolved, composerUserId, loungeReadOnly, openProfileModal])
 
   useEffect(() => {
     if (!requestOpenProfileUserId) return
@@ -16077,6 +16095,7 @@ export default function SocialFeed({
           navRestore={profileNavRestore}
           onNavRestoreApplied={onProfileNavRestoreApplied}
           onOpenFanSubscriptionSettings={onOpenFanSubscriptionSettings}
+          requestOpenFanPortal={profileModalOpenFanPortal}
         />
       ) : null}
 
