@@ -157,6 +157,8 @@ export default function LoungeDockSlidePanels({
   notificationsViewerUserId = '',
   onOpenPostFromNotifications,
   onOpenProfileFromNotifications,
+  /** Open a creator profile from Settings → Subscriptions → Creators I support. */
+  onOpenProfileFromSettings,
   onOpenOwnProfileFollowers,
   onNotificationsUnreadChange,
   notificationInteractionProps = null,
@@ -2048,7 +2050,10 @@ export default function LoungeDockSlidePanels({
                     data-settings-subscriptions
                     className="mt-3 rounded-xl border border-zinc-800/90 bg-zinc-950/40 divide-y divide-zinc-800/90"
                   >
-                    <CreatorFanSupportedCreatorsPanel supabaseClient={settingsSupabaseClient} />
+                    <CreatorFanSupportedCreatorsPanel
+                      supabaseClient={settingsSupabaseClient}
+                      onOpenCreatorProfile={onOpenProfileFromSettings}
+                    />
                     <div>
                       <button
                         type="button"

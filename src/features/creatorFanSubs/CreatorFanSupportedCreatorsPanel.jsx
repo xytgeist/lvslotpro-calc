@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS } from '../lounge/loungeFeedAvatar.js'
 import {
   profileAvatarInitials,
@@ -7,7 +8,6 @@ import {
 import {
   fetchCreatorProfilesForFanSubs,
   fetchMyCreatorFanSubscriptions,
-  openCreatorFanBillingPortal,
 } from './creatorFanSubsApi.js'
 import { fanSubBillingStatusLine } from './fanSubBillingDates.js'
 import { formatFanTierLabel } from './fanSubTiers.js'
@@ -15,14 +15,14 @@ import { formatFanTierLabel } from './fanSubTiers.js'
 /**
  * @param {{
  *   supabaseClient: import('@supabase/supabase-js').SupabaseClient,
+ *   onOpenCreatorProfile?: (entity: { user_id: string, author_profile?: object }) => void,
  * }} props
  */
-export default function CreatorFanSupportedCreatorsPanel({ supabaseClient }) {
+export default function CreatorFanSupportedCreatorsPanel({ supabaseClient, onOpenCreatorProfile }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  /** @type {[Array<{ sub: Awaited<ReturnType<typeof fetchMyCreatorFanSubscriptions>>[number], profile?: { handle?: string, display_name?: string, avatar_url?: string } }>, import('react').Dispatch<import('react').SetStateAction<Array<{ sub: Awaited<ReturnType<typeof fetchMyCreatorFanSubscriptions>>[number], profile?: { handle?: string, display_name?: string, avatar_url?: string } }>>>]} */
+  /** @type {[Array<{ sub: Awaited<ReturnType<typeof fetchMyCreatorFanSubscriptions>>[number], profile?: { user_id?: string, handle?: string, display_name?: string, avatar_url?: string } }>, import('react').Dispatch<import('react').SetStateAction<Array<{ sub: Awaited<ReturnType<typeof fetchMyCreatorFanSubscriptions>>[number], profile?: { user_id?: string, handle?: string, display_name?: string, avatar_url?: string } }>>>]} */
   const [rows, setRows] = useState([])
-  const [cancelBusyId, setCancelBusyId] = useState('')
 
   const reload = useCallback(async () => {
     if (!supabaseClient) {
@@ -72,23 +72,24 @@ export default function CreatorFanSupportedCreatorsPanel({ supabaseClient }) {
     }
   }, [reload, supabaseClient])
 
-  const onCancel = async (creatorUserId) => {
-    if (!supabaseClient || cancelBusyId) return
-    setCancelBusyId(creatorUserId)
-    setError('')
-    try {
-      await openCreatorFanBillingPortal(supabaseClient, creatorUserId)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open billing portal.')
-      setCancelBusyId('')
-    }
+  const openCreatorProfile = (sub, profile) => {
+    if (typeof onOpenCreatorProfile !== 'function') return
+    onOpenCreatorProfile({
+      user_id: sub.creatorUserId,
+      author_profile: {
+        user_id: sub.creatorUserId,
+        handle: profile?.handle,
+        display_name: profile?.display_name,
+        avatar_url: profile?.avatar_url,
+      },
+    })
   }
 
   return (
     <div className="px-3.5 py-3" data-settings-creators-i-support>
       <div className="text-[15px] font-semibold text-zinc-100">Creators I support</div>
       <p className="mt-1 text-[12px] leading-snug text-zinc-500">
-        Fan subscriptions you pay for each month. Cancel anytime in Stripe.
+        Fan subscriptions you pay for each month. Tap a creator to open their profile.
       </p>
 
       {loading ? (
@@ -111,13 +112,17 @@ export default function CreatorFanSupportedCreatorsPanel({ supabaseClient }) {
             })
             const avatarUrl = profile?.avatar_url ? String(profile.avatar_url) : ''
             const seed = sub.creatorUserId
+            const canOpen = typeof onOpenCreatorProfile === 'function'
 
             return (
-              <li
-                key={sub.creatorUserId}
-                className="rounded-xl border border-zinc-800/90 bg-zinc-900/35 p-3"
-              >
-                <div className="flex gap-3">
+              <li key={sub.creatorUserId}>
+                <button
+                  type="button"
+                  disabled={!canOpen}
+                  onClick={() => openCreatorProfile(sub, profile)}
+                  className="flex w-full gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/35 p-3 text-left touch-manipulation hover:bg-zinc-800/45 disabled:cursor-default disabled:hover:bg-zinc-900/35 [-webkit-tap-highlight-color:transparent]"
+                  aria-label={`Open ${displayName}'s profile`}
+                >
                   <div
                     className={`${LOUNGE_NOTIFICATION_AUTHOR_AVATAR_CLASS} shrink-0 overflow-hidden ${profileAvatarToneClass(seed)}`}
                   >
@@ -135,17 +140,14 @@ export default function CreatorFanSupportedCreatorsPanel({ supabaseClient }) {
                     <p className="mt-1 text-[12px] font-semibold text-orange-400/95">{tierLabel}</p>
                     <p className="mt-0.5 text-[12px] leading-snug text-zinc-500">{statusLine}</p>
                   </div>
-                </div>
-                {sub.cancelAtPeriodEnd ? null : (
-                  <button
-                    type="button"
-                    disabled={Boolean(cancelBusyId)}
-                    onClick={() => void onCancel(sub.creatorUserId)}
-                    className="mt-3 min-h-10 w-full rounded-lg border border-zinc-700/90 bg-zinc-900/80 px-3 text-[13px] font-semibold text-zinc-100 touch-manipulation hover:bg-zinc-800 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
-                  >
-                    {cancelBusyId === sub.creatorUserId ? 'Opening Stripe…' : 'Cancel subscription'}
-                  </button>
-                )}
+                  {canOpen ? (
+                    <ChevronRight
+                      className="mt-1 h-5 w-5 shrink-0 text-zinc-600"
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  ) : null}
+                </button>
               </li>
             )
           })}

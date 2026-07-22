@@ -15967,6 +15967,7 @@ export default function SocialFeed({
           notificationsViewerUserId={composerUserId || ''}
           onOpenPostFromNotifications={onLoungeOpenPostFromNotifications}
           onOpenProfileFromNotifications={onLoungeOpenProfileFromNotifications}
+          onOpenProfileFromSettings={onLoungeOpenProfileFromNotifications}
           onOpenOwnProfileFollowers={onLoungeOpenOwnProfileFollowers}
           onNotificationsUnreadChange={onLoungeNotificationsUnreadChange}
           notificationInteractionProps={notificationInteractionProps}
