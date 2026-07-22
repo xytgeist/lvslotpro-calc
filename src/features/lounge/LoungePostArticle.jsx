@@ -15,8 +15,7 @@ import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungeFanOnlySubscribeCta from './LoungeFanOnlySubscribeCta.jsx'
-import LoungeFanOnlyLockedCaptionTeaser from './LoungeFanOnlyLockedCaptionTeaser.jsx'
-import LoungeFanOnlyLockedBlurFrame from './LoungeFanOnlyLockedBlurFrame.jsx'
+import LoungeFanOnlyLockedCaptionBlock from './LoungeFanOnlyLockedCaptionBlock.jsx'
 import { loungePostIsThreadRoot, loungePostThreadPartCount } from '../../utils/loungePostThreadApi.js'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
@@ -196,17 +195,18 @@ export default function LoungePostArticle({
     if (!showPostCaption(entity)) return null
     const locked = isLoungeFanOnlyPostLocked(entity, fanLockCtx)
     if (locked) {
+      if (typeof onSubscribeToCreatorFan !== 'function') return null
       const captionText = postCaptionDisplayText(entity)
+      const handle = entity.author_profile?.handle || handleFor(entity)?.replace(/^@/, '')
       return (
-        <div
-          data-lounge-post-caption
-          data-lounge-fan-only-locked
-          role="presentation"
-          className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-zinc-200`}
-        >
-          <LoungeFanOnlyLockedCaptionTeaser text={captionText} captionOpts={richCaptionOpts} />
-          {renderFanSubscribeCta(entity, { className: 'mt-2' })}
-          <LoungeFanOnlyLockedBlurFrame text={captionText} captionOpts={richCaptionOpts} />
+        <div data-lounge-post-caption role="presentation">
+          <LoungeFanOnlyLockedCaptionBlock
+            text={captionText}
+            captionOpts={richCaptionOpts}
+            creatorHandle={handle}
+            busy={fanSubscribeBusy}
+            onSubscribe={() => onSubscribeToCreatorFan?.(entity.user_id)}
+          />
         </div>
       )
     }

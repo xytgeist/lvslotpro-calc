@@ -20,6 +20,7 @@ export default function LoungeFanOnlySubscribeCta({
     <div
       className={`relative z-10 rounded-2xl border border-cyan-500/30 bg-cyan-950/40 px-3 py-3 ${className}`}
       data-lounge-fan-only-cta
+      data-lounge-fan-only-cta-shell="card"
     >
       <button
         type="button"
