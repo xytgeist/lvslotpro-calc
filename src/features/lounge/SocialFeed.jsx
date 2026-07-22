@@ -210,11 +210,13 @@ import {
 import {
   fetchLoungeCommunityFeedPostsForViewer,
   isLoungeFanOnlyPostLocked,
+  isLoungeFanOnlyDirectFeedRowLocked,
+  loungeFanOnlyPostDetailOpenBlocked,
   LOUNGE_COMPOSER_AUDIENCE_SUBS,
-  loungeFanOnlyPostBlocksRepost,
   loungeFanOnlyPostContentEntity,
   showLoungeFanOnlyPostUnlockedTint,
 } from '../../utils/loungeFanOnlyPost.js'
+import LoungeQuoteRepostEmbeddedOriginal from './LoungeQuoteRepostEmbeddedOriginal.jsx'
 import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
@@ -5271,10 +5273,6 @@ export default function SocialFeed({
   const openQuoteRepostComposer = useCallback(
     (post) => {
       if (!post?.id || loungeReadOnly) return
-      if (loungeFanOnlyPostBlocksRepost(post)) {
-        setLoungeManageErr('Subscribers-only posts cannot be quote reposted.')
-        return
-      }
       if (openProfileGateIfNeeded()) return
       if (quoteRepostBackgroundUploadInFlight()) {
         setLoungeManageErr('Your quote repost is still uploading. You can keep browsing while it finishes.')
@@ -5342,10 +5340,6 @@ export default function SocialFeed({
   const handlePlainRepost = useCallback(
     async (post) => {
       if (!post?.id || loungeReadOnly || !composerUserId) return
-      if (loungeFanOnlyPostBlocksRepost(post)) {
-        setLoungeManageErr('Subscribers-only posts cannot be reposted.')
-        return
-      }
       if (openProfileGateIfNeeded()) return
       setLoungeManageErr('')
       setLoungeDetailRepostMenuOpen(false)
@@ -6853,7 +6847,7 @@ export default function SocialFeed({
     (post, opts) => {
       if (!post?.id) return
       const contentPost = loungeFanOnlyPostContentEntity(post)
-      if (isLoungeFanOnlyPostLocked(contentPost, loungeFanLockCtx)) {
+      if (loungeFanOnlyPostDetailOpenBlocked(post, loungeFanLockCtx)) {
         return
       }
       if (performance.now() < loungeFeedNavClickSuppressUntilRef.current) return
@@ -7015,7 +7009,7 @@ export default function SocialFeed({
     async (post, commentId, { focusComposer = false, prefetchedComments = null } = {}) => {
       if (!post?.id || !commentId) return
       const contentPost = loungeFanOnlyPostContentEntity(post)
-      if (isLoungeFanOnlyPostLocked(contentPost, loungeFanLockCtx)) {
+      if (loungeFanOnlyPostDetailOpenBlocked(post, loungeFanLockCtx)) {
         return
       }
       let parentPost = post
@@ -14360,10 +14354,7 @@ export default function SocialFeed({
           <>
             {communityPosts.map((post) => {
               const fanOnlyRowTint = showLoungeFanOnlyPostUnlockedTint(post, loungeFanLockCtx)
-              const fanOnlyFeedLocked = isLoungeFanOnlyPostLocked(
-                loungeFanOnlyPostContentEntity(post),
-                loungeFanLockCtx,
-              )
+              const fanOnlyFeedLocked = isLoungeFanOnlyDirectFeedRowLocked(post, loungeFanLockCtx)
               return (
               <article
                 key={post.id}
@@ -14377,7 +14368,9 @@ export default function SocialFeed({
                   // Quote-repost embed tap
                   const origHost = t.closest('[data-lounge-original-embed]')
                   if (origHost && post.reposted_post?.id && !post.is_plain_repost) {
-                    openLoungePostDetail(post.reposted_post)
+                    if (!isLoungeFanOnlyPostLocked(post.reposted_post, loungeFanLockCtx)) {
+                      openLoungePostDetail(post.reposted_post)
+                    }
                     return
                   }
                   if (
@@ -14387,8 +14380,11 @@ export default function SocialFeed({
                   )
                     return
                   if (fanOnlyFeedLocked) return
-                  // Plain post repost → open original
                   if (post.is_plain_repost && post.reposted_post?.id) {
+                    if (isLoungeFanOnlyPostLocked(post.reposted_post, loungeFanLockCtx)) {
+                      openLoungePostDetail(post)
+                      return
+                    }
                     openLoungePostDetail(post.reposted_post)
                     return
                   }
@@ -15012,94 +15008,39 @@ export default function SocialFeed({
                         variant="detail"
                       />
                     ) : loungePostDetail.reposted_post ? (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      data-lounge-original-embed
-                      aria-label="View original post"
-                      onClick={(e) => {
-                        if (e.target instanceof Element && e.target.closest('button, a')) {
-                          e.stopPropagation()
-                          return
-                        }
-                        void openLoungePostDetail(loungePostDetail.reposted_post)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'Enter' && e.key !== ' ') return
-                        if (e.target !== e.currentTarget) return
-                        e.preventDefault()
-                        void openLoungePostDetail(loungePostDetail.reposted_post)
-                      }}
-                      className="mt-3 w-full cursor-pointer rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/80 active:bg-zinc-800/50"
-                    >
-                    <LoungeQuoteRepostEmbedAuthorMeta
-                      post={loungePostDetail.reposted_post}
-                      displayNameFor={displayNameFor}
-                      handleFor={handleFor}
-                      postAgeLabel={postAgeLabel}
-                    />
-                    {loungeDetailCaptionDisplayText(loungePostDetail.reposted_post) ? (
-                      <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 whitespace-pre-wrap break-words">
-                        <LoungeExpandableRichCaption
-                          text={loungeDetailCaptionDisplayText(loungePostDetail.reposted_post)}
+                      <div className="mt-1">
+                        <LoungeQuoteRepostEmbeddedOriginal
+                          hostPost={loungePostDetail}
+                          repostedPost={loungePostDetail.reposted_post}
+                          fanLockCtx={loungeFanLockCtx}
+                          captionText={loungeDetailCaptionDisplayText(loungePostDetail.reposted_post)}
                           captionOpts={loungePostDetailRichCaptionOpts}
-                          startExpanded
+                          showCaption={Boolean(loungeDetailCaptionDisplayText(loungePostDetail.reposted_post))}
+                          captionStartExpanded
+                          displayNameFor={displayNameFor}
+                          handleFor={handleFor}
+                          postAgeLabel={postAgeLabel}
+                          onOpenOriginal={() => openLoungePostDetail(loungePostDetail.reposted_post)}
+                          onLinkPreviewOpen={openLinkPreview}
+                          renderMarketStrip={(row, className) => (
+                            <LoungeMarketChartStrip
+                              post={row}
+                              className={className}
+                              onOpenChart={(embed, embeds) => openMarketChartModal({ embed, embeds })}
+                            />
+                          )}
+                          mediaLightboxProps={{
+                            feedAutoplayScope: 'detail',
+                            visibilityResetRootRef: loungePostDetailScrollRef,
+                            lightboxPortalClass: loungeDetailMediaLightboxPortalClass,
+                            streamLightboxHost: loungePostDetail,
+                            streamLightboxSurface: loungeDetailStreamLightboxSurface,
+                          }}
+                          onOpenGuideCard={openLoungeGuideCard}
+                          fanSubscribeBusy={feedFanSubscribeBusy}
+                          onSubscribeToCreatorFan={loungeReadOnly ? undefined : openFeedFanSubscribe}
                         />
                       </div>
-                    ) : null}
-                    <LoungeLinkPreviewBlock
-                      preview={loungePostDetail.reposted_post.link_preview}
-                      className="mt-2"
-                      onPreviewOpen={openLinkPreview}
-                    />
-                    <LoungeMarketChartStrip
-                      post={loungePostDetail.reposted_post}
-                      className="mt-2"
-                      onOpenChart={(embed, embeds) => openMarketChartModal({ embed, embeds })}
-                    />
-                    <LoungePostFeedImagesAndGif
-                      post={loungePostDetail.reposted_post}
-                      variant="embed"
-                      feedAutoplayRowId={loungePostDetail.id}
-                      feedAutoplayScope="detail"
-                      firstMarginTopClass="mt-2"
-                      visibilityResetRootRef={loungePostDetailScrollRef}
-                      lightboxPortalClass={loungeDetailMediaLightboxPortalClass}
-                      streamLightboxHost={loungePostDetail}
-                      streamLightboxSurface={loungeDetailStreamLightboxSurface}
-                    />
-                    {loungePostDetail.reposted_post.is_ap_guide_post && loungePostDetail.reposted_post.game_slug ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openLoungeGuideCard(loungePostDetail.reposted_post.game_slug)
-                        }}
-                        className="mt-2 w-full text-left rounded-xl overflow-hidden border border-zinc-700/60 bg-zinc-900/80 hover:border-zinc-600 active:border-cyan-700/60 transition-colors touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                        aria-label={`View AP Guide: ${loungePostDetail.reposted_post.game_title}`}
-                      >
-                        <div className="relative h-40 bg-gradient-to-br from-amber-950/60 to-zinc-900 overflow-hidden">
-                          {loungePostDetail.reposted_post.guide_thumbnail_url ? (
-                            <img
-                              src={loungePostDetail.reposted_post.guide_thumbnail_url}
-                              alt=""
-                              className="h-full w-full object-cover opacity-80"
-                              loading="lazy"
-                              decoding="async"
-                              onError={(ev) => { ev.currentTarget.style.display = 'none' }}
-                            />
-                          ) : null}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                          <div className="absolute bottom-0 inset-x-0 px-2.5 pb-2 flex flex-col items-start gap-1">
-                            <p className="text-[#fff] font-bold text-xs leading-tight truncate w-full">{loungePostDetail.reposted_post.game_title}</p>
-                            <span className="inline-flex items-center rounded-full border border-amber-500/50 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">
-                              AP Guide
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    ) : null}
-                    </div>
                     ) : null}
                   </div>
                 </>
@@ -15222,7 +15163,6 @@ export default function SocialFeed({
                 const bookmarkGlyphFilled = !ro && isBookmarked
                 const plainId = ui.plainRepostChildId
                 const quoteId = ui.quoteRepostChildId
-                const detailRepostBlocked = loungeFanOnlyPostBlocksRepost(d)
                 const dSlotComment = 24
                 const dSlotRepost = 24
                 const dSlotLike = 24
@@ -15343,7 +15283,6 @@ export default function SocialFeed({
                         countClass={commentClass}
                         countValue={commentCount}
                       />
-                      {!(detailRepostBlocked && !ui.reposted) ? (
                       <LoungeInteractionGlyphRail
                         railRef={loungeDetailRepostMenuRef}
                         extraAfterStat={
@@ -15531,13 +15470,6 @@ export default function SocialFeed({
                         countClass={repostClass}
                         countValue={repostCount}
                       />
-                      ) : (
-                        <span
-                          className="inline-block shrink-0"
-                          style={{ width: dSlotRepost, minWidth: dSlotRepost, minHeight: dRailMinH }}
-                          aria-hidden
-                        />
-                      )}
                       <LoungeInteractionGlyphRail
                         slotPx={dSlotLike}
                         glyphPx={dSlotLike}
@@ -15632,7 +15564,7 @@ export default function SocialFeed({
                     onToggleCommentBookmark: toggleLoungeDetailCommentBookmark,
                     getCommentBookmarked: getLoungeDetailCommentBookmarked,
                     repostActionBusy: repostManageBusy,
-                    repostHidden: Boolean(loungePostDetail?.creator_fan_only),
+                    repostHidden: false,
                     onAvatarClickProfile: openAuthorProfile,
                     positionScrollRootRef: loungePostDetailScrollRef,
                     onCommentMenuDelete: deleteLoungeDetailComment,
@@ -15714,7 +15646,7 @@ export default function SocialFeed({
                     onToggleCommentBookmark: toggleLoungeDetailCommentBookmark,
                     getCommentBookmarked: getLoungeDetailCommentBookmarked,
                     repostActionBusy: repostManageBusy,
-                    repostHidden: Boolean(loungePostDetail?.creator_fan_only),
+                    repostHidden: false,
                     onAvatarClickProfile: openAuthorProfile,
                     positionScrollRootRef: loungePostDetailScrollRef,
                     onCommentMenuDelete: deleteLoungeDetailComment,

@@ -22,6 +22,7 @@ import { prepareAvatarImageForUpload, isProbablyImageFile } from '../../utils/co
 import { collectLoungePostInteractionHydrateIds, feedPostDisplayCaption } from '../../utils/communityFeedPost.js'
 import {
   fetchLoungeCommunityFeedPostsForViewer,
+  isLoungeFanOnlyPostLocked,
   loungeProfileReplyItemVisible,
   showLoungeFanOnlyPostUnlockedTint,
 } from '../../utils/loungeFanOnlyPost.js'
@@ -2464,12 +2465,14 @@ export default function LoungeProfileFullScreen({
                         if (!(t instanceof Element)) return
                         const origHost = t.closest('[data-lounge-original-embed]')
                         if (origHost && post.reposted_post?.id && !post.repost_of_comment_id) {
-                          postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          if (!isLoungeFanOnlyPostLocked(post.reposted_post, profileFanLockCtx)) {
+                            postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          }
                           return
                         }
                         if (
                           t.closest(
-                            'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
+                            'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip], [data-lounge-fan-only-cta]',
                           )
                         )
                           return
@@ -2478,9 +2481,13 @@ export default function LoungeProfileFullScreen({
                           postCardPropsForLists.onOpenCommentRepost?.(post.reposted_comment)
                           return
                         }
-                        // Plain repost of a post → open the original
+                        // Plain repost of a post → open original (or repost row when original is locked)
                         if (post.is_plain_repost && post.reposted_post?.id) {
-                          postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          if (isLoungeFanOnlyPostLocked(post.reposted_post, profileFanLockCtx)) {
+                            postCardPropsForLists.onPostBodyClick?.(post)
+                          } else {
+                            postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          }
                           return
                         }
                         postCardPropsForLists.onPostBodyClick?.(post)
@@ -2549,12 +2556,14 @@ export default function LoungeProfileFullScreen({
                         if (!(t instanceof Element)) return
                         const origHost = t.closest('[data-lounge-original-embed]')
                         if (origHost && post.reposted_post?.id && !post.repost_of_comment_id) {
-                          postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          if (!isLoungeFanOnlyPostLocked(post.reposted_post, profileFanLockCtx)) {
+                            postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          }
                           return
                         }
                         if (
                           t.closest(
-                            'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
+                            'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip], [data-lounge-fan-only-cta]',
                           )
                         )
                           return
@@ -2563,9 +2572,13 @@ export default function LoungeProfileFullScreen({
                           postCardPropsForLists.onOpenCommentRepost?.(post.reposted_comment)
                           return
                         }
-                        // Plain repost of a post → open the original
+                        // Plain repost of a post → open original (or repost row when original is locked)
                         if (post.is_plain_repost && post.reposted_post?.id) {
-                          postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          if (isLoungeFanOnlyPostLocked(post.reposted_post, profileFanLockCtx)) {
+                            postCardPropsForLists.onPostBodyClick?.(post)
+                          } else {
+                            postCardPropsForLists.onPostBodyClick?.(post.reposted_post)
+                          }
                           return
                         }
                         postCardPropsForLists.onPostBodyClick?.(post)

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { feedPostDisplayCaption, isQuoteRepostPost, quoteRepostOriginalUnavailable } from '../../utils/communityFeedPost'
-import { isLoungeFanOnlyPostLocked, loungeFanOnlyPostBlocksRepost } from '../../utils/loungeFanOnlyPost.js'
+import { isLoungeFanOnlyPostLocked } from '../../utils/loungeFanOnlyPost.js'
 import { displayPostCategoryPills } from '../../utils/loungePostCategoryPills.js'
 import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
@@ -15,7 +15,8 @@ import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungeFanOnlySubscribeCta from './LoungeFanOnlySubscribeCta.jsx'
-import LoungeFanOnlyLockedCaptionBlock from './LoungeFanOnlyLockedCaptionBlock.jsx'
+import LoungeFanOnlyLockedPostInset from './LoungeFanOnlyLockedPostInset.jsx'
+import LoungeQuoteRepostEmbeddedOriginal from './LoungeQuoteRepostEmbeddedOriginal.jsx'
 import { loungePostIsThreadRoot, loungePostThreadPartCount } from '../../utils/loungePostThreadApi.js'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
@@ -175,7 +176,6 @@ export default function LoungePostArticle({
   // The "display" entity (what we show as the card's main content / author)
   const displayPost = isPlainPostRepost ? post.reposted_post : post
   const rc = isCommentRepost ? post.reposted_comment : null
-  const feedRepostBlocked = loungeFanOnlyPostBlocksRepost(post)
 
   const renderFanSubscribeCta = (entity, { className } = {}) => {
     if (!entity || !isLoungeFanOnlyPostLocked(entity, fanLockCtx)) return null
@@ -200,12 +200,12 @@ export default function LoungePostArticle({
       const handle = entity.author_profile?.handle || handleFor(entity)?.replace(/^@/, '')
       return (
         <div data-lounge-post-caption role="presentation">
-          <LoungeFanOnlyLockedCaptionBlock
+          <LoungeFanOnlyLockedPostInset
             text={captionText}
             captionOpts={richCaptionOpts}
             creatorHandle={handle}
             busy={fanSubscribeBusy}
-            onSubscribe={() => onSubscribeToCreatorFan?.(entity.user_id)}
+            onSubscribe={() => onSubscribeToCreatorFan(entity.user_id)}
           />
         </div>
       )
@@ -630,73 +630,25 @@ export default function LoungePostArticle({
             {quoteRepostOriginalUnavailable(post) ? (
               <LoungePostOriginalUnavailableEmbed post={post} />
             ) : post.reposted_post ? (
-            <div
-              role="button"
-              tabIndex={0}
-              data-lounge-original-embed
-              aria-label="View original post"
-              className="mt-2 w-full cursor-pointer rounded-xl border border-zinc-700/80 bg-zinc-900/55 px-2.5 py-2 text-left font-inherit text-inherit touch-manipulation [-webkit-tap-highlight-color:transparent] hover:bg-zinc-900/80 active:bg-zinc-800/50"
-            >
-              <LoungeQuoteRepostEmbedAuthorMeta
-                post={post.reposted_post}
+              <LoungeQuoteRepostEmbeddedOriginal
+                hostPost={post}
+                repostedPost={post.reposted_post}
+                fanLockCtx={fanLockCtx}
+                captionText={postCaptionDisplayText(post.reposted_post)}
+                captionOpts={richCaptionOpts}
+                showCaption={showPostCaption(post.reposted_post)}
                 displayNameFor={displayNameFor}
                 handleFor={handleFor}
                 postAgeLabel={postAgeLabel}
-                onDisplayNameClick={(e) => onEmbeddedAuthorProfile(e, post.reposted_post)}
+                onEmbeddedAuthorProfile={onEmbeddedAuthorProfile}
+                onOpenOriginal={() => onPostBodyClick?.(post.reposted_post)}
+                onLinkPreviewOpen={onLinkPreviewOpen}
+                renderMarketStrip={renderMarketStrip}
+                mediaLightboxProps={mediaLightboxProps}
+                onOpenGuideCard={onOpenGuideCard}
+                fanSubscribeBusy={fanSubscribeBusy}
+                onSubscribeToCreatorFan={onSubscribeToCreatorFan}
               />
-              {showPostCaption(post.reposted_post) ? (
-                <div className="mt-1 text-left text-[15px] leading-snug text-zinc-400 whitespace-pre-wrap break-words">
-                  <LoungeExpandableRichCaption
-                    text={postCaptionDisplayText(post.reposted_post)}
-                    captionOpts={richCaptionOpts}
-                  />
-                </div>
-              ) : null}
-              <LoungeLinkPreviewBlock
-                preview={post.reposted_post.link_preview}
-                className="mt-2"
-                onPreviewOpen={onLinkPreviewOpen}
-              />
-              {renderMarketStrip(post.reposted_post, 'mt-2')}
-              <LoungePostFeedImagesAndGif
-                post={post.reposted_post}
-                variant="embed"
-                feedAutoplayRowId={post.id}
-                firstMarginTopClass="mt-2"
-                {...mediaLightboxProps}
-              />
-              {post.reposted_post.is_ap_guide_post && post.reposted_post.game_slug ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenGuideCard?.(post.reposted_post.game_slug)
-                  }}
-                  className="mt-2 w-full text-left rounded-xl overflow-hidden border border-zinc-700/60 bg-zinc-900/80 hover:border-zinc-600 active:border-cyan-700/60 transition-colors touch-manipulation [-webkit-tap-highlight-color:transparent]"
-                  aria-label={`View AP Guide: ${post.reposted_post.game_title}`}
-                >
-                  <div className="relative h-40 bg-gradient-to-br from-amber-950/60 to-zinc-900 overflow-hidden">
-                    {post.reposted_post.guide_thumbnail_url ? (
-                      <img
-                        src={post.reposted_post.guide_thumbnail_url}
-                        alt=""
-                        className="h-full w-full object-cover opacity-80"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(ev) => { ev.currentTarget.style.display = 'none' }}
-                      />
-                    ) : null}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                    <div className="absolute bottom-0 inset-x-0 px-2.5 pb-2 flex flex-col items-start gap-1">
-                      <p className="text-[#fff] font-bold text-xs leading-tight truncate w-full">{post.reposted_post.game_title}</p>
-                      <span className="inline-flex items-center rounded-full border border-amber-500/50 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-300">
-                        AP Guide
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              ) : null}
-            </div>
             ) : post.reposted_comment ? (
             <div
               role="button"
@@ -848,10 +800,10 @@ export default function LoungePostArticle({
             loungeReadOnly={loungeReadOnly}
             interactionStateFor={interactionStateFor}
             toggleInteraction={toggleInteraction}
-            onPlainRepost={feedRepostBlocked ? undefined : onPlainRepost}
+            onPlainRepost={onPlainRepost}
             onUndoPlainRepost={onUndoPlainRepost}
             onRemoveQuoteRepost={isPlainPostRepost ? undefined : onRemoveQuoteRepost}
-            onQuoteRepost={feedRepostBlocked ? undefined : isPlainPostRepost ? undefined : onQuoteRepost}
+            onQuoteRepost={isPlainPostRepost ? undefined : onQuoteRepost}
             toggleBookmark={toggleBookmark}
             bookmarkedByPost={bookmarkedByPost}
             onOpenComments={onOpenComments}
@@ -862,7 +814,6 @@ export default function LoungePostArticle({
             requireLoungeAuth={requireLoungeAuth}
             openProfileGateIfNeeded={openProfileGateIfNeeded}
             repostMenuScrollRootRef={repostMenuScrollRootRef}
-            repostHidden={feedRepostBlocked}
           />
         )}
       </div>

@@ -1,5 +1,7 @@
 /** @typedef {Record<string, { active?: boolean }>} CreatorFanEntitlementsMap */
 
+import { isQuoteRepostPost } from './communityFeedPost.js'
+
 export const LOUNGE_COMPOSER_AUDIENCE_ALL = 'all'
 export const LOUNGE_COMPOSER_AUDIENCE_SUBS = 'subs'
 
@@ -41,7 +43,7 @@ export function showLoungeFanOnlyPostUnlockedTint(post, ctx = {}) {
   return Boolean(entity?.creator_fan_only && !isLoungeFanOnlyPostLocked(entity, ctx))
 }
 
-/** Original post targeted by repost / quote / plain-repost card. */
+/** Fan-only source on a repost/quote target (for locked inset UI). */
 export function loungeFanOnlyPostRepostSource(post) {
   if (!post) return null
   if (post.reposted_post && (post.is_plain_repost === true || post.repost_of_post_id)) {
@@ -50,9 +52,28 @@ export function loungeFanOnlyPostRepostSource(post) {
   return loungeFanOnlyPostContentEntity(post)
 }
 
-/** Plain repost, quote repost, and comment-repost are disallowed for subs-only sources. */
-export function loungeFanOnlyPostBlocksRepost(post) {
-  return Boolean(loungeFanOnlyPostRepostSource(post)?.creator_fan_only)
+/**
+ * Feed row: block opening post detail only for standalone locked subs-only posts (not quote/plain repost wrappers).
+ *
+ * @param {object | null | undefined} post
+ * @param {{ viewerUserId?: string | null, viewerIsStaff?: boolean, fanEntitlements?: CreatorFanEntitlementsMap | null }} ctx
+ */
+export function isLoungeFanOnlyDirectFeedRowLocked(post, ctx = {}) {
+  if (!post) return false
+  if (post.is_plain_repost === true) return false
+  if (isQuoteRepostPost(post)) return false
+  return isLoungeFanOnlyPostLocked(post, ctx)
+}
+
+/**
+ * Block post-detail navigation for standalone locked subs-only rows (not repost/quote wrappers).
+ */
+export function loungeFanOnlyPostDetailOpenBlocked(post, ctx = {}) {
+  if (!post) return true
+  if (post.is_plain_repost === true) return false
+  if (isQuoteRepostPost(post)) return false
+  const entity = loungeFanOnlyPostContentEntity(post)
+  return isLoungeFanOnlyPostLocked(entity, ctx)
 }
 
 /**

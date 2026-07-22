@@ -20,6 +20,7 @@ export default function LoungeFanOnlyLockedCaptionBlock({
   creatorHandle,
   onSubscribe,
   busy = false,
+  className,
 }) {
   const { cashtagQuotesByTicker } = useLoungeMarketFeedQuotes()
   const body = String(text ?? '')
@@ -34,11 +35,13 @@ export default function LoungeFanOnlyLockedCaptionBlock({
   const raw = creatorHandle ? String(creatorHandle).replace(/^@/, '').trim() : ''
   const handleLabel = raw ? `@${raw}` : 'this creator'
 
+  const rootClass = className ?? LOUNGE_FEED_CAPTION_TOP_CLASS
+
   if (!body.trim() && !rich) return null
 
   return (
     <div
-      className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} relative text-left text-zinc-200`}
+      className={`${rootClass} relative text-left text-zinc-200`}
       data-lounge-fan-only-locked
     >
       <div
