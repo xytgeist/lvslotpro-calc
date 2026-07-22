@@ -183,7 +183,7 @@ export default function CreatorFanPortalModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="creator-fan-portal-title"
-        className="relative flex max-h-[min(92dvh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-zinc-700/80 bg-zinc-950 shadow-2xl sm:rounded-2xl"
+        className="relative flex h-[min(94dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-8px))] w-full max-w-[min(100%,40rem)] flex-col overflow-hidden rounded-t-2xl border border-zinc-700/80 bg-zinc-950 shadow-2xl sm:max-w-2xl sm:rounded-2xl lg:max-w-3xl"
       >
         <div className="flex items-start justify-between gap-3 border-b border-zinc-800/90 px-4 py-3">
           <div>
@@ -205,11 +205,12 @@ export default function CreatorFanPortalModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
           {loading ? (
             <p className="text-[13px] text-zinc-500">Loading…</p>
           ) : (
             <>
+              <div className="shrink-0">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { label: 'Active subs', value: String(activeCount) },
@@ -321,18 +322,19 @@ export default function CreatorFanPortalModal({
               >
                 Apply search
               </button>
+              </div>
 
-              <div className="mt-4">
-                <div className="text-[12px] font-semibold uppercase tracking-wide text-zinc-500">
+              <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="shrink-0 text-[12px] font-semibold uppercase tracking-wide text-zinc-500">
                   Subscribers ({filteredSubs.length})
                 </div>
                 {filteredSubs.length === 0 ? (
-                  <p className="mt-2 text-[13px] leading-relaxed text-zinc-500">
+                  <p className="mt-2 shrink-0 text-[13px] leading-relaxed text-zinc-500">
                     No fan subscribers yet … share your profile and offer. New subs show up here and
                     in Alerts.
                   </p>
                 ) : (
-                  <ul className="mt-2 space-y-2">
+                  <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-y-contain pb-1 [-webkit-overflow-scrolling:touch]">
                     {filteredSubs.map((row) => {
                       const uid = String(row.subscriber_user_id || '')
                       const handle = String(row.handle || '').replace(/^@/, '')
@@ -389,7 +391,7 @@ export default function CreatorFanPortalModal({
               </div>
             </>
           )}
-          {error ? <p className="mt-3 text-[12px] text-red-300/95">{error}</p> : null}
+          {error ? <p className="mt-3 shrink-0 text-[12px] text-red-300/95">{error}</p> : null}
         </div>
       </div>
     </div>,

@@ -11,6 +11,8 @@ import {
   upsertUserSubscriptionFromStripe,
   upsertCreatorFanSubscriptionFromStripe,
   isCreatorFanSubscriptionMetadata,
+  mergeCreatorFanStripeMetadata,
+  isPlatformProductSlug,
   type StripeSubscriptionPayload,
 } from '../_shared/billingDb.ts'
 import {
@@ -306,6 +308,28 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, duplicate: true })
     }
 
+    try {
+      await processStripeWebhookEvent(stripe, admin, event)
+    } catch (processErr) {
+      if (isNew) {
+        await admin.from('stripe_webhook_events').delete().eq('stripe_event_id', event.id)
+      }
+      throw processErr
+    }
+
+    return jsonResponse({ ok: true })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('stripe-webhook error', msg)
+    return jsonResponse({ error: msg || 'Webhook error' }, 400)
+  }
+})
+
+async function processStripeWebhookEvent(
+  stripe: Stripe,
+  admin: ReturnType<typeof createBillingAdmin>,
+  event: Stripe.Event,
+) {
     if (
       event.type === 'customer.subscription.created' ||
       event.type === 'customer.subscription.updated'
@@ -313,12 +337,20 @@ Deno.serve(async (req) => {
       const subscription = event.data.object as StripeSubscriptionPayload
       if (isCreatorFanSubscriptionMetadata(subscription.metadata)) {
         await upsertCreatorFanSubscriptionFromStripe(admin, { subscription })
-        return jsonResponse({ ok: true })
+        return
       }
       const { userId, productSlug } = await resolveUserAndProduct(admin, subscription)
+      if (!isPlatformProductSlug(productSlug)) {
+        console.warn(
+          'stripe-webhook: creator fan sub skipped platform path',
+          subscription.id,
+          productSlug,
+        )
+        return
+      }
       if (!userId) {
         console.warn('stripe-webhook: missing user for subscription', subscription.id)
-        return jsonResponse({ ok: true, skipped: true })
+        return
       }
       await upsertUserSubscriptionFromStripe(admin, {
         userId,
@@ -331,7 +363,7 @@ Deno.serve(async (req) => {
       const subscription = event.data.object as StripeSubscriptionPayload
       if (isCreatorFanSubscriptionMetadata(subscription.metadata)) {
         await deleteCreatorFanSubscriptionByStripeId(admin, subscription.id)
-        return jsonResponse({ ok: true })
+        return
       }
       const userId = await deleteUserSubscriptionByStripeId(admin, subscription.id)
       if (userId) {
@@ -340,6 +372,7 @@ Deno.serve(async (req) => {
         })
         if (syncErr) throw new Error(`sync_profile_has_active_subscription: ${syncErr.message}`)
       }
+      return
     }
 
     if (event.type === 'checkout.session.completed') {
@@ -360,11 +393,11 @@ Deno.serve(async (req) => {
       if (session.mode === 'payment') {
         const productSlug = session.metadata?.product_slug?.trim() || 'slots-edge-lifetime'
         if (productSlug !== 'slots-edge-lifetime') {
-          return jsonResponse({ ok: true, skipped: true })
+          return
         }
         if (!userId) {
           console.warn('stripe-webhook: lifetime payment missing user', session.id)
-          return jsonResponse({ ok: true, skipped: true })
+          return
         }
 
         const paymentReferenceId =
@@ -394,36 +427,48 @@ Deno.serve(async (req) => {
           kind: 'lifetime',
         })
 
-        return jsonResponse({ ok: true })
+        return
       }
 
       if (session.mode !== 'subscription' || !session.subscription) {
-        return jsonResponse({ ok: true })
+        return
       }
 
       const subscriptionId =
         typeof session.subscription === 'string' ? session.subscription : session.subscription.id
-      const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as StripeSubscriptionPayload
+      const subscriptionRaw = (await stripe.subscriptions.retrieve(
+        subscriptionId,
+      )) as StripeSubscriptionPayload
+      const sessionMeta = (session.metadata ?? {}) as Record<string, string>
+      const mergedMeta = mergeCreatorFanStripeMetadata(subscriptionRaw.metadata, sessionMeta)
+      const subscription: StripeSubscriptionPayload = {
+        ...subscriptionRaw,
+        metadata: mergedMeta,
+      }
 
-      if (isCreatorFanSubscriptionMetadata(subscription.metadata)) {
-        const resolvedUserId =
-          userId ||
-          subscription.metadata?.subscriber_user_id?.trim() ||
-          null
-        if (resolvedUserId) {
-          await upsertCreatorFanSubscriptionFromStripe(admin, { subscription })
-        }
-        return jsonResponse({ ok: true })
+      if (isCreatorFanSubscriptionMetadata(mergedMeta)) {
+        await upsertCreatorFanSubscriptionFromStripe(admin, { subscription })
+        return
       }
 
       const resolvedUserId =
         userId ||
         subscription.metadata?.supabase_user_id?.trim() ||
+        sessionMeta.subscriber_user_id?.trim() ||
         null
       const productSlug =
-        session.metadata?.product_slug?.trim() ||
+        sessionMeta.product_slug?.trim() ||
         subscription.metadata?.product_slug?.trim() ||
         'slots-edge'
+
+      if (!isPlatformProductSlug(productSlug)) {
+        console.warn(
+          'stripe-webhook: creator fan checkout missing metadata',
+          subscriptionId,
+          session.id,
+        )
+        return
+      }
 
       if (resolvedUserId) {
         await upsertUserSubscriptionFromStripe(admin, {
@@ -460,6 +505,7 @@ Deno.serve(async (req) => {
         kind,
         stripeSubscriptionId: subscriptionId,
       })
+      return
     }
 
     if (event.type === 'invoice.paid') {
@@ -468,6 +514,7 @@ Deno.serve(async (req) => {
         await commissionFromInvoice(admin, stripe, invoice)
         await promotePayableCommissions(admin)
       }
+      return
     }
 
     if (
@@ -481,18 +528,11 @@ Deno.serve(async (req) => {
         charge,
         event.type === 'charge.dispute.created' ? 'dispute' : 'refund',
       )
+      return
     }
 
     if (event.type === 'invoice.payment_failed') {
       const invoice = event.data.object as Stripe.Invoice
-      // Do not void historical commissions on payment_failed; renewals simply won't insert.
       console.warn('stripe-webhook: invoice.payment_failed', invoice.id)
     }
-
-    return jsonResponse({ ok: true })
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error('stripe-webhook error', msg)
-    return jsonResponse({ error: msg || 'Webhook error' }, 400)
-  }
-})
+}

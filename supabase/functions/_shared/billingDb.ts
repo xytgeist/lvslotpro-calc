@@ -211,6 +211,20 @@ export function isCreatorFanSubscriptionMetadata(meta: Record<string, string> | 
   return Boolean(meta.creator_user_id?.trim() && meta.subscriber_user_id?.trim())
 }
 
+/** Checkout Session metadata is authoritative when Subscription.metadata is still empty (Connect checkout). */
+export function mergeCreatorFanStripeMetadata(
+  subscriptionMeta: Record<string, string> | undefined,
+  sessionMeta: Record<string, string> | undefined,
+): Record<string, string> {
+  return { ...(subscriptionMeta ?? {}), ...(sessionMeta ?? {}) }
+}
+
+export function isPlatformProductSlug(productSlug: string | null | undefined): boolean {
+  const slug = String(productSlug || '').trim()
+  if (!slug) return true
+  return !slug.startsWith('creator-fan:')
+}
+
 export async function upsertCreatorFanSubscriptionFromStripe(
   admin: SupabaseClient,
   args: {
