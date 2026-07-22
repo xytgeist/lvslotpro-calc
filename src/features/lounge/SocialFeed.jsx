@@ -24,6 +24,10 @@ import {
 } from '../../constants/inAppToastLayout.js'
 import { adminSetProfileRole } from '../profiles/adminSetProfileRole.js'
 import {
+  BOT_IMPERSONATE_OPEN_DOCK_KEY,
+  BOT_IMPERSONATE_SETTINGS_FOCUS_KEY,
+} from '../bots/botPortalApi.js'
+import {
   collectLoungePostInteractionHydrateIds,
   communityFeedPlainRepostInsertPayload,
   communityFeedCommentRepostInsertPayload,
@@ -1013,6 +1017,19 @@ export default function SocialFeed({
     }
     prevLoungeFeedActiveRef.current = isActivePage
   }, [isActivePage])
+
+  useEffect(() => {
+    if (!composerUserId || typeof window === 'undefined') return
+    const dock = sessionStorage.getItem(BOT_IMPERSONATE_OPEN_DOCK_KEY)
+    const focus = sessionStorage.getItem(BOT_IMPERSONATE_SETTINGS_FOCUS_KEY)
+    if (!dock && !focus) return
+    sessionStorage.removeItem(BOT_IMPERSONATE_OPEN_DOCK_KEY)
+    sessionStorage.removeItem(BOT_IMPERSONATE_SETTINGS_FOCUS_KEY)
+    ensureLoungeFeedVisible()
+    if (dock === 'settings') setLoungeDockPanel('settings')
+    if (focus) setLoungeSettingsFocusSection(focus)
+  }, [composerUserId, ensureLoungeFeedVisible])
+
   /** When opening Settings from another panel, scroll to this section (`notifications`, …). */
   const [loungeSettingsFocusSection, setLoungeSettingsFocusSection] = useState(null)
   const [loungeDockSearchQuery, setLoungeDockSearchQuery] = useState('')

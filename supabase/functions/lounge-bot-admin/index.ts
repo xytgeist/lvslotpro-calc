@@ -2,6 +2,7 @@
  * Admin bot lifecycle: create bot account (+ auth user + profile).
  *
  * POST { "action": "create_bot", ...fields }
+ * POST { "action": "staff_sign_in_as_bot", "bot_user_id": "uuid" } → OTP for client verifyOtp (admin JWT only)
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
@@ -21,6 +22,11 @@ type CreateBotBody = {
   config?: Record<string, unknown>
   x_handles?: string[]
   run_state?: 'running' | 'paused' | 'stopped'
+}
+
+type StaffSignInAsBotBody = {
+  action: 'staff_sign_in_as_bot'
+  bot_user_id: string
 }
 
 async function authorize(req: Request): Promise<{ admin: SupabaseClient; userId: string }> {
@@ -138,10 +144,53 @@ Deno.serve(async (req) => {
 
   try {
     const { admin } = await authorize(req)
-    const body = (await req.json().catch(() => ({}))) as Partial<CreateBotBody>
+    const body = (await req.json().catch(() => ({}))) as Partial<CreateBotBody & StaffSignInAsBotBody>
+
+    if (body.action === 'staff_sign_in_as_bot') {
+      const botUserId = String(body.bot_user_id || '').trim()
+      if (!botUserId) return adminOpsJson(400, { error: 'bot_user_id required.' })
+
+      const { data: botRow, error: botErr } = await admin
+        .from('lounge_bot_accounts')
+        .select('user_id, slug')
+        .eq('user_id', botUserId)
+        .maybeSingle()
+      if (botErr) return adminOpsJson(500, { error: botErr.message })
+      if (!botRow?.user_id) return adminOpsJson(404, { error: 'Not a Lounge bot account.' })
+
+      const { data: authUser, error: authUserErr } = await admin.auth.admin.getUserById(botUserId)
+      if (authUserErr || !authUser.user?.email) {
+        return adminOpsJson(500, { error: authUserErr?.message || 'Bot auth user missing.' })
+      }
+
+      const email = authUser.user.email
+      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+      })
+      if (linkErr || !linkData?.properties?.hashed_token) {
+        return adminOpsJson(500, { error: linkErr?.message || 'Could not create bot sign-in link.' })
+      }
+
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('handle, display_name')
+        .eq('user_id', botUserId)
+        .maybeSingle()
+
+      return adminOpsJson(200, {
+        ok: true,
+        bot_user_id: botUserId,
+        slug: botRow.slug,
+        email,
+        handle: profile?.handle ?? null,
+        display_name: profile?.display_name ?? null,
+        token_hash: linkData.properties.hashed_token,
+      })
+    }
 
     if (body.action !== 'create_bot') {
-      return adminOpsJson(400, { error: 'Unknown action. Use create_bot.' })
+      return adminOpsJson(400, { error: 'Unknown action. Use create_bot or staff_sign_in_as_bot.' })
     }
 
     const slug = normalizeSlug(body.slug || '')

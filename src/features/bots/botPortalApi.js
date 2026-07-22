@@ -210,6 +210,61 @@ export async function createBotAccount(supabaseClient, payload) {
 }
 
 /**
+ * Admin-only: mint a one-time magic-link token to sign in as a Lounge bot (fan subs, profile, Settings).
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} botUserId
+ */
+export async function staffSignInAsBot(supabaseClient, botUserId) {
+  const id = String(botUserId || '').trim()
+  if (!id) throw new Error('Bot user id required.')
+  const { data, error, response } = await supabaseClient.functions.invoke('lounge-bot-admin', {
+    body: { action: 'staff_sign_in_as_bot', bot_user_id: id },
+  })
+  if (error) {
+    let detail = error.message || 'staff_sign_in_as_bot failed'
+    try {
+      const raw = await response?.clone()?.text()
+      if (raw) {
+        const body = JSON.parse(raw)
+        if (body?.error) detail = String(body.error)
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(detail)
+  }
+  if (data?.error) throw new Error(String(data.error))
+  if (!data?.email || !data?.token_hash) throw new Error('Bot sign-in token missing.')
+  return data
+}
+
+/** SessionStorage keys used after staff bot impersonation (SocialFeed reads on next load). */
+export const BOT_IMPERSONATE_SETTINGS_FOCUS_KEY = 'edge:post-auth-lounge-settings'
+export const BOT_IMPERSONATE_OPEN_DOCK_KEY = 'edge:post-auth-lounge-dock'
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} botUserId
+ * @param {{ settingsFocus?: string }} [opts]
+ */
+export async function staffSignInAsBotAndReload(supabaseClient, botUserId, opts = {}) {
+  const payload = await staffSignInAsBot(supabaseClient, botUserId)
+  const { error: otpErr } = await supabaseClient.auth.verifyOtp({
+    email: payload.email,
+    token: payload.token_hash,
+    type: 'magiclink',
+  })
+  if (otpErr) throw new Error(otpErr.message || 'Could not sign in as bot.')
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem(BOT_IMPERSONATE_OPEN_DOCK_KEY, 'settings')
+    sessionStorage.setItem(BOT_IMPERSONATE_SETTINGS_FOCUS_KEY, opts.settingsFocus || 'subscriptions-fan')
+    window.location.assign('/')
+  }
+  return payload
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {{ slug?: string, dryRun?: boolean, force?: boolean }} [opts]
  */

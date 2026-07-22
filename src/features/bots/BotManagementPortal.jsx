@@ -31,6 +31,7 @@ import {
   toggleBotNewsSource,
   updateBotPostCaption,
   waitForPgNetRequestResult,
+  staffSignInAsBotAndReload,
 } from './botPortalApi.js'
 import { revokeBotComposeImagePreviews } from './botComposeImages.js'
 import { SCOTT_EXAMPLE_POST_COUNT } from './scottExamplePosts.js'
@@ -783,6 +784,24 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     void onReload()
   }
 
+  const onStaffSignInAsBot = async () => {
+    if (!bot?.user_id || busy) return
+    const handle = bot.handle ? `@${String(bot.handle).replace(/^@/, '')}` : bot.slug
+    const ok = window.confirm(
+      `Sign in as ${bot.display_name || bot.slug} (${handle})?\n\nYou will leave your admin session in this browser and open Lounge Settings → fan subscriptions as this bot.`,
+    )
+    if (!ok) return
+    setBusy('sign-in-as-bot')
+    try {
+      await staffSignInAsBotAndReload(supabaseClient, bot.user_id, {
+        settingsFocus: 'subscriptions-fan',
+      })
+    } catch (e) {
+      setToast?.(e instanceof Error ? e.message : 'Could not sign in as bot.')
+      setBusy('')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
@@ -800,6 +819,15 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
             <div className="text-zinc-600 text-[10px] mt-1 font-mono truncate">{bot.user_id}</div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={Boolean(busy)}
+              onClick={() => void onStaffSignInAsBot()}
+              className="min-h-8 rounded-lg border border-violet-700/70 bg-violet-950/40 px-3 text-[11px] font-semibold text-violet-200 touch-manipulation hover:bg-violet-950/70 disabled:opacity-40"
+              title="Admin test: sign into the app as this bot (fan subs, profile, Settings)"
+            >
+              {busy === 'sign-in-as-bot' ? 'Signing in…' : 'Sign in as bot'}
+            </button>
             {BOT_RUN_STATES.map((state) => (
               <button
                 key={state.id}
