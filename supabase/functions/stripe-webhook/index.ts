@@ -21,7 +21,10 @@ import {
   promotePayableCommissions,
   voidAffiliateCommissionsForRefund,
 } from '../_shared/affiliateLedger.ts'
-import { sendBillingCheckoutAdminAlert } from '../_shared/billingAdminAlert.ts'
+import {
+  sendBillingCheckoutAdminAlert,
+  sendBillingWebhookFailureAdminAlert,
+} from '../_shared/billingAdminAlert.ts'
 
 function parseReplaceSubscriptionIds(session: Stripe.Checkout.Session): string[] {
   const raw =
@@ -288,6 +291,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
 
+  let parsedEvent: Stripe.Event | null = null
+
   try {
     const stripe = new Stripe(requireStripeSecretKey())
     const signature = req.headers.get('stripe-signature')
@@ -296,23 +301,23 @@ Deno.serve(async (req) => {
     }
 
     const rawBody = await req.text()
-    const event = await stripe.webhooks.constructEventAsync(
+    parsedEvent = await stripe.webhooks.constructEventAsync(
       rawBody,
       signature,
       requireStripeWebhookSecret(),
     )
     const admin = createBillingAdmin()
 
-    const isNew = await recordWebhookEvent(admin, event.id, event.type)
+    const isNew = await recordWebhookEvent(admin, parsedEvent.id, parsedEvent.type)
     if (!isNew) {
       return jsonResponse({ ok: true, duplicate: true })
     }
 
     try {
-      await processStripeWebhookEvent(stripe, admin, event)
+      await processStripeWebhookEvent(stripe, admin, parsedEvent)
     } catch (processErr) {
       if (isNew) {
-        await admin.from('stripe_webhook_events').delete().eq('stripe_event_id', event.id)
+        await admin.from('stripe_webhook_events').delete().eq('stripe_event_id', parsedEvent.id)
       }
       throw processErr
     }
@@ -321,6 +326,15 @@ Deno.serve(async (req) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('stripe-webhook error', msg)
+    if (parsedEvent) {
+      const admin = createBillingAdmin()
+      await sendBillingWebhookFailureAdminAlert(admin, {
+        eventId: parsedEvent.id,
+        eventType: parsedEvent.type,
+        errorMessage: msg,
+        livemode: parsedEvent.livemode,
+      })
+    }
     return jsonResponse({ error: msg || 'Webhook error' }, 400)
   }
 })

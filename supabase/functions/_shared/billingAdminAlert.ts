@@ -158,3 +158,104 @@ export async function sendBillingCheckoutAdminAlert(
     console.warn('billingAdminAlert: error', err instanceof Error ? err.message : String(err))
   }
 }
+
+async function sendBillingOpsEmail(subject: string, lines: string[]) {
+  const recipients = parseBillingAlertEmails()
+  const resendKey = Deno.env.get('RESEND_API_KEY')?.trim()
+  if (!recipients.length) {
+    console.log('billingAdminAlert: skipped (BILLING_ADMIN_ALERT_EMAILS not set)')
+    return
+  }
+  if (!resendKey) {
+    console.warn('billingAdminAlert: skipped (RESEND_API_KEY not set)')
+    return
+  }
+
+  const html = lines.map((line) => `<p>${line.replace(/</g, '&lt;')}</p>`).join('')
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: billingAlertFromAddress(),
+      to: recipients,
+      subject,
+      text: lines.join('\n'),
+      html,
+    }),
+  })
+  const raw = await res.text()
+  if (!res.ok) {
+    console.warn('billingAdminAlert: Resend failed', res.status, raw.slice(0, 300))
+    return
+  }
+  console.log('billingAdminAlert: sent', { to: recipients, subject })
+}
+
+/**
+ * Email ops when stripe-webhook processing fails (returns 400). Never throws.
+ */
+export async function sendBillingWebhookFailureAdminAlert(
+  _admin: SupabaseClient,
+  args: {
+    eventId?: string | null
+    eventType?: string | null
+    errorMessage: string
+    livemode?: boolean | null
+  },
+) {
+  try {
+    const mode = args.livemode === true ? 'live' : args.livemode === false ? 'test' : 'unknown'
+    const subject = `[EdgeTilt] Stripe webhook FAILED · ${args.eventType || 'event'} · ${mode}`
+    const lines = [
+      'Stripe webhook processing failed after recording the event id (Stripe will retry).',
+      '',
+      `Event type: ${args.eventType || '(unknown)'}`,
+      args.eventId ? `Event id: ${args.eventId}` : '',
+      `Mode: ${mode}`,
+      '',
+      `Error: ${args.errorMessage}`,
+      '',
+      'Check Supabase Edge logs for stripe-webhook. Fix and resend the event from Stripe Dashboard,',
+      'or run npm run creator-fan:sync-from-stripe for a single fan sub if applicable.',
+    ].filter(Boolean)
+    await sendBillingOpsEmail(subject, lines)
+  } catch (err) {
+    console.warn('billingAdminAlert: webhook failure email error', err instanceof Error ? err.message : String(err))
+  }
+}
+
+/**
+ * Email ops when daily fan sub reconcile reports errors. Never throws.
+ */
+export async function sendBillingFanReconcileAdminAlert(
+  _admin: SupabaseClient,
+  args: {
+    scanned: number
+    synced: number
+    skipped: number
+    errors: string[]
+    dryRun?: boolean
+  },
+) {
+  if (!args.errors.length) return
+  try {
+    const subject = `[EdgeTilt] Fan sub reconcile errors (${args.errors.length})`
+    const lines = [
+      args.dryRun ? 'Dry run ... no DB writes.' : 'Daily creator fan subscription reconcile finished with errors.',
+      '',
+      `Scanned (fan metadata): ${args.scanned}`,
+      `Upserted: ${args.synced}`,
+      `Skipped (non-fan): ${args.skipped}`,
+      '',
+      'Errors:',
+      ...args.errors.slice(0, 25).map((e) => `- ${e}`),
+      args.errors.length > 25 ? `… and ${args.errors.length - 25} more` : '',
+    ].filter(Boolean)
+    await sendBillingOpsEmail(subject, lines)
+  } catch (err) {
+    console.warn('billingAdminAlert: reconcile email error', err instanceof Error ? err.message : String(err))
+  }
+}

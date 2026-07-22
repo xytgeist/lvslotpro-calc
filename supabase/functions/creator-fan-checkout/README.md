@@ -9,9 +9,10 @@
 | **`creator-fan-connect`** | User JWT | `{ "action": "onboard" \| "refresh" }` → onboarding `{ url }` or refresh `{ connect_onboarding_complete }` |
 | **`creator-fan-checkout`** | User JWT | `{ "creator_user_id": "uuid" }` → `{ url }` Connect destination subscription checkout |
 | **`creator-fan-resume-subscription`** | User JWT | `{ "creator_user_id": "uuid" }` → `{ ok: true }` clears **`cancel_at_period_end`** (fan subscribe modal **Resume subscription**) |
+| **`creator-fan-reconcile-stripe`** | Service role or **`CREATOR_FAN_RECONCILE_CRON_SECRET`** | POST (optional **`dryRun`**) → scans Stripe fan subs, upserts **`creator_subscriptions`** |
 | **`stripe-create-portal-session`** | User JWT | optional `{ "creator_user_id": "uuid" }` → cancel-at-period-end portal flow |
 
-**Webhook:** `stripe-webhook` writes `creator_subscriptions` when subscription metadata includes `billing_kind: creator_fan_sub` (set by checkout). Checkout return: **`/?billing=fan_success&creator={uuid}`** … **`App.jsx`** polls **`get_my_creator_fan_entitlements`** then fires **`edge:creator-fan-billing-return`**. Backfill if webhook missed a row: **`npm run creator-fan:sync-from-stripe -- --target=production --customer=cus_…`** (requires **`STRIPE_SECRET_KEY`**).
+**Webhook:** `stripe-webhook` writes `creator_subscriptions` when subscription metadata includes `billing_kind: creator_fan_sub` (set by checkout). On processing failure (400 to Stripe), ops email via **`sendBillingWebhookFailureAdminAlert`** when **`BILLING_ADMIN_ALERT_EMAILS`** + **`RESEND_API_KEY`** set. Checkout return: **`/?billing=fan_success&creator={uuid}`** … **`App.jsx`** polls **`get_my_creator_fan_entitlements`** then fires **`edge:creator-fan-billing-return`**. Backfill if webhook missed a row: **`npm run creator-fan:sync-from-stripe -- --target=production --customer=cus_…`** (requires **`STRIPE_SECRET_KEY`**). **Daily reconcile:** Edge **`creator-fan-reconcile-stripe`** + pg_cron **`creator_fan_reconcile_stripe_daily`** (migration **`20260722210000`**) … lists Stripe fan subs and upserts Postgres; emails ops only when reconcile errors.
 
 ## Stripe (test mode first)
 
