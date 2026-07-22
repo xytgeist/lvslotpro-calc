@@ -11,7 +11,7 @@
 | **`creator-fan-resume-subscription`** | User JWT | `{ "creator_user_id": "uuid" }` → `{ ok: true }` clears **`cancel_at_period_end`** (fan subscribe modal **Resume subscription**) |
 | **`stripe-create-portal-session`** | User JWT | optional `{ "creator_user_id": "uuid" }` → cancel-at-period-end portal flow |
 
-**Webhook:** `stripe-webhook` writes `creator_subscriptions` when subscription metadata includes `billing_kind: creator_fan_sub` (set by checkout).
+**Webhook:** `stripe-webhook` writes `creator_subscriptions` when subscription metadata includes `billing_kind: creator_fan_sub` (set by checkout). Checkout return: **`/?billing=fan_success&creator={uuid}`** … **`App.jsx`** polls **`get_my_creator_fan_entitlements`** then fires **`edge:creator-fan-billing-return`**. Backfill if webhook missed a row: **`npm run creator-fan:sync-from-stripe -- --target=production --customer=cus_…`** (requires **`STRIPE_SECRET_KEY`**).
 
 ## Stripe (test mode first)
 

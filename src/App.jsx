@@ -60,7 +60,8 @@ function readBillingQueryParams() {
     return {
       billing,
       product: params.get('product') || PRODUCT_SLOTS_EDGE,
-      fanCreator: (params.get('fan_creator') || '').trim() || null,
+      fanCreator:
+        (params.get('fan_creator') || params.get('creator') || '').trim() || null,
     }
   } catch {
     return null
@@ -74,6 +75,7 @@ function clearBillingQueryParams() {
     url.searchParams.delete('billing')
     url.searchParams.delete('product')
     url.searchParams.delete('fan_creator')
+    url.searchParams.delete('creator')
     const next = `${url.pathname}${url.search}${url.hash}`
     window.history.replaceState({}, document.title, next || '/')
   } catch {
@@ -407,6 +409,16 @@ function App() {
 
     let cancelled = false
 
+    const pollFanEntitlements = async (creatorUserId) => {
+      const key = `creator-fan:${creatorUserId}`
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        if (cancelled) return
+        const { data, error } = await supabase.rpc('get_my_creator_fan_entitlements')
+        if (!error && data?.[key]?.active === true) return
+        await new Promise((r) => window.setTimeout(r, 1200))
+      }
+    }
+
     const pollEntitlements = async () => {
       const maxAttempts = billing.billing === 'portal' ? 8 : 15
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -424,6 +436,21 @@ function App() {
         }
         if (billing.billing === 'portal' && attempt >= maxAttempts - 1) return
         await new Promise((r) => window.setTimeout(r, 1200))
+      }
+    }
+
+    if (billing.billing === 'fan_success' && billing.fanCreator) {
+      void pollFanEntitlements(billing.fanCreator).then(() => {
+        window.dispatchEvent(
+          new CustomEvent('edge:creator-fan-billing-return', {
+            detail: { creatorUserId: billing.fanCreator },
+          }),
+        )
+      })
+      setAccessNotice('Fan subscription active — thanks for supporting this creator.')
+      clearBillingQueryParams()
+      return () => {
+        cancelled = true
       }
     }
 

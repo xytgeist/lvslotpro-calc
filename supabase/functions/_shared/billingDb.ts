@@ -246,7 +246,52 @@ export async function upsertCreatorFanSubscriptionFromStripe(
       ? new Date(subscription.current_period_end * 1000).toISOString()
       : null
 
+  const { data: existingBySubId, error: subLookupErr } = await admin
+    .from('creator_subscriptions')
+    .select('id, status')
+    .eq('stripe_subscription_id', subscription.id)
+    .maybeSingle()
+  if (subLookupErr) {
+    throw new Error(`creator_subscriptions lookup (${subscription.id}): ${subLookupErr.message}`)
+  }
+
+  const protectedStatuses = new Set(['active', 'trialing'])
+  const staleIncomingStatuses = new Set(['incomplete', 'incomplete_expired'])
+
+  // Stripe webhook order is not guaranteed (same class of bug as platform Edge Pro billing).
+  if (
+    existingBySubId?.id &&
+    protectedStatuses.has(String(existingBySubId.status)) &&
+    staleIncomingStatuses.has(subscription.status)
+  ) {
+    return
+  }
+
   if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+    if (staleIncomingStatuses.has(subscription.status)) {
+      return
+    }
+
+    if (subscription.status === 'past_due') {
+      const row = {
+        subscriber_user_id: subscriberUserId,
+        creator_user_id: creatorUserId,
+        fan_tier_key: fanTierKey,
+        stripe_subscription_id: subscription.id,
+        stripe_customer_id: String(subscription.customer),
+        status: subscription.status,
+        current_period_end: periodEnd,
+        cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+        updated_at: new Date().toISOString(),
+      }
+      const { error } = await admin.from('creator_subscriptions').upsert(row, {
+        onConflict: 'subscriber_user_id,creator_user_id',
+      })
+      if (error) throw new Error(`creator_subscriptions upsert: ${error.message}`)
+      await syncCreatorFanChatMemberWarnOnly(admin, subscriberUserId, creatorUserId, false)
+      return
+    }
+
     await deleteCreatorFanSubscriptionByStripeId(admin, subscription.id)
     return
   }
@@ -263,37 +308,13 @@ export async function upsertCreatorFanSubscriptionFromStripe(
     updated_at: new Date().toISOString(),
   }
 
-  const { data: existingBySubId, error: subLookupErr } = await admin
-    .from('creator_subscriptions')
-    .select('id, status')
-    .eq('stripe_subscription_id', subscription.id)
-    .maybeSingle()
-  if (subLookupErr) {
-    throw new Error(`creator_subscriptions lookup (${subscription.id}): ${subLookupErr.message}`)
-  }
-
-  const protectedStatuses = new Set(['active', 'trialing'])
-  const staleIncomingStatuses = new Set(['incomplete', 'incomplete_expired'])
-  if (
-    existingBySubId?.id &&
-    protectedStatuses.has(String(existingBySubId.status)) &&
-    staleIncomingStatuses.has(subscription.status)
-  ) {
-    return
-  }
-
   const { error } = await admin.from('creator_subscriptions').upsert(row, {
     onConflict: 'subscriber_user_id,creator_user_id',
   })
   if (error) throw new Error(`creator_subscriptions upsert: ${error.message}`)
 
   const grantAccess = subscription.status === 'active' || subscription.status === 'trialing'
-  const { error: syncErr } = await admin.rpc('creator_fan_sub_sync_chat_member', {
-    p_subscriber_user_id: subscriberUserId,
-    p_creator_user_id: creatorUserId,
-    p_grant_access: grantAccess,
-  })
-  if (syncErr) throw new Error(`creator_fan_sub_sync_chat_member: ${syncErr.message}`)
+  await syncCreatorFanChatMemberWarnOnly(admin, subscriberUserId, creatorUserId, grantAccess)
 
   const wasActive =
     existingBySubId?.id != null && protectedStatuses.has(String(existingBySubId.status))
@@ -306,6 +327,22 @@ export async function upsertCreatorFanSubscriptionFromStripe(
     if (notifyErr) {
       console.warn('creator_fan_notify_new_subscriber:', notifyErr.message)
     }
+  }
+}
+
+async function syncCreatorFanChatMemberWarnOnly(
+  admin: SupabaseClient,
+  subscriberUserId: string,
+  creatorUserId: string,
+  grantAccess: boolean,
+) {
+  const { error: syncErr } = await admin.rpc('creator_fan_sub_sync_chat_member', {
+    p_subscriber_user_id: subscriberUserId,
+    p_creator_user_id: creatorUserId,
+    p_grant_access: grantAccess,
+  })
+  if (syncErr) {
+    console.warn('creator_fan_sub_sync_chat_member:', syncErr.message)
   }
 }
 
@@ -327,12 +364,12 @@ export async function deleteCreatorFanSubscriptionByStripeId(
     .eq('stripe_subscription_id', stripeSubscriptionId)
   if (delErr) throw new Error(`creator_subscriptions delete: ${delErr.message}`)
 
-  const { error: syncErr } = await admin.rpc('creator_fan_sub_sync_chat_member', {
-    p_subscriber_user_id: data.subscriber_user_id,
-    p_creator_user_id: data.creator_user_id,
-    p_grant_access: false,
-  })
-  if (syncErr) throw new Error(`creator_fan_sub_sync_chat_member: ${syncErr.message}`)
+  await syncCreatorFanChatMemberWarnOnly(
+    admin,
+    data.subscriber_user_id,
+    data.creator_user_id,
+    false,
+  )
 }
 
 async function syncProfileHasActiveSubscription(admin: SupabaseClient, userId: string) {
