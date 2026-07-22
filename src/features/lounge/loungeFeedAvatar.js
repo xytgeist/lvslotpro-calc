@@ -18,6 +18,10 @@ export const LOUNGE_NOTIFICATION_ACTION_AVATAR_SLOT_CLASS =
 export const LOUNGE_NOTIFICATION_GROUPED_TINT_RAIL_CLASS =
   'pointer-events-none absolute inset-y-0 -left-3 z-0 w-[calc(0.75rem+2.5rem+0.75rem)] sm:w-[calc(0.75rem+2.75rem+0.75rem)]'
 
+/** Subs-only post row (creator / fan sub viewer) — same left fade language as grouped notification rows. */
+export const LOUNGE_FAN_ONLY_POST_TINT_RAIL_CLASS =
+  'pointer-events-none absolute inset-y-0 -left-3 z-0 w-[min(78%,15rem)]'
+
 /** Glyph size inside grouped like/bookmark left column - matches notification author avatar. */
 export const LOUNGE_NOTIFICATION_ACTION_AVATAR_GLYPH_CLASS = 'h-10 w-10 sm:h-11 sm:w-11'
 

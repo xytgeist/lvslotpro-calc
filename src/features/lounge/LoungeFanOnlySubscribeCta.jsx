@@ -10,13 +10,9 @@
 export default function LoungeFanOnlySubscribeCta({ creatorHandle, onSubscribe, busy = false }) {
   const label = creatorHandle ? `@${creatorHandle.replace(/^@/, '')}` : 'this creator'
   return (
-    <div
-      className="mt-2 rounded-xl border border-fuchsia-500/35 bg-fuchsia-950/40 px-3 py-2.5"
-      data-lounge-fan-only-cta
-    >
-      <p className="text-[14px] leading-snug text-zinc-300">
-        Subscribers-only post from{' '}
-        <span className="font-semibold text-fuchsia-200">{label}</span>.
+    <div className="-mt-1 pt-0.5" data-lounge-fan-only-cta>
+      <p className="text-[13px] leading-snug text-zinc-500">
+        Subscribers-only · subscribe to <span className="text-zinc-400">{label}</span> to read the rest.
       </p>
       <button
         type="button"
@@ -25,9 +21,9 @@ export default function LoungeFanOnlySubscribeCta({ creatorHandle, onSubscribe, 
           e.stopPropagation()
           onSubscribe()
         }}
-        className="mt-2 min-h-10 w-full rounded-lg bg-fuchsia-600 px-3 text-[15px] font-semibold text-white touch-manipulation hover:bg-fuchsia-500 disabled:opacity-60"
+        className="mt-2 inline-flex min-h-9 items-center justify-center rounded-lg border border-zinc-600/65 bg-zinc-800/45 px-3.5 text-[14px] font-medium text-zinc-200 touch-manipulation hover:border-zinc-500/80 hover:bg-zinc-800/80 active:bg-zinc-800 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
       >
-        {busy ? 'Loading…' : 'Subscribe to unlock'}
+        {busy ? 'Loading…' : 'Subscribe'}
       </button>
     </div>
   )

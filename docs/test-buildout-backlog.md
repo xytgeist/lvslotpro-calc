@@ -466,8 +466,7 @@ Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **
 
 ### 2. Lounge composer — audience: All vs Subs
 
-- [x] **Composer control** for creators with fan monetization enabled: post audience **`All`** | **`Subs`** (maps to **`community_feed_posts.creator_fan_only`**).
-- [x] Default **All**; persist last choice per session optional.
+- [x] **Composer control** for creators with fan monetization enabled: **Who should see this?** sheet on **Post** (Everyone vs Subscribers only → **`community_feed_posts.creator_fan_only`**). Same choice applies to **whole threads** (one pick per publish). No remembered default between posts.
 - [x] RLS + insert path unchanged for subs-only body; author must have completed offer + Connect.
 
 ### 3. Fan-only posts in main feed — teaser + subscribe CTA
@@ -852,7 +851,7 @@ Creators need to know when someone subscribes. **Shipped v1 (2026-07-21):** **`c
 
 ## Update log
 
-- 2026-07-22: **Creator fan subs §2–§3 (composer All|Subs + feed teaser):** migration **`20260722230000`** (`lounge_feed_post_mask_for_viewer`, definer feed/pinned/profile RPCs); composer **`LoungeComposerAudienceToggle`**; locked cards **`LoungeFanOnlySubscribeCta`**; **`fan_success` auto-follow** on checkout return. Apply SQL test + prod; redeploy frontend only (no new Edge). Smoke §3 checklist still open.
+- 2026-07-22: **Creator fan subs §2–§3 (composer audience sheet + feed teaser):** migration **`20260722230000`**; **`20260722230200`** hotfix (fan-only insert guard uses **`coalesce(new.user_id, auth.uid())`** — guard ran before **`trg_set_community_feed_posts_user_id`**). Composer **`LoungeComposerAudienceSheet`** on Post; locked cards **`LoungeFanOnlySubscribeCta`**; **`fan_success` auto-follow**. Smoke §3 checklist still open.
 - 2026-07-21: **Creator fan billing ops:** **`billingAdminAlert.ts`** webhook failure + reconcile error emails (**`BILLING_ADMIN_ALERT_EMAILS`** + **`RESEND_API_KEY`**); **`creator-fan-reconcile-stripe`** Edge + migration **`20260722210000`** pg_cron daily (**08:30 UTC**). Apply SQL on test first; redeploy **`stripe-webhook`** + **`creator-fan-reconcile-stripe`** test then prod.
 - 2026-07-21: **Creator fan sub tiers $149 / $249:** migration **`20260721180000`** on test + prod; client + Edge tier catalog **`fan-tier-14999`**, **`fan-tier-24999`**; live Stripe **`STRIPE_PRICE_FAN_TIER_14999`**, **`STRIPE_PRICE_FAN_TIER_24999`** on prod.
 - 2026-07-21: **Creator fan portal + new-sub alerts (§7 v1):** migration **`20260721210000`** … **Test:** SQL applied on **`kcosfvmreeiosdjdzycb`**; **`stripe-webhook`** + **`lounge-send-activity-push`** redeployed; frontend **`test`** @ **`4444af78`**. **Prod:** SQL + Edge redeploy on **`jtjgtucumuoswnbauxry`**; **`main`** @ **`89103efc`** (Vercel **`edgetilt.com`**) — Ryan promote **2026-07-21**.

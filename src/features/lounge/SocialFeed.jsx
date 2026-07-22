@@ -199,8 +199,9 @@ import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
 import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
 import { normalizeMarketEmbeds, LOUNGE_MARKET_EMBED_MAX, extractCashtagsFromCaption } from '../../utils/loungeMarketCaptionParse.js'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
+import LoungeFanOnlyPostRowTint from './LoungeFanOnlyPostRowTint.jsx'
 import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
-import LoungeComposerAudienceToggle from './LoungeComposerAudienceToggle.jsx'
+import LoungeComposerAudienceSheet from './LoungeComposerAudienceSheet.jsx'
 import CreatorFanSubscribeModal from '../creatorFanSubs/CreatorFanSubscribeModal.jsx'
 import {
   fetchCreatorFanOffer,
@@ -208,9 +209,11 @@ import {
 } from '../creatorFanSubs/creatorFanSubsApi.js'
 import {
   fetchLoungeCommunityFeedPostsForViewer,
-  readLoungeComposerAudience,
-  writeLoungeComposerAudience,
+  isLoungeFanOnlyPostLocked,
   LOUNGE_COMPOSER_AUDIENCE_SUBS,
+  loungeFanOnlyPostBlocksRepost,
+  loungeFanOnlyPostContentEntity,
+  showLoungeFanOnlyPostUnlockedTint,
 } from '../../utils/loungeFanOnlyPost.js'
 import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
@@ -687,8 +690,9 @@ export default function SocialFeed({
     focusSymbol: null,
   })
   const [composerCategoryPills, setComposerCategoryPills] = useState(() => readLoungeComposerLastCategoryPills())
-  const [composerPostAudience, setComposerPostAudience] = useState(() => readLoungeComposerAudience())
   const [composerFanMonetizationLive, setComposerFanMonetizationLive] = useState(false)
+  const [composerAudienceSheetOpen, setComposerAudienceSheetOpen] = useState(false)
+  const composerAudienceContinueRef = useRef(/** @type {((creatorFanOnly: boolean) => void) | null} */ (null))
   const [viewerFanEntitlements, setViewerFanEntitlements] = useState(null)
   const [feedFanSubscribeOffer, setFeedFanSubscribeOffer] = useState(null)
   const [feedFanSubscribeOpen, setFeedFanSubscribeOpen] = useState(false)
@@ -707,10 +711,6 @@ export default function SocialFeed({
   useEffect(() => {
     writeLoungeComposerLastCategoryPills(composerCategoryPills)
   }, [composerCategoryPills])
-
-  useEffect(() => {
-    writeLoungeComposerAudience(composerPostAudience)
-  }, [composerPostAudience])
 
   useEffect(() => {
     if (!feedFanSubscribeOpen || !feedFanSubscribeOffer?.creator_user_id) {
@@ -1261,6 +1261,31 @@ export default function SocialFeed({
     [loungeReadOnly, onRequireAuth, supabaseClient],
   )
 
+  const closeComposerAudienceSheet = useCallback(() => {
+    setComposerAudienceSheetOpen(false)
+    composerAudienceContinueRef.current = null
+  }, [])
+
+  const promptComposerAudienceIfNeeded = useCallback(
+    (continueWithFanOnly) => {
+      if (composerFanMonetizationLive && !loungeReadOnly) {
+        composerAudienceContinueRef.current = continueWithFanOnly
+        setComposerAudienceSheetOpen(true)
+        return
+      }
+      continueWithFanOnly(false)
+    },
+    [composerFanMonetizationLive, loungeReadOnly],
+  )
+
+  const onComposerAudienceSelect = useCallback((audience) => {
+    setComposerAudienceSheetOpen(false)
+    const cont = composerAudienceContinueRef.current
+    composerAudienceContinueRef.current = null
+    if (!cont) return
+    cont(audience === LOUNGE_COMPOSER_AUDIENCE_SUBS)
+  }, [])
+
   const loungeFeedVideoAutoplayEnabled = useSyncExternalStore(
     subscribeLoungeFeedVideoAutoplayEnabled,
     readLoungeFeedVideoAutoplayEnabled,
@@ -1323,6 +1348,15 @@ export default function SocialFeed({
     const r = composerUserProfile?.role
     return r === 'moderator' || r === 'admin'
   }, [composerUserProfile?.role])
+
+  const loungeFanLockCtx = useMemo(
+    () => ({
+      viewerUserId: composerUserId,
+      viewerIsStaff: loungeViewerIsStaff,
+      fanEntitlements: viewerFanEntitlements,
+    }),
+    [composerUserId, loungeViewerIsStaff, viewerFanEntitlements],
+  )
 
   const loungeViewerIsAdmin = useMemo(
     () => String(composerUserProfile?.role || '').toLowerCase() === 'admin',
@@ -3076,13 +3110,12 @@ export default function SocialFeed({
       setLoungePostUploadBar(null)
       threadComposeVideoPrepControllerRef.current?.reset()
       threadComposeVideoPrepByPartRef.current = {}
-      setThreadComposeOpen(false)
+      const parts = loungePostDraftThreadParts(draft)
       flushSync(() => {
         setLoungeComposerActiveDraftId(String(draft.id))
         setComposerCategoryPills(Array.isArray(draft.category_pills) ? draft.category_pills : [])
-        const parts = loungePostDraftThreadParts(draft)
-        setThreadComposeCaptions(parts)
-        setThreadComposePartMedia(loungePostDraftThreadComposePartMedia(draft, parts.length))
+        setThreadComposeCaptions(parts.length > 0 ? parts : [''])
+        setThreadComposePartMedia(loungePostDraftThreadComposePartMedia(draft, Math.max(1, parts.length)))
         setComposerImageItems([])
         setComposerMediaUrl('')
         setThreadComposeActivePartIndex(0)
@@ -3095,8 +3128,8 @@ export default function SocialFeed({
         setComposerExpanded(false)
         setLoungeDraftsSheetOpen(false)
         setThreadComposeSessionKey((k) => k + 1)
+        setThreadComposeOpen(true)
       })
-      setThreadComposeOpen(true)
     },
     [blurAllThreadComposeFields, cancelComposerMediaPrep],
   )
@@ -3108,6 +3141,8 @@ export default function SocialFeed({
         loadServerDraftIntoThreadCompose(draft)
         return
       }
+      setThreadComposeOpen(false)
+      setThreadComposeErr('')
       cancelComposerMediaPrep()
       setComposerVideoSlot(loungePostDraftComposerVideoSlot(draft))
       setPostText(String(draft.caption || ''))
@@ -5236,6 +5271,10 @@ export default function SocialFeed({
   const openQuoteRepostComposer = useCallback(
     (post) => {
       if (!post?.id || loungeReadOnly) return
+      if (loungeFanOnlyPostBlocksRepost(post)) {
+        setLoungeManageErr('Subscribers-only posts cannot be quote reposted.')
+        return
+      }
       if (openProfileGateIfNeeded()) return
       if (quoteRepostBackgroundUploadInFlight()) {
         setLoungeManageErr('Your quote repost is still uploading. You can keep browsing while it finishes.')
@@ -5254,6 +5293,10 @@ export default function SocialFeed({
   const openQuoteRepostComposerForComment = useCallback(
     (comment) => {
       if (!comment?.id || loungeReadOnly) return
+      if (loungePostDetail?.creator_fan_only) {
+        setLoungeManageErr('Comments on subscribers-only posts cannot be quote reposted.')
+        return
+      }
       if (openProfileGateIfNeeded()) return
       if (quoteRepostBackgroundUploadInFlight()) {
         setLoungeManageErr('Your quote repost is still uploading. You can keep browsing while it finishes.')
@@ -5299,6 +5342,10 @@ export default function SocialFeed({
   const handlePlainRepost = useCallback(
     async (post) => {
       if (!post?.id || loungeReadOnly || !composerUserId) return
+      if (loungeFanOnlyPostBlocksRepost(post)) {
+        setLoungeManageErr('Subscribers-only posts cannot be reposted.')
+        return
+      }
       if (openProfileGateIfNeeded()) return
       setLoungeManageErr('')
       setLoungeDetailRepostMenuOpen(false)
@@ -5907,6 +5954,10 @@ export default function SocialFeed({
   const addLoungeDetailCommentPlainRepost = useCallback(
     async (commentId) => {
       if (!composerUserId || !commentId) return
+      if (loungePostDetail?.creator_fan_only) {
+        setLoungeManageErr('Comments on subscribers-only posts cannot be reposted.')
+        return
+      }
       const prevSnap = interactionByCommentRef.current[commentId] || defaultInteraction
       if (prevSnap.reposted) return
       // Optimistic update
@@ -6801,6 +6852,10 @@ export default function SocialFeed({
   const openLoungePostDetail = useCallback(
     (post, opts) => {
       if (!post?.id) return
+      const contentPost = loungeFanOnlyPostContentEntity(post)
+      if (isLoungeFanOnlyPostLocked(contentPost, loungeFanLockCtx)) {
+        return
+      }
       if (performance.now() < loungeFeedNavClickSuppressUntilRef.current) return
       pauseAllLoungeStreamInlineVideos()
       if (loungeReadOnly && !opts?.fromPublicLink) {
@@ -6949,7 +7004,7 @@ export default function SocialFeed({
         })
       })
     },
-    [cancelLoungeDetailEditMediaPrep, composerUserId, loungeReadOnly, onRequireAuth, profileModalOpen, profileOverlayStack.length, refreshLoungePostInteractions, supabaseClient]
+    [cancelLoungeDetailEditMediaPrep, composerUserId, loungeFanLockCtx, loungeReadOnly, onRequireAuth, profileModalOpen, profileOverlayStack.length, refreshLoungePostInteractions, supabaseClient]
   )
 
   /**
@@ -6959,6 +7014,10 @@ export default function SocialFeed({
   const openDirectCommentPostDetail = useCallback(
     async (post, commentId, { focusComposer = false, prefetchedComments = null } = {}) => {
       if (!post?.id || !commentId) return
+      const contentPost = loungeFanOnlyPostContentEntity(post)
+      if (isLoungeFanOnlyPostLocked(contentPost, loungeFanLockCtx)) {
+        return
+      }
       let parentPost = post
       if (!parentPost.user_id && !parentPost.caption) {
         try {
@@ -7004,7 +7063,7 @@ export default function SocialFeed({
       loungeCommentDetailDirectEntryDepthRef.current = pathIds.length
       openLoungePostDetail(parentPost)
     },
-    [hydrateCommunityPosts, openLoungePostDetail, supabaseClient],
+    [hydrateCommunityPosts, loungeFanLockCtx, openLoungePostDetail, supabaseClient],
   )
 
   /**
@@ -11679,6 +11738,226 @@ export default function SocialFeed({
     setComposerExpanded(false)
   }, [closeThreadComposeImmediate])
 
+  const submitThreadComposeWithAudience = useCallback(
+    async (creatorFanOnly) => {
+      setThreadComposeErr('')
+      const normalizedParts = normalizeThreadComposePartsForSubmit(
+        threadComposeCaptions,
+        threadComposePartMedia,
+      )
+      if (normalizedParts.length === 0) return
+      const rootPart = normalizedParts[0]
+      const rootMedia = threadComposePartMedia[0] || emptyThreadComposePartMedia()
+      const rootSlot = rootMedia.videoSlot
+      const gifCheck = validateAtMostOneGifUrl(rootPart.gifUrl)
+      if (!gifCheck.ok) {
+        setThreadComposeErr(gifCheck.message)
+        return
+      }
+      const caption = rootPart.body
+      const hasThread = normalizedParts.length > 1
+
+      const buildThreadPartsSnapshot = () =>
+        normalizedParts.map((part, i) => {
+          const media = threadComposePartMedia[i] || emptyThreadComposePartMedia()
+          const videoSnap = threadComposePartVideoSnapshotFields(
+            media.videoSlot,
+            threadComposeVideoPrepByPartRef.current[i] ?? null,
+          )
+          return {
+            body: part.body,
+            gifUrl: part.gifUrl,
+            imageFiles: part.imageFiles,
+            existingImageUrls: part.existingImageUrls,
+            imagePreviewBlobUrls: threadPartImagePreviewBlobUrlsFromMedia(media),
+            ...videoSnap,
+          }
+        })
+
+      setPostBusy(true)
+      let snapshot = null
+      try {
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession()
+        if (!session?.user) {
+          setThreadComposeErr('You must be signed in to post in Lounge.')
+          onRequireAuth?.()
+          return
+        }
+
+        const { data: ownProfile, error: profileErr } = await fetchOwnProfile(supabaseClient, session.user.id)
+        if (profileErr) {
+          setThreadComposeErr(`Could not verify profile: ${profileErr.message || 'Unknown error.'}`)
+          return
+        }
+        if (loungeProfileNeedsGate(ownProfile, session.user.id)) {
+          const h = String(ownProfile?.handle || '').trim()
+          const d = String(ownProfile?.display_name || '').trim()
+          const seed = profileSeedFromUser(session.user)
+          setProfileGateHandle(h || seed.baseHandle)
+          setProfileGateDisplayName(d || seed.displayName)
+          setProfileGateAvatarFile(null)
+          setProfileGateAvatarCropFile(null)
+          setProfileGateAvatarPreview(
+            ownProfile?.avatar_url || composerUserProfile?.avatar_url || '',
+          )
+          setProfileGateCategoryPills(profileCategoryPills(ownProfile || composerUserProfile))
+          setProfileGateErr('')
+          setProfileGateOpen(true)
+          setThreadComposeErr('Complete your profile to post in Lounge.')
+          return
+        }
+
+        const isStaffPoster =
+          ownProfile?.role === 'moderator' ||
+          ownProfile?.role === 'admin' ||
+          composerUserProfile?.role === 'moderator' ||
+          composerUserProfile?.role === 'admin'
+
+        const gifOnlyUrl = gifCheck.value
+        const rootVideoSnap = threadComposePartVideoSnapshotFields(
+          rootSlot,
+          threadComposeVideoPrepByPartRef.current[0] ?? null,
+        )
+        if (rootSlot && gifOnlyUrl) {
+          setThreadComposeErr('Remove the GIF before posting a video.')
+          return
+        }
+
+        const uid = rootSlot ? String(rootSlot.streamVideoUid || '').trim() || null : null
+        const awaiting =
+          rootSlot &&
+          !uid &&
+          rootSlot.prepStatus === 'preparing' &&
+          typeof rootSlot.prepJobId === 'number'
+            ? rootSlot.prepJobId
+            : null
+        const specForSnap = rootSlot && !uid ? rootVideoSnap.videoPrepSpec : null
+        const trimRestore = rootVideoSnap.videoPrepSlotRestore
+        const sessionPosterBlob = rootVideoSnap.sessionStreamPosterBlobUrl
+
+        const threadPartsSnap = buildThreadPartsSnapshot()
+        const fanOnlyPost =
+          Boolean(creatorFanOnly) && composerFanMonetizationLive
+
+        snapshot = {
+          caption,
+          gifOnlyUrl,
+          imageFiles: rootPart.imageFiles,
+          existingImageUrls: rootPart.existingImageUrls,
+          imagePreviewBlobUrls: threadPartImagePreviewBlobUrlsFromMedia(
+            threadComposePartMedia[0] || emptyThreadComposePartMedia(),
+          ),
+          videoFile: rootVideoSnap.videoFile,
+          streamVideoUid: uid,
+          awaitingComposerVideoPrepJobId: awaiting ?? rootVideoSnap.awaitingThreadPartVideoPrepJobId,
+          videoPrepSpec: specForSnap,
+          videoPrepSlotRestore: trimRestore,
+          sessionStreamPosterBlobUrl: sessionPosterBlob,
+          wantsPin: false,
+          isStaffPoster,
+          savedDraftId: loungeComposerActiveDraftIdRef.current,
+          _capturedPrepHandoff:
+            threadComposeVideoPrepByPartRef.current[0]?.handoff ??
+            rootVideoSnap._capturedPrepHandoff ??
+            null,
+          categoryPills: composerCategoryPills,
+          threadParts: hasThread ? threadPartsSnap : threadPartsSnap.length > 0 ? threadPartsSnap : undefined,
+          threadCaptions: hasThread ? normalizedParts.map((p) => p.body) : undefined,
+          creatorFanOnly: fanOnlyPost,
+        }
+      } finally {
+        setPostBusy(false)
+      }
+
+      if (!snapshot) return
+
+      if (loungeSubmissionSnapshotThreadPartCount(snapshot) > 1) {
+        try {
+          const draftPayload = loungePostDraftPayloadFromSubmissionSnapshot(snapshot)
+          if (
+            draftPayload &&
+            loungePostDraftHasContent({
+              caption: draftPayload.caption,
+              threadCaptions: draftPayload.threadCaptions,
+              gifUrl: draftPayload.gifUrl,
+              imageUrls: draftPayload.existingImageUrls,
+              imageFiles: draftPayload.imageFiles,
+            })
+          ) {
+            const { data: draftRow, error: draftErr } = await upsertLoungePostDraft(supabaseClient, {
+              ...draftPayload,
+              id: snapshot.savedDraftId || loungeComposerActiveDraftIdRef.current,
+            })
+            if (draftRow) {
+              snapshot = { ...snapshot, savedDraftId: draftRow.id }
+              setLoungeComposerActiveDraftId(draftRow.id)
+              await refreshLoungeDraftCount()
+            } else if (draftErr) {
+              setThreadComposeErr(draftErr.message)
+              return
+            }
+          }
+        } catch {
+          // Non-blocking - failure handler saves again if needed.
+        }
+      }
+
+      const preserveVideoPrep =
+        snapshot.awaitingComposerVideoPrepJobId != null ||
+        (Array.isArray(snapshot.threadParts) &&
+          snapshot.threadParts.some(
+            (p) =>
+              p?.awaitingThreadPartVideoPrepJobId != null ||
+              (p?._capturedPrepHandoff && !p._capturedPrepHandoff.settled),
+          ))
+      if (shouldAssignLoungePostSnapshotRef()) {
+        loungePostSnapshotRef.current = snapshot
+      }
+      const posterBlob =
+        typeof snapshot.sessionStreamPosterBlobUrl === 'string'
+          ? snapshot.sessionStreamPosterBlobUrl.trim()
+          : ''
+      const postUid = String(snapshot.streamVideoUid || '').trim()
+      if (postUid && posterBlob.startsWith('blob:')) {
+        pinLoungeStreamSessionPoster(postUid, posterBlob)
+      }
+      if (Array.isArray(snapshot.threadParts)) {
+        for (const part of snapshot.threadParts) {
+          const partUid = String(part?.streamVideoUid ?? '').trim()
+          const partPoster =
+            typeof part?.sessionStreamPosterBlobUrl === 'string'
+              ? part.sessionStreamPosterBlobUrl.trim()
+              : ''
+          if (partUid && partPoster.startsWith('blob:')) {
+            pinLoungeStreamSessionPoster(partUid, partPoster)
+          }
+        }
+      }
+      closeThreadComposeImmediate({ skipRestoreFeedText: true, pendingSnapshot: snapshot })
+      clearComposerForPostAttempt({
+        preserveComposerVideoPrep: preserveVideoPrep,
+        pendingSnapshot: snapshot,
+      })
+      triggerTapHapticLight()
+      enqueueAndRunLoungeSubmitRef.current('post', snapshot)
+    },
+    [
+      clearComposerForPostAttempt,
+      closeThreadComposeImmediate,
+      composerCategoryPills,
+      composerFanMonetizationLive,
+      composerUserProfile?.avatar_url,
+      composerUserProfile?.role,
+      onRequireAuth,
+      supabaseClient,
+      threadComposeCaptions,
+      threadComposePartMedia,
+      refreshLoungeDraftCount,
+    ],
+  )
+
   const submitThreadCompose = useCallback(async () => {
     setThreadComposeErr('')
     const normalizedParts = normalizeThreadComposePartsForSubmit(
@@ -11723,15 +12002,11 @@ export default function SocialFeed({
       }
     }
     const rootPart = normalizedParts[0]
-    const rootMedia = threadComposePartMedia[0] || emptyThreadComposePartMedia()
-    const rootSlot = rootMedia.videoSlot
     const gifCheck = validateAtMostOneGifUrl(rootPart.gifUrl)
     if (!gifCheck.ok) {
       setThreadComposeErr(gifCheck.message)
       return
     }
-    const caption = rootPart.body
-    const hasThread = normalizedParts.length > 1
     if (loungeComposerVideoPostBlocked) {
       const blockedPart = threadComposePartMedia.findIndex((part) =>
         threadComposeVideoSlotBlocksPost(part.videoSlot),
@@ -11744,203 +12019,19 @@ export default function SocialFeed({
       return
     }
 
-    const buildThreadPartsSnapshot = () =>
-      normalizedParts.map((part, i) => {
-        const media = threadComposePartMedia[i] || emptyThreadComposePartMedia()
-        const videoSnap = threadComposePartVideoSnapshotFields(
-          media.videoSlot,
-          threadComposeVideoPrepByPartRef.current[i] ?? null,
-        )
-        return {
-          body: part.body,
-          gifUrl: part.gifUrl,
-          imageFiles: part.imageFiles,
-          existingImageUrls: part.existingImageUrls,
-          imagePreviewBlobUrls: threadPartImagePreviewBlobUrlsFromMedia(media),
-          ...videoSnap,
-        }
-      })
-
-    setPostBusy(true)
-    let snapshot = null
-    try {
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession()
-      if (!session?.user) {
-        setThreadComposeErr('You must be signed in to post in Lounge.')
-        onRequireAuth?.()
-        return
-      }
-
-      const { data: ownProfile, error: profileErr } = await fetchOwnProfile(supabaseClient, session.user.id)
-      if (profileErr) {
-        setThreadComposeErr(`Could not verify profile: ${profileErr.message || 'Unknown error.'}`)
-        return
-      }
-      if (loungeProfileNeedsGate(ownProfile, session.user.id)) {
-        const h = String(ownProfile?.handle || '').trim()
-        const d = String(ownProfile?.display_name || '').trim()
-        const seed = profileSeedFromUser(session.user)
-        setProfileGateHandle(h || seed.baseHandle)
-        setProfileGateDisplayName(d || seed.displayName)
-        setProfileGateAvatarFile(null)
-        setProfileGateAvatarCropFile(null)
-        setProfileGateAvatarPreview(
-          ownProfile?.avatar_url || composerUserProfile?.avatar_url || '',
-        )
-        setProfileGateCategoryPills(profileCategoryPills(ownProfile || composerUserProfile))
-        setProfileGateErr('')
-        setProfileGateOpen(true)
-        setThreadComposeErr('Complete your profile to post in Lounge.')
-        return
-      }
-
-      const isStaffPoster =
-        ownProfile?.role === 'moderator' ||
-        ownProfile?.role === 'admin' ||
-        composerUserProfile?.role === 'moderator' ||
-        composerUserProfile?.role === 'admin'
-
-      const gifOnlyUrl = gifCheck.value
-      const rootVideoSnap = threadComposePartVideoSnapshotFields(
-        rootSlot,
-        threadComposeVideoPrepByPartRef.current[0] ?? null,
-      )
-      if (rootSlot && gifOnlyUrl) {
-        setThreadComposeErr('Remove the GIF before posting a video.')
-        return
-      }
-
-      const uid = rootSlot ? String(rootSlot.streamVideoUid || '').trim() || null : null
-      const awaiting =
-        rootSlot &&
-        !uid &&
-        rootSlot.prepStatus === 'preparing' &&
-        typeof rootSlot.prepJobId === 'number'
-          ? rootSlot.prepJobId
-          : null
-      const specForSnap = rootSlot && !uid ? rootVideoSnap.videoPrepSpec : null
-      const trimRestore = rootVideoSnap.videoPrepSlotRestore
-      const sessionPosterBlob = rootVideoSnap.sessionStreamPosterBlobUrl
-
-      const threadPartsSnap = buildThreadPartsSnapshot()
-
-      snapshot = {
-        caption,
-        gifOnlyUrl,
-        imageFiles: rootPart.imageFiles,
-        existingImageUrls: rootPart.existingImageUrls,
-        imagePreviewBlobUrls: threadPartImagePreviewBlobUrlsFromMedia(
-          threadComposePartMedia[0] || emptyThreadComposePartMedia(),
-        ),
-        videoFile: rootVideoSnap.videoFile,
-        streamVideoUid: uid,
-        awaitingComposerVideoPrepJobId: awaiting ?? rootVideoSnap.awaitingThreadPartVideoPrepJobId,
-        videoPrepSpec: specForSnap,
-        videoPrepSlotRestore: trimRestore,
-        sessionStreamPosterBlobUrl: sessionPosterBlob,
-        wantsPin: false,
-        isStaffPoster,
-        savedDraftId: loungeComposerActiveDraftIdRef.current,
-        _capturedPrepHandoff:
-          threadComposeVideoPrepByPartRef.current[0]?.handoff ??
-          rootVideoSnap._capturedPrepHandoff ??
-          null,
-        categoryPills: composerCategoryPills,
-        threadParts: hasThread ? threadPartsSnap : threadPartsSnap.length > 0 ? threadPartsSnap : undefined,
-        threadCaptions: hasThread ? normalizedParts.map((p) => p.body) : undefined,
-      }
-    } finally {
-      setPostBusy(false)
-    }
-
-    if (!snapshot) return
-
-    if (loungeSubmissionSnapshotThreadPartCount(snapshot) > 1) {
-      try {
-        const draftPayload = loungePostDraftPayloadFromSubmissionSnapshot(snapshot)
-        if (
-          draftPayload &&
-          loungePostDraftHasContent({
-            caption: draftPayload.caption,
-            threadCaptions: draftPayload.threadCaptions,
-            gifUrl: draftPayload.gifUrl,
-            imageUrls: draftPayload.existingImageUrls,
-            imageFiles: draftPayload.imageFiles,
-          })
-        ) {
-          const { data: draftRow, error: draftErr } = await upsertLoungePostDraft(supabaseClient, {
-            ...draftPayload,
-            id: snapshot.savedDraftId || loungeComposerActiveDraftIdRef.current,
-          })
-          if (draftRow) {
-            snapshot = { ...snapshot, savedDraftId: draftRow.id }
-            setLoungeComposerActiveDraftId(draftRow.id)
-            await refreshLoungeDraftCount()
-          } else if (draftErr) {
-            setThreadComposeErr(draftErr.message)
-            return
-          }
-        }
-      } catch {
-        // Non-blocking - failure handler saves again if needed.
-      }
-    }
-
-    const preserveVideoPrep =
-      snapshot.awaitingComposerVideoPrepJobId != null ||
-      (Array.isArray(snapshot.threadParts) &&
-        snapshot.threadParts.some(
-          (p) =>
-            p?.awaitingThreadPartVideoPrepJobId != null ||
-            (p?._capturedPrepHandoff && !p._capturedPrepHandoff.settled),
-        ))
-    if (shouldAssignLoungePostSnapshotRef()) {
-      loungePostSnapshotRef.current = snapshot
-    }
-    const posterBlob =
-      typeof snapshot.sessionStreamPosterBlobUrl === 'string'
-        ? snapshot.sessionStreamPosterBlobUrl.trim()
-        : ''
-    const postUid = String(snapshot.streamVideoUid || '').trim()
-    if (postUid && posterBlob.startsWith('blob:')) {
-      pinLoungeStreamSessionPoster(postUid, posterBlob)
-    }
-    if (Array.isArray(snapshot.threadParts)) {
-      for (const part of snapshot.threadParts) {
-        const partUid = String(part?.streamVideoUid ?? '').trim()
-        const partPoster =
-          typeof part?.sessionStreamPosterBlobUrl === 'string'
-            ? part.sessionStreamPosterBlobUrl.trim()
-            : ''
-        if (partUid && partPoster.startsWith('blob:')) {
-          pinLoungeStreamSessionPoster(partUid, partPoster)
-        }
-      }
-    }
-    closeThreadComposeImmediate({ skipRestoreFeedText: true, pendingSnapshot: snapshot })
-    clearComposerForPostAttempt({
-      preserveComposerVideoPrep: preserveVideoPrep,
-      pendingSnapshot: snapshot,
+    promptComposerAudienceIfNeeded((fanOnly) => {
+      void submitThreadComposeWithAudience(fanOnly)
     })
-    triggerTapHapticLight()
-    enqueueAndRunLoungeSubmitRef.current('post', snapshot)
   }, [
-    clearComposerForPostAttempt,
-    closeThreadComposeImmediate,
-    composerCategoryPills,
-    composerUserProfile?.avatar_url,
-    composerUserProfile?.role,
     loungeComposerVideoPostBlocked,
-    onRequireAuth,
-    supabaseClient,
+    promptComposerAudienceIfNeeded,
+    submitThreadComposeWithAudience,
     threadComposeCaptions,
     threadComposePartMedia,
-    refreshLoungeDraftCount,
+    loungeComposerCaptionMax,
   ])
 
-  const submitLoungePost = useCallback(async () => {
+  const submitLoungePostWithAudience = useCallback(async (creatorFanOnly) => {
     const caption = normalizeFeedCaption(postText, loungeComposerCaptionMax)
     setPostErr('')
     const gifCheck = validateAtMostOneGifUrl(composerMediaUrl)
@@ -11951,20 +12042,6 @@ export default function SocialFeed({
     const hasGif = gifCheck.value.length > 0
     const hasImages = composerImageItems.length > 0
     const hasVideo = composerVideoSlot != null
-    const hasMarket = composerMarketSymbols.length > 0 || extractCashtagsFromCaption(caption).length > 0
-    if (!caption && !hasGif && !hasImages && !hasVideo && !hasMarket) return
-    if (caption.length > loungeComposerCaptionMax) {
-      setPostErr(`Caption must be ${loungeComposerCaptionMax} characters or fewer.`)
-      return
-    }
-    if (loungeComposerVideoPostBlocked) return
-
-    if (hasVideo && composerVideoSlot?.file) {
-      if (composerVideoSlot.file.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
-        setPostErr('Video must be 200 MB or smaller for upload.')
-        return
-      }
-    }
 
     setPostBusy(true)
     /** @type {{ caption: string, gifOnlyUrl: string, imageFiles: File[], videoFile: File | null, streamVideoUid: string | null, awaitingComposerVideoPrepJobId?: number | null, videoPrepSpec?: object | null, videoPrepSlotRestore?: { posterUrl: string, preview: string } | null, wantsPin: boolean, isStaffPoster: boolean } | null} */
@@ -12060,8 +12137,7 @@ export default function SocialFeed({
         _capturedPrepHandoff: composerVideoPrepHandoffRef.current ?? null,
         categoryPills: composerCategoryPills,
         marketSymbols: composerMarketSymbols,
-        creatorFanOnly:
-          composerPostAudience === LOUNGE_COMPOSER_AUDIENCE_SUBS && composerFanMonetizationLive,
+        creatorFanOnly: Boolean(creatorFanOnly) && composerFanMonetizationLive,
       }
     } finally {
       setPostBusy(false)
@@ -12092,7 +12168,6 @@ export default function SocialFeed({
     clearComposerForPostAttempt,
     composerCategoryPills,
     composerMarketSymbols,
-    composerPostAudience,
     composerFanMonetizationLive,
     composerImageItems,
     composerMediaUrl,
@@ -12102,6 +12177,47 @@ export default function SocialFeed({
     onRequireAuth,
     postText,
     supabaseClient,
+  ])
+
+  const submitLoungePost = useCallback(async () => {
+    const caption = normalizeFeedCaption(postText, loungeComposerCaptionMax)
+    setPostErr('')
+    const gifCheck = validateAtMostOneGifUrl(composerMediaUrl)
+    if (!gifCheck.ok) {
+      setPostErr(gifCheck.message)
+      return
+    }
+    const hasGif = gifCheck.value.length > 0
+    const hasImages = composerImageItems.length > 0
+    const hasVideo = composerVideoSlot != null
+    const hasMarket = composerMarketSymbols.length > 0 || extractCashtagsFromCaption(caption).length > 0
+    if (!caption && !hasGif && !hasImages && !hasVideo && !hasMarket) return
+    if (caption.length > loungeComposerCaptionMax) {
+      setPostErr(`Caption must be ${loungeComposerCaptionMax} characters or fewer.`)
+      return
+    }
+    if (loungeComposerVideoPostBlocked) return
+
+    if (hasVideo && composerVideoSlot?.file) {
+      if (composerVideoSlot.file.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
+        setPostErr('Video must be 200 MB or smaller for upload.')
+        return
+      }
+    }
+
+    promptComposerAudienceIfNeeded((fanOnly) => {
+      void submitLoungePostWithAudience(fanOnly)
+    })
+  }, [
+    composerImageItems,
+    composerMarketSymbols,
+    composerMediaUrl,
+    composerVideoSlot,
+    loungeComposerCaptionMax,
+    loungeComposerVideoPostBlocked,
+    postText,
+    promptComposerAudienceIfNeeded,
+    submitLoungePostWithAudience,
   ])
 
   const onProfileGateAvatarCropCancel = useCallback(() => {
@@ -14036,13 +14152,6 @@ export default function SocialFeed({
                 </svg>
               </button>
               <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-                {composerFanMonetizationLive && !loungeReadOnly ? (
-                  <LoungeComposerAudienceToggle
-                    value={composerPostAudience}
-                    onChange={setComposerPostAudience}
-                    disabled={postBusy || loungeComposerVideoPostBlocked}
-                  />
-                ) : null}
                 <div className="inline-flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
@@ -14249,11 +14358,19 @@ export default function SocialFeed({
           )
         ) : (
           <>
-            {communityPosts.map((post) => (
+            {communityPosts.map((post) => {
+              const fanOnlyRowTint = showLoungeFanOnlyPostUnlockedTint(post, loungeFanLockCtx)
+              const fanOnlyFeedLocked = isLoungeFanOnlyPostLocked(
+                loungeFanOnlyPostContentEntity(post),
+                loungeFanLockCtx,
+              )
+              return (
               <article
                 key={post.id}
                 style={feedPostRowPerfStyle}
-                className={LOUNGE_FEED_POST_ROW_CLASS}
+                className={`${LOUNGE_FEED_POST_ROW_CLASS}${fanOnlyRowTint ? ' relative overflow-hidden' : ''}${
+                  fanOnlyFeedLocked ? ' cursor-default' : ''
+                }`}
                 onClick={(e) => {
                   const t = e.target
                   if (!(t instanceof Element)) return
@@ -14265,10 +14382,11 @@ export default function SocialFeed({
                   }
                   if (
                     t.closest(
-                      'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip]',
+                      'button, a, textarea, input, select, [data-lounge-post-menu], [data-lounge-image-zoom], [data-lounge-video-zoom], [data-lounge-badge-tip], [data-lounge-fan-only-cta]',
                     )
                   )
                     return
+                  if (fanOnlyFeedLocked) return
                   // Plain post repost → open original
                   if (post.is_plain_repost && post.reposted_post?.id) {
                     openLoungePostDetail(post.reposted_post)
@@ -14282,6 +14400,8 @@ export default function SocialFeed({
                   openLoungePostDetail(post)
                 }}
               >
+                {fanOnlyRowTint ? <LoungeFanOnlyPostRowTint /> : null}
+                <div className={fanOnlyRowTint ? 'relative z-[1]' : undefined}>
                 <LoungePostArticle
                   post={post}
                   feedEditSavePending={loungeFeedPostEditPendingPostId === post.id}
@@ -14351,8 +14471,10 @@ export default function SocialFeed({
                   onSubscribeToCreatorFan={loungeReadOnly ? undefined : openFeedFanSubscribe}
                   fanSubscribeBusy={feedFanSubscribeBusy}
                 />
+                </div>
               </article>
-            ))}
+              )
+            })}
 
             {communityFeedHasMore ? <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden /> : null}
 
@@ -15100,6 +15222,7 @@ export default function SocialFeed({
                 const bookmarkGlyphFilled = !ro && isBookmarked
                 const plainId = ui.plainRepostChildId
                 const quoteId = ui.quoteRepostChildId
+                const detailRepostBlocked = loungeFanOnlyPostBlocksRepost(d)
                 const dSlotComment = 24
                 const dSlotRepost = 24
                 const dSlotLike = 24
@@ -15220,6 +15343,7 @@ export default function SocialFeed({
                         countClass={commentClass}
                         countValue={commentCount}
                       />
+                      {!(detailRepostBlocked && !ui.reposted) ? (
                       <LoungeInteractionGlyphRail
                         railRef={loungeDetailRepostMenuRef}
                         extraAfterStat={
@@ -15407,6 +15531,13 @@ export default function SocialFeed({
                         countClass={repostClass}
                         countValue={repostCount}
                       />
+                      ) : (
+                        <span
+                          className="inline-block shrink-0"
+                          style={{ width: dSlotRepost, minWidth: dSlotRepost, minHeight: dRailMinH }}
+                          aria-hidden
+                        />
+                      )}
                       <LoungeInteractionGlyphRail
                         slotPx={dSlotLike}
                         glyphPx={dSlotLike}
@@ -15501,6 +15632,7 @@ export default function SocialFeed({
                     onToggleCommentBookmark: toggleLoungeDetailCommentBookmark,
                     getCommentBookmarked: getLoungeDetailCommentBookmarked,
                     repostActionBusy: repostManageBusy,
+                    repostHidden: Boolean(loungePostDetail?.creator_fan_only),
                     onAvatarClickProfile: openAuthorProfile,
                     positionScrollRootRef: loungePostDetailScrollRef,
                     onCommentMenuDelete: deleteLoungeDetailComment,
@@ -15582,6 +15714,7 @@ export default function SocialFeed({
                     onToggleCommentBookmark: toggleLoungeDetailCommentBookmark,
                     getCommentBookmarked: getLoungeDetailCommentBookmarked,
                     repostActionBusy: repostManageBusy,
+                    repostHidden: Boolean(loungePostDetail?.creator_fan_only),
                     onAvatarClickProfile: openAuthorProfile,
                     positionScrollRootRef: loungePostDetailScrollRef,
                     onCommentMenuDelete: deleteLoungeDetailComment,
@@ -17307,6 +17440,12 @@ export default function SocialFeed({
           </div>
         </div>
       ) : null}
+
+      <LoungeComposerAudienceSheet
+        open={composerAudienceSheetOpen}
+        onClose={closeComposerAudienceSheet}
+        onSelect={onComposerAudienceSelect}
+      />
 
       <LoungePostDraftsSheet
         open={loungeDraftsSheetOpen}

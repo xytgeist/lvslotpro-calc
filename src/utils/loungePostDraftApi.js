@@ -173,7 +173,10 @@ export function collectLoungePostDraftStreamUids(draft) {
 
 /** True when the draft should restore into the thread compose sheet. */
 export function loungePostDraftIsThread(draft) {
-  return Array.isArray(draft?.thread_captions) && draft.thread_captions.length > 1
+  if (!Array.isArray(draft?.thread_captions) || draft.thread_captions.length <= 1) return false
+  const hasNonEmptyPart = draft.thread_captions.some((t) => String(t || '').trim().length > 0)
+  if (!hasNonEmptyPart && String(draft?.caption || '').trim()) return false
+  return true
 }
 
 function draftPartMediaHasContent(part) {
@@ -914,6 +917,8 @@ export async function upsertLoungePostDraft(supabaseClient, payload = {}) {
     return { data: null, error: new Error('Add caption text, a GIF, or at least one image before saving.') }
   }
 
+  const isMultiPartThread = threadCaptions.length > 1
+
   const row = {
     caption,
     category_pills: categoryPills,
@@ -923,14 +928,14 @@ export async function upsertLoungePostDraft(supabaseClient, payload = {}) {
     stream_poster_url: rootStream.stream_poster_url,
     stream_video_width: rootStream.stream_video_width,
     stream_video_height: rootStream.stream_video_height,
-    thread_captions: threadCaptions,
-    thread_part_media: threadPartMedia,
+    thread_captions: isMultiPartThread ? threadCaptions : [],
+    thread_part_media: isMultiPartThread ? threadPartMedia : [],
     quote_repost_of_post_id: quoteRepostOfPostId || null,
   }
 
-  async function writeDraft(includeThreadFields, includeMediaFields) {
+  async function writeDraft(writeThreadFields, includeMediaFields) {
     const writeRow = { ...row }
-    if (!includeThreadFields) {
+    if (!writeThreadFields) {
       delete writeRow.thread_captions
       delete writeRow.thread_part_media
     } else if (!includeMediaFields) {
@@ -948,10 +953,10 @@ export async function upsertLoungePostDraft(supabaseClient, payload = {}) {
     }
 
     const selectCols =
-      includeThreadFields && includeMediaFields
+      writeThreadFields && includeMediaFields
         ? LOUNGE_POST_DRAFT_SELECT_WITH_THREAD
-        : includeThreadFields
-          ? 'id, caption, category_pills, gif_url, image_urls, thread_captions, quote_repost_of_post_id, updated_at, created_at'
+        : writeThreadFields
+          ? 'id, caption, category_pills, gif_url, image_urls, thread_captions, thread_part_media, quote_repost_of_post_id, updated_at, created_at'
           : LOUNGE_POST_DRAFT_SELECT_BASE
 
     if (draftId) {
@@ -967,14 +972,14 @@ export async function upsertLoungePostDraft(supabaseClient, payload = {}) {
 
   report('Saving draft…', '', 0.05)
 
-  let includeThread = threadCaptions.length > 1
+  let writeThreadFields = true
   let includeMedia = true
-  let { data, error } = await writeDraft(includeThread, includeMedia)
+  let { data, error } = await writeDraft(writeThreadFields, includeMedia)
 
   if (error && isDraftMediaSchemaError(error)) {
     includeMedia = false
-    ;({ data, error } = await writeDraft(includeThread, includeMedia))
-    if (!error && includeThread) {
+    ;({ data, error } = await writeDraft(writeThreadFields, includeMedia))
+    if (!error && isMultiPartThread) {
       return {
         data: null,
         error: new Error(
@@ -985,8 +990,8 @@ export async function upsertLoungePostDraft(supabaseClient, payload = {}) {
   }
 
   if (error && isThreadCaptionsSchemaError(error)) {
-    includeThread = false
-    ;({ data, error } = await writeDraft(includeThread, includeMedia))
+    writeThreadFields = false
+    ;({ data, error } = await writeDraft(writeThreadFields, includeMedia))
   }
 
   if (error) {
@@ -994,7 +999,7 @@ export async function upsertLoungePostDraft(supabaseClient, payload = {}) {
     if (msg.includes('Draft limit reached')) {
       return { data: null, error: new Error('Draft limit reached (20). Delete an old draft first.') }
     }
-    if (includeThread && isThreadCaptionsSchemaError(error)) {
+    if (writeThreadFields && isThreadCaptionsSchemaError(error)) {
       return {
         data: null,
         error: new Error(

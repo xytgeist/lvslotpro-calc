@@ -76,6 +76,7 @@ export function LoungeCommentCard({
   onToggleCommentBookmark,
   getCommentBookmarked,
   repostActionBusy,
+  repostHidden = false,
   positionScrollRootRef,
   onCommentMenuEdit,
   onCommentMenuDelete,
@@ -343,6 +344,7 @@ export function LoungeCommentCard({
             repostMenuScrollRootRef={positionScrollRootRef}
             onCommentClick={onCommentBarClick}
             repostActionBusy={repostActionBusy}
+            repostHidden={repostHidden}
           />
         ) : null}
       </div>
@@ -458,6 +460,7 @@ export default function LoungePostCommentThread({
   onToggleCommentBookmark,
   getCommentBookmarked,
   repostActionBusy = false,
+  repostHidden = false,
   onOpenCommentThread,
   onAvatarClickProfile,
   positionScrollRootRef,
@@ -628,6 +631,7 @@ export default function LoungePostCommentThread({
     onToggleCommentBookmark,
     getCommentBookmarked,
     repostActionBusy,
+    repostHidden,
     onAvatarClickProfile,
     positionScrollRootRef,
     onCommentMenuEdit,

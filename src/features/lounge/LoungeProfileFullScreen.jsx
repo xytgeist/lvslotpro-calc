@@ -20,6 +20,12 @@ import { normalizeProfileLocation } from '../profiles/profileLocation.js'
 import ProfileLocationPicker from '../profiles/ProfileLocationPicker.jsx'
 import { prepareAvatarImageForUpload, isProbablyImageFile } from '../../utils/compressImageForUpload'
 import { collectLoungePostInteractionHydrateIds, feedPostDisplayCaption } from '../../utils/communityFeedPost.js'
+import {
+  fetchLoungeCommunityFeedPostsForViewer,
+  loungeProfileReplyItemVisible,
+  showLoungeFanOnlyPostUnlockedTint,
+} from '../../utils/loungeFanOnlyPost.js'
+import LoungeFanOnlyPostRowTint from './LoungeFanOnlyPostRowTint.jsx'
 import { loungeFeedPostRowPerfStyle } from '../../utils/loungeFeedPostRowPerfStyle.js'
 import { feedCommentRowHasMedia } from '../../utils/communityFeedComment.js'
 import LoungePostArticle from './LoungePostArticle'
@@ -125,7 +131,7 @@ function ProfileLocationPinIcon({ className = 'h-4 w-4 shrink-0' }) {
 }
 
 const PROFILE_LIKED_POST_SELECT =
-  'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url'
+  'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url,creator_fan_only'
 
 const PROFILE_COMMENT_SELECT =
   'id,body,created_at,user_id,parent_id,post_id,comment_count,like_count,repost_count,bookmark_count,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,edited_at'
@@ -768,6 +774,15 @@ export default function LoungeProfileFullScreen({
     }
   }, [postCardProps, tab])
 
+  const profileFanLockCtx = useMemo(
+    () => ({
+      viewerUserId: postCardProps?.viewerUserId,
+      viewerIsStaff: postCardProps?.loungeViewerIsStaff,
+      fanEntitlements: postCardProps?.fanEntitlements,
+    }),
+    [postCardProps?.viewerUserId, postCardProps?.loungeViewerIsStaff, postCardProps?.fanEntitlements],
+  )
+
   useEffect(() => {
     if (!open || tab !== 'replies') {
       return
@@ -945,12 +960,7 @@ export default function LoungeProfileFullScreen({
           if (!cancelled) setProfileReplies([])
           return
         }
-        const { data: postRows, error: pe } = await supabaseClient
-          .from('community_feed_posts')
-          .select(PROFILE_REPLY_POST_SELECT)
-          .in('id', postIds)
-          .is('hidden_at', null)
-        if (pe) throw pe
+        const postRows = await fetchLoungeCommunityFeedPostsForViewer(supabaseClient, postIds)
         const hydratedPosts = await hydratePosts(postRows || [])
         const postById = new Map((hydratedPosts || []).map((p) => [String(p.id), p]))
         const expandedRows = await expandFeedCommentsWithAncestors(supabaseClient, comments)
@@ -990,7 +1000,13 @@ export default function LoungeProfileFullScreen({
             threadComments,
           })
         }
-        if (!cancelled) setProfileReplies(items)
+        const replyCtx = {
+          viewerUserId: viewerUserId || postCardProps?.viewerUserId,
+          viewerIsStaff: postCardProps?.loungeViewerIsStaff,
+          fanEntitlements: postCardProps?.fanEntitlements,
+        }
+        const visibleItems = items.filter((it) => loungeProfileReplyItemVisible(it, profileUserId, replyCtx))
+        if (!cancelled) setProfileReplies(visibleItems)
       } catch (e) {
         if (!cancelled) {
           setProfileRepliesErr(e?.message || 'Could not load replies.')
@@ -1003,7 +1019,7 @@ export default function LoungeProfileFullScreen({
     return () => {
       cancelled = true
     }
-  }, [open, tab, profileUserId, supabaseClient, hydratePosts, profile])
+  }, [open, tab, profileUserId, supabaseClient, hydratePosts, profile, viewerUserId, postCardProps?.viewerUserId, postCardProps?.loungeViewerIsStaff, postCardProps?.fanEntitlements])
 
   useEffect(() => {
     if (!open) {
@@ -2436,11 +2452,13 @@ export default function LoungeProfileFullScreen({
                 ) : posts.length === 0 ? (
                   <div className="px-3 py-8 text-center text-zinc-500 text-[15px]">No Lounge posts yet.</div>
                 ) : (
-                  posts.map((post) => (
+                  posts.map((post) => {
+                    const fanOnlyRowTint = showLoungeFanOnlyPostUnlockedTint(post, profileFanLockCtx)
+                    return (
                     <article
                       key={post.id}
                       style={profilePostRowPerfStyle}
-                      className={`${LOUNGE_FEED_POST_ROW_CLASS} cursor-pointer`}
+                      className={`${LOUNGE_FEED_POST_ROW_CLASS} cursor-pointer${fanOnlyRowTint ? ' relative overflow-hidden' : ''}`}
                       onClick={(e) => {
                         const t = e.target
                         if (!(t instanceof Element)) return
@@ -2468,6 +2486,8 @@ export default function LoungeProfileFullScreen({
                         postCardPropsForLists.onPostBodyClick?.(post)
                       }}
                     >
+                      {fanOnlyRowTint ? <LoungeFanOnlyPostRowTint /> : null}
+                      <div className={fanOnlyRowTint ? 'relative z-[1]' : undefined}>
                       <LoungePostArticle
                         post={post}
                         suppressAvatarProfileNavigation
@@ -2475,8 +2495,10 @@ export default function LoungeProfileFullScreen({
                         {...postCardPropsForLists}
                         repostMenuScrollRootRef={profileBodyScrollRef}
                       />
+                      </div>
                     </article>
-                  ))
+                    )
+                  })
                 )
               ) : tab === 'replies' ? (
                 profileRepliesLoading ? (
@@ -2515,11 +2537,13 @@ export default function LoungeProfileFullScreen({
                       : 'Posts you bookmark will show up here.'}
                   </div>
                 ) : (
-                  interactionPosts.map((post) => (
+                  interactionPosts.map((post) => {
+                    const fanOnlyRowTint = showLoungeFanOnlyPostUnlockedTint(post, profileFanLockCtx)
+                    return (
                     <article
                       key={post.id}
                       style={profilePostRowPerfStyle}
-                      className={`${LOUNGE_FEED_POST_ROW_CLASS} cursor-pointer`}
+                      className={`${LOUNGE_FEED_POST_ROW_CLASS} cursor-pointer${fanOnlyRowTint ? ' relative overflow-hidden' : ''}`}
                       onClick={(e) => {
                         const t = e.target
                         if (!(t instanceof Element)) return
@@ -2547,6 +2571,8 @@ export default function LoungeProfileFullScreen({
                         postCardPropsForLists.onPostBodyClick?.(post)
                       }}
                     >
+                      {fanOnlyRowTint ? <LoungeFanOnlyPostRowTint /> : null}
+                      <div className={fanOnlyRowTint ? 'relative z-[1]' : undefined}>
                       <LoungePostArticle
                         post={post}
                         suppressAvatarProfileNavigation
@@ -2554,8 +2580,10 @@ export default function LoungeProfileFullScreen({
                         {...postCardPropsForLists}
                         repostMenuScrollRootRef={profileBodyScrollRef}
                       />
+                      </div>
                     </article>
-                  ))
+                    )
+                  })
                 )
               ) : null}
               </LoungeFeedVideoAutoplayProvider>

@@ -165,9 +165,26 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     const domText = plainTextFromComposerRoot(el)
     if (domText === value) {
       lastValueRef.current = value
+      setDomHasText(value.length > 0)
       return
     }
-    if (domText === lastValueRef.current) return
+    if (domText === lastValueRef.current && value === lastValueRef.current) {
+      return
+    }
+    if (domText === lastValueRef.current && value !== lastValueRef.current) {
+      // Parent-driven update (draft restore, clear, paste) while DOM still matches last emit.
+      if (domText.length === 0 || value.length > domText.length) {
+        lastValueRef.current = value
+        const caret =
+          document.activeElement === el
+            ? Math.min(getCaretTextOffset(el), value.length)
+            : value.length
+        caretRef.current = caret
+        syncComposerHtml(el, value, caret)
+        setDomHasText(value.length > 0)
+      }
+      return
+    }
     lastValueRef.current = value
     const caret =
       document.activeElement === el
@@ -175,6 +192,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
         : value.length
     caretRef.current = caret
     syncComposerHtml(el, value, caret)
+    setDomHasText(value.length > 0)
   }, [value, iosNativeTextarea])
 
   useLayoutEffect(() => {

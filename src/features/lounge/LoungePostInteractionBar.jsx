@@ -45,6 +45,7 @@ export default function LoungePostInteractionBar({
   onToggleBookmark,
   getBookmarked,
   repostActionBusy = false,
+  repostHidden = false,
   /** Stream hero overlay: pill per control instead of a shared bar background. */
   pillOverlay = false,
   /** Extra classes on the outer grid wrapper (e.g. `w-full` in lightbox). */
@@ -581,6 +582,7 @@ export default function LoungePostInteractionBar({
         countValue={commentCount}
       />
 
+      {!(repostHidden && !ui.reposted) ? (
       <LoungeInteractionGlyphRail
         railRef={repostMenuRef}
         extraAfterStat={!isFeed ? repostMenuSheet : null}
@@ -629,6 +631,9 @@ export default function LoungePostInteractionBar({
         countClass={repostClass}
         countValue={repostCount}
       />
+      ) : (
+        <span className="inline-block shrink-0" style={{ width: slotRepost, minWidth: slotRepost }} aria-hidden />
+      )}
 
       <LoungeInteractionGlyphRail
         slotPx={slotLike}

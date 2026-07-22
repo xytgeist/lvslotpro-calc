@@ -860,6 +860,36 @@ html.light [data-lounge-post-interaction-bar] .text-zinc-500 {
 html.light [data-lounge-post-interaction-bar] .text-zinc-100 {
   color: #71717a;
 }
+
+/* Subs-only unlocked post row — left tint (dark: cyan; light: blue below). */
+[data-lounge-fan-only-row-tint] {
+  background-image: linear-gradient(
+    to right,
+    rgb(34 211 238 / 0.28),
+    rgb(34 211 238 / 0.12),
+    transparent
+  );
+}
+
+/* Fan-only locked teaser fade (feed row bg in light mode). */
+html.light [data-lounge-fan-only-teaser] .lounge-fan-only-teaser-fade {
+  background-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(244 244 245 / 0.55),
+    rgb(244 244 245 / 0.98)
+  );
+}
+
+html.light [data-lounge-fan-only-row-tint] {
+  background-image: linear-gradient(
+    to right,
+    rgb(37 99 235 / 0.2),
+    rgb(59 130 246 / 0.09),
+    transparent
+  );
+}
+
 /* Bookmarked: lv-yellow on white is bad; blue is clean and distinct. */
 html.light .text-lv-yellow {
   color: #2563eb;

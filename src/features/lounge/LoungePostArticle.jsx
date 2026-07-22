@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { feedPostDisplayCaption, isQuoteRepostPost, quoteRepostOriginalUnavailable } from '../../utils/communityFeedPost'
-import { isLoungeFanOnlyPostLocked } from '../../utils/loungeFanOnlyPost.js'
+import { isLoungeFanOnlyPostLocked, loungeFanOnlyPostBlocksRepost } from '../../utils/loungeFanOnlyPost.js'
 import { displayPostCategoryPills } from '../../utils/loungePostCategoryPills.js'
 import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
@@ -15,6 +15,7 @@ import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungeFanOnlySubscribeCta from './LoungeFanOnlySubscribeCta.jsx'
+import LoungeFanOnlyLockedCaptionTeaser from './LoungeFanOnlyLockedCaptionTeaser.jsx'
 import { loungePostIsThreadRoot, loungePostThreadPartCount } from '../../utils/loungePostThreadApi.js'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
@@ -174,6 +175,7 @@ export default function LoungePostArticle({
   // The "display" entity (what we show as the card's main content / author)
   const displayPost = isPlainPostRepost ? post.reposted_post : post
   const rc = isCommentRepost ? post.reposted_comment : null
+  const feedRepostBlocked = loungeFanOnlyPostBlocksRepost(post)
 
   const renderFanSubscribeCta = (entity) => {
     if (!entity || !isLoungeFanOnlyPostLocked(entity, fanLockCtx)) return null
@@ -185,6 +187,39 @@ export default function LoungePostArticle({
         busy={fanSubscribeBusy}
         onSubscribe={() => onSubscribeToCreatorFan(entity.user_id)}
       />
+    )
+  }
+
+  const renderFeedCaptionBlock = (entity) => {
+    if (!showPostCaption(entity)) return null
+    const locked = isLoungeFanOnlyPostLocked(entity, fanLockCtx)
+    if (locked) {
+      return (
+        <div
+          data-lounge-post-caption
+          role="presentation"
+          className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-zinc-200`}
+        >
+          <LoungeFanOnlyLockedCaptionTeaser
+            text={postCaptionDisplayText(entity)}
+            captionOpts={richCaptionOpts}
+          />
+          {renderFanSubscribeCta(entity)}
+        </div>
+      )
+    }
+    return (
+      <div
+        data-lounge-post-caption
+        role="presentation"
+        onClick={captionOpensDetail ? onCaptionAreaClick : undefined}
+        className={captionBlockClass}
+      >
+        <LoungeExpandableRichCaption
+          text={postCaptionDisplayText(entity)}
+          captionOpts={richCaptionOpts}
+        />
+      </div>
     )
   }
   // ── Row menu - always based on the repost row (`post`), not the display entity ──
@@ -543,26 +578,7 @@ export default function LoungePostArticle({
         ) : isPlainPostRepost ? (
           // Plain post repost: show original post content directly (no embed box)
           <>
-            {showPostCaption(displayPost) ? (
-              <div
-                data-lounge-post-caption
-                role="presentation"
-                onClick={
-                  captionOpensDetail && !isLoungeFanOnlyPostLocked(displayPost, fanLockCtx)
-                    ? onCaptionAreaClick
-                    : undefined
-                }
-                className={`${captionBlockClass}${
-                  isLoungeFanOnlyPostLocked(displayPost, fanLockCtx) ? ' opacity-90' : ''
-                }`}
-              >
-                <LoungeExpandableRichCaption
-                  text={postCaptionDisplayText(displayPost)}
-                  captionOpts={richCaptionOpts}
-                />
-              </div>
-            ) : null}
-            {renderFanSubscribeCta(displayPost)}
+            {renderFeedCaptionBlock(displayPost)}
             {!isLoungeFanOnlyPostLocked(displayPost, fanLockCtx) ? (
               <>
             <LoungeLinkPreviewBlock preview={displayPost.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
@@ -716,23 +732,7 @@ export default function LoungePostArticle({
         ) : (
           // Regular post
           <>
-            {showPostCaption(post) ? (
-              <div
-                data-lounge-post-caption
-                role="presentation"
-                onClick={
-                  captionOpensDetail && !isLoungeFanOnlyPostLocked(post, fanLockCtx)
-                    ? onCaptionAreaClick
-                    : undefined
-                }
-                className={`${captionBlockClass}${
-                  isLoungeFanOnlyPostLocked(post, fanLockCtx) ? ' opacity-90' : ''
-                }`}
-              >
-                <LoungeExpandableRichCaption text={postCaptionDisplayText(post)} captionOpts={richCaptionOpts} />
-              </div>
-            ) : null}
-            {renderFanSubscribeCta(post)}
+            {renderFeedCaptionBlock(post)}
             {loungePostIsThreadRoot(post) && !isLoungeFanOnlyPostLocked(post, fanLockCtx) ? (
               <div
                 className={`${showPostCaption(post) ? 'mt-1' : LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-[13px] font-semibold text-cyan-400/90`}
@@ -840,10 +840,10 @@ export default function LoungePostArticle({
             loungeReadOnly={loungeReadOnly}
             interactionStateFor={interactionStateFor}
             toggleInteraction={toggleInteraction}
-            onPlainRepost={onPlainRepost}
+            onPlainRepost={feedRepostBlocked ? undefined : onPlainRepost}
             onUndoPlainRepost={onUndoPlainRepost}
             onRemoveQuoteRepost={isPlainPostRepost ? undefined : onRemoveQuoteRepost}
-            onQuoteRepost={isPlainPostRepost ? undefined : onQuoteRepost}
+            onQuoteRepost={feedRepostBlocked ? undefined : isPlainPostRepost ? undefined : onQuoteRepost}
             toggleBookmark={toggleBookmark}
             bookmarkedByPost={bookmarkedByPost}
             onOpenComments={onOpenComments}
@@ -854,6 +854,7 @@ export default function LoungePostArticle({
             requireLoungeAuth={requireLoungeAuth}
             openProfileGateIfNeeded={openProfileGateIfNeeded}
             repostMenuScrollRootRef={repostMenuScrollRootRef}
+            repostHidden={feedRepostBlocked}
           />
         )}
       </div>
