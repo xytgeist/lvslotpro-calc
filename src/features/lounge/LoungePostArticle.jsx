@@ -16,6 +16,7 @@ import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungeFanOnlySubscribeCta from './LoungeFanOnlySubscribeCta.jsx'
 import LoungeFanOnlyLockedCaptionTeaser from './LoungeFanOnlyLockedCaptionTeaser.jsx'
+import LoungeFanOnlyLockedBlurFrame from './LoungeFanOnlyLockedBlurFrame.jsx'
 import { loungePostIsThreadRoot, loungePostThreadPartCount } from '../../utils/loungePostThreadApi.js'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
@@ -177,7 +178,7 @@ export default function LoungePostArticle({
   const rc = isCommentRepost ? post.reposted_comment : null
   const feedRepostBlocked = loungeFanOnlyPostBlocksRepost(post)
 
-  const renderFanSubscribeCta = (entity) => {
+  const renderFanSubscribeCta = (entity, { className } = {}) => {
     if (!entity || !isLoungeFanOnlyPostLocked(entity, fanLockCtx)) return null
     if (typeof onSubscribeToCreatorFan !== 'function') return null
     const handle = entity.author_profile?.handle || handleFor(entity)?.replace(/^@/, '')
@@ -185,6 +186,7 @@ export default function LoungePostArticle({
       <LoungeFanOnlySubscribeCta
         creatorHandle={handle}
         busy={fanSubscribeBusy}
+        className={className}
         onSubscribe={() => onSubscribeToCreatorFan(entity.user_id)}
       />
     )
@@ -194,17 +196,17 @@ export default function LoungePostArticle({
     if (!showPostCaption(entity)) return null
     const locked = isLoungeFanOnlyPostLocked(entity, fanLockCtx)
     if (locked) {
+      const captionText = postCaptionDisplayText(entity)
       return (
         <div
           data-lounge-post-caption
+          data-lounge-fan-only-locked
           role="presentation"
           className={`${LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-zinc-200`}
         >
-          <LoungeFanOnlyLockedCaptionTeaser
-            text={postCaptionDisplayText(entity)}
-            captionOpts={richCaptionOpts}
-          />
-          {renderFanSubscribeCta(entity)}
+          <LoungeFanOnlyLockedCaptionTeaser text={captionText} captionOpts={richCaptionOpts} />
+          {renderFanSubscribeCta(entity, { className: 'mt-2' })}
+          <LoungeFanOnlyLockedBlurFrame text={captionText} captionOpts={richCaptionOpts} />
         </div>
       )
     }

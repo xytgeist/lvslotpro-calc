@@ -7,13 +7,18 @@
  *   busy?: boolean,
  * }} props
  */
-export default function LoungeFanOnlySubscribeCta({ creatorHandle, onSubscribe, busy = false }) {
+export default function LoungeFanOnlySubscribeCta({
+  creatorHandle,
+  onSubscribe,
+  busy = false,
+  className = 'mt-2',
+}) {
   const raw = creatorHandle ? String(creatorHandle).replace(/^@/, '').trim() : ''
   const handleLabel = raw ? `@${raw}` : 'this creator'
 
   return (
     <div
-      className="mt-2 rounded-2xl border border-cyan-500/30 bg-cyan-950/40 px-3 py-3"
+      className={`relative z-10 rounded-2xl border border-cyan-500/30 bg-cyan-950/40 px-3 py-3 ${className}`}
       data-lounge-fan-only-cta
     >
       <button

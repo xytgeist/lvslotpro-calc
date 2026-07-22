@@ -871,13 +871,17 @@ html.light [data-lounge-post-interaction-bar] .text-zinc-100 {
   );
 }
 
-/* Fan-only locked teaser fade (feed row bg in light mode). */
-html.light [data-lounge-fan-only-teaser] .lounge-fan-only-teaser-fade {
+/* Fan-only locked blur frame (feed row bg in light mode). */
+html.light [data-lounge-fan-only-blur-frame] {
+  border-color: rgb(212 212 216 / 0.85);
+  background-color: rgb(244 244 245 / 0.65);
+}
+html.light [data-lounge-fan-only-blur-frame] .lounge-fan-only-blur-frame-overlay {
   background-image: linear-gradient(
     to bottom,
-    transparent,
+    rgb(244 244 245 / 0.2),
     rgb(244 244 245 / 0.55),
-    rgb(244 244 245 / 0.98)
+    rgb(244 244 245 / 0.92)
   );
 }
 
