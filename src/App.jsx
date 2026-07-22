@@ -414,7 +414,24 @@ function App() {
       for (let attempt = 0; attempt < 15; attempt += 1) {
         if (cancelled) return
         const { data, error } = await supabase.rpc('get_my_creator_fan_entitlements')
-        if (!error && data?.[key]?.active === true) return
+        if (!error && data?.[key]?.active === true) {
+          const creatorId = String(creatorUserId || '').trim()
+          if (creatorId) {
+            const { data: followRow } = await supabase
+              .from('profile_follows')
+              .select('follower_id')
+              .eq('follower_id', user.id)
+              .eq('following_id', creatorId)
+              .maybeSingle()
+            if (!followRow) {
+              await supabase.from('profile_follows').insert({
+                follower_id: user.id,
+                following_id: creatorId,
+              })
+            }
+          }
+          return
+        }
         await new Promise((r) => window.setTimeout(r, 1200))
       }
     }

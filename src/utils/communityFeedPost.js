@@ -205,6 +205,8 @@ export function communityFeedPostInsertPayload({
   threadPartIndex = 0,
   /** Total parts including root (set on root row when threading). */
   threadPartCount = 1,
+  /** Creator fan subs: true = subscribers-only (requires live monetization). */
+  creatorFanOnly = false,
 }) {
   const cap = normalizeFeedCaption(caption)
   const gt = String(gameTitle ?? '').trim()
@@ -254,6 +256,7 @@ export function communityFeedPostInsertPayload({
     const thu = guideThumbnailUrl != null ? String(guideThumbnailUrl).trim() : ''
     if (thu) out.guide_thumbnail_url = thu
   }
+  if (creatorFanOnly === true) out.creator_fan_only = true
   return out
 }
 

@@ -19,7 +19,7 @@ export function filterLoungeFeedTimelinePosts(rows) {
 }
 
 const COMMUNITY_FEED_SELECT =
-  'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url,link_preview,market_embeds,thread_root_id,thread_part_index,thread_part_count'
+  'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url,link_preview,market_embeds,thread_root_id,thread_part_index,thread_part_count,creator_fan_only'
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
@@ -43,22 +43,13 @@ export async function fetchLoungeFollowingAuthorIds(supabaseClient, viewerUserId
  * @param {string[] | null | undefined} [excludedCategorySlugs] - unchecked pills; hide post only when every pill is excluded
  */
 export function loungeFeedPinnedQuery(supabaseClient, scope, followingAuthorIds, excludedCategorySlugs) {
-  let q = supabaseClient
-    .from('community_feed_posts')
-    .select(COMMUNITY_FEED_SELECT)
-    .eq('pinned', true)
-    .is('thread_root_id', null)
-    .order('created_at', { ascending: false })
-    .limit(2)
-  if (scope === LOUNGE_FEED_SCOPE_FOLLOWING && followingAuthorIds) {
-    q = q.in('user_id', followingAuthorIds)
-  }
-  if (excludedCategorySlugs?.length) {
-    const arr = `{${excludedCategorySlugs.join(',')}}`
-    // Show when untagged, or at least one pill is not in the excluded set (cd = contained in).
-    q = q.or(`category_pills.is.null,category_pills.eq.{},not.category_pills.cd.${arr}`)
-  }
-  return q
+  const following =
+    scope === LOUNGE_FEED_SCOPE_FOLLOWING && followingAuthorIds?.length ? followingAuthorIds : null
+  const excluded = excludedCategorySlugs?.length ? excludedCategorySlugs : null
+  return supabaseClient.rpc('lounge_feed_pinned_for_viewer', {
+    p_following_user_ids: following,
+    p_excluded_category_slugs: excluded,
+  })
 }
 
 /**

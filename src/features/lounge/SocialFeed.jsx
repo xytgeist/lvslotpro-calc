@@ -197,10 +197,21 @@ import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
 import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
-import { COMMUNITY_FEED_SELECT } from '../../utils/loungeFeedScope.js'
 import { normalizeMarketEmbeds, LOUNGE_MARKET_EMBED_MAX, extractCashtagsFromCaption } from '../../utils/loungeMarketCaptionParse.js'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
+import LoungeComposerAudienceToggle from './LoungeComposerAudienceToggle.jsx'
+import CreatorFanSubscribeModal from '../creatorFanSubs/CreatorFanSubscribeModal.jsx'
+import {
+  fetchCreatorFanOffer,
+  fetchMyCreatorFanMonetization,
+} from '../creatorFanSubs/creatorFanSubsApi.js'
+import {
+  fetchLoungeCommunityFeedPostsForViewer,
+  readLoungeComposerAudience,
+  writeLoungeComposerAudience,
+  LOUNGE_COMPOSER_AUDIENCE_SUBS,
+} from '../../utils/loungeFanOnlyPost.js'
 import LoungePostCategoryPillPicker from './LoungePostCategoryPillPicker.jsx'
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableEmbed.jsx'
@@ -676,6 +687,13 @@ export default function SocialFeed({
     focusSymbol: null,
   })
   const [composerCategoryPills, setComposerCategoryPills] = useState(() => readLoungeComposerLastCategoryPills())
+  const [composerPostAudience, setComposerPostAudience] = useState(() => readLoungeComposerAudience())
+  const [composerFanMonetizationLive, setComposerFanMonetizationLive] = useState(false)
+  const [viewerFanEntitlements, setViewerFanEntitlements] = useState(null)
+  const [feedFanSubscribeOffer, setFeedFanSubscribeOffer] = useState(null)
+  const [feedFanSubscribeOpen, setFeedFanSubscribeOpen] = useState(false)
+  const [feedFanSubscribeBusy, setFeedFanSubscribeBusy] = useState(false)
+  const [feedFanSubscribed, setFeedFanSubscribed] = useState(false)
   /** Server draft id when composer content was loaded from or last saved to `lounge_post_drafts`. */
   const [loungeComposerActiveDraftId, setLoungeComposerActiveDraftId] = useState(null)
   const [loungeDraftCount, setLoungeDraftCount] = useState(0)
@@ -689,6 +707,20 @@ export default function SocialFeed({
   useEffect(() => {
     writeLoungeComposerLastCategoryPills(composerCategoryPills)
   }, [composerCategoryPills])
+
+  useEffect(() => {
+    writeLoungeComposerAudience(composerPostAudience)
+  }, [composerPostAudience])
+
+  useEffect(() => {
+    if (!feedFanSubscribeOpen || !feedFanSubscribeOffer?.creator_user_id) {
+      setFeedFanSubscribed(false)
+      return
+    }
+    const key = `creator-fan:${String(feedFanSubscribeOffer.creator_user_id).trim()}`
+    setFeedFanSubscribed(Boolean(viewerFanEntitlements?.[key]?.active))
+  }, [feedFanSubscribeOpen, feedFanSubscribeOffer, viewerFanEntitlements])
+
   const [postBusy, setPostBusy] = useState(false)
   const [postErr, setPostErr] = useState('')
   /** Bottom bar during background lounge post submission (`progress` 0–1, plus diagnostic copy). */
@@ -1153,6 +1185,81 @@ export default function SocialFeed({
 
   /** No composer, server-only counts, gated taps until session is known and user is signed in. */
   const loungeReadOnly = !composerAuthResolved || !composerUserId
+
+  const refreshViewerFanEntitlements = useCallback(async () => {
+    if (!composerUserId || !supabaseClient) {
+      setViewerFanEntitlements(null)
+      return
+    }
+    try {
+      const { data, error } = await supabaseClient.rpc('get_my_creator_fan_entitlements')
+      if (error) throw error
+      setViewerFanEntitlements(data && typeof data === 'object' ? data : {})
+    } catch {
+      setViewerFanEntitlements({})
+    }
+  }, [composerUserId, supabaseClient])
+
+  useEffect(() => {
+    void refreshViewerFanEntitlements()
+  }, [refreshViewerFanEntitlements])
+
+  useEffect(() => {
+    if (!composerUserId || !supabaseClient) {
+      setComposerFanMonetizationLive(false)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const row = await fetchMyCreatorFanMonetization(supabaseClient)
+        if (cancelled) return
+        setComposerFanMonetizationLive(
+          Boolean(row?.enabled && row?.connect_onboarding_complete),
+        )
+      } catch {
+        if (!cancelled) setComposerFanMonetizationLive(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [composerUserId, supabaseClient])
+
+  useEffect(() => {
+    const onBillingReturn = () => {
+      void refreshViewerFanEntitlements()
+    }
+    window.addEventListener('edge:creator-fan-billing-return', onBillingReturn)
+    return () => window.removeEventListener('edge:creator-fan-billing-return', onBillingReturn)
+  }, [refreshViewerFanEntitlements])
+
+  const openFeedFanSubscribe = useCallback(
+    async (creatorUserId) => {
+      const id = String(creatorUserId || '').trim()
+      if (!id) return
+      if (loungeReadOnly) {
+        onRequireAuth?.()
+        return
+      }
+      setFeedFanSubscribeBusy(true)
+      setFeedFanSubscribed(false)
+      try {
+        const offer = await fetchCreatorFanOffer(supabaseClient, id)
+        if (!offer) {
+          setPostErr('This creator is not accepting fan subscriptions right now.')
+          return
+        }
+        setFeedFanSubscribeOffer(offer)
+        setFeedFanSubscribeOpen(true)
+      } catch (e) {
+        setPostErr(e?.message || 'Could not open subscribe.')
+      } finally {
+        setFeedFanSubscribeBusy(false)
+      }
+    },
+    [loungeReadOnly, onRequireAuth, supabaseClient],
+  )
 
   const loungeFeedVideoAutoplayEnabled = useSyncExternalStore(
     subscribeLoungeFeedVideoAutoplayEnabled,
@@ -6854,14 +6961,14 @@ export default function SocialFeed({
       if (!post?.id || !commentId) return
       let parentPost = post
       if (!parentPost.user_id && !parentPost.caption) {
-        const { data } = await supabaseClient
-          .from('community_feed_posts')
-          .select(COMMUNITY_FEED_SELECT)
-          .eq('id', post.id)
-          .is('hidden_at', null)
-        if (data?.length) {
-          const hydrated = await hydrateCommunityPosts(data)
-          parentPost = hydrated?.[0] || parentPost
+        try {
+          const rows = await fetchLoungeCommunityFeedPostsForViewer(supabaseClient, [post.id])
+          if (rows?.length) {
+            const hydrated = await hydrateCommunityPosts(rows)
+            parentPost = hydrated?.[0] || parentPost
+          }
+        } catch {
+          /* keep stub post */
         }
       }
 
@@ -6909,14 +7016,16 @@ export default function SocialFeed({
       if (!repostedComment?.post_id || !repostedComment?.id) return
       let parentPost = communityPosts.find((p) => String(p.id) === String(repostedComment.post_id))
       if (!parentPost) {
-        const { data } = await supabaseClient
-          .from('community_feed_posts')
-          .select(COMMUNITY_FEED_SELECT)
-          .eq('id', repostedComment.post_id)
-          .is('hidden_at', null)
-        if (data?.length) {
-          const hydrated = await hydrateCommunityPosts(data)
-          parentPost = hydrated?.[0]
+        try {
+          const rows = await fetchLoungeCommunityFeedPostsForViewer(supabaseClient, [
+            repostedComment.post_id,
+          ])
+          if (rows?.length) {
+            const hydrated = await hydrateCommunityPosts(rows)
+            parentPost = hydrated?.[0]
+          }
+        } catch {
+          /* fall through */
         }
         if (!parentPost) {
           parentPost = { id: repostedComment.post_id }
@@ -11951,6 +12060,8 @@ export default function SocialFeed({
         _capturedPrepHandoff: composerVideoPrepHandoffRef.current ?? null,
         categoryPills: composerCategoryPills,
         marketSymbols: composerMarketSymbols,
+        creatorFanOnly:
+          composerPostAudience === LOUNGE_COMPOSER_AUDIENCE_SUBS && composerFanMonetizationLive,
       }
     } finally {
       setPostBusy(false)
@@ -11980,8 +12091,10 @@ export default function SocialFeed({
     loungeComposerVideoPostBlocked,
     clearComposerForPostAttempt,
     composerCategoryPills,
-    composerImageItems,
     composerMarketSymbols,
+    composerPostAudience,
+    composerFanMonetizationLive,
+    composerImageItems,
     composerMediaUrl,
     composerUserProfile?.avatar_url,
     composerUserProfile?.role,
@@ -13182,6 +13295,9 @@ export default function SocialFeed({
       feedVideoAutoplayEnabled: loungeFeedVideoAutoplayEnabled,
       onFeedVideoAutoplayChange: onLoungeFeedVideoAutoplayChange,
       onOpenGuideCard: openLoungeGuideCard,
+      fanEntitlements: viewerFanEntitlements,
+      onSubscribeToCreatorFan: loungeReadOnly ? undefined : openFeedFanSubscribe,
+      fanSubscribeBusy: feedFanSubscribeBusy,
     }),
     [
       loungeReadOnly,
@@ -13243,6 +13359,9 @@ export default function SocialFeed({
       loungeFeedVideoAutoplayEnabled,
       onLoungeFeedVideoAutoplayChange,
       openLoungeGuideCard,
+      viewerFanEntitlements,
+      openFeedFanSubscribe,
+      feedFanSubscribeBusy,
     ]
   )
 
@@ -13917,6 +14036,13 @@ export default function SocialFeed({
                 </svg>
               </button>
               <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+                {composerFanMonetizationLive && !loungeReadOnly ? (
+                  <LoungeComposerAudienceToggle
+                    value={composerPostAudience}
+                    onChange={setComposerPostAudience}
+                    disabled={postBusy || loungeComposerVideoPostBlocked}
+                  />
+                ) : null}
                 <div className="inline-flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
@@ -14221,6 +14347,9 @@ export default function SocialFeed({
                   onFeedVideoAutoplayChange={onLoungeFeedVideoAutoplayChange}
                   onOpenGuideCard={openLoungeGuideCard}
                   onOpenMarketChart={openMarketChartModal}
+                  fanEntitlements={viewerFanEntitlements}
+                  onSubscribeToCreatorFan={loungeReadOnly ? undefined : openFeedFanSubscribe}
+                  fanSubscribeBusy={feedFanSubscribeBusy}
                 />
               </article>
             ))}
@@ -17249,6 +17378,14 @@ export default function SocialFeed({
           </div>
         </div>
       ) : null}
+      <CreatorFanSubscribeModal
+        open={feedFanSubscribeOpen}
+        onClose={() => setFeedFanSubscribeOpen(false)}
+        supabaseClient={supabaseClient}
+        offer={feedFanSubscribeOffer}
+        alreadySubscribed={feedFanSubscribed}
+        postAlertsEnabled={false}
+      />
       </LoungeMarketFeedProvider>
       </LoungeStreamLightboxProvider>
     </div>

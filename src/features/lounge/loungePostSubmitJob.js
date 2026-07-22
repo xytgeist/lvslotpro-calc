@@ -765,10 +765,14 @@ export async function executeLoungeCommunityPostSubmission({
     threadCaptions: snapshotThreadCaptions,
     threadParts: snapshotThreadParts,
     marketSymbols,
+    creatorFanOnly: snapshotCreatorFanOnly,
   } = snapshot
   const quoteParentId = quoteRepostOfPostId != null ? String(quoteRepostOfPostId).trim() : ''
   const quoteCommentParentId =
     quoteRepostOfCommentId != null ? String(quoteRepostOfCommentId).trim() : ''
+  const creatorFanOnly =
+    snapshotCreatorFanOnly === true && !quoteParentId && !quoteCommentParentId
+  const fanOnlyInsert = creatorFanOnly ? { creatorFanOnly: true } : {}
   const threadParts = Array.isArray(snapshotThreadParts) && snapshotThreadParts.length > 0
     ? snapshotThreadParts.map((part) => ({
         body: normalizeFeedCaption(part?.body),
@@ -1138,6 +1142,7 @@ export async function executeLoungeCommunityPostSubmission({
         streamVideoWidth: streamVideoWidthOut || undefined,
         streamVideoHeight: streamVideoHeightOut || undefined,
         categoryPills,
+        ...fanOnlyInsert,
       })
     } else if (uploadedUrls.length > 0) {
       insertPayload = communityFeedPostInsertPayload({
@@ -1146,6 +1151,7 @@ export async function executeLoungeCommunityPostSubmission({
         imageUrls: uploadedUrls,
         gifUrl: gifOnlyUrl || undefined,
         categoryPills,
+        ...fanOnlyInsert,
       })
     } else if (gifOnlyUrl) {
       insertPayload = communityFeedPostInsertPayload({
@@ -1153,12 +1159,14 @@ export async function executeLoungeCommunityPostSubmission({
         pinned: isStaffPoster && wantsPin ? true : undefined,
         mediaUrl: gifOnlyUrl,
         categoryPills,
+        ...fanOnlyInsert,
       })
     } else {
       insertPayload = communityFeedPostInsertPayload({
         caption,
         pinned: isStaffPoster && wantsPin ? true : undefined,
         categoryPills,
+        ...fanOnlyInsert,
       })
     }
 

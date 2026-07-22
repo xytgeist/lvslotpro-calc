@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { feedPostDisplayCaption, isQuoteRepostPost, quoteRepostOriginalUnavailable } from '../../utils/communityFeedPost'
+import { isLoungeFanOnlyPostLocked } from '../../utils/loungeFanOnlyPost.js'
 import { displayPostCategoryPills } from '../../utils/loungePostCategoryPills.js'
 import LoungeExpandableRichCaption from './LoungeExpandableRichCaption.jsx'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
@@ -13,6 +14,7 @@ import LoungePostOriginalUnavailableEmbed from './LoungePostOriginalUnavailableE
 import LoungePostCategoryPillRow from './LoungePostCategoryPillRow.jsx'
 import LoungeQuoteRepostEmbedAuthorMeta from './LoungeQuoteRepostEmbedAuthorMeta.jsx'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
+import LoungeFanOnlySubscribeCta from './LoungeFanOnlySubscribeCta.jsx'
 import { loungePostIsThreadRoot, loungePostThreadPartCount } from '../../utils/loungePostThreadApi.js'
 import {
   LOUNGE_FEED_META_HANDLE_TIME_CLASS,
@@ -128,8 +130,22 @@ export default function LoungePostArticle({
   onLinkPreviewOpen: onLinkPreviewOpenProp,
   /** Tap a market mini chart → full-screen modal. */
   onOpenMarketChart,
+  /** Active fan sub grants for viewer (`get_my_creator_fan_entitlements` object). */
+  fanEntitlements = null,
+  /** Open subscribe flow for a creator (feed locked posts). */
+  onSubscribeToCreatorFan,
+  fanSubscribeBusy = false,
 }) {
   const ro = loungeReadOnly
+
+  const fanLockCtx = useMemo(
+    () => ({
+      viewerUserId,
+      viewerIsStaff: loungeViewerIsStaff,
+      fanEntitlements,
+    }),
+    [viewerUserId, loungeViewerIsStaff, fanEntitlements],
+  )
 
   const captionDisplayText = (raw, linkPreview) => bodyTextWithLinkPreview(raw, linkPreview)
   const postCaptionDisplayText = (row) =>
@@ -158,6 +174,19 @@ export default function LoungePostArticle({
   // The "display" entity (what we show as the card's main content / author)
   const displayPost = isPlainPostRepost ? post.reposted_post : post
   const rc = isCommentRepost ? post.reposted_comment : null
+
+  const renderFanSubscribeCta = (entity) => {
+    if (!entity || !isLoungeFanOnlyPostLocked(entity, fanLockCtx)) return null
+    if (typeof onSubscribeToCreatorFan !== 'function') return null
+    const handle = entity.author_profile?.handle || handleFor(entity)?.replace(/^@/, '')
+    return (
+      <LoungeFanOnlySubscribeCta
+        creatorHandle={handle}
+        busy={fanSubscribeBusy}
+        onSubscribe={() => onSubscribeToCreatorFan(entity.user_id)}
+      />
+    )
+  }
   // ── Row menu - always based on the repost row (`post`), not the display entity ──
   const menuIsOwn = Boolean(viewerUserId && post?.user_id === viewerUserId)
   const menuShowEdit = Boolean(
@@ -518,8 +547,14 @@ export default function LoungePostArticle({
               <div
                 data-lounge-post-caption
                 role="presentation"
-                onClick={captionOpensDetail ? onCaptionAreaClick : undefined}
-                className={captionBlockClass}
+                onClick={
+                  captionOpensDetail && !isLoungeFanOnlyPostLocked(displayPost, fanLockCtx)
+                    ? onCaptionAreaClick
+                    : undefined
+                }
+                className={`${captionBlockClass}${
+                  isLoungeFanOnlyPostLocked(displayPost, fanLockCtx) ? ' opacity-90' : ''
+                }`}
               >
                 <LoungeExpandableRichCaption
                   text={postCaptionDisplayText(displayPost)}
@@ -527,6 +562,9 @@ export default function LoungePostArticle({
                 />
               </div>
             ) : null}
+            {renderFanSubscribeCta(displayPost)}
+            {!isLoungeFanOnlyPostLocked(displayPost, fanLockCtx) ? (
+              <>
             <LoungeLinkPreviewBlock preview={displayPost.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
             {renderMarketStrip(displayPost)}
             <LoungePostFeedImagesAndGif
@@ -540,6 +578,8 @@ export default function LoungePostArticle({
               }
               {...mediaLightboxProps}
             />
+              </>
+            ) : null}
           </>
         ) : isQuoteRepost ? (
           // Quote repost: reposter's caption + embedded original (or unavailable placeholder)
@@ -680,19 +720,28 @@ export default function LoungePostArticle({
               <div
                 data-lounge-post-caption
                 role="presentation"
-                onClick={captionOpensDetail ? onCaptionAreaClick : undefined}
-                className={captionBlockClass}
+                onClick={
+                  captionOpensDetail && !isLoungeFanOnlyPostLocked(post, fanLockCtx)
+                    ? onCaptionAreaClick
+                    : undefined
+                }
+                className={`${captionBlockClass}${
+                  isLoungeFanOnlyPostLocked(post, fanLockCtx) ? ' opacity-90' : ''
+                }`}
               >
                 <LoungeExpandableRichCaption text={postCaptionDisplayText(post)} captionOpts={richCaptionOpts} />
               </div>
             ) : null}
-            {loungePostIsThreadRoot(post) ? (
+            {renderFanSubscribeCta(post)}
+            {loungePostIsThreadRoot(post) && !isLoungeFanOnlyPostLocked(post, fanLockCtx) ? (
               <div
                 className={`${showPostCaption(post) ? 'mt-1' : LOUNGE_FEED_CAPTION_TOP_CLASS} text-left text-[13px] font-semibold text-cyan-400/90`}
               >
                 Thread · {loungePostThreadPartCount(post)} parts
               </div>
             ) : null}
+            {!isLoungeFanOnlyPostLocked(post, fanLockCtx) ? (
+              <>
             <LoungeLinkPreviewBlock preview={post.link_preview} className="mt-2" onPreviewOpen={onLinkPreviewOpen} />
             {renderMarketStrip(post)}
             <LoungePostFeedImagesAndGif
@@ -705,6 +754,8 @@ export default function LoungePostArticle({
               }
               {...mediaLightboxProps}
             />
+              </>
+            ) : null}
           </>
         )}
 

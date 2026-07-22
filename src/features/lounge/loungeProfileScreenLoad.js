@@ -116,16 +116,15 @@ export async function fetchLoungeProfilePosts(
   }
 
   const from = Math.max(0, offset)
-  const to = from + safeLimit - 1
 
-  let { data: postRows, error: postsErr } = await profilePostsQuery(supabaseClient, uid).range(from, to)
-  if (postsErr && /profile_pinned_at/i.test(String(postsErr.message || ''))) {
-    ;({ data: postRows, error: postsErr } = await profilePostsQuery(
-      supabaseClient,
-      uid,
-      PROFILE_POST_SELECT_LEGACY,
-    ).range(from, to))
-  }
+  const { data: postRows, error: postsErr } = await supabaseClient.rpc(
+    'lounge_profile_feed_posts_for_viewer',
+    {
+      p_profile_user_id: uid,
+      p_limit: safeLimit,
+      p_offset: from,
+    },
+  )
 
   const hydrated =
     typeof hydratePosts === 'function' ? await hydratePosts(postRows || []) : postRows || []

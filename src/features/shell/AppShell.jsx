@@ -12,6 +12,7 @@ import {
   loungeFeedPageRpcQuery,
   loungeFeedPinnedQuery,
 } from '../../utils/loungeFeedScope'
+import { fetchLoungeCommunityFeedPostsForViewer } from '../../utils/loungeFanOnlyPost.js'
 import { LOUNGE_FEED_SORT, readLoungeFeedSort } from '../../utils/loungeFeedSortPref'
 import { readLoungeFeedCategoryFilter } from '../../utils/loungeFeedCategoryFilterPref.js'
 import { triggerTapHapticLight } from '../../utils/tapHaptic.js'
@@ -476,7 +477,7 @@ export default function AppShell({
       }
 
       const originalPostSelect =
-        'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url,link_preview'
+        'id,caption,game_title,game_slug,category_pills,user_id,created_at,edited_at,pinned,like_count,comment_count,repost_count,repost_of_post_id,repost_of_comment_id,is_plain_repost,repost_target_unavailable,media_url,gif_url,image_urls,stream_video_uid,stream_poster_url,stream_video_width,stream_video_height,is_ap_guide_post,guide_thumbnail_url,link_preview,creator_fan_only'
 
       let repostById = {}
       if (depth === 0) {
@@ -489,16 +490,17 @@ export default function AppShell({
           ),
         ]
         if (repostTargetIds.length > 0) {
-          const { data: origRows, error: origErr } = await supabaseClient
-            .from('community_feed_posts')
-            .select(originalPostSelect)
-            .in('id', repostTargetIds)
-            .is('hidden_at', null)
-          if (origErr) {
-            console.warn('hydrateCommunityPosts originals:', origErr.message)
-          } else if (origRows?.length) {
-            const nested = await hydrateCommunityPosts(origRows, depth + 1)
-            repostById = Object.fromEntries(nested.map((p) => [uidKey(p.id), p]))
+          try {
+            const origRows = await fetchLoungeCommunityFeedPostsForViewer(
+              supabaseClient,
+              repostTargetIds,
+            )
+            if (origRows?.length) {
+              const nested = await hydrateCommunityPosts(origRows, depth + 1)
+              repostById = Object.fromEntries(nested.map((p) => [uidKey(p.id), p]))
+            }
+          } catch (origErr) {
+            console.warn('hydrateCommunityPosts originals:', origErr?.message || origErr)
           }
         }
       }
