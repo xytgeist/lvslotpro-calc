@@ -17,6 +17,24 @@ export type FanConnectReturnUrls = {
   return_url: string
 }
 
+/** Destination charges for fan subs; bank payouts can lag after charges are enabled. */
+export function stripeConnectReadyForFanSubs(account: Stripe.Account): boolean {
+  if (!account.details_submitted) return false
+  if (account.charges_enabled) return true
+  if (account.capabilities?.transfers === 'active') return true
+  return Boolean(account.payouts_enabled)
+}
+
+/** Stripe only allows account_update after full Express onboarding; do not tie this to fan-sub "ready". */
+export function stripeExpressAccountLinkType(
+  account: Stripe.Account,
+): 'account_onboarding' | 'account_update' {
+  const stripeFullyOnboarded = Boolean(
+    account.details_submitted && account.charges_enabled && account.payouts_enabled,
+  )
+  return stripeFullyOnboarded ? 'account_update' : 'account_onboarding'
+}
+
 export async function ensureCreatorMonetizationRow(admin: SupabaseClient, userId: string) {
   const { data: existing } = await admin
     .from('creator_monetization_profiles')
@@ -91,9 +109,7 @@ export async function runCreatorFanConnectAction(
 
   if (action === 'refresh') {
     const account = await stripe.accounts.retrieve(accountId)
-    const complete = Boolean(
-      account.details_submitted && account.charges_enabled && account.payouts_enabled,
-    )
+    const complete = stripeConnectReadyForFanSubs(account)
     const { error: upErr } = await admin
       .from('creator_monetization_profiles')
       .update({
@@ -109,14 +125,12 @@ export async function runCreatorFanConnectAction(
   }
 
   const account = await stripe.accounts.retrieve(accountId)
-  const onboarded = Boolean(
-    account.details_submitted && account.charges_enabled && account.payouts_enabled,
-  )
+  const linkType = stripeExpressAccountLinkType(account)
   const link = await stripe.accountLinks.create({
     account: accountId,
     refresh_url: returnUrls.refresh_url,
     return_url: returnUrls.return_url,
-    type: onboarded ? 'account_update' : 'account_onboarding',
+    type: linkType,
   })
 
   return { url: link.url, account_id: accountId }

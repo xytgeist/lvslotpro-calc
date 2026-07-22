@@ -121,6 +121,23 @@ function BotFanSubscriptionsAdminBlock({ bot, supabaseClient, busy, setBusy, set
     }
   }
 
+  const onRefreshConnect = async () => {
+    if (!bot?.user_id || busy) return
+    setBusy('bot-fan-connect-refresh')
+    try {
+      const data = await staffBotFanConnectRefresh(supabaseClient, bot.user_id)
+      setToast?.(
+        data?.connect_onboarding_complete
+          ? 'Stripe Connect ready for fan subs.'
+          : 'Connect refreshed … finish any open items in Stripe if Turn on stays blocked.',
+      )
+    } catch (e) {
+      setToast?.(e instanceof Error ? e.message : 'Connect refresh failed.')
+    } finally {
+      setBusy('')
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-orange-700/35 bg-zinc-900/90 p-4">
       <div className="text-white font-bold text-sm">Fan subscriptions</div>
@@ -136,6 +153,14 @@ function BotFanSubscriptionsAdminBlock({ bot, supabaseClient, busy, setBusy, set
         className="mt-3 min-h-9 rounded-lg border border-orange-600/60 bg-orange-950/40 px-3 text-[12px] font-semibold text-orange-100 hover:bg-orange-950/70 disabled:opacity-40"
       >
         {busy === 'bot-fan-connect' ? 'Opening Stripe…' : 'Connect payouts (Stripe)'}
+      </button>
+      <button
+        type="button"
+        disabled={Boolean(busy)}
+        onClick={() => void onRefreshConnect()}
+        className="mt-2 min-h-9 rounded-lg border border-zinc-700/80 bg-zinc-950/60 px-3 text-[12px] font-semibold text-zinc-300 hover:bg-zinc-800/80 disabled:opacity-40"
+      >
+        {busy === 'bot-fan-connect-refresh' ? 'Refreshing…' : 'Refresh Connect status'}
       </button>
     </div>
   )

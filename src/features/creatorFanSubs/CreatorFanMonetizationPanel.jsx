@@ -49,12 +49,16 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
   const [offerPrivatePosts, setOfferPrivatePosts] = useState('')
   const [offerFanChat, setOfferFanChat] = useState('')
   const [offerComplete, setOfferComplete] = useState(false)
+  const [stripeConnectAccountId, setStripeConnectAccountId] = useState('')
 
   const applyRow = useCallback((row) => {
     if (!row) return
     if (row.fan_tier_key) setTierKey(String(row.fan_tier_key))
     setEnabled(Boolean(row.enabled))
     setConnectComplete(Boolean(row.connect_onboarding_complete))
+    setStripeConnectAccountId(
+      typeof row.stripe_connect_account_id === 'string' ? row.stripe_connect_account_id : '',
+    )
     setHandle(typeof row.handle === 'string' ? row.handle : '')
     setOfferHeadline(typeof row.offer_headline === 'string' ? row.offer_headline : '')
     setOfferIntro(typeof row.offer_intro === 'string' ? row.offer_intro : '')
@@ -108,6 +112,23 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
     }
   }, [supabaseClient, reload])
 
+  useEffect(() => {
+    if (!supabaseClient || loading || busy) return
+    if (connectComplete || !stripeConnectAccountId.trim()) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await refreshCreatorFanConnectStatus(supabaseClient)
+        if (!cancelled) await reload()
+      } catch {
+        // ignore — user can tap Refresh status
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabaseClient, loading, busy, connectComplete, stripeConnectAccountId, reload])
+
   const draftOfferComplete = useMemo(
     () =>
       isCreatorFanOfferComplete({
@@ -127,6 +148,22 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
       await startCreatorFanConnectOnboarding(supabaseClient)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Connect failed.')
+      setBusy(false)
+    }
+  }
+
+  const onRefreshConnect = async () => {
+    if (!supabaseClient || busy) return
+    setBusy(true)
+    setError('')
+    setStatusMessage('')
+    try {
+      await refreshCreatorFanConnectStatus(supabaseClient)
+      await reload()
+      setStatusMessage('Connect status refreshed.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Connect refresh failed.')
+    } finally {
       setBusy(false)
     }
   }
@@ -184,6 +221,13 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
   const missingHandle = !handle?.trim()
   const canGoLive = connectComplete && (offerComplete || draftOfferComplete)
   const showOfferGap = enabled && !offerComplete
+  const goLiveBlockReason = !connectComplete
+    ? stripeConnectAccountId.trim()
+      ? 'Stripe is still verifying Connect … tap Refresh status, or finish any steps in Stripe.'
+      : 'Connect payouts (Stripe) before going live.'
+    : !(offerComplete || draftOfferComplete)
+      ? 'Save your offer (overview + at least one detail section, 20+ characters each).'
+      : ''
 
   const body = loading ? (
     <p className="text-[13px] text-zinc-500">Loading…</p>
@@ -251,12 +295,26 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
             >
               {connectComplete ? 'Update Stripe Connect' : 'Connect payouts (Stripe)'}
             </button>
+            {stripeConnectAccountId.trim() ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onRefreshConnect()}
+                className="min-h-10 rounded-lg border border-zinc-700/90 bg-zinc-900/80 px-3 text-[13px] font-semibold text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                Refresh status
+              </button>
+            ) : null}
             {connectComplete ? (
               <span className="text-[12px] font-semibold text-emerald-300/90">Payouts ready</span>
             ) : (
               <span className="text-[12px] text-zinc-500">Required before going live</span>
             )}
           </div>
+
+          {goLiveBlockReason && !enabled ? (
+            <p className="text-[12px] leading-snug text-zinc-500">{goLiveBlockReason}</p>
+          ) : null}
 
           <div className="flex flex-wrap gap-2">
             <button
