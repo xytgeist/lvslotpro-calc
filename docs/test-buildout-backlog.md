@@ -851,6 +851,7 @@ Creators need to know when someone subscribes. **Shipped v1 (2026-07-21):** **`c
 
 ## Update log
 
+- 2026-07-23: **Hotfix feed_comments RLS (prod + test):** migration **`20260723103000`** — `lounge_viewer_can_read_feed_comment` **`row_security off`** + author read in SELECT policy; fixes comment INSERT/RETURNING (upload failed) after **`20260722240000`**.
 - 2026-07-22: **Fan-only lounge UX → prod:** **`main`** @ **`970fc185`** (merge from **`test`**); production SQL **`20260722230000`** … **`20260722260000`** applied on **`jtjgtucumuoswnbauxry`**; Vercel **`edgetilt.com`**. Ryan sign-off on test repost/quote + locked embed **2026-07-22**.
 - 2026-07-22: **Fan-only repost/quote allowed (test):** migration **`20260722260000`** drops post repost block (comment-repost on fan-only parent still blocked); quote embed + plain repost show **`LoungeFanOnlyLockedPostInset`** for non-subs; standalone locked rows still block detail open. Apply SQL on test; frontend **`origin/test`** push.
 - 2026-07-22: **Fan-only lounge polish (test `d396714f`):** locked feed teaser + subs row tint; block post detail for non-subs; profile Replies filter + migration **`20260722240000`** (comment SELECT + repost block trigger); **`20260722230200`** re-applied on test; draft restore **`LoungeRichComposerField`** sync; no Edge redeploy. Frontend: **`origin/test`** push → Vercel **lvslotpro.com** sandbox.

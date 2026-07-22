@@ -11,6 +11,7 @@ language sql
 stable
 security definer
 set search_path = public
+set row_security = off
 as $$
   select coalesce(
     (
@@ -46,7 +47,10 @@ create policy feed_comments_select_visible on public.feed_comments
   for select to authenticated
   using (
     hidden_at is null
-    and public.lounge_viewer_can_read_feed_comment(id)
+    and (
+      user_id = (select auth.uid())
+      or public.lounge_viewer_can_read_feed_comment(id)
+    )
   );
 
 -- ---------------------------------------------------------------------------
