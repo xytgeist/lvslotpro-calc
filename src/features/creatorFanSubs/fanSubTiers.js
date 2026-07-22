@@ -6,6 +6,8 @@ export const CREATOR_FAN_TIER_KEYS = [
   'fan-tier-1999',
   'fan-tier-4999',
   'fan-tier-9999',
+  'fan-tier-14999',
+  'fan-tier-24999',
 ]
 
 /** @type {Record<string, { msrpCents: number, label: string }>} */
@@ -15,6 +17,8 @@ export const CREATOR_FAN_TIER_DISPLAY = {
   'fan-tier-1999': { msrpCents: 1999, label: '$19.99/mo' },
   'fan-tier-4999': { msrpCents: 4999, label: '$49.99/mo' },
   'fan-tier-9999': { msrpCents: 9999, label: '$99.99/mo' },
+  'fan-tier-14999': { msrpCents: 14999, label: '$149.99/mo' },
+  'fan-tier-24999': { msrpCents: 24999, label: '$249.99/mo' },
 }
 
 export function formatFanTierLabel(tierKey) {

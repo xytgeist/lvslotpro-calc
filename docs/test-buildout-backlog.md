@@ -841,6 +841,7 @@ Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **
 
 ## Update log
 
+- 2026-07-21: **Creator fan sub tiers $149 / $249:** migration **`20260721180000`** on test + prod; client + Edge tier catalog **`fan-tier-14999`**, **`fan-tier-24999`**; live Stripe **`STRIPE_PRICE_FAN_TIER_14999`**, **`STRIPE_PRICE_FAN_TIER_24999`** on prod.
 - 2026-07-21: **Creator fan subscribe modal — resume:** pending cancel-at-period-end shows **Resume subscription** (Edge **`creator-fan-resume-subscription`**, deploy to test before smoke); **`stripe-create-portal-session`** still used for cancel. **Creators I support** rows open creator profile (not inline cancel).
 - 2026-07-21: **Settings IA (test):** **Memberships** (Edge AP Slots + staff access) and **Subscriptions** (Creators I support + collapsed **Enable fan subscriptions**); Account slimmed to identity/legal. Own profile **Enable fan subscriptions** CTA → Settings **`subscriptions-fan`**; Stripe Connect return **`?settings=fan`** opens same.
 - 2026-07-21: **Creator fan subs Settings — Creators I support (test):** Account accordion lists active fan subs (`get_my_creator_fan_entitlements` + **`profiles`**), tier + renew/access-through copy, **Cancel subscription** → **`openCreatorFanBillingPortal(creator_user_id)`**; refetch on portal return. **`CreatorFanSupportedCreatorsPanel`** in **`LoungeDockSlidePanels`**.

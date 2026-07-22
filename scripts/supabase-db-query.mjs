@@ -9,6 +9,7 @@
  *   node scripts/supabase-db-query.mjs --target=test "select 1"
  *   node scripts/supabase-db-query.mjs --target=production -f supabase/foo.sql
  *   npm run db:query:test -- "select 1"
+ *   npm run db:query:production -- -f supabase/foo.sql
  */
 import { runSupabaseDbQuery } from "./lib/supabaseDbCli.mjs";
 

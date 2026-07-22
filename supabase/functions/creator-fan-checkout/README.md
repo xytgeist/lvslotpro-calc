@@ -15,7 +15,7 @@
 
 ## Stripe (test mode first)
 
-Create **five monthly Prices** on the **platform** account (USD), one per tier. Map to Edge secrets:
+Create **seven monthly Prices** on the **platform** account (USD), one per tier. Map to Edge secrets:
 
 | Tier key | MSRP | Edge secret |
 | --- | --- | --- |
@@ -24,6 +24,8 @@ Create **five monthly Prices** on the **platform** account (USD), one per tier. 
 | `fan-tier-1999` | $19.99/mo | `STRIPE_PRICE_FAN_TIER_1999` |
 | `fan-tier-4999` | $49.99/mo | `STRIPE_PRICE_FAN_TIER_4999` |
 | `fan-tier-9999` | $99.99/mo | `STRIPE_PRICE_FAN_TIER_9999` |
+| `fan-tier-14999` | $149.99/mo | `STRIPE_PRICE_FAN_TIER_14999` |
+| `fan-tier-24999` | $249.99/mo | `STRIPE_PRICE_FAN_TIER_24999` |
 
 Prices must be compatible with **Connect destination charges** (see Stripe Connect subs docs).
 

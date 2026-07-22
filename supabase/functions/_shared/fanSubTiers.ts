@@ -8,6 +8,8 @@ export const CREATOR_FAN_TIER_KEYS = [
   'fan-tier-1999',
   'fan-tier-4999',
   'fan-tier-9999',
+  'fan-tier-14999',
+  'fan-tier-24999',
 ] as const
 
 export type CreatorFanTierKey = (typeof CREATOR_FAN_TIER_KEYS)[number]
@@ -18,6 +20,8 @@ const MSRP_CENTS: Record<CreatorFanTierKey, number> = {
   'fan-tier-1999': 1999,
   'fan-tier-4999': 4999,
   'fan-tier-9999': 9999,
+  'fan-tier-14999': 14999,
+  'fan-tier-24999': 24999,
 }
 
 export function isCreatorFanTierKey(value: string): value is CreatorFanTierKey {
