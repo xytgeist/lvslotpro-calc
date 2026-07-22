@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import {
   LOUNGE_COMPOSER_AUDIENCE_ALL,
   LOUNGE_COMPOSER_AUDIENCE_SUBS,
@@ -17,7 +18,8 @@ export default function LoungeComposerAudienceSheet({ open, onClose, onSelect })
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-8 backdrop-blur-[2px] sm:items-center sm:pb-8"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-[2px]"
+      data-lounge-composer-audience-modal
       role="dialog"
       aria-modal="true"
       aria-labelledby="lounge-composer-audience-title"
@@ -28,8 +30,20 @@ export default function LoungeComposerAudienceSheet({ open, onClose, onSelect })
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-zinc-700/85 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-md">
-        <h2 id="lounge-composer-audience-title" className="text-[17px] font-bold text-white">
+      <div
+        className="relative z-10 w-full max-w-sm rounded-2xl border border-zinc-700/85 bg-zinc-950/95 p-4 pt-3.5 shadow-2xl backdrop-blur-md"
+        data-lounge-composer-audience-panel
+      >
+        <button
+          type="button"
+          data-lounge-composer-audience-close
+          className="absolute right-1.5 top-1.5 grid h-9 w-9 place-items-center rounded-lg text-zinc-400 touch-manipulation hover:bg-zinc-800 hover:text-zinc-100 [-webkit-tap-highlight-color:transparent]"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </button>
+        <h2 id="lounge-composer-audience-title" className="pr-9 text-[17px] font-bold text-white">
           Who should see this?
         </h2>
         <p className="mt-1.5 text-[14px] leading-snug text-zinc-400">
@@ -46,20 +60,14 @@ export default function LoungeComposerAudienceSheet({ open, onClose, onSelect })
           </button>
           <button
             type="button"
-            className="min-h-12 w-full rounded-xl border border-fuchsia-700/60 bg-fuchsia-950/40 px-4 text-left touch-manipulation hover:bg-fuchsia-950/60"
+            data-lounge-composer-audience-subs
+            className="min-h-12 w-full rounded-xl border border-cyan-500/40 bg-cyan-950/45 px-4 text-left touch-manipulation hover:bg-cyan-950/65 hover:border-cyan-400/55"
             onClick={() => onSelect(LOUNGE_COMPOSER_AUDIENCE_SUBS)}
           >
-            <span className="block text-[15px] font-semibold text-fuchsia-100">Subscribers only</span>
-            <span className="mt-0.5 block text-[13px] text-fuchsia-200/70">
+            <span className="block text-[15px] font-semibold text-cyan-50">Subscribers only</span>
+            <span className="mt-0.5 block text-[13px] text-cyan-200/75">
               Fans see everything; others see a teaser
             </span>
-          </button>
-          <button
-            type="button"
-            className="min-h-11 w-full rounded-xl px-4 text-[15px] font-semibold text-zinc-400 hover:text-zinc-200 touch-manipulation"
-            onClick={onClose}
-          >
-            Cancel
           </button>
         </div>
       </div>
