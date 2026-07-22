@@ -103,6 +103,7 @@ export default function CreatorAffiliatePortal({
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search || '')
+    if (params.get('tab') !== 'creator') return
     const connect = (params.get('connect') || '').trim()
     if (connect !== 'return' && connect !== 'refresh') return
     void (async () => {

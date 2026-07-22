@@ -7255,11 +7255,11 @@ export default function SocialFeed({
   )
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !composerUserId || !composerAuthResolved) return
     const params = new URLSearchParams(window.location.search)
     if (params.get('settings') !== 'fan') return
     onLoungeOpenSettingsSection('subscriptions-fan')
-  }, [onLoungeOpenSettingsSection])
+  }, [composerUserId, composerAuthResolved, onLoungeOpenSettingsSection])
 
   const onLoungeSettingsFocusSectionHandled = useCallback(() => {
     setLoungeSettingsFocusSection(null)

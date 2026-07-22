@@ -104,7 +104,8 @@ Long posts may still truncate with `+N more games today.` at the **2000-char** c
 | **Post all examples** | One feed post per alert type (**17** total, incl. Coffee & Covers thread part); captions match live format |
 | **Min +EV %** | Settings field **0.5–15** → **`lounge_bot_odds_config.min_edge_pct`** |
 | **Alert audience** | Per alert type: **All** (public feed) or **Subs** (subscriber-only post). Matrix in Settings → **`lounge_bot_odds_config.alert_audience`**. Code defaults: Coffee & Covers + Value Radar **All**; most other kinds **Subs**. **Ryan prod (Jul 2026):** all types set **All** in portal. |
-| **Sign in as bot** | Admin-only (**`lounge-bot-admin`** `staff_sign_in_as_bot`): replaces your browser session with the bot's auth user, reloads Lounge, opens Settings → **Fan subscriptions** so you can run Stripe Connect + tier setup like a normal creator. Works for Scott Share and every bot on the portal. Sign back in as yourself when done. |
+| **Sign in as bot** | Admin-only (**`lounge-bot-admin`** `staff_sign_in_as_bot`): swaps browser session to the bot and opens Lounge Settings → **Fan subscriptions** (offer copy, go live). **Do not use for Stripe Connect** … use **Connect payouts (Stripe)** below instead (admin session, return to Bot Portal). |
+| **Connect payouts (Stripe)** | Admin-only **`staff_bot_fan_connect`**: Stripe Express onboarding for the bot without leaving your admin login; return URL **`/?tab=bots&bot={slug}&fan_connect=return`**. Then **Sign in as bot** only if you need the in-app offer editor / **Turn on fan subscriptions**. |
 
 ---
 

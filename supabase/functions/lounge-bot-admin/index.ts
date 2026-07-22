@@ -3,9 +3,13 @@
  *
  * POST { "action": "create_bot", ...fields }
  * POST { "action": "staff_sign_in_as_bot", "bot_user_id": "uuid" } → OTP for client verifyOtp (admin JWT only)
+ * POST { "action": "staff_bot_fan_connect", "bot_user_id", "subaction": "onboard"|"refresh" } → Stripe Connect (admin stays signed in; return URL → Bot Portal)
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
+import Stripe from 'npm:stripe@17.7.0'
 import { adminOpsCorsHeaders, adminOpsJson, requireAdminUser } from '../_shared/adminAuth.ts'
+import { requireStripeSecretKey } from '../_shared/billingEnv.ts'
+import { appOriginFromRequest, runCreatorFanConnectAction } from '../_shared/creatorFanConnectOps.ts'
 import { defaultNewsSourcesForProfile, newsProfileFromAccount } from '../_shared/loungeBotNewsProfile.ts'
 
 type CreateBotBody = {
@@ -27,6 +31,12 @@ type CreateBotBody = {
 type StaffSignInAsBotBody = {
   action: 'staff_sign_in_as_bot'
   bot_user_id: string
+}
+
+type StaffBotFanConnectBody = {
+  action: 'staff_bot_fan_connect'
+  bot_user_id: string
+  subaction?: 'onboard' | 'refresh'
 }
 
 async function authorize(req: Request): Promise<{ admin: SupabaseClient; userId: string }> {
@@ -195,8 +205,63 @@ Deno.serve(async (req) => {
       })
     }
 
+    if (body.action === 'staff_bot_fan_connect') {
+      const botUserId = String(body.bot_user_id || '').trim()
+      if (!botUserId) return adminOpsJson(400, { error: 'bot_user_id required.' })
+
+      const subaction = String(body.subaction || 'onboard').trim().toLowerCase() === 'refresh'
+        ? 'refresh'
+        : 'onboard'
+
+      const { data: botRow, error: botErr } = await admin
+        .from('lounge_bot_accounts')
+        .select('user_id, slug')
+        .eq('user_id', botUserId)
+        .maybeSingle()
+      if (botErr) return adminOpsJson(500, { error: botErr.message })
+      if (!botRow?.user_id || !botRow.slug) {
+        return adminOpsJson(404, { error: 'Not a Lounge bot account.' })
+      }
+
+      const { data: profile, error: profErr } = await admin
+        .from('profiles')
+        .select('handle, display_name')
+        .eq('user_id', botUserId)
+        .maybeSingle()
+      if (profErr) return adminOpsJson(500, { error: profErr.message })
+      if (!profile?.handle?.trim()) {
+        return adminOpsJson(400, { error: 'Bot needs a profile handle before fan subscriptions.' })
+      }
+
+      const { data: authUser, error: authUserErr } = await admin.auth.admin.getUserById(botUserId)
+      if (authUserErr) return adminOpsJson(500, { error: authUserErr.message })
+
+      const origin = appOriginFromRequest(req)
+      const slugEnc = encodeURIComponent(String(botRow.slug))
+      const returnUrls = {
+        refresh_url: `${origin}/?tab=bots&bot=${slugEnc}&fan_connect=refresh`,
+        return_url: `${origin}/?tab=bots&bot=${slugEnc}&fan_connect=return`,
+      }
+
+      const stripe = new Stripe(requireStripeSecretKey())
+      const result = await runCreatorFanConnectAction(
+        admin,
+        stripe,
+        botUserId,
+        { handle: profile.handle, display_name: profile.display_name },
+        authUser.user?.email,
+        origin,
+        returnUrls,
+        subaction,
+      )
+
+      return adminOpsJson(200, { ok: true, bot_user_id: botUserId, slug: botRow.slug, ...result })
+    }
+
     if (body.action !== 'create_bot') {
-      return adminOpsJson(400, { error: 'Unknown action. Use create_bot or staff_sign_in_as_bot.' })
+      return adminOpsJson(400, {
+        error: 'Unknown action. Use create_bot, staff_sign_in_as_bot, or staff_bot_fan_connect.',
+      })
     }
 
     const slug = normalizeSlug(body.slug || '')

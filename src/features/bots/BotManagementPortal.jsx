@@ -32,6 +32,10 @@ import {
   updateBotPostCaption,
   waitForPgNetRequestResult,
   staffSignInAsBotAndReload,
+  staffBotFanConnectOnboard,
+  staffBotFanConnectRefresh,
+  botFanConnectReturnFromUrl,
+  clearBotFanConnectQueryParams,
 } from './botPortalApi.js'
 import { revokeBotComposeImagePreviews } from './botComposeImages.js'
 import { SCOTT_EXAMPLE_POST_COUNT } from './scottExamplePosts.js'
@@ -98,6 +102,42 @@ function RunStateBadge({ runState }) {
     <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${botRunStateBadgeClass(meta.tone)}`}>
       {meta.label}
     </span>
+  )
+}
+
+function BotFanSubscriptionsAdminBlock({ bot, supabaseClient, busy, setBusy, setToast }) {
+  const onConnect = async () => {
+    if (!bot?.user_id || busy) return
+    if (!bot.handle?.trim()) {
+      setToast?.('Set a profile handle first, then connect payouts.')
+      return
+    }
+    setBusy('bot-fan-connect')
+    try {
+      await staffBotFanConnectOnboard(supabaseClient, bot.user_id)
+    } catch (e) {
+      setToast?.(e instanceof Error ? e.message : 'Connect failed.')
+      setBusy('')
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-orange-700/35 bg-zinc-900/90 p-4">
+      <div className="text-white font-bold text-sm">Fan subscriptions</div>
+      <p className="mt-1 text-zinc-500 text-xs leading-relaxed">
+        Connect Stripe payouts here and stay signed in as admin … Stripe returns to this bot in the portal.
+        Use <span className="text-violet-300 font-semibold">Sign in as bot</span> for offer copy and turning subs on in
+        Lounge Settings.
+      </p>
+      <button
+        type="button"
+        disabled={Boolean(busy)}
+        onClick={() => void onConnect()}
+        className="mt-3 min-h-9 rounded-lg border border-orange-600/60 bg-orange-950/40 px-3 text-[12px] font-semibold text-orange-100 hover:bg-orange-950/70 disabled:opacity-40"
+      >
+        {busy === 'bot-fan-connect' ? 'Opening Stripe…' : 'Connect payouts (Stripe)'}
+      </button>
+    </div>
   )
 }
 
@@ -788,7 +828,7 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
     if (!bot?.user_id || busy) return
     const handle = bot.handle ? `@${String(bot.handle).replace(/^@/, '')}` : bot.slug
     const ok = window.confirm(
-      `Sign in as ${bot.display_name || bot.slug} (${handle})?\n\nYou will leave your admin session in this browser and open Lounge Settings → fan subscriptions as this bot.`,
+      `Sign in as ${bot.display_name || bot.slug} (${handle})?\n\nFor Stripe Connect, use Connect payouts (Stripe) in Fan subscriptions below instead.\n\nThis swaps your browser session to the bot and opens Lounge Settings → fan subscriptions (offer + go live).`,
     )
     if (!ok) return
     setBusy('sign-in-as-bot')
@@ -1037,6 +1077,14 @@ function BotDetailPanel({ bot, supabaseClient, onReload, toast, setToast }) {
         setToast={setToast}
         busy={busy}
         setBusy={setBusy}
+      />
+
+      <BotFanSubscriptionsAdminBlock
+        bot={bot}
+        supabaseClient={supabaseClient}
+        busy={busy}
+        setBusy={setBusy}
+        setToast={setToast}
       />
 
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
@@ -1524,6 +1572,44 @@ export default function BotManagementPortal({
     const id = window.setTimeout(() => setToast(''), 4000)
     return () => window.clearTimeout(id)
   }, [toast])
+
+  useEffect(() => {
+    if (!supabaseClient || loading) return
+    const pending = botFanConnectReturnFromUrl()
+    if (!pending) return
+    clearBotFanConnectQueryParams()
+    const bot =
+      bots.find((b) => String(b.slug || '').toLowerCase() === pending.botSlug) ||
+      (pending.botSlug ? null : bots[0])
+    if (bot?.user_id) setSelectedId(bot.user_id)
+    setPortalTab('manage')
+    let cancelled = false
+    ;(async () => {
+      try {
+        if (bot?.user_id) {
+          await staffBotFanConnectRefresh(supabaseClient, bot.user_id)
+          if (!cancelled) {
+            setToast(
+              pending.fanConnect === 'return'
+                ? 'Stripe Connect updated for this bot.'
+                : 'Stripe Connect status refreshed.',
+            )
+          }
+        } else if (!cancelled) {
+          setToast('Stripe returned … select the bot and check fan subscription status.')
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setToast(e instanceof Error ? e.message : 'Connect refresh failed.')
+        }
+      } finally {
+        if (!cancelled) void onReload?.()
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabaseClient, bots, loading, onReload])
 
   return (
     <div data-bot-portal className="min-h-0">

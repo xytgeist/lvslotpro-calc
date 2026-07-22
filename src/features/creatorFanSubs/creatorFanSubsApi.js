@@ -1,3 +1,8 @@
+import {
+  BOT_IMPERSONATE_OPEN_DOCK_KEY,
+  BOT_IMPERSONATE_SETTINGS_FOCUS_KEY,
+} from '../bots/botPortalApi.js'
+
 /**
  * @param {Response | undefined} response
  */
@@ -16,7 +21,15 @@ async function readEdgeFunctionError(response) {
   return ''
 }
 
-/** @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient */
+function stashCreatorFanConnectReturnNavigation() {
+  if (typeof window === 'undefined') return
+  sessionStorage.setItem(BOT_IMPERSONATE_OPEN_DOCK_KEY, 'settings')
+  sessionStorage.setItem(BOT_IMPERSONATE_SETTINGS_FOCUS_KEY, 'subscriptions-fan')
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ */
 export async function fetchMyCreatorFanMonetization(supabaseClient) {
   const { data, error } = await supabaseClient.rpc('get_my_creator_fan_monetization')
   if (error) {
@@ -66,6 +79,7 @@ export async function startCreatorFanConnectOnboarding(supabaseClient) {
   }
   if (data?.error) throw new Error(String(data.error))
   if (!data?.url) throw new Error('Connect URL missing from server.')
+  stashCreatorFanConnectReturnNavigation()
   window.location.assign(data.url)
 }
 

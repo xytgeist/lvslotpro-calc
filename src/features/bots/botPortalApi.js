@@ -268,6 +268,62 @@ export async function staffSignInAsBotAndReload(supabaseClient, botUserId, opts 
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} botUserId
+ */
+export async function staffBotFanConnectOnboard(supabaseClient, botUserId) {
+  const id = String(botUserId || '').trim()
+  if (!id) throw new Error('Bot user id required.')
+  const { data, error } = await invokeAdminEdgeFunction(supabaseClient, 'lounge-bot-admin', {
+    action: 'staff_bot_fan_connect',
+    bot_user_id: id,
+    subaction: 'onboard',
+  })
+  if (error) throw error
+  if (!data?.url) throw new Error('Connect URL missing from server.')
+  window.location.assign(data.url)
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} botUserId
+ */
+export async function staffBotFanConnectRefresh(supabaseClient, botUserId) {
+  const id = String(botUserId || '').trim()
+  if (!id) throw new Error('Bot user id required.')
+  const { data, error } = await invokeAdminEdgeFunction(supabaseClient, 'lounge-bot-admin', {
+    action: 'staff_bot_fan_connect',
+    bot_user_id: id,
+    subaction: 'refresh',
+  })
+  if (error) throw error
+  return data
+}
+
+/** @returns {{ fanConnect: string, botSlug: string } | null} */
+export function botFanConnectReturnFromUrl() {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('tab') !== 'bots') return null
+  const fanConnect = (params.get('fan_connect') || '').trim()
+  if (fanConnect !== 'return' && fanConnect !== 'refresh') return null
+  return {
+    fanConnect,
+    botSlug: (params.get('bot') || '').trim().toLowerCase(),
+  }
+}
+
+export function clearBotFanConnectQueryParams() {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('tab') !== 'bots') return
+  url.searchParams.delete('fan_connect')
+  url.searchParams.delete('bot')
+  const next = `${url.pathname}${url.search}${url.hash}`
+  window.history.replaceState(window.history.state, '', next)
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @param {{ slug?: string, dryRun?: boolean, force?: boolean }} [opts]
  */
 export async function invokeLoungeNewsPoll(supabaseClient, opts = {}) {
