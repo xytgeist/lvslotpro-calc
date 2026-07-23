@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { extractCashtagsFromCaption } from '../../utils/loungeMarketCaptionParse.js'
 import { loungeMarketResolveCashtags } from '../../utils/loungeMarketApi.js'
-import { getComposerMarketSymbolForCashtag } from './loungeMarketSymbolUtils.js'
 
 /**
  * Debounced Edge `resolve_cashtags` for compose / post-edit captions.
@@ -15,14 +14,6 @@ export function useLoungeCashtagDisambiguation(supabaseClient, caption) {
 
   const [byTag, setByTag] = useState(/** @type {Record<string, object>} */ ({}))
   const [loading, setLoading] = useState(false)
-  const [confirmedTags, setConfirmedTags] = useState(() => new Set())
-
-  useEffect(() => {
-    setConfirmedTags((prev) => {
-      const next = new Set([...prev].filter((t) => tags.includes(t)))
-      return next.size === prev.size ? prev : next
-    })
-  }, [tags, tagsKey])
 
   useEffect(() => {
     if (!supabaseClient || !tags.length) {
@@ -68,48 +59,5 @@ export function useLoungeCashtagDisambiguation(supabaseClient, caption) {
     [tags, byTag],
   )
 
-  const confirmTag = useCallback((tag) => {
-    const u = String(tag || '').trim().toUpperCase()
-    if (!u) return
-    setConfirmedTags((prev) => {
-      if (prev.has(u)) return prev
-      const next = new Set(prev)
-      next.add(u)
-      return next
-    })
-  }, [])
-
-  const resetConfirmed = useCallback(() => {
-    setConfirmedTags(new Set())
-  }, [])
-
-  const blockMarketSubmit = useMemo(() => {
-    if (!ambiguousTags.length) return false
-    return ambiguousTags.some((t) => {
-      const info = byTag[t]
-      const needsConfirm = info?.ambiguous === true || (info?.candidates?.length ?? 0) >= 2
-      return needsConfirm && !confirmedTags.has(t)
-    })
-  }, [ambiguousTags, byTag, confirmedTags])
-
-  const isTagConfirmed = useCallback(
-    (tag) => {
-      const u = String(tag || '').trim().toUpperCase()
-      if (!u) return true
-      if (!byTag[u]?.ambiguous) return true
-      return confirmedTags.has(u)
-    },
-    [byTag, confirmedTags],
-  )
-
-  return {
-    byTag,
-    loading,
-    ambiguousTags,
-    blockMarketSubmit,
-    confirmTag,
-    resetConfirmed,
-    isTagConfirmed,
-    getComposerMarketSymbolForCashtag,
-  }
+  return { byTag, loading, ambiguousTags }
 }

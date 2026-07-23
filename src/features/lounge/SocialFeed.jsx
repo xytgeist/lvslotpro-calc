@@ -8005,10 +8005,6 @@ export default function SocialFeed({
 
   const saveLoungeDetailCaption = useCallback(async () => {
     if (!loungePostDetail?.id || !composerUserId) return
-    if (detailEditCashtagDisambig.blockMarketSubmit) {
-      setLoungeDetailEditErr('Confirm each ambiguous $ ticker chart before saving.')
-      return
-    }
     const cap = normalizeFeedCaption(loungeDetailDraftCaption, loungeComposerCaptionMax)
     setLoungeDetailEditErr('')
     const gifCheck = validateAtMostOneGifUrl(loungeDetailEditMediaUrl)
@@ -8112,7 +8108,6 @@ export default function SocialFeed({
     loungeDetailEditMarketSymbols,
     loungeDetailEditMediaUrl,
     loungeDetailEditVideoPostBlocked,
-    detailEditCashtagDisambig.blockMarketSubmit,
     loungePostDetail,
     shouldAssignLoungePostSnapshotRef,
   ])
@@ -9385,7 +9380,6 @@ export default function SocialFeed({
     })
     setComposerMediaUrl('')
     setComposerMarketSymbols([])
-    composerCashtagDisambig.resetConfirmed()
     composerFoldedFromFeedScrollRef.current = false
     composerFoldRevealRef.current = 0
     setComposerFoldReveal(0)
@@ -9402,7 +9396,7 @@ export default function SocialFeed({
     if (postUid && pendingPoster.startsWith('blob:')) {
       pinLoungeStreamSessionPoster(postUid, pendingPoster)
     }
-  }, [composerCashtagDisambig.resetConfirmed])
+  }, [])
 
   const restoreComposerFromSnapshot = useCallback(
     (snap, opts = {}) => {
@@ -12205,11 +12199,6 @@ export default function SocialFeed({
     }
     if (loungeComposerVideoPostBlocked) return
 
-    if (composerCashtagDisambig.blockMarketSubmit) {
-      setPostErr('Confirm each ambiguous $ ticker chart before posting.')
-      return
-    }
-
     if (hasVideo && composerVideoSlot?.file) {
       if (composerVideoSlot.file.size > LOUNGE_CF_STREAM_MAX_UPLOAD_BYTES) {
         setPostErr('Video must be 200 MB or smaller for upload.')
@@ -12225,7 +12214,6 @@ export default function SocialFeed({
     composerMarketSymbols,
     composerMediaUrl,
     composerVideoSlot,
-    composerCashtagDisambig.blockMarketSubmit,
     loungeComposerCaptionMax,
     loungeComposerVideoPostBlocked,
     postText,
@@ -14093,7 +14081,6 @@ export default function SocialFeed({
                 loading={composerCashtagDisambig.loading}
                 symbols={composerMarketSymbols}
                 onChangeSymbols={setComposerMarketSymbols}
-                onConfirmTag={composerCashtagDisambig.confirmTag}
                 className="mt-2"
               />
             ) : null}
@@ -14197,7 +14184,6 @@ export default function SocialFeed({
                       loungeComposerVideoPostBlocked ||
                       loungePostUploadFailedOpen ||
                       loungeVideoCrop != null ||
-                      composerCashtagDisambig.blockMarketSubmit ||
                       (!postText.trim() &&
                         !String(composerMediaUrl || '').trim() &&
                         composerImageItems.length === 0 &&
@@ -14874,7 +14860,6 @@ export default function SocialFeed({
                       loading={detailEditCashtagDisambig.loading}
                       symbols={loungeDetailEditMarketSymbols}
                       onChangeSymbols={setLoungeDetailEditMarketSymbols}
-                      onConfirmTag={detailEditCashtagDisambig.confirmTag}
                       className="mt-1.5"
                     />
                     {loungeDetailEditErr ? (
@@ -15257,7 +15242,6 @@ export default function SocialFeed({
                               onClick={() => void saveLoungeDetailCaption()}
                               disabled={
                                 loungeDetailEditVideoPostBlocked ||
-                                detailEditCashtagDisambig.blockMarketSubmit ||
                                 (!normalizeFeedCaption(loungeDetailDraftCaption, loungeComposerCaptionMax) &&
                                   loungeDetailEditImageItems.length === 0 &&
                                   loungeDetailEditImageUrls.length === 0 &&
