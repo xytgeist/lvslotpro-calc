@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { createChart, LineSeries } from 'lightweight-charts'
+import { AreaSeries, createChart } from 'lightweight-charts'
 import {
   formatMarketChangePct,
   formatMarketPrice,
   marketEmbedCacheKey,
   pickRollingMarketPayload,
 } from '../../utils/loungeMarketCaptionParse.js'
-import { loungeMarketBarsToSeries, loungeMarketChartTheme } from './loungeMarketChartTheme.js'
+import { loungeMarketBarsToSeries, loungeMarketChartIsLight, loungeMarketChartTheme } from './loungeMarketChartTheme.js'
 import { marketChartLocalizationBase } from './loungeMarketChartLocale.js'
 
 /**
@@ -32,7 +32,8 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
   const bars = isRolling ? rollingPayload?.bars : embed?.bars
   const changePct = Number(quote?.change_pct)
   const up = Number.isFinite(changePct) ? changePct >= 0 : true
-  const theme = loungeMarketChartTheme()
+  const isLight = loungeMarketChartIsLight()
+  const theme = loungeMarketChartTheme(isLight)
   const displaySymbol = String(embed?.display_symbol || '').trim().toUpperCase()
   const displayName = String(embed?.name || displaySymbol).trim() || displaySymbol
 
@@ -52,8 +53,26 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
       handleScroll: false,
       handleScale: false,
     })
-    const series = chart.addSeries(LineSeries, {
-      color: up ? theme.upColor : theme.downColor,
+    const lineColor = up ? theme.upColor : theme.downColor
+    const topColor = up
+      ? isLight
+        ? 'rgba(22, 163, 74, 0.22)'
+        : 'rgba(34, 197, 94, 0.28)'
+      : isLight
+        ? 'rgba(220, 38, 38, 0.22)'
+        : 'rgba(239, 68, 68, 0.28)'
+    const bottomColor = up
+      ? isLight
+        ? 'rgba(22, 163, 74, 0)'
+        : 'rgba(34, 197, 94, 0)'
+      : isLight
+        ? 'rgba(220, 38, 38, 0)'
+        : 'rgba(239, 68, 68, 0)'
+
+    const series = chart.addSeries(AreaSeries, {
+      lineColor,
+      topColor,
+      bottomColor,
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -73,7 +92,7 @@ export default function LoungeMarketChartMini({ embed, rollingLive = null, onOpe
       chart.remove()
       chartRef.current = null
     }
-  }, [embed?.symbol, embed?.kind, bars, up, theme])
+  }, [embed?.symbol, embed?.kind, bars, up, isLight, theme])
 
   if (!embed?.display_symbol) return null
 
