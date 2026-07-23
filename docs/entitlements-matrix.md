@@ -142,8 +142,8 @@ get_my_entitlements(user_id) → {
 | Pricing | **Preset monthly tiers only** (no custom amount). Creators pick **one** tier at enable time; change tier later via settings (new subscribers at new price; existing subs follow Stripe price-change rules). |
 | Tier MSRP (monthly) | **$4.99**, **$9.99**, **$19.99**, **$49.99**, **$99.99**, **$149.99**, **$249.99** ... locked **2026-07-21** (Ryan; added $149 / $249) |
 | Tier keys (Stripe / DB) | `fan-tier-499`, `fan-tier-999`, `fan-tier-1999`, `fan-tier-4999`, `fan-tier-9999`, `fan-tier-14999`, `fan-tier-24999` ... one shared Connect Price per key platform-wide |
-| Benefits | Fan-only posts + one fan group chat room |
-| Chat | **Not E2EE**; creator-owned moderation; searchable room metadata; message access members-only |
+| Benefits | Fan-only posts + one **Private Subs** fan group chat (creator-named, description + topic keywords, editable avatar) |
+| Chat | **Not E2EE**; creator-owned moderation (§5 UI after tab ships); **Private Subs** tab lists all live fan rooms with in-tab search (name, description, keywords); member rooms highlighted + top; **not** in Inbox; message access members-only |
 | Cancel | Access through **paid period end**, then remove room membership |
 | Platform fee | **30%** EdgeTilt / **70%** creator |
 
@@ -160,7 +160,7 @@ get_my_entitlements(user_id) → {
 | **4** | Add-on SKUs + Lifetime/Pro bundle rules | Slots vertical |
 | **5** | Fan room E2EE (optional) | Phase 2 traction + crypto design |
 
-Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts. **Detailed task breakdown (2026-07-21):** **`docs/test-buildout-backlog.md` § Creator fan subs — product backlog** (Settings manage subs, composer audience, feed teaser, Chat Subs tab, room mod tools, **creator new-sub awareness §7**, audio hang out).
+Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts. **Detailed task breakdown (2026-07-21):** **`docs/test-buildout-backlog.md` § Creator fan subs — product backlog** (Settings manage subs, composer audience, feed teaser, **Chat Private Subs tab §4**, room mod tools §5, **creator new-sub awareness §7**, audio hang out).
 
 ---
 
@@ -169,6 +169,7 @@ Track implementation in `docs/test-buildout-backlog.md` when Phase 1 work starts
 | Date | Change |
 | --- | --- |
 | 2026-07-18 | Initial matrix: multi-product catalog, capability table, creator fan sub v1, Edge Pro platform tier, stacking rules, engineering target, rollout phases (Ryan spec). |
+| 2026-07-22 | **Private Subs** chat tab spec locked (Ryan): creator-named fan rooms + description + topic keywords + editable avatar; full catalog with in-tab search; member rows highlighted and top; fan rooms excluded from Inbox; zero-sub rooms still listed; §5 mod UI may ship after tab. Backlog **`test-buildout-backlog.md` §4**. |
 | 2026-07-21 | Creator fan sub tiers expanded to **seven** monthly MSRPs: added **$149.99** / **$249.99** (`fan-tier-14999`, `fan-tier-24999`); migration **`20260721180000`**. |
 | 2026-07-20 | Creator fan sub preset tiers locked to **five** monthly MSRPs: $4.99 / $9.99 / $19.99 / $49.99 / $99.99 + tier keys `fan-tier-*`. |
 | 2026-07-21 | Feed teaser model for fan-only posts (visible in main feed, partial line + subscribe CTA, auto-follow on sub) added to product backlog; supersedes “hide fan-only from non-subs” for **timeline** only — full post detail policy TBD in backlog §3. |

@@ -4,6 +4,7 @@ import ScrollLinkedEdgeTitleBarShell from '../../components/ScrollLinkedEdgeTitl
 import QuickLinkPageToggle from '../../components/QuickLinkPageToggle.jsx'
 import ChatConversation from './ChatConversation.jsx'
 import ChatGroupHeaderStack from './ChatGroupHeaderStack.jsx'
+import ChatPrivateSubsTab from './ChatPrivateSubsTab.jsx'
 import {
   chatOpenDm,
   chatCreateGroup,
@@ -64,7 +65,7 @@ export default function ChatTab({
   const [roomsErr, setRoomsErr] = useState('')
   const [activeRoomId, setActiveRoomId] = useState(/** @type {string | null} */ (null))
   const [iosResumeCount, setIosResumeCount] = useState(0)
-  const [tab, setTab] = useState(/** @type {'inbox' | 'topics'} */ ('inbox'))
+  const [tab, setTab] = useState(/** @type {'inbox' | 'topics' | 'privateSubs'} */ ('inbox'))
   const [showArchivedList, setShowArchivedList] = useState(false)
   const [archivedRooms, setArchivedRooms] = useState(/** @type {any[]} */ ([]))
   const [archivedRoomsLoading, setArchivedRoomsLoading] = useState(false)
@@ -77,6 +78,7 @@ export default function ChatTab({
   const [searchResults, setSearchResults] = useState(/** @type {any[]} */ ([]))
   const [searchBusy, setSearchBusy] = useState(false)
   const searchTimerRef = useRef(null)
+  const openedFromPrivateSubsRef = useRef(false)
 
   // Long-press context menu on room rows
   const [roomMenu, setRoomMenu] = useState(/** @type {{ room: any, y: number, x: number } | null} */ (null))
@@ -532,6 +534,18 @@ export default function ChatTab({
     }
   }, [supabaseClient, groupTitle, groupMembers, viewerUserId, loadRooms])
 
+  const inboxRooms = useMemo(
+    () => rooms.filter((r) => r.kind !== 'creator_fan'),
+    [rooms],
+  )
+
+  const onOpenPrivateSubsRoom = useCallback((room) => {
+    openedFromPrivateSubsRef.current = true
+    setHydratedOpenRoom(room)
+    setHydrateOpenRoomDone(true)
+    setActiveRoomId(room.id)
+  }, [])
+
   // ── Active room data ──────────────────────────────────────────────────────
 
   const activeRoom = useMemo(
@@ -635,7 +649,15 @@ export default function ChatTab({
         viewerProfile={viewerProfile}
         profilesById={profilesById}
         otherUnreadCount={otherUnreadCount}
-        onBack={() => { setActiveRoomId(null); setHydratedOpenRoom(null); void refreshInboxLists() }}
+        onBack={() => {
+          if (openedFromPrivateSubsRef.current) {
+            openedFromPrivateSubsRef.current = false
+            setTab('privateSubs')
+          }
+          setActiveRoomId(null)
+          setHydratedOpenRoom(null)
+          void refreshInboxLists()
+        }}
         onViewProfile={onViewProfile}
         onOpenDm={openDmWithUser}
         openedFromArchived={openedFromArchived}
@@ -867,7 +889,7 @@ export default function ChatTab({
           <button
             type="button"
             onClick={() => { setTab('topics'); setShowArchivedList(false) }}
-            className={`min-h-10 rounded-t-xl px-4 text-[14px] font-bold touch-manipulation ${
+            className={`min-h-10 rounded-t-xl px-3 text-[14px] font-bold touch-manipulation ${
               tab === 'topics'
                 ? 'border-b-2 border-cyan-500 text-cyan-400'
                 : 'text-zinc-500 hover:text-zinc-300'
@@ -877,8 +899,19 @@ export default function ChatTab({
           </button>
           <button
             type="button"
+            onClick={() => { setTab('privateSubs'); setShowArchivedList(false) }}
+            className={`min-h-10 rounded-t-xl px-3 text-[14px] font-bold touch-manipulation ${
+              tab === 'privateSubs'
+                ? 'border-b-2 border-cyan-500 text-cyan-400'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            Private Subs
+          </button>
+          <button
+            type="button"
             onClick={() => { setTab('inbox'); setShowArchivedList(true) }}
-            className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-t-xl px-3 text-[13px] font-semibold text-zinc-500 touch-manipulation hover:text-zinc-300"
+            className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-t-xl px-2 text-[13px] font-semibold text-zinc-500 touch-manipulation hover:text-zinc-300"
           >
             <ChatSwipeArchiveIcon className="h-4 w-4" />
             Archived
@@ -925,6 +958,13 @@ export default function ChatTab({
             </div>
           ))}
         </div>
+      ) : tab === 'privateSubs' ? (
+        <ChatPrivateSubsTab
+          supabaseClient={supabaseClient}
+          viewerUserId={viewerUserId}
+          onOpenRoom={onOpenPrivateSubsRoom}
+          onViewProfile={onViewProfile}
+        />
       ) : showArchivedList ? (
         archivedRoomsLoading ? (
           <div className="flex items-center justify-center py-16 text-[14px] text-zinc-500">
@@ -976,18 +1016,18 @@ export default function ChatTab({
         <div className="mx-3 mt-4 rounded-2xl border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[13px] text-rose-200">
           {roomsErr}
         </div>
-      ) : rooms.length === 0 ? (
+      ) : inboxRooms.length === 0 ? (
         <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
           <div className="text-4xl">💬</div>
           <p className="text-[15px] leading-relaxed text-zinc-400">
             No conversations yet.{' '}
             <span className="text-zinc-300">Open someone&apos;s profile and tap Message</span>
-            , or join a topic above.
+            , join a topic, or browse Private Subs.
           </p>
         </div>
       ) : (
         <ul className="px-2 py-1.5">
-          {rooms.map((room) => (
+          {inboxRooms.map((room) => (
             <ChatRoomListRow
               key={room.id}
               room={room}

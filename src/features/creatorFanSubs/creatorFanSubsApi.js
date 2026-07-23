@@ -238,7 +238,36 @@ export async function fetchCreatorFanOffer(supabaseClient, creatorUserId) {
   if (error) throw error
   if (!data || typeof data !== 'object') return null
   if (data.enabled !== true) return null
-  if (data.offer_complete !== true) return null
+  return data
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} [searchQuery]
+ */
+export async function listCreatorFanPrivateSubs(supabaseClient, searchQuery = '') {
+  const { data, error } = await supabaseClient.rpc('list_creator_fan_private_subs', {
+    p_search: searchQuery?.trim() || '',
+  })
+  if (error) {
+    if (error.code === 'PGRST202') return []
+    throw new Error(error.message || 'Could not load Private Subs.')
+  }
+  return Array.isArray(data) ? data : []
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {{ title: string, description?: string, topicKeywords?: string, avatarUrl?: string | null }} fields
+ */
+export async function saveCreatorFanPrivateSubsRoom(supabaseClient, fields) {
+  const { data, error } = await supabaseClient.rpc('creator_fan_update_room', {
+    p_title: fields.title ?? '',
+    p_description: fields.description ?? '',
+    p_topic_keywords: fields.topicKeywords ?? '',
+    p_avatar_url: fields.avatarUrl === undefined ? null : fields.avatarUrl,
+  })
+  if (error) throw new Error(error.message || 'Could not save fan chat room.')
   return data
 }
 

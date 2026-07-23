@@ -11,6 +11,7 @@ import {
   startCreatorFanConnectOnboarding,
 } from './creatorFanSubsApi.js'
 import CreatorFanOfferFormFields from './CreatorFanOfferFormFields.jsx'
+import CreatorFanPrivateSubsRoomPanel from './CreatorFanPrivateSubsRoomPanel.jsx'
 import { isCreatorFanOfferComplete } from './fanSubOffer.js'
 
 function connectReturnPending() {
@@ -50,6 +51,11 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
   const [offerFanChat, setOfferFanChat] = useState('')
   const [offerComplete, setOfferComplete] = useState(false)
   const [stripeConnectAccountId, setStripeConnectAccountId] = useState('')
+  const [fanRoomId, setFanRoomId] = useState(/** @type {string | null} */ (null))
+  const [fanRoomTitle, setFanRoomTitle] = useState('')
+  const [fanRoomDescription, setFanRoomDescription] = useState('')
+  const [fanRoomTopicKeywords, setFanRoomTopicKeywords] = useState('')
+  const [fanRoomAvatarUrl, setFanRoomAvatarUrl] = useState(/** @type {string | null} */ (null))
 
   const applyRow = useCallback((row) => {
     if (!row) return
@@ -65,6 +71,11 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
     setOfferPrivatePosts(typeof row.offer_private_posts === 'string' ? row.offer_private_posts : '')
     setOfferFanChat(typeof row.offer_fan_chat === 'string' ? row.offer_fan_chat : '')
     setOfferComplete(isCreatorFanOfferComplete(row))
+    setFanRoomId(row.fan_room_id ? String(row.fan_room_id) : null)
+    setFanRoomTitle(typeof row.fan_room_title === 'string' ? row.fan_room_title : '')
+    setFanRoomDescription(typeof row.fan_room_description === 'string' ? row.fan_room_description : '')
+    setFanRoomTopicKeywords(typeof row.fan_room_topic_keywords === 'string' ? row.fan_room_topic_keywords : '')
+    setFanRoomAvatarUrl(typeof row.fan_room_avatar_url === 'string' ? row.fan_room_avatar_url : null)
   }, [])
 
   const reload = useCallback(async () => {
@@ -285,6 +296,23 @@ export default function CreatorFanMonetizationPanel({ supabaseClient, embedded =
               Save offer
             </button>
           </div>
+
+          {fanRoomId ? (
+            <div className="rounded-xl border border-zinc-800/90 bg-zinc-900/40 p-3">
+              <CreatorFanPrivateSubsRoomPanel
+                supabaseClient={supabaseClient}
+                fanRoomId={fanRoomId}
+                initialTitle={fanRoomTitle}
+                initialDescription={fanRoomDescription}
+                initialTopicKeywords={fanRoomTopicKeywords}
+                initialAvatarUrl={fanRoomAvatarUrl}
+                compact
+                onSaved={(row) => {
+                  if (row) applyRow(row)
+                }}
+              />
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
             <button

@@ -991,6 +991,44 @@ html.light [data-lounge-upload-failed-panel] button.bg-zinc-800:hover {
   background-color: rgb(212 212 216);
 }
 
+/* Chat → Private Subs tab (creator fan rooms). */
+html.light [data-chat-private-subs] .text-zinc-100 {
+  color: rgb(24 24 27);
+}
+html.light [data-chat-private-subs] .text-zinc-400,
+html.light [data-chat-private-subs] .text-zinc-500 {
+  color: rgb(82 82 91);
+}
+html.light [data-chat-private-subs] .border-zinc-800 {
+  border-color: rgb(212 212 216);
+}
+html.light [data-chat-private-subs] .border-cyan-500\/30 {
+  border-color: rgb(59 130 246 / 0.35);
+}
+html.light [data-chat-private-subs] .bg-zinc-900\/50,
+html.light [data-chat-private-subs] .bg-zinc-900\/80 {
+  background-color: rgb(255 255 255 / 0.96);
+}
+html.light [data-chat-private-subs] .bg-zinc-950 {
+  background-color: rgb(255 255 255);
+}
+html.light [data-chat-private-subs] .text-white {
+  color: rgb(24 24 27);
+}
+html.light [data-chat-private-subs] .chat-private-subs-member-pill {
+  background-color: rgb(219 234 254 / 0.95);
+  color: rgb(29 78 216);
+}
+html.light [data-creator-fan-private-subs-room] .text-white {
+  color: rgb(24 24 27);
+}
+html.light [data-creator-fan-private-subs-room] .bg-zinc-950 {
+  background-color: rgb(255 255 255);
+}
+html.light [data-creator-fan-private-subs-room] .border-zinc-700 {
+  border-color: rgb(212 212 216);
+}
+
 /* Bookmarked: lv-yellow on white is bad; blue is clean and distinct. */
 html.light .text-lv-yellow {
   color: #2563eb;

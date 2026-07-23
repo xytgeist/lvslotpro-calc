@@ -383,7 +383,36 @@ export function chatRoomLabel(room) {
     return name || room.peerLabel || 'Direct message'
   }
   if (room.kind === 'channel') return room.title ? `#${room.slug} · ${room.title}` : `#${room.slug}`
+  if (room.kind === 'creator_fan') return room.title || 'Private Sub'
   return room.title || 'Group chat'
+}
+
+/**
+ * Build a chat room row from Private Subs catalog RPC for opening conversation.
+ * @param {Record<string, unknown>} row
+ * @param {string} viewerUserId
+ */
+export function buildProvisionalFanRoom(row, viewerUserId) {
+  const preview = row.last_message_preview
+    ? String(row.last_message_preview)
+    : null
+  return enrichChatRoomRow(
+    {
+      id: row.room_id,
+      kind: 'creator_fan',
+      title: row.title,
+      description: row.description,
+      avatar_url: row.avatar_url,
+      member_role: row.is_host ? 'admin' : 'member',
+      memberRole: row.is_host ? 'admin' : 'member',
+      has_unread: row.has_unread,
+      last_message_at: row.last_message_at,
+      last_message_preview: preview,
+      created_by: row.creator_user_id,
+      creator_user_id: row.creator_user_id,
+    },
+    viewerUserId,
+  )
 }
 
 /**

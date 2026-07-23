@@ -311,7 +311,9 @@ export default function ChatConversation({
     memberRole: roomMeta.memberRole ?? room.memberRole ?? room.member_role,
     created_by: roomMeta.created_by ?? room.created_by,
   }
-  const isGroupRoom = activeRoom.kind === 'group'
+  const isFanRoom = activeRoom.kind === 'creator_fan'
+  const isGroupRoom = activeRoom.kind === 'group' || isFanRoom
+  const isClassicGroupRoom = activeRoom.kind === 'group'
   const isDmRoom = activeRoom.kind === 'dm'
   const isGroupOwner = chatIsGroupOwner(activeRoom, viewerUserId)
   const canPinMessages = chatCanPinMessages(activeRoom, viewerUserId)
@@ -2139,7 +2141,7 @@ export default function ChatConversation({
                   <span className="text-[16px] font-bold text-zinc-50">{headerDisplayName}</span>
                   <span className="text-[15px] font-normal text-zinc-300">›</span>
                 </button>
-              ) : (
+              ) : isClassicGroupRoom ? (
                 <button
                   type="button"
                   onClick={() => setGroupSettingsOpen(true)}
@@ -2149,7 +2151,11 @@ export default function ChatConversation({
                   <span className="truncate text-[16px] font-bold text-zinc-50">{headerDisplayName}</span>
                   <span className="text-[15px] font-normal text-zinc-300">›</span>
                 </button>
-              )}
+              ) : isFanRoom ? (
+                <div className="chat-header-glass -mt-1 max-w-full rounded-full px-4 py-1.5">
+                  <span className="truncate text-[16px] font-bold text-zinc-50">{headerDisplayName}</span>
+                </div>
+              ) : null}
               {groupHeaderErr ? (
                 <p className="mt-1 max-w-[300px] px-2 text-center text-[11px] leading-snug text-amber-400/90">
                   {groupHeaderErr}
@@ -2198,7 +2204,7 @@ export default function ChatConversation({
               </>
             )}
 
-            {isGroupRoom && (
+            {isClassicGroupRoom && (
               <>
                 <OptionsRow
                   label="Group settings"
@@ -2495,7 +2501,7 @@ export default function ChatConversation({
         }}
       />
 
-      {isGroupRoom ? (
+      {isClassicGroupRoom ? (
         <ChatGroupSettingsSheet
           open={groupSettingsOpen}
           onClose={() => setGroupSettingsOpen(false)}

@@ -476,14 +476,38 @@ Shipped foundation is on **test** (`docs/test-buildout-backlog.md` Update log **
 - [x] **Subscribers** (and staff) see full post (existing **`has_creator_fan_sub`** / entitlements).
 - [x] **Subscribe from feed CTA:** on successful checkout (or alerts-only path if product allows), **auto-follow** creator if viewer is **not** already following (**`profile_follows`** insert).
 - [x] RPC/hydrate: extend feed load or post payload with **`teaser` / `locked`** flags; avoid leaking full **`content_markdown`** to client for non-subs (server-side trim or dedicated column).
-- [ ] Smoke: sub sees full text; non-sub sees teaser + CTA; follow row created after sub.
+- [x] Smoke: sub sees full text; non-sub sees teaser + CTA; follow row created after sub. **PASSED** (Ryan, 2026-07-22).
 
-### 4. Subscriber chat — “Subs” tab + fan rooms
+### 4. Subscriber chat — **Private Subs** tab + fan rooms
 
-- [ ] **Chat screen tab:** **Subs** next to **Inbox** / **Topics** listing **creator fan rooms** the user can enter (**`chat_rooms.kind = creator_fan`**, membership via **`creator_fan_sub_sync_chat_member`** / webhook).
-- [ ] **Creator enablement:** create/configure **private fan room** when monetization on ( **`creator_fan_ensure_room`** exists; UI + naming/avatar copy).
-- [ ] **Enter gate:** non-subscribers see subscribe CTA (entitlements matrix §2.3 copy).
-- [ ] Search/discover metadata for fan rooms (later tie-in to Phase G search) — optional follow-on.
+**Product locked (Ryan, 2026-07-22):** Chat third tab is **`Private Subs`** (not “Subs”). **`chat_rooms.kind = creator_fan`** only. **§5 moderation UI can ship after §4.**
+
+| Decision | Choice |
+| --- | --- |
+| Tab label | **Private Subs** (alongside **Inbox** / **Topics**) |
+| Inbox | **`creator_fan` rooms never appear in Inbox** (still in `chat_room_members`; list/filter excludes them) |
+| Catalog | **All live** creator fan rooms where **`get_creator_fan_offer`** would succeed (**enabled + Connect complete**, same bar as profile **SUB**); including **zero subscribers** |
+| Membership UX | Rows the viewer **is a member of** (**`chat_room_members`**, includes creator **admin**) are **sorted to the top** and **highlighted**: **subtle cyan-tinted border** + lifted surface + trailing **`Joined`** micro-pill (**`Host`** / **`Yours`** on creator’s own room). Discover rows below without pill. |
+| Room name | **Creator-editable** **`title`**; **`creator_fan_ensure_room`** seeds default **`@{handle} fan room`** (not forced in UI; creator may keep or replace) |
+| Room copy | **Description** + **topic keywords** — single **comma-separated** text field (normalize trim/split for search) |
+| Room avatar | **Editable** by creator (`chat_rooms.avatar_url`; same storage pattern as group avatars where applicable) |
+| Tab search | Client or RPC search over **name (`title`)**, **description**, **comma-separated topic keywords** |
+| Enter gate | Non-members tap → subscribe CTA (**`docs/entitlements-matrix.md` §2.3** copy); members open **`ChatConversation`** (treat like group for v1) |
+| Mod tools | **Not required for §4 ship** — read/send first; §5 follows |
+
+**Implementation checklist**
+
+- [x] **SQL:** migration **`20260723200000_creator_fan_private_subs.sql`** — `topic_keywords`, **`list_creator_fan_private_subs`**, **`creator_fan_update_room`**, monetization JSON room fields; apply on test before smoke.
+- [x] **Creator setup UI:** **`CreatorFanPrivateSubsRoomPanel`** in Settings fan monetization (name, description, keywords, avatar).
+- [x] **`ChatTab.jsx` + `ChatPrivateSubsTab.jsx`:** **Private Subs** tab, search, **Joined** / **Host** pills, enter gate via **`CreatorFanSubscribeModal`**; **`creator_fan` filtered out of Inbox list.
+- [x] **`ChatConversation.jsx`:** `creator_fan` uses group message UX; no group settings sheet (edit in Settings).
+- [ ] Smoke: non-member sees room in catalog, cannot read messages until sub; member row pinned/highlighted; room absent from Inbox; creator edits name/description/keywords/avatar; empty-sub room still listed for creator and in catalog.
+
+**Existing plumbing (no re-invent):** **`creator_fan_ensure_room`**, **`creator_fan_sub_sync_chat_member`** (webhook), **`fan_room_id`** on **`creator_monetization_profiles`**, member **`admin`** for creator.
+
+**Later (not §4):** Phase G Lounge search tie-in for fan room metadata; §5 mod actions.
+
+**§4 UX — member row highlight (Ryan 2026-07-22, pill locked):** Joined section uses **subtle border** (`border-cyan-500/30` dark; scoped light under `data-chat-private-subs`) + slightly stronger card bg. Trailing **`Joined`** pill: `rounded-full`, **`text-[10px]`** uppercase tracking-wide, **`px-2 py-0.5`**, **`font-semibold`**, `bg-cyan-500/15 text-cyan-300` (light mode → readable blue-zinc pair like composer audience subs row). **Creator admin** on own fan room: same chrome, pill **`Host`** or **`Yours`** (pick one at build). Not profile **SUBSCRIBED** styling … room membership only.
 
 ### 5. Fan room moderation (creator + delegated mods)
 
@@ -510,7 +534,7 @@ Creators need to know when someone subscribes. **Shipped v1 (2026-07-21):** **`c
 
 **Test:** apply **`20260721210000`** on test; redeploy **`stripe-webhook`** + **`lounge-send-activity-push`**; new fan sub → creator Alerts row + push; own profile **Fan hub** lists subscriber; **`/?fanPortal=1`** smoke.
 
-**Suggested timing:** **§2–§6** still open; **§7** v1 shipped — email digest / MRR charts deferred.
+**Suggested timing:** **§4–§6** still open (**§1–§3** shipped + §3 smoke signed off); **§7** v1 shipped — email digest / MRR charts deferred.
 
 ---
 
@@ -851,6 +875,11 @@ Creators need to know when someone subscribes. **Shipped v1 (2026-07-21):** **`c
 
 ## Update log
 
+- 2026-07-22: **Creator fan subs §4 Private Subs (code):** migration **`20260723200000`**; Chat **Private Subs** tab + catalog RPC; creator room editor in Settings; Inbox excludes `creator_fan`. Apply SQL test then prod; smoke checklist still open.
+- 2026-07-22: **Creator fan subs §4 highlight:** Ryan — member rows use **border + `Joined` micro-pill** (creator own room **`Host`** / **`Yours`** TBD at build); not border-only.
+- 2026-07-22: **Creator fan subs §4 spec refinements (Ryan):** default room title **`@{handle} fan room`**; topic keywords **comma-separated** field; catalog = **live offer + Connect complete** only; member rows **subtle border** highlight (optional **Joined** pill noted in §4 UX).
+- 2026-07-22: **Creator fan subs §4 spec locked (Ryan):** Chat tab **Private Subs** — all live `creator_fan` rooms in catalog (incl. zero subs), creator **name / description / topic keywords / avatar**; in-tab search; member rows highlighted + top; **excluded from Inbox**; enter gate for non-subs; §5 mod UI after tab. See §4 table + checklist.
+- 2026-07-22: **Creator fan subs §3 smoke PASSED (Ryan):** subscriber sees full fan-only post; non-subscriber sees teaser + Subscribe CTA; follow row after **`fan_success`** checkout. Backlog §3 smoke checkbox closed.
 - 2026-07-23: **Hotfix feed_comments RLS (prod + test):** migration **`20260723103000`** — `lounge_viewer_can_read_feed_comment` **`row_security off`** + author read in SELECT policy; fixes comment INSERT/RETURNING (upload failed) after **`20260722240000`**.
 - 2026-07-22: **Fan-only lounge UX → prod:** **`main`** @ **`970fc185`** (merge from **`test`**); production SQL **`20260722230000`** … **`20260722260000`** applied on **`jtjgtucumuoswnbauxry`**; Vercel **`edgetilt.com`**. Ryan sign-off on test repost/quote + locked embed **2026-07-22**.
 - 2026-07-22: **Fan-only repost/quote allowed (test):** migration **`20260722260000`** drops post repost block (comment-repost on fan-only parent still blocked); quote embed + plain repost show **`LoungeFanOnlyLockedPostInset`** for non-subs; standalone locked rows still block detail open. Apply SQL on test; frontend **`origin/test`** push.
