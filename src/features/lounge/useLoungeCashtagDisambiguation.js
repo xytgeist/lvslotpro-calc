@@ -58,7 +58,13 @@ export function useLoungeCashtagDisambiguation(supabaseClient, caption) {
   }, [supabaseClient, tagsKey, tags.length])
 
   const ambiguousTags = useMemo(
-    () => tags.filter((t) => byTag[t]?.ambiguous === true),
+    () =>
+      tags.filter((t) => {
+        const info = byTag[t]
+        if (!info) return false
+        if (info.ambiguous === true) return true
+        return Array.isArray(info.candidates) && info.candidates.length >= 2
+      }),
     [tags, byTag],
   )
 
@@ -79,8 +85,12 @@ export function useLoungeCashtagDisambiguation(supabaseClient, caption) {
 
   const blockMarketSubmit = useMemo(() => {
     if (!ambiguousTags.length) return false
-    return ambiguousTags.some((t) => !confirmedTags.has(t))
-  }, [ambiguousTags, confirmedTags])
+    return ambiguousTags.some((t) => {
+      const info = byTag[t]
+      const needsConfirm = info?.ambiguous === true || (info?.candidates?.length ?? 0) >= 2
+      return needsConfirm && !confirmedTags.has(t)
+    })
+  }, [ambiguousTags, byTag, confirmedTags])
 
   const isTagConfirmed = useCallback(
     (tag) => {
