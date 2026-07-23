@@ -177,10 +177,7 @@ export function LoungeImageCarousel({
 
   const tierForSlide = (index) => {
     if (!isFeedVariant) return 'column'
-    const measured = feedAttachmentTiers[index]
-    if (measured) return measured
-    if (singleFeedSlide) return 'tall'
-    return 'column'
+    return feedAttachmentTiers[index] ?? 'column'
   }
 
   const noteFeedAttachmentTier = (index, img) => {

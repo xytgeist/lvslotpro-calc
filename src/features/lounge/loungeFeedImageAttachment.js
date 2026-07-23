@@ -1,8 +1,8 @@
 /**
- * Feed post still/GIF attachment layout: full column vs tall (portrait screenshots).
+ * Feed post still/GIF attachment layout: full column vs tall narrow (phone screenshots).
  */
 
-/** Height / width above this → tall attachment (width-first, taller max height). */
+/** Height / width above this → tall attachment (narrow frame, not full post width). */
 export const LOUNGE_FEED_ATTACHMENT_TALL_HW_RATIO = 1.35
 
 /** @typedef {'column' | 'tall'} LoungeFeedAttachmentTier */
@@ -25,13 +25,16 @@ export function loungeFeedImageAttachmentTier(naturalWidth, naturalHeight) {
  */
 export function loungeFeedAttachmentSlideClassName(tier, opts = {}) {
   const { singleInPost = false, multiCarousel = false } = opts
-  if (tier === 'tall' || singleInPost) {
+  if (tier === 'tall') {
+    return 'relative w-auto max-w-[min(72vw,20rem)] shrink-0 snap-start'
+  }
+  if (singleInPost) {
     return 'relative w-full min-w-0 max-w-full shrink-0 snap-start'
   }
   if (multiCarousel) {
     return 'relative w-auto shrink-0 snap-start min-w-[3rem] max-w-[min(88vw,20rem)] sm:max-w-[min(72vw,17rem)]'
   }
-  return 'relative w-auto shrink-0 snap-start min-w-[3rem] max-w-full'
+  return 'relative w-full min-w-0 max-w-full shrink-0 snap-start'
 }
 
 /**
@@ -39,26 +42,25 @@ export function loungeFeedAttachmentSlideClassName(tier, opts = {}) {
  * @param {{ rounding: string, border: string }} frame
  */
 export function loungeFeedAttachmentFrameClassName(tier, { rounding, border }) {
-  const base = `block w-full max-w-full overflow-hidden ${rounding} border ${border} bg-zinc-950/40`
-  if (tier === 'tall') {
-    return `${base} max-h-[min(85vh,960px)]`
-  }
-  return base
+  void tier
+  return `block w-full max-w-full overflow-hidden ${rounding} border ${border} bg-zinc-950/40`
 }
 
 /** @param {LoungeFeedAttachmentTier} tier */
 export function loungeFeedAttachmentImgClassName(tier) {
   if (tier === 'tall') {
-    // Width always fills the column; frame max-height clips excess (lightbox for full image).
-    return 'block w-full h-auto max-w-full object-contain object-top'
+    return 'block w-full h-auto max-w-full max-h-[min(55vh,420px)] object-contain'
   }
-  return 'block w-full max-h-[312px] h-auto max-w-full object-contain'
+  // h/w <= 1.35: width-first at full column — no max-h that shrinks width inward.
+  return 'block w-full h-auto max-w-full object-contain'
 }
 
 /** @param {LoungeFeedAttachmentTier} tier */
 export function loungeFeedAttachmentTapTargetClassName(tier) {
   const tap =
     'cursor-zoom-in touch-manipulation [-webkit-tap-highlight-color:transparent] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50'
-  void tier
+  if (tier === 'tall') {
+    return `block w-auto max-w-[min(72vw,20rem)] ${tap}`
+  }
   return `block w-full max-w-full ${tap}`
 }
