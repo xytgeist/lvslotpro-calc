@@ -27,6 +27,7 @@ import {
 import { useEdgeMonitorSnapshot } from './useEdgeMonitorSnapshot.js'
 import { useEdgeMonitorExternalHealth } from './useEdgeMonitorExternalHealth.js'
 import { useLoungeBotOps } from './useLoungeBotOps.js'
+import EdgeMonitorActivityPanel from './EdgeMonitorActivityPanel.jsx'
 import EdgeMonitorBotOpsPanel from './EdgeMonitorBotOpsPanel.jsx'
 import EdgeMonitorSubscriberRosterPanel from './EdgeMonitorSubscriberRosterPanel.jsx'
 import EdgeMonitorUserSignupsPanel from './EdgeMonitorUserSignupsPanel.jsx'
@@ -653,7 +654,11 @@ export default function EdgeMonitorDashboard({
           accent={OPS_CHART_COLORS.red}
           hint="Active starter subs with no slugs left"
         />
-        <MetricTile label="Activity 24h" value={formatOpsMonitorCount(activity.events_24h)} />
+        <MetricTile
+          label="Alerts by type 24h"
+          value={formatOpsMonitorBreakdown(activity.by_type_24h, 'count')}
+          hint="See Activity alerts panel above for full 24h / 7d table"
+        />
       </MonitorSection>
 
       <EdgeMonitorBotOpsPanel
@@ -834,6 +839,8 @@ export default function EdgeMonitorDashboard({
           ) : (
             <MobileMonitorGlance heroKpis={heroKpis} />
           )}
+
+          <EdgeMonitorActivityPanel snapshot={snapshot} loading={loading} />
 
           <EdgeMonitorUserSignupsPanel
             roster={roster}

@@ -107,9 +107,9 @@ export function opsMonitorHeroKpis(snapshot) {
     },
     {
       id: 'pulse',
-      label: 'Activity 24h',
+      label: 'Alerts 24h',
       value: activity.events_24h,
-      sub: `${chat.messages_24h ?? 0} chat msgs`,
+      sub: `${chat.messages_24h ?? 0} chat msgs · expand below`,
       theme: OPS_SECTION_THEMES.chat,
     },
     {

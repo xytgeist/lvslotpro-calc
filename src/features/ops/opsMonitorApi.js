@@ -103,7 +103,7 @@ export function formatOpsMonitorBreakdown(rows, key = 'count') {
   return rows
     .map((row) => {
       const label =
-        row.product_slug || row.status || row.kind || '?'
+        row.product_slug || row.status || row.kind || row.event_type || '?'
       const count = formatOpsMonitorCount(row[key] ?? row.count)
       return `${label}: ${count}`
     })
