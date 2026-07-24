@@ -22,13 +22,13 @@ export const OPS_CHART_SEQUENCE = [
 ]
 
 export const OPS_SECTION_THEMES = {
-  users: { accent: OPS_CHART_COLORS.cyan, icon: '👥', gradient: 'from-cyan-500/20 via-cyan-400/5 to-transparent' },
-  subs: { accent: OPS_CHART_COLORS.purple, icon: '💳', gradient: 'from-violet-500/25 via-purple-500/5 to-transparent' },
-  lounge: { accent: OPS_CHART_COLORS.green, icon: '🔥', gradient: 'from-emerald-500/20 via-lv-green/5 to-transparent' },
-  search: { accent: OPS_CHART_COLORS.yellow, icon: '🔎', gradient: 'from-yellow-400/15 via-amber-500/5 to-transparent' },
-  chat: { accent: OPS_CHART_COLORS.orange, icon: '💬', gradient: 'from-orange-500/20 via-lv-orange/5 to-transparent' },
-  tools: { accent: OPS_CHART_COLORS.pink, icon: '🎰', gradient: 'from-fuchsia-500/20 via-pink-500/5 to-transparent' },
-  ops: { accent: OPS_CHART_COLORS.red, icon: '⚡', gradient: 'from-red-500/15 via-lv-red/5 to-transparent' },
+  users: { accent: OPS_CHART_COLORS.cyan, icon: '👥' },
+  subs: { accent: OPS_CHART_COLORS.purple, icon: '💳' },
+  lounge: { accent: OPS_CHART_COLORS.green, icon: '🔥' },
+  search: { accent: OPS_CHART_COLORS.yellow, icon: '🔎' },
+  chat: { accent: OPS_CHART_COLORS.orange, icon: '💬' },
+  tools: { accent: OPS_CHART_COLORS.pink, icon: '🎰' },
+  ops: { accent: OPS_CHART_COLORS.red, icon: '⚡' },
 }
 
 /** @param {object | null | undefined} snapshot */

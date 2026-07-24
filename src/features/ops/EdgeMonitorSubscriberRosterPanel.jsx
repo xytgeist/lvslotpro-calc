@@ -28,8 +28,8 @@ const TABS = [
 function RosterMetric({ label, value, accent = OPS_CHART_COLORS.purple }) {
   return (
     <div
-      className="rounded-xl bg-zinc-950/50 border border-zinc-800/70 px-3 py-2 min-w-0"
-      style={{ borderLeftWidth: 3, borderLeftColor: `${accent}88` }}
+      className="rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 min-w-0"
+      style={{ borderLeftWidth: 3, borderLeftColor: accent }}
     >
       <div className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wide truncate">{label}</div>
       <div className="text-white font-bold tabular-nums mt-0.5">{formatOpsMonitorCount(value)}</div>
@@ -252,19 +252,15 @@ export default function EdgeMonitorSubscriberRosterPanel({
 
   return (
     <section
-      className="edge-monitor-panel relative overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4 lg:p-5 mb-4 lg:col-span-full"
+      className="edge-monitor-panel rounded-2xl border border-zinc-800 bg-zinc-900 p-4 lg:p-5 mb-4 lg:col-span-full"
       data-edge-monitor-subscriber-roster
+      style={{ borderLeftWidth: 3, borderLeftColor: theme.accent }}
     >
-      <div
-        className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-b ${theme.gradient} pointer-events-none`}
-        aria-hidden
-      />
-      <div className="relative">
+      <div>
         <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-2.5 min-w-0">
             <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg"
-              style={{ backgroundColor: `${theme.accent}22`, boxShadow: `inset 0 0 0 1px ${theme.accent}44` }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-lg"
               aria-hidden
             >
               {theme.icon}
@@ -281,7 +277,7 @@ export default function EdgeMonitorSubscriberRosterPanel({
               type="button"
               onClick={onExport}
               disabled={!roster || loading}
-              className="min-h-8 inline-flex items-center gap-1.5 rounded-lg bg-zinc-800/80 px-3 text-zinc-200 text-[11px] font-semibold hover:bg-zinc-700 disabled:opacity-50"
+              className="min-h-8 inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 text-zinc-200 text-[11px] font-semibold hover:bg-zinc-700 disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" aria-hidden />
               CSV
@@ -290,7 +286,7 @@ export default function EdgeMonitorSubscriberRosterPanel({
               type="button"
               disabled={loading || refreshing}
               onClick={onReload}
-              className="min-h-8 rounded-lg bg-gradient-to-r from-violet-700 to-purple-700 px-3 text-white text-[11px] font-bold hover:from-violet-600 hover:to-purple-600 disabled:opacity-50"
+              className="min-h-8 rounded-lg bg-zinc-100 px-3 text-zinc-950 text-[11px] font-bold hover:bg-white disabled:opacity-50"
             >
               {refreshing ? 'Refreshing…' : 'Refresh roster'}
             </button>

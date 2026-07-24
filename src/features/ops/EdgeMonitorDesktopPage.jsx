@@ -40,17 +40,15 @@ export default function EdgeMonitorDesktopPage({
         className="edge-monitor-desktop-page flex h-dvh max-h-dvh flex-col overflow-hidden bg-zinc-950"
       >
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto overscroll-y-contain px-6 py-8">
-          <div className="max-w-md w-full rounded-3xl border border-zinc-800 bg-zinc-900/90 p-8 text-center">
-            <div className="text-3xl font-black bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
-              Edge Monitor
-            </div>
+          <div className="max-w-md w-full rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center">
+            <div className="text-3xl font-black text-white">Edge Monitor</div>
             <p className="mt-3 text-zinc-400 text-sm leading-relaxed">
               Admin-only ops dashboard. Sign in with an admin account to view product metrics.
             </p>
             <button
               type="button"
               onClick={() => onOpenAuth?.()}
-              className="mt-6 w-full min-h-12 rounded-2xl bg-gradient-to-r from-cyan-600 to-violet-600 text-white font-bold hover:from-cyan-500 hover:to-violet-500"
+              className="mt-6 w-full min-h-12 rounded-xl bg-zinc-100 text-zinc-950 font-bold hover:bg-white"
             >
               Log in
             </button>
@@ -97,8 +95,7 @@ export default function EdgeMonitorDesktopPage({
       data-edge-monitor-desktop
       className="edge-monitor-desktop-page flex h-dvh max-h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100"
     >
-      <div className="pointer-events-none fixed inset-0 edge-monitor-desktop-bg" aria-hidden />
-      <header className="relative z-40 shrink-0 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md">
+      <header className="relative z-40 shrink-0 border-b border-zinc-800 bg-zinc-950">
         <div className="mx-auto flex max-w-[1680px] items-center justify-between gap-4 px-6 py-3">
           <div className="flex items-center gap-3 min-w-0">
             <img src="/edge-lounge-logo-transparent.png" alt="" className="h-8 w-auto shrink-0" />
@@ -109,19 +106,19 @@ export default function EdgeMonitorDesktopPage({
           <div className="flex items-center gap-2 shrink-0">
             <a
               href="/"
-              className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800/80 px-3 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
+              className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800 px-3 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
             >
               Open app
             </a>
             <a
               href="/?tab=bots"
-              className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800/80 px-3 text-zinc-400 text-xs font-semibold hover:bg-zinc-700 hover:text-zinc-200"
+              className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800 px-3 text-zinc-400 text-xs font-semibold hover:bg-zinc-700 hover:text-zinc-200"
             >
               Bot Portal
             </a>
             <a
               href="/?tab=monitor"
-              className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800/80 px-3 text-zinc-400 text-xs font-semibold hover:bg-zinc-700 hover:text-zinc-200"
+              className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800 px-3 text-zinc-400 text-xs font-semibold hover:bg-zinc-700 hover:text-zinc-200"
             >
               Mobile tab
             </a>

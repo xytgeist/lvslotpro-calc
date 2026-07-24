@@ -33,29 +33,26 @@ import { useEdgeMonitorLivePulse } from './useEdgeMonitorLivePulse.js'
 import { useEdgeMonitorSubscriberRoster } from './useEdgeMonitorSubscriberRoster.js'
 import { EDGE_MONITOR_PATH } from './opsMonitorNavigation.js'
 
+const MONITOR_PANEL = 'rounded-2xl border border-zinc-800 bg-zinc-900'
+const MONITOR_BTN = 'min-h-10 rounded-xl bg-zinc-800 px-3 text-zinc-200 text-xs font-semibold touch-manipulation hover:bg-zinc-700 disabled:opacity-50'
+const MONITOR_BTN_PRIMARY =
+  'min-h-10 rounded-xl bg-zinc-100 px-4 text-zinc-950 text-xs font-bold touch-manipulation hover:bg-white disabled:opacity-50'
+const MONITOR_META_PILL = 'rounded-lg bg-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-300'
+
 function HeroKpiCard({ kpi, compact = false }) {
   const theme = kpi.theme || OPS_SECTION_THEMES.users
   return (
     <div
-      className={`edge-monitor-hero-card relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br ${theme.gradient} min-w-0 ${compact ? 'p-3' : 'p-3 lg:p-4'}`}
-      style={{ boxShadow: `0 0 0 1px ${theme.accent}22, 0 8px 24px ${theme.accent}14` }}
+      className={`edge-monitor-hero-card min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 ${compact ? 'p-3' : 'p-3 lg:p-4'}`}
+      style={{ borderLeftWidth: 3, borderLeftColor: theme.accent }}
     >
+      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{kpi.label}</div>
       <div
-        className="absolute -right-3 -top-3 h-16 w-16 rounded-full blur-2xl opacity-40"
-        style={{ backgroundColor: theme.accent }}
-        aria-hidden
-      />
-      <div className="relative">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{kpi.label}</div>
-        <div
-          className={`text-white font-black tabular-nums mt-0.5 tracking-tight ${compact ? 'text-2xl' : 'text-2xl lg:text-3xl'}`}
-        >
-          {formatOpsMonitorCount(kpi.value)}
-        </div>
-        <div className="text-[11px] font-medium mt-1 truncate" style={{ color: theme.accent }}>
-          {kpi.sub}
-        </div>
+        className={`text-white font-black tabular-nums mt-0.5 tracking-tight ${compact ? 'text-2xl' : 'text-2xl lg:text-3xl'}`}
+      >
+        {formatOpsMonitorCount(kpi.value)}
       </div>
+      <div className="text-[11px] font-medium mt-1 truncate text-zinc-400">{kpi.sub}</div>
     </div>
   )
 }
@@ -63,8 +60,8 @@ function HeroKpiCard({ kpi, compact = false }) {
 function MetricTile({ label, value, hint = '', accent = OPS_CHART_COLORS.cyan }) {
   return (
     <div
-      className="rounded-2xl bg-zinc-950/45 border border-zinc-800/70 px-3 py-3 min-w-0"
-      style={{ borderLeftWidth: 3, borderLeftColor: `${accent}88` }}
+      className="rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-3 min-w-0"
+      style={{ borderLeftWidth: 3, borderLeftColor: accent }}
     >
       <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 truncate">{label}</div>
       <div className="text-white text-lg font-bold tabular-nums mt-1 truncate">{value}</div>
@@ -98,17 +95,13 @@ function MonitorSection({ themeKey, title, subtitle, chart = null, children, cla
   const theme = OPS_SECTION_THEMES[themeKey] || OPS_SECTION_THEMES.ops
   return (
     <section
-      className={`edge-monitor-section relative overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/90 ${className}`}
+      className={`edge-monitor-section ${MONITOR_PANEL} ${className}`}
+      style={{ borderLeftWidth: 3, borderLeftColor: theme.accent }}
     >
-      <div
-        className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-b ${theme.gradient} pointer-events-none`}
-        aria-hidden
-      />
-      <div className="relative p-4 lg:p-5">
+      <div className="p-4 lg:p-5">
         <div className="mb-3 flex items-start gap-2.5">
           <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg"
-            style={{ backgroundColor: `${theme.accent}22`, boxShadow: `inset 0 0 0 1px ${theme.accent}44` }}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-lg"
             aria-hidden
           >
             {theme.icon}
@@ -143,7 +136,7 @@ function LivePulseStrip({ live, error, show = true }) {
     (Number(live.chat_messages_1m) || 0) > 0
   if (!hasSignal) return null
   return (
-    <section className="mb-4 rounded-2xl border border-zinc-800/80 bg-zinc-950/40 px-3 py-3">
+    <section className={`mb-4 ${MONITOR_PANEL} px-3 py-3`}>
       <div className="mb-2">
         <div className="text-white text-xs font-bold">Right now</div>
         <div className="text-zinc-500 text-[10px]">Last minute on prod · refreshes ~15s</div>
@@ -157,8 +150,8 @@ function LivePulseStrip({ live, error, show = true }) {
         ].map((item) => (
           <div
             key={item.label}
-            className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-2"
-            style={{ borderLeftWidth: 3, borderLeftColor: `${item.accent}88` }}
+            className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2"
+            style={{ borderLeftWidth: 3, borderLeftColor: item.accent }}
           >
             <div className="text-[10px] uppercase tracking-wide text-zinc-500">{item.label}</div>
             <div className="text-white text-lg font-bold tabular-nums">{formatOpsMonitorCount(item.value)}</div>
@@ -172,7 +165,7 @@ function LivePulseStrip({ live, error, show = true }) {
 function MobileMonitorGlance({ heroKpis }) {
   if (!heroKpis?.length) return null
   return (
-    <section className="mb-4 rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-3">
+    <section className={`mb-4 ${MONITOR_PANEL} p-3`}>
       <div className="mb-2">
         <div className="text-white text-sm font-bold">At a glance</div>
         <div className="text-zinc-500 text-[10px]">24h snapshot · scroll down for subscriber roster</div>
@@ -264,7 +257,7 @@ function ExternalHealthPanel({ external, loading, error, onReload }) {
   ]
 
   return (
-    <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4 lg:p-5 lg:col-span-2">
+    <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4 lg:p-5 lg:col-span-2`}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="text-white font-bold text-[15px]">External health</div>
@@ -286,7 +279,7 @@ function ExternalHealthPanel({ external, loading, error, onReload }) {
       ) : null}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map(({ key, title, probe, href }) => (
-          <div key={key} className="rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-3 min-w-0">
+          <div key={key} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <div className="text-white text-sm font-bold">{title}</div>
               {href ? (
@@ -469,7 +462,7 @@ export default function EdgeMonitorDashboard({
   const chartPanel = (
     <>
       {trendLabels.length > 0 ? (
-        <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4 lg:p-5 h-full">
+        <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4 lg:p-5 h-full`}>
           <div className="mb-3">
             <div className="text-white font-bold text-[15px] lg:text-base">7-day pulse</div>
             <div className="text-zinc-500 text-xs mt-0.5">UTC daily · signups, posts, activity, chat</div>
@@ -478,7 +471,7 @@ export default function EdgeMonitorDashboard({
         </section>
       ) : null}
 
-      <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4 lg:p-5">
+      <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4 lg:p-5`}>
         <div className="mb-3">
           <div className="text-white font-bold text-[15px] lg:text-base">Velocity</div>
           <div className="text-zinc-500 text-xs mt-0.5">24h vs 7d totals</div>
@@ -487,7 +480,7 @@ export default function EdgeMonitorDashboard({
       </section>
 
       <div className={`grid gap-4 ${isDesktop ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
-        <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+        <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4`}>
           <div className="text-white font-bold text-sm mb-2">Role mix</div>
           <MonitorDoughnutChart
             labels={roleDoughnut.labels}
@@ -496,7 +489,7 @@ export default function EdgeMonitorDashboard({
             height={isDesktop ? 200 : 190}
           />
         </section>
-        <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+        <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4`}>
           <div className="text-white font-bold text-sm mb-2">Active subs by product</div>
           <MonitorDoughnutChart
             labels={subsDoughnut.labels}
@@ -586,13 +579,13 @@ export default function EdgeMonitorDashboard({
         <MetricTile label="Rate hits 24h" value={formatOpsMonitorCount(rateLimits.events_24h)} accent={OPS_CHART_COLORS.red} />
         <MetricTile label="Rate hits 7d" value={formatOpsMonitorCount(rateLimits.events_7d)} />
         <MetricTile label="Kinds 24h" value={formatOpsMonitorBreakdown(rateLimits.by_kind_24h, 'count')} />
-        <div className="col-span-2 sm:col-span-3 rounded-2xl bg-zinc-950/45 border border-zinc-800/70 px-3 py-3">
+        <div className="col-span-2 sm:col-span-3 rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-3">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Top queries 7d</div>
           <pre className="text-zinc-300 text-[11px] whitespace-pre-wrap font-sans leading-relaxed">
             {formatOpsMonitorTopQueries(topQueries7d)}
           </pre>
         </div>
-        <div className="col-span-2 sm:col-span-3 rounded-2xl bg-zinc-950/45 border border-zinc-800/70 px-3 py-3">
+        <div className="col-span-2 sm:col-span-3 rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-3">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">Top queries 30d</div>
           <pre className="text-zinc-300 text-[11px] whitespace-pre-wrap font-sans leading-relaxed">
             {formatOpsMonitorTopQueries(topQueries30d)}
@@ -685,62 +678,40 @@ export default function EdgeMonitorDashboard({
       className={isDesktop ? 'edge-monitor-desktop' : 'edge-monitor-mobile'}
     >
       <div
-        className={
-          isDesktop
-            ? 'edge-monitor-header relative mb-8 overflow-hidden rounded-2xl border border-cyan-500/25 bg-gradient-to-r from-cyan-950/90 via-zinc-900 to-violet-950/80 px-6 py-5'
-            : 'edge-monitor-header relative mb-5 overflow-hidden rounded-3xl border border-cyan-500/20 bg-zinc-950 p-4'
-        }
+        className={`edge-monitor-header ${MONITOR_PANEL} ${isDesktop ? 'mb-8 px-6 py-5' : 'mb-5 p-4'}`}
       >
-        <div className="pointer-events-none absolute inset-0 edge-monitor-header-glow" aria-hidden />
         {isDesktop ? (
-          <div className="relative flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 flex items-start gap-4">
               <img
                 src="/edge-lounge-logo-transparent.png"
                 alt=""
-                className="hidden sm:block h-12 w-auto shrink-0 drop-shadow-[0_0_18px_rgba(6,206,252,0.35)]"
+                className="hidden sm:block h-12 w-auto shrink-0"
               />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <div className="text-2xl lg:text-3xl font-black tracking-tight bg-gradient-to-r from-cyan-300 via-white to-violet-300 bg-clip-text text-transparent">
-                    Edge Monitor
-                  </div>
-                  <span className="hidden md:inline rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/30">
+                  <div className="text-2xl lg:text-3xl font-black tracking-tight text-white">Edge Monitor</div>
+                  <span className="hidden md:inline rounded-lg bg-zinc-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                     Desktop
                   </span>
                 </div>
                 <div className="text-zinc-400 text-sm mt-1">Live pulse · admin ops</div>
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                  <span className="rounded-full bg-black/30 px-2.5 py-1 font-semibold text-cyan-200 ring-1 ring-cyan-500/30">
-                    {opsMonitorSupabaseProjectRef()}
-                  </span>
-                  <span className="rounded-full bg-black/30 px-2.5 py-1 font-semibold text-zinc-300 ring-1 ring-zinc-600/50">
-                    {APP_BUILD_SHA.slice(0, 7)}
-                  </span>
-                  {generatedAt ? (
-                    <span className="rounded-full bg-black/20 px-2.5 py-1 font-medium text-zinc-400">{generatedAt}</span>
-                  ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className={MONITOR_META_PILL}>{opsMonitorSupabaseProjectRef()}</span>
+                  <span className={MONITOR_META_PILL}>{APP_BUILD_SHA.slice(0, 7)}</span>
+                  {generatedAt ? <span className={MONITOR_META_PILL}>{generatedAt}</span> : null}
                 </div>
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {headerSlot}
               {showDesktopLink ? (
-                <a
-                  href={EDGE_MONITOR_PATH}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="min-h-9 inline-flex items-center rounded-xl bg-zinc-800/80 px-3 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
-                >
+                <a href={EDGE_MONITOR_PATH} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center ${MONITOR_BTN}`}>
                   Desktop ↗
                 </a>
               ) : null}
               {onBack ? (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="min-h-9 rounded-xl bg-zinc-800/80 px-3 text-zinc-200 text-xs font-semibold touch-manipulation hover:bg-zinc-700"
-                >
+                <button type="button" onClick={onBack} className={MONITOR_BTN}>
                   ← Lounge
                 </button>
               ) : null}
@@ -751,33 +722,27 @@ export default function EdgeMonitorDashboard({
                   void load(true)
                   void loadRoster(true)
                 }}
-                className="min-h-9 rounded-xl bg-gradient-to-r from-cyan-600 to-violet-600 px-4 text-white text-xs font-bold touch-manipulation hover:from-cyan-500 hover:to-violet-500 disabled:opacity-50 shadow-lg shadow-cyan-900/30"
+                className={MONITOR_BTN_PRIMARY}
               >
                 {refreshing || rosterRefreshing ? 'Refreshing…' : 'Refresh'}
               </button>
               <button
                 type="button"
                 onClick={() => setAutoRefresh((v) => !v)}
-                className={`min-h-9 rounded-xl px-3 text-xs font-semibold touch-manipulation ring-1 ${
-                  autoRefresh
-                    ? 'bg-emerald-950/60 text-emerald-200 ring-emerald-500/40'
-                    : 'bg-zinc-800/80 text-zinc-300 ring-zinc-600/50'
-                }`}
+                className={`${MONITOR_BTN} ring-1 ring-zinc-700 ${autoRefresh ? 'bg-emerald-900 text-emerald-200 ring-emerald-800' : ''}`}
               >
                 Auto 90s {autoRefresh ? 'ON' : 'OFF'}
               </button>
             </div>
           </div>
         ) : (
-          <div className="relative flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-xl shrink-0" aria-hidden>
                   📊
                 </span>
-                <div className="text-xl font-black tracking-tight bg-gradient-to-r from-cyan-300 via-white to-violet-300 bg-clip-text text-transparent">
-                  Edge Monitor
-                </div>
+                <div className="text-xl font-black tracking-tight text-white">Edge Monitor</div>
               </div>
               <div className="text-zinc-400 text-sm mt-1">Live pulse · admin ops</div>
             </div>
@@ -788,17 +753,13 @@ export default function EdgeMonitorDashboard({
                   href={EDGE_MONITOR_PATH}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="min-h-10 inline-flex items-center justify-center rounded-xl bg-zinc-800 px-3 text-zinc-200 text-xs font-semibold touch-manipulation hover:bg-zinc-700"
+                  className={`inline-flex items-center justify-center ${MONITOR_BTN}`}
                 >
                   Desktop ↗
                 </a>
               ) : null}
               {onBack ? (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="min-h-10 rounded-xl bg-zinc-800 px-3 text-zinc-200 text-xs font-semibold touch-manipulation hover:bg-zinc-700"
-                >
+                <button type="button" onClick={onBack} className={MONITOR_BTN}>
                   ← Lounge
                 </button>
               ) : null}
@@ -809,32 +770,22 @@ export default function EdgeMonitorDashboard({
                   void load(true)
                   void loadRoster(true)
                 }}
-                className="min-h-10 rounded-xl bg-gradient-to-r from-cyan-600 to-violet-600 px-3 text-white text-xs font-bold touch-manipulation hover:from-cyan-500 hover:to-violet-500 disabled:opacity-50 shadow-lg shadow-cyan-900/30"
+                className={MONITOR_BTN_PRIMARY}
               >
                 {refreshing || rosterRefreshing ? 'Refreshing…' : 'Refresh'}
               </button>
               <button
                 type="button"
                 onClick={() => setAutoRefresh((v) => !v)}
-                className={`min-h-10 rounded-xl px-3 text-xs font-semibold touch-manipulation ring-1 ${
-                  autoRefresh
-                    ? 'bg-emerald-950/60 text-emerald-200 ring-emerald-500/40'
-                    : 'bg-zinc-800 text-zinc-300 ring-zinc-600/50'
-                }`}
+                className={`${MONITOR_BTN} ring-1 ring-zinc-700 ${autoRefresh ? 'bg-emerald-900 text-emerald-200 ring-emerald-800' : ''}`}
               >
                 Auto 90s {autoRefresh ? 'ON' : 'OFF'}
               </button>
             </div>
-            <div className="flex flex-wrap gap-2 text-[11px]">
-              <span className="rounded-full bg-zinc-900 px-2.5 py-1 font-semibold text-cyan-200 ring-1 ring-cyan-500/30">
-                {opsMonitorSupabaseProjectRef()}
-              </span>
-              <span className="rounded-full bg-zinc-900 px-2.5 py-1 font-semibold text-zinc-300 ring-1 ring-zinc-600/50">
-                {APP_BUILD_SHA.slice(0, 7)}
-              </span>
-              {generatedAt ? (
-                <span className="rounded-full bg-zinc-900/80 px-2.5 py-1 font-medium text-zinc-400">{generatedAt}</span>
-              ) : null}
+            <div className="flex flex-wrap gap-2">
+              <span className={MONITOR_META_PILL}>{opsMonitorSupabaseProjectRef()}</span>
+              <span className={MONITOR_META_PILL}>{APP_BUILD_SHA.slice(0, 7)}</span>
+              {generatedAt ? <span className={MONITOR_META_PILL}>{generatedAt}</span> : null}
             </div>
           </div>
         )}
@@ -886,7 +837,7 @@ export default function EdgeMonitorDashboard({
             <div className="edge-monitor-desktop-charts mb-6 grid grid-cols-1 xl:grid-cols-12 gap-4">
               <div className="xl:col-span-8 space-y-4">
                 {trendLabels.length > 0 ? (
-                  <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-5 h-full">
+                  <section className={`edge-monitor-panel ${MONITOR_PANEL} p-5 h-full`}>
                     <div className="mb-3">
                       <div className="text-white font-bold text-base">7-day pulse</div>
                       <div className="text-zinc-500 text-xs mt-0.5">UTC daily · signups, posts, activity, chat</div>
@@ -896,7 +847,7 @@ export default function EdgeMonitorDashboard({
                 ) : null}
               </div>
               <div className="xl:col-span-4 space-y-4">
-                <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-5">
+                <section className={`edge-monitor-panel ${MONITOR_PANEL} p-5`}>
                   <div className="mb-3">
                     <div className="text-white font-bold text-base">Velocity</div>
                     <div className="text-zinc-500 text-xs mt-0.5">24h vs 7d</div>
@@ -904,7 +855,7 @@ export default function EdgeMonitorDashboard({
                   <MonitorCompareBars items={velocityCompare} height={220} />
                 </section>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+                  <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4`}>
                     <div className="text-white font-bold text-sm mb-1">30-day signups</div>
                     <div className="text-zinc-500 text-[10px] mb-2">UTC daily sparkline</div>
                     <MonitorSparklineChart
@@ -915,7 +866,7 @@ export default function EdgeMonitorDashboard({
                       height={130}
                     />
                   </section>
-                  <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+                  <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4`}>
                     <div className="text-white font-bold text-sm mb-1">90-day activity</div>
                     <div className="text-zinc-500 text-[10px] mb-2">UTC weekly buckets</div>
                     <MonitorSparklineChart
@@ -928,7 +879,7 @@ export default function EdgeMonitorDashboard({
                   </section>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+                  <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4`}>
                     <div className="text-white font-bold text-sm mb-2">Roles</div>
                     <MonitorDoughnutChart
                       labels={roleDoughnut.labels}
@@ -937,7 +888,7 @@ export default function EdgeMonitorDashboard({
                       height={170}
                     />
                   </section>
-                  <section className="edge-monitor-panel rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+                  <section className={`edge-monitor-panel ${MONITOR_PANEL} p-4`}>
                     <div className="text-white font-bold text-sm mb-2">Subs</div>
                     <MonitorDoughnutChart
                       labels={subsDoughnut.labels}

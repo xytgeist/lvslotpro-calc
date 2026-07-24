@@ -46,7 +46,7 @@ function baseScales() {
 export function MonitorPulseChart({ labels, datasets, height = 220 }) {
   if (!labels?.length || !datasets?.length) return null
   return (
-    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950/50 border border-zinc-800/80 p-3" style={{ height }}>
+    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950 border border-zinc-800 p-3" style={{ height }}>
       <Line
         data={{ labels, datasets }}
         options={{
@@ -75,7 +75,7 @@ export function MonitorPulseChart({ labels, datasets, height = 220 }) {
 export function MonitorDoughnutChart({ labels, values, colors, height = 200 }) {
   if (!labels?.length || !values?.some((v) => v > 0)) return null
   return (
-    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950/50 border border-zinc-800/80 p-3" style={{ height }}>
+    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950 border border-zinc-800 p-3" style={{ height }}>
       <Doughnut
         data={{
           labels,
@@ -113,7 +113,7 @@ export function MonitorDoughnutChart({ labels, values, colors, height = 200 }) {
 export function MonitorBarChart({ labels, values, color = OPS_CHART_COLORS.cyan, height = 200 }) {
   if (!labels?.length) return null
   return (
-    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950/50 border border-zinc-800/80 p-3" style={{ height }}>
+    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950 border border-zinc-800 p-3" style={{ height }}>
       <Bar
         data={{
           labels,
@@ -155,7 +155,7 @@ export function MonitorSparklineChart({
 }) {
   if (!labels?.length || !values?.length) return null
   return (
-    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950/50 border border-zinc-800/80 p-3" style={{ height }}>
+    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950 border border-zinc-800 p-3" style={{ height }}>
       <Line
         data={{
           labels,
@@ -208,7 +208,7 @@ export function MonitorCompareBars({ items, height = 180 }) {
   const values24 = items.map((i) => i.v24)
   const values7 = items.map((i) => i.v7)
   return (
-    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950/50 border border-zinc-800/80 p-3" style={{ height }}>
+    <div className="edge-monitor-chart-shell rounded-2xl bg-zinc-950 border border-zinc-800 p-3" style={{ height }}>
       <Bar
         data={{
           labels,
