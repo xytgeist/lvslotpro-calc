@@ -1111,7 +1111,7 @@ function pickerEnrichCacheKey(assetClass: MarketAssetClass, symbol: string): str
 }
 
 /** Finnhub profile2 logo — deduped per US root (AAPL.TO → AAPL). Yahoo chart often omits logos. */
-async function resolveStockLogoUrl(symbol: string): Promise<string> {
+export async function finnhubStockLogoUrl(symbol: string): Promise<string> {
   const lookup = logoProfileSymbol(symbol, 'stock')
   const cacheKey = lookup.toLowerCase()
   const cached = stockLogoCache.get(cacheKey)
@@ -1148,7 +1148,7 @@ async function enrichStockPickerFields(symbol: string): Promise<PickerEnrichFiel
   }
 
   let logo_url = row.logo
-  if (!logo_url) logo_url = await resolveStockLogoUrl(symbol)
+  if (!logo_url) logo_url = await finnhubStockLogoUrl(symbol)
 
   let market_cap = toUsd(row.market_cap)
   if (market_cap == null) {
@@ -1198,7 +1198,7 @@ export async function enrichSearchResultsLogosOnly<
 
       const yahoo = await yahooStockPickerRow(row.symbol).catch(() => null)
       logo_url = String(yahoo?.logo || '').trim()
-      if (!logo_url) logo_url = await resolveStockLogoUrl(row.symbol)
+      if (!logo_url) logo_url = await finnhubStockLogoUrl(row.symbol)
       return { ...row, logo_url: logo_url || '' }
     }),
   )

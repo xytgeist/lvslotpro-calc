@@ -126,15 +126,15 @@ export default function LoungeComposerMediaToolbar({
   const filled = !isThread
   const labelClass = isThread
     ? `flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full p-2 text-cyan-600 hover:text-cyan-500 active:text-cyan-400 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]${disabled ? ' pointer-events-none opacity-45' : ''}`
-    : `flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]${disabled ? ' pointer-events-none opacity-45' : ''}`
+    : `flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-md p-0.5 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]${disabled ? ' pointer-events-none opacity-45' : ''}`
   const gifBtnClass = isThread
     ? 'flex shrink-0 touch-manipulation items-center justify-center rounded-full p-2 text-cyan-600 hover:text-cyan-500 active:text-cyan-400 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]'
-    : 'flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]'
+    : 'flex shrink-0 touch-manipulation items-center justify-center rounded-md p-0.5 text-sky-400 hover:text-sky-300 active:text-sky-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]'
 
   const preventFocusSteal = (e) => e.preventDefault()
 
   return (
-    <>
+    <div className={`inline-flex shrink-0 items-center gap-0.5${className ? ` ${className}` : ''}`}>
       <label
         htmlFor={imageInputId}
         onPointerDown={onImagePointerDown}
@@ -181,6 +181,6 @@ export default function LoungeComposerMediaToolbar({
           <LoungeComposerMediaChartIcon className={iconClass} filled={filled} />
         </button>
       ) : null}
-    </>
+    </div>
   )
 }

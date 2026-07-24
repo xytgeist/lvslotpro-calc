@@ -1,7 +1,7 @@
 import { appendHighlightedPlainText, loungeSearchHighlightTerms } from '../../utils/loungeSearchHighlight.jsx'
 import { splitTextWithLinks } from '../../utils/linkifyText.jsx'
 import { LOUNGE_CAPTION_DISPLAY_MAX, LOUNGE_CAPTION_DISPLAY_MAX_LINES } from '../../utils/loungeCommentLimits.js'
-import { marketCashtagColorClass } from '../../utils/loungeMarketCaptionParse.js'
+import { marketCashtagColorClass, guessCashtagAssetClass } from '../../utils/loungeMarketCaptionParse.js'
 
 /** @returns {{ text: string, isTruncated: boolean }} */
 export function truncateCaptionForDisplay(
@@ -136,7 +136,8 @@ export function renderRichCaption(
       const ticker = String(m[1] || '').trim()
       const tickerKey = ticker.toUpperCase()
       const changePct = cashtagQuotesByTicker?.[tickerKey]?.change_pct
-      const cashtagClassName = marketCashtagColorClass(changePct)
+      const assetClass = guessCashtagAssetClass(tickerKey)
+      const cashtagClassName = marketCashtagColorClass(changePct, { assetClass })
       const label = `$${tickerKey}`
       if (onCashtagClick) {
         out.push(

@@ -28,6 +28,7 @@ import {
   type MarketProfile,
   type MarketWindowKey,
 } from '../_shared/finnhubMarket.ts'
+import { isAllowedMarketLogoUrlForFetch, readMarketLogoR2Config } from '../_shared/marketLogoR2.ts'
 import { resolveMarketSymbolLookup } from '../_shared/marketSymbolLookup.ts'
 import {
   resolveMarketBarsBeforeByResolution,
@@ -264,21 +265,13 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function isAllowedMarketLogoUrl(url: string): boolean {
+  let r2Base = ''
   try {
-    const parsed = new URL(url)
-    if (parsed.protocol !== 'https:') return false
-    const host = parsed.hostname.toLowerCase()
-    const allowedSuffixes = [
-      'finnhub.io',
-      'coingecko.com',
-      'yimg.com',
-      'clearbit.com',
-      'googleusercontent.com',
-    ]
-    return allowedSuffixes.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+    r2Base = readMarketLogoR2Config().publicBaseUrl
   } catch {
-    return false
+    /* R2 not configured — still allow legacy CDN hosts */
   }
+  return isAllowedMarketLogoUrlForFetch(url, r2Base)
 }
 
 async function resolveMarketLogoUrl(
@@ -701,7 +694,15 @@ Deno.serve(async (req) => {
     if (postRow.user_id !== user.id) return respond(403, { error: 'Not allowed.' })
 
     try {
-      const symbols = await resolveMarketSymbolsForAttach(caption, pickerSymbols)
+      const pickerOnly = body?.picker_only === true
+      const symbols = pickerOnly
+        ? pickerSymbols
+            .map((row) => ({
+              symbol: row.symbol,
+              asset_class: row.asset_class,
+            }))
+            .filter((row) => row.symbol)
+        : await resolveMarketSymbolsForAttach(caption, pickerSymbols)
       if (!symbols.length) {
         const { error } = await admin
           .from('community_feed_posts')

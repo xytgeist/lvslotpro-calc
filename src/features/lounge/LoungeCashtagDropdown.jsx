@@ -145,7 +145,7 @@ export default function LoungeCashtagDropdown({
                   isActive ? 'bg-zinc-800' : 'hover:bg-zinc-800/60'
                 }`}
               >
-                <LoungeMarketSearchResultRow row={row} variant="compact" showQuotes={false} />
+                <LoungeMarketSearchResultRow row={row} variant="compact" />
               </button>
             )
           })}

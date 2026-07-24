@@ -20,7 +20,6 @@ import { normalizeLoungePostCategoryPills } from '../../utils/loungePostCategory
 import { feedCommentThreadPartInsertPayload } from '../../utils/communityFeedComment.js'
 import { attachLinkPreview } from '../../utils/loungeLinkPreviewApi.js'
 import { attachMarketEmbedsToPost } from '../../utils/loungeMarketApi.js'
-import { extractCashtagsFromCaption } from '../../utils/loungeMarketCaptionParse.js'
 import { resolveLoungeSubmissionVideoPrep } from './loungeQueuedVideoPrep.js'
 
 async function uploadLoungeThreadPartImageFiles({
@@ -571,7 +570,7 @@ async function syncMarketEmbedsAfterPostSave(supabaseClient, { postId, caption, 
         }))
         .filter((row) => row.symbol)
     : []
-  if (!pickerSymbols.length && !extractCashtagsFromCaption(cap).length) {
+  if (!pickerSymbols.length) {
     const { error } = await supabaseClient.from('community_feed_posts').update({ market_embeds: [] }).eq('id', id)
     if (error) {
       const msg = String(error.message || '')
@@ -588,6 +587,7 @@ async function syncMarketEmbedsAfterPostSave(supabaseClient, { postId, caption, 
     postId: id,
     caption: cap,
     symbols: pickerSymbols,
+    pickerOnly: true,
   })
   if (!result || result.error) {
     const msg = String(result?.error || 'Could not attach market charts.')

@@ -264,11 +264,32 @@ Deno.serve(async (req) => {
               await admin.from('lounge_bot_x_sources').update({ x_user_id: xUserId }).eq('id', src.id)
             }
           }
-          if (!xUserId) continue
+          if (!xUserId) {
+            if (!dryRun) {
+              await admin.from('lounge_bot_x_sources').update({
+                last_polled_at: new Date().toISOString(),
+                last_error: `Could not resolve X user id for @${src.x_handle}`,
+              }).eq('id', src.id)
+            }
+            continue
+          }
 
           const json = await fetchTweets(xUserId, src.since_id, token, src)
           const tweets = Array.isArray(json?.data) ? json.data : []
           const newestId = json?.meta?.newest_id as string | undefined
+
+          // First poll on a source: seed since_id only (forward from next run, no history backfill).
+          if (!src.since_id && newestId) {
+            if (!dryRun) {
+              await admin.from('lounge_bot_x_sources').update({
+                since_id: newestId,
+                x_user_id: xUserId,
+                last_polled_at: new Date().toISOString(),
+                last_error: null,
+              }).eq('id', src.id)
+            }
+            continue
+          }
 
           for (const tw of tweets) {
             if (!isTopLevelTweet(tw)) continue

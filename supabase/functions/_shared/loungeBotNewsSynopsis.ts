@@ -4,7 +4,7 @@
  */
 
 import { decodeHtmlEntities } from './decodeHtmlEntities.ts'
-import { sanitizeWireProse } from './wireBotProse.ts'
+import { sanitizeWireProse, splitWireSentences } from './wireBotProse.ts'
 import type { NewsProfile } from './loungeBotNewsProfile.ts'
 
 const SYNOPSIS_MAX = 380
@@ -91,8 +91,8 @@ function filterSynopsisRedundancy(
   if (!raw) return ''
 
   const refs = headlineBodiesForCompare(headline, originalTitle)
-  const parts = raw.match(/[^.!?]+[.!?]+(?:\s|$)/g)
-  if (!parts?.length) {
+  const parts = splitWireSentences(raw)
+  if (!parts.length) {
     return sentenceRedundantWithHeadline(raw, refs) ? '' : sanitizeWireProse(raw)
   }
 
@@ -113,7 +113,8 @@ function splitSummarySentences(summary: string): string[] {
   )
   if (!t || t.length < 48) return []
   if (/^(read more|click here|view article)/i.test(t)) return []
-  return t.match(/[^.!?]+[.!?]+(?:\s|$)/g)?.map((s) => s.trim()).filter(Boolean) ?? [t]
+  const parts = splitWireSentences(t)
+  return parts.length ? parts : [t]
 }
 
 function clipFeedSummary(

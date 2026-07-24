@@ -1,6 +1,6 @@
 # Lounge bot editorial queue — X-tracker bots only (planned)
 
-**Status:** **Code shipped (Jul 2026)** ... X ingest, editorial inbox, LLM rewrite via per-bot `config.voice_prompt` (portal **Settings** / create wizard). Cron for X ingest still TBD.
+**Status:** **Code shipped (Jul 2026)** ... X ingest, editorial inbox, LLM rewrite via per-bot `config.voice_prompt` (portal **Settings** / create wizard). **pg_cron:** migration **`20260724000000`** — **`invoke_lounge_x_ingest()`** every **8 hours** (one Edge call polls **all** running `pipeline=x` bots; no per-bot cron rows).
 
 **Decision (2026-07-03):** The **morning editorial inbox** is **only** for **X-tracker bots** ... human-imitating Edge accounts that follow configured `@handles`, rewrite tweets in persona voice, and need Ryan's review before publish.
 
@@ -156,7 +156,7 @@ GET https://api.x.com/2/users/{x_user_id}/tweets
 Authorization: Bearer <token>
 ```
 
-**Cron:** every 30–60 min overnight, or 2–4 fixed runs (11pm, 2am, 5am PT). Advance `since_id` after processing.
+**Cron:** **`lounge_x_ingest_editorial`** every **8 hours** (`0 */8 * * *` UTC) via **`invoke_lounge_x_ingest()`** — one POST, all running X bots. **First poll** on a new `@handle` seeds **`since_id` only** (forward from next run; no historical backfill). Advance **`since_id`** after each successful ingest pass.
 
 **Dedupe:** unique `external_key` (tweet id) on queue table. **Skip** keeps the row (key stays locked). Portal **Discard** hard-deletes via RPC **`admin_lounge_bot_queue_delete`** so Transform can re-ingest the same tweet.
 

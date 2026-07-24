@@ -53,6 +53,33 @@ export function loungeMarketBarsToSeries(bars) {
   return out
 }
 
+/** Normalize closes to % change from the first bar (for multi-symbol strip compare). */
+export function loungeMarketBarsToPercentSeries(bars) {
+  if (!Array.isArray(bars) || !bars.length) return []
+  const sorted = bars
+    .filter((b) => Number.isFinite(b?.t) && Number.isFinite(b?.c))
+    .slice()
+    .sort((a, b) => a.t - b.t)
+  const base = sorted[0]?.c
+  if (!Number.isFinite(base) || base === 0) return loungeMarketBarsToSeries(bars)
+
+  const mapped = sorted.map((b) => ({
+    time: Math.floor(b.t > 1e12 ? b.t / 1000 : b.t),
+    value: ((b.c - base) / base) * 100,
+  }))
+
+  const out = []
+  for (const point of mapped) {
+    const last = out[out.length - 1]
+    if (last && last.time === point.time) {
+      last.value = point.value
+    } else {
+      out.push(point)
+    }
+  }
+  return out
+}
+
 /** Crosshair - both axes; labels only in advanced modal. */
 export function loungeMarketChartCrosshairOptions(isAdvancedView = false, isLight = loungeMarketChartIsLight()) {
   const color = isLight ? 'rgba(113, 113, 122, 0.55)' : 'rgba(161, 161, 170, 0.55)'

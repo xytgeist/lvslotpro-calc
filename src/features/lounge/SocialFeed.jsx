@@ -106,7 +106,9 @@ import {
   persistLoungeComposerDraft,
   clearLoungeComposerDraft,
   readLoungeComposerLastCategoryPills,
+  readLoungeComposerAudience,
   writeLoungeComposerLastCategoryPills,
+  writeLoungeComposerAudience,
   persistLoungeComposerLastCategoryPillsFromSubmit,
   LOUNGE_PROFILE_CACHE_KEY,
   loungeProfileNeedsGate,
@@ -190,18 +192,19 @@ import {
   parseLoungeProfileHandleFromUrl,
 } from './loungeCaptionLink.js'
 import { useMentionState } from './loungeMentionAutocomplete'
-import LoungeComposerMarketSymbolPills from './LoungeComposerMarketSymbolPills.jsx'
+import LoungeComposerMarketChartStrip from './LoungeComposerMarketChartStrip.jsx'
 import LoungeMentionDropdown from './LoungeMentionDropdown'
 import { LoungeImageCarousel, LoungePostFeedImagesAndGif } from './LoungePostFeedMedia.jsx'
 import LoungeFeedStatSlot from './LoungeFeedStatSlot'
 import LoungePostArticle from './LoungePostArticle'
 import LoungeLinkPreviewBlock from './LoungeLinkPreviewBlock.jsx'
 import { bodyTextWithLinkPreview } from '../../utils/linkifyText.jsx'
-import { normalizeMarketEmbeds, LOUNGE_MARKET_EMBED_MAX, extractCashtagsFromCaption } from '../../utils/loungeMarketCaptionParse.js'
+import { normalizeMarketEmbeds, LOUNGE_MARKET_EMBED_MAX } from '../../utils/loungeMarketCaptionParse.js'
 import LoungeFeedPendingStatusRow from './LoungeFeedPendingStatusRow.jsx'
 import LoungeFanOnlyPostRowTint from './LoungeFanOnlyPostRowTint.jsx'
 import LoungeComposerCharRing from './LoungeComposerCharRing.jsx'
 import LoungeComposerAudienceSheet from './LoungeComposerAudienceSheet.jsx'
+import LoungeComposerAudiencePill from './LoungeComposerAudiencePill.jsx'
 import CreatorFanSubscribeModal from '../creatorFanSubs/CreatorFanSubscribeModal.jsx'
 import {
   fetchCreatorFanOffer,
@@ -212,6 +215,7 @@ import {
   isLoungeFanOnlyPostLocked,
   isLoungeFanOnlyDirectFeedRowLocked,
   loungeFanOnlyPostDetailOpenBlocked,
+  LOUNGE_COMPOSER_AUDIENCE_ALL,
   LOUNGE_COMPOSER_AUDIENCE_SUBS,
   loungeFanOnlyPostContentEntity,
   showLoungeFanOnlyPostUnlockedTint,
@@ -283,9 +287,11 @@ import {
   useLoungeKeyboardOverlapPx,
 } from './useLoungeKeyboardOverlapPx.js'
 import LoungeMarketSymbolPickerSheet from './LoungeMarketSymbolPickerSheet.jsx'
-import { useCashtagState } from './loungeCashtagAutocomplete.js'
+import { useCashtagState, shouldKeepCashtagAutocompleteAfterBlur } from './loungeCashtagAutocomplete.js'
 import LoungeCashtagDropdown from './LoungeCashtagDropdown.jsx'
-import { mergeComposerMarketSymbolForCashtag } from './loungeMarketSymbolUtils.js'
+import { mergeComposerMarketSymbolForCashtag, marketSymbolDedupeKey } from './loungeMarketSymbolUtils.js'
+import { fetchComposerMarketEmbed, hydrateComposerMarketSymbolEmbeds } from './loungeComposerMarketEmbed.js'
+import { useComposerCashtagStyleContext } from './loungeComposerCashtagStyle.js'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import PwaInstallTitleBarRow from '../../components/PwaInstallBanner.jsx'
 import TitleBarStatusLine from '../../components/TitleBarStatusLine.jsx'
@@ -696,6 +702,7 @@ export default function SocialFeed({
   })
   const [composerCategoryPills, setComposerCategoryPills] = useState(() => readLoungeComposerLastCategoryPills())
   const [composerFanMonetizationLive, setComposerFanMonetizationLive] = useState(false)
+  const [composerAudience, setComposerAudience] = useState(() => readLoungeComposerAudience())
   const [composerAudienceSheetOpen, setComposerAudienceSheetOpen] = useState(false)
   const composerAudienceContinueRef = useRef(/** @type {((creatorFanOnly: boolean) => void) | null} */ (null))
   const [viewerFanEntitlements, setViewerFanEntitlements] = useState(null)
@@ -716,6 +723,10 @@ export default function SocialFeed({
   useEffect(() => {
     writeLoungeComposerLastCategoryPills(composerCategoryPills)
   }, [composerCategoryPills])
+
+  useEffect(() => {
+    writeLoungeComposerAudience(composerAudience)
+  }, [composerAudience])
 
   useEffect(() => {
     if (!feedFanSubscribeOpen || !feedFanSubscribeOffer?.creator_user_id) {
@@ -1419,21 +1430,41 @@ export default function SocialFeed({
     : loungeComposerFooterPaddingBottom(0, loungeDetailCommentIosSafeBottomPx)
 
   // ── @mention / $cashtag autocomplete - one instance per composer ───────────
-  const appendComposerMarketSymbol = useCallback((row) => {
-    setComposerMarketSymbols((prev) => {
+  const appendComposerMarketSymbol = useCallback(
+    (row) => {
       const tag = String(row?.display_symbol || row?.symbol || '').trim().toUpperCase()
-      if (!tag || !row?.symbol) return prev
-      return mergeComposerMarketSymbolForCashtag(prev, tag, row, LOUNGE_MARKET_EMBED_MAX)
-    })
-  }, [])
+      if (!tag || !row?.symbol) return
+      const key = marketSymbolDedupeKey(row)
+      setComposerMarketSymbols((prev) =>
+        mergeComposerMarketSymbolForCashtag(prev, tag, row, LOUNGE_MARKET_EMBED_MAX),
+      )
+      void fetchComposerMarketEmbed(supabaseClient, row).then((embed) => {
+        if (!embed) return
+        setComposerMarketSymbols((prev) =>
+          prev.map((s) => (marketSymbolDedupeKey(s) === key ? { ...s, composerEmbed: embed } : s)),
+        )
+      })
+    },
+    [supabaseClient],
+  )
 
-  const appendDetailEditMarketSymbol = useCallback((row) => {
-    setLoungeDetailEditMarketSymbols((prev) => {
+  const appendDetailEditMarketSymbol = useCallback(
+    (row) => {
       const tag = String(row?.display_symbol || row?.symbol || '').trim().toUpperCase()
-      if (!tag || !row?.symbol) return prev
-      return mergeComposerMarketSymbolForCashtag(prev, tag, row, LOUNGE_MARKET_EMBED_MAX)
-    })
-  }, [])
+      if (!tag || !row?.symbol) return
+      const key = marketSymbolDedupeKey(row)
+      setLoungeDetailEditMarketSymbols((prev) =>
+        mergeComposerMarketSymbolForCashtag(prev, tag, row, LOUNGE_MARKET_EMBED_MAX),
+      )
+      void fetchComposerMarketEmbed(supabaseClient, row).then((embed) => {
+        if (!embed) return
+        setLoungeDetailEditMarketSymbols((prev) =>
+          prev.map((s) => (marketSymbolDedupeKey(s) === key ? { ...s, composerEmbed: embed } : s)),
+        )
+      })
+    },
+    [supabaseClient],
+  )
 
   const mentionComposer = useMentionState(postText, supabaseClient, !loungeReadOnly)
   const mentionDetailComment = useMentionState(loungeDetailCommentDraft, supabaseClient, !loungeReadOnly)
@@ -1450,6 +1481,19 @@ export default function SocialFeed({
     supabaseClient,
     Boolean(loungeDetailEditing && !loungeReadOnly),
     appendDetailEditMarketSymbol,
+  )
+
+  const composerCashtagStyleContext = useComposerCashtagStyleContext(
+    supabaseClient,
+    postText,
+    composerMarketSymbols,
+    !loungeReadOnly && composerExpanded,
+  )
+  const detailEditCashtagStyleContext = useComposerCashtagStyleContext(
+    supabaseClient,
+    loungeDetailDraftCaption,
+    loungeDetailEditMarketSymbols,
+    Boolean(loungeDetailEditing && !loungeReadOnly),
   )
 
   const chatDockIsStaff = Boolean(isStaff || loungeViewerIsStaff)
@@ -6992,6 +7036,7 @@ export default function SocialFeed({
             logo_url: e.logo_url,
             market_cap: e.market_cap,
             currency: e.currency,
+            composerEmbed: e,
           })),
         )
         setLoungeDetailEditing(true)
@@ -8040,9 +8085,7 @@ export default function SocialFeed({
     const hasVideo = hasNewVideo || Boolean(keepStream)
     const hasImages = loungeDetailEditImageItems.length > 0 || loungeDetailEditImageUrls.length > 0
     const hasMedia = hasImages || Boolean(gifOnlyUrl) || hasVideo
-    const hasMarket =
-      loungeDetailEditMarketSymbols.length > 0 ||
-      extractCashtagsFromCaption(cap).length > 0
+    const hasMarket = loungeDetailEditMarketSymbols.length > 0
     if (!cap && !hasMedia && !hasMarket) {
       setLoungeDetailEditErr('Write a caption or attach media before saving.')
       return
@@ -9089,7 +9132,7 @@ export default function SocialFeed({
             </button>
           </div>
         ) : null}
-        <div className="lounge-media-toolbar mt-1 flex w-full items-center gap-1.5">
+        <div className="lounge-media-toolbar mt-1 flex w-full items-center">
           <LoungeComposerMediaToolbar
             variant="compact"
             imageInputId={LOUNGE_COMMENT_EDIT_IMAGE_INPUT_ID}
@@ -12212,7 +12255,7 @@ export default function SocialFeed({
     const hasGif = gifCheck.value.length > 0
     const hasImages = composerImageItems.length > 0
     const hasVideo = composerVideoSlot != null
-    const hasMarket = composerMarketSymbols.length > 0 || extractCashtagsFromCaption(caption).length > 0
+    const hasMarket = composerMarketSymbols.length > 0
     if (!caption && !hasGif && !hasImages && !hasVideo && !hasMarket) return
     if (caption.length > loungeComposerCaptionMax) {
       setPostErr(`Caption must be ${loungeComposerCaptionMax} characters or fewer.`)
@@ -12227,10 +12270,9 @@ export default function SocialFeed({
       }
     }
 
-    promptComposerAudienceIfNeeded((fanOnly) => {
-      void submitLoungePostWithAudience(fanOnly)
-    })
+    void submitLoungePostWithAudience(composerAudience === LOUNGE_COMPOSER_AUDIENCE_SUBS)
   }, [
+    composerAudience,
     composerImageItems,
     composerMarketSymbols,
     composerMediaUrl,
@@ -12238,7 +12280,6 @@ export default function SocialFeed({
     loungeComposerCaptionMax,
     loungeComposerVideoPostBlocked,
     postText,
-    promptComposerAudienceIfNeeded,
     submitLoungePostWithAudience,
   ])
 
@@ -13831,6 +13872,7 @@ export default function SocialFeed({
           className={`relative shrink-0 border-b border-zinc-600/65 bg-zinc-700/55 px-3 ${
             composerExpanded ? 'pt-3 pb-1.5' : 'py-3'
           }`}
+          data-lounge-feed-composer=""
         >
         {composerExpanded && composerFoldReveal > 0.14 ? (
           <div className="absolute right-3 top-3 z-10">
@@ -13947,6 +13989,14 @@ export default function SocialFeed({
               >
                 <div className="mt-0.5 flex min-h-[6.5rem] flex-col">
                   <div ref={mentionComposerAnchorRef} className="pr-8">
+                    {composerFanMonetizationLive ? (
+                      <LoungeComposerAudiencePill
+                        value={composerAudience}
+                        onChange={setComposerAudience}
+                        disabled={postBusy}
+                        className="mb-1.5"
+                      />
+                    ) : null}
                     <LoungeRichComposerField
                       ref={composerFieldRef}
                       variant="feed"
@@ -13955,6 +14005,7 @@ export default function SocialFeed({
                       maxLength={loungeComposerCaptionMax}
                       placeholder="Are ya winning, son?"
                       ariaLabel="Lounge post caption"
+                      cashtagStyleContext={composerCashtagStyleContext}
                       onKeyDown={(e) => {
                         if (cashtagComposer.onCashtagKeyDown(e, setPostText, composerFieldRef.current)) return
                         mentionComposer.onMentionKeyDown(e, setPostText, composerFieldRef.current)
@@ -13973,6 +14024,7 @@ export default function SocialFeed({
                       }}
                       onBlur={() =>
                         window.setTimeout(() => {
+                          if (shouldKeepCashtagAutocompleteAfterBlur(composerFieldRef.current)) return
                           cashtagComposer.clearCashtag()
                           mentionComposer.clearMention()
                         }, 150)
@@ -14000,9 +14052,10 @@ export default function SocialFeed({
                       anchorRef={mentionComposerAnchorRef}
                       caretFieldRef={composerFieldRef}
                     />
-                    <LoungeComposerMarketSymbolPills
+                    <LoungeComposerMarketChartStrip
                       symbols={composerMarketSymbols}
                       onChange={setComposerMarketSymbols}
+                      onOpenChart={(embed, embeds) => openMarketChartModal({ embed, embeds })}
                       className="mt-1.5"
                     />
                   </div>
@@ -14153,22 +14206,23 @@ export default function SocialFeed({
             />
             <div
               data-lounge-fab-obstacle
-              className="lounge-media-toolbar mt-0.5 flex w-full items-center gap-1.5 pr-1 py-0.5"
+              className="lounge-media-toolbar mt-0.5 flex w-full items-center pr-1 py-0.5"
             >
-              <LoungeComposerMediaToolbar
-                variant="feed"
-                imageInputId={LOUNGE_COMPOSER_IMAGE_INPUT_ID}
-                videoInputId={LOUNGE_COMPOSER_VIDEO_INPUT_ID}
-                onImagePointerDown={() => beginLoungeComposerMediaPicker('composer')}
-                onVideoPointerDown={() => beginLoungeComposerMediaPicker('composer')}
-                onOpenGifPicker={() => openKlipyPicker('composer')}
-                onOpenMarketPicker={() => openMarketPicker('composer')}
-              />
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => openThreadComposeSheet()}
-                className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-1 text-sky-400 hover:text-sky-300 active:text-sky-200 [-webkit-tap-highlight-color:transparent]"
+              <div className="inline-flex shrink-0 items-center gap-0.5">
+                <LoungeComposerMediaToolbar
+                  variant="feed"
+                  imageInputId={LOUNGE_COMPOSER_IMAGE_INPUT_ID}
+                  videoInputId={LOUNGE_COMPOSER_VIDEO_INPUT_ID}
+                  onImagePointerDown={() => beginLoungeComposerMediaPicker('composer')}
+                  onVideoPointerDown={() => beginLoungeComposerMediaPicker('composer')}
+                  onOpenGifPicker={() => openKlipyPicker('composer')}
+                  onOpenMarketPicker={() => openMarketPicker('composer')}
+                />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => openThreadComposeSheet()}
+                  className="flex shrink-0 touch-manipulation items-center justify-center rounded-md p-0.5 text-sky-400 hover:text-sky-300 active:text-sky-200 [-webkit-tap-highlight-color:transparent]"
                 title="Start a thread"
                 aria-label="Start a thread"
               >
@@ -14191,7 +14245,8 @@ export default function SocialFeed({
                     strokeLinecap="round"
                   />
                 </svg>
-              </button>
+                </button>
+              </div>
               <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
                 <div className="inline-flex shrink-0 items-center gap-1.5">
                   <button
@@ -14218,8 +14273,7 @@ export default function SocialFeed({
                         !String(composerMediaUrl || '').trim() &&
                         composerImageItems.length === 0 &&
                         !composerVideoSlot &&
-                        composerMarketSymbols.length === 0 &&
-                        extractCashtagsFromCaption(postText).length === 0)
+                        composerMarketSymbols.length === 0)
                     }
                     className="lounge-composer-post-btn min-h-7 shrink-0 touch-manipulation rounded-md px-2 py-0.5 text-[13px] font-bold leading-tight disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -14878,6 +14932,7 @@ export default function SocialFeed({
                       placeholder="Are ya winning, son?"
                       ariaLabel="Edit caption"
                       disabled={loungeDetailEditBusy}
+                      cashtagStyleContext={detailEditCashtagStyleContext}
                       onKeyDown={(e) => {
                         if (
                           cashtagDetailEdit.onCashtagKeyDown(
@@ -14892,7 +14947,12 @@ export default function SocialFeed({
                       onKeyUp={cashtagDetailEdit.onCursorMove}
                       onMouseUp={cashtagDetailEdit.onCursorMove}
                       onInput={cashtagDetailEdit.onCursorMove}
-                      onBlur={() => window.setTimeout(() => cashtagDetailEdit.clearCashtag(), 150)}
+                      onBlur={() =>
+                        window.setTimeout(() => {
+                          if (shouldKeepCashtagAutocompleteAfterBlur(loungeDetailEditFieldRef.current)) return
+                          cashtagDetailEdit.clearCashtag()
+                        }, 150)
+                      }
                     />
                     <LoungeCashtagDropdown
                       open={cashtagDetailEdit.isOpen}
@@ -14910,9 +14970,10 @@ export default function SocialFeed({
                       anchorRef={loungeDetailEditCashtagAnchorRef}
                       caretFieldRef={loungeDetailEditFieldRef}
                     />
-                    <LoungeComposerMarketSymbolPills
+                    <LoungeComposerMarketChartStrip
                       symbols={loungeDetailEditMarketSymbols}
                       onChange={setLoungeDetailEditMarketSymbols}
+                      onOpenChart={(embed, embeds) => openMarketChartModal({ embed, embeds })}
                       className="mt-1.5"
                     />
                     {loungeDetailEditErr ? (
@@ -15274,7 +15335,7 @@ export default function SocialFeed({
                           {...loungeFileInputMediaPickerHandlers('detailEdit')}
                           onChange={(e) => handleDetailEditMediaInputChange(e, 'video')}
                         />
-                        <div className="lounge-media-toolbar mb-0.5 flex w-full items-center gap-1.5 pr-1 py-0.5">
+                        <div className="lounge-media-toolbar mb-0.5 flex w-full items-center pr-1 py-0.5">
                           <LoungeComposerMediaToolbar
                             variant="feed"
                             imageInputId={LOUNGE_DETAIL_EDIT_IMAGE_INPUT_ID}
@@ -16116,7 +16177,7 @@ export default function SocialFeed({
                           </div>
                         ) : null}
                         <div className="mx-auto mt-0.5 h-px w-[92%] bg-zinc-700/85" role="presentation" aria-hidden />
-                        <div className="lounge-media-toolbar mt-0.5 flex w-full items-center gap-1.5 pb-0 pt-1">
+                        <div className="lounge-media-toolbar mt-0.5 flex w-full items-center pb-0 pt-1">
                           <LoungeComposerMediaToolbar
                             variant="compact"
                             imageInputId={LOUNGE_DETAIL_COMMENT_IMAGE_INPUT_ID}
@@ -16703,7 +16764,7 @@ export default function SocialFeed({
                         </div>
                       </div>
                         <div className="lounge-media-toolbar mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-zinc-700/70 py-0.5">
-                          <div className="flex shrink-0 items-center justify-center gap-1.5">
+                          <div className="flex shrink-0 items-center justify-center">
                             <LoungeComposerMediaToolbar
                               variant="feed"
                               imageInputId={LOUNGE_QUOTE_REPOST_IMAGE_INPUT_ID}
@@ -16828,9 +16889,15 @@ export default function SocialFeed({
         onClose={() => setMarketPickerOpen(false)}
         caption={marketPickerTarget === 'detailEdit' ? loungeDetailDraftCaption : postText}
         selected={marketPickerTarget === 'detailEdit' ? loungeDetailEditMarketSymbols : composerMarketSymbols}
-        onChange={
-          marketPickerTarget === 'detailEdit' ? setLoungeDetailEditMarketSymbols : setComposerMarketSymbols
-        }
+        onChange={(next) => {
+          if (marketPickerTarget === 'detailEdit') {
+            setLoungeDetailEditMarketSymbols(next)
+            hydrateComposerMarketSymbolEmbeds(supabaseClient, setLoungeDetailEditMarketSymbols, next)
+          } else {
+            setComposerMarketSymbols(next)
+            hydrateComposerMarketSymbolEmbeds(supabaseClient, setComposerMarketSymbols, next)
+          }
+        }}
         supabaseClient={supabaseClient}
       />
 

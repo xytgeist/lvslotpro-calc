@@ -3,6 +3,29 @@
  * Prose breaks → middle dot (·); numeric ranges → hyphen without spaces.
  */
 
+/** Private-use placeholder — mask decimal points before sentence splitting on `.` */
+const WIRE_DECIMAL_DOT = '\uE000'
+
+function maskDecimalPoints(text: string): string {
+  return String(text || '').replace(/(\d)\.(\d)/g, `$1${WIRE_DECIMAL_DOT}$2`)
+}
+
+function unmaskDecimalPoints(text: string): string {
+  return String(text || '').replaceAll(WIRE_DECIMAL_DOT, '.')
+}
+
+/** Split wire prose into sentences without breaking decimals (49.8, 52.2 vs 50.5). */
+export function splitWireSentences(text: string): string[] {
+  const raw = String(text || '').trim()
+  if (!raw) return []
+
+  const masked = maskDecimalPoints(raw)
+  const parts = masked.match(/[^.!?]+[.!?]+(?:\s|$)/g)
+  if (!parts?.length) return [unmaskDecimalPoints(raw)]
+
+  return parts.map((part) => unmaskDecimalPoints(part).trim()).filter(Boolean)
+}
+
 function sanitizeWireProseLine(text: string): string {
   let s = String(text || '')
 

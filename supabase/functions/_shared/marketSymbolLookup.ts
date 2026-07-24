@@ -15,6 +15,11 @@ import {
   type MarketAssetClass,
   type MarketSymbolUniverseRow,
 } from './finnhubMarket.ts'
+import {
+  isMarketLogoHostedOnR2,
+  mirrorInstrumentRowsToR2,
+  readMarketLogoR2Config,
+} from './marketLogoR2.ts'
 import { withCashtagRowLogo } from './marketCashtagLogos.ts'
 import {
   marketInstrumentCacheKey,
@@ -27,6 +32,8 @@ const UPSERT_CHUNK = 400
 /** PostgREST batch upsert size for crypto backfill (avoids per-row HTTP). */
 const BATCH_UPSERT_CHUNK = 500
 const CRYPTO_UNIVERSE_MAX_PAGES = 8
+const STOCK_LOGO_BATCH_DEFAULT = 50
+const STOCK_LOGO_BATCH_MAX = 200
 const NEW_STOCK_LOGO_CONCURRENCY = 8
 /** Cap new stock logo fetches per daily sync — rest fill on miss fallback. */
 const NEW_STOCK_LOGO_CAP_PER_SYNC = 50
@@ -198,6 +205,7 @@ export async function syncMarketCryptoLookup(
   chunks: number
   pages: number
   crypto_with_logo: number
+  r2_hits: number
 }> {
   const pages = Math.min(
     CRYPTO_UNIVERSE_MAX_PAGES,
@@ -216,8 +224,9 @@ export async function syncMarketCryptoLookup(
     }),
   )
   const upsertRows = universeRows.map((row) => universeRowToInstrument(row))
-  const withLogo = upsertRows.filter((row) => String(row.logo_url || '').trim()).length
-  const { upserted, chunks } = await batchUpsertInstrumentRows(admin, upsertRows, {
+  const { rows: mirrored, r2_hits } = await mirrorInstrumentRowsToR2(upsertRows, NEW_STOCK_LOGO_CONCURRENCY)
+  const withLogo = mirrored.filter((row) => String(row.logo_url || '').trim()).length
+  const { upserted, chunks } = await batchUpsertInstrumentRows(admin, mirrored, {
     chunkSize: BATCH_UPSERT_CHUNK,
     logLabel: 'syncMarketCryptoLookup',
   })
@@ -231,7 +240,149 @@ export async function syncMarketCryptoLookup(
     chunks,
     pages,
     crypto_with_logo: withLogo,
+    r2_hits,
   }
+}
+
+type LogoBatchCandidate = MarketInstrumentRow
+
+const LOGO_NEEDS_R2_OR = 'logo_url.eq.,logo_url.not.ilike.%/market-logos/%'
+
+function mapLogoBatchRow(row: Record<string, unknown>, assetClass: MarketAssetClass): LogoBatchCandidate {
+  return {
+    cache_key: String(row.cache_key || '').trim().toLowerCase(),
+    display_symbol: String(row.display_symbol || '').trim().toUpperCase(),
+    asset_class: assetClass,
+    symbol: String(row.symbol || '').trim(),
+    coin_id: row.coin_id ? String(row.coin_id).trim() : null,
+    name: String(row.name || '').trim(),
+    exchange: String(row.exchange || '').trim(),
+    logo_url: String(row.logo_url || '').trim(),
+    market_cap_usd: row.market_cap_usd != null ? Number(row.market_cap_usd) : null,
+    listing_currency: String(row.listing_currency || 'USD').trim() || 'USD',
+    metadata_updated_at: new Date().toISOString(),
+  }
+}
+
+async function readLogoBatchCandidates(
+  admin: SupabaseClient,
+  assetClass: MarketAssetClass,
+  opts: { limit: number; after_cache_key?: string },
+): Promise<LogoBatchCandidate[]> {
+  let query = admin
+    .from('market_instruments')
+    .select(
+      'cache_key, display_symbol, asset_class, symbol, coin_id, name, exchange, logo_url, market_cap_usd, listing_currency, metadata_updated_at',
+    )
+    .eq('asset_class', assetClass)
+    .or(LOGO_NEEDS_R2_OR)
+    .order('cache_key', { ascending: true })
+    .limit(opts.limit)
+
+  const after = String(opts.after_cache_key || '').trim().toLowerCase()
+  if (after) query = query.gt('cache_key', after)
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message || `Could not load ${assetClass} logo batch.`)
+  return (Array.isArray(data) ? data : []).map((row) => mapLogoBatchRow(row, assetClass))
+}
+
+async function countInstrumentsNeedingR2Logo(
+  admin: SupabaseClient,
+  assetClass: MarketAssetClass,
+): Promise<number> {
+  const { count, error } = await admin
+    .from('market_instruments')
+    .select('*', { count: 'exact', head: true })
+    .eq('asset_class', assetClass)
+    .or(LOGO_NEEDS_R2_OR)
+  if (error) throw new Error(error.message || 'Could not count logo batch remaining.')
+  return count || 0
+}
+
+async function runLogoBatchToR2(
+  admin: SupabaseClient,
+  assetClass: MarketAssetClass,
+  opts: { limit?: number; after_cache_key?: string } = {},
+): Promise<{
+  candidates: number
+  logo_hits: number
+  r2_hits: number
+  finnhub_fetches: number
+  upserted: number
+  chunks: number
+  remaining_without_r2_logo: number
+  last_cache_key: string | null
+  next_after_cache_key: string | null
+}> {
+  const limit = Math.min(
+    STOCK_LOGO_BATCH_MAX,
+    Math.max(1, Math.floor(Number(opts.limit) || STOCK_LOGO_BATCH_DEFAULT)),
+  )
+  readMarketLogoR2Config()
+
+  const candidates = await readLogoBatchCandidates(admin, assetClass, {
+    limit,
+    after_cache_key: opts.after_cache_key,
+  })
+  if (!candidates.length) {
+    const remaining = await countInstrumentsNeedingR2Logo(admin, assetClass)
+    return {
+      candidates: 0,
+      logo_hits: 0,
+      r2_hits: 0,
+      finnhub_fetches: 0,
+      upserted: 0,
+      chunks: 0,
+      remaining_without_r2_logo: remaining,
+      last_cache_key: null,
+      next_after_cache_key: null,
+    }
+  }
+
+  const { rows: updated, r2_hits, finnhub_fetches } = await mirrorInstrumentRowsToR2(
+    candidates,
+    NEW_STOCK_LOGO_CONCURRENCY,
+  )
+  const cfg = readMarketLogoR2Config()
+  const withR2 = updated.filter((row) => isMarketLogoHostedOnR2(String(row.logo_url || ''), cfg.publicBaseUrl))
+  const { upserted, chunks } = withR2.length
+    ? await batchUpsertInstrumentRows(admin, withR2, {
+        chunkSize: BATCH_UPSERT_CHUNK,
+        logLabel: `${assetClass}LogoBatchR2`,
+      })
+    : { upserted: 0, chunks: 0 }
+
+  const last_cache_key = candidates[candidates.length - 1]?.cache_key || null
+  const remaining = await countInstrumentsNeedingR2Logo(admin, assetClass)
+
+  return {
+    candidates: candidates.length,
+    logo_hits: withR2.length,
+    r2_hits,
+    finnhub_fetches,
+    upserted,
+    chunks,
+    remaining_without_r2_logo: remaining,
+    last_cache_key,
+    next_after_cache_key: last_cache_key,
+  }
+}
+
+/** Finnhub → R2 stock logo batch (50 default). */
+export async function syncMarketStockLogosBatch(
+  admin: SupabaseClient,
+  opts: { limit?: number; after_cache_key?: string } = {},
+) {
+  return runLogoBatchToR2(admin, 'stock', opts)
+}
+
+/** CoinGecko (or existing source URL) → R2 crypto logo batch (50 default). */
+export async function syncMarketCryptoLogosBatch(
+  admin: SupabaseClient,
+  opts: { limit?: number; after_cache_key?: string } = {},
+) {
+  return runLogoBatchToR2(admin, 'crypto', opts)
 }
 
 /** Daily bulk sync — tickers for all; logos for new crypto + new stocks only. */

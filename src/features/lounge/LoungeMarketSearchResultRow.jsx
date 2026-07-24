@@ -89,7 +89,7 @@ export default function LoungeMarketSearchResultRow({
           </div>
           <div
             className={`font-semibold tabular-nums ${compact ? 'text-[11px]' : 'text-xs'} ${
-              up ? 'text-lv-green' : 'text-lv-red'
+              up ? 'lounge-cashtag-positive' : 'text-lv-red'
             }`}
           >
             {formatMarketChangePct(changePct)}

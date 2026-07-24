@@ -1,9 +1,15 @@
 import { splitTextWithLinks } from '../../utils/linkifyText.jsx'
+import {
+  guessCashtagAssetClass,
+  marketCashtagColorClass,
+} from '../../utils/loungeMarketCaptionParse.js'
 
 const MENTION_CLASS = 'font-medium text-orange-400'
 const HASHTAG_CLASS = 'font-semibold text-cyan-400'
 const LINK_CLASS =
   'font-medium text-sky-400 underline underline-offset-2 decoration-sky-400/70 break-words'
+
+const CASHTAG_RE = /\$([A-Za-z][A-Za-z0-9.-]{0,14})\b/g
 
 function escapeHtml(text) {
   return String(text)
@@ -16,7 +22,25 @@ function wrapSpan(className, inner) {
   return `<span class="${className}">${inner}</span>`
 }
 
-function appendMentionHtml(out, fragment, { committedOnly = false } = {}) {
+function appendCashtagHtml(out, fragment, styleCtx) {
+  if (!fragment) return
+  let last = 0
+  CASHTAG_RE.lastIndex = 0
+  let m
+  while ((m = CASHTAG_RE.exec(fragment)) !== null) {
+    if (m.index > last) out.push(escapeHtml(fragment.slice(last, m.index)))
+    const tickerKey = String(m[1] || '').trim().toUpperCase()
+    const changePct = styleCtx?.quotesByTicker?.[tickerKey]?.change_pct
+    const assetClass =
+      styleCtx?.assetClassByTicker?.get(tickerKey) || guessCashtagAssetClass(tickerKey)
+    const cls = marketCashtagColorClass(changePct, { assetClass })
+    out.push(wrapSpan(cls, escapeHtml(`$${tickerKey}`)))
+    last = m.index + m[0].length
+  }
+  if (last < fragment.length) out.push(escapeHtml(fragment.slice(last)))
+}
+
+function appendMentionHtml(out, fragment, { committedOnly = false } = {}, styleCtx = null) {
   if (!fragment) return
   let last = 0
   // Composer: only style @handles followed by whitespace so partial @queries stay
@@ -24,48 +48,48 @@ function appendMentionHtml(out, fragment, { committedOnly = false } = {}) {
   const re = committedOnly ? /@([\w]+)(?=\s)/g : /@([\w]+)/g
   let m
   while ((m = re.exec(fragment)) !== null) {
-    if (m.index > last) out.push(escapeHtml(fragment.slice(last, m.index)))
+    if (m.index > last) appendCashtagHtml(out, fragment.slice(last, m.index), styleCtx)
     out.push(wrapSpan(MENTION_CLASS, `@${escapeHtml(m[1])}`))
     last = m.index + m[0].length
   }
-  if (last < fragment.length) out.push(escapeHtml(fragment.slice(last)))
+  if (last < fragment.length) appendCashtagHtml(out, fragment.slice(last), styleCtx)
 }
 
-function appendHashtagHtml(out, fragment, mentionOpts) {
+function appendHashtagHtml(out, fragment, mentionOpts, styleCtx) {
   if (!fragment) return
   let last = 0
   const re = /#(?:[\p{L}\p{N}_-]+)/gu
   let m
   while ((m = re.exec(fragment)) !== null) {
-    if (m.index > last) appendMentionHtml(out, fragment.slice(last, m.index), mentionOpts)
+    if (m.index > last) appendMentionHtml(out, fragment.slice(last, m.index), mentionOpts, styleCtx)
     out.push(wrapSpan(HASHTAG_CLASS, escapeHtml(m[0])))
     last = m.index + m[0].length
   }
-  if (last < fragment.length) appendMentionHtml(out, fragment.slice(last), mentionOpts)
+  if (last < fragment.length) appendMentionHtml(out, fragment.slice(last), mentionOpts, styleCtx)
 }
 
 const COMPOSER_MENTION_OPTS = { committedOnly: true }
 
 /** Build styled HTML for a plain caption string (composer contenteditable). */
-function appendStyledComposerFragment(out, fragment) {
+function appendStyledComposerFragment(out, fragment, styleCtx) {
   if (!fragment) return
   for (const seg of splitTextWithLinks(fragment, { trimTrailing: false })) {
     if (seg.type === 'link' && seg.href) {
       out.push(wrapSpan(LINK_CLASS, escapeHtml(seg.value)))
     } else if (seg.value) {
-      appendHashtagHtml(out, seg.value, COMPOSER_MENTION_OPTS)
+      appendHashtagHtml(out, seg.value, COMPOSER_MENTION_OPTS, styleCtx)
     }
   }
 }
 
-export function buildRichComposerHtml(text) {
+export function buildRichComposerHtml(text, styleCtx = null) {
   const s = String(text ?? '')
   if (!s) return ''
   const lines = s.split('\n')
   const out = []
   for (let i = 0; i < lines.length; i++) {
     if (i > 0) out.push('<br>')
-    appendStyledComposerFragment(out, lines[i])
+    appendStyledComposerFragment(out, lines[i], styleCtx)
   }
   return out.join('')
 }
@@ -405,9 +429,9 @@ export function composerNewlineFromCaret(root) {
 }
 
 /** Replace composer HTML from plain text and optionally restore caret. */
-export function syncComposerHtml(root, text, caretOffset = null) {
+export function syncComposerHtml(root, text, caretOffset = null, styleCtx = null) {
   if (!root) return
-  let html = buildRichComposerHtml(text)
+  let html = buildRichComposerHtml(text, styleCtx)
   if (shouldAppendIosCaretAnchor(text, caretOffset)) {
     html = appendIosCaretAnchorBr(html)
   }
@@ -575,4 +599,76 @@ export function insertComposerNewlineByPlainSync(
   else syncPlainComposerHtml(root, nextText, nextCaret)
 
   return { text: nextText, caret: nextCaret }
+}
+
+/** Keep the typing caret visible when a composer field scrolls internally. */
+export function scrollComposerCaretIntoView(root, { paddingPx = 6, bottomInsetPx = 0 } = {}) {
+  if (!root || typeof window === 'undefined') return
+  const active = document.activeElement
+  if (active !== root && !root.contains(active)) return
+  if (root.scrollHeight <= root.clientHeight + 1) return
+
+  const pad = paddingPx
+  const bottomInset = Math.max(0, bottomInsetPx)
+
+  if (isRichComposerElement(root)) {
+    const caret = getComposerCaretClientRect(root)
+    if (!caret) return
+    const box = root.getBoundingClientRect()
+    const visibleBottom = box.bottom - pad - bottomInset
+    if (caret.bottom > visibleBottom) {
+      root.scrollTop += caret.bottom - visibleBottom
+    } else if (caret.top < box.top + pad) {
+      root.scrollTop -= box.top + pad - caret.top
+    }
+    return
+  }
+
+  if (typeof root.selectionStart !== 'number') return
+  const style = window.getComputedStyle(root)
+  const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.25 || 20
+  const textBefore = String(root.value ?? '').slice(0, root.selectionStart)
+  const lineCount = Math.max(1, textBefore.split('\n').length)
+  const caretTop = (lineCount - 1) * lineHeight
+  const caretBottom = caretTop + lineHeight
+  const visibleTop = root.scrollTop
+  const visibleBottom = visibleTop + root.clientHeight - bottomInset
+  if (caretBottom > visibleBottom - pad) {
+    root.scrollTop = caretBottom - root.clientHeight + pad + bottomInset
+  } else if (caretTop < visibleTop + pad) {
+    root.scrollTop = Math.max(0, caretTop - pad)
+  }
+}
+
+const COMPOSER_FIELD_SCROLL_PAD_PX = 40
+const COMPOSER_FIELD_CATEGORY_GAP_PX = 10
+
+/** Cap feed composer height above category pills and reserve scroll padding at the bottom. */
+export function syncComposerFieldAutoHeight(root, { lineFloor = 38, viewportMaxPx = 352 } = {}) {
+  if (!root) return
+  root.style.height = 'auto'
+  root.style.paddingBottom = ''
+  let maxHeightPx = Math.round(Math.min(window.innerHeight * 0.42, viewportMaxPx))
+
+  const header = root.closest('[data-lounge-feed-composer]')
+  const category = header?.querySelector('[data-lounge-composer-category]')
+  if (category) {
+    const fieldTop = root.getBoundingClientRect().top
+    const categoryTop = category.getBoundingClientRect().top
+    const availableAboveCategory = categoryTop - fieldTop - COMPOSER_FIELD_CATEGORY_GAP_PX
+    if (availableAboveCategory > lineFloor) {
+      maxHeightPx = Math.min(maxHeightPx, Math.floor(availableAboveCategory))
+    }
+  }
+
+  const contentHeight = Math.max(root.scrollHeight, lineFloor)
+  const nextHeight = Math.min(contentHeight, maxHeightPx)
+  const needsScroll = contentHeight > maxHeightPx
+  root.style.height = `${nextHeight}px`
+  root.style.overflowY = needsScroll ? 'auto' : 'hidden'
+  root.style.paddingBottom = needsScroll ? `${COMPOSER_FIELD_SCROLL_PAD_PX}px` : ''
+  scrollComposerCaretIntoView(root, {
+    paddingPx: 8,
+    bottomInsetPx: needsScroll ? COMPOSER_FIELD_SCROLL_PAD_PX : 0,
+  })
 }

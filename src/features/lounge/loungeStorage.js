@@ -290,6 +290,29 @@ export function writeLoungeComposerLastCategoryPills(pills) {
   }
 }
 
+export const LOUNGE_COMPOSER_AUDIENCE_KEY = 'loungeComposerAudience:v1'
+
+/** @returns {'all' | 'subs'} */
+export function readLoungeComposerAudience() {
+  if (typeof window === 'undefined') return 'all'
+  try {
+    const raw = window.localStorage.getItem(LOUNGE_COMPOSER_AUDIENCE_KEY)
+    return raw === 'subs' ? 'subs' : 'all'
+  } catch {
+    return 'all'
+  }
+}
+
+/** @param {'all' | 'subs'} audience */
+export function writeLoungeComposerAudience(audience) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LOUNGE_COMPOSER_AUDIENCE_KEY, audience === 'subs' ? 'subs' : 'all')
+  } catch {
+    // ignore
+  }
+}
+
 export const LOUNGE_CATEGORY_PILL_USAGE_KEY = 'loungeCategoryPillUsage:v1'
 
 /** @returns {Record<string, number>} slug → pick count */

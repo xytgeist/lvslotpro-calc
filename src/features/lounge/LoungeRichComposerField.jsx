@@ -6,10 +6,12 @@ import {
   insertPlainTextAtSelection,
   LOUNGE_IOS,
   plainTextFromComposerRoot,
+  syncComposerFieldAutoHeight,
   syncComposerHtml,
 } from './loungeRichComposerDom.js'
 import { LOUNGE_CAPTION_MAX } from '../../utils/loungeCommentLimits.js'
 import { normalizeCashtagsInCaption } from '../../utils/loungeMarketCaptionParse.js'
+import { detectCashtagAtCursor } from './loungeCashtagAutocomplete.js'
 import { LOUNGE_RICH_COMPOSER_VARIANTS } from './loungeRichComposerVariants.js'
 
 function isEnterKeyEvent(e) {
@@ -40,6 +42,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     disabled = false,
     autoGrow = false,
     enterInsertsNewline = true,
+    cashtagStyleContext = null,
   },
   ref,
 ) {
@@ -55,6 +58,8 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
   const preset = LOUNGE_RICH_COMPOSER_VARIANTS[variant] || LOUNGE_RICH_COMPOSER_VARIANTS.feed
   /** iOS nested composers: native textarea avoids WebKit caret paint bugs in fixed/transformed footers. */
   const iosNativeTextarea = LOUNGE_IOS && variant !== 'feed'
+  /** Grow to a viewport cap, then scroll internally (feed contenteditable included). */
+  const manageFieldHeight = true
   /** Android: DOM text can lead React value by a keystroke; do not overlay placeholder on typed chars. */
   const [domHasText, setDomHasText] = useState(() => String(value ?? '').length > 0)
   const [isComposing, setIsComposing] = useState(false)
@@ -93,14 +98,16 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     lastValueRef.current = capped
     caretRef.current = nextCaret
     notifyComposerInput(el, capped, nextCaret, { sync: true })
-    if (skipRichSyncRef.current) {
-      skipRichSyncRef.current = false
+    const skipRichForCashtag = detectCashtagAtCursor(capped, nextCaret)?.query
+    if (skipRichSyncRef.current || skipRichForCashtag) {
+      if (skipRichSyncRef.current) skipRichSyncRef.current = false
     } else {
-      syncComposerHtml(el, capped, nextCaret)
+      syncComposerHtml(el, capped, nextCaret, cashtagStyleContext)
     }
     if (capped !== value) onChange?.(capped)
     setDomHasText(capped.length > 0)
-  }, [maxLength, notifyComposerInput, onChange, value])
+    requestAnimationFrame(() => syncComposerFieldAutoHeight(el))
+  }, [cashtagStyleContext, maxLength, notifyComposerInput, onChange, value])
 
   const insertEnterNewline = useCallback(() => {
     if (enterHandledRef.current) return true
@@ -127,6 +134,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
       notifyComposerInput(el, text, nextCaret, { sync: true })
       if (text !== value) onChange?.(text)
       setDomHasText(text.length > 0)
+      requestAnimationFrame(() => syncComposerFieldAutoHeight(el))
       return true
     }
 
@@ -151,6 +159,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     notifyComposerInput(el, text, nextCaret, { sync: true })
     if (text !== value) onChange?.(text)
     setDomHasText(text.length > 0)
+    requestAnimationFrame(() => syncComposerFieldAutoHeight(el))
     return true
   }, [maxLength, notifyComposerInput, onChange, value, variant])
 
@@ -166,6 +175,13 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
     if (domText === value) {
       lastValueRef.current = value
       setDomHasText(value.length > 0)
+      const caret =
+        document.activeElement === el
+          ? Math.min(getCaretTextOffset(el), value.length)
+          : value.length
+      if (!detectCashtagAtCursor(value, caret)?.query) {
+        syncComposerHtml(el, value, caret, cashtagStyleContext)
+      }
       return
     }
     if (domText === lastValueRef.current && value === lastValueRef.current) {
@@ -180,7 +196,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
             ? Math.min(getCaretTextOffset(el), value.length)
             : value.length
         caretRef.current = caret
-        syncComposerHtml(el, value, caret)
+        syncComposerHtml(el, value, caret, cashtagStyleContext)
         setDomHasText(value.length > 0)
       }
       return
@@ -191,24 +207,20 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
         ? Math.min(getCaretTextOffset(el), value.length)
         : value.length
     caretRef.current = caret
-    syncComposerHtml(el, value, caret)
+    syncComposerHtml(el, value, caret, cashtagStyleContext)
     setDomHasText(value.length > 0)
-  }, [value, iosNativeTextarea])
+  }, [cashtagStyleContext, value, iosNativeTextarea])
 
   useLayoutEffect(() => {
-    if (!autoGrow && !iosNativeTextarea) return
+    if (!manageFieldHeight) return
     const el = rootRef.current
     if (!el) return
     try {
-      el.style.height = 'auto'
-      const max = Math.round(Math.min(window.innerHeight * 0.42, 352))
-      const lineFloor = 38
-      el.style.height = `${Math.min(Math.max(el.scrollHeight, lineFloor), max)}px`
-      el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden'
+      syncComposerFieldAutoHeight(el)
     } catch {
       // ignore
     }
-  }, [autoGrow, iosNativeTextarea, value])
+  }, [manageFieldHeight, value])
 
   useEffect(() => {
     if (iosNativeTextarea) return undefined
@@ -223,6 +235,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
       const caret = getCaretTextOffset(root)
       caretRef.current = caret
       notifyComposerInput(root, plainTextFromComposerRoot(root), caret)
+      syncComposerFieldAutoHeight(root)
     }
     document.addEventListener('selectionchange', onSelectionChange)
     return () => document.removeEventListener('selectionchange', onSelectionChange)
@@ -242,6 +255,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
       notifyComposerInput(el, text, caret, { sync: true })
       if (text !== value) onChange?.(text)
       setDomHasText(text.length > 0)
+      requestAnimationFrame(() => syncComposerFieldAutoHeight(el))
     },
     [maxLength, notifyComposerInput, onChange, value],
   )
@@ -323,7 +337,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
           onSelect={handleTextareaSelect}
           onBlur={onBlur}
           onFocus={onFocus}
-          className={`w-full resize-none border-0 bg-transparent touch-manipulation whitespace-pre-wrap break-words px-0 text-left text-zinc-100 outline-none selection:bg-cyan-500/25 [-webkit-tap-highlight-color:transparent] ${preset.fieldClass} ${autoGrow ? 'overflow-hidden' : 'overflow-y-auto'} ${className}`}
+          className={`w-full resize-none border-0 bg-transparent touch-manipulation whitespace-pre-wrap break-words px-0 text-left text-zinc-100 outline-none selection:bg-cyan-500/25 [-webkit-tap-highlight-color:transparent] ${preset.fieldClass} ${manageFieldHeight ? 'overflow-hidden' : 'overflow-y-auto'} ${className}`}
         />
       </div>
     )
@@ -366,7 +380,7 @@ const LoungeRichComposerField = forwardRef(function LoungeRichComposerField(
           setIsComposing(false)
           readAndEmit()
         }}
-        className={`w-full touch-manipulation whitespace-pre-wrap break-words px-0 text-left text-zinc-100 outline-none selection:bg-cyan-500/25 [-webkit-tap-highlight-color:transparent] ${preset.fieldClass} ${autoGrow ? 'overflow-hidden' : 'overflow-y-auto'} ${className}`}
+        className={`w-full touch-manipulation whitespace-pre-wrap break-words px-0 text-left text-zinc-100 outline-none selection:bg-cyan-500/25 [-webkit-tap-highlight-color:transparent] ${preset.fieldClass} ${manageFieldHeight ? 'overflow-hidden' : 'overflow-y-auto'} ${className}`}
       />
     </div>
   )

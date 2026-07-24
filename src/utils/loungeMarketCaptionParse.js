@@ -1,7 +1,7 @@
 /** @typedef {'stock'|'crypto'} MarketAssetClass */
 /** @typedef {'rolling'|'historical'} MarketEmbedKind */
 
-import { isUsableStockIntradayBars } from './usEquityMarketSession.js'
+import { isUsableStockIntradayBars, isUsEquityRegularSessionOpen } from './usEquityMarketSession.js'
 
 /**
  * @typedef {Object} MarketBar
@@ -173,11 +173,21 @@ export function guessCashtagAssetClass(ticker, embedClassByTicker) {
   return 'stock'
 }
 
-/** Cashtag color from 1D % change - neutral cyan when quote unknown. */
-export function marketCashtagColorClass(changePct) {
+/**
+ * Cashtag color from 1D % change.
+ * US stocks outside regular session render blue (last close); crypto is always live green/red.
+ *
+ * @param {number | null | undefined} changePct
+ * @param {{ assetClass?: 'stock' | 'crypto', marketClosed?: boolean }} [opts]
+ */
+export function marketCashtagColorClass(changePct, opts = {}) {
+  const assetClass = String(opts.assetClass || 'stock').trim() === 'crypto' ? 'crypto' : 'stock'
+  const marketClosed =
+    opts.marketClosed ?? (assetClass === 'stock' && !isUsEquityRegularSessionOpen())
+  if (marketClosed) return 'font-semibold lounge-cashtag-closed'
   const v = Number(changePct)
-  if (!Number.isFinite(v)) return 'font-semibold text-cyan-400'
-  if (v > 0) return 'font-semibold text-lv-green lounge-cashtag-positive'
+  if (!Number.isFinite(v)) return 'font-semibold lounge-cashtag-closed'
+  if (v > 0) return 'font-semibold lounge-cashtag-positive'
   if (v < 0) return 'font-semibold text-lv-red'
   return 'font-semibold text-zinc-400'
 }
@@ -438,6 +448,38 @@ export function formatMarketPriceWhole(price) {
   } catch {
     return `$${Math.round(v).toLocaleString()}`
   }
+}
+
+/**
+ * One-line multi-chart strip summary: leader by window % change.
+ * e.g. two symbols: "NVDA +2.1% vs AAPL +0.4%"; three+: "NVDA +2.1% leads · MU +0.9%".
+ * @param {object[]} embeds
+ * @param {Record<string, object>} [quotesByKey] rolling live map from feed context
+ */
+export function buildMarketStripCompareLabel(embeds, quotesByKey = {}) {
+  if (!Array.isArray(embeds) || embeds.length < 2) return ''
+
+  const rows = embeds
+    .map((embed) => {
+      const key = marketEmbedCacheKey(embed)
+      const rollingLive = embed?.kind === 'rolling' ? quotesByKey[key] : null
+      const payload = pickRollingMarketPayload(embed, rollingLive)
+      const pct = Number(payload?.quote?.change_pct ?? embed?.quote?.change_pct)
+      const sym = String(embed?.display_symbol || '').trim().toUpperCase()
+      if (!sym || !Number.isFinite(pct)) return null
+      return { sym, pct }
+    })
+    .filter(Boolean)
+
+  if (rows.length < 2) return ''
+
+  rows.sort((a, b) => b.pct - a.pct)
+  const fmt = (row) => `${row.sym} ${formatMarketChangePct(row.pct)}`
+
+  if (rows.length === 2) {
+    return `${fmt(rows[0])} vs ${fmt(rows[1])}`
+  }
+  return `${fmt(rows[0])} leads · ${rows.slice(1).map(fmt).join(' · ')}`
 }
 
 /** @param {number} pct */

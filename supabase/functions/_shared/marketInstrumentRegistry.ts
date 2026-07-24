@@ -1,4 +1,5 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
+import { ensureMarketInstrumentLogoOnR2 } from './marketLogoR2.ts'
 import type { MarketAssetClass, MarketEmbed } from './finnhubMarket.ts'
 import { finnhubSymbolForAsset } from './finnhubMarket.ts'
 
@@ -66,6 +67,15 @@ export async function upsertMarketInstrument(
 ): Promise<void> {
   const cache_key = String(row.cache_key || '').trim().toLowerCase()
   if (!cache_key) return
+
+  let logo_url = String(row.logo_url || '').trim()
+  try {
+    const mirrored = await ensureMarketInstrumentLogoOnR2(row)
+    if (mirrored) logo_url = mirrored
+  } catch (e) {
+    console.warn('[upsertMarketInstrument] R2 logo mirror skipped:', e instanceof Error ? e.message : e)
+  }
+
   await admin.from('market_instruments').upsert({
     cache_key,
     display_symbol: String(row.display_symbol || '').trim().toUpperCase(),
@@ -74,7 +84,7 @@ export async function upsertMarketInstrument(
     coin_id: row.coin_id ? String(row.coin_id).trim() : null,
     name: String(row.name || '').trim(),
     exchange: String(row.exchange || '').trim(),
-    logo_url: String(row.logo_url || '').trim(),
+    logo_url,
     market_cap_usd: row.market_cap_usd,
     listing_currency: String(row.listing_currency || 'USD').trim() || 'USD',
     metadata_updated_at: row.metadata_updated_at || new Date().toISOString(),

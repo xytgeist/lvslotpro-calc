@@ -141,9 +141,9 @@ export async function loungeMarketPreview(supabase, symbol) {
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {{ postId: string, caption: string, symbols: Array<{ symbol: string, asset_class: string }> }} opts
+ * @param {{ postId: string, caption: string, symbols: Array<{ symbol: string, asset_class: string, display_symbol?: string }>, pickerOnly?: boolean }} opts
  */
-export async function attachMarketEmbedsToPost(supabase, { postId, caption, symbols }) {
+export async function attachMarketEmbedsToPost(supabase, { postId, caption, symbols, pickerOnly = false }) {
   if (!postId) return null
   const origin =
     typeof window !== 'undefined' && window.location?.origin
@@ -154,6 +154,7 @@ export async function attachMarketEmbedsToPost(supabase, { postId, caption, symb
     post_id: postId,
     caption,
     symbols: Array.isArray(symbols) ? symbols : [],
+    picker_only: pickerOnly === true,
     ...(origin ? { origin } : {}),
   })
   if (!data || data.error) {

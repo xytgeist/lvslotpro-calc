@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { LOUNGE_MARKET_EMBED_MAX } from '../../utils/loungeMarketCaptionParse.js'
-import { loungeMarketResolveSymbol } from '../../utils/loungeMarketApi.js'
+import { loungeMarketResolveSymbol, loungeMarketEnrichSymbols } from '../../utils/loungeMarketApi.js'
 import { searchLoungeMarketSymbolUniverse } from '../../utils/loungeMarketSymbolSearch.js'
 import { marketSymbolDedupeKey } from './loungeMarketSymbolUtils.js'
 import {
@@ -63,7 +63,38 @@ function localCashtagMatches(universe, query, searchIndex = null) {
   return searchLoungeMarketSymbolUniverse(pool, query, MAX_RESULTS)
 }
 
-/** Active `$TICKER` fragment at cursor (partial query allowed). */
+async function enrichCashtagSuggestionRows(supabaseClient, rows) {
+  if (!supabaseClient || !rows?.length) return rows
+  try {
+    const enriched = await loungeMarketEnrichSymbols(
+      supabaseClient,
+      rows.map((row) => marketSymbolFromSearchRow(row)),
+    )
+    if (!Array.isArray(enriched) || !enriched.length) return rows
+    const byKey = new Map(
+      enriched.map((row) => [
+        `${String(row.asset_class || 'stock').trim()}:${String(row.symbol || '').trim().toLowerCase()}`,
+        row,
+      ]),
+    )
+    return rows.map((row) => {
+      const key = `${String(row.asset_class || 'stock').trim()}:${String(row.symbol || '').trim().toLowerCase()}`
+      const quoteRow = byKey.get(key)
+      if (!quoteRow) return row
+      return {
+        ...row,
+        price: quoteRow.price ?? row.price,
+        change_pct: quoteRow.change_pct ?? row.change_pct,
+        market_cap: quoteRow.market_cap ?? row.market_cap,
+        exchange: quoteRow.exchange ?? row.exchange,
+      }
+    })
+  } catch {
+    return rows
+  }
+}
+
+/** Active `$TICKER` fragment at cursor (partial query allowed; requires ≥1 letter after `$`). */
 export function detectCashtagAtCursor(value, cursorPos) {
   if (!value || cursorPos == null) return null
   const before = value.slice(0, cursorPos)
@@ -74,6 +105,15 @@ export function detectCashtagAtCursor(value, cursorPos) {
   const tail = after.match(/^[A-Za-z0-9.-]*/)
   const end = cursorPos + (tail ? tail[0].length : 0)
   return { query: m[1], start, end }
+}
+
+/** Ignore spurious contenteditable blur after DOM sync or when focus moved to the cashtag list. */
+export function shouldKeepCashtagAutocompleteAfterBlur(fieldEl) {
+  const active = document.activeElement
+  if (fieldEl && (active === fieldEl || fieldEl.contains?.(active))) return true
+  const dropdown = document.querySelector('[aria-label="Market symbol suggestions"]')
+  if (dropdown?.contains?.(active)) return true
+  return false
 }
 
 /** @param {object} row Universe row */
@@ -130,6 +170,7 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
   const fullUniverseRef = useRef(false)
   const loadGenRef = useRef(0)
   const fallbackTimerRef = useRef(null)
+  const loadingRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -144,6 +185,10 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
   useEffect(() => {
     liveValueRef.current = value
   }, [value])
+
+  useEffect(() => {
+    loadingRef.current = loading
+  }, [loading])
 
   const clearCashtag = useCallback(() => {
     loadGenRef.current += 1
@@ -163,14 +208,34 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
         loadGenRef.current += 1
       }
       lastQueryRef.current = query
+      const gen = loadGenRef.current
 
-      const localRows = localCashtagMatches(universeRef.current, query, searchIndexRef.current).map(
-        withCashtagRowLogo,
-      )
+      const finishSuggestionsWithQuotes = (rows) => {
+        if (!rows.length) {
+          setSuggestions([])
+          setLoading(false)
+          return
+        }
+        setSuggestions(rows.map(withCashtagRowLogo))
+        if (!supabaseClient) {
+          setLoading(false)
+          return
+        }
+        setLoading(true)
+        void enrichCashtagSuggestionRows(supabaseClient, rows)
+          .then((enriched) => {
+            if (gen !== loadGenRef.current) return
+            if (String(lastQueryRef.current || '').trim().toUpperCase() !== cacheKey) return
+            setSuggestions(enriched.map(withCashtagRowLogo))
+            setLoading(false)
+          })
+          .catch(() => setLoading(false))
+      }
+
+      const localRows = localCashtagMatches(universeRef.current, query, searchIndexRef.current)
 
       if (localRows.length > 0) {
-        setSuggestions(localRows)
-        setLoading(false)
+        finishSuggestionsWithQuotes(localRows)
         return
       }
 
@@ -183,13 +248,11 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
 
       const cachedMiss = missFallbackCache.get(cacheKey)
       if (cachedMiss !== undefined) {
-        setSuggestions(cachedMiss.map(withCashtagRowLogo))
-        setLoading(false)
+        finishSuggestionsWithQuotes(Array.isArray(cachedMiss) ? cachedMiss : [])
         return
       }
 
       setLoading(true)
-      const gen = loadGenRef.current
 
       fallbackTimerRef.current = setTimeout(() => {
         void loungeMarketResolveSymbol(supabaseClient, query)
@@ -197,7 +260,7 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
             if (gen !== loadGenRef.current) return
             if (String(lastQueryRef.current || '').trim().toUpperCase() !== cacheKey) return
 
-            const rows = Array.isArray(resolved) ? resolved.map(withCashtagRowLogo) : []
+            const rows = Array.isArray(resolved) ? resolved : []
             missFallbackCache.set(cacheKey, rows)
             if (missFallbackCache.size > MISS_FALLBACK_CACHE_MAX) {
               const first = missFallbackCache.keys().next().value
@@ -211,8 +274,7 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
               searchIndexRef.current = installed.index
             }
 
-            setSuggestions(rows)
-            setLoading(false)
+            finishSuggestionsWithQuotes(rows)
           })
           .catch((err) => {
             if (gen !== loadGenRef.current) return
@@ -253,7 +315,7 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
       }
 
       const active = detectCashtagAtCursor(draft, cursor)
-      if (!active) {
+      if (!active || !active.query || active.query.length < MIN_QUERY_LEN) {
         clearCashtag()
         return
       }
@@ -261,25 +323,16 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
       setCashtag(active)
       setActiveIndex(0)
 
-      if (!active.query || active.query.length < MIN_QUERY_LEN) {
-        loadGenRef.current += 1
-        if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
-        lastQueryRef.current = active.query || ''
-        setSuggestions([])
-        setLoading(false)
-        return
-      }
-
       if (
         active.query === lastQueryRef.current &&
-        (suggestionsRef.current.length > 0 || loading)
+        (suggestionsRef.current.length > 0 || loadingRef.current)
       ) {
         return
       }
 
       applyCashtagQuery(active.query)
     },
-    [applyCashtagQuery, clearCashtag, enabled, loading],
+    [applyCashtagQuery, clearCashtag, enabled],
   )
 
   const applyCursor = useCallback((editorEl) => {
@@ -383,7 +436,7 @@ export function useCashtagState(value, supabaseClient, enabled = true, onAddSymb
     [commitSelection],
   )
 
-  const isOpen = Boolean(cashtag)
+  const isOpen = Boolean(cashtag?.query && cashtag.query.length >= MIN_QUERY_LEN)
 
   return {
     cashtag,

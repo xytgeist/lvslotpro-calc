@@ -54,9 +54,11 @@ export default function LoungePostCategoryPillPicker({
     if (firstChip instanceof HTMLElement) {
       setRowHeightPx(firstChip.offsetHeight)
     }
-    if (clip && !expanded && collapsibleSingleRow) {
-      setHasHiddenRows(row.scrollHeight > clip.clientHeight + 1)
-    } else if (collapsibleSingleRow) {
+    if (clip && collapsibleSingleRow && !expanded) {
+      setHasHiddenRows(row.scrollWidth > clip.clientWidth + 1)
+      return
+    }
+    if (collapsibleSingleRow) {
       const chips = [...row.querySelectorAll('[data-lounge-category-slug]')]
       if (chips.length <= 1) {
         setHasHiddenRows(false)
@@ -71,9 +73,11 @@ export default function LoungePostCategoryPillPicker({
     measureRows()
     if (typeof window === 'undefined' || !('ResizeObserver' in window)) return undefined
     const row = rowRef.current
+    const clip = clipRef.current
     if (!row) return undefined
     const ro = new window.ResizeObserver(() => measureRows())
     ro.observe(row)
+    if (clip) ro.observe(clip)
     return () => ro.disconnect()
   }, [measureRows, sortedOptions.length, selected.join(','), expanded])
 
@@ -92,25 +96,32 @@ export default function LoungePostCategoryPillPicker({
   }
 
   const showExpandToggle = collapsibleSingleRow && (hasHiddenRows || expanded)
+  const collapsedSingleRow = collapsibleSingleRow && !expanded
 
   return (
-    <div className={`mt-2 ${className}`.trim()}>
+    <div className={`mt-2 ${className}`.trim()} data-lounge-composer-category="">
       {hint ? (
         <p className="mb-1.5 text-[11px] leading-snug text-zinc-500">{hint}</p>
       ) : null}
       <div className="relative min-w-0">
         <div
           ref={clipRef}
-          className="overflow-hidden"
+          className={
+            collapsedSingleRow
+              ? 'overflow-x-auto overflow-y-hidden overscroll-x-contain [touch-action:pan-x_pan-y] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+              : 'overflow-hidden'
+          }
           style={
-            collapsibleSingleRow && !expanded && rowHeightPx
+            collapsedSingleRow && rowHeightPx
               ? { maxHeight: rowHeightPx }
               : undefined
           }
         >
           <div
             ref={rowRef}
-            className={`lounge-pill-row flex flex-wrap gap-1.5 ${showExpandToggle ? 'pr-7' : ''}`}
+            className={`lounge-pill-row flex gap-1.5 ${
+              collapsedSingleRow ? 'w-max min-w-full flex-nowrap' : 'flex-wrap'
+            } ${showExpandToggle ? 'pr-8' : ''}`}
             data-lounge-category-picker=""
           >
             {sortedOptions.map(({ slug, label }) => {
@@ -124,7 +135,7 @@ export default function LoungePostCategoryPillPicker({
                   disabled={chipDisabled}
                   aria-pressed={on}
                   onClick={() => toggle(slug)}
-                  className={`lounge-category-pill inline-flex max-w-full touch-manipulation items-center truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-tight transition-colors [-webkit-tap-highlight-color:transparent] ${
+                  className={`lounge-category-pill inline-flex max-w-full shrink-0 touch-manipulation items-center truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-tight transition-colors [-webkit-tap-highlight-color:transparent] ${
                     on
                       ? loungePostCategoryPillChipClass(slug, 'selected')
                       : chipDisabled
@@ -139,34 +150,37 @@ export default function LoungePostCategoryPillPicker({
           </div>
         </div>
         {showExpandToggle ? (
-          <button
-            type="button"
-            disabled={disabled}
-            aria-expanded={expanded}
-            aria-label={expanded ? 'Show fewer tribes' : 'Show all tribes'}
-            title={expanded ? 'Show fewer tribes' : 'Show all tribes'}
-            onClick={() => setExpanded((v) => !v)}
-            className="absolute right-0 top-0 flex touch-manipulation items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]"
-            style={{
-              width: rowHeightPx ?? 24,
-              height: rowHeightPx ?? 24,
-            }}
-          >
-            <svg
-              className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
-              viewBox="0 0 20 20"
-              fill="none"
-              aria-hidden
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center pl-5">
+            <div className="h-full w-5 bg-gradient-to-l from-zinc-700/95 to-transparent" />
+            <button
+              type="button"
+              disabled={disabled}
+              aria-expanded={expanded}
+              aria-label={expanded ? 'Show fewer tribes' : 'Show all tribes'}
+              title={expanded ? 'Show fewer tribes' : 'Show all tribes'}
+              onClick={() => setExpanded((v) => !v)}
+              className="pointer-events-auto flex touch-manipulation items-center justify-center rounded-md bg-zinc-700/95 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-45 [-webkit-tap-highlight-color:transparent]"
+              style={{
+                width: rowHeightPx ?? 24,
+                height: rowHeightPx ?? 24,
+              }}
             >
-              <path
-                d="M5 8l5 5 5-5"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+              <svg
+                className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                viewBox="0 0 20 20"
+                fill="none"
+                aria-hidden
+              >
+                <path
+                  d="M5 8l5 5 5-5"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
         ) : null}
       </div>
     </div>
