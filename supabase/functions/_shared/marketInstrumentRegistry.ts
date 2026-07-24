@@ -61,6 +61,44 @@ export async function readMarketInstrumentCoinId(
   return coinId || null
 }
 
+/** Batch-read stored logos from `market_instruments` (R2 URLs after backfill). */
+export async function readMarketInstrumentLogosByCacheKeys(
+  admin: SupabaseClient,
+  cacheKeys: string[],
+): Promise<Map<string, string>> {
+  const keys = [...new Set(cacheKeys.map((k) => String(k || '').trim().toLowerCase()).filter(Boolean))]
+  const out = new Map<string, string>()
+  if (!keys.length) return out
+
+  const { data, error } = await admin.from('market_instruments').select('cache_key, logo_url').in('cache_key', keys)
+  if (error || !Array.isArray(data)) return out
+
+  for (const row of data) {
+    const key = String(row?.cache_key || '').trim().toLowerCase()
+    const logo = String(row?.logo_url || '').trim()
+    if (key && logo) out.set(key, logo)
+  }
+  return out
+}
+
+/** Prefer registry `logo_url` (usually R2) over empty client seed rows before picker enrich. */
+export async function hydratePickerRowsWithRegistryLogos<
+  T extends { symbol: string; asset_class: MarketAssetClass; logo_url?: string },
+>(admin: SupabaseClient, rows: T[]): Promise<T[]> {
+  if (!rows.length) return rows
+
+  const keys = rows.map((row) => marketInstrumentCacheKey(row.symbol, row.asset_class))
+  const logos = await readMarketInstrumentLogosByCacheKeys(admin, keys)
+
+  return rows.map((row, i) => {
+    const dbLogo = logos.get(keys[i]!)
+    const existing = String(row.logo_url || '').trim()
+    if (!dbLogo) return row
+    if (existing && existing === dbLogo) return row
+    return { ...row, logo_url: dbLogo }
+  })
+}
+
 export async function upsertMarketInstrument(
   admin: SupabaseClient,
   row: MarketInstrumentRow,

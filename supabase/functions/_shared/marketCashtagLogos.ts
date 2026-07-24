@@ -1,10 +1,10 @@
 /**
- * Static cashtag logos — CoinGecko `image` URLs for crypto (bulk / seed).
- * US stock logos are resolved per symbol via Edge enrich (Yahoo + Finnhub profile).
+ * Static cashtag logos for bundled seed rows — R2 when configured, CoinGecko fallback for crypto.
  * Keep in sync with `src/features/lounge/marketCashtagLogos.js`.
  */
 
 import { coingeckoCoinIdForTicker } from './marketCashtagCrypto.ts'
+import { marketLogoR2PublicUrlForInstrument, readMarketLogoR2Config } from './marketLogoR2.ts'
 
 /** CoinGecko `/coins/markets` `image` for seeded cashtag crypto (refresh rarely). */
 export const COINGECKO_LOGO_BY_COIN_ID: Record<string, string> = {
@@ -64,7 +64,39 @@ export function isGuessedFinnhubStockLogoUrl(url: string): boolean {
   return /static2\.finnhub\.io\/file\/publicdatany\/finnhubimage\/stock_logo\//i.test(String(url || ''))
 }
 
-/** Crypto only — stocks need Edge logo enrich (Yahoo / Finnhub profile). */
+function readMarketLogoR2PublicBaseUrl(): string {
+  try {
+    return String(readMarketLogoR2Config().publicBaseUrl || '')
+      .trim()
+      .replace(/\/+$/, '')
+  } catch {
+    return ''
+  }
+}
+
+function marketLogoR2UrlForRow(row: {
+  asset_class: string
+  display_symbol?: string
+  symbol?: string
+  coin_id?: string
+}): string {
+  const base = readMarketLogoR2PublicBaseUrl()
+  if (!base) return ''
+  try {
+    const cfg = readMarketLogoR2Config()
+    const assetClass = row.asset_class === 'crypto' ? 'crypto' : 'stock'
+    return marketLogoR2PublicUrlForInstrument(cfg, {
+      asset_class: assetClass,
+      display_symbol: String(row.display_symbol || row.symbol || '').trim(),
+      symbol: String(row.symbol || row.display_symbol || '').trim(),
+      coin_id: row.coin_id ? String(row.coin_id).trim() : null,
+    })
+  } catch {
+    return ''
+  }
+}
+
+/** Seed / registry rows — prefer mirrored R2 logo URLs (no upstream logo fetch). */
 export function withCashtagRowLogo<
   T extends {
     asset_class: string
@@ -80,6 +112,9 @@ export function withCashtagRowLogo<
     existing = ''
   }
   if (existing) return row
+
+  const r2Logo = marketLogoR2UrlForRow(row)
+  if (r2Logo) return { ...row, logo_url: r2Logo }
 
   if (row.asset_class !== 'crypto') return row
 

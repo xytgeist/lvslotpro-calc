@@ -1092,7 +1092,7 @@ export function logoProfileSymbol(symbol: string, assetClass: MarketAssetClass):
   return finnhubSymbolForAsset(symbol, assetClass)
 }
 
-/** Finnhub `/search` has no logos — enrich picker rows via Yahoo (stocks) + CoinGecko batch (crypto). */
+/** Cashtag picker enrich — Finnhub quote/profile first; Yahoo bundled row as fallback. */
 type PickerEnrichFields = {
   logo_url: string
   name: string
@@ -1129,14 +1129,10 @@ export async function finnhubStockLogoUrl(symbol: string): Promise<string> {
   return logo
 }
 
-async function enrichStockPickerFields(symbol: string): Promise<PickerEnrichFields | null> {
-  const cacheKey = pickerEnrichCacheKey('stock', symbol)
-  const cached = pickerEnrichCache.get(cacheKey)
-  if (cached && cached.expires > Date.now()) {
-    const { expires: _e, ...fields } = cached
-    return fields
-  }
-
+async function enrichStockPickerFieldsFromYahoo(
+  symbol: string,
+  logo_url: string,
+): Promise<PickerEnrichFields | null> {
   const row = await yahooStockPickerRow(symbol)
   if (!row) return null
 
@@ -1147,34 +1143,77 @@ async function enrichStockPickerFields(symbol: string): Promise<PickerEnrichFiel
     return n * rate
   }
 
-  let logo_url = row.logo
-  if (!logo_url) logo_url = await finnhubStockLogoUrl(symbol)
+  let resolvedLogo = logo_url
+  if (!resolvedLogo) resolvedLogo = row.logo
+  if (!resolvedLogo) resolvedLogo = await finnhubStockLogoUrl(symbol)
 
-  let market_cap = toUsd(row.market_cap)
-  if (market_cap == null) {
-    try {
-      const profile = await finnhubProfile(logoProfileSymbol(symbol, 'stock'), 'stock')
-      market_cap = await normalizeMarketCapToUsd(profile.marketCapitalization, profile.currency)
-      if (!logo_url) logo_url = String(profile.logo || '')
-    } catch {
-      // keep null
-    }
-  }
-
-  const fields: PickerEnrichFields = {
-    logo_url,
+  return {
+    logo_url: resolvedLogo,
     name: row.name,
     exchange: row.exchange,
-    market_cap,
+    market_cap: toUsd(row.market_cap),
     price: toUsd(row.price),
     change_pct: row.change_pct,
     currency: 'USD',
   }
+}
+
+async function enrichStockPickerFields(
+  symbol: string,
+  opts?: { logo_url?: string },
+): Promise<PickerEnrichFields | null> {
+  const cacheKey = pickerEnrichCacheKey('stock', symbol)
+  const cached = pickerEnrichCache.get(cacheKey)
+  if (cached && cached.expires > Date.now()) {
+    const { expires: _e, ...fields } = cached
+    return fields
+  }
+
+  let logo_url = String(opts?.logo_url || '').trim()
+  let fields: PickerEnrichFields | null = null
+
+  try {
+    const [profile, quote] = await Promise.all([
+      finnhubProfile(symbol, 'stock'),
+      finnhubQuote(symbol, 'stock'),
+    ])
+    const currency = embedQuoteCurrency(profile.exchange, profile.currency)
+    const [quoteUsd, marketCapUsd] = await Promise.all([
+      normalizeMarketQuoteToUsd(quote, currency),
+      normalizeMarketCapToUsd(profile.marketCapitalization, currency),
+    ])
+    const price = quoteUsd.price != null && Number.isFinite(quoteUsd.price) && quoteUsd.price > 0
+      ? quoteUsd.price
+      : null
+
+    if (price != null) {
+      if (!logo_url) logo_url = String(profile.logo || '').trim()
+      if (!logo_url) logo_url = await finnhubStockLogoUrl(symbol)
+      fields = {
+        logo_url,
+        name: profile.name,
+        exchange: profile.exchange,
+        market_cap: marketCapUsd,
+        price,
+        change_pct: quote.change_pct,
+        currency: 'USD',
+      }
+    }
+  } catch {
+    fields = null
+  }
+
+  if (!fields?.price) {
+    fields = await enrichStockPickerFieldsFromYahoo(symbol, logo_url)
+  }
+
+  if (!fields) return null
+
   pickerEnrichCache.set(cacheKey, { ...fields, expires: Date.now() + PICKER_ENRICH_CACHE_TTL_MS })
   return fields
 }
 
-/** Logo-only enrich for cashtag typeahead (Yahoo + Finnhub profile; CoinGecko map for crypto). */
+/** Logo-only enrich for cashtag typeahead — registry/R2 first; Finnhub logo, then Yahoo. */
 export async function enrichSearchResultsLogosOnly<
   T extends {
     symbol: string
@@ -1196,9 +1235,11 @@ export async function enrichSearchResultsLogosOnly<
         return { ...row, logo_url: logo_url || '' }
       }
 
-      const yahoo = await yahooStockPickerRow(row.symbol).catch(() => null)
-      logo_url = String(yahoo?.logo || '').trim()
-      if (!logo_url) logo_url = await finnhubStockLogoUrl(row.symbol)
+      logo_url = await finnhubStockLogoUrl(row.symbol)
+      if (!logo_url) {
+        const yahoo = await yahooStockPickerRow(row.symbol).catch(() => null)
+        logo_url = String(yahoo?.logo || '').trim()
+      }
       return { ...row, logo_url: logo_url || '' }
     }),
   )
@@ -1265,7 +1306,8 @@ export async function enrichSearchResultsForPicker<
         stockFieldsByKey.set(key, fields)
         return
       }
-      stockFieldsByKey.set(key, await enrichStockPickerFields(row.symbol))
+      const registryLogo = String(row.logo_url || '').trim()
+      stockFieldsByKey.set(key, await enrichStockPickerFields(row.symbol, { logo_url: registryLogo }))
     }),
   )
 

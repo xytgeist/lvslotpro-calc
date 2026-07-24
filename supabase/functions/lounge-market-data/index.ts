@@ -42,6 +42,7 @@ import {
   shouldDebugCoingecko,
 } from '../_shared/coingeckoUsageLog.ts'
 import {
+  hydratePickerRowsWithRegistryLogos,
   marketInstrumentCacheKey,
   readMarketInstrument,
   readMarketInstrumentCoinId,
@@ -337,7 +338,8 @@ Deno.serve(async (req) => {
     if (q.length < 1) return respond(400, { error: 'query is required.' })
     try {
       const results = await marketSearch(q)
-      const enriched = await enrichSearchResultsForPicker(results.slice(0, 8))
+      const hydrated = await hydratePickerRowsWithRegistryLogos(admin, results.slice(0, 8))
+      const enriched = await enrichSearchResultsForPicker(hydrated)
       return respond(200, { ok: true, results: sortMarketSearchResults(q, enriched) })
     } catch (e) {
       return respond(502, { error: e instanceof Error ? e.message : 'Search failed.' })
@@ -381,7 +383,8 @@ Deno.serve(async (req) => {
       .filter(Boolean)
     if (!rows.length) return respond(400, { error: 'symbols is required.' })
     try {
-      const results = await enrichSearchResultsLogosOnly(rows)
+      const hydrated = await hydratePickerRowsWithRegistryLogos(admin, rows)
+      const results = await enrichSearchResultsLogosOnly(hydrated)
       return respond(200, { ok: true, results })
     } catch (e) {
       return respond(502, { error: e instanceof Error ? e.message : 'Logo enrich failed.' })
@@ -413,7 +416,8 @@ Deno.serve(async (req) => {
       .filter(Boolean)
     if (!rows.length) return respond(400, { error: 'symbols is required.' })
     try {
-      const results = await enrichSearchResultsForPicker(rows)
+      const hydrated = await hydratePickerRowsWithRegistryLogos(admin, rows)
+      const results = await enrichSearchResultsForPicker(hydrated)
       return respond(200, { ok: true, results })
     } catch (e) {
       return respond(502, { error: e instanceof Error ? e.message : 'Symbol enrich failed.' })

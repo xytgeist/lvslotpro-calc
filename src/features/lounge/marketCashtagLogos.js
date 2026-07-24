@@ -1,12 +1,13 @@
 /**
- * Static cashtag logos — CoinGecko `image` URLs for crypto (bulk / seed).
- * US stock logos are resolved per symbol via Edge enrich (Yahoo + Finnhub profile).
- * Keep in sync with `supabase/functions/_shared/marketCashtagLogos.ts`.
+ * Static cashtag logos for bundled seed rows — R2 when configured, CoinGecko fallback for crypto.
+ * Keep sanitize + key paths in sync with `supabase/functions/_shared/marketLogoR2.ts`.
  */
 
 import { coingeckoCoinIdForTicker } from '../../utils/loungeMarketCaptionParse.js'
 
-/** CoinGecko `/coins/markets` `image` for seeded cashtag crypto (refresh rarely). */
+export const MARKET_LOGO_R2_PREFIX = 'market-logos'
+
+/** CoinGecko `/coins/markets` `image` for seeded cashtag crypto when R2 base URL is unset. */
 export const COINGECKO_LOGO_BY_COIN_ID = {
   bitcoin: 'https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400',
   ethereum: 'https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628',
@@ -54,6 +55,38 @@ export const COINGECKO_LOGO_BY_COIN_ID = {
   'matic-network': 'https://coin-images.coingecko.com/coins/images/4713/large/polygon.png?1698233745',
 }
 
+function marketLogoR2PublicBaseUrl() {
+  return String(import.meta.env.VITE_LOUNGE_CF_MEDIA_PUBLIC_BASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '')
+}
+
+/** @param {string} raw */
+function sanitizeMarketLogoFilePart(raw) {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 120)
+}
+
+/** @param {{ asset_class?: string, display_symbol?: string, symbol?: string, coin_id?: string }} row */
+export function marketLogoR2UrlForRow(row) {
+  const base = marketLogoR2PublicBaseUrl()
+  if (!base || !row) return ''
+
+  if (row.asset_class === 'crypto') {
+    const coinId = sanitizeMarketLogoFilePart(String(row.coin_id || ''))
+    const fallback = sanitizeMarketLogoFilePart(String(row.display_symbol || row.symbol || ''))
+    const part = coinId || fallback
+    return part ? `${base}/${MARKET_LOGO_R2_PREFIX}/crypto/${part}.png` : ''
+  }
+
+  const ticker = sanitizeMarketLogoFilePart(String(row.display_symbol || row.symbol || ''))
+  return ticker ? `${base}/${MARKET_LOGO_R2_PREFIX}/stocks/${ticker}.png` : ''
+}
+
 export function coingeckoLogoUrlForCoinId(coinId) {
   const id = String(coinId || '').trim()
   return id ? String(COINGECKO_LOGO_BY_COIN_ID[id] || '').trim() : ''
@@ -64,7 +97,7 @@ export function isGuessedFinnhubStockLogoUrl(url) {
   return /static2\.finnhub\.io\/file\/publicdatany\/finnhubimage\/stock_logo\//i.test(String(url || ''))
 }
 
-/** Crypto only — stocks need Edge logo enrich (Yahoo / Finnhub profile). */
+/** Seed / cached rows — prefer mirrored R2 logo URLs (no upstream logo fetch). */
 export function withCashtagRowLogo(row) {
   if (!row) return row
   let existing = String(row.logo_url || row.logo || '').trim()
@@ -72,6 +105,9 @@ export function withCashtagRowLogo(row) {
     existing = ''
   }
   if (existing) return row
+
+  const r2Logo = marketLogoR2UrlForRow(row)
+  if (r2Logo) return { ...row, logo_url: r2Logo }
 
   if (row.asset_class !== 'crypto') return row
 

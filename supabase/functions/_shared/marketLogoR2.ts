@@ -31,6 +31,14 @@ function sanitizeMarketLogoFilePart(raw: string): string {
     .slice(0, 120)
 }
 
+/** Public CDN URL for a mirrored logo (no network — key must match backfill). */
+export function marketLogoR2PublicUrlForInstrument(
+  cfg: LoungeCfR2Config,
+  row: Pick<MarketInstrumentRow, 'asset_class' | 'display_symbol' | 'coin_id' | 'symbol'>,
+): string {
+  return loungeCfR2PublicUrl(cfg, marketLogoR2ObjectKey(row))
+}
+
 export function marketLogoR2ObjectKey(row: Pick<MarketInstrumentRow, 'asset_class' | 'display_symbol' | 'coin_id' | 'symbol'>): string {
   if (row.asset_class === 'crypto') {
     const coinId = sanitizeMarketLogoFilePart(String(row.coin_id || ''))
