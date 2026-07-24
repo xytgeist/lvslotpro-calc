@@ -24,6 +24,9 @@ import {
 
 const LOOKUP_SYNC_TTL_MS = 24 * 60 * 60 * 1000
 const UPSERT_CHUNK = 400
+/** PostgREST batch upsert size for crypto backfill (avoids per-row HTTP). */
+const BATCH_UPSERT_CHUNK = 500
+const CRYPTO_UNIVERSE_MAX_PAGES = 8
 const NEW_STOCK_LOGO_CONCURRENCY = 8
 /** Cap new stock logo fetches per daily sync — rest fill on miss fallback. */
 const NEW_STOCK_LOGO_CAP_PER_SYNC = 50
@@ -137,10 +140,97 @@ async function enrichNewStockLogos(rows: MarketSymbolUniverseRow[]): Promise<Mar
   return out
 }
 
+function instrumentRowToDbPayload(row: MarketInstrumentRow) {
+  return {
+    cache_key: String(row.cache_key || '').trim().toLowerCase(),
+    display_symbol: String(row.display_symbol || '').trim().toUpperCase(),
+    asset_class: row.asset_class,
+    symbol: String(row.symbol || '').trim(),
+    coin_id: row.coin_id ? String(row.coin_id).trim() : null,
+    name: String(row.name || '').trim(),
+    exchange: String(row.exchange || '').trim(),
+    logo_url: String(row.logo_url || '').trim(),
+    market_cap_usd: row.market_cap_usd,
+    listing_currency: String(row.listing_currency || 'USD').trim() || 'USD',
+    metadata_updated_at: row.metadata_updated_at || new Date().toISOString(),
+  }
+}
+
+async function batchUpsertInstrumentRows(
+  admin: SupabaseClient,
+  rows: MarketInstrumentRow[],
+  opts?: { chunkSize?: number; logLabel?: string },
+): Promise<{ upserted: number; chunks: number }> {
+  const chunkSize = Math.max(1, opts?.chunkSize ?? BATCH_UPSERT_CHUNK)
+  let upserted = 0
+  let chunks = 0
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize)
+    const payload = chunk.map(instrumentRowToDbPayload)
+    const { error } = await admin.from('market_instruments').upsert(payload, { onConflict: 'cache_key' })
+    if (error) throw new Error(error.message || 'Batch upsert failed.')
+    upserted += chunk.length
+    chunks += 1
+    if (opts?.logLabel) {
+      console.log(`[${opts.logLabel}] batch upsert ${upserted}/${rows.length} (${chunks} chunks)`)
+    }
+  }
+  return { upserted, chunks }
+}
+
 async function upsertInstrumentRows(admin: SupabaseClient, rows: MarketInstrumentRow[]) {
   for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
     const chunk = rows.slice(i, i + UPSERT_CHUNK)
     await Promise.all(chunk.map((row) => upsertMarketInstrument(admin, row)))
+  }
+}
+
+/**
+ * One-shot top crypto backfill — CoinGecko `/coins/markets` (250/page), batch upsert with logos.
+ * Default 8 pages ≈ 2000 unique symbols (deduped by ticker).
+ */
+export async function syncMarketCryptoLookup(
+  admin: SupabaseClient,
+  opts: { maxPages?: number } = {},
+): Promise<{
+  fetched: number
+  upserted: number
+  chunks: number
+  pages: number
+  crypto_with_logo: number
+}> {
+  const pages = Math.min(
+    CRYPTO_UNIVERSE_MAX_PAGES,
+    Math.max(1, Math.floor(Number(opts.maxPages) || CRYPTO_UNIVERSE_MAX_PAGES)),
+  )
+  const cryptos = await coingeckoCryptoUniverse(pages)
+  const universeRows: MarketSymbolUniverseRow[] = cryptos.map((row) =>
+    withCashtagRowLogo({
+      symbol: row.symbol,
+      display_symbol: row.display_symbol,
+      asset_class: 'crypto',
+      name: row.description,
+      exchange: 'Crypto',
+      coin_id: row.coin_id || undefined,
+      logo_url: String(row.logo_url || '').trim(),
+    }),
+  )
+  const upsertRows = universeRows.map((row) => universeRowToInstrument(row))
+  const withLogo = upsertRows.filter((row) => String(row.logo_url || '').trim()).length
+  const { upserted, chunks } = await batchUpsertInstrumentRows(admin, upsertRows, {
+    chunkSize: BATCH_UPSERT_CHUNK,
+    logLabel: 'syncMarketCryptoLookup',
+  })
+
+  const { count } = await admin.from('market_instruments').select('*', { count: 'exact', head: true })
+  await writeLookupMeta(admin, count || upserted)
+
+  return {
+    fetched: cryptos.length,
+    upserted,
+    chunks,
+    pages,
+    crypto_with_logo: withLogo,
   }
 }
 

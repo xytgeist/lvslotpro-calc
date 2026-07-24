@@ -1,13 +1,15 @@
 /**
- * Service-role / pg_cron: daily bulk sync for cashtag symbol lookup (`market_instruments`).
- * Schedule via migration 20260723280000_market_symbol_lookup_cron.sql.
+ * Service-role manual backfill for cashtag symbol lookup (`market_instruments`).
+ *
+ * POST body (optional):
+ *   { "crypto_only": true, "max_pages": 8 }  — top ~2000 crypto via CoinGecko markets + batch upsert
  *
  * Manual smoke (after deploy):
- *   select public.invoke_lounge_market_symbol_sync();
+ *   select public.invoke_lounge_market_crypto_backfill(8);
  */
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { isKnownServiceRoleBearer } from '../_shared/adminAuth.ts'
-import { syncMarketSymbolLookupIfStale } from '../_shared/marketSymbolLookup.ts'
+import { syncMarketCryptoLookup, syncMarketSymbolLookupIfStale } from '../_shared/marketSymbolLookup.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,9 +41,25 @@ Deno.serve(async (req) => {
     return json(401, { error: 'Unauthorized' })
   }
 
+  let body: Record<string, unknown> = {}
+  try {
+    const parsed = await req.json()
+    if (parsed && typeof parsed === 'object') body = parsed as Record<string, unknown>
+  } catch {
+    /* empty body ok */
+  }
+
+  const cryptoOnly = body.crypto_only !== false
+  const maxPages = Math.min(8, Math.max(1, Math.floor(Number(body.max_pages) || 8)))
+
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
   try {
+    if (cryptoOnly) {
+      const result = await syncMarketCryptoLookup(admin, { maxPages })
+      return json(200, { ok: true, mode: 'crypto_backfill', ...result })
+    }
+
     const synced = await syncMarketSymbolLookupIfStale(admin)
     const { data: meta } = await admin
       .from('market_symbol_lookup_meta')
@@ -51,6 +69,7 @@ Deno.serve(async (req) => {
 
     return json(200, {
       ok: true,
+      mode: 'full_sync_if_stale',
       synced,
       row_count: Number(meta?.row_count) || 0,
       last_sync_at: meta?.last_sync_at || null,

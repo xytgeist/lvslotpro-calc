@@ -1,15 +1,24 @@
-# Lounge market symbol sync (cron)
+# Lounge market symbol sync (manual backfill)
 
-Daily bulk sync for cashtag lookup: Finnhub US stock list + top crypto → `market_instruments` (+ diff logos for new stocks).
+Optional **service-role** backfill for cashtag lookup (`market_instruments`). **No scheduled cron** (disabled **`20260723290000`**).
 
-**Not user-facing.** Clients use bundled seed rows + debounced `resolve_symbol` on `lounge-market-data`.
+## Crypto backfill (~2000 coins)
+
+CoinGecko **`/coins/markets`**: 8 pages × 250 = up to **2000** unique tickers, **`coin_id` + logo_url** included. Batch upsert (**500 rows/chunk**, ~4 PostgREST calls).
+
+**8 CoinGecko API calls** + **~4 DB batch upserts** per run.
 
 ## Secrets
 
 Same as `lounge-market-data`:
 
-- **`FINNHUB_API_KEY`**
+- **`FINNHUB_API_KEY`** (unused for crypto-only mode)
 - **`COINGECKO_API_KEY`** (recommended)
+
+Vault for SQL invoke (reuse lounge odds cron):
+
+- `lounge_odds_poll_project_url`
+- `lounge_odds_poll_service_role_key`
 
 ## Deploy
 
@@ -17,14 +26,40 @@ Same as `lounge-market-data`:
 supabase functions deploy lounge-market-symbol-sync --project-ref <project-ref>
 ```
 
-## Schedule
+Apply migration **`20260723300000_invoke_lounge_market_crypto_backfill.sql`**.
 
-Migration **`20260723280000_market_symbol_lookup_cron.sql`** added daily **09:00 UTC** pg_cron; **`20260723290000`** **disabled** it. Stock universe is already in `market_instruments`; new tickers use **`resolve_symbol`**.
-
-Optional manual one-shot (service role):
+## Manual run
 
 ```sql
-select public.invoke_lounge_market_symbol_sync();
+select public.invoke_lounge_market_crypto_backfill(8);
 ```
 
-Use sparingly — prefer targeted backfills over full sync.
+Check pg_net response (no **546**):
+
+```sql
+select id, status_code, timed_out, left(content, 400) as body, created
+from net._http_response
+order by id desc
+limit 3;
+```
+
+Verify rows:
+
+```sql
+select count(*)::int as crypto_total,
+       count(*) filter (where btrim(logo_url) <> '')::int as crypto_with_logo
+from market_instruments
+where asset_class = 'crypto';
+```
+
+## POST body (curl / service role)
+
+```json
+{ "crypto_only": true, "max_pages": 8 }
+```
+
+Legacy full sync (avoid — may 546):
+
+```json
+{ "crypto_only": false }
+```
