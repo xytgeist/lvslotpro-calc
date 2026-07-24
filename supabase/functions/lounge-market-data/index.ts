@@ -6,12 +6,14 @@ import {
   buildRollingBatchPayload,
   embedQuoteCurrency,
   enrichSearchResultsForPicker,
+  enrichSearchResultsLogosOnly,
   finnhubLatestNews,
   fetchLiveMarketCapUsd,
   finnhubProfile,
   finnhubQuote,
   finnhubSymbolForAsset,
   marketSearch,
+  marketSymbolUniverse,
   normalizeDisplaySymbol,
   normalizeMarketBarsToUsd,
   normalizeMarketCapToUsd,
@@ -27,6 +29,11 @@ import {
   type MarketProfile,
   type MarketWindowKey,
 } from '../_shared/finnhubMarket.ts'
+import {
+  readMarketSymbolLookup,
+  resolveMarketSymbolLookup,
+  syncMarketSymbolLookupIfStale,
+} from '../_shared/marketSymbolLookup.ts'
 import {
   resolveMarketBarsBeforeByResolution,
   resolveMarketSeriesByResolution,
@@ -346,6 +353,89 @@ Deno.serve(async (req) => {
       return respond(200, { ok: true, results: sortMarketSearchResults(q, enriched) })
     } catch (e) {
       return respond(502, { error: e instanceof Error ? e.message : 'Search failed.' })
+    }
+  }
+
+  if (action === 'symbol_universe') {
+    try {
+      await syncMarketSymbolLookupIfStale(admin)
+      const { updated_at, rows } = await readMarketSymbolLookup(admin)
+      if (rows.length) {
+        return respond(200, { ok: true, updated_at, results: rows })
+      }
+      const fallback = await marketSymbolUniverse()
+      return respond(200, { ok: true, updated_at: fallback.updated_at, results: fallback.rows })
+    } catch (e) {
+      return respond(502, { error: e instanceof Error ? e.message : 'Symbol universe failed.' })
+    }
+  }
+
+  if (action === 'resolve_symbol') {
+    const q = String(body?.query || body?.q || '').trim()
+    if (q.length < 1) return respond(400, { error: 'query is required.' })
+    try {
+      const results = await resolveMarketSymbolLookup(admin, q)
+      return respond(200, { ok: true, results })
+    } catch (e) {
+      return respond(502, { error: e instanceof Error ? e.message : 'Symbol resolve failed.' })
+    }
+  }
+
+  if (action === 'enrich_logos') {
+    const raw = Array.isArray(body?.symbols) ? body.symbols : []
+    const rows = raw
+      .slice(0, 8)
+      .map((row) => {
+        const parsed = parseSymbolInput(row)
+        if (!parsed) return null
+        const r = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
+        return {
+          symbol: parsed.symbol,
+          asset_class: parsed.asset_class,
+          display_symbol: String(r.display_symbol || parsed.symbol || '').trim(),
+          logo_url: String(r.logo_url || r.logo || '').trim(),
+          coin_id: String(r.coin_id || '').trim(),
+        }
+      })
+      .filter(Boolean)
+    if (!rows.length) return respond(400, { error: 'symbols is required.' })
+    try {
+      const results = await enrichSearchResultsLogosOnly(rows)
+      return respond(200, { ok: true, results })
+    } catch (e) {
+      return respond(502, { error: e instanceof Error ? e.message : 'Logo enrich failed.' })
+    }
+  }
+
+  if (action === 'enrich_symbols') {
+    const raw = Array.isArray(body?.symbols) ? body.symbols : []
+    const rows = raw
+      .slice(0, 8)
+      .map((row) => {
+        const parsed = parseSymbolInput(row)
+        if (!parsed) return null
+        const r = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
+        const name = String(r.name || r.description || '').trim()
+        const exchange = String(r.exchange || r.type || '').trim()
+        return {
+          symbol: parsed.symbol,
+          asset_class: parsed.asset_class,
+          display_symbol: String(r.display_symbol || parsed.symbol || '').trim(),
+          name,
+          description: name,
+          exchange,
+          type: exchange,
+          logo_url: String(r.logo_url || r.logo || '').trim(),
+          coin_id: String(r.coin_id || '').trim(),
+        }
+      })
+      .filter(Boolean)
+    if (!rows.length) return respond(400, { error: 'symbols is required.' })
+    try {
+      const results = await enrichSearchResultsForPicker(rows)
+      return respond(200, { ok: true, results })
+    } catch (e) {
+      return respond(502, { error: e instanceof Error ? e.message : 'Symbol enrich failed.' })
     }
   }
 

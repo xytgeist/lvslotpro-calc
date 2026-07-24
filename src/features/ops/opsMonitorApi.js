@@ -13,6 +13,15 @@ export async function fetchOpsMonitorSnapshot(supabaseClient) {
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @returns {Promise<{ data: object | null, error: import('@supabase/supabase-js').PostgrestError | null }>}
+ */
+export async function fetchOpsMonitorSubscriberRoster(supabaseClient) {
+  const { data, error } = await supabaseClient.rpc('admin_ops_subscriber_roster')
+  return { data, error }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
  * @returns {Promise<{ data: object | null, error: Error | null }>}
  */
 export async function fetchOpsMonitorExternalHealth(supabaseClient) {

@@ -13,7 +13,9 @@ import {
   coingeckoBatchPickerQuotes,
   coingeckoCryptoCandles,
   coingeckoCryptoProfile,
+  coingeckoCryptoLogo,
   coingeckoMarketCapUsd,
+  coingeckoCryptoUniverse,
   coingeckoMarketSearch,
 } from './coingeckoMarket.ts'
 import {
@@ -24,7 +26,8 @@ import {
   regularSessionDaysBack,
 } from './usEquityMarketSession.ts'
 import { yahooFxRateToUsd, yahooIntervalForWindow, yahooLatestNews, yahooResolveUsEquityCashtag, yahooStockAllTimeCandles, yahooStockCandles, yahooStockPickerRow, yahooStockProfile, yahooStockQuote, yahooStockMonthlyTwoHourCandles, yahooStockQuarterlyDailyCandles, yahooStockWeeklyIntradayCandles } from './yahooMarket.ts'
-import { isCommonCryptoCashtag, coingeckoCoinIdForTicker } from './marketCashtagCrypto.ts'
+import { coingeckoCoinIdForTicker } from './marketCashtagCrypto.ts'
+import { coingeckoLogoUrlForCoinId, isGuessedFinnhubStockLogoUrl, withCashtagRowLogo } from './marketCashtagLogos.ts'
 
 export type MarketProfile = {
   name: string
@@ -1005,6 +1008,81 @@ export async function marketSearch(query: string) {
   return dedupeMarketSearchRoots(sortMarketSearchResults(q, out)).slice(0, 20)
 }
 
+export type MarketSymbolUniverseRow = {
+  symbol: string
+  display_symbol: string
+  asset_class: MarketAssetClass
+  name: string
+  exchange: string
+  coin_id?: string
+  logo_url?: string
+}
+
+let symbolUniverseCache: {
+  rows: MarketSymbolUniverseRow[]
+  updated_at: string
+  expires: number
+} | null = null
+
+const SYMBOL_UNIVERSE_TTL_MS = 24 * 60 * 60 * 1000
+
+export async function finnhubUsStockUniverse(): Promise<MarketSymbolUniverseRow[]> {
+  const data = await finnhubFetch('/stock/symbol', { exchange: 'US' })
+  const list = Array.isArray(data) ? data : []
+  const out: MarketSymbolUniverseRow[] = []
+  const seen = new Set<string>()
+
+  for (const row of list) {
+    const sym = String(row?.symbol || '').trim().toUpperCase()
+    if (!sym || seen.has(sym)) continue
+    const type = String(row?.type || '').trim()
+    if (type && !/common stock|etf|adr|reit/i.test(type)) continue
+    seen.add(sym)
+    const display = String(row?.displaySymbol || sym).trim().toUpperCase() || sym
+    out.push({
+      symbol: sym,
+      display_symbol: display,
+      asset_class: 'stock',
+      name: String(row?.description || display).trim(),
+      exchange: 'US',
+    })
+  }
+
+  return out
+}
+
+/** US equities + top crypto — cached 24h for client-side cashtag search (no per-keystroke API). */
+export async function marketSymbolUniverse(): Promise<{
+  updated_at: string
+  rows: MarketSymbolUniverseRow[]
+}> {
+  if (symbolUniverseCache && symbolUniverseCache.expires > Date.now()) {
+    return { updated_at: symbolUniverseCache.updated_at, rows: symbolUniverseCache.rows }
+  }
+
+  const [stocks, cryptos] = await Promise.all([
+    finnhubUsStockUniverse().catch(() => [] as MarketSymbolUniverseRow[]),
+    coingeckoCryptoUniverse().catch(() => []),
+  ])
+
+  const rows: MarketSymbolUniverseRow[] = [
+    ...stocks,
+    ...cryptos.map((row) => ({
+      symbol: row.symbol,
+      display_symbol: row.display_symbol,
+      asset_class: 'crypto' as const,
+      name: row.description,
+      exchange: 'Crypto',
+      coin_id: row.coin_id || undefined,
+      logo_url: row.logo_url || undefined,
+    })),
+  ].map((row) => withCashtagRowLogo(row))
+
+  const updated_at = new Date().toISOString()
+  symbolUniverseCache = { rows, updated_at, expires: Date.now() + SYMBOL_UNIVERSE_TTL_MS }
+  return { updated_at, rows }
+}
+
 /** Prefer US root ticker for logo lookup (AAPL.TO → AAPL). */
 export function logoProfileSymbol(symbol: string, assetClass: MarketAssetClass): string {
   if (assetClass === 'crypto') return finnhubSymbolForAsset(symbol, assetClass)
@@ -1094,6 +1172,36 @@ async function enrichStockPickerFields(symbol: string): Promise<PickerEnrichFiel
   }
   pickerEnrichCache.set(cacheKey, { ...fields, expires: Date.now() + PICKER_ENRICH_CACHE_TTL_MS })
   return fields
+}
+
+/** Logo-only enrich for cashtag typeahead (Yahoo + Finnhub profile; CoinGecko map for crypto). */
+export async function enrichSearchResultsLogosOnly<
+  T extends {
+    symbol: string
+    asset_class: MarketAssetClass
+    logo_url?: string
+    coin_id?: string
+    display_symbol?: string
+  },
+>(results: T[]): Promise<Array<T & { logo_url: string }>> {
+  return Promise.all(
+    results.map(async (row) => {
+      let logo_url = String(row.logo_url || '').trim()
+      if (isGuessedFinnhubStockLogoUrl(logo_url)) logo_url = ''
+      if (logo_url) return { ...row, logo_url }
+
+      if (row.asset_class === 'crypto') {
+        logo_url = coingeckoLogoUrlForCoinId(String(row.coin_id || ''))
+        if (!logo_url) logo_url = await coingeckoCryptoLogo(row.symbol)
+        return { ...row, logo_url: logo_url || '' }
+      }
+
+      const yahoo = await yahooStockPickerRow(row.symbol).catch(() => null)
+      logo_url = String(yahoo?.logo || '').trim()
+      if (!logo_url) logo_url = await resolveStockLogoUrl(row.symbol)
+      return { ...row, logo_url: logo_url || '' }
+    }),
+  )
 }
 
 export async function enrichSearchResultsForPicker<

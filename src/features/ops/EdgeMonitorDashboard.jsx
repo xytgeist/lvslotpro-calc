@@ -28,7 +28,9 @@ import { useEdgeMonitorSnapshot } from './useEdgeMonitorSnapshot.js'
 import { useEdgeMonitorExternalHealth } from './useEdgeMonitorExternalHealth.js'
 import { useLoungeBotOps } from './useLoungeBotOps.js'
 import EdgeMonitorBotOpsPanel from './EdgeMonitorBotOpsPanel.jsx'
+import EdgeMonitorSubscriberRosterPanel from './EdgeMonitorSubscriberRosterPanel.jsx'
 import { useEdgeMonitorLivePulse } from './useEdgeMonitorLivePulse.js'
+import { useEdgeMonitorSubscriberRoster } from './useEdgeMonitorSubscriberRoster.js'
 import { EDGE_MONITOR_PATH } from './opsMonitorNavigation.js'
 
 function HeroKpiCard({ kpi, compact = false }) {
@@ -318,6 +320,16 @@ export default function EdgeMonitorDashboard({
   const { botOps, loading: botOpsLoading, error: botOpsError, reload: reloadBotOps } =
     useLoungeBotOps(supabaseClient)
   const { live, error: liveError } = useEdgeMonitorLivePulse(supabaseClient, { enabled: Boolean(snapshot) })
+  const {
+    roster,
+    loading: rosterLoading,
+    error: rosterError,
+    refreshing: rosterRefreshing,
+    load: loadRoster,
+  } = useEdgeMonitorSubscriberRoster(supabaseClient, {
+    enabled: Boolean(snapshot),
+    autoRefreshMs: autoRefresh ? 90_000 : 0,
+  })
 
   const generatedAt = snapshot?.generated_at
     ? new Date(snapshot.generated_at).toLocaleString(undefined, {
@@ -705,11 +717,14 @@ export default function EdgeMonitorDashboard({
             ) : null}
             <button
               type="button"
-              disabled={loading || refreshing}
-              onClick={() => void load(true)}
+              disabled={loading || refreshing || rosterRefreshing}
+              onClick={() => {
+                void load(true)
+                void loadRoster(true)
+              }}
               className="min-h-9 rounded-xl bg-gradient-to-r from-cyan-600 to-violet-600 px-4 text-white text-xs font-bold touch-manipulation hover:from-cyan-500 hover:to-violet-500 disabled:opacity-50 shadow-lg shadow-cyan-900/30"
             >
-              {refreshing ? 'Refreshing…' : 'Refresh'}
+              {refreshing || rosterRefreshing ? 'Refreshing…' : 'Refresh'}
             </button>
             <button
               type="button"
@@ -755,6 +770,14 @@ export default function EdgeMonitorDashboard({
               <HeroKpiCard key={kpi.id} kpi={kpi} compact={!isDesktop} />
             ))}
           </div>
+
+          <EdgeMonitorSubscriberRosterPanel
+            roster={roster}
+            loading={rosterLoading}
+            error={rosterError}
+            refreshing={rosterRefreshing}
+            onReload={() => void loadRoster(true)}
+          />
 
           {isDesktop ? (
             <div className="edge-monitor-desktop-charts mb-6 grid grid-cols-1 xl:grid-cols-12 gap-4">

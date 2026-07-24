@@ -412,7 +412,8 @@ In-app ops dashboard for **`profiles.role = admin`**. Roadmap: **`docs/edge-moni
 
 - [x] **v1 snapshot:** migrations **`20260703100000`**, **`20260703110000`** — RPC **`admin_ops_monitor_snapshot()`** + 7d charts; **`EdgeMonitorScreen`** / **`/monitor`** desktop page.
 - [x] **Phases 2–5 (code):** migration **`20260703120000`** (30/90d trends, top searches, freemium funnel, starter pool, **`admin_ops_monitor_live_pulse()`**); Edge fn **`admin-ops-external-health`**; alerts + runbooks + live pulse poll in **`EdgeMonitorDashboard.jsx`**.
-- [ ] **Ryan smoke (test):** apply SQL **`20260703120000`**, deploy **`admin-ops-external-health`**, admin opens Monitor → extended sections + live pulse + external cards; non-admin denied.
+- [x] **Subscriber roster (code):** migration **`20260723220000`** — RPC **`admin_ops_subscriber_roster()`**; **`EdgeMonitorSubscriberRosterPanel`** (platform + fan rosters, creators, cancels, new-user buckets, CSV). Applied on test 2026-07-23.
+- [ ] **Ryan smoke (test):** apply SQL **`20260703120000`** + **`20260723220000`**, deploy **`admin-ops-external-health`**, admin opens Monitor → subscriber roster panel + extended sections + live pulse + external cards; non-admin denied.
 - [ ] **Prod promote:** after test sign-off, apply migrations + deploy Edge fn on **`jtjgtucumuoswnbauxry`** per **`docs/production-rollout-checklist.md`**.
 
 ---
@@ -875,6 +876,7 @@ Creators need to know when someone subscribes. **Shipped v1 (2026-07-21):** **`c
 
 ## Update log
 
+- 2026-07-23: **Edge Monitor subscriber roster Stripe links:** migration **`20260723230000`** (fan/cancel stripe ids + Connect account on roster rows); Monitor panel **Customer / Sub / Connect ↗** dashboard links. Applied test + prod. Pairs with frontend deploy.
 - 2026-07-23: **Lounge cashtag disambiguation (code):** Edge **`resolve_cashtags`** + smarter auto-attach scoring (deprioritize micro-cap crypto when a large-cap stock shares the tag); composer + post-edit **`LoungeComposerCashtagDisambiguation`** blocks Post/Save until ambiguous **`$`** tags are confirmed. **`lounge-market-data`** redeployed on **test** + **prod** with client **`70d0c90d`**. **2026-07-23 follow-up:** **`resolve_cashtags`** no longer skips **`COMMON_CRYPTO`** / Yahoo-only tags — **`$LINK`**-style stock+crypto collisions surface picker; redeploy Edge after **`1cf0c1c8`** client.
 - 2026-07-23: **Creator fan subs §4 SQL on prod + test:** **`20260723200000_creator_fan_private_subs.sql`** applied on **`jtjgtucumuoswnbauxry`** and **`kcosfvmreeiosdjdzycb`**; **`schema_migrations`** **`20260723200000`** recorded. Pairs with frontend **`main`** **`a4284186`**.
 - 2026-07-23: **Legal entity + branding:** **`LEGAL_ENTITY_NAME`** → **Digiverse Ventures, LLC**; product copy **EDGE / EDGETILT** (no LVSlotPro in Terms/Privacy/Guidelines); **`LEGAL_POLICY_VERSION` `2026-07-23`** triggers re-acceptance modal for signed-in users.

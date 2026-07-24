@@ -283,8 +283,10 @@ import {
   useLoungeKeyboardOverlapPx,
 } from './useLoungeKeyboardOverlapPx.js'
 import LoungeMarketSymbolPickerSheet from './LoungeMarketSymbolPickerSheet.jsx'
-import LoungeComposerCashtagDisambiguation from './LoungeComposerCashtagDisambiguation.jsx'
-import { useLoungeCashtagDisambiguation } from './useLoungeCashtagDisambiguation.js'
+import { useCashtagState } from './loungeCashtagAutocomplete.js'
+import LoungeCashtagDropdown from './LoungeCashtagDropdown.jsx'
+import { mergeComposerMarketSymbolForCashtag } from './loungeMarketSymbolUtils.js'
+import { prefetchLoungeMarketSymbolUniverse } from './loungeMarketSymbolUniverse.js'
 import EdgeLogoWithEasterEgg from '../../components/EdgeLogoWithEasterEgg.jsx'
 import PwaInstallTitleBarRow from '../../components/PwaInstallBanner.jsx'
 import TitleBarStatusLine from '../../components/TitleBarStatusLine.jsx'
@@ -1102,11 +1104,6 @@ export default function SocialFeed({
   const [loungeDetailDraftCaption, setLoungeDetailDraftCaption] = useState('')
   const [loungeDetailEditBusy, setLoungeDetailEditBusy] = useState(false)
   const [loungeDetailEditErr, setLoungeDetailEditErr] = useState('')
-  const composerCashtagDisambig = useLoungeCashtagDisambiguation(supabaseClient, postText)
-  const detailEditCashtagDisambig = useLoungeCashtagDisambiguation(
-    supabaseClient,
-    loungeDetailEditing ? loungeDetailDraftCaption : '',
-  )
   /** Remote URLs for the post being edited (remove-only in UI until upload-on-edit exists). */
   const [loungeDetailEditImageUrls, setLoungeDetailEditImageUrls] = useState([])
   const [loungeDetailEditImageItems, setLoungeDetailEditImageItems] = useState([])
@@ -1157,6 +1154,7 @@ export default function SocialFeed({
   const mentionDetailCommentAnchorRef = useRef(null)
   const mentionQuoteRepostAnchorRef = useRef(null)
   const loungeDetailEditFieldRef = useRef(null)
+  const loungeDetailEditCashtagAnchorRef = useRef(null)
   const loungeDetailEditImageInputRef = useRef(null)
   const loungeDetailEditVideoInputRef = useRef(null)
   const loungeFeedScrollRef = useRef(null)
@@ -1194,6 +1192,11 @@ export default function SocialFeed({
 
   /** No composer, server-only counts, gated taps until session is known and user is signed in. */
   const loungeReadOnly = !composerAuthResolved || !composerUserId
+
+  useEffect(() => {
+    if (loungeReadOnly || !supabaseClient) return
+    prefetchLoungeMarketSymbolUniverse(supabaseClient)
+  }, [loungeReadOnly, supabaseClient])
 
   const refreshViewerFanEntitlements = useCallback(async () => {
     if (!composerUserId || !supabaseClient) {
@@ -1421,7 +1424,23 @@ export default function SocialFeed({
     ? `${Math.round(loungeDetailCommentKbFooterLiftPx)}px`
     : loungeComposerFooterPaddingBottom(0, loungeDetailCommentIosSafeBottomPx)
 
-  // ── @mention autocomplete - one instance per composer ──────────────────────
+  // ── @mention / $cashtag autocomplete - one instance per composer ───────────
+  const appendComposerMarketSymbol = useCallback((row) => {
+    setComposerMarketSymbols((prev) => {
+      const tag = String(row?.display_symbol || row?.symbol || '').trim().toUpperCase()
+      if (!tag || !row?.symbol) return prev
+      return mergeComposerMarketSymbolForCashtag(prev, tag, row, LOUNGE_MARKET_EMBED_MAX)
+    })
+  }, [])
+
+  const appendDetailEditMarketSymbol = useCallback((row) => {
+    setLoungeDetailEditMarketSymbols((prev) => {
+      const tag = String(row?.display_symbol || row?.symbol || '').trim().toUpperCase()
+      if (!tag || !row?.symbol) return prev
+      return mergeComposerMarketSymbolForCashtag(prev, tag, row, LOUNGE_MARKET_EMBED_MAX)
+    })
+  }, [])
+
   const mentionComposer = useMentionState(postText, supabaseClient, !loungeReadOnly)
   const mentionDetailComment = useMentionState(loungeDetailCommentDraft, supabaseClient, !loungeReadOnly)
   const mentionQuoteRepost = useMentionState(quoteRepostDraft, supabaseClient, !loungeReadOnly)
@@ -1429,6 +1448,14 @@ export default function SocialFeed({
     threadComposeCaptions[0] ?? '',
     supabaseClient,
     threadComposeOpen && !loungeReadOnly,
+  )
+
+  const cashtagComposer = useCashtagState(postText, supabaseClient, !loungeReadOnly, appendComposerMarketSymbol)
+  const cashtagDetailEdit = useCashtagState(
+    loungeDetailDraftCaption,
+    supabaseClient,
+    Boolean(loungeDetailEditing && !loungeReadOnly),
+    appendDetailEditMarketSymbol,
   )
 
   const chatDockIsStaff = Boolean(isStaff || loungeViewerIsStaff)
@@ -13935,23 +13962,42 @@ export default function SocialFeed({
                       placeholder="Are ya winning, son?"
                       ariaLabel="Lounge post caption"
                       onKeyDown={(e) => {
+                        if (cashtagComposer.onCashtagKeyDown(e, setPostText, composerFieldRef.current)) return
                         mentionComposer.onMentionKeyDown(e, setPostText, composerFieldRef.current)
                       }}
                       onKeyUp={(e) => {
+                        cashtagComposer.onCursorMove(e)
                         mentionComposer.onCursorMove(e)
                       }}
                       onMouseUp={(e) => {
+                        cashtagComposer.onCursorMove(e)
                         mentionComposer.onCursorMove(e)
                       }}
                       onInput={(e) => {
+                        cashtagComposer.onCursorMove(e)
                         mentionComposer.onCursorMove(e)
                       }}
                       onBlur={() =>
                         window.setTimeout(() => {
+                          cashtagComposer.clearCashtag()
                           mentionComposer.clearMention()
                         }, 150)
                       }
                     />
+                    {cashtagComposer.isOpen ? (
+                      <LoungeCashtagDropdown
+                        open
+                        query={cashtagComposer.cashtag?.query ?? ''}
+                        suggestions={cashtagComposer.suggestions}
+                        activeIndex={cashtagComposer.activeIndex}
+                        loading={cashtagComposer.loading}
+                        onSelect={(row) =>
+                          cashtagComposer.onCashtagSelect(row, setPostText, composerFieldRef.current)
+                        }
+                        anchorRef={mentionComposerAnchorRef}
+                        caretFieldRef={composerFieldRef}
+                      />
+                    ) : null}
                     <LoungeMentionDropdown
                       suggestions={mentionComposer.suggestions}
                       activeIndex={mentionComposer.activeIndex}
@@ -14074,16 +14120,6 @@ export default function SocialFeed({
                 })()}
               </button>
             )}
-            {composerExpanded ? (
-              <LoungeComposerCashtagDisambiguation
-                ambiguousTags={composerCashtagDisambig.ambiguousTags}
-                byTag={composerCashtagDisambig.byTag}
-                loading={composerCashtagDisambig.loading}
-                symbols={composerMarketSymbols}
-                onChangeSymbols={setComposerMarketSymbols}
-                className="mt-2"
-              />
-            ) : null}
           </div>
         </div>
         {composerExpanded ? (
@@ -14838,7 +14874,7 @@ export default function SocialFeed({
                       />
                     </svg>
                   </button>
-                  <div className="pr-8">
+                  <div ref={loungeDetailEditCashtagAnchorRef} className="pr-8">
                     <LoungeRichComposerField
                       ref={loungeDetailEditFieldRef}
                       variant="detailEdit"
@@ -14848,18 +14884,41 @@ export default function SocialFeed({
                       placeholder="Are ya winning, son?"
                       ariaLabel="Edit caption"
                       disabled={loungeDetailEditBusy}
+                      onKeyDown={(e) => {
+                        if (
+                          cashtagDetailEdit.onCashtagKeyDown(
+                            e,
+                            setLoungeDetailDraftCaption,
+                            loungeDetailEditFieldRef.current,
+                          )
+                        ) {
+                          return
+                        }
+                      }}
+                      onKeyUp={cashtagDetailEdit.onCursorMove}
+                      onMouseUp={cashtagDetailEdit.onCursorMove}
+                      onInput={cashtagDetailEdit.onCursorMove}
+                      onBlur={() => window.setTimeout(() => cashtagDetailEdit.clearCashtag(), 150)}
+                    />
+                    <LoungeCashtagDropdown
+                      open={cashtagDetailEdit.isOpen}
+                      query={cashtagDetailEdit.cashtag?.query ?? ''}
+                      suggestions={cashtagDetailEdit.suggestions}
+                      activeIndex={cashtagDetailEdit.activeIndex}
+                      loading={cashtagDetailEdit.loading}
+                      onSelect={(row) =>
+                        cashtagDetailEdit.onCashtagSelect(
+                          row,
+                          setLoungeDetailDraftCaption,
+                          loungeDetailEditFieldRef.current,
+                        )
+                      }
+                      anchorRef={loungeDetailEditCashtagAnchorRef}
+                      caretFieldRef={loungeDetailEditFieldRef}
                     />
                     <LoungeComposerMarketSymbolPills
                       symbols={loungeDetailEditMarketSymbols}
                       onChange={setLoungeDetailEditMarketSymbols}
-                      className="mt-1.5"
-                    />
-                    <LoungeComposerCashtagDisambiguation
-                      ambiguousTags={detailEditCashtagDisambig.ambiguousTags}
-                      byTag={detailEditCashtagDisambig.byTag}
-                      loading={detailEditCashtagDisambig.loading}
-                      symbols={loungeDetailEditMarketSymbols}
-                      onChangeSymbols={setLoungeDetailEditMarketSymbols}
                       className="mt-1.5"
                     />
                     {loungeDetailEditErr ? (

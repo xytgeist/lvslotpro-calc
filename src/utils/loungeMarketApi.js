@@ -77,6 +77,60 @@ export async function loungeMarketSearch(supabase, query) {
 }
 
 /**
+ * Daily-cached US stocks + top crypto for client-side cashtag typeahead.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ */
+export async function loungeMarketSymbolUniverse(supabase) {
+  const data = await loungeMarketInvoke(supabase, { action: 'symbol_universe' })
+  if (!data || data.error) {
+    return { error: String(data?.error || 'Could not load market tickers.'), rows: [] }
+  }
+  return {
+    updated_at: data.updated_at,
+    rows: Array.isArray(data.results) ? data.results : [],
+  }
+}
+
+/**
+ * Quote/logo enrich for known symbols (skips Finnhub/CoinGecko text search).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {Array<{ symbol: string, asset_class: string, display_symbol?: string, name?: string, exchange?: string, logo_url?: string, coin_id?: string }>} symbols
+ */
+export async function loungeMarketEnrichSymbols(supabase, symbols) {
+  const list = Array.isArray(symbols) ? symbols.slice(0, 8) : []
+  if (!list.length) return []
+  const data = await loungeMarketInvoke(supabase, { action: 'enrich_symbols', symbols: list })
+  if (!data || data.error) return []
+  return Array.isArray(data.results) ? data.results : []
+}
+
+/**
+ * Logo-only enrich for cashtag dropdown (no quote/mcap API).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {Array<{ symbol: string, asset_class: string, display_symbol?: string, logo_url?: string, coin_id?: string }>} symbols
+ */
+export async function loungeMarketEnrichLogos(supabase, symbols) {
+  const list = Array.isArray(symbols) ? symbols.slice(0, 8) : []
+  if (!list.length) return []
+  const data = await loungeMarketInvoke(supabase, { action: 'enrich_logos', symbols: list })
+  if (!data || data.error) return []
+  return Array.isArray(data.results) ? data.results : []
+}
+
+/**
+ * Miss fallback — resolve unknown ticker via API, upsert lookup table, return rows.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} query
+ */
+export async function loungeMarketResolveSymbol(supabase, query) {
+  const q = String(query || '').trim()
+  if (!q) return []
+  const data = await loungeMarketInvoke(supabase, { action: 'resolve_symbol', query: q })
+  if (!data || data.error) return []
+  return Array.isArray(data.results) ? data.results : []
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string[]} tags Cashtag tickers without `$`
  */

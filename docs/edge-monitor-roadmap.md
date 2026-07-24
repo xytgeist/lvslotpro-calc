@@ -67,6 +67,21 @@ Deploy: **`supabase/functions/admin-ops-external-health/README.md`**
 - [x] **`admin_ops_monitor_live_pulse()`** RPC polled every ~15s (activity rate, posts/chat 1m counters)
 - [ ] Optional “live users” approximation (presence table ... TBD)
 
+## Phase 6 — subscriber roster (shipped)
+
+**Migration:** **`20260723220000_admin_ops_subscriber_roster.sql`**
+
+Admin-only RPC **`admin_ops_subscriber_roster()`** + **`EdgeMonitorSubscriberRosterPanel`** in **`EdgeMonitorDashboard.jsx`**.
+
+- New users: 24h / 7d / 30d counts + last 100 signups (handle, email, role, Stripe link)
+- Platform subs: per-product active counts, full active roster (who + product + status + cancel flag)
+- Creator fan subs: monetization profiles, active fan roster (fan → creator), per-creator subscriber counts
+- Cancellations: pending cancel (platform + fan) + churn rows updated in last 30d
+- Tab filter + CSV export (platform / fan / signups / pending cancel)
+- Stripe Dashboard links: **Customer ↗**, **Sub ↗**, **Connect ↗** (migration **`20260723230000`** adds fan/cancel stripe ids)
+
+**Blast radius:** Admin Monitor only (`/?tab=monitor`, **`/monitor`**). Reads **`auth.users.email`** via security definer; no member-facing change.
+
 ## Related docs
 
 - **`docs/access-tiers.md`** — admin vs moderator
@@ -76,7 +91,7 @@ Deploy: **`supabase/functions/admin-ops-external-health/README.md`**
 
 ## Smoke (test)
 
-1. Apply **`20260703100000`**, **`20260703110000`**, **`20260703120000`** on test Supabase.
+1. Apply **`20260703100000`**, **`20260703110000`**, **`20260703120000`**, **`20260723220000`** on test Supabase.
 2. Deploy Edge fn **`admin-ops-external-health`** on test.
 3. Set your test profile to **`role = admin`**.
 4. Open app → hamburger → **Monitor** (or `/?tab=monitor`).
@@ -84,8 +99,10 @@ Deploy: **`supabase/functions/admin-ops-external-health/README.md`**
 6. **External health** cards show dashboard links; Stripe/CF probes if Edge secrets set.
 7. Non-admin account: tab shows “admin-only” (no RPC call required for gate test).
 8. **Desktop:** open **`/monitor`** ... 30/90d sparklines, alerts banner, auto-refresh toggle.
+9. **Subscriber roster:** panel below hero KPIs ... new-user buckets, platform/fan tabs, creator monetization table, cancels tab, CSV export.
 
 ---
 
 _Update log: 2026-07-03 — v1 scaffold (RPC + EdgeMonitorScreen + AppShell tab)._
 _Update log: 2026-07-03 — Phases 2–5 (extended RPC, external-health Edge fn, alerts/runbooks, live pulse poll)._
+_Update log: 2026-07-23 — Phase 6 subscriber roster (`admin_ops_subscriber_roster` + Monitor panel)._

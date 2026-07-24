@@ -47,6 +47,8 @@ supabase functions deploy lounge-market-data --project-ref jtjgtucumuoswnbauxry
 | action | body | response |
 | --- | --- | --- |
 | `search` | `{ query }` | `{ results[] }` — Finnhub stocks + CoinGecko crypto; **picker enrichment** via Yahoo (price/mcap/exchange) + CoinGecko batch (crypto), 45s Edge cache |
+| `symbol_universe` | `{}` | `{ updated_at, results[] }` — **US stock list** (Finnhub `/stock/symbol`) + **top ~500 crypto** (CoinGecko markets); **24h Edge cache** for client-side `$` cashtag typeahead (no per-keystroke search) |
+| `enrich_symbols` | `{ symbols: [{ symbol, asset_class, display_symbol?, name?, exchange?, logo_url?, coin_id? }] }` (max 8) | `{ results[] }` — **quotes only** for known rows via `enrichSearchResultsForPicker` (no text search); use after local cashtag match |
 | `resolve_cashtags` | `{ tags: string[] }` | `{ by_tag: Record<tag, { ambiguous, suggested, candidates[] }> }` — compose-time cashtag disambiguation (stock vs crypto, close scores); **redeploy after `finnhubMarket.ts` scoring changes** |
 | `preview` | `{ symbol, asset_class }` | `{ preview }` picker info row |
 | `attach` | `{ post_id, caption, symbols[]? }` | `{ embeds[], warnings?[] }` — merges caption `$` cashtags (auto) with picker rows; picker wins per ticker; **skips failed tickers** instead of failing the whole post |

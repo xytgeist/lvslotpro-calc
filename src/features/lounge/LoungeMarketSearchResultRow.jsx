@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   formatMarketCap,
   formatMarketChangePct,
@@ -14,10 +14,14 @@ function marketSearchMetaLine(row) {
 }
 
 function MarketSearchAvatar({ row, size = 'md' }) {
-  const [imgOk, setImgOk] = useState(Boolean(row?.logo_url || row?.logo))
   const dim = size === 'sm' ? 'h-8 w-8 text-[11px]' : 'h-9 w-9 text-xs'
   const logo = row?.logo_url || row?.logo
   const initials = (row?.display_symbol || row?.symbol || '?').slice(0, 2)
+  const [imgOk, setImgOk] = useState(Boolean(logo))
+
+  useEffect(() => {
+    setImgOk(Boolean(logo))
+  }, [logo])
 
   if (logo && imgOk) {
     return (
@@ -42,9 +46,14 @@ function MarketSearchAvatar({ row, size = 'md' }) {
 }
 
 /**
- * Shared cashtag/picker search row - name, ticker · exchange · mcap, price + % change.
+ * Shared cashtag/picker search row - name, ticker · exchange · mcap, optional price + % change.
  */
-export default function LoungeMarketSearchResultRow({ row, variant = 'default', className = '' }) {
+export default function LoungeMarketSearchResultRow({
+  row,
+  variant = 'default',
+  className = '',
+  showQuotes = true,
+}) {
   const compact = variant === 'compact'
   const name = row?.name || row?.description || row?.display_symbol || row?.symbol || ''
   const changePct = Number(row?.change_pct ?? row?.quote?.change_pct)
@@ -69,22 +78,24 @@ export default function LoungeMarketSearchResultRow({ row, variant = 'default', 
           {meta}
         </div>
       </div>
-      <div className="shrink-0 text-right">
-        <div
-          className={`font-semibold tabular-nums text-zinc-100 ${
-            compact ? 'text-[13px]' : 'text-sm'
-          }`}
-        >
-          {formatMarketPrice(price)}
+      {showQuotes ? (
+        <div className="shrink-0 text-right">
+          <div
+            className={`font-semibold tabular-nums text-zinc-100 ${
+              compact ? 'text-[13px]' : 'text-sm'
+            }`}
+          >
+            {formatMarketPrice(price)}
+          </div>
+          <div
+            className={`font-semibold tabular-nums ${compact ? 'text-[11px]' : 'text-xs'} ${
+              up ? 'text-lv-green' : 'text-lv-red'
+            }`}
+          >
+            {formatMarketChangePct(changePct)}
+          </div>
         </div>
-        <div
-          className={`font-semibold tabular-nums ${compact ? 'text-[11px]' : 'text-xs'} ${
-            up ? 'text-lv-green' : 'text-lv-red'
-          }`}
-        >
-          {formatMarketChangePct(changePct)}
-        </div>
-      </div>
+      ) : null}
     </div>
   )
 }

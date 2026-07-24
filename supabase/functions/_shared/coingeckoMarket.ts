@@ -526,3 +526,40 @@ export async function coingeckoMarketSearch(query: string): Promise<CoingeckoSea
     return []
   }
 }
+
+/** Top crypto by market cap for client symbol universe (refreshed daily on Edge). */
+export async function coingeckoCryptoUniverse(maxPages = 2): Promise<CoingeckoSearchRow[]> {
+  const out: CoingeckoSearchRow[] = []
+  const seen = new Set<string>()
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const data = await coingeckoFetch(
+      '/coins/markets',
+      {
+        vs_currency: 'usd',
+        order: 'market_cap_desc',
+        per_page: '250',
+        page: String(page),
+        sparkline: 'false',
+      },
+      'universe_crypto',
+    )
+    const coins = Array.isArray(data) ? data : []
+    for (const coin of coins) {
+      const sym = String(coin?.symbol || '').trim().toUpperCase()
+      if (!sym || seen.has(sym)) continue
+      seen.add(sym)
+      out.push({
+        symbol: finnhubCryptoSymbol(sym),
+        display_symbol: sym,
+        description: String(coin?.name || sym),
+        type: 'Crypto',
+        asset_class: 'crypto',
+        logo_url: String(coin?.image || ''),
+        coin_id: String(coin?.id || ''),
+      })
+    }
+  }
+
+  return out
+}
